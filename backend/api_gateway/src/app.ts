@@ -239,6 +239,18 @@ app.post(
   requireServiceRole(['SERVICE_TECHNICIAN']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
+app.patch(
+  '/i/service/tickets/:id/revise-estimate',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets/:id/revisions',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
 app.post(
   '/i/service/tickets/:id/customer-approve',
   authMiddleware,
@@ -261,6 +273,30 @@ app.post(
   '/i/service/tickets/:id/complete',
   authMiddleware,
   requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets/:id/quotation-pdf',
+  authMiddleware,
+  requireServiceRole(['FINANCE', 'SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/tickets/:id/completion-bill-pdf',
+  authMiddleware,
+  requireServiceRole(['FINANCE', 'SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/send-quotation',
+  authMiddleware,
+  requireServiceRole(['FINANCE', 'SERVICE_HELP_DESK']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/send-completion-bill',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(
@@ -335,6 +371,12 @@ app.get(
   '/i/inventory/spare-parts/barcode-pdf',
   authMiddleware,
   requireRole(UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+
+app.get(
+  ['/i/spareparts/:id/stock', '/i/spare-parts/:id/stock'],
+  authMiddleware,
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 

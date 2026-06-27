@@ -219,11 +219,12 @@ graph TD
 ### Phase 4: Repair & Completion
 
 1.  **Repair In-Progress**: The technician starts the repair, moving the status to `IN_PROGRESS` (recording `repairStartedAt`).
-2.  **Job Completion**: Once the machine is operational, the technician enters `workPerformed`, `resolutionDetails`, customer remarks, and captures the customer's signature. The status updates to `COMPLETED`.
-3.  **Inventory & Stock Sync**:
+2.  **Job Completion**: Once the machine is operational, the technician enters `workPerformed`, `resolutionDetails`, customer remarks (digital signatures are no longer required, falling back to a default signed state). The status updates to `COMPLETED`, and the system automatically generates a monthly sequential Service Completion Bill (e.g. `SCB-YYYYMM-XXXX`) saved to `completion_bill_number`.
+3.  **Document Sharing & Delivery**: Employees can access both the Service Quotation PDF (once approved by finance/recorded) and the Service Completion Bill PDF (once completed) from the ticket list and details view. They can download the documents directly and share them with the customer via Email and WhatsApp (configured dynamically in the sharing modal).
+4.  **Inventory & Stock Sync**:
     - Upon completion, the system transitions reservations from `RESERVED` to `CONSUMED`.
     - It decrements the physical stock levels in the master `SparePart` repository by the quantities used.
-4.  **History Logging**:
+5.  **History Logging**:
     - The system creates a `MachineServiceHistory` record to track the machine's lifetime costs (parts cost + labor cost).
     - If a consumable (e.g., toner or drum) was replaced, a `ConsumableYieldHistory` record is written to track print yields between replacements.
 
@@ -237,6 +238,7 @@ graph TD
 - `serviceContext`: Enum (`RENT`, `LEASE_UNDER_WARRANTY`, `LEASE_EXPIRED`, `FSMA`, `SMA`, `AMC`, `CHARGEABLE`, `WARRANTY`).
 - `status`: Enum (`OPEN`, `FREE_SERVICE`, `ASSIGNED`, `DIAGNOSED`, `WAITING_FINANCE_APPROVAL`, `QUOTED`, `CUSTOMER_APPROVED`, `CUSTOMER_REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`).
 - `contractReferenceId`: Foreign key to `ServiceContract` or `Invoice` (Proforma).
+- `completion_bill_number`: Sequential completed bill identifier (format: `SCB-YYYYMM-XXXX`).
 
 ### Service Ticket Item (`service_ticket_items` table)
 

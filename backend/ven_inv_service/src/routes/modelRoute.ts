@@ -5,6 +5,7 @@ import {
   editModel,
   getallModels,
   syncQuantities,
+  getModelById,
 } from '../controllers/modelController';
 
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -13,6 +14,7 @@ import { roleMiddleware } from '../middlewares/roleMiddleware';
 const modelRoute = Router();
 
 modelRoute.get('/', authMiddleware, getallModels);
+modelRoute.get('/:id', authMiddleware, getModelById);
 modelRoute.post('/', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), addModel);
 modelRoute.put('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), editModel);
 modelRoute.delete('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), deleteModel);

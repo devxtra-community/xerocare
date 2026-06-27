@@ -1292,7 +1292,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                 fontSize: '12px',
               }}
             >
-              <span style={{ color: '#666' }}>Total Lease Value</span>
+              <span style={{ color: '#666' }}>Subtotal (Before VAT)</span>
               <span style={{ fontWeight: '400', color: '#333' }}>{fmt(totals.subTotal)}</span>
             </div>
             <div
@@ -1304,7 +1304,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                 fontSize: '12px',
               }}
             >
-              <span style={{ color: '#666' }}>Tax (0%)</span>
+              <span style={{ color: '#666' }}>VAT Amount</span>
               <span style={{ fontWeight: '400', color: '#333' }}>{fmt(totals.tax)}</span>
             </div>
             {leaseDetails.discountPercent && leaseDetails.discountPercent > 0 ? (
@@ -1336,7 +1336,9 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                 marginTop: '4px',
               }}
             >
-              <span style={{ fontSize: '14px', fontWeight: '900', color: NAVY }}>Total</span>
+              <span style={{ fontSize: '14px', fontWeight: '900', color: NAVY }}>
+                Grand Total (Including VAT)
+              </span>
               <span style={{ fontSize: '14px', fontWeight: '900', color: NAVY }}>
                 QAR {fmt(totals.total)}
               </span>

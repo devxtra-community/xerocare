@@ -29,6 +29,7 @@ export interface StandardQuotationLineItem {
 }
 
 export interface ProductStandardQuotationProps {
+  isInvoice?: boolean;
   /** Subject line – product name */
   productName?: string;
   /** Subject line – model name */
@@ -683,7 +684,12 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
         {/* Right: SUB TOTAL / VAT / TOTAL */}
         <div style={{ width: '240px', alignSelf: 'flex-start' }}>
           {[
-            { label: 'SUB TOTAL', value: totals.subTotal, num: totals.subTotal, bold: false },
+            {
+              label: 'SUBTOTAL (BEFORE VAT)',
+              value: totals.subTotal,
+              num: totals.subTotal,
+              bold: false,
+            },
             {
               label: 'DISCOUNT',
               value: `- ${fmt(totals.discountTotal || 0)}`,
@@ -691,9 +697,13 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
               bold: false,
               color: GOLD,
             },
-            { label: 'VAT TOTAL', value: fmt(totals.vatTotal), num: totals.vatTotal, bold: false },
-            { label: 'TOTAL', value: fmt(totals.total), num: totals.total, bold: true },
-            { label: 'PAYMENT', value: fmt(totals.payment), num: totals.payment, bold: false },
+            { label: 'VAT AMOUNT', value: fmt(totals.vatTotal), num: totals.vatTotal, bold: false },
+            {
+              label: 'GRAND TOTAL (INCLUDING VAT)',
+              value: fmt(totals.total),
+              num: totals.total,
+              bold: true,
+            },
           ].map(({ label, value, num, bold, color }) => (
             <div
               key={label}
@@ -743,39 +753,6 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
           <div style={{ borderTop: 'none', margin: '8px 0' }} />
 
           {/* Grand Total */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span
-                style={{
-                  fontWeight: '500',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
-                }}
-              >
-                BALANCE DUE
-              </span>
-              <span style={{ fontWeight: '500', fontSize: '15px' }}>
-                QAR {fmt(totals.balanceDue)}
-              </span>
-            </div>
-            <div
-              style={{
-                fontSize: '9.5px',
-                color: '#111827',
-                fontStyle: 'italic',
-                textAlign: 'right',
-                marginTop: '3px',
-              }}
-            >
-              {numberToWords(totals.balanceDue)}
-            </div>
-          </div>
 
           {totals.paid && (
             <div

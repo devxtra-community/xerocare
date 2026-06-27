@@ -82,4 +82,18 @@ productRoute.post(
   bulkCreateProducts,
 );
 
+productRoute.post(
+  '/upload-image',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  uploadProductImage.single('image'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const file = req.file as unknown as { location?: string };
+    return res.status(200).json({ success: true, imageUrl: file.location || '' });
+  },
+);
+
 export default productRoute;

@@ -57,6 +57,12 @@ import {
   createServiceQuotation,
   getContractBySerial,
   getCustomerBillingHistory,
+  reviseEstimate,
+  financeExtendValidity,
+  reassignCustomer,
+  recordPayment,
+  getInvoiceLedger,
+  getMachineBillingContext,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -110,7 +116,13 @@ router.post(
 router.post(
   '/direct-sale',
   authMiddleware,
-  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  requireRole(
+    EmployeeRole.ADMIN,
+    EmployeeRole.MANAGER,
+    EmployeeRole.FINANCE,
+    EmployeeRole.EMPLOYEE,
+  ),
+  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_AND_LEASE),
   createDirectSale,
 );
 
@@ -204,6 +216,17 @@ router.post(
   requestValidityExtension,
 );
 
+/**
+ * Re-allocate a customer on an existing quotation.
+ */
+router.post(
+  '/:id/reassign-customer',
+  authMiddleware,
+  requireRole(EmployeeRole.EMPLOYEE, EmployeeRole.MANAGER, EmployeeRole.ADMIN),
+  requireJob(EmployeeJob.SALES, EmployeeJob.RENT_AND_LEASE),
+  reassignCustomer,
+);
+
 // --- 2. Making it Official (Contracts and Machines) ---
 
 /**
@@ -250,6 +273,16 @@ router.put('/:id/approve', authMiddleware, approveQuotation);
  * Generic status update for an invoice or quotation.
  */
 router.put('/:id/status', authMiddleware, updateStatus);
+
+/**
+ * Record a payment transaction against an invoice or contract.
+ */
+router.post('/:id/payments', authMiddleware, recordPayment);
+
+/**
+ * Get the payment ledger and transaction history for an invoice or contract.
+ */
+router.get('/:id/ledger', authMiddleware, getInvoiceLedger);
 
 // --- 3. Lists and Statistics for Staff ---
 
@@ -488,7 +521,11 @@ router.delete(
 router.get('/audit-logs/:id', authMiddleware, getInvoiceAuditLogs);
 
 router.post('/service-quotation', createServiceQuotation);
-router.get('/invoices/contract/serial/:serialNumber', getContractBySerial);
-router.get('/invoices/customer/:customerId/history', getCustomerBillingHistory);
+router.get('/contract/serial/:serialNumber', getContractBySerial);
+router.get('/customer/:customerId/history', getCustomerBillingHistory);
+router.get('/machine/:productId/billing-context', getMachineBillingContext);
+
+router.patch('/:id/revise-estimate', authMiddleware, reviseEstimate);
+router.post('/:id/finance-extend-validity', authMiddleware, financeExtendValidity);
 
 export default router;

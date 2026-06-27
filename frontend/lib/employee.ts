@@ -22,6 +22,7 @@ export interface Employee {
   } | null;
   employee_job?: string | null;
   finance_job?: string | null;
+  id_proof_key?: string | null;
 }
 
 export interface HRStats {
@@ -74,9 +75,20 @@ export const getAllEmployees = async (
   limit: number = 20,
   role?: string,
   search?: string,
+  branchId?: string,
+  sortBy?: string,
+  sortOrder?: 'ASC' | 'DESC',
 ): Promise<{ success: boolean; data: EmployeeResponse }> => {
   const res = await api.get('/e/employee/', {
-    params: { page, limit, role: role === 'All' ? undefined : role, search },
+    params: {
+      page,
+      limit,
+      role: role === 'All' ? undefined : role,
+      search: search || undefined,
+      branchId: branchId === 'All' ? undefined : branchId,
+      sortBy: sortBy || undefined,
+      sortOrder,
+    },
   });
   return res.data;
 };

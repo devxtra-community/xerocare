@@ -1,4 +1,4 @@
-import { getRabbitChannel } from '../config/rabbitmq';
+import { createRabbitChannel } from '../config/rabbitmq';
 import { logger } from '../config/logger';
 import { Source } from '../config/db';
 import { SparePart } from '../entities/sparePartEntity';
@@ -10,7 +10,7 @@ const QUEUE = 'inventory.sparepart.reduce.queue';
 const ROUTING_KEY = 'inventory.sparepart.reduce';
 
 export async function startSparePartReductionConsumer() {
-  const channel = await getRabbitChannel();
+  const channel = await createRabbitChannel();
 
   const DLX = 'dlx.inventory';
   const DLQ = 'dlq.inventory';
@@ -20,13 +20,6 @@ export async function startSparePartReductionConsumer() {
   await channel.bindQueue(DLQ, DLX, '#');
 
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
-
-  // Delete the old queue if it exists to allow changing the arguments
-  try {
-    await channel.deleteQueue(QUEUE);
-  } catch (err) {
-    logger.warn('Failed to delete queue prior to re-asserting', { queue: QUEUE, error: err });
-  }
 
   await channel.assertQueue(QUEUE, {
     durable: true,

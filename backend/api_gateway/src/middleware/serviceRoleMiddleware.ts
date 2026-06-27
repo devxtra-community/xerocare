@@ -13,13 +13,19 @@ export const requireServiceRole = (allowedJobs: string[], allowManagerAdmin = tr
 
     const { role, employeeJob } = req.user;
 
-    // ADMIN and MANAGER always have full access by default
-    if (allowManagerAdmin && (role === 'ADMIN' || role === 'MANAGER')) {
+    // ADMIN and MANAGER always have full access by default. Also allow employee managers.
+    if (
+      allowManagerAdmin &&
+      (role === 'ADMIN' || role === 'MANAGER' || employeeJob === 'MANAGER')
+    ) {
       return next();
     }
 
-    // Check if employee has one of the allowed jobs
-    if (role === 'EMPLOYEE' && employeeJob && allowedJobs.includes(employeeJob)) {
+    // Check if employee has one of the allowed jobs or if user is FINANCE and FINANCE is allowed
+    if (
+      (role === 'EMPLOYEE' && employeeJob && allowedJobs.includes(employeeJob)) ||
+      (role === 'FINANCE' && allowedJobs.includes('FINANCE'))
+    ) {
       return next();
     }
 

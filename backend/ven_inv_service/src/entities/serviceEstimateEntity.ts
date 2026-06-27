@@ -47,6 +47,18 @@ export class ServiceEstimate {
   @Column({ type: 'integer', default: 1 })
   version!: number;
 
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
+  currencyCode?: string;
+
+  @Column({
+    name: 'exchange_rate_snapshot',
+    type: 'decimal',
+    precision: 18,
+    scale: 6,
+    nullable: true,
+  })
+  exchangeRateSnapshot?: number;
+
   @OneToMany(() => ServiceEstimateItem, (item) => item.estimate, { cascade: true })
   items!: ServiceEstimateItem[];
 

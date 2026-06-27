@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import RfqCreateForm from '@/components/ManagerDashboardComponents/RfqComponents/RfqCreateForm';
 
 export default function RfqCreatePage() {
@@ -16,7 +16,11 @@ export default function RfqCreatePage() {
       </div>
 
       <div className="space-y-4 sm:space-y-6">
-        <RfqCreateForm basePath="/manager" />
+        <Suspense
+          fallback={<div className="p-8 text-center text-primary font-medium">Loading form...</div>}
+        >
+          <RfqCreateForm basePath="/manager" />
+        </Suspense>
       </div>
     </div>
   );

@@ -50,6 +50,7 @@ interface ProductMeta {
   inventory?: { description?: string }[];
   image?: string;
   sku?: string;
+  tax_rate?: number;
 }
 
 interface QuotationViewDialogProps {
@@ -177,6 +178,9 @@ export function QuotationViewDialog({
                       if (!typedM.description || prodDesc.length > typedM.description.length) {
                         typedM.description = prodDesc;
                       }
+                    }
+                    if ((bestProd as { tax_rate?: number }).tax_rate !== undefined) {
+                      typedM.tax_rate = Number((bestProd as { tax_rate?: number }).tax_rate);
                     }
                   }
 
@@ -650,7 +654,7 @@ export function QuotationViewDialog({
       qty: qty,
       unitPrice: unitP,
       specialPrice: discountedPrice,
-      vat: 0,
+      vat: ((discountedPrice * Number(item.metadata?.tax_rate || 0)) / 100) * qty,
       amount: subAmt,
       productImage: item.metadata?.imageUrl || item.metadata?.image_url || item.metadata?.image,
       discount: disc,
@@ -666,14 +670,24 @@ export function QuotationViewDialog({
     0,
   );
   // Use quotation.discountAmount if it's greater than our detected sum
-  const finalDiscountTotal = Math.max(totalDiscountFromItems, quotation.discountAmount || 0);
+  const finalDiscountTotal = Math.max(
+    totalDiscountFromItems,
+    Number(quotation.discountAmount || 0),
+  );
 
-  const finalVatTotal = 0;
-  const finalTotalAmount =
-    quotation.totalAmount || templateLineItems.reduce((acc, it) => acc + it.amount, 0);
+  const finalVatTotal = templateLineItems.reduce((acc, it) => acc + (it.vat || 0), 0);
+  const netAmount = totalBeforeDiscount - finalDiscountTotal;
+  const isVatAlreadyIncluded =
+    quotation.totalAmount &&
+    Math.abs(Number(quotation.totalAmount) - (netAmount + finalVatTotal)) < 0.05;
+  const finalTotalAmount = isVatAlreadyIncluded
+    ? Number(quotation.totalAmount)
+    : Number(quotation.totalAmount || netAmount) + finalVatTotal;
 
   const templateTotals = {
-    subTotal: totalBeforeDiscount,
+    subTotal: isVatAlreadyIncluded
+      ? Number(quotation.totalAmount) - finalVatTotal + finalDiscountTotal
+      : totalBeforeDiscount,
     discountTotal: finalDiscountTotal,
     vatTotal: finalVatTotal,
     total: finalTotalAmount,
@@ -819,7 +833,29 @@ export function QuotationViewDialog({
       (quotation.monthlyRent || 0) * (1 - (quotation.discountPercent || 0) / 100),
   };
 
+  const rentTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  const rentSubTotal = Number(quotation.monthlyRent || 0);
+  const rentTaxAmount = (rentSubTotal * rentTaxRate) / 100;
+  const rentTotalAmount = rentSubTotal + rentTaxAmount;
+
   const isFsmLease = quotation.leaseType === 'FSM';
+
+  const leaseTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  const getLeaseSubTotal = () => {
+    return Number(
+      quotation.totalLeaseAmount ||
+        (isFsmLease
+          ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
+          : quotation.totalAmount ||
+            (quotation.items || []).reduce(
+              (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
+              0,
+            )),
+    );
+  };
+  const leaseSubTotal = getLeaseSubTotal();
+  const leaseTaxAmount = (leaseSubTotal * leaseTaxRate) / 100;
+  const leaseTotalAmount = leaseSubTotal + leaseTaxAmount;
 
   const leaseTemplateLineItems = (quotation.items || [])
     .filter((it) => it.itemType === 'PRODUCT' || !it.itemType)
@@ -920,7 +956,9 @@ export function QuotationViewDialog({
       : 'TBD',
     // FSM: periodic payment is stored in monthlyRent; total lease value in monthlyLeaseAmount
     // EMI: periodic payment is stored in monthlyEmiAmount
-    monthlyEmi: isFsmLease ? quotation.monthlyRent || 0 : quotation.monthlyEmiAmount || 0,
+    monthlyEmi: isFsmLease
+      ? Number(quotation.monthlyRent || 0)
+      : Number(quotation.monthlyEmiAmount || 0),
     // Total lease amount (for summary/totals row)
     totalLeaseValue: isFsmLease
       ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
@@ -1028,9 +1066,9 @@ export function QuotationViewDialog({
                 lineItems={rentTemplateLineItems}
                 agreementDetails={rentAgreementDetails}
                 totals={{
-                  subTotal: quotation.monthlyRent || 0,
-                  tax: 0,
-                  total: quotation.monthlyRent || 0,
+                  subTotal: rentSubTotal,
+                  tax: rentTaxAmount,
+                  total: rentTotalAmount,
                 }}
               />
             )}
@@ -1041,9 +1079,9 @@ export function QuotationViewDialog({
                 lineItems={rentTemplateLineItems}
                 agreementDetails={rentAgreementDetails}
                 totals={{
-                  subTotal: quotation.monthlyRent || 0,
-                  tax: 0,
-                  total: quotation.monthlyRent || 0,
+                  subTotal: rentSubTotal,
+                  tax: rentTaxAmount,
+                  total: rentTotalAmount,
                 }}
               />
             )}
@@ -1054,9 +1092,9 @@ export function QuotationViewDialog({
                 lineItems={rentTemplateLineItems}
                 agreementDetails={rentAgreementDetails}
                 totals={{
-                  subTotal: quotation.monthlyRent || 0,
-                  tax: 0,
-                  total: quotation.monthlyRent || 0,
+                  subTotal: rentSubTotal,
+                  tax: rentTaxAmount,
+                  total: rentTotalAmount,
                 }}
               />
             )}
@@ -1067,25 +1105,9 @@ export function QuotationViewDialog({
                 lineItems={leaseTemplateLineItems}
                 leaseDetails={leaseAgreementDetails}
                 totals={{
-                  subTotal:
-                    quotation.totalLeaseAmount ||
-                    (isFsmLease
-                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
-                      : quotation.totalAmount ||
-                        (quotation.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        )),
-                  tax: 0,
-                  total:
-                    quotation.totalLeaseAmount ||
-                    (isFsmLease
-                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
-                      : quotation.totalAmount ||
-                        (quotation.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        )),
+                  subTotal: leaseSubTotal,
+                  tax: leaseTaxAmount,
+                  total: leaseTotalAmount,
                 }}
               />
             )}
@@ -1096,25 +1118,9 @@ export function QuotationViewDialog({
                 lineItems={leaseTemplateLineItems}
                 leaseDetails={leaseAgreementDetails}
                 totals={{
-                  subTotal:
-                    quotation.totalLeaseAmount ||
-                    (isFsmLease
-                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
-                      : quotation.totalAmount ||
-                        (quotation.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        )),
-                  tax: 0,
-                  total:
-                    quotation.totalLeaseAmount ||
-                    (isFsmLease
-                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
-                      : quotation.totalAmount ||
-                        (quotation.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        )),
+                  subTotal: leaseSubTotal,
+                  tax: leaseTaxAmount,
+                  total: leaseTotalAmount,
                 }}
               />
             )}
@@ -1125,25 +1131,9 @@ export function QuotationViewDialog({
                 lineItems={leaseTemplateLineItems}
                 leaseDetails={leaseAgreementDetails}
                 totals={{
-                  subTotal:
-                    quotation.totalLeaseAmount ||
-                    (isFsmLease
-                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
-                      : quotation.totalAmount ||
-                        (quotation.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        )),
-                  tax: 0,
-                  total:
-                    quotation.totalLeaseAmount ||
-                    (isFsmLease
-                      ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
-                      : quotation.totalAmount ||
-                        (quotation.items || []).reduce(
-                          (acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0),
-                          0,
-                        )),
+                  subTotal: leaseSubTotal,
+                  tax: leaseTaxAmount,
+                  total: leaseTotalAmount,
                 }}
               />
             )}

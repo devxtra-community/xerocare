@@ -10,6 +10,7 @@ export interface EmployeeCreatedEvent {
   role: string;
   status: string;
   name: string;
+  branchId?: string | null;
 }
 
 export interface EmployeeUpdatedEvent {
@@ -18,8 +19,10 @@ export interface EmployeeUpdatedEvent {
   role: string;
   status: string;
   name: string;
+  branchId?: string | null;
 }
 
 export interface EmployeeDeletedEvent {
   employeeId: string;
+  branchId?: string | null;
 }

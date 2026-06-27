@@ -11,6 +11,20 @@ export interface Branch {
   status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   created_at: string;
   updated_at: string;
+  // Currency & Country
+  country_code?: string;
+  currency_code?: string;
+  currency_symbol?: string;
+  currency_name?: string;
+  // Tax
+  has_tax?: boolean;
+  tax_name?: string | null;
+  tax_percent?: number | null;
+  tax_registration_number?: string | null;
+  // Address details
+  city?: string;
+  state?: string;
+  postal_code?: string;
 }
 
 export interface CreateBranchPayload {
@@ -19,6 +33,20 @@ export interface CreateBranchPayload {
   location: string;
   manager_id?: string | null;
   started_date: string;
+  // Currency & Country
+  country_code?: string;
+  currency_code?: string;
+  currency_symbol?: string;
+  currency_name?: string;
+  // Tax
+  has_tax?: boolean;
+  tax_name?: string | null;
+  tax_percent?: number | null;
+  tax_registration_number?: string | null;
+  // Address details
+  city?: string;
+  state?: string;
+  postal_code?: string;
 }
 
 export interface UpdateBranchPayload {
@@ -28,6 +56,20 @@ export interface UpdateBranchPayload {
   manager_id?: string | null;
   started_date?: string;
   status?: 'ACTIVE' | 'INACTIVE';
+  // Currency & Country
+  country_code?: string;
+  currency_code?: string;
+  currency_symbol?: string;
+  currency_name?: string;
+  // Tax
+  has_tax?: boolean;
+  tax_name?: string | null;
+  tax_percent?: number | null;
+  tax_registration_number?: string | null;
+  // Address details
+  city?: string;
+  state?: string;
+  postal_code?: string;
 }
 
 export async function createBranch(data: CreateBranchPayload) {

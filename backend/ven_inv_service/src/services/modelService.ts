@@ -121,4 +121,11 @@ export class ModelService {
       logger.error(`Failed to sync model ${modelId} to Redis`, error);
     }
   }
+
+  /**
+   * Retrieves a model by ID.
+   */
+  async getModelById(id: string) {
+    return this.modelRepository.findbyid(id);
+  }
 }

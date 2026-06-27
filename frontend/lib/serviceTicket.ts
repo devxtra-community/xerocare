@@ -43,6 +43,15 @@ export interface ServiceTicket {
   diagnosisStartedAt?: string;
   repairStartedAt?: string;
   items: ServiceTicketItem[];
+  visitChargeAmount?: number;
+  visitChargeMethod?: string | null;
+  discountAmount?: number;
+  technicianNoteToFinance?: string | null;
+  additionalEstimateCount?: number;
+  track?: 'A' | 'B';
+  problemFound?: string | null;
+  rootCause?: string | null;
+  meterReadingAtService?: number;
 }
 
 export const getServiceTickets = async (): Promise<ServiceTicket[]> => {
@@ -80,6 +89,10 @@ export const diagnoseServiceTicket = async (
     technicianNotes: string;
     meterReading: number;
     labourCost?: number;
+    visitChargeAmount?: number;
+    visitChargeMethod?: string | null;
+    discountAmount?: number;
+    technicianNoteToFinance?: string | null;
     items: Partial<ServiceTicketItem>[];
   },
 ): Promise<ServiceTicket> => {
@@ -89,9 +102,15 @@ export const diagnoseServiceTicket = async (
 
 export const submitServiceQuotation = async (
   id: string,
-  laborCost: number,
+  payload: {
+    laborCost: number;
+    visitChargeAmount?: number;
+    visitChargeMethod?: string | null;
+    discountAmount?: number;
+    technicianNoteToFinance?: string | null;
+  },
 ): Promise<ServiceTicket> => {
-  const response = await api.post(`/i/service/tickets/${id}/quote`, { laborCost });
+  const response = await api.post(`/i/service/tickets/${id}/quote`, payload);
   return response.data.data;
 };
 
@@ -216,6 +235,21 @@ export interface ServiceEstimateRevision {
   status: string;
   items: ServiceEstimateItem[];
   created_at: string;
+  revisionNumber?: number;
+  revisionType?: 'INITIAL' | 'DISCOUNT' | 'VALIDITY_EXTENSION' | 'DISCOUNT_AND_VALIDITY' | null;
+  totalAmount?: number;
+  discountApplied?: number;
+  visitChargeAmount?: number;
+  technicianNoteToFinance?: string | null;
+  submittedBy?: string | null;
+  financeDecision?: 'APPROVED' | 'REJECTED' | null;
+  financeDecisionBy?: string | null;
+  financeDecisionNote?: string | null;
+  financeDecisionAt?: string | null;
+  validUntil?: string | null;
+  reason?: string | null;
+  submittedAt?: string;
+  itemsSnapshot?: Record<string, unknown> | unknown[] | null;
 }
 
 export const getTicketEstimates = async (
@@ -260,6 +294,14 @@ export const approveEstimateCustomer = async (estimateId: string): Promise<Servi
 export const rejectEstimateCustomer = async (estimateId: string): Promise<ServiceEstimate> => {
   const response = await api.post(`/i/service/estimates/${estimateId}/reject-customer`);
   return response.data.data;
+};
+
+export const extendTicketValidity = async (
+  ticketId: string,
+  newDate: string,
+): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post(`/i/service/tickets/${ticketId}/extend-validity`, { newDate });
+  return response.data;
 };
 
 export const createEstimateRevision = async (
@@ -417,4 +459,54 @@ export const downloadServiceReport = async (ticketId: string): Promise<Blob> => 
     responseType: 'blob',
   });
   return response.data;
+};
+
+export const downloadQuotationPdf = async (id: string): Promise<Blob> => {
+  const response = await api.get(`/i/service/tickets/${id}/quotation-pdf`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+export const downloadCompletionBillPdf = async (id: string): Promise<Blob> => {
+  const response = await api.get(`/i/service/tickets/${id}/completion-bill-pdf`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+export const sendQuotationDoc = async (
+  id: string,
+  payload: { sendToPhone?: string; sendToEmail?: string },
+): Promise<unknown> => {
+  const response = await api.post(`/i/service/tickets/${id}/send-quotation`, payload);
+  return response.data;
+};
+
+export const sendCompletionBillDoc = async (
+  id: string,
+  payload: { sendToPhone?: string; sendToEmail?: string },
+): Promise<unknown> => {
+  const response = await api.post(`/i/service/tickets/${id}/send-completion-bill`, payload);
+  return response.data;
+};
+
+export const reviseServiceEstimate = async (
+  id: string,
+  payload: {
+    items: Partial<ServiceTicketItem>[];
+    visitChargeAmount: number;
+    visitChargeMethod: string | null;
+    discountAmount: number;
+    technicianNoteToFinance: string;
+    revisionType: string;
+  },
+): Promise<unknown> => {
+  const response = await api.patch(`/i/service/tickets/${id}/revise-estimate`, payload);
+  return response.data.data;
+};
+
+export const getEstimateRevisions = async (id: string): Promise<unknown[]> => {
+  const response = await api.get(`/i/service/tickets/${id}/revisions`);
+  return response.data.data;
 };

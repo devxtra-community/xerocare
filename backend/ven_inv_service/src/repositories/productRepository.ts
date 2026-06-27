@@ -86,7 +86,7 @@ export class ProductRepository {
   async findOne(id: string) {
     return this.repo.findOne({
       where: { id },
-      relations: { model: true, warehouse: true },
+      relations: { model: true, warehouse: true, lot: true, vendor: true },
     });
   }
 
@@ -137,7 +137,7 @@ export class ProductRepository {
 
     return this.repo.find({
       where: ids.map((id) => ({ id })),
-      relations: { model: true, warehouse: true },
+      relations: { model: true, warehouse: true, lot: true, vendor: true },
     });
   }
 }

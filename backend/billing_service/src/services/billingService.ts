@@ -3,6 +3,8 @@ import { In, Raw } from 'typeorm';
 import { Source } from '../config/dataSource';
 import { logAudit } from './auditLogService';
 import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 // import { getRabbitChannel } from '../config/rabbitmq';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
@@ -307,6 +309,7 @@ export class BillingService {
             invoiceId: contract.id,
             approvedBy: 'SYSTEM',
             approvedAt: new Date(),
+            customerId: null,
           });
         } catch (e) {
           logger.error('Failed to emit product status update for allocation', {
@@ -332,6 +335,95 @@ export class BillingService {
     return 12; // Default
   }
 
+  private async validateQuotationDiscounts(
+    items?: Array<{
+      productId?: string;
+      modelId?: string;
+      sparePartId?: string;
+      discountAmount?: number;
+      description?: string;
+    }>,
+  ) {
+    if (!items || items.length === 0) return;
+
+    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
+    const { sign } = await import('jsonwebtoken');
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+
+    for (const item of items) {
+      const discount = Number(item.discountAmount || 0);
+      if (discount <= 0) continue;
+
+      let maxDiscount = 0;
+      let name = item.description || 'Product';
+
+      if (item.productId) {
+        try {
+          const response = await fetch(`${inventoryServiceUrl}/products/${item.productId}`, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const product = data.data;
+            if (product) {
+              maxDiscount = Number(product.max_discount_amount || 0);
+              name = product.name || name;
+            }
+          }
+        } catch (error) {
+          logger.error(`Product fetch failed for discount validation: ${item.productId}`, error);
+        }
+      } else if (item.modelId) {
+        try {
+          const response = await fetch(`${inventoryServiceUrl}/models/${item.modelId}`, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const model = data.data;
+            if (model) {
+              maxDiscount = Number(model.maxDiscountableAmount || 0);
+              name = model.model_name || model.name || name;
+            }
+          }
+        } catch (error) {
+          logger.error(`Model fetch failed for discount validation: ${item.modelId}`, error);
+        }
+      } else if (item.sparePartId) {
+        try {
+          const response = await fetch(`${inventoryServiceUrl}/spare-parts/${item.sparePartId}`, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            const sparePart = data.data;
+            if (sparePart) {
+              maxDiscount = Number(sparePart.maxDiscountableAmount || 0);
+              name = sparePart.part_name || sparePart.name || name;
+            }
+          }
+        } catch (error) {
+          logger.error(
+            `Spare part fetch failed for discount validation: ${item.sparePartId}`,
+            error,
+          );
+        }
+      }
+
+      if (discount > maxDiscount) {
+        throw new AppError(
+          `Discount of QAR ${discount} exceeds maximum allowed discount of QAR ${maxDiscount} for ${name}`,
+          400,
+        );
+      }
+    }
+  }
+
   /**
    * Creates a new quotation, validating availability and pricing.
    */
@@ -352,6 +444,7 @@ export class BillingService {
     effectiveTo?: string;
     totalAmount?: number;
     billingCycleInDays?: number; // Added for CUSTOM period logic
+    validityDays?: number;
 
     // Lease Fields
     leaseType?: LeaseType;
@@ -368,6 +461,7 @@ export class BillingService {
       itemType?: ItemType;
       productId?: string; // Optional: Specific Serial (Sale)
       modelId?: string; // Required for Rent/Lease Quotation
+      discountAmount?: number;
     }[];
     // Pricing Items (Rules)
     pricingItems?: {
@@ -519,6 +613,10 @@ export class BillingService {
       invoiceItems.push(...ruleItems);
     }
 
+    const valDays = payload.validityDays !== undefined ? Number(payload.validityDays) : 30;
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + valDays);
+
     // 2. Create Invoice as Quotation
     const invoice = await this.invoiceRepo.createInvoice({
       invoiceNumber,
@@ -572,6 +670,10 @@ export class BillingService {
 
       totalAmount: 0, // Placeholder
       items: invoiceItems,
+
+      validityDays: valDays,
+      expiryDate: expDate,
+      isConverted: false,
     });
 
     // 3. Finalize Amounts for SALE / LEASE / RENT
@@ -665,6 +767,7 @@ export class BillingService {
         itemType?: ItemType;
         productId?: string;
         modelId?: string;
+        discountAmount?: number;
       }[];
 
       // Security Deposit Fields
@@ -690,14 +793,7 @@ export class BillingService {
       );
     }
 
-    if (
-      invoice.type === InvoiceType.QUOTATION &&
-      payload.items?.some(
-        (item) => item.itemType === 'SPARE_PART' || (item.itemType as unknown) === 'SPAREPART',
-      )
-    ) {
-      throw new AppError('Spare parts are not allowed in quotations', 400);
-    }
+    await this.validateQuotationDiscounts(payload.items);
 
     // Update basic fields
     if (payload.rentType) invoice.rentType = payload.rentType;
@@ -1177,6 +1273,13 @@ export class BillingService {
 
     if (payload?.effectiveTo) {
       invoice.effectiveTo = payload.effectiveTo;
+    }
+
+    if (invoice.billType === 'SERVICE') {
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 30);
+      invoice.estimateValidUntil = validUntil;
+      invoice.estimateExpired = false;
     }
 
     const saved = await this.invoiceRepo.save(invoice);
@@ -1866,6 +1969,7 @@ export class BillingService {
             invoiceId: invoice.id,
             approvedBy: userId,
             approvedAt: invoice.financeApprovedAt || new Date(),
+            customerId: billType === 'RETURNED' ? null : invoice.customerId,
           });
         } catch (error) {
           logger.error('Failed to emit product status update', {
@@ -1891,10 +1995,11 @@ export class BillingService {
     if (
       invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
       (invoice.status as string) !== 'TRANSACTION_COMPLETED' &&
-      invoice.status !== InvoiceStatus.FINANCE_APPROVED
+      invoice.status !== InvoiceStatus.FINANCE_APPROVED &&
+      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
     ) {
       throw new AppError(
-        'Only Employee Approved, Finance Approved, or Converted quotations can be rejected by Finance',
+        'Only Employee Approved, Finance Approved, Waiting Finance Approval, or Converted quotations can be rejected by Finance',
         400,
       );
     }
@@ -1985,6 +2090,7 @@ export class BillingService {
             invoiceId: invoice.id,
             approvedBy: userId,
             approvedAt: invoice.financeApprovedAt,
+            customerId: null,
           });
         } catch (e) {
           logger.error('Failed to emit product status update on finance reject', {
@@ -2240,6 +2346,7 @@ export class BillingService {
               invoiceId: contract.id,
               approvedBy: 'SYSTEM',
               approvedAt: new Date(),
+              customerId: null,
             });
           } catch (e) {
             logger.error('Failed to emit product status update for allocation', {
@@ -2695,6 +2802,7 @@ export class BillingService {
           invoiceId: oldAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
+          customerId: null,
         }).catch((err) => logger.error('Failed to emit RETURNED event', err));
       }
       if (newAllocation.productId) {
@@ -2704,6 +2812,7 @@ export class BillingService {
           invoiceId: newAllocation.contractId,
           approvedBy: 'SYSTEM',
           approvedAt: ts,
+          customerId: invoice?.customerId || null,
         }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
       }
 
@@ -2803,6 +2912,17 @@ export class BillingService {
     paymentReference?: string;
     notes?: string;
   }) {
+    if (payload.items) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      payload.items.forEach((item: any) => {
+        if (item.itemType === 'SPAREPART' || item.itemType === 'SPARE_PART') {
+          item.itemType = 'SPARE_PART';
+        } else {
+          item.itemType = 'PRODUCT';
+        }
+      });
+    }
+
     if (!payload.items || payload.items.length === 0) {
       throw new AppError('Direct sale must have at least one item', 400);
     }
@@ -2975,6 +3095,7 @@ export class BillingService {
           // Create ProductAllocation for safety/billing tracking
           await queryRunner.manager.insert(ProductAllocation, {
             contractId: savedInvoice.id,
+            modelId: item.modelId,
             productId: item.productId,
             serialNumber: item.serialNumber,
             status: AllocationStatus.ALLOCATED,
@@ -2999,7 +3120,7 @@ export class BillingService {
 
       savedInvoice.grossAmount = grossAmount;
       savedInvoice.discountAmount = totalDiscount;
-      savedInvoice.totalAmount = calculatedTotal;
+      savedInvoice.totalAmount = grossAmount - totalDiscount;
 
       let paymentStatus = InvoiceStatus.SENT;
       if (payload.paymentAmount && payload.paymentAmount > 0) {
@@ -3655,9 +3776,22 @@ export class BillingService {
     }[];
     saleType: string;
     status: string;
+    visitChargeAmount?: number;
+    visitChargeMethod?: string | null;
+    totalDiscountAmount?: number;
+    technicianNoteToFinance?: string | null;
   }) {
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
     const invoiceRepo = Source.getRepository(Invoice);
+    const itemsTotal = payload.items.reduce(
+      (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
+      0,
+    );
+    const visitCharge = Number(payload.visitChargeAmount) || 0;
+    const discount = Number(payload.totalDiscountAmount) || 0;
+    const finalTotal =
+      itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
+
     const invoice = invoiceRepo.create({
       invoiceNumber,
       customerId: payload.customerId || undefined,
@@ -3667,10 +3801,11 @@ export class BillingService {
       saleType: payload.saleType as SaleType,
       status: payload.status as InvoiceStatus,
       billType: BillType.SERVICE,
-      totalAmount: payload.items.reduce(
-        (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
-        0,
-      ),
+      visitChargeAmount: visitCharge,
+      visitChargeMethod: payload.visitChargeMethod || null,
+      totalDiscountAmount: discount,
+      technicianNoteToFinance: payload.technicianNoteToFinance || null,
+      totalAmount: finalTotal,
     });
 
     const savedInvoice = await invoiceRepo.save(invoice);
@@ -3695,5 +3830,494 @@ export class BillingService {
 
     savedInvoice.items = invoiceItems;
     return savedInvoice;
+  }
+
+  async reviseEstimate(
+    id: string,
+    payload: {
+      items: { description: string; quantity: number; unitPrice: number; isFree?: boolean }[];
+      visitChargeAmount: number;
+      visitChargeMethod: string;
+      discountAmount: number;
+      technicianNoteToFinance: string;
+    },
+    userId: string,
+  ): Promise<Invoice> {
+    logger.info(`Estimate ${id} revised by user ${userId}`);
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.billType !== BillType.SERVICE) {
+      throw new AppError('Only service quotations can be revised', 400);
+    }
+
+    if (
+      invoice.status === InvoiceStatus.CUSTOMER_ACCEPTED ||
+      invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
+      invoice.status === InvoiceStatus.PAID
+    ) {
+      throw new AppError(
+        'Cannot revise an estimate that has already been approved by the customer',
+        400,
+      );
+    }
+
+    // Clear existing items
+    await this.invoiceRepo.clearItems(invoice.id);
+
+    const invoiceItemRepo = Source.getRepository(InvoiceItem);
+    const invoiceItems = payload.items.map((it) => {
+      const invItem = new InvoiceItem();
+      invItem.invoice = invoice;
+      invItem.itemType = ItemType.PRODUCT;
+      invItem.description = it.description;
+      invItem.quantity = it.quantity;
+      invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
+      return invItem;
+    });
+    await invoiceItemRepo.save(invoiceItems);
+
+    const itemsTotal = payload.items.reduce(
+      (sum, item) => sum + item.quantity * (item.isFree ? 0 : item.unitPrice),
+      0,
+    );
+    const visitCharge = Number(payload.visitChargeAmount) || 0;
+    const discount = Number(payload.discountAmount) || 0;
+    const finalTotal =
+      itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
+
+    invoice.visitChargeAmount = visitCharge;
+    invoice.visitChargeMethod = payload.visitChargeMethod || null;
+    invoice.totalDiscountAmount = discount;
+    invoice.technicianNoteToFinance = payload.technicianNoteToFinance;
+    invoice.totalAmount = finalTotal;
+
+    invoice.status = InvoiceStatus.WAITING_FINANCE_APPROVAL;
+    invoice.estimateExpired = false;
+    invoice.revisionCount = (invoice.revisionCount || 0) + 1;
+
+    const saved = await this.invoiceRepo.save(invoice);
+
+    // Break circular reference
+    invoiceItems.forEach((item) => {
+      delete (item as { invoice?: unknown }).invoice;
+    });
+    saved.items = invoiceItems;
+
+    // Notify Finance Staff
+    if (saved.branchId) {
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        const { SERVICE_ESTIMATE_REVISED } = await import('../constants/notificationTypes');
+        const { getFinanceEmployeesByBranch, getCustomerName } = await import('./billingHelpers');
+
+        const customerName = await getCustomerName(saved.customerId);
+        const financeIds = await getFinanceEmployeesByBranch(saved.branchId);
+
+        for (const financeId of financeIds) {
+          try {
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: financeId,
+              title: 'Estimate Revision Submitted',
+              message: `A revised service estimate for customer ${customerName} (ticket ${invoice.serviceTicketId}) has been submitted for review.`,
+              type: SERVICE_ESTIMATE_REVISED,
+              referenceId: saved.id,
+              referenceType: 'QUOTATION',
+            });
+          } catch (err) {
+            logger.error(
+              `Failed to publish service estimate revised notification to finance employee ${financeId}`,
+              err,
+            );
+          }
+        }
+      } catch (err) {
+        logger.error('Failed to notify finance staff about estimate revision', err);
+      }
+    }
+
+    return saved;
+  }
+
+  async financeExtendValidity(
+    id: string,
+    payload: {
+      extensionDays: number;
+      extensionFee: number;
+    },
+    userId: string,
+  ): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (
+      invoice.status !== InvoiceStatus.EMPLOYEE_APPROVED &&
+      invoice.status !== InvoiceStatus.WAITING_FINANCE_APPROVAL
+    ) {
+      throw new AppError('Quotation must be in a pending approval state', 400);
+    }
+
+    const days = Number(payload.extensionDays) || 0;
+    const fee = Number(payload.extensionFee) || 0;
+
+    const baseValidUntil = new Date();
+    const totalDays = 30 + days;
+    baseValidUntil.setDate(baseValidUntil.getDate() + totalDays);
+
+    invoice.estimateValidUntil = baseValidUntil;
+    invoice.estimateExpired = false;
+    invoice.validityExtensionDays = days;
+    invoice.validityExtensionFee = fee;
+
+    const oldStatus = invoice.status;
+    invoice.status = InvoiceStatus.FINANCE_APPROVED;
+    invoice.financeApprovedBy = userId;
+    invoice.financeApprovedAt = new Date();
+
+    if (fee > 0) {
+      invoice.validityExtensionFeeAdded = true;
+      const invoiceItemRepo = Source.getRepository(InvoiceItem);
+      const feeItem = new InvoiceItem();
+      feeItem.invoice = invoice;
+      feeItem.itemType = ItemType.PRICING_RULE;
+      feeItem.description = `Validity Extension Fee (${days} Days)`;
+      feeItem.quantity = 1;
+      feeItem.unitPrice = fee;
+      await invoiceItemRepo.save(feeItem);
+
+      invoice.totalAmount = Number(invoice.totalAmount || 0) + fee;
+    }
+
+    const saved = await this.invoiceRepo.save(invoice);
+    await logAudit(
+      invoice.id,
+      'STATUS_CHANGE',
+      userId,
+      `Finance approved quotation with validity extension. Days: ${days}, Fee: ${fee}.`,
+      oldStatus,
+      InvoiceStatus.FINANCE_APPROVED,
+    );
+
+    // Callbacks to ven_inv_service
+    if (invoice.serviceTicketId) {
+      try {
+        const { sign } = await import('jsonwebtoken');
+        const token = sign(
+          { userId: 'billing_service', role: 'ADMIN' },
+          process.env.ACCESS_SECRET as string,
+          { expiresIn: '1m' },
+        );
+
+        const venInvUrl = process.env.VENDOR_INVENTORY_SERVICE_URL || 'http://localhost:3003';
+        await globalThis.fetch(
+          `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/quotation-link`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              serviceQuotationId: invoice.id,
+              status: 'FINANCE_APPROVED',
+            }),
+          },
+        );
+        logger.info(
+          `[BillingService] Sent finance approval callback for service ticket ${invoice.serviceTicketId}`,
+        );
+
+        if (invoice.billType === 'SERVICE') {
+          await globalThis.fetch(
+            `${venInvUrl}/service/tickets/${invoice.serviceTicketId}/finance-approved`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          );
+        }
+      } catch (callbackErr) {
+        logger.error('[BillingService] Failed to call service ticket callback:', callbackErr);
+      }
+    }
+
+    return saved;
+  }
+
+  async reassignCustomer(
+    id: string,
+    userId: string,
+    payload: {
+      newCustomerId: string;
+      discountAmount?: number;
+    },
+  ) {
+    const originalInvoice = await this.invoiceRepo.findById(id);
+    if (!originalInvoice) {
+      throw new AppError('Quotation not found', 404);
+    }
+    if (originalInvoice.type !== InvoiceType.QUOTATION) {
+      throw new AppError('Only quotations can be reassigned', 400);
+    }
+
+    // Generate new quotation number
+    const newInvoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+
+    // Clone items
+    const newItems: InvoiceItem[] = [];
+    let calculatedTotal = 0;
+    if (originalInvoice.items) {
+      for (const item of originalInvoice.items) {
+        const clonedItem = new InvoiceItem();
+        clonedItem.itemType = item.itemType;
+        clonedItem.description = item.description;
+        clonedItem.quantity = item.quantity;
+        clonedItem.unitPrice = item.unitPrice;
+        clonedItem.modelId = item.modelId;
+        clonedItem.productId = item.productId;
+        clonedItem.sparePartId = item.sparePartId;
+        clonedItem.bwIncludedLimit = item.bwIncludedLimit;
+        clonedItem.colorIncludedLimit = item.colorIncludedLimit;
+        clonedItem.combinedIncludedLimit = item.combinedIncludedLimit;
+        clonedItem.bwExcessRate = item.bwExcessRate;
+        clonedItem.colorExcessRate = item.colorExcessRate;
+        clonedItem.combinedExcessRate = item.combinedExcessRate;
+        clonedItem.bwSlabRanges = item.bwSlabRanges;
+        clonedItem.colorSlabRanges = item.colorSlabRanges;
+        clonedItem.comboSlabRanges = item.comboSlabRanges;
+        clonedItem.discountAmount = item.discountAmount;
+        newItems.push(clonedItem);
+
+        calculatedTotal += (item.quantity || 0) * (item.unitPrice || 0);
+      }
+    }
+
+    // Validate discounts
+    await this.validateQuotationDiscounts(newItems);
+
+    const valDays =
+      originalInvoice.validityDays !== undefined ? Number(originalInvoice.validityDays) : 30;
+    const expDate = new Date();
+    expDate.setDate(expDate.getDate() + valDays);
+
+    const newQuotation = await this.invoiceRepo.createInvoice({
+      invoiceNumber: newInvoiceNumber,
+      branchId: originalInvoice.branchId,
+      createdBy: userId,
+      customerId: payload.newCustomerId,
+      saleType: originalInvoice.saleType,
+      type: InvoiceType.QUOTATION,
+      status: InvoiceStatus.DRAFT,
+      rentType: originalInvoice.rentType,
+      rentPeriod: originalInvoice.rentPeriod,
+      monthlyRent: originalInvoice.monthlyRent,
+      advanceAmount: originalInvoice.advanceAmount,
+      discountPercent: originalInvoice.discountPercent,
+      effectiveFrom: originalInvoice.effectiveFrom,
+      effectiveTo: originalInvoice.effectiveTo,
+      billingCycleInDays: originalInvoice.billingCycleInDays,
+      leaseType: originalInvoice.leaseType,
+      leaseTenureMonths: originalInvoice.leaseTenureMonths,
+      totalLeaseAmount: originalInvoice.totalLeaseAmount,
+      monthlyEmiAmount: originalInvoice.monthlyEmiAmount,
+      monthlyLeaseAmount: originalInvoice.monthlyLeaseAmount,
+      securityDepositAmount: originalInvoice.securityDepositAmount,
+      securityDepositMode: originalInvoice.securityDepositMode,
+      securityDepositReference: originalInvoice.securityDepositReference,
+      securityDepositDate: originalInvoice.securityDepositDate,
+      securityDepositBank: originalInvoice.securityDepositBank,
+      layoutId: originalInvoice.layoutId,
+      notes: originalInvoice.notes,
+      totalAmount: 0,
+      items: newItems,
+      validityDays: valDays,
+      expiryDate: expDate,
+      isConverted: false,
+    });
+
+    // 3. Finalize Amounts for SALE / LEASE / RENT
+    if (
+      [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
+        newQuotation.saleType,
+      )
+    ) {
+      const discAmount =
+        payload.discountAmount !== undefined
+          ? Number(payload.discountAmount)
+          : Number(originalInvoice.discountAmount || 0);
+      const discPercent = newQuotation.discountPercent ? Number(newQuotation.discountPercent) : 0;
+
+      if (discAmount > 0) {
+        newQuotation.discountAmount = discAmount;
+        newQuotation.grossAmount = calculatedTotal;
+        newQuotation.totalAmount = calculatedTotal - discAmount;
+      } else {
+        newQuotation.grossAmount = calculatedTotal;
+        newQuotation.discountAmount = calculatedTotal * (discPercent / 100);
+        newQuotation.totalAmount = calculatedTotal - (newQuotation.discountAmount || 0);
+      }
+    } else if (newQuotation.saleType === SaleType.LEASE) {
+      newQuotation.totalAmount = Number(newQuotation.advanceAmount || 0);
+    } else {
+      newQuotation.totalAmount =
+        calculatedTotal === 0 ? Number(newQuotation.advanceAmount || 0) : calculatedTotal;
+    }
+
+    await this.invoiceRepo.save(newQuotation);
+
+    // Audit log for clone creation
+    await logAudit(
+      newQuotation.id,
+      'CREATION',
+      userId,
+      `Cloned from quotation ${originalInvoice.invoiceNumber} with customer re-assigned to ${payload.newCustomerId}`,
+    );
+
+    // Mark original as SUPERSEDED
+    const oldStatus = originalInvoice.status;
+    originalInvoice.status = InvoiceStatus.SUPERSEDED;
+    await this.invoiceRepo.save(originalInvoice);
+
+    // Audit log for old quotation superseded
+    await logAudit(
+      originalInvoice.id,
+      'STATUS_CHANGE',
+      userId,
+      `Quotation superseded by cloned quotation ${newQuotation.invoiceNumber} for customer reassignment`,
+      oldStatus,
+      InvoiceStatus.SUPERSEDED,
+    );
+
+    return newQuotation;
+  }
+
+  async recordPayment(
+    invoiceId: string,
+    data: {
+      paymentMode: string;
+      referenceNumber?: string;
+      amount: number;
+      transactionDate?: string | Date;
+      remarks?: string;
+      isSecurityDeposit?: boolean;
+    },
+    userId?: string,
+  ): Promise<PaymentTransaction> {
+    const invoice = await this.invoiceRepo.findById(invoiceId);
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404);
+    }
+
+    const isActiveOrInvoiced =
+      invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
+      invoice.status === InvoiceStatus.INVOICED ||
+      invoice.status === InvoiceStatus.PAID;
+
+    const isSecurityDeposit =
+      data.isSecurityDeposit === true || data.remarks?.toLowerCase() === 'security deposit';
+
+    if (!isActiveOrInvoiced && !isSecurityDeposit) {
+      throw new AppError(
+        'Payment is only allowed for active contracts/invoiced sales, unless it is a Security Deposit',
+        400,
+      );
+    }
+
+    // Save transaction
+    const transactionRepo = Source.getRepository(PaymentTransaction);
+    const transaction = new PaymentTransaction();
+    transaction.invoiceId = invoiceId;
+    transaction.paymentMode = data.paymentMode;
+    transaction.referenceNumber = data.referenceNumber;
+    transaction.amount = Number(data.amount);
+    transaction.transactionDate = data.transactionDate
+      ? new Date(data.transactionDate)
+      : new Date();
+    transaction.recordedBy = userId;
+    transaction.remarks = data.remarks || (isSecurityDeposit ? 'Security Deposit' : undefined);
+
+    await transactionRepo.save(transaction);
+
+    // If active or invoiced or security deposit, we can maintain the ledger.
+    const ledgerRepo = Source.getRepository(InvoiceLedger);
+    let ledger = await ledgerRepo.findOne({ where: { invoiceId } });
+
+    if (!ledger && (isActiveOrInvoiced || isSecurityDeposit)) {
+      ledger = new InvoiceLedger();
+      ledger.invoiceId = invoiceId;
+      ledger.totalAmount = Number(invoice.totalAmount || 0);
+      ledger.paidAmount = 0;
+      ledger.balanceAmount = Number(invoice.totalAmount || 0);
+    }
+
+    if (ledger) {
+      ledger.paidAmount = Number(ledger.paidAmount) + Number(transaction.amount);
+      ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
+      await ledgerRepo.save(ledger);
+
+      // Check if invoice is an opening balance entry
+      if (invoice.isOpeningEntry || invoice.type === 'OPENING') {
+        const { OpeningBalanceEntry } = await import('../entities/openingBalanceEntryEntity');
+        const openingBalanceRepo = Source.getRepository(OpeningBalanceEntry);
+        const entry = await openingBalanceRepo.findOne({ where: { invoiceId: invoice.id } });
+        if (entry) {
+          entry.remainingBalance = ledger.balanceAmount;
+          entry.isFullySettled = ledger.balanceAmount === 0;
+          await openingBalanceRepo.save(entry);
+
+          await logAudit(
+            entry.id,
+            'UPDATE',
+            userId || 'SYSTEM',
+            `Updated opening balance entry ${entry.entryNumber}: remaining balance is now QAR ${entry.remainingBalance}.`,
+          );
+        }
+      }
+
+      // Check if invoice is fully paid
+      if (ledger.balanceAmount === 0 && invoice.status !== InvoiceStatus.PAID) {
+        const oldStatus = invoice.status;
+        invoice.status = InvoiceStatus.PAID;
+        await this.invoiceRepo.save(invoice);
+
+        // Audit log status change
+        await logAudit(
+          invoice.id,
+          'STATUS_CHANGE',
+          userId || 'SYSTEM',
+          `Invoice fully paid via payment transaction. Status updated to PAID.`,
+          oldStatus,
+          InvoiceStatus.PAID,
+        );
+      }
+    }
+
+    // Audit log payment creation
+    await logAudit(
+      invoice.id,
+      'PAYMENT_RECORDED',
+      userId || 'SYSTEM',
+      `Payment transaction of QAR ${transaction.amount} recorded via ${transaction.paymentMode}.`,
+    );
+
+    return transaction;
+  }
+
+  async getInvoiceLedger(
+    invoiceId: string,
+  ): Promise<{ ledger: InvoiceLedger[]; transactions: PaymentTransaction[] }> {
+    const ledgerRepo = Source.getRepository(InvoiceLedger);
+    const transactionRepo = Source.getRepository(PaymentTransaction);
+
+    const ledger = await ledgerRepo.find({ where: { invoiceId }, order: { createdAt: 'DESC' } });
+    const transactions = await transactionRepo.find({
+      where: { invoiceId },
+      order: { transactionDate: 'DESC' },
+    });
+
+    return { ledger, transactions };
   }
 }

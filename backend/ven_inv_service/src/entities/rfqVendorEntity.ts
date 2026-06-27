@@ -49,6 +49,38 @@ export class RfqVendor {
   @Column({ type: 'timestamp', nullable: true })
   quoted_at?: Date;
 
+  // Vendor submits in their own currency; branch amount is the converted value
+  @Column({ name: 'vendor_currency_code', type: 'varchar', length: 3, nullable: true })
+  vendor_currency_code?: string;
+
+  @Column({ name: 'vendor_amount', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  vendor_amount?: number;
+
+  @Column({ name: 'branch_currency_code', type: 'varchar', length: 3, nullable: true })
+  branch_currency_code?: string;
+
+  @Column({
+    name: 'branch_converted_amount',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
+  branch_converted_amount?: number;
+
+  // Rate locked at quote time — never recalculated
+  @Column({
+    name: 'exchange_rate_snapshot',
+    type: 'decimal',
+    precision: 18,
+    scale: 6,
+    nullable: true,
+  })
+  exchange_rate_snapshot?: number;
+
+  @Column({ name: 'exchange_rate_fetched_at', type: 'timestamp', nullable: true })
+  exchange_rate_fetched_at?: Date;
+
   @OneToMany(() => RfqVendorItem, (vendorItem) => vendorItem.rfq_vendor, { cascade: true })
   items!: RfqVendorItem[];
 

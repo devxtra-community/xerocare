@@ -37,5 +37,5 @@ export interface InAppNotificationRequestEvent {
   message: string;
   type: string;
   referenceId: string;
-  referenceType: 'QUOTATION' | 'TEMPLATE' | 'CONTRACT';
+  referenceType: 'QUOTATION' | 'TEMPLATE' | 'CONTRACT' | 'OPENING_BALANCE';
 }

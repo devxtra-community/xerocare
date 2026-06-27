@@ -231,6 +231,32 @@ export class Invoice {
   @Column({ nullable: true })
   usageRecordId?: string; // Link to Usage Record (for Monthly Invoice)
 
+  // --- Currency (set at creation from branch, never updated) ---
+  @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
+  currencyCode?: string;
+
+  @Column({
+    name: 'exchange_rate_snapshot',
+    type: 'decimal',
+    precision: 18,
+    scale: 6,
+    nullable: true,
+  })
+  exchangeRateSnapshot?: number;
+
+  // --- Tax Snapshot (copied from branch at invoice creation, never recalculated) ---
+  @Column({ name: 'tax_name', type: 'varchar', length: 50, nullable: true })
+  taxName?: string;
+
+  @Column({ name: 'tax_percent', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  taxPercent?: number;
+
+  @Column({ name: 'tax_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxAmount?: number;
+
+  @Column({ name: 'tax_registration_number', type: 'varchar', length: 50, nullable: true })
+  taxRegistrationNumber?: string;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   grossAmount?: number;
 
@@ -275,6 +301,10 @@ export class Invoice {
   @Index()
   @Column({ type: 'boolean', default: false })
   isTemplate!: boolean;
+
+  @Index()
+  @Column({ name: 'is_opening_entry', type: 'boolean', default: false })
+  isOpeningEntry!: boolean;
 
   @Index()
   @Column({ type: 'uuid', nullable: true })
@@ -341,4 +371,46 @@ export class Invoice {
 
   @DeleteDateColumn()
   deletedAt?: Date;
+
+  // --- Quotation Validity Fields ---
+  @Column({ type: 'int', nullable: true })
+  validityDays?: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  expiryDate?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  isConverted!: boolean;
+
+  // --- Service Estimate Fields (billType = SERVICE) ---
+  @Column({ type: 'timestamp', nullable: true })
+  estimateValidUntil?: Date;
+
+  @Column({ type: 'boolean', nullable: true })
+  estimateExpired?: boolean;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  visitChargeAmount?: number;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  visitChargeMethod?: string | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  totalDiscountAmount?: number;
+
+  @Column({ type: 'text', nullable: true })
+  technicianNoteToFinance?: string | null;
+
+  @Column({ type: 'int', nullable: true, default: 0 })
+  revisionCount?: number;
+
+  // --- Validity Extension Fields ---
+  @Column({ type: 'int', nullable: true })
+  validityExtensionDays?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  validityExtensionFee?: number;
+
+  @Column({ type: 'boolean', default: false })
+  validityExtensionFeeAdded?: boolean;
 }

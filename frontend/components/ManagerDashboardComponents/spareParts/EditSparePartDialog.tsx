@@ -70,6 +70,7 @@ export default function EditSparePartDialog({
     quantity: '',
     description: '',
     yield: '',
+    maxDiscountableAmount: '',
   });
 
   useEffect(() => {
@@ -118,6 +119,10 @@ export default function EditSparePartDialog({
           quantity: String(product.quantity),
           description: product.description || '',
           yield: product.yield || '',
+          maxDiscountableAmount:
+            product.maxDiscountableAmount !== undefined
+              ? String(product.maxDiscountableAmount)
+              : '',
         });
       } catch (error) {
         console.error('Failed to load dependencies', error);
@@ -140,6 +145,7 @@ export default function EditSparePartDialog({
         base_price: Number(formData.base_price),
         purchase_price: Number(formData.purchase_price),
         wholesale_price: Number(formData.wholesale_price),
+        maxDiscountableAmount: Number(formData.maxDiscountableAmount || 0),
         quantity: Number(formData.quantity),
         description: formData.description,
         yield: formData.yield,
@@ -260,6 +266,18 @@ export default function EditSparePartDialog({
                 type="number"
                 value={formData.base_price}
                 onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Max Discount Allowed (QAR)</Label>
+              <Input
+                type="number"
+                min="0"
+                value={formData.maxDiscountableAmount}
+                onChange={(e) =>
+                  setFormData({ ...formData, maxDiscountableAmount: e.target.value })
+                }
+                placeholder="0"
               />
             </div>
             {/* Model */}

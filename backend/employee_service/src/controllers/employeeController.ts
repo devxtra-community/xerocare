@@ -110,13 +110,29 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
     const role = req.query.role as EmployeeRole | undefined;
-    const search = req.query.search as string | undefined;
+    const search = (req.query.search as string) || undefined;
     const job = req.query.job as string | undefined;
+    const sortBy = (req.query.sortBy as string) || undefined;
+    const rawSortOrder = (req.query.sortOrder as string)?.toUpperCase();
+    const sortOrder: 'ASC' | 'DESC' =
+      rawSortOrder === 'ASC' || rawSortOrder === 'DESC' ? rawSortOrder : 'DESC';
 
-    // Branch filtering: Admin see all employees, HR and MANAGERS see only their branch (if assigned)
-    const branchId = req.user?.role === EmployeeRole.ADMIN ? undefined : req.user?.branchId;
+    // Admins can filter by any branch from query param; non-admins are locked to their own branch
+    const branchId =
+      req.user?.role === EmployeeRole.ADMIN
+        ? (req.query.branchId as string) || undefined
+        : req.user?.branchId;
 
-    const result = await service.getAllEmployees(page, limit, role, branchId, search, job);
+    const result = await service.getAllEmployees(
+      page,
+      limit,
+      role,
+      branchId,
+      search,
+      job,
+      sortBy,
+      sortOrder,
+    );
     logger.debug('Fetched employees', {
       count: result.employees.length,
       page,

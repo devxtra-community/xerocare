@@ -1,5 +1,5 @@
-import { getRabbitChannel } from '../config/rabbitmq';
-import { ProductStatus } from '../entities/productEntity';
+import { createRabbitChannel } from '../config/rabbitmq';
+import { ProductStatus, OwnershipType } from '../entities/productEntity';
 import { logger } from '../config/logger';
 import { ProductRepository } from '../repositories/productRepository';
 import { ModelRepository } from '../repositories/modelRepository';
@@ -29,6 +29,15 @@ const STATUS_MAP: Record<BillType, ProductStatus> = {
 };
 
 /**
+ * BillType → OwnershipType mapping
+ */
+const OWNERSHIP_MAP: Record<Exclude<BillType, 'RETURNED' | 'DAMAGED'>, OwnershipType> = {
+  SALE: OwnershipType.SALE,
+  RENT: OwnershipType.RENT,
+  LEASE: OwnershipType.LEASE,
+};
+
+/**
  * Runtime type guard for billType
  */
 function isBillType(value: unknown): value is BillType {
@@ -45,7 +54,7 @@ function isBillType(value: unknown): value is BillType {
  * Consumer bootstrap
  */
 export async function startProductStatusConsumer() {
-  const channel = await getRabbitChannel();
+  const channel = await createRabbitChannel();
 
   await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
   await channel.assertQueue(QUEUE, { durable: true });
@@ -57,7 +66,7 @@ export async function startProductStatusConsumer() {
     try {
       const event = JSON.parse(msg.content.toString());
 
-      const { productId, billType, invoiceId, approvedBy, approvedAt } = event;
+      const { productId, billType, invoiceId, approvedBy, approvedAt, customerId } = event;
 
       logger.info('[INVENTORY] Product status event received', {
         productId,
@@ -65,6 +74,7 @@ export async function startProductStatusConsumer() {
         invoiceId,
         approvedBy,
         approvedAt,
+        customerId,
       });
 
       /**
@@ -99,24 +109,40 @@ export async function startProductStatusConsumer() {
       /**
        * 3️⃣ Idempotency check
        */
-      if (product.product_status === newStatus) {
+      const targetCustomerId =
+        billType === 'RETURNED' || billType === 'DAMAGED' ? null : customerId || null;
+      const targetOwnership =
+        billType === 'RETURNED' || billType === 'DAMAGED'
+          ? product.ownership
+          : OWNERSHIP_MAP[billType];
+
+      if (
+        product.product_status === newStatus &&
+        product.customer_id === targetCustomerId &&
+        product.ownership === targetOwnership
+      ) {
         logger.info('Product already in correct state', {
           productId,
           status: newStatus,
+          customerId: targetCustomerId,
         });
         channel.ack(msg);
         return;
       }
 
       /**
-       * 4️⃣ Update product status
+       * 4️⃣ Update product status and metadata
        */
       product.product_status = newStatus;
+      product.customer_id = targetCustomerId;
+      product.ownership = targetOwnership;
       await productRepo.addProduct(product);
 
       logger.info('Product status updated successfully', {
         productId,
         status: newStatus,
+        customerId: targetCustomerId,
+        ownership: targetOwnership,
       });
 
       // Update the model quantity if the product was SOLD, RENTED, or LEASED

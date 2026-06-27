@@ -860,7 +860,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '400', color: '#333' }}>Sub Total</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>Subtotal (Before VAT)</span>
             <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
           </div>
           <div
@@ -872,7 +872,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '400', color: '#333' }}>Tax (0%)</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>VAT Amount</span>
             <span style={{ fontWeight: '400' }}>QAR {fmt(totals.tax)}</span>
           </div>
           <div
@@ -888,7 +888,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontWeight: '900',
             }}
           >
-            <span>Grand Total</span>
+            <span>Grand Total (Including VAT)</span>
             <span>QAR {fmt(totals.total)}</span>
           </div>
         </div>

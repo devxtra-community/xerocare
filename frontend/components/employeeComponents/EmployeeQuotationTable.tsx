@@ -101,6 +101,7 @@ interface SaleItem {
   itemType: 'PRODUCT' | 'SPAREPART';
   warranty?: string;
   isEditable: boolean;
+  availableStock?: number;
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
   combinedIncludedLimit?: number;
@@ -204,6 +205,41 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
+function ConvertedBadge({ q }: { q: Invoice }) {
+  if (q.isConverted) {
+    return (
+      <Badge className="bg-green-100 text-green-700 rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-green-200">
+        Converted
+      </Badge>
+    );
+  }
+  const isExpired = q.expiryDate ? new Date(q.expiryDate) < new Date() : false;
+  if (
+    ['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
+      q.status,
+    ) ||
+    isExpired
+  ) {
+    return (
+      <Badge className="bg-red-100 text-red-700 rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-red-200">
+        Not Converted
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-yellow-100 text-yellow-700 rounded-full px-2 py-0.5 text-[8.5px] font-bold tracking-wider shadow-none uppercase border-yellow-200">
+      Pending
+    </Badge>
+  );
+}
+
+const getRemainingDays = (expiryDate?: string | Date) => {
+  if (!expiryDate) return 'N/A';
+  const diffTime = new Date(expiryDate).getTime() - new Date().getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? `${diffDays} days remaining` : 'Expired';
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeQuotationTable() {
@@ -221,6 +257,14 @@ export default function EmployeeQuotationTable() {
   const [selectedQ, setSelectedQ] = useState<Invoice | null>(null);
   const [sourceQuotationData, setSourceQuotationData] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
+  const [conversionFilter, setConversionFilter] = useState<
+    'ALL' | 'CONVERTED' | 'NOT_CONVERTED' | 'PENDING' | 'EXPIRED'
+  >('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'FINANCE_APPROVED' | 'SENT_TO_CUSTOMER'>(
+    'ALL',
+  );
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [allModels, setAllModels] = useState<Model[]>([]);
@@ -312,7 +356,7 @@ export default function EmployeeQuotationTable() {
   }, [fetchQuotations]);
   useEffect(() => {
     setPage(1);
-  }, [search, setPage]);
+  }, [search, conversionFilter, statusFilter, startDate, endDate, setPage]);
 
   // Stats
   const total_q = quotations.length;
@@ -367,20 +411,62 @@ export default function EmployeeQuotationTable() {
   );
 
   // Filter
-  const filtered = useMemo(() => {
-    return quotations.filter((q) => {
-      const s = search.toLowerCase();
-      return (
-        q.invoiceNumber?.toLowerCase().includes(s) ||
-        q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
-        q.customerName?.toLowerCase().includes(s) ||
-        getProductNames(q).toLowerCase().includes(s) ||
-        q.saleType?.toLowerCase().includes(s) ||
-        q.status?.toLowerCase().includes(s) ||
-        getProductNames(q)?.toLowerCase().includes(s)
-      );
-    });
-  }, [quotations, search, getProductNames]);
+  const filtered = quotations.filter((q) => {
+    const s = search.toLowerCase();
+
+    // Search match
+    const searchMatch =
+      q.invoiceNumber?.toLowerCase().includes(s) ||
+      q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
+      q.customerName?.toLowerCase().includes(s) ||
+      getProductNames(q).toLowerCase().includes(s) ||
+      q.saleType?.toLowerCase().includes(s) ||
+      q.status?.toLowerCase().includes(s);
+
+    // Conversion filter match
+    let conversionMatch = true;
+    const isExpired = q.expiryDate ? new Date(q.expiryDate) < new Date() : false;
+    if (conversionFilter === 'CONVERTED') {
+      conversionMatch = !!q.isConverted;
+    } else if (conversionFilter === 'NOT_CONVERTED') {
+      conversionMatch =
+        !q.isConverted &&
+        (['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
+          q.status,
+        ) ||
+          isExpired);
+    } else if (conversionFilter === 'PENDING') {
+      conversionMatch =
+        !q.isConverted &&
+        !isExpired &&
+        !['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
+          q.status,
+        );
+    } else if (conversionFilter === 'EXPIRED') {
+      conversionMatch = isExpired || q.status === 'EXPIRED';
+    }
+
+    // Status filter match
+    let statusMatch = true;
+    if (statusFilter === 'FINANCE_APPROVED') {
+      statusMatch = q.status === 'FINANCE_APPROVED';
+    } else if (statusFilter === 'SENT_TO_CUSTOMER') {
+      statusMatch = q.status === 'SENT' || q.status === 'SENT_TO_CUSTOMER';
+    }
+
+    // Date range match
+    let dateMatch = true;
+    if (startDate) {
+      dateMatch = dateMatch && new Date(q.createdAt) >= new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateMatch = dateMatch && new Date(q.createdAt) <= end;
+    }
+
+    return searchMatch && conversionMatch && statusMatch && dateMatch;
+  });
 
   useEffect(() => {
     setTotal(filtered.length);
@@ -722,17 +808,102 @@ export default function EmployeeQuotationTable() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search by number, customer, product, type..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9 text-xs"
-          />
+      {/* Search & Filters */}
+      <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by number, customer, product..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 h-9 text-xs"
+            />
+          </div>
+
+          <div>
+            <Select
+              value={conversionFilter}
+              onValueChange={(val: string) =>
+                setConversionFilter(
+                  val as 'ALL' | 'CONVERTED' | 'NOT_CONVERTED' | 'PENDING' | 'EXPIRED',
+                )
+              }
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Conversion Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Conversion Statuses</SelectItem>
+                <SelectItem value="CONVERTED">Converted</SelectItem>
+                <SelectItem value="NOT_CONVERTED">Not Converted</SelectItem>
+                <SelectItem value="PENDING">Pending Conversion</SelectItem>
+                <SelectItem value="EXPIRED">Expired</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Select
+              value={statusFilter}
+              onValueChange={(val: string) =>
+                setStatusFilter(val as 'ALL' | 'FINANCE_APPROVED' | 'SENT_TO_CUSTOMER')
+              }
+            >
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Workflow Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Workflow Statuses</SelectItem>
+                <SelectItem value="FINANCE_APPROVED">Finance Approved</SelectItem>
+                <SelectItem value="SENT_TO_CUSTOMER">Sent to Customer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">FROM:</span>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-9 text-xs p-2"
+            />
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <span className="text-[10px] text-slate-500 font-bold whitespace-nowrap">TO:</span>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="h-9 text-xs p-2"
+            />
+          </div>
         </div>
+
+        {(search ||
+          conversionFilter !== 'ALL' ||
+          statusFilter !== 'ALL' ||
+          startDate ||
+          endDate) && (
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+              onClick={() => {
+                setSearch('');
+                setConversionFilter('ALL');
+                setStatusFilter('ALL');
+                setStartDate('');
+                setEndDate('');
+              }}
+            >
+              Clear Filters
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -748,6 +919,9 @@ export default function EmployeeQuotationTable() {
                 <TableHead className="text-primary font-bold">TYPE</TableHead>
                 <TableHead className="text-primary font-bold">BALANCE</TableHead>
                 <TableHead className="text-primary font-bold">DATE</TableHead>
+                <TableHead className="text-primary font-bold">CONVERTED</TableHead>
+                <TableHead className="text-primary font-bold">EXPIRY DATE</TableHead>
+                <TableHead className="text-primary font-bold">VALIDITY</TableHead>
                 <TableHead className="text-primary font-bold text-center">ACTION</TableHead>
                 <TableHead className="text-primary font-bold">STATUS</TableHead>
               </TableRow>
@@ -755,7 +929,7 @@ export default function EmployeeQuotationTable() {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-14 text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center py-14 text-muted-foreground">
                     <FilePlus2 className="h-10 w-10 mx-auto mb-2 opacity-20" />
                     No quotations yet. Create your first one!
                   </TableCell>
@@ -797,6 +971,37 @@ export default function EmployeeQuotationTable() {
                         month: 'short',
                         year: 'numeric',
                       })}
+                    </TableCell>
+                    <TableCell>
+                      <ConvertedBadge q={q} />
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      <span
+                        className={
+                          q.expiryDate && new Date(q.expiryDate) < new Date()
+                            ? 'text-red-600 font-bold'
+                            : 'text-slate-700'
+                        }
+                      >
+                        {q.expiryDate
+                          ? new Date(q.expiryDate).toLocaleDateString(undefined, {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : 'N/A'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm font-medium">
+                      <span
+                        className={
+                          getRemainingDays(q.expiryDate) === 'Expired'
+                            ? 'text-red-500 font-bold'
+                            : 'text-slate-600'
+                        }
+                      >
+                        {getRemainingDays(q.expiryDate)}
+                      </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1.5">
@@ -1283,12 +1488,19 @@ function QuotationFormModal({
           unitPrice: finalUnitPrice,
           maxDiscount: 0,
           isManual: parsed.isManual,
-          productId: item.itemType === 'PRODUCT' ? item.productId : undefined,
-          sparePartId: item.itemType === 'SPAREPART' ? item.productId : undefined,
+          productId:
+            (item.itemType as string) !== 'SPAREPART' && (item.itemType as string) !== 'SPARE_PART'
+              ? item.productId
+              : undefined,
+          sparePartId:
+            (item.itemType as string) === 'SPAREPART' || (item.itemType as string) === 'SPARE_PART'
+              ? item.productId
+              : undefined,
           modelId: item.modelId,
-          itemType: (item.itemType === 'SPAREPART' ? 'SPAREPART' : 'PRODUCT') as
-            | 'PRODUCT'
-            | 'SPAREPART',
+          itemType: ((item.itemType as string) === 'SPAREPART' ||
+          (item.itemType as string) === 'SPARE_PART'
+            ? 'SPAREPART'
+            : 'PRODUCT') as 'PRODUCT' | 'SPAREPART',
           isEditable: parsed.isManual || !item.productId,
 
           bwIncludedLimit: item.bwIncludedLimit,
@@ -1383,6 +1595,28 @@ function QuotationFormModal({
     }
   }, [effectiveFrom, durationMonths]);
 
+  const selectedQuantities = useMemo(() => {
+    const map: Record<string, number> = {};
+    saleItems.forEach((it) => {
+      const id = it.productId || it.sparePartId;
+      if (id) {
+        map[id] = (map[id] || 0) + it.quantity;
+      }
+    });
+    return map;
+  }, [saleItems]);
+
+  const [activeItemTab, setActiveItemTab] = useState<'PRODUCT' | 'SPAREPART'>('PRODUCT');
+
+  // Synchronize activeItemTab with quotationType
+  useEffect(() => {
+    if (quotationType === 'SPAREPART_SALE') {
+      setActiveItemTab('SPAREPART');
+    } else {
+      setActiveItemTab('PRODUCT');
+    }
+  }, [quotationType]);
+
   // ── Sale item helpers ────────────────────────────────────────────────────
   const addItem = (item: SelectableItem) => {
     let description = '',
@@ -1396,6 +1630,7 @@ function QuotationFormModal({
       consumables: Consumable[] = [];
 
     const isSparePart = 'part_name' in item;
+    let availableStock = 1;
 
     if (isSparePart) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1405,6 +1640,7 @@ function QuotationFormModal({
       maxDiscount = Number(sp.max_discount_amount) || 0;
       sparePartId = sp.id;
       itemType = 'SPAREPART';
+      availableStock = typeof sp.quantity === 'number' ? sp.quantity : 999999;
     } else {
       const pr = item as Product;
       description = pr.name || pr.description || pr.model?.description || 'Product';
@@ -1430,6 +1666,52 @@ function QuotationFormModal({
             }),
           )
         : [];
+      const isAvailable = !pr.product_status || pr.product_status === 'AVAILABLE';
+      if (!isAvailable) {
+        availableStock = 0;
+      } else {
+        availableStock =
+          typeof (pr as unknown as { stock?: number }).stock === 'number'
+            ? (pr as unknown as { stock?: number }).stock!
+            : 1;
+      }
+    }
+
+    const existingIdx = saleItems.findIndex((existing) => {
+      if (isSparePart) {
+        return (
+          !existing.isManual &&
+          existing.sparePartId === sparePartId &&
+          existing.itemType === 'SPAREPART'
+        );
+      } else {
+        return (
+          !existing.isManual && existing.productId === productId && existing.itemType === 'PRODUCT'
+        );
+      }
+    });
+
+    if (existingIdx > -1) {
+      const currentQty = saleItems[existingIdx].quantity;
+      if (currentQty >= availableStock) {
+        toast.error(`Cannot add more. Only ${availableStock} item(s) available in inventory.`);
+        return;
+      }
+      setSaleItems((prev) => {
+        const updated = [...prev];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          quantity: updated[existingIdx].quantity + 1,
+        };
+        return updated;
+      });
+      toast.success(`Incremented quantity for ${description}`);
+      return;
+    }
+
+    if (availableStock <= 0) {
+      toast.error(`Item is out of stock.`);
+      return;
     }
 
     setSaleItems((prev) => [
@@ -1447,6 +1729,7 @@ function QuotationFormModal({
         modelId,
         itemType,
         isEditable: isSparePart ? false : !productId || basePrice === 0,
+        availableStock,
         bwSlabRanges: [],
         colorSlabRanges: [],
         comboSlabRanges: [],
@@ -1469,6 +1752,10 @@ function QuotationFormModal({
       }
 
       if (type === 'PRODUCT') {
+        if (quotationType === 'SPAREPART_SALE') {
+          toast.error('Cannot add products to a Spare Parts Sale quotation.');
+          return;
+        }
         const pr = item as Product;
         const exists = saleItems.some((si) => si.productId === pr.id);
         if (exists) {
@@ -1477,6 +1764,10 @@ function QuotationFormModal({
         }
         addItem(pr);
       } else if (type === 'SPARE_PART') {
+        if (quotationType !== 'SPAREPART_SALE') {
+          toast.error('Cannot add spare parts to a Product/Service/Agreement quotation.');
+          return;
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sp = item as any;
         const existingIndex = saleItems.findIndex((si) => si.sparePartId === sp.id);
@@ -1759,8 +2050,16 @@ function QuotationFormModal({
     setSaleItems((prev) => {
       const items = [...prev];
       const item = items[index];
-      if (field === 'quantity') items[index] = { ...item, quantity: Number(value) };
-      else if (field === 'description') items[index] = { ...item, description: String(value) };
+      if (field === 'quantity') {
+        const reqQty = Math.max(1, Number(value));
+        const limit = typeof item.availableStock === 'number' ? item.availableStock : 999999;
+        if (reqQty > limit) {
+          toast.error(`Cannot set quantity to ${reqQty}. Only ${limit} available in inventory.`);
+          items[index] = { ...item, quantity: limit };
+        } else {
+          items[index] = { ...item, quantity: reqQty };
+        }
+      } else if (field === 'description') items[index] = { ...item, description: String(value) };
       else if (field === 'brand') items[index] = { ...item, brand: String(value) };
       else if (field === 'model') {
         const modelNo = String(value);
@@ -1781,9 +2080,10 @@ function QuotationFormModal({
       else if (field === 'hsCode') items[index] = { ...item, hsCode: String(value) };
       else if (field === 'discount') {
         let d = Number(value);
-        if (item.maxDiscount > 0 && d > item.maxDiscount) {
-          toast.warning(`Maximum discount allowed is QAR ${item.maxDiscount}`);
-          d = item.maxDiscount;
+        const maxLimit = item.maxDiscount || 0;
+        if (d > maxLimit) {
+          toast.warning(`Maximum discount allowed is QAR ${maxLimit}`);
+          d = maxLimit;
         }
         if (d > item.basePrice) {
           toast.error('Discount cannot exceed price');
@@ -2470,11 +2770,10 @@ function QuotationFormModal({
                     <div className="flex-1 bg-card p-2 rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
                       <ProductSelect
                         onSelect={addItem}
-                        mode={quotationType === 'SPAREPART_SALE' ? 'SPAREPART' : 'PRODUCT'}
+                        mode={activeItemTab}
+                        selectedQuantities={selectedQuantities}
                         placeholder={
-                          quotationType === 'SPAREPART_SALE'
-                            ? 'Select Spare Part'
-                            : 'Select Product'
+                          activeItemTab === 'SPAREPART' ? 'Select Spare Part' : 'Select Product'
                         }
                       />
                     </div>
@@ -2585,17 +2884,36 @@ function QuotationFormModal({
                                     className="min-h-[60px] text-sm resize-none bg-slate-50/50"
                                   />
                                 </div>
-                                <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                    Warranty
-                                  </label>
-                                  <Input
-                                    placeholder="e.g. 1 Year"
-                                    value={item.warranty}
-                                    onChange={(e) => updateItem(index, 'warranty', e.target.value)}
-                                    className="h-9 text-sm bg-slate-50/50"
-                                  />
-                                </div>
+                                {quotationType === 'SPAREPART_SALE' ? (
+                                  <div className="md:col-span-2 space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                      Quantity
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      value={item.quantity}
+                                      onChange={(e) =>
+                                        updateItem(index, 'quantity', Number(e.target.value))
+                                      }
+                                      className="h-9 text-sm bg-slate-50/50 text-center font-bold"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="md:col-span-2 space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                      Warranty
+                                    </label>
+                                    <Input
+                                      placeholder="e.g. 1 Year"
+                                      value={item.warranty}
+                                      onChange={(e) =>
+                                        updateItem(index, 'warranty', e.target.value)
+                                      }
+                                      className="h-9 text-sm bg-slate-50/50"
+                                    />
+                                  </div>
+                                )}
                                 <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
                                     Rate
@@ -2644,17 +2962,36 @@ function QuotationFormModal({
                                   />
                                 </div>
 
-                                <div className="md:col-span-2 space-y-1">
-                                  <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                    Warranty
-                                  </label>
-                                  <Input
-                                    placeholder="e.g. 1 Year"
-                                    value={item.warranty}
-                                    onChange={(e) => updateItem(index, 'warranty', e.target.value)}
-                                    className="h-9 text-sm bg-slate-50/50"
-                                  />
-                                </div>
+                                {item.itemType === 'SPAREPART' ? (
+                                  <div className="md:col-span-2 space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                      Quantity
+                                    </label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      value={item.quantity}
+                                      onChange={(e) =>
+                                        updateItem(index, 'quantity', Number(e.target.value))
+                                      }
+                                      className="h-9 text-sm bg-slate-50/50 text-center font-bold"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="md:col-span-2 space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
+                                      Warranty
+                                    </label>
+                                    <Input
+                                      placeholder="e.g. 1 Year"
+                                      value={item.warranty}
+                                      onChange={(e) =>
+                                        updateItem(index, 'warranty', e.target.value)
+                                      }
+                                      className="h-9 text-sm bg-slate-50/50"
+                                    />
+                                  </div>
+                                )}
 
                                 <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
@@ -2887,6 +3224,7 @@ function QuotationFormModal({
                     </label>
                     <ProductSelect
                       mode="PRODUCT"
+                      selectedQuantities={selectedQuantities}
                       onSelect={(item) => {
                         if (saleItems.find((x) => x.productId === item.id)) return;
                         addItem(item);
@@ -3279,6 +3617,7 @@ function QuotationFormModal({
                     </label>
                     <ProductSelect
                       mode="PRODUCT"
+                      selectedQuantities={selectedQuantities}
                       onSelect={(item) => {
                         if (saleItems.find((x) => x.productId === item.id)) return;
                         addItem(item);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createInvoice, CreateInvoicePayload } from '@/lib/invoice';
 import { CustomerSelect, SelectableCustomer } from './CustomerSelect';
@@ -30,6 +30,7 @@ interface InvoiceItemRow {
   unitPrice: number;
   productId?: string;
   sparePartId?: string;
+  availableStock?: number;
 }
 
 /**
@@ -48,22 +49,74 @@ export default function InvoiceForm() {
   const [loading, setLoading] = useState(false);
   const [scanQuery, setScanQuery] = useState('');
 
+  const selectedQuantities = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    items.forEach((it) => {
+      const id = it.productId || it.sparePartId;
+      if (id) {
+        map[id] = (map[id] || 0) + it.quantity;
+      }
+    });
+    return map;
+  }, [items]);
+
   const addItem = (item: SelectableItem) => {
     let description = '';
     let unitPrice = 0;
     let productId: string | undefined = undefined;
     let sparePartId: string | undefined = undefined;
+    let availableStock = 1;
 
     if ('part_name' in item) {
       // It's a SparePart
+      const sp = item as SparePart & { quantity?: number };
       description = item.part_name;
       unitPrice = Number(item.base_price) || 0;
       sparePartId = item.id;
+      availableStock = typeof sp.quantity === 'number' ? sp.quantity : 999999;
     } else {
       // It's a Product
+      const pr = item as Product;
       description = item.name;
       unitPrice = item.sale_price || 0;
       productId = item.id;
+      const isAvailable = !pr.product_status || pr.product_status === 'AVAILABLE';
+      if (!isAvailable) {
+        availableStock = 0;
+      } else {
+        availableStock =
+          typeof (pr as unknown as Record<string, unknown>).stock === 'number'
+            ? ((pr as unknown as Record<string, unknown>).stock as number)
+            : 1;
+      }
+    }
+
+    const existingIdx = items.findIndex((it) => {
+      if ('part_name' in item) {
+        return it.sparePartId === item.id;
+      } else {
+        return it.productId === item.id;
+      }
+    });
+
+    if (existingIdx > -1) {
+      const currentQty = items[existingIdx].quantity;
+      if (currentQty >= availableStock) {
+        toast.error(`Cannot add more. Only ${availableStock} item(s) available in inventory.`);
+        return;
+      }
+      setItems(
+        items.map((it, idx) =>
+          idx === existingIdx ? { ...it, quantity: Number(it.quantity) + 1 } : it,
+        ),
+      );
+      toast.info(`Incremented quantity for ${description}`);
+      return;
+    }
+
+    if (availableStock <= 0) {
+      toast.error(`Item is out of stock.`);
+      return;
     }
 
     const newItem: InvoiceItemRow = {
@@ -73,6 +126,7 @@ export default function InvoiceForm() {
       unitPrice,
       productId,
       sparePartId,
+      availableStock,
     };
     setItems([...items, newItem]);
     toast.info(`Added ${description}`);
@@ -119,7 +173,25 @@ export default function InvoiceForm() {
   };
 
   const updateItem = (id: string, field: keyof InvoiceItemRow, value: string | number) => {
-    setItems(items.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+    setItems(
+      items.map((item) => {
+        if (item.id === id) {
+          if (field === 'quantity') {
+            const reqQty = Math.max(1, Number(value));
+            const limit = typeof item.availableStock === 'number' ? item.availableStock : 999999;
+            if (reqQty > limit) {
+              toast.error(
+                `Cannot set quantity to ${reqQty}. Only ${limit} available in inventory.`,
+              );
+              return { ...item, quantity: limit };
+            }
+            return { ...item, quantity: reqQty };
+          }
+          return { ...item, [field]: value };
+        }
+        return item;
+      }),
+    );
   };
 
   const removeItem = (id: string) => {
@@ -280,7 +352,7 @@ export default function InvoiceForm() {
               </div>
 
               <div className="w-full">
-                <ProductSelect onSelect={addItem} />
+                <ProductSelect onSelect={addItem} selectedQuantities={selectedQuantities} />
               </div>
               <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
                 Scan barcode or search for items by name/SKU. Selected items will be added to the

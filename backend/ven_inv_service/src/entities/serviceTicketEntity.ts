@@ -176,6 +176,36 @@ export class ServiceTicket {
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'report_url' })
   reportUrl?: string | null;
 
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'completion_bill_number' })
+  completionBillNumber?: string | null;
+
+  @Column({ name: 'visit_charge_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  visitChargeAmount!: number;
+
+  @Column({
+    name: 'visit_charge_method',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+    default: null,
+  })
+  visitChargeMethod!: string | null; // 'SEPARATE' | 'ADDED_TO_ESTIMATE'
+
+  @Column({ name: 'discount_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discountAmount!: number;
+
+  @Column({ name: 'technician_note_to_finance', type: 'text', nullable: true, default: null })
+  technicianNoteToFinance!: string | null;
+
+  @Column({ name: 'visit_charge_collected', type: 'boolean', default: false })
+  visitChargeCollected!: boolean;
+
+  @Column({ name: 'visit_charge_collected_at', type: 'timestamp', nullable: true, default: null })
+  visitChargeCollectedAt!: Date | null;
+
+  @Column({ name: 'visit_charge_informed', type: 'boolean', default: false })
+  visitChargeInformed!: boolean;
+
   @OneToMany(() => ServiceTicketItem, (item) => item.ticket, { cascade: true })
   items!: ServiceTicketItem[];
 

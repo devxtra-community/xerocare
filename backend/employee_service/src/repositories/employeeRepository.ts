@@ -53,6 +53,8 @@ export class EmployeeRepository {
     branchId?: string,
     search?: string,
     job?: string,
+    sortBy?: string,
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
     const query = this.repo
       .createQueryBuilder('employee')
@@ -81,11 +83,19 @@ export class EmployeeRepository {
       );
     }
 
-    const [data, total] = await query
-      .orderBy('employee.createdAt', 'DESC')
-      .skip(skip)
-      .take(take)
-      .getManyAndCount();
+    if (sortBy === 'branch') {
+      query.orderBy('branch.name', sortOrder, 'NULLS LAST');
+    } else if (sortBy === 'name') {
+      query.orderBy('employee.first_name', sortOrder).addOrderBy('employee.last_name', sortOrder);
+    } else if (sortBy === 'salary') {
+      query.orderBy('employee.salary', sortOrder, 'NULLS LAST');
+    } else if (sortBy === 'joined') {
+      query.orderBy('employee.createdAt', sortOrder);
+    } else {
+      query.orderBy('employee.createdAt', 'DESC');
+    }
+
+    const [data, total] = await query.skip(skip).take(take).getManyAndCount();
 
     return { data, total };
   }

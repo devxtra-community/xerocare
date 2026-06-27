@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DetailDialog } from '@/components/ui/DetailDialog';
 import { useToast } from '@/components/ui/ToastProvider';
-import { Play, UserPlus } from 'lucide-react';
+import SendDocumentModal from '@/components/SendDocumentModal';
+import { Play, UserPlus, Send } from 'lucide-react';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import {
   getServiceTickets,
@@ -40,6 +41,9 @@ import {
   createEstimateRevision,
   approveRevisionFinance,
   approveRevisionCustomer,
+  reviseServiceEstimate,
+  getEstimateRevisions,
+  extendTicketValidity,
   ServiceEstimate,
   ServiceEstimateRevision,
   ServiceEstimateItem,
@@ -80,6 +84,7 @@ import {
   FileText,
   Activity,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface AuthUser {
@@ -216,6 +221,9 @@ export default function ServiceDashboardPage() {
   const [showIntelModal, setShowIntelModal] = useState(false);
   const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareDocType, setShareDocType] = useState<'quotation' | 'completion-bill'>('quotation');
+  const [shareTicket, setShareTicket] = useState<ServiceTicket | null>(null);
 
   // New states for ERP service workflow
   const [showEstimatesModal, setShowEstimatesModal] = useState(false);
@@ -228,6 +236,9 @@ export default function ServiceDashboardPage() {
   // const [showRevisionForm, setShowRevisionForm] = useState(false);
   const [newRevLabour, setNewRevLabour] = useState<number>(0);
   const [newRevItems, setNewRevItems] = useState<Partial<ServiceEstimateItem>[]>([]);
+  const [ticketRevisions, setTicketRevisions] = useState<ServiceEstimateRevision[]>([]);
+  const [loadingRevisions, setLoadingRevisions] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'revisions'>('info');
 
   const [showMachineIntelModal, setShowMachineIntelModal] = useState(false);
   const [selectedMachineSerial, setSelectedMachineSerial] = useState('');
@@ -358,6 +369,10 @@ export default function ServiceDashboardPage() {
     rootCause: string;
     meterReading: number;
     labourCost: number;
+    visitChargeAmount: number;
+    visitChargeMethod: 'ADDED_TO_ESTIMATE' | 'SEPARATE';
+    discountAmount: number;
+    technicianNoteToFinance: string;
     items: Array<{
       itemSource: 'SPARE_PART' | 'CUSTOM';
       sparePartId: string;
@@ -375,11 +390,19 @@ export default function ServiceDashboardPage() {
     rootCause: '',
     meterReading: 0,
     labourCost: 0,
+    visitChargeAmount: 0,
+    visitChargeMethod: 'ADDED_TO_ESTIMATE',
+    discountAmount: 0,
+    technicianNoteToFinance: '',
     items: [],
   });
 
   const [quoteForm, setQuoteForm] = useState({
     laborCost: 0,
+    visitChargeAmount: 0,
+    visitChargeMethod: 'ADDED_TO_ESTIMATE' as 'ADDED_TO_ESTIMATE' | 'SEPARATE',
+    discountAmount: 0,
+    technicianNoteToFinance: '',
   });
 
   const [completionNotes, setCompletionNotes] = useState('');
@@ -732,26 +755,82 @@ export default function ServiceDashboardPage() {
   const handleDiagnose = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
+
+    // Validate discount amount <= total maxDiscountableAmount across parts
+    let totalMaxDiscount = 0;
+    for (const item of diagnosisForm.items) {
+      if (item.itemSource === 'SPARE_PART' && item.sparePartId) {
+        const part = spareParts.find((p) => p.id === item.sparePartId);
+        if (part) {
+          totalMaxDiscount += (Number(part.maxDiscountableAmount) || 0) * (item.quantity || 1);
+        }
+      }
+    }
+
+    if (Number(diagnosisForm.discountAmount || 0) > totalMaxDiscount) {
+      toast.error(
+        `Discount of QAR ${diagnosisForm.discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
+      );
+      return;
+    }
+
+    // Require Technician Note to Finance if status is REVISED/rejected or revisionCount > 0
+    const isRevision =
+      selectedTicket.status === 'REVISED' ||
+      selectedTicket.status === 'FINANCE_REJECTED' ||
+      (selectedTicket.additionalEstimateCount && selectedTicket.additionalEstimateCount > 0);
+    if (isRevision && !diagnosisForm.technicianNoteToFinance?.trim()) {
+      toast.error('Technician note to finance is required explaining the reason for revision.');
+      return;
+    }
+
     try {
       setSubmitting(true);
-      await diagnoseServiceTicket(selectedTicket.id, {
-        problemFound: diagnosisForm.problemFound || 'General breakdown',
-        rootCause: diagnosisForm.rootCause || 'Undetermined root cause',
-        technicianNotes: diagnosisForm.notes,
-        meterReading: Number(diagnosisForm.meterReading) || 0,
-        labourCost: Number(diagnosisForm.labourCost) || 0,
-        items: diagnosisForm.items.map((it) => ({
-          itemSource: it.itemSource,
-          sparePartId: it.sparePartId || undefined,
-          customPartName: it.customPartName || undefined,
-          customPartBrand: it.customPartBrand || undefined,
-          customPartDescription: it.customPartDescription || undefined,
-          partName: it.partName,
-          quantity: Number(it.quantity) || 1,
-          unitPrice: Number(it.unitPrice) || 0,
-          isFree: !!it.isFree,
-        })),
-      });
+      if (isRevision) {
+        await reviseServiceEstimate(selectedTicket.id, {
+          items: diagnosisForm.items.map((it) => ({
+            itemSource: it.itemSource,
+            sparePartId: it.sparePartId || undefined,
+            customPartName: it.customPartName || undefined,
+            customPartBrand: it.customPartBrand || undefined,
+            customPartDescription: it.customPartDescription || undefined,
+            partName: it.partName,
+            quantity: Number(it.quantity) || 1,
+            unitPrice: Number(it.unitPrice) || 0,
+            isFree: !!it.isFree,
+          })),
+          visitChargeAmount: Number(diagnosisForm.visitChargeAmount) || 0,
+          visitChargeMethod: diagnosisForm.visitChargeMethod,
+          discountAmount: Number(diagnosisForm.discountAmount) || 0,
+          technicianNoteToFinance: diagnosisForm.technicianNoteToFinance,
+          revisionType: 'REVISION',
+        });
+        toastSuccess('Estimate revision submitted successfully!');
+      } else {
+        await diagnoseServiceTicket(selectedTicket.id, {
+          problemFound: diagnosisForm.problemFound || 'General breakdown',
+          rootCause: diagnosisForm.rootCause || 'Undetermined root cause',
+          technicianNotes: diagnosisForm.notes,
+          meterReading: Number(diagnosisForm.meterReading) || 0,
+          labourCost: Number(diagnosisForm.labourCost) || 0,
+          visitChargeAmount: Number(diagnosisForm.visitChargeAmount) || 0,
+          visitChargeMethod: diagnosisForm.visitChargeMethod,
+          discountAmount: Number(diagnosisForm.discountAmount) || 0,
+          technicianNoteToFinance: diagnosisForm.technicianNoteToFinance || null,
+          items: diagnosisForm.items.map((it) => ({
+            itemSource: it.itemSource,
+            sparePartId: it.sparePartId || undefined,
+            customPartName: it.customPartName || undefined,
+            customPartBrand: it.customPartBrand || undefined,
+            customPartDescription: it.customPartDescription || undefined,
+            partName: it.partName,
+            quantity: Number(it.quantity) || 1,
+            unitPrice: Number(it.unitPrice) || 0,
+            isFree: !!it.isFree,
+          })),
+        });
+        toastSuccess('Diagnosis and estimate submitted successfully!');
+      }
       setShowDiagnoseModal(false);
       setDiagnosisForm({
         notes: '',
@@ -759,13 +838,16 @@ export default function ServiceDashboardPage() {
         rootCause: '',
         meterReading: 0,
         labourCost: 0,
+        visitChargeAmount: 0,
+        visitChargeMethod: 'ADDED_TO_ESTIMATE',
+        discountAmount: 0,
+        technicianNoteToFinance: '',
         items: [],
       });
       await fetchInitialData();
-      toastSuccess('Diagnosis recorded successfully!');
     } catch (error) {
-      console.error('Failed to save diagnosis:', error);
-      toastError('Failed to save diagnosis.');
+      console.error('Failed to submit:', error);
+      toastError('Failed to submit. Please check inputs.');
     } finally {
       setSubmitting(false);
     }
@@ -776,9 +858,15 @@ export default function ServiceDashboardPage() {
     if (!selectedTicket) return;
     try {
       setSubmitting(true);
-      await submitServiceQuotation(selectedTicket.id, quoteForm.laborCost);
+      await submitServiceQuotation(selectedTicket.id, quoteForm);
       setShowQuoteModal(false);
-      setQuoteForm({ laborCost: 0 });
+      setQuoteForm({
+        laborCost: 0,
+        visitChargeAmount: 0,
+        visitChargeMethod: 'ADDED_TO_ESTIMATE',
+        discountAmount: 0,
+        technicianNoteToFinance: '',
+      });
       await fetchInitialData();
     } catch (error) {
       console.error('Failed to submit quote:', error);
@@ -853,6 +941,18 @@ export default function ServiceDashboardPage() {
       setEstimatesData(data);
     } catch (err) {
       console.error('Failed to fetch estimates:', err);
+    }
+  };
+
+  const fetchTicketRevisions = async (ticketId: string) => {
+    try {
+      setLoadingRevisions(true);
+      const data = await getEstimateRevisions(ticketId);
+      setTicketRevisions((data as ServiceEstimateRevision[]) || []);
+    } catch (err) {
+      console.error('Failed to fetch revisions:', err);
+    } finally {
+      setLoadingRevisions(false);
     }
   };
 
@@ -1605,6 +1705,8 @@ export default function ServiceDashboardPage() {
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'FINANCE_APPROVED':
         return 'bg-green-100 text-green-800 border-green-200';
+      case 'QUOTED':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'FINANCE_REJECTED':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'CUSTOMER_APPROVED':
@@ -1818,7 +1920,38 @@ export default function ServiceDashboardPage() {
                           : 'Unscheduled'}
                       </TableCell>
                       <TableCell className="py-2 px-2">
-                        <Badge status={ticket.status} />
+                        <div className="flex items-center gap-1.5">
+                          <Badge status={ticket.status} />
+                          {ticket.status === 'COMPLETED' && (
+                            <button
+                              title="Share Completion Bill"
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShareTicket(ticket);
+                                setShareDocType('completion-bill');
+                                setShareModalOpen(true);
+                              }}
+                            >
+                              <Send className="size-3.5" />
+                            </button>
+                          )}
+                          {(ticket.status === 'QUOTED' ||
+                            ticket.status === 'CUSTOMER_APPROVED') && (
+                            <button
+                              title="Share Service Quotation"
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShareTicket(ticket);
+                                setShareDocType('quotation');
+                                setShareModalOpen(true);
+                              }}
+                            >
+                              <FileText className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell
                         className="text-right py-2 px-2 actions-cell"
@@ -1826,39 +1959,42 @@ export default function ServiceDashboardPage() {
                       >
                         <div className="flex items-center justify-end gap-1">
                           {/* HELP DESK ACTIONS */}
-                          {isHelpDesk && ticket.status === 'OPEN' && (
-                            <Button
-                              size="sm"
-                              className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
-                              onClick={() => {
-                                setSelectedTicket(ticket);
-                                setShowAssignModal(true);
-                              }}
-                            >
-                              <UserPlus className="size-3.5" />
-                              Assign Tech
-                            </Button>
-                          )}
+                          {isHelpDesk &&
+                            (ticket.status === 'OPEN' || ticket.status === 'FREE_SERVICE') && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  setShowAssignModal(true);
+                                }}
+                              >
+                                <UserPlus className="size-3.5" />
+                                Assign Tech
+                              </Button>
+                            )}
 
-                          {isHelpDesk && ticket.status === 'FINANCE_APPROVED' && (
-                            <>
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-[#14532d] text-white h-7 px-2 rounded-md text-[11px] font-bold"
-                                onClick={() => handleApproveQuotation(ticket.id)}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="h-7 px-2 rounded-md text-[11px] font-bold"
-                                onClick={() => handleRejectQuotation(ticket.id)}
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          )}
+                          {(isHelpDesk || isManagerOrAdmin) &&
+                            (ticket.status === 'FINANCE_APPROVED' ||
+                              ticket.status === 'QUOTED') && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-[#14532d] text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                  onClick={() => handleApproveQuotation(ticket.id)}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2 rounded-md text-[11px] font-bold"
+                                  onClick={() => handleRejectQuotation(ticket.id)}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
 
                           {/* TECHNICIAN ACTIONS */}
                           {isTechnician &&
@@ -1890,6 +2026,10 @@ export default function ServiceDashboardPage() {
                                       rootCause: '',
                                       meterReading: 0,
                                       labourCost: 0,
+                                      visitChargeAmount: 0,
+                                      visitChargeMethod: 'ADDED_TO_ESTIMATE',
+                                      discountAmount: 0,
+                                      technicianNoteToFinance: '',
                                       items: [],
                                     });
                                     setShowDiagnoseModal(true);
@@ -1918,8 +2058,56 @@ export default function ServiceDashboardPage() {
                             )}
 
                           {isTechnician &&
+                            (ticket.status === 'FINANCE_REJECTED' ||
+                              ticket.status === 'REVISED') && (
+                              <Button
+                                size="sm"
+                                className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  const laborItem = ticket.items?.find(
+                                    (it) => it.partName === 'Labor Cost / Service Charge',
+                                  );
+                                  const otherItems =
+                                    ticket.items?.filter(
+                                      (it) => it.partName !== 'Labor Cost / Service Charge',
+                                    ) || [];
+                                  setDiagnosisForm({
+                                    notes: ticket.diagnosisNotes || '',
+                                    problemFound: ticket.problemFound || '',
+                                    rootCause: ticket.rootCause || '',
+                                    meterReading: ticket.meterReadingAtService || 0,
+                                    labourCost: laborItem ? Number(laborItem.unitPrice) : 0,
+                                    visitChargeAmount: ticket.visitChargeAmount || 0,
+                                    visitChargeMethod:
+                                      (ticket.visitChargeMethod as
+                                        | 'ADDED_TO_ESTIMATE'
+                                        | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
+                                    discountAmount: ticket.discountAmount || 0,
+                                    technicianNoteToFinance: ticket.technicianNoteToFinance || '',
+                                    items: otherItems.map((it) => ({
+                                      itemSource: it.itemSource,
+                                      sparePartId: it.sparePartId || '',
+                                      customPartName: it.customPartName || '',
+                                      customPartBrand: it.customPartBrand || '',
+                                      customPartDescription: it.customPartDescription || '',
+                                      partName: it.partName || '',
+                                      quantity: it.quantity || 1,
+                                      unitPrice: it.unitPrice || 0,
+                                      isFree: !!it.isFree,
+                                    })),
+                                  });
+                                  setShowDiagnoseModal(true);
+                                }}
+                              >
+                                Revise Estimate
+                              </Button>
+                            )}
+
+                          {isTechnician &&
                             (ticket.status === 'CUSTOMER_APPROVED' ||
                               ticket.status === 'FREE_SERVICE') &&
+                            ticket.assignedTechnicianId === user?.userId &&
                             !ticket.repairStartedAt && (
                               <Button
                                 size="sm"
@@ -2122,9 +2310,30 @@ export default function ServiceDashboardPage() {
                             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                               <h4 className="text-xs font-bold text-slate-700">Select Machine</h4>
                               {selectedMachine && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
-                                  Selected: {selectedMachine.serialNumber}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                    Selected: {selectedMachine.serialNumber}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedMachine(null);
+                                      setNewTicket((prev) => ({
+                                        ...prev,
+                                        productId: '',
+                                        contractReferenceId: '',
+                                        productBrand: '',
+                                        productModel: '',
+                                        productName: '',
+                                        serialNumber: '',
+                                        serviceContext: 'CHARGEABLE',
+                                      }));
+                                    }}
+                                    className="text-[10px] font-bold text-red-600 hover:text-white bg-red-50 hover:bg-red-500 border border-red-200 hover:border-red-500 px-2 py-0.5 rounded-full transition cursor-pointer"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
                               )}
                             </div>
 
@@ -3736,6 +3945,128 @@ export default function ServiceDashboardPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* TRACK B EXTRA PRICING AND REVISION FIELDS */}
+                {selectedTicket.track !== 'A' && (
+                  <div className="mt-6 border-t border-slate-100 pt-6 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Estimate & Pricing Details
+                    </h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Visit Charge (QAR)
+                        </label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={diagnosisForm.visitChargeAmount || ''}
+                          onChange={(e) =>
+                            setDiagnosisForm({
+                              ...diagnosisForm,
+                              visitChargeAmount: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Visit Charge Method
+                        </label>
+                        <select
+                          value={diagnosisForm.visitChargeMethod}
+                          onChange={(e) =>
+                            setDiagnosisForm({
+                              ...diagnosisForm,
+                              visitChargeMethod: e.target.value as 'ADDED_TO_ESTIMATE' | 'SEPARATE',
+                            })
+                          }
+                          className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent animate-none"
+                        >
+                          <option value="ADDED_TO_ESTIMATE">Add to Estimate</option>
+                          <option value="SEPARATE">Separate Cash On-Site</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Discount (QAR)
+                        </label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={diagnosisForm.discountAmount || ''}
+                          onChange={(e) =>
+                            setDiagnosisForm({
+                              ...diagnosisForm,
+                              discountAmount: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                        />
+                      </div>
+                      <div>
+                        {/* Live Calculation display */}
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Grand Service Estimate Total
+                        </label>
+                        <div className="h-9 px-3 flex items-center justify-between bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl text-xs font-bold">
+                          <span>QAR</span>
+                          <span>
+                            {(() => {
+                              const partsTotal = diagnosisForm.items.reduce(
+                                (sum, item) =>
+                                  sum + (item.isFree ? 0 : item.quantity * item.unitPrice),
+                                0,
+                              );
+                              const laborTotal = diagnosisForm.labourCost || 0;
+                              const visitChargeToAdd =
+                                diagnosisForm.visitChargeMethod === 'ADDED_TO_ESTIMATE'
+                                  ? diagnosisForm.visitChargeAmount || 0
+                                  : 0;
+                              const totalEstimate = Math.max(
+                                0,
+                                partsTotal +
+                                  laborTotal +
+                                  visitChargeToAdd -
+                                  (diagnosisForm.discountAmount || 0),
+                              );
+                              return totalEstimate.toFixed(2);
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Technician Note to Finance */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        Technician Note to Finance{' '}
+                        {(selectedTicket.status === 'REVISED' ||
+                          selectedTicket.status === 'FINANCE_REJECTED' ||
+                          (selectedTicket.additionalEstimateCount &&
+                            selectedTicket.additionalEstimateCount > 0)) && (
+                          <span className="text-red-500">* Required</span>
+                        )}
+                      </label>
+                      <textarea
+                        placeholder="Explain details for finance approval/revision reasoning..."
+                        value={diagnosisForm.technicianNoteToFinance}
+                        onChange={(e) =>
+                          setDiagnosisForm({
+                            ...diagnosisForm,
+                            technicianNoteToFinance: e.target.value,
+                          })
+                        }
+                        className="w-full min-h-[70px] p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                )}
               </CardContent>
               <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
                 <Button
@@ -3893,46 +4224,15 @@ export default function ServiceDashboardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Technician Remarks
-                    </label>
-                    <Input
-                      placeholder="Optional technician notes..."
-                      value={completeForm.technicianRemarks}
-                      onChange={(e) =>
-                        setCompleteForm({ ...completeForm, technicianRemarks: e.target.value })
-                      }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Customer Signature (Digital)
-                    </label>
-                    <Input
-                      required
-                      placeholder="Name or signature string"
-                      value={completeForm.customerSignature}
-                      onChange={(e) =>
-                        setCompleteForm({ ...completeForm, customerSignature: e.target.value })
-                      }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Technician Signature (Digital)
+                    Technician Remarks
                   </label>
                   <Input
-                    required
-                    placeholder="Technician signature string"
-                    value={completeForm.technicianSignature}
+                    placeholder="Optional technician notes..."
+                    value={completeForm.technicianRemarks}
                     onChange={(e) =>
-                      setCompleteForm({ ...completeForm, technicianSignature: e.target.value })
+                      setCompleteForm({ ...completeForm, technicianRemarks: e.target.value })
                     }
                     className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
                   />
@@ -4136,417 +4436,700 @@ export default function ServiceDashboardPage() {
 
             return (
               <div className="space-y-4 text-slate-800">
-                {/* TOP HEADER SECTION */}
-                <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Service Ticket
-                      </span>
-                      <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
-                        {selectedTicket.jobType}
-                      </span>
-                    </div>
-                    <h3 className="text-lg font-bold tracking-tight text-slate-900 font-mono">
-                      {selectedTicket.ticketNumber}
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge status={selectedTicket.status} />
-                    <Badge context={selectedTicket.serviceContext} />
-                  </div>
+                {/* TABS SELECTOR */}
+                <div className="flex border-b border-slate-200 gap-4 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveDetailTab('info')}
+                    className={`pb-2 px-2 text-xs font-bold transition-all relative ${activeDetailTab === 'info' ? 'text-primary font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Ticket Details
+                    {activeDetailTab === 'info' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDetailTab('revisions');
+                      fetchTicketRevisions(selectedTicket.id);
+                    }}
+                    className={`pb-2 px-2 text-xs font-bold transition-all relative ${activeDetailTab === 'revisions' ? 'text-primary font-extrabold' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    Revision History
+                    {activeDetailTab === 'revisions' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded" />
+                    )}
+                  </button>
                 </div>
 
-                {/* CORE INFO GRID (4 Columns side-by-side) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {/* Visit Date */}
-                  <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
-                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
-                      <Calendar size={16} />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                        Scheduled Visit
-                      </span>
-                      <span className="text-xs font-semibold text-slate-800 block truncate">
-                        {selectedTicket.scheduledVisitDate
-                          ? new Date(selectedTicket.scheduledVisitDate).toLocaleDateString(
-                              undefined,
-                              {
-                                weekday: 'short',
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              },
-                            )
-                          : 'Unscheduled'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Technician */}
-                  <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
-                    <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
-                      <Wrench size={16} />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                        Assigned Technician
-                      </span>
-                      <span className="text-xs font-semibold text-slate-800 block truncate">
-                        {technician
-                          ? `${technician.first_name || ''} ${technician.last_name || ''}`.trim()
-                          : 'Not Assigned'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Customer Info Card */}
-                  <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
-                    <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
-                      <User size={14} className="text-slate-400 shrink-0" />
-                      <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                        Customer Info
-                      </h4>
-                    </div>
-                    <div className="space-y-0.5 min-w-0">
-                      <a
-                        href={`/employee/customer?id=${customer?.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs block truncate"
-                      >
-                        {customer ? customer.name : 'Unknown Customer'}
-                      </a>
-                      {customer?.email && (
-                        <div className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0">
-                          <Mail size={10} className="text-slate-400 shrink-0" />
-                          <span className="truncate">{customer.email}</span>
+                {activeDetailTab === 'info' ? (
+                  <>
+                    {/* TOP HEADER SECTION */}
+                    <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Service Ticket
+                          </span>
+                          <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                            {selectedTicket.jobType}
+                          </span>
                         </div>
-                      )}
-                      {customer?.phone && (
-                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                          <Phone size={10} className="text-slate-400 shrink-0" />
-                          <span className="truncate">{customer.phone}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Machine Details Card */}
-                  <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
-                    <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
-                      <Laptop size={14} className="text-slate-400 shrink-0" />
-                      <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                        Machine Details
-                      </h4>
-                    </div>
-                    <div className="space-y-0.5 min-w-0">
-                      <span className="font-bold text-slate-800 text-xs block truncate">
-                        {formatMachineName(
-                          selectedTicket.productBrand,
-                          selectedTicket.productModel,
-                          selectedTicket.productName,
-                        )}
-                      </span>
-                      <div className="flex flex-wrap items-center gap-1 min-w-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (selectedTicket.serialNumber) {
-                              setShowDetailsModal(false);
-                              handleOpenMachineIntel(selectedTicket.serialNumber);
-                            }
-                          }}
-                          className="text-[10px] font-mono font-bold bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1.5 py-0.5 text-blue-600 hover:text-blue-800 transition-colors focus:outline-none truncate"
-                        >
-                          SN: {selectedTicket.serialNumber || 'N/A'} (View)
-                        </button>
+                        <h3 className="text-lg font-bold tracking-tight text-slate-900 font-mono">
+                          {selectedTicket.ticketNumber}
+                        </h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge status={selectedTicket.status} />
+                        <Badge context={selectedTicket.serviceContext} />
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* NOTES / DESCRIPTIONS CALLOUTS (3 Columns side-by-side) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Issue Description */}
-                  <div className="bg-amber-50/45 border border-amber-200/50 rounded-xl p-3 space-y-1 shadow-sm">
-                    <div className="flex items-center gap-1 text-amber-800 font-bold text-[10px] uppercase tracking-wider">
-                      <FileText size={12} />
-                      <span>Issue Description</span>
-                    </div>
-                    <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                      {selectedTicket.issueDescription || 'No description provided.'}
-                    </p>
-                  </div>
+                    {/* CORE INFO GRID (4 Columns side-by-side) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      {/* Visit Date */}
+                      <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
+                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                          <Calendar size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                            Scheduled Visit
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800 block truncate">
+                            {selectedTicket.scheduledVisitDate
+                              ? new Date(selectedTicket.scheduledVisitDate).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    weekday: 'short',
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  },
+                                )
+                              : 'Unscheduled'}
+                          </span>
+                        </div>
+                      </div>
 
-                  {/* Diagnosis Notes */}
-                  <div className="bg-purple-50/45 border border-purple-200/50 rounded-xl p-3 space-y-1 shadow-sm">
-                    <div className="flex items-center gap-1 text-purple-800 font-bold text-[10px] uppercase tracking-wider">
-                      <Activity size={12} />
-                      <span>Diagnosis Notes</span>
+                      {/* Technician */}
+                      <div className="bg-white border border-slate-100 rounded-xl p-3 flex items-center gap-2.5 shadow-sm min-w-0">
+                        <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
+                          <Wrench size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                            Assigned Technician
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800 block truncate">
+                            {technician
+                              ? `${technician.first_name || ''} ${technician.last_name || ''}`.trim()
+                              : 'Not Assigned'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Customer Info Card */}
+                      <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
+                        <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
+                          <User size={14} className="text-slate-400 shrink-0" />
+                          <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                            Customer Info
+                          </h4>
+                        </div>
+                        <div className="space-y-0.5 min-w-0">
+                          <a
+                            href={`/employee/customer?id=${customer?.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs block truncate"
+                          >
+                            {customer ? customer.name : 'Unknown Customer'}
+                          </a>
+                          {customer?.email && (
+                            <div className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0">
+                              <Mail size={10} className="text-slate-400 shrink-0" />
+                              <span className="truncate">{customer.email}</span>
+                            </div>
+                          )}
+                          {customer?.phone && (
+                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                              <Phone size={10} className="text-slate-400 shrink-0" />
+                              <span className="truncate">{customer.phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Machine Details Card */}
+                      <div className="border border-slate-200/60 rounded-xl p-3 space-y-1.5 bg-white shadow-sm min-w-0">
+                        <div className="flex items-center gap-1.5 border-b border-slate-50 pb-1">
+                          <Laptop size={14} className="text-slate-400 shrink-0" />
+                          <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                            Machine Details
+                          </h4>
+                        </div>
+                        <div className="space-y-0.5 min-w-0">
+                          <span className="font-bold text-slate-800 text-xs block truncate">
+                            {formatMachineName(
+                              selectedTicket.productBrand,
+                              selectedTicket.productModel,
+                              selectedTicket.productName,
+                            )}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedTicket.serialNumber) {
+                                  setShowDetailsModal(false);
+                                  handleOpenMachineIntel(selectedTicket.serialNumber);
+                                }
+                              }}
+                              className="text-[10px] font-mono font-bold bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1.5 py-0.5 text-blue-600 hover:text-blue-800 transition-colors focus:outline-none truncate"
+                            >
+                              SN: {selectedTicket.serialNumber || 'N/A'} (View)
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    {selectedTicket.diagnosisNotes ? (
-                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                        {selectedTicket.diagnosisNotes}
-                      </p>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 italic">Not yet submitted</span>
+
+                    {/* NOTES / DESCRIPTIONS CALLOUTS (3 Columns side-by-side) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {/* Issue Description */}
+                      <div className="bg-amber-50/45 border border-amber-200/50 rounded-xl p-3 space-y-1 shadow-sm">
+                        <div className="flex items-center gap-1 text-amber-800 font-bold text-[10px] uppercase tracking-wider">
+                          <FileText size={12} />
+                          <span>Issue Description</span>
+                        </div>
+                        <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                          {selectedTicket.issueDescription || 'No description provided.'}
+                        </p>
+                      </div>
+
+                      {/* Diagnosis Notes */}
+                      <div className="bg-purple-50/45 border border-purple-200/50 rounded-xl p-3 space-y-1 shadow-sm">
+                        <div className="flex items-center gap-1 text-purple-800 font-bold text-[10px] uppercase tracking-wider">
+                          <Activity size={12} />
+                          <span>Diagnosis Notes</span>
+                        </div>
+                        {selectedTicket.diagnosisNotes ? (
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                            {selectedTicket.diagnosisNotes}
+                          </p>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">
+                            Not yet submitted
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Completion Notes */}
+                      <div className="bg-emerald-50/45 border border-emerald-200/50 rounded-xl p-3 space-y-1 shadow-sm">
+                        <div className="flex items-center gap-1 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">
+                          <CheckCircle2 size={12} />
+                          <span>Completion Notes</span>
+                        </div>
+                        {selectedTicket.completionNotes ? (
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                            {selectedTicket.completionNotes}
+                          </p>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">
+                            Not yet completed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Items & Spare Parts Used */}
+                    {selectedTicket.items && selectedTicket.items.length > 0 && (
+                      <div className="border-t border-slate-100 pt-3">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                          Spare Parts / Items Used
+                        </h4>
+                        <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                          <Table>
+                            <TableHeader className="bg-slate-50/50">
+                              <TableRow>
+                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 px-2">
+                                  Part Name
+                                </TableHead>
+                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-center px-2">
+                                  Qty
+                                </TableHead>
+                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
+                                  Unit Price
+                                </TableHead>
+                                <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
+                                  Total
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedTicket.items.map((item, index: number) => (
+                                <TableRow key={item.id || index} className="hover:bg-slate-50/20">
+                                  <TableCell className="py-1 px-2 text-xs font-semibold text-slate-700">
+                                    {item.partName}
+                                  </TableCell>
+                                  <TableCell className="py-1 px-2 text-xs text-slate-600 text-center">
+                                    {item.quantity}
+                                  </TableCell>
+                                  <TableCell className="py-1 px-2 text-xs text-slate-600 text-right">
+                                    QAR{' '}
+                                    {item.unitPrice.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </TableCell>
+                                  <TableCell className="py-1 px-2 text-xs font-bold text-slate-700 text-right">
+                                    {item.isFree ? (
+                                      <span className="text-emerald-600 font-bold text-[10px] uppercase">
+                                        FOC
+                                      </span>
+                                    ) : (
+                                      `QAR ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
                     )}
-                  </div>
 
-                  {/* Completion Notes */}
-                  <div className="bg-emerald-50/45 border border-emerald-200/50 rounded-xl p-3 space-y-1 shadow-sm">
-                    <div className="flex items-center gap-1 text-emerald-800 font-bold text-[10px] uppercase tracking-wider">
-                      <CheckCircle2 size={12} />
-                      <span>Completion Notes</span>
+                    {/* Action buttons relevant to current status */}
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                      {selectedTicket.status === 'COMPLETED' && (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 rounded-lg font-bold gap-1 mr-auto"
+                          onClick={async () => {
+                            try {
+                              const blob = await downloadServiceReport(selectedTicket.id);
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `Service_Report_${selectedTicket.ticketNumber}.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              window.URL.revokeObjectURL(url);
+                              toastSuccess('PDF Report downloaded successfully!');
+                            } catch (err) {
+                              console.error(err);
+                              toastError('Failed to download PDF Report.');
+                            }
+                          }}
+                        >
+                          <FileText className="size-3.5" />
+                          Download PDF Report
+                        </Button>
+                      )}
+
+                      {isHelpDesk &&
+                        (selectedTicket.status === 'OPEN' ||
+                          selectedTicket.status === 'FREE_SERVICE') && (
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              setShowAssignModal(true);
+                            }}
+                          >
+                            <UserPlus className="size-3.5" />
+                            Assign Tech
+                          </Button>
+                        )}
+
+                      {isTechnician &&
+                        selectedTicket.status === 'ASSIGNED' &&
+                        !selectedTicket.diagnosisStartedAt && (
+                          <Button
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              handleStartDiagnosis(selectedTicket.id);
+                            }}
+                          >
+                            <Play className="size-3.5 fill-current" />
+                            Start Diagnosis
+                          </Button>
+                        )}
+
+                      {isTechnician &&
+                        selectedTicket.status === 'ASSIGNED' &&
+                        selectedTicket.diagnosisStartedAt && (
+                          <div className="flex items-center gap-1.5">
+                            <ActiveTimer startTime={selectedTicket.diagnosisStartedAt.toString()} />
+                            <Button
+                              size="sm"
+                              className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-3 rounded-lg font-bold"
+                              onClick={() => {
+                                setShowDetailsModal(false);
+                                setDiagnosisForm({
+                                  notes: '',
+                                  problemFound: '',
+                                  rootCause: '',
+                                  meterReading: 0,
+                                  labourCost: 0,
+                                  visitChargeAmount: 0,
+                                  visitChargeMethod: 'ADDED_TO_ESTIMATE',
+                                  discountAmount: 0,
+                                  technicianNoteToFinance: '',
+                                  items: [],
+                                });
+                                setShowDiagnoseModal(true);
+                              }}
+                            >
+                              Diagnose
+                            </Button>
+                          </div>
+                        )}
+
+                      {!isHelpDesk &&
+                        (selectedTicket.status === 'DIAGNOSED' ||
+                          selectedTicket.status === 'WAITING_FINANCE_APPROVAL' ||
+                          selectedTicket.status === 'FINANCE_APPROVED' ||
+                          selectedTicket.status === 'QUOTED' ||
+                          selectedTicket.status === 'FINANCE_REJECTED' ||
+                          selectedTicket.status === 'CUSTOMER_APPROVED' ||
+                          selectedTicket.status === 'CUSTOMER_REJECTED') && (
+                          <Button
+                            size="sm"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 rounded-lg font-bold"
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              handleOpenEstimates(selectedTicket);
+                            }}
+                          >
+                            Estimates
+                          </Button>
+                        )}
+
+                      {isTechnician &&
+                        (selectedTicket.status === 'CUSTOMER_APPROVED' ||
+                          selectedTicket.status === 'FREE_SERVICE') &&
+                        selectedTicket.assignedTechnicianId === user?.userId &&
+                        !selectedTicket.repairStartedAt && (
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              handleStartRepair(selectedTicket.id);
+                            }}
+                          >
+                            <Play className="size-3.5 fill-current" />
+                            Start Repair
+                          </Button>
+                        )}
+
+                      {isTechnician &&
+                        selectedTicket.status === 'IN_PROGRESS' &&
+                        selectedTicket.repairStartedAt && (
+                          <div className="flex items-center gap-1.5">
+                            <ActiveTimer startTime={selectedTicket.repairStartedAt.toString()} />
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold"
+                              onClick={() => {
+                                setShowDetailsModal(false);
+                                setCompleteForm({
+                                  workPerformed: '',
+                                  resolutionDetails: '',
+                                  meterReading: 0,
+                                  customerRemarks: '',
+                                  technicianRemarks: '',
+                                  customerSignature: 'Customer Signed',
+                                  technicianSignature: 'Technician Signed',
+                                });
+                                setCompletionNotes('');
+                                setShowCompleteModal(true);
+                              }}
+                            >
+                              Complete Job
+                            </Button>
+                          </div>
+                        )}
+
+                      {isManagerOrAdmin &&
+                        selectedTicket.status !== 'COMPLETED' &&
+                        selectedTicket.status !== 'CANCELLED' && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="h-8 px-3 rounded-lg font-bold"
+                            onClick={() => {
+                              setShowDetailsModal(false);
+                              handleCancelTicketClick(
+                                selectedTicket.id,
+                                selectedTicket.ticketNumber,
+                              );
+                            }}
+                          >
+                            Cancel Ticket
+                          </Button>
+                        )}
+
+                      {(selectedTicket.status === 'QUOTED' ||
+                        selectedTicket.status === 'CUSTOMER_APPROVED') && (
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold flex items-center gap-1"
+                          onClick={() => {
+                            setShareTicket(selectedTicket);
+                            setShareDocType('quotation');
+                            setShareModalOpen(true);
+                          }}
+                        >
+                          <Send className="size-3" />
+                          Share Quotation
+                        </Button>
+                      )}
+
+                      {selectedTicket.status === 'COMPLETED' && (
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold flex items-center gap-1"
+                          onClick={() => {
+                            setShareTicket(selectedTicket);
+                            setShareDocType('completion-bill');
+                            setShareModalOpen(true);
+                          }}
+                        >
+                          <Send className="size-3" />
+                          Share Bill
+                        </Button>
+                      )}
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          setSelectedTicket(null);
+                          setActiveDetailTab('info');
+                          setTicketRevisions([]);
+                        }}
+                        className="text-slate-500 border-slate-300 hover:bg-slate-50 h-8 px-3 rounded-lg font-bold"
+                      >
+                        Close
+                      </Button>
                     </div>
-                    {selectedTicket.completionNotes ? (
-                      <p className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
-                        {selectedTicket.completionNotes}
-                      </p>
-                    ) : (
-                      <span className="text-[11px] text-slate-400 italic">Not yet completed</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Items & Spare Parts Used */}
-                {selectedTicket.items && selectedTicket.items.length > 0 && (
-                  <div className="border-t border-slate-100 pt-3">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                      Spare Parts / Items Used
+                  </>
+                ) : (
+                  <div className="space-y-4 pt-2">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      Estimate Revision History
                     </h4>
-                    <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
-                      <Table>
-                        <TableHeader className="bg-slate-50/50">
-                          <TableRow>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 px-2">
-                              Part Name
-                            </TableHead>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-center px-2">
-                              Qty
-                            </TableHead>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
-                              Unit Price
-                            </TableHead>
-                            <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
-                              Total
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedTicket.items.map((item, index: number) => (
-                            <TableRow key={item.id || index} className="hover:bg-slate-50/20">
-                              <TableCell className="py-1 px-2 text-xs font-semibold text-slate-700">
-                                {item.partName}
-                              </TableCell>
-                              <TableCell className="py-1 px-2 text-xs text-slate-600 text-center">
-                                {item.quantity}
-                              </TableCell>
-                              <TableCell className="py-1 px-2 text-xs text-slate-600 text-right">
-                                QAR{' '}
-                                {item.unitPrice.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                })}
-                              </TableCell>
-                              <TableCell className="py-1 px-2 text-xs font-bold text-slate-700 text-right">
-                                {item.isFree ? (
-                                  <span className="text-emerald-600 font-bold text-[10px] uppercase">
-                                    FOC
-                                  </span>
-                                ) : (
-                                  `QAR ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+
+                    {loadingRevisions ? (
+                      <div className="flex items-center justify-center py-8 text-slate-400 text-xs">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" /> Loading
+                        revision history...
+                      </div>
+                    ) : ticketRevisions.length === 0 ? (
+                      <div className="text-xs text-slate-400 bg-slate-50 p-6 rounded-xl border border-slate-100 italic text-center">
+                        No revisions recorded for this ticket estimate.
+                      </div>
+                    ) : (
+                      <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                        {ticketRevisions.map((rev) => (
+                          <div
+                            key={rev.id}
+                            className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-800">
+                                Revision #{rev.revisionNumber} ({rev.revisionType || 'REVISION'})
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                                  rev.financeDecision === 'APPROVED'
+                                    ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                                    : rev.financeDecision === 'REJECTED'
+                                      ? 'border-red-200 text-red-700 bg-red-50'
+                                      : 'border-amber-200 text-amber-700 bg-amber-50'
+                                }`}
+                              >
+                                {rev.financeDecision || 'PENDING'}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[11px] text-slate-600 bg-white p-3 rounded-lg border border-slate-100">
+                              <div>
+                                <span className="text-slate-400 block font-bold">Total Amount</span>
+                                <span className="font-semibold text-slate-900">
+                                  QAR {Number(rev.totalAmount || 0).toFixed(2)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block font-bold">
+                                  Discount Applied
+                                </span>
+                                <span className="font-semibold text-slate-900">
+                                  QAR {Number(rev.discountApplied || 0).toFixed(2)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block font-bold">Visit Charge</span>
+                                <span className="font-semibold text-slate-900">
+                                  QAR {Number(rev.visitChargeAmount || 0).toFixed(2)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block font-bold">Submitted At</span>
+                                <span className="font-semibold text-slate-900">
+                                  {rev.submittedAt
+                                    ? new Date(rev.submittedAt).toLocaleDateString()
+                                    : 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {rev.technicianNoteToFinance && (
+                              <div className="text-[11px] bg-indigo-50/50 border border-indigo-100/60 p-2.5 rounded-lg">
+                                <span className="font-bold text-indigo-900 block mb-0.5">
+                                  Technician Note to Finance:
+                                </span>
+                                <p className="text-slate-700 leading-relaxed">
+                                  {rev.technicianNoteToFinance}
+                                </p>
+                              </div>
+                            )}
+
+                            {rev.financeDecisionNote && (
+                              <div className="text-[11px] bg-red-50/50 border border-red-100/60 p-2.5 rounded-lg">
+                                <span className="font-bold text-red-900 block mb-0.5">
+                                  Finance Decision Note:
+                                </span>
+                                <p className="text-slate-700 leading-relaxed">
+                                  {rev.financeDecisionNote}
+                                </p>
+                              </div>
+                            )}
+
+                            {rev.itemsSnapshot && Object.keys(rev.itemsSnapshot).length > 0 && (
+                              <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Items Snapshot
+                                </span>
+                                <div className="border border-slate-200/60 rounded-lg overflow-hidden bg-white">
+                                  <table className="w-full text-[10px] text-left text-slate-500">
+                                    <thead className="bg-slate-50 text-slate-700 uppercase font-bold">
+                                      <tr>
+                                        <th className="px-3 py-1.5">Description</th>
+                                        <th className="px-3 py-1.5 text-center">Qty</th>
+                                        <th className="px-3 py-1.5 text-right">Unit Price</th>
+                                        <th className="px-3 py-1.5 text-right">Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {Array.isArray(rev.itemsSnapshot)
+                                        ? (
+                                            rev.itemsSnapshot as {
+                                              partName?: string;
+                                              description?: string;
+                                              quantity?: number;
+                                              unitPrice?: number;
+                                              isFree?: boolean;
+                                            }[]
+                                          ).map((item, idx) => (
+                                            <tr key={idx}>
+                                              <td className="px-3 py-1 font-medium text-slate-700">
+                                                {item.partName || item.description || 'Spare Part'}
+                                              </td>
+                                              <td className="px-3 py-1 text-center">
+                                                {item.quantity}
+                                              </td>
+                                              <td className="px-3 py-1 text-right">
+                                                QAR {Number(item.unitPrice || 0).toFixed(2)}
+                                              </td>
+                                              <td className="px-3 py-1 text-right font-bold text-slate-700">
+                                                {item.isFree
+                                                  ? 'FOC'
+                                                  : `QAR ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
+                                              </td>
+                                            </tr>
+                                          ))
+                                        : (
+                                            Object.values(rev.itemsSnapshot) as {
+                                              partName?: string;
+                                              description?: string;
+                                              quantity?: number;
+                                              unitPrice?: number;
+                                              isFree?: boolean;
+                                            }[]
+                                          ).map((item, idx) => (
+                                            <tr key={idx}>
+                                              <td className="px-3 py-1 font-medium text-slate-700">
+                                                {item.partName || item.description || 'Spare Part'}
+                                              </td>
+                                              <td className="px-3 py-1 text-center">
+                                                {item.quantity}
+                                              </td>
+                                              <td className="px-3 py-1 text-right">
+                                                QAR {Number(item.unitPrice || 0).toFixed(2)}
+                                              </td>
+                                              <td className="px-3 py-1 text-right font-bold text-slate-700">
+                                                {item.isFree
+                                                  ? 'FOC'
+                                                  : `QAR ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShowDetailsModal(false);
+                          setSelectedTicket(null);
+                          setActiveDetailTab('info');
+                          setTicketRevisions([]);
+                        }}
+                        className="text-slate-500 border-slate-300 hover:bg-slate-50 h-8 px-3 rounded-lg font-bold"
+                      >
+                        Close
+                      </Button>
                     </div>
                   </div>
                 )}
-
-                {/* Action buttons relevant to current status */}
-                <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
-                  {selectedTicket.status === 'COMPLETED' && (
-                    <Button
-                      size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3 rounded-lg font-bold gap-1 mr-auto"
-                      onClick={async () => {
-                        try {
-                          const blob = await downloadServiceReport(selectedTicket.id);
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `Service_Report_${selectedTicket.ticketNumber}.pdf`;
-                          document.body.appendChild(a);
-                          a.click();
-                          a.remove();
-                          window.URL.revokeObjectURL(url);
-                          toastSuccess('PDF Report downloaded successfully!');
-                        } catch (err) {
-                          console.error(err);
-                          toastError('Failed to download PDF Report.');
-                        }
-                      }}
-                    >
-                      <FileText className="size-3.5" />
-                      Download PDF Report
-                    </Button>
-                  )}
-
-                  {isHelpDesk && selectedTicket.status === 'OPEN' && (
-                    <Button
-                      size="sm"
-                      className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        setShowAssignModal(true);
-                      }}
-                    >
-                      <UserPlus className="size-3.5" />
-                      Assign Tech
-                    </Button>
-                  )}
-
-                  {isTechnician &&
-                    selectedTicket.status === 'ASSIGNED' &&
-                    !selectedTicket.diagnosisStartedAt && (
-                      <Button
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
-                        onClick={() => {
-                          setShowDetailsModal(false);
-                          handleStartDiagnosis(selectedTicket.id);
-                        }}
-                      >
-                        <Play className="size-3.5 fill-current" />
-                        Start Diagnosis
-                      </Button>
-                    )}
-
-                  {isTechnician &&
-                    selectedTicket.status === 'ASSIGNED' &&
-                    selectedTicket.diagnosisStartedAt && (
-                      <div className="flex items-center gap-1.5">
-                        <ActiveTimer startTime={selectedTicket.diagnosisStartedAt.toString()} />
-                        <Button
-                          size="sm"
-                          className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-3 rounded-lg font-bold"
-                          onClick={() => {
-                            setShowDetailsModal(false);
-                            setDiagnosisForm({
-                              notes: '',
-                              problemFound: '',
-                              rootCause: '',
-                              meterReading: 0,
-                              labourCost: 0,
-                              items: [],
-                            });
-                            setShowDiagnoseModal(true);
-                          }}
-                        >
-                          Diagnose
-                        </Button>
-                      </div>
-                    )}
-
-                  {!isHelpDesk &&
-                    (selectedTicket.status === 'DIAGNOSED' ||
-                      selectedTicket.status === 'WAITING_FINANCE_APPROVAL' ||
-                      selectedTicket.status === 'FINANCE_APPROVED' ||
-                      selectedTicket.status === 'FINANCE_REJECTED' ||
-                      selectedTicket.status === 'CUSTOMER_APPROVED' ||
-                      selectedTicket.status === 'CUSTOMER_REJECTED') && (
-                      <Button
-                        size="sm"
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 rounded-lg font-bold"
-                        onClick={() => {
-                          setShowDetailsModal(false);
-                          handleOpenEstimates(selectedTicket);
-                        }}
-                      >
-                        Estimates
-                      </Button>
-                    )}
-
-                  {isTechnician &&
-                    (selectedTicket.status === 'CUSTOMER_APPROVED' ||
-                      selectedTicket.status === 'FREE_SERVICE') &&
-                    !selectedTicket.repairStartedAt && (
-                      <Button
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
-                        onClick={() => {
-                          setShowDetailsModal(false);
-                          handleStartRepair(selectedTicket.id);
-                        }}
-                      >
-                        <Play className="size-3.5 fill-current" />
-                        Start Repair
-                      </Button>
-                    )}
-
-                  {isTechnician &&
-                    selectedTicket.status === 'IN_PROGRESS' &&
-                    selectedTicket.repairStartedAt && (
-                      <div className="flex items-center gap-1.5">
-                        <ActiveTimer startTime={selectedTicket.repairStartedAt.toString()} />
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold"
-                          onClick={() => {
-                            setShowDetailsModal(false);
-                            setCompleteForm({
-                              workPerformed: '',
-                              resolutionDetails: '',
-                              meterReading: 0,
-                              customerRemarks: '',
-                              technicianRemarks: '',
-                              customerSignature: 'Customer Signed',
-                              technicianSignature: 'Technician Signed',
-                            });
-                            setCompletionNotes('');
-                            setShowCompleteModal(true);
-                          }}
-                        >
-                          Complete Job
-                        </Button>
-                      </div>
-                    )}
-
-                  {isManagerOrAdmin &&
-                    selectedTicket.status !== 'COMPLETED' &&
-                    selectedTicket.status !== 'CANCELLED' && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="h-8 px-3 rounded-lg font-bold"
-                        onClick={() => {
-                          setShowDetailsModal(false);
-                          handleCancelTicketClick(selectedTicket.id, selectedTicket.ticketNumber);
-                        }}
-                      >
-                        Cancel Ticket
-                      </Button>
-                    )}
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setShowDetailsModal(false);
-                      setSelectedTicket(null);
-                    }}
-                    className="text-slate-500 border-slate-300 hover:bg-slate-50 h-8 px-3 rounded-lg font-bold"
-                  >
-                    Close
-                  </Button>
-                </div>
               </div>
             );
           })()}
       </DetailDialog>
+
+      {shareTicket &&
+        (() => {
+          const customer = customers.find((c) => c.id === shareTicket.customerId);
+          return (
+            <SendDocumentModal
+              open={shareModalOpen}
+              onOpenChange={setShareModalOpen}
+              ticketId={shareTicket.id}
+              ticketNumber={shareTicket.ticketNumber}
+              docType={shareDocType}
+              initialEmail={customer?.email || ''}
+              initialPhone={customer?.phone || ''}
+              customerName={customer ? customer.name : 'Customer'}
+            />
+          );
+        })()}
 
       {/* ESTIMATES AND REVISIONS WORKFLOW MODAL */}
       {showEstimatesModal && selectedTicket && estimatesData && (
@@ -4578,6 +5161,81 @@ export default function ServiceDashboardPage() {
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Approval Timeline & History
                 </h3>
+
+                {(() => {
+                  const sortedRevs = [...estimatesData.revisions].sort(
+                    (a, b) => b.version - a.version,
+                  );
+                  const latestRev = sortedRevs[0];
+                  const isExpired =
+                    latestRev &&
+                    latestRev.validUntil &&
+                    new Date(latestRev.validUntil) < new Date();
+
+                  if (!isExpired) return null;
+
+                  return (
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-red-800 flex items-center gap-1.5">
+                          <AlertTriangle size={14} className="text-red-600 animate-pulse" />{' '}
+                          Estimate Validity Expired
+                        </span>
+                        <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold">
+                          Expired
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                        The estimate validity expired on{' '}
+                        <span className="font-bold text-red-700">
+                          {new Date(latestRev.validUntil!).toLocaleDateString()}
+                        </span>
+                        . Finance approval is required to extend validity.
+                      </p>
+                      {canManageFinance && (
+                        <div className="space-y-2 pt-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase block">
+                            Set New Validity Date
+                          </label>
+                          <div className="flex gap-2">
+                            <Input
+                              type="date"
+                              className="h-8 text-xs bg-white border-slate-200 rounded-lg"
+                              id="extendValidityDate"
+                            />
+                            <Button
+                              size="sm"
+                              className="bg-primary hover:bg-primary/90 text-white text-[11px] h-8 px-3 rounded-lg shrink-0"
+                              onClick={async () => {
+                                const inputEl = document.getElementById(
+                                  'extendValidityDate',
+                                ) as HTMLInputElement;
+                                if (!inputEl || !inputEl.value) {
+                                  toastError('Please select a valid date');
+                                  return;
+                                }
+                                try {
+                                  setSubmitting(true);
+                                  await extendTicketValidity(selectedTicket.id, inputEl.value);
+                                  await fetchEstimates(selectedTicket.id);
+                                  await fetchInitialData();
+                                  toastSuccess('Validity extended successfully!');
+                                } catch (err) {
+                                  console.error(err);
+                                  toastError('Failed to extend validity.');
+                                } finally {
+                                  setSubmitting(false);
+                                }
+                              }}
+                            >
+                              Extend Validity
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {estimatesData.estimates.length === 0 ? (
                   <div className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100 italic">
@@ -4659,9 +5317,16 @@ export default function ServiceDashboardPage() {
                                   size="sm"
                                   variant="destructive"
                                   className="text-[11px] h-8 px-3 rounded-lg"
-                                  onClick={() =>
-                                    handleRejectFinance(est.id, 'Finance budget rejected')
-                                  }
+                                  onClick={() => {
+                                    const note = prompt(
+                                      'Please enter a rejection note to the technician (Required):',
+                                    );
+                                    if (!note || !note.trim()) {
+                                      alert('Rejection note is required.');
+                                      return;
+                                    }
+                                    handleRejectFinance(est.id, note);
+                                  }}
                                 >
                                   Reject (Finance)
                                 </Button>

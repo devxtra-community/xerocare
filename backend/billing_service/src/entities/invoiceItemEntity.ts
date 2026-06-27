@@ -54,6 +54,9 @@ export class InvoiceItem {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: 0 })
   unitPrice?: number;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: 0 })
+  discountAmount?: number;
+
   @Column({ type: 'int', nullable: true })
   initialBwCount?: number;
 

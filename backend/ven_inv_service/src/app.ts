@@ -60,6 +60,7 @@ app.use('/models', modelRoute);
 app.use('/products', productRoute);
 app.use('/inventory', inventoryRouter);
 app.use('/spare-parts', sparePartRouter);
+app.use('/spareparts', sparePartRouter);
 app.use('/brands', brandRouter);
 app.use('/lots', lotRouter);
 app.use('/rfq', rfqRouter);

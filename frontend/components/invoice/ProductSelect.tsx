@@ -12,6 +12,7 @@ interface ProductSelectProps {
   mode?: 'PRODUCT' | 'SPAREPART' | 'BOTH';
   className?: string;
   onlyAvailable?: boolean;
+  selectedQuantities?: Record<string, number>;
 }
 
 /**
@@ -24,6 +25,7 @@ export function ProductSelect({
   placeholder,
   className,
   onlyAvailable = true,
+  selectedQuantities,
 }: ProductSelectProps & { placeholder?: string }) {
   const [items, setItems] = useState<SelectableItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -81,12 +83,15 @@ export function ProductSelect({
     let label: React.ReactNode = '';
     let price = 0;
     let type = '';
+    let availableStock = 1;
 
     if ('part_name' in item) {
       // SparePart
+      const sp = item as SparePart & { quantity?: number };
       label = `${item.part_name} (Lot: ${item.lotNumber})`;
       price = Number(item.base_price) || 0;
       type = 'Spare Part';
+      availableStock = typeof sp.quantity === 'number' ? sp.quantity : 999999;
     } else {
       // Product
       const baseLabel = `${item.name} ${item.model?.model_name ? `- ${item.model.model_name}` : ''}`;
@@ -117,17 +122,26 @@ export function ProductSelect({
 
       price = item.sale_price || 0;
       type = 'Product';
+
+      const isAvailable = !item.product_status || item.product_status === ProductStatus.AVAILABLE;
+      if (!isAvailable) {
+        availableStock = 0;
+      } else {
+        availableStock =
+          typeof (item as unknown as Record<string, unknown>).stock === 'number'
+            ? ((item as unknown as Record<string, unknown>).stock as number)
+            : 1;
+      }
     }
+
+    const selectedQty = selectedQuantities?.[item.id] || 0;
+    const isDisabled = selectedQty >= availableStock;
 
     return {
       value: item.id,
-      label: label as React.ReactNode,
-      searchText:
-        'part_name' in item
-          ? `${item.part_name} ${item.lotNumber}`
-          : `${item.name} ${item.model?.model_name || ''} ${item.product_status || ''}`,
-      description: `${type} • QAR ${price.toLocaleString()}`,
-      disabled: false,
+      label: label,
+      description: `${type} • QAR ${price.toLocaleString()} • Available: ${availableStock}${selectedQty > 0 ? ` (Selected: ${selectedQty})` : ''}`,
+      disabled: isDisabled,
     };
   });
 

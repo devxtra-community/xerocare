@@ -1,8 +1,9 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
 import { UserRole } from '../constants/userRole';
+import { AppError } from '../errors/appError';
 
 import {
   createInvoice,
@@ -55,6 +56,40 @@ import {
  * This file defines all the paths (routes) for handling Invoices.
  * Invoices are the bills and financial records our system creates.
  */
+const requireDirectSaleRoles = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return next(new AppError('Not authenticated', 401));
+  }
+  const { role, employeeJob } = req.user;
+  if (role === 'ADMIN' || role === 'MANAGER' || role === 'FINANCE') {
+    return next();
+  }
+  if (
+    role === 'EMPLOYEE' &&
+    (employeeJob === 'SALES' || employeeJob === 'RENT_AND_LEASE' || employeeJob === 'MANAGER')
+  ) {
+    return next();
+  }
+  return next(new AppError('Access denied: insufficient permissions', 403));
+};
+
+const requireQuotationRoles = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return next(new AppError('Not authenticated', 401));
+  }
+  const { role, employeeJob } = req.user;
+  if (role === 'ADMIN' || role === 'MANAGER') {
+    return next();
+  }
+  if (
+    role === 'EMPLOYEE' &&
+    (employeeJob === 'SALES' || employeeJob === 'RENT_AND_LEASE' || employeeJob === 'MANAGER')
+  ) {
+    return next();
+  }
+  return next(new AppError('Access denied: insufficient permissions', 403));
+};
+
 const router = Router();
 
 // This setup allows us to handle file uploads, like scanning and saving a contract.
@@ -294,14 +329,15 @@ router.post(
 );
 
 /**
- * Create a brand new invoice.
+ * Create a brand new invoice/quotation.
  */
-router.post('/', requireRole(UserRole.EMPLOYEE), createInvoice);
+router.post('/', requireQuotationRoles, createInvoice);
+router.post('/quotation', requireQuotationRoles, createInvoice);
 
 /**
  * Create a new direct sale (Final Invoice) bypassing the quotation flow.
  */
-router.post('/direct-sale', requireRole(UserRole.EMPLOYEE), createDirectSale);
+router.post('/direct-sale', requireDirectSaleRoles, createDirectSale);
 
 router.put('/:id', requireRole(UserRole.EMPLOYEE), updateQuotation);
 
@@ -321,6 +357,8 @@ router.post(
   createQuotationTemplate,
 );
 
+router.post('/template', requireRole(UserRole.MANAGER, UserRole.ADMIN), createQuotationTemplate);
+
 router.get(
   '/quotation/template',
   requireRole(UserRole.MANAGER, UserRole.ADMIN),
@@ -335,6 +373,12 @@ router.get(
 
 router.post(
   '/quotation/template/:id/assign',
+  requireRole(UserRole.MANAGER, UserRole.ADMIN),
+  assignQuotationTemplate,
+);
+
+router.post(
+  '/template/:id/assign',
   requireRole(UserRole.MANAGER, UserRole.ADMIN),
   assignQuotationTemplate,
 );

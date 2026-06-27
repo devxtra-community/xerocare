@@ -46,6 +46,42 @@ export class Branch {
   })
   status!: BranchStatus;
 
+  // --- Country & Currency ---
+  @Column({ type: 'varchar', length: 2, nullable: true })
+  country_code?: string;
+
+  @Column({ type: 'varchar', length: 3, nullable: true })
+  currency_code?: string;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  currency_symbol?: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  currency_name?: string;
+
+  // --- Tax Configuration ---
+  @Column({ type: 'boolean', default: false })
+  has_tax!: boolean;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tax_name?: string | null;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  tax_percent?: number | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tax_registration_number?: string | null;
+
+  // --- Address Details ---
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  city?: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  state?: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  postal_code?: string;
+
   @CreateDateColumn()
   created_at!: Date;
 

@@ -172,3 +172,26 @@ export const deleteSparePart = async (req: Request, res: Response) => {
     res.status(status).json({ success: false, message });
   }
 };
+
+/**
+ * Gets stock levels of a spare part across warehouses in the user's branch.
+ */
+export const getSparePartStock = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params as { id: string };
+    const userBranchId = req.user?.branchId;
+    const userRole = req.user?.role;
+    const isAdmin = userRole === 'ADMIN';
+
+    const stockData = await service.getStock(id, userBranchId, isAdmin);
+    if (!stockData) {
+      return res.status(404).json({ success: false, message: 'Spare part not found' });
+    }
+
+    res.status(200).json({ success: true, data: stockData });
+  } catch (error: unknown) {
+    logger.error('Error in getSparePartStock:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    res.status(500).json({ success: false, message });
+  }
+};
