@@ -149,19 +149,21 @@ export function QuotationConversionFlow({
         });
       }
 
-      // 3. Activate the contract to make it a final sale
-      await activateContractInvoice(quotation.id, {
-        contractConfirmationUrl: '',
-        deposit:
-          cautionAmount && Number(cautionAmount) > 0
-            ? {
-                amount: Number(cautionAmount),
-                mode: cautionMode as 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER',
-                reference: cautionReference || undefined,
-                receivedDate: paymentDate || new Date().toISOString().split('T')[0],
-              }
-            : undefined,
-      });
+      // 3. Activate the contract to make it a final sale (only for non-Rent/Lease)
+      if (quotation.saleType !== 'RENT' && quotation.saleType !== 'LEASE') {
+        await activateContractInvoice(quotation.id, {
+          contractConfirmationUrl: '',
+          deposit:
+            cautionAmount && Number(cautionAmount) > 0
+              ? {
+                  amount: Number(cautionAmount),
+                  mode: cautionMode as 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER',
+                  reference: cautionReference || undefined,
+                  receivedDate: paymentDate || new Date().toISOString().split('T')[0],
+                }
+              : undefined,
+        });
+      }
 
       // 4. Record advance payment in the ledger
       if (advanceAmount && Number(advanceAmount) > 0) {
@@ -177,7 +179,10 @@ export function QuotationConversionFlow({
         });
       }
 
-      let successMsg = `Invoice ${quotation.invoiceNumber} is now active.`;
+      let successMsg =
+        quotation.saleType === 'RENT' || quotation.saleType === 'LEASE'
+          ? `Invoice ${quotation.invoiceNumber} has been converted and sent to Finance for processing.`
+          : `Invoice ${quotation.invoiceNumber} is now active.`;
       const hasAdvance = advanceAmount && Number(advanceAmount) > 0;
       const hasCaution = cautionAmount && Number(cautionAmount) > 0;
       if (hasAdvance && hasCaution) {
