@@ -39,10 +39,6 @@ export default function EmployeeReturnsPage() {
   const [selectedRecord, setSelectedRecord] = useState<CreditNoteRecord | null>(null);
   const [recordToDelete, setRecordToDelete] = useState<CreditNoteRecord | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       const [statsRes, listRes, customers] = await Promise.all([
@@ -65,6 +61,10 @@ export default function EmployeeReturnsPage() {
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleSave = async (formData: Record<string, string | number | undefined>) => {
     try {

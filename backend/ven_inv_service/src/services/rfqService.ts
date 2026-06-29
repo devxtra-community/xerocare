@@ -14,6 +14,7 @@ import { AppError } from '../errors/appError';
 import * as xlsx from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { logger } from '../config/logger';
+import { Vendor } from '../entities/vendorEntity';
 
 interface CreateRfqDto {
   branchId: string;
@@ -657,6 +658,10 @@ export class RfqService {
 
       if (!rfqVendor) throw new AppError('Vendor not invited to this RFQ', 404);
 
+      const vendor = await manager.findOne(Vendor, { where: { id: vendorId } });
+      if (!vendor) throw new AppError('Vendor not found', 404);
+      rfqVendor.vendor_currency_code = vendor.currency || 'QAR';
+
       // Validation rules: must match exact items
       if (quotes.length !== rfq.items.length) {
         throw new AppError(`Quote must include exactly ${rfq.items.length} items`, 400);
@@ -713,6 +718,26 @@ export class RfqService {
 
       const newStatus = allQuoted ? RfqStatus.FULLY_QUOTED : RfqStatus.PARTIAL_QUOTED;
       await manager.update(Rfq, { id: rfq.id }, { status: newStatus });
+
+      // Notify RFQ creator when vendor submits quote
+      if (rfq.created_by) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: rfq.created_by,
+            title: allQuoted ? 'All Vendors Have Quoted' : 'Vendor Quote Received',
+            message: allQuoted
+              ? `All vendors have submitted their quotes for RFQ [${rfq.rfq_number}]. You can now compare and award.`
+              : `${vendor.name} has submitted a quote for RFQ [${rfq.rfq_number}].`,
+            type: allQuoted ? 'RFQ_FULLY_QUOTED' : 'VENDOR_QUOTE_RECEIVED',
+            referenceId: rfq.id,
+            referenceType: 'QUOTATION',
+          });
+        } catch (err) {
+          logger.error('Failed to notify RFQ creator on vendor quote', err);
+        }
+      }
 
       return rfqVendor;
     });
@@ -848,6 +873,25 @@ export class RfqService {
       rfq.status = RfqStatus.AWARDED;
       rfq.awarded_vendor_id = targetVendor.vendor_id;
       await manager.save(rfq);
+
+      // Notify RFQ creator on award
+      if (rfq.created_by) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          const awardedVendorName = targetVendor.vendor?.name || 'the selected vendor';
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: rfq.created_by,
+            title: 'RFQ Awarded',
+            message: `RFQ [${rfq.rfq_number}] has been awarded to ${awardedVendorName}. You can now create a lot from this RFQ.`,
+            type: 'RFQ_AWARDED',
+            referenceId: rfq.id,
+            referenceType: 'QUOTATION',
+          });
+        } catch (err) {
+          logger.error('Failed to notify RFQ creator on award', err);
+        }
+      }
 
       logger.info('Vendor awarded successfully', { rfqId, awardedVendorId: vendorId });
       return { success: true, message: 'Vendor awarded successfully', rfq };

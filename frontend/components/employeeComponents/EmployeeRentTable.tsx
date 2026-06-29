@@ -80,6 +80,37 @@ export default function EmployeeRentTable({
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
+  const fetchPendingQuotations = async () => {
+    try {
+      setLoadingQuotations(true);
+      let data: Invoice[] = [];
+      try {
+        data = await getBranchInvoices();
+      } catch (err) {
+        console.error('getBranchInvoices failed, falling back to getMyInvoices:', err);
+        data = await getMyInvoices();
+      }
+
+      const pending = data.filter(
+        (inv) =>
+          inv.type === 'QUOTATION' &&
+          (inv.status === 'FINANCE_APPROVED' ||
+            inv.status === 'CUSTOMER_ACCEPTED' ||
+            inv.status === 'SENT_TO_CUSTOMER') &&
+          inv.saleType === 'RENT',
+      );
+      setPendingQuotations(pending);
+      setIsConverterOpen(true);
+    } catch (error: unknown) {
+      console.error(error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to fetch pending quotations';
+      toast.error(msg);
+    } finally {
+      setLoadingQuotations(false);
+    }
+  };
+
   useEffect(() => {
     if (convertId) {
       fetchPendingQuotations();
@@ -138,37 +169,6 @@ export default function EmployeeRentTable({
     if (invoice) {
       setSelectedInvoice(invoice);
       setDetailsOpen(true);
-    }
-  };
-
-  const fetchPendingQuotations = async () => {
-    try {
-      setLoadingQuotations(true);
-      let data: Invoice[] = [];
-      try {
-        data = await getBranchInvoices();
-      } catch (err) {
-        console.error('getBranchInvoices failed, falling back to getMyInvoices:', err);
-        data = await getMyInvoices();
-      }
-
-      const pending = data.filter(
-        (inv) =>
-          inv.type === 'QUOTATION' &&
-          (inv.status === 'FINANCE_APPROVED' ||
-            inv.status === 'CUSTOMER_ACCEPTED' ||
-            inv.status === 'SENT_TO_CUSTOMER') &&
-          inv.saleType === 'RENT',
-      );
-      setPendingQuotations(pending);
-      setIsConverterOpen(true);
-    } catch (error: unknown) {
-      console.error(error);
-      const err = error as { response?: { data?: { message?: string } } };
-      const msg = err.response?.data?.message || 'Failed to fetch pending quotations';
-      toast.error(msg);
-    } finally {
-      setLoadingQuotations(false);
     }
   };
 

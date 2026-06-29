@@ -41,7 +41,7 @@ export interface LeaseAgreementDetails {
   endDate: string;
   monthlyEmi: number;
   totalLeaseValue?: number;
-  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyType?: 'none' | 'duration' | 'copies' | 'both';
   warrantyDurationValue?: number;
   warrantyDurationUnit?: 'months' | 'years';
   warrantyCopyLimit?: number;

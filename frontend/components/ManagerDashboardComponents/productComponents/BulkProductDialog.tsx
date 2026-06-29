@@ -93,6 +93,29 @@ export function BulkProductDialog({
     }
   };
 
+  const createEmptyRow = (): Partial<BulkProductRow> => ({
+    model_id: '',
+    model_no: '',
+    warehouse_id: '',
+    vendor_id: '',
+    product_status: 'AVAILABLE',
+    serial_no: '',
+    name: '',
+    brand: '',
+    MFD: '',
+    purchase_price: 0,
+    sale_price: 0,
+    tax_rate: 0,
+    print_colour: 'BLACK_WHITE',
+    max_discount_amount: 0,
+    wholesale_price: 0,
+    lot_id: '',
+    hs_code: '',
+    description: '',
+    features: [],
+    consumables: [],
+  });
+
   useEffect(() => {
     if (open) {
       setFile(null);
@@ -149,29 +172,6 @@ export function BulkProductDialog({
       prepareInitialData();
     }
   }, [open, initialLotId, initialItemId, models]);
-
-  const createEmptyRow = (): Partial<BulkProductRow> => ({
-    model_id: '',
-    model_no: '',
-    warehouse_id: '',
-    vendor_id: '',
-    product_status: 'AVAILABLE',
-    serial_no: '',
-    name: '',
-    brand: '',
-    MFD: '',
-    purchase_price: 0,
-    sale_price: 0,
-    tax_rate: 0,
-    print_colour: 'BLACK_WHITE',
-    max_discount_amount: 0,
-    wholesale_price: 0,
-    lot_id: '',
-    hs_code: '',
-    description: '',
-    features: [],
-    consumables: [],
-  });
 
   /**
    * Converts an Excel serial date number to a YYYY-MM-DD string.

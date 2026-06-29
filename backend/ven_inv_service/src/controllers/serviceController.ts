@@ -263,10 +263,7 @@ export class ServiceController {
         let isSaleWarrantyActive = false;
         if (saleInvoice) {
           const saleDate = new Date(saleInvoice.effectiveFrom || saleInvoice.createdAt);
-          const warrantyStr = saleInvoice.warranty || product.warranty || '12';
-          const warrantyMonths = parseInt(warrantyStr, 10) || 12;
-          const warrantyEndDate = new Date(saleDate);
-          warrantyEndDate.setMonth(warrantyEndDate.getMonth() + warrantyMonths);
+          const currentDate = new Date();
 
           let copiesUsed = 0;
           if (latestAllocation) {
@@ -279,9 +276,41 @@ export class ServiceController {
             copiesUsed = product.meter_reading;
           }
 
-          const warrantyMaxCopies = product.warranty_max_pages || 200000;
-          const currentDate = new Date();
-          if (currentDate <= warrantyEndDate && copiesUsed < warrantyMaxCopies) {
+          const invoiceWarrantyType = saleInvoice.warrantyType || 'duration';
+          let durationValid = true;
+          let copiesValid = true;
+
+          if (invoiceWarrantyType === 'duration' || invoiceWarrantyType === 'both') {
+            let endDate: Date;
+            if (saleInvoice.warrantyDurationValue && saleInvoice.warrantyDurationUnit) {
+              endDate = new Date(saleDate);
+              if (saleInvoice.warrantyDurationUnit === 'years')
+                endDate.setFullYear(
+                  endDate.getFullYear() + Number(saleInvoice.warrantyDurationValue),
+                );
+              else endDate.setMonth(endDate.getMonth() + Number(saleInvoice.warrantyDurationValue));
+            } else {
+              // Legacy fallback: item-level warranty string or product.warranty (months)
+              const warrantyMonths =
+                parseInt(saleInvoice.warranty || product.warranty || '12', 10) || 12;
+              endDate = new Date(saleDate);
+              endDate.setMonth(endDate.getMonth() + warrantyMonths);
+            }
+            durationValid = currentDate <= endDate;
+          }
+
+          if (invoiceWarrantyType === 'copies' || invoiceWarrantyType === 'both') {
+            const copyLimit = saleInvoice.warrantyCopyLimit || product.warranty_max_pages || 200000;
+            copiesValid = copiesUsed < copyLimit;
+          }
+
+          // 'both'     → AND: warranty valid only while BOTH hold; expires at whichever hits first
+          // 'duration' → only durationValid matters
+          // 'copies'   → only copiesValid matters
+          // 'none'     → never under warranty
+          const isUnderWarranty = invoiceWarrantyType !== 'none' && durationValid && copiesValid;
+
+          if (isUnderWarranty) {
             serviceContext = ServiceContext.WARRANTY;
             track = 'A';
             linkedInvoiceId = saleInvoice.id;
@@ -293,9 +322,7 @@ export class ServiceController {
           // Step 3 - Check if machine is on LEASE
           if (leaseInvoice) {
             const effectiveFrom = new Date(leaseInvoice.effectiveFrom);
-            const leaseTenureMonths = Number(leaseInvoice.leaseTenureMonths) || 0;
-            const warrantyEndDate = new Date(effectiveFrom);
-            warrantyEndDate.setMonth(warrantyEndDate.getMonth() + leaseTenureMonths);
+            const currentDate = new Date();
 
             let copiesUsed = 0;
             if (latestAllocation) {
@@ -308,10 +335,41 @@ export class ServiceController {
               copiesUsed = product.meter_reading;
             }
 
-            const maxCopyLimit =
-              Number(leaseInvoice.maxCopyLimit) || product.warranty_max_pages || 200000;
-            const currentDate = new Date();
-            if (currentDate <= warrantyEndDate && copiesUsed < maxCopyLimit) {
+            const leaseWarrantyType = leaseInvoice.warrantyType || 'both';
+            let durationValid = true;
+            let copiesValid = true;
+
+            if (leaseWarrantyType === 'duration' || leaseWarrantyType === 'both') {
+              let endDate: Date;
+              if (leaseInvoice.warrantyDurationValue && leaseInvoice.warrantyDurationUnit) {
+                endDate = new Date(effectiveFrom);
+                if (leaseInvoice.warrantyDurationUnit === 'years')
+                  endDate.setFullYear(
+                    endDate.getFullYear() + Number(leaseInvoice.warrantyDurationValue),
+                  );
+                else
+                  endDate.setMonth(endDate.getMonth() + Number(leaseInvoice.warrantyDurationValue));
+              } else {
+                // Fallback: use lease tenure months
+                const tenureMonths = Number(leaseInvoice.leaseTenureMonths) || 0;
+                endDate = new Date(effectiveFrom);
+                endDate.setMonth(endDate.getMonth() + tenureMonths);
+              }
+              durationValid = currentDate <= endDate;
+            }
+
+            if (leaseWarrantyType === 'copies' || leaseWarrantyType === 'both') {
+              const copyLimit =
+                leaseInvoice.warrantyCopyLimit ||
+                Number(leaseInvoice.maxCopyLimit) ||
+                product.warranty_max_pages ||
+                200000;
+              copiesValid = copiesUsed < copyLimit;
+            }
+
+            const isUnderWarranty = leaseWarrantyType !== 'none' && durationValid && copiesValid;
+
+            if (isUnderWarranty) {
               serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
               track = 'A';
               linkedInvoiceId = leaseInvoice.id;

@@ -251,6 +251,17 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     }
   }, [selectedCustomer, fetchInvoices, fetchCustomerDetails]);
 
+  const fetchProductMeta = async (productId: string) => {
+    setLoadingProduct(true);
+    try {
+      setProductMeta(await getProductById(productId));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingProduct(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedProduct?.productId) {
       fetchProductMeta(selectedProduct.productId);
@@ -265,17 +276,6 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       (i: GlobalInvoiceItem) => i.productId === key || i.id === key,
     );
     setSelectedProduct((prod as unknown as ReturnInvoiceItem) || null);
-  };
-
-  const fetchProductMeta = async (productId: string) => {
-    setLoadingProduct(true);
-    try {
-      setProductMeta(await getProductById(productId));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingProduct(false);
-    }
   };
 
   /* ── submit ── */

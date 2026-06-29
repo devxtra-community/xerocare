@@ -159,6 +159,15 @@ async function runPreMigrations() {
       END $$;
     `);
 
+    // Extend warrantytype enum with 'both' (must be outside DO block — PG restriction on DDL in transactions)
+    try {
+      await client.query(`ALTER TYPE invoices_warrantytype_enum ADD VALUE IF NOT EXISTS 'both';`);
+    } catch (err) {
+      logger.debug(
+        `Skipped adding 'both' to invoices_warrantytype_enum: ${(err as Error).message}`,
+      );
+    }
+
     // Ensure columns exist on invoices and invoice_items tables
     try {
       await client.query(`
@@ -243,19 +252,19 @@ async function runPreMigrations() {
       // --- Quotation validity + service estimate columns ---
       await client.query(`
         ALTER TABLE invoices
-        ADD COLUMN IF NOT EXISTS "validityDays" INTEGER NULL,
-        ADD COLUMN IF NOT EXISTS "expiryDate" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "isConverted" BOOLEAN NOT NULL DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS "estimateValidUntil" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "estimateExpired" BOOLEAN NULL,
-        ADD COLUMN IF NOT EXISTS "visitChargeAmount" DECIMAL(12,2) NULL,
-        ADD COLUMN IF NOT EXISTS "visitChargeMethod" VARCHAR(100) NULL,
-        ADD COLUMN IF NOT EXISTS "totalDiscountAmount" DECIMAL(12,2) NULL,
-        ADD COLUMN IF NOT EXISTS "technicianNoteToFinance" TEXT NULL,
-        ADD COLUMN IF NOT EXISTS "revisionCount" INTEGER NULL DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS "validityExtensionDays" INTEGER NULL,
-        ADD COLUMN IF NOT EXISTS "validityExtensionFee" DECIMAL(12,2) NULL,
-        ADD COLUMN IF NOT EXISTS "validityExtensionFeeAdded" BOOLEAN NOT NULL DEFAULT FALSE;
+        ADD COLUMN IF NOT EXISTS validity_days INTEGER NOT NULL DEFAULT 30,
+        ADD COLUMN IF NOT EXISTS expiry_date TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS is_converted BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS estimate_valid_until TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS estimate_expired BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS visit_charge_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS visit_charge_method VARCHAR(30) NULL,
+        ADD COLUMN IF NOT EXISTS total_discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT NULL,
+        ADD COLUMN IF NOT EXISTS revision_count INTEGER NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS validity_extension_days INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS validity_extension_fee DECIMAL(10,2) NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS validity_extension_fee_added BOOLEAN NOT NULL DEFAULT FALSE;
       `);
 
       // Add columns to invoice_ledger table
@@ -312,6 +321,39 @@ async function runPreMigrations() {
       // Ensure branch_name column exists
       await client.query(`
         ALTER TABLE opening_balance_entries ADD COLUMN IF NOT EXISTS branch_name VARCHAR(255) NULL;
+      `);
+
+      // Create credit_notes table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS credit_notes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "creditNoteNo" VARCHAR(255) UNIQUE NOT NULL,
+            invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+            "invoiceNumber" VARCHAR(255) NULL,
+            "customerId" UUID NOT NULL,
+            "customerName" VARCHAR(255) NULL,
+            "branchId" UUID NOT NULL,
+            "productId" UUID NOT NULL,
+            "productName" VARCHAR(255) NOT NULL,
+            "modelName" VARCHAR(255) NOT NULL,
+            brand VARCHAR(255) NOT NULL,
+            "serialNumber" VARCHAR(255) NULL,
+            "productAmount" DECIMAL(12,2) NOT NULL,
+            type credit_note_type_enum NOT NULL,
+            status credit_note_status_enum NOT NULL DEFAULT 'DRAFT',
+            "sellerEmployeeId" UUID NOT NULL,
+            notes TEXT NULL,
+            "financeNote" TEXT NULL,
+            "damageReason" damage_reason_enum NULL,
+            "rejectionReason" TEXT NULL,
+            "replacementProductId" UUID NULL,
+            "replacementProductName" VARCHAR(255) NULL,
+            "replacementSerialNumber" VARCHAR(255) NULL,
+            "replacementAmount" DECIMAL(12,2) NULL,
+            "replacementDiscount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+            "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
       `);
 
       logger.info(

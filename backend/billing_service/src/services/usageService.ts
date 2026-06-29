@@ -581,7 +581,8 @@ export class UsageService {
   ) {
     if (
       contract.saleType === SaleType.LEASE &&
-      contract.warrantyType === WarrantyType.COPIES &&
+      (contract.warrantyType === WarrantyType.COPIES ||
+        contract.warrantyType === WarrantyType.BOTH) &&
       !contract.warrantyExpiryEmailSent
     ) {
       const currentTotalReading =

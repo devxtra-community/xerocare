@@ -60,16 +60,6 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [brandDialogOpen, setBrandDialogOpen] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    if (vendorIdParam) {
-      setSelectedVendors([vendorIdParam]);
-    }
-  }, [vendorIdParam]);
-
   const fetchData = async () => {
     try {
       const [vRes, mRes, spRes, pRes, bRes] = await Promise.all([
@@ -89,6 +79,16 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
       toast.error('Failed to load initial data');
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (vendorIdParam) {
+      setSelectedVendors([vendorIdParam]);
+    }
+  }, [vendorIdParam]);
 
   const toggleVendor = (vendorId: string) => {
     setSelectedVendors((prev) =>

@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, Users, CalendarCheck, Plane, Wallet } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarCheck, Plane, Wallet, Bell } from 'lucide-react';
 
 import {
   Sidebar,
@@ -43,6 +43,11 @@ const menuItems = [
     title: 'Payroll',
     icon: Wallet,
     href: '/hr/payroll',
+  },
+  {
+    title: 'Notifications',
+    icon: Bell,
+    href: '/hr/notifications',
   },
 ];
 

@@ -19,6 +19,8 @@ import StatCard from '@/components/StatCard';
 import VendorRequestHistory from '@/components/ManagerDashboardComponents/VendorComponents/VendorRequestHistory';
 import { getVendorById, Vendor as ApiVendor } from '@/lib/vendor';
 import { toast } from 'sonner';
+import { Globe, Landmark } from 'lucide-react';
+import { formatCurrency } from '@/lib/format';
 
 export default function VendorProfilePage() {
   const params = useParams();
@@ -67,12 +69,8 @@ export default function VendorProfilePage() {
     );
   }
 
-  // Helper for bank details to avoid deep nesting issues
-  const bankDetails = vendor.bankDetails || {
-    bankName: 'N/A',
-    accountNumber: 'N/A',
-    ifsc: 'N/A',
-  };
+  const currency = vendor.currency || 'QAR';
+  const bankAccounts = vendor.bankAccounts || [];
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
@@ -121,7 +119,7 @@ export default function VendorProfilePage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Spend"
-            value={`QAR ${((vendor.purchaseValue || 0) / 1000).toFixed(1)}k`}
+            value={formatCurrency(vendor.purchaseValue || 0, currency)}
             subtitle="Lifetime Purchase"
           />
           <StatCard
@@ -131,13 +129,13 @@ export default function VendorProfilePage() {
           />
           <StatCard
             title="Outstanding"
-            value={`QAR ${((vendor.outstandingAmount || 0) / 1000).toFixed(0)}k`}
+            value={formatCurrency(vendor.outstandingAmount || 0, currency)}
             subtitle="Pending Payments"
           />
           <StatCard
             title="Credit Limit"
-            value={`QAR ${((vendor.creditLimit || 0) / 1000).toFixed(1)}k`}
-            subtitle="Available: QAR 4.5k"
+            value={formatCurrency(vendor.creditLimit || 0, currency)}
+            subtitle="Approved Limit"
           />
         </div>
 
@@ -199,38 +197,108 @@ export default function VendorProfilePage() {
                     </p>
                   </div>
                 </div>
+                {vendor.countryName && (
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <Globe className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                        Country
+                      </p>
+                      <p className="text-xs font-semibold text-foreground">
+                        {vendor.countryName}
+                        {vendor.countryCode && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 text-[10px] font-mono">
+                            {vendor.countryCode}
+                          </span>
+                        )}
+                      </p>
+                      {currency && (
+                        <p className="text-[10px] text-blue-500 font-semibold mt-0.5">
+                          Currency: {currency}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Business Details Card */}
-            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex-1 flex flex-col">
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col">
               <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
                 <Building2 className="h-3.5 w-3.5 text-primary" /> Business & Tax
               </h3>
-              <div className="space-y-4 flex-1">
-                <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
-                  <p className="text-[10px] text-blue-600 uppercase font-bold tracking-wider">
-                    GSTIN Number
-                  </p>
-                  <p className="text-sm font-bold text-primary">{vendor.gstin || 'N/A'}</p>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                      Bank Name
-                    </p>
-                    <p className="text-xs font-semibold text-foreground">{bankDetails.bankName}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                      Account / IFSC
-                    </p>
-                    <p className="text-xs font-mono font-semibold text-foreground break-all">
-                      {bankDetails.accountNumber} / {bankDetails.ifsc}
-                    </p>
-                  </div>
-                </div>
+              <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100/50">
+                <p className="text-[10px] text-blue-600 uppercase font-bold tracking-wider">
+                  GSTIN Number
+                </p>
+                <p className="text-sm font-bold text-primary">{vendor.gstin || 'N/A'}</p>
               </div>
+            </div>
+
+            {/* Bank Accounts Card */}
+            <div className="bg-card rounded-xl shadow-sm p-4 border border-blue-100/30 flex flex-col">
+              <h3 className="text-xs font-bold text-primary uppercase flex items-center gap-2 border-b border-gray-50 pb-3 mb-4">
+                <Landmark className="h-3.5 w-3.5 text-primary" /> Bank Accounts
+                <span className="ml-auto text-[10px] font-normal text-gray-400 normal-case">
+                  {bankAccounts.length} account{bankAccounts.length !== 1 ? 's' : ''}
+                </span>
+              </h3>
+              {bankAccounts.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">
+                  No bank accounts on file. Edit vendor to add.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {bankAccounts.map((acc, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-xl border ${acc.isPrimary ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 bg-gray-50/40'}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold text-foreground">{acc.bankName}</span>
+                        {acc.isPrimary && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wide">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
+                      <p className="text-[11px] font-mono font-semibold text-gray-700 mt-0.5">
+                        {acc.accountNumber}
+                      </p>
+                      {(acc.swiftCode || acc.iban || acc.ifscCode || acc.routingNumber) && (
+                        <div className="flex flex-wrap gap-x-3 mt-1">
+                          {acc.swiftCode && (
+                            <span className="text-[10px] text-gray-400">
+                              SWIFT:{' '}
+                              <span className="font-mono text-gray-600">{acc.swiftCode}</span>
+                            </span>
+                          )}
+                          {acc.iban && (
+                            <span className="text-[10px] text-gray-400">
+                              IBAN: <span className="font-mono text-gray-600">{acc.iban}</span>
+                            </span>
+                          )}
+                          {acc.ifscCode && (
+                            <span className="text-[10px] text-gray-400">
+                              IFSC: <span className="font-mono text-gray-600">{acc.ifscCode}</span>
+                            </span>
+                          )}
+                          {acc.routingNumber && (
+                            <span className="text-[10px] text-gray-400">
+                              Routing:{' '}
+                              <span className="font-mono text-gray-600">{acc.routingNumber}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

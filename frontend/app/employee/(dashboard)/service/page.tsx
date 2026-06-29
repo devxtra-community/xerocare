@@ -416,12 +416,6 @@ export default function ServiceDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  useEffect(() => {
-    const currentUser = getUserFromToken() as AuthUser;
-    setUser(currentUser);
-    fetchInitialData();
-  }, []);
-
   const fetchInitialData = async () => {
     try {
       setLoading(true);
@@ -450,6 +444,12 @@ export default function ServiceDashboardPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const currentUser = getUserFromToken() as AuthUser;
+    setUser(currentUser);
+    fetchInitialData();
+  }, []);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();

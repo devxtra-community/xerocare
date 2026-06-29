@@ -12,6 +12,7 @@ import {
   Calendar,
   FileQuestion,
   RotateCcw,
+  Bell,
 } from 'lucide-react';
 
 import {
@@ -110,6 +111,12 @@ const menuItems = [
     icon: FileText,
     href: '/employee/service/contracts',
     modules: ['service'],
+  },
+  {
+    title: 'Notifications',
+    icon: Bell,
+    href: '/employee/notifications',
+    modules: ['*'],
   },
 ];
 

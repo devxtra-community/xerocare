@@ -163,6 +163,21 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed rfq_vendors currency columns exist.');
 
+        // --- Vendor country, currency & bank accounts columns ---
+        await Source.query(`
+          ALTER TABLE vendors
+          ADD COLUMN IF NOT EXISTS country_code VARCHAR(2),
+          ADD COLUMN IF NOT EXISTS country_name VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS bank_accounts JSONB DEFAULT '[]'::jsonb;
+        `);
+        logger.info('Guaranteed vendor country, currency & bank accounts columns exist.');
+
+        // --- Remove blank/zombie vendors (empty name or email) ---
+        await Source.query(`
+          DELETE FROM vendors WHERE TRIM(email) = '' OR TRIM(name) = '';
+        `);
+        logger.info('Cleaned up blank vendor records.');
+
         // --- Currency columns on service_estimates ---
         await Source.query(`
           ALTER TABLE service_estimates

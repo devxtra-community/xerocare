@@ -953,6 +953,20 @@ function QuotationTemplateFormModal({
     return 'normal';
   });
 
+  // Warranty states
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>(
+    (template?.warrantyType as 'none' | 'duration' | 'copies' | 'both') || 'none',
+  );
+  const [warrantyDurationValue, setWarrantyDurationValue] = useState(
+    template?.warrantyDurationValue ? String(template.warrantyDurationValue) : '',
+  );
+  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>(
+    (template?.warrantyDurationUnit as 'months' | 'years') || 'months',
+  );
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState(
+    template?.warrantyCopyLimit ? String(template.warrantyCopyLimit) : '',
+  );
+
   // ── SALE state ──────────────────────────────────────────────────────────
   const [saleItems, setSaleItems] = useState<SaleItem[]>(() => {
     if (template?.items) {
@@ -1135,6 +1149,11 @@ function QuotationTemplateFormModal({
     } else {
       setActiveItemTab('PRODUCT');
     }
+  }, [selectedLayoutCategory]);
+
+  // Auto-set layout style to 'normal' when category changes (only one default style exists)
+  React.useEffect(() => {
+    setSelectedLayoutStyle('normal');
   }, [selectedLayoutCategory]);
 
   // ── Sale item helpers ────────────────────────────────────────────────────
@@ -1399,12 +1418,7 @@ function QuotationTemplateFormModal({
           toast.error('All manual product rows must specify Brand, Model, and Product Name.');
           return;
         }
-        item.description = `${item.brand} ${item.model} ${item.productName}`.trim();
-        if (item.hsCode) {
-          item.description = `[HS:${item.hsCode}] ${item.description}`;
-        }
-      }
-      if (!item.description) {
+      } else if (!item.description) {
         toast.error('Please enter a description for all products.');
         return;
       }
@@ -1427,15 +1441,22 @@ function QuotationTemplateFormModal({
       };
 
       if (activeCategory === 'SALE') {
-        payload.items = saleItems.map((it) => ({
-          description: it.description,
-          quantity: it.quantity,
-          unitPrice: it.basePrice,
-          discount: it.discount / it.quantity,
-          productId: it.productId,
-          modelId: it.modelId,
-          itemType: it.itemType,
-        }));
+        payload.items = saleItems.map((it) => {
+          let desc = it.description;
+          if (it.isManual && it.brand && it.model && it.productName) {
+            desc = `${it.brand} ${it.model} ${it.productName}`.trim();
+            if (it.hsCode) desc = `[HS:${it.hsCode}] ${desc}`;
+          }
+          return {
+            description: desc,
+            quantity: it.quantity,
+            unitPrice: it.basePrice,
+            discount: it.discount / it.quantity,
+            productId: it.productId,
+            modelId: it.modelId,
+            itemType: it.itemType,
+          };
+        });
         // Valid for
         const d = new Date();
         d.setDate(d.getDate() + validDays);
@@ -1543,6 +1564,20 @@ function QuotationTemplateFormModal({
         }));
       }
 
+      // Warranty fields for SALE and LEASE templates
+      if (activeCategory === 'SALE' || activeCategory === 'LEASE') {
+        payload.warrantyType = warrantyType;
+        if (warrantyType === 'duration' || warrantyType === 'both') {
+          payload.warrantyDurationValue = warrantyDurationValue
+            ? Number(warrantyDurationValue)
+            : undefined;
+          payload.warrantyDurationUnit = warrantyDurationUnit;
+        }
+        if (warrantyType === 'copies' || warrantyType === 'both') {
+          payload.warrantyCopyLimit = warrantyCopyLimit ? Number(warrantyCopyLimit) : undefined;
+        }
+      }
+
       await onConfirm(payload);
     } finally {
       setIsSubmitting(false);
@@ -1646,47 +1681,93 @@ function QuotationTemplateFormModal({
               </Button>
             </div>
 
-            {/* Layout selector */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Layout Class
-                </label>
-                <Select
-                  value={selectedLayoutCategory || 'product'}
-                  onValueChange={setSelectedLayoutCategory}
-                >
-                  <SelectTrigger className="text-xs h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="product">Product Sale Layout</SelectItem>
-                    <SelectItem value="spareparts">Spare Parts Layout</SelectItem>
-                    <SelectItem value="rent">Rent Layout</SelectItem>
-                    <SelectItem value="lease">Lease Layout</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Warranty Configuration — Sale and Lease only */}
+            {(activeCategory === 'SALE' || activeCategory === 'LEASE') && (
+              <div className="bg-card p-5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" /> Warranty Configuration
+                  </label>
+                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                    {activeCategory === 'SALE' ? 'SALE SPECIFIC' : 'LEASE SPECIFIC'}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">
+                      Warranty Type
+                    </label>
+                    <Select
+                      value={warrantyType}
+                      onValueChange={(v) =>
+                        setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both')
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No Warranty</SelectItem>
+                        <SelectItem value="duration">By Duration (Time-based)</SelectItem>
+                        <SelectItem value="copies">By Count of Copies</SelectItem>
+                        <SelectItem value="both">
+                          Both (Duration &amp; Copies, whichever first)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  Design Aesthetics
-                </label>
-                <Select
-                  value={selectedLayoutStyle || 'normal'}
-                  onValueChange={setSelectedLayoutStyle}
-                >
-                  <SelectTrigger className="text-xs h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="normal">Normal Style (Basic)</SelectItem>
-                    <SelectItem value="standard">Standard Style (Structured)</SelectItem>
-                    <SelectItem value="premium">Premium Style (Interactive/Visual)</SelectItem>
-                  </SelectContent>
-                </Select>
+                  {(warrantyType === 'duration' || warrantyType === 'both') && (
+                    <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                          Duration Value
+                        </label>
+                        <Input
+                          type="number"
+                          placeholder="e.g. 6"
+                          value={warrantyDurationValue}
+                          onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                          className="h-9 text-sm border-amber-100 shadow-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">
+                          Unit
+                        </label>
+                        <Select
+                          value={warrantyDurationUnit}
+                          onValueChange={(v) => setWarrantyDurationUnit(v as 'months' | 'years')}
+                        >
+                          <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="months">Months</SelectItem>
+                            <SelectItem value="years">Years</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {(warrantyType === 'copies' || warrantyType === 'both') && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">
+                        Warranty Copy Limit (Total)
+                      </label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 100000"
+                        value={warrantyCopyLimit}
+                        onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                        className="h-9 text-sm border-amber-100 shadow-sm"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Rent details */}
             {activeCategory === 'RENT' && (

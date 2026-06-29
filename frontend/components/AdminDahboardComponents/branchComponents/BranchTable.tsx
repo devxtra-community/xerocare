@@ -163,10 +163,6 @@ export default function BranchReport() {
   const user = getUserFromToken();
   const isAdmin = user?.role === 'ADMIN';
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -179,6 +175,10 @@ export default function BranchReport() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const getManagerName = (managerId?: string | null) => {
     if (!managerId) return 'Unassigned';

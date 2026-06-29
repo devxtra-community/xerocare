@@ -26,10 +26,6 @@ export default function RfqTable({ basePath }: RfqTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchRfqs();
-  }, []);
-
   const fetchRfqs = async () => {
     try {
       setLoading(true);
@@ -41,6 +37,10 @@ export default function RfqTable({ basePath }: RfqTableProps) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchRfqs();
+  }, []);
 
   const filteredRfqs = rfqs.filter((rfq) =>
     rfq.rfq_number.toLowerCase().includes(searchQuery.toLowerCase()),

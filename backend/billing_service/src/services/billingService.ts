@@ -776,6 +776,12 @@ export class BillingService {
       securityDepositReference?: string;
       securityDepositDate?: string;
       securityDepositBank?: string;
+
+      // Warranty Fields
+      warrantyType?: string;
+      warrantyDurationValue?: number;
+      warrantyDurationUnit?: string;
+      warrantyCopyLimit?: number;
     },
   ) {
     const invoice = await this.invoiceRepo.findById(id);
@@ -833,6 +839,16 @@ export class BillingService {
     if (payload.securityDepositBank !== undefined) {
       invoice.securityDepositBank = payload.securityDepositBank;
     }
+
+    // Warranty Fields
+    if (payload.warrantyType !== undefined)
+      invoice.warrantyType = payload.warrantyType as WarrantyType;
+    if (payload.warrantyDurationValue !== undefined)
+      invoice.warrantyDurationValue = payload.warrantyDurationValue;
+    if (payload.warrantyDurationUnit !== undefined)
+      invoice.warrantyDurationUnit = payload.warrantyDurationUnit as WarrantyDurationUnit;
+    if (payload.warrantyCopyLimit !== undefined)
+      invoice.warrantyCopyLimit = payload.warrantyCopyLimit;
 
     // Validation update: If switching to CUSTOM, check validity
     if (
@@ -1161,6 +1177,58 @@ export class BillingService {
           }
         } catch (err) {
           logger.error('Failed to notify branch manager on customer acceptance', err);
+        }
+      }
+    } else {
+      // Notify creator on rejection
+      if (invoice.createdBy) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          const { CUSTOMER_REJECTED } = await import('../constants/notificationTypes');
+          const { getCustomerName } = await import('./billingHelpers');
+
+          const customerName = await getCustomerName(invoice.customerId);
+
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: invoice.createdBy,
+            title: 'Customer Rejected Quotation',
+            message: `Customer ${customerName} has rejected quotation [${invoice.invoiceNumber}]. You may need to revise and resubmit.`,
+            type: CUSTOMER_REJECTED,
+            referenceId: invoice.id,
+            referenceType: 'QUOTATION',
+          });
+        } catch (err) {
+          logger.error('Failed to notify creator on customer rejection', err);
+        }
+      }
+
+      // Notify branch manager on rejection
+      if (invoice.branchId) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          const { CUSTOMER_REJECTED } = await import('../constants/notificationTypes');
+          const { getBranchManager, getCustomerName, getEmployeeDetails } =
+            await import('./billingHelpers');
+
+          const managerId = await getBranchManager(invoice.branchId);
+          if (managerId) {
+            const customerName = await getCustomerName(invoice.customerId);
+            const empDetails = await getEmployeeDetails(invoice.createdBy);
+            const employeeName = empDetails ? empDetails.name : 'Employee';
+
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: managerId,
+              title: 'Customer Rejected Quotation',
+              message: `Customer ${customerName} has rejected quotation [${invoice.invoiceNumber}] created by ${employeeName}.`,
+              type: CUSTOMER_REJECTED,
+              referenceId: invoice.id,
+              referenceType: 'QUOTATION',
+            });
+          }
+        } catch (err) {
+          logger.error('Failed to notify branch manager on customer rejection', err);
         }
       }
     }
@@ -2911,6 +2979,10 @@ export class BillingService {
     paymentMode?: PaymentMode;
     paymentReference?: string;
     notes?: string;
+    warrantyType?: string;
+    warrantyDurationValue?: number;
+    warrantyDurationUnit?: string;
+    warrantyCopyLimit?: number;
   }) {
     if (payload.items) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3122,6 +3194,17 @@ export class BillingService {
       savedInvoice.discountAmount = totalDiscount;
       savedInvoice.totalAmount = grossAmount - totalDiscount;
 
+      // Apply warranty fields for product sales
+      if (hasProducts && payload.warrantyType) {
+        savedInvoice.warrantyType = payload.warrantyType as WarrantyType;
+        if (payload.warrantyDurationValue !== undefined)
+          savedInvoice.warrantyDurationValue = payload.warrantyDurationValue;
+        if (payload.warrantyDurationUnit !== undefined)
+          savedInvoice.warrantyDurationUnit = payload.warrantyDurationUnit as WarrantyDurationUnit;
+        if (payload.warrantyCopyLimit !== undefined)
+          savedInvoice.warrantyCopyLimit = payload.warrantyCopyLimit;
+      }
+
       let paymentStatus = InvoiceStatus.SENT;
       if (payload.paymentAmount && payload.paymentAmount > 0) {
         if (payload.paymentAmount >= calculatedTotal - 0.01) {
@@ -3157,6 +3240,30 @@ export class BillingService {
       }
       for (const reduction of reductionsToEmit) {
         emitSparePartReduce(reduction);
+      }
+
+      // Notify branch manager if direct sale is unpaid/partial
+      if (paymentStatus !== InvoiceStatus.PAID && payload.branchId) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          const { DIRECT_SALE_UNPAID } = await import('../constants/notificationTypes');
+          const { getBranchManager } = await import('./billingHelpers');
+
+          const managerId = await getBranchManager(payload.branchId);
+          if (managerId) {
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: managerId,
+              title: 'Direct Sale Created — Payment Pending',
+              message: `Direct sale [${savedInvoice.invoiceNumber}] was created with outstanding payment. Total: QAR ${savedInvoice.totalAmount}.`,
+              type: DIRECT_SALE_UNPAID,
+              referenceId: savedInvoice.id,
+              referenceType: 'CONTRACT',
+            });
+          }
+        } catch (err) {
+          logger.error('Failed to notify manager on unpaid direct sale', err);
+        }
       }
 
       return savedInvoice;
@@ -4302,6 +4409,29 @@ export class BillingService {
       userId || 'SYSTEM',
       `Payment transaction of QAR ${transaction.amount} recorded via ${transaction.paymentMode}.`,
     );
+
+    // Notify branch manager of payment recorded
+    if (invoice.branchId) {
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        const { PAYMENT_RECORDED } = await import('../constants/notificationTypes');
+        const { getBranchManager } = await import('./billingHelpers');
+
+        const managerId = await getBranchManager(invoice.branchId);
+        if (managerId) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: managerId,
+            title: 'Payment Recorded',
+            message: `A payment of QAR ${transaction.amount} was recorded via ${transaction.paymentMode} on invoice [${invoice.invoiceNumber}].`,
+            type: PAYMENT_RECORDED,
+            referenceId: invoice.id,
+            referenceType: 'CONTRACT',
+          });
+        }
+      } catch (err) {
+        logger.error('Failed to notify manager on payment recorded', err);
+      }
+    }
 
     return transaction;
   }

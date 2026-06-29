@@ -7,6 +7,17 @@ import { VendorRequest } from '../entities/vendorRequestEntity';
 import { FindOptionsWhere } from 'typeorm';
 import { logger } from '../config/logger';
 
+interface BankAccountDTO {
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  routingNumber?: string;
+  swiftCode?: string;
+  iban?: string;
+  ifscCode?: string;
+  isPrimary?: boolean;
+}
+
 interface CreateVendorDTO {
   name: string;
   email: string;
@@ -15,6 +26,9 @@ interface CreateVendorDTO {
   contactPerson?: string;
   status?: VendorStatus;
   currency?: string;
+  countryCode?: string;
+  countryName?: string;
+  bankAccounts?: BankAccountDTO[];
 }
 
 interface RequestProductsDTO {
@@ -35,15 +49,40 @@ export class VendorService {
   /**
    * Creates a new vendor, validating uniqueness and sending a welcome email.
    */
+  private validateBankAccounts(bankAccounts?: BankAccountDTO[]) {
+    if (!bankAccounts || bankAccounts.length === 0) return;
+    const primaryCount = bankAccounts.filter((acc) => acc.isPrimary).length;
+    if (primaryCount > 1) {
+      throw new AppError('Only one bank account can be marked as primary', 400);
+    }
+  }
+
   async createVendor(data: CreateVendorDTO): Promise<Vendor> {
-    const existingByEmail = await this.vendorRepo.findByEmail(data.email);
-    if (existingByEmail) {
-      throw new AppError('Vendor email already exists', 409);
+    this.validateBankAccounts(data.bankAccounts);
+
+    if (!data.name || !data.name.trim()) {
+      throw new AppError('Vendor name is required', 400);
+    }
+    if (!data.email || !data.email.trim()) {
+      throw new AppError('Vendor email is required', 400);
     }
 
-    const existingByName = await this.vendorRepo.findByName(data.name);
+    const existingByEmail = await this.vendorRepo.findByEmail(data.email.trim());
+    if (existingByEmail) {
+      const msg =
+        existingByEmail.status === VendorStatus.DELETED
+          ? 'This email belongs to a deleted vendor. Use a different email.'
+          : 'Vendor with this email already exists';
+      throw new AppError(msg, 409);
+    }
+
+    const existingByName = await this.vendorRepo.findByName(data.name.trim());
     if (existingByName) {
-      throw new AppError('Vendor name already exists', 409);
+      const msg =
+        existingByName.status === VendorStatus.DELETED
+          ? 'This vendor name belongs to a deleted vendor. Use a different name.'
+          : 'Vendor with this name already exists';
+      throw new AppError(msg, 409);
     }
 
     const vendor = this.vendorRepo.create(data);
@@ -78,6 +117,37 @@ export class VendorService {
    * Updates a vendor's details.
    */
   async updateVendor(id: string, data: Partial<CreateVendorDTO>): Promise<Vendor> {
+    this.validateBankAccounts(data.bankAccounts);
+
+    if (data.name !== undefined && !data.name.trim()) {
+      throw new AppError('Vendor name cannot be empty', 400);
+    }
+    if (data.email !== undefined && !data.email.trim()) {
+      throw new AppError('Vendor email cannot be empty', 400);
+    }
+
+    if (data.email) {
+      const existingByEmail = await this.vendorRepo.findByEmail(data.email.trim());
+      if (existingByEmail && existingByEmail.id !== id) {
+        const msg =
+          existingByEmail.status === VendorStatus.DELETED
+            ? 'This email belongs to a deleted vendor. Use a different email.'
+            : 'Vendor with this email already exists';
+        throw new AppError(msg, 409);
+      }
+    }
+
+    if (data.name) {
+      const existingByName = await this.vendorRepo.findByName(data.name.trim());
+      if (existingByName && existingByName.id !== id) {
+        const msg =
+          existingByName.status === VendorStatus.DELETED
+            ? 'This vendor name belongs to a deleted vendor. Use a different name.'
+            : 'Vendor with this name already exists';
+        throw new AppError(msg, 409);
+      }
+    }
+
     const vendor = await this.getVendorById(id);
 
     Object.keys(data).forEach((key) => {

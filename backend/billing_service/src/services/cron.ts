@@ -9,7 +9,7 @@ import { logger } from '../config/logger';
 import { BillingEventType } from '../events/billingEvents';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { getBranchManagerEmail } from './billingHelpers';
-import { Raw } from 'typeorm';
+import { In, Raw } from 'typeorm';
 import cron from 'node-cron';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
@@ -282,7 +282,7 @@ export async function leaseWarrantyExpiryJob() {
     const leaseContracts = await invoiceRepo.find({
       where: {
         saleType: SaleType.LEASE,
-        warrantyType: WarrantyType.DURATION,
+        warrantyType: In([WarrantyType.DURATION, WarrantyType.BOTH]),
         warrantyExpiryEmailSent: false,
       },
     });

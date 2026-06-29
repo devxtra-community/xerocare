@@ -57,6 +57,19 @@ export default function AddPurchaseDialog({
     groundfieldCost: 0,
   });
 
+  const fetchLots = async () => {
+    try {
+      setLoadingLots(true);
+      const res = await lotService.getAllLots({ limit: 100 });
+      setLots(res.data || []);
+    } catch (error) {
+      console.error('Failed to fetch lots:', error);
+      toast.error('Failed to load lots');
+    } finally {
+      setLoadingLots(false);
+    }
+  };
+
   useEffect(() => {
     if (open) {
       fetchLots();
@@ -83,19 +96,6 @@ export default function AddPurchaseDialog({
       }
     }
   }, [open, editMode, purchaseData]);
-
-  const fetchLots = async () => {
-    try {
-      setLoadingLots(true);
-      const res = await lotService.getAllLots({ limit: 100 });
-      setLots(res.data || []);
-    } catch (error) {
-      console.error('Failed to fetch lots:', error);
-      toast.error('Failed to load lots');
-    } finally {
-      setLoadingLots(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1646,12 +1646,14 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
 
     const saleInvoice = await Source.query(
       `
-      SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty
+      SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty,
+             i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit"
       FROM invoices i
       JOIN invoice_items ii ON i.id = ii."invoiceId"
       WHERE i.type = 'FINAL'
         AND (i."billType" = 'SALE' OR (i."billType" IS NULL AND i."saleType" = 'PRODUCT_SALE'))
         AND ii."productId" = $1
+      ORDER BY i."createdAt" DESC
       LIMIT 1;
     `,
       [productId],
@@ -1659,7 +1661,8 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
 
     const leaseInvoice = await Source.query(
       `
-      SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit"
+      SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit",
+             i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit"
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
       WHERE i.type = 'PROFORMA'

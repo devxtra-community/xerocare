@@ -13,9 +13,12 @@ export class NotificationController {
       const notifications = await notificationRepo.find({
         where: { employee_id: user.userId },
         order: { createdAt: 'DESC' },
+        take: 100,
       });
 
-      return res.status(200).json(notifications);
+      const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+      return res.status(200).json({ notifications, unreadCount, total: notifications.length });
     } catch (error) {
       logger.error('Error fetching notifications:', error);
       return res.status(500).json({ message: 'Internal server error' });

@@ -373,44 +373,44 @@ export class Invoice {
   deletedAt?: Date;
 
   // --- Quotation Validity Fields ---
-  @Column({ type: 'int', nullable: true })
-  validityDays?: number;
+  @Column({ name: 'validity_days', type: 'integer', default: 30 })
+  validityDays!: number;
 
-  @Column({ type: 'timestamp', nullable: true })
-  expiryDate?: Date;
+  @Column({ name: 'expiry_date', type: 'timestamp', nullable: true })
+  expiryDate?: Date | null;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ name: 'is_converted', type: 'boolean', default: false })
   isConverted!: boolean;
 
   // --- Service Estimate Fields (billType = SERVICE) ---
-  @Column({ type: 'timestamp', nullable: true })
-  estimateValidUntil?: Date;
+  @Column({ name: 'estimate_valid_until', type: 'timestamp', nullable: true })
+  estimateValidUntil?: Date | null;
 
-  @Column({ type: 'boolean', nullable: true })
-  estimateExpired?: boolean;
+  @Column({ name: 'estimate_expired', type: 'boolean', default: false })
+  estimateExpired!: boolean;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  visitChargeAmount?: number;
+  @Column({ name: 'visit_charge_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  visitChargeAmount!: number;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  visitChargeMethod?: string | null;
+  @Column({ name: 'visit_charge_method', type: 'varchar', nullable: true })
+  visitChargeMethod!: string | null;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  totalDiscountAmount?: number;
+  @Column({ name: 'total_discount_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  totalDiscountAmount!: number;
 
-  @Column({ type: 'text', nullable: true })
-  technicianNoteToFinance?: string | null;
+  @Column({ name: 'technician_note_to_finance', type: 'text', nullable: true })
+  technicianNoteToFinance!: string | null;
 
-  @Column({ type: 'int', nullable: true, default: 0 })
-  revisionCount?: number;
+  @Column({ name: 'revision_count', type: 'int', default: 0 })
+  revisionCount!: number;
 
   // --- Validity Extension Fields ---
-  @Column({ type: 'int', nullable: true })
-  validityExtensionDays?: number;
+  @Column({ name: 'validity_extension_days', type: 'int', nullable: true })
+  validityExtensionDays!: number | null;
 
-  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  validityExtensionFee?: number;
+  @Column({ name: 'validity_extension_fee', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  validityExtensionFee!: number | null;
 
-  @Column({ type: 'boolean', default: false })
-  validityExtensionFeeAdded?: boolean;
+  @Column({ name: 'validity_extension_fee_added', type: 'boolean', default: false })
+  validityExtensionFeeAdded!: boolean;
 }

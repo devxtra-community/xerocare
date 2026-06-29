@@ -13,10 +13,6 @@ export default function PayrollPage() {
 
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
 
-  useEffect(() => {
-    fetchPayroll();
-  }, [selectedYear]);
-
   const fetchPayroll = async () => {
     try {
       setLoading(true);
@@ -56,6 +52,10 @@ export default function PayrollPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchPayroll();
+  }, [selectedYear]);
 
   return (
     <div className="flex flex-col gap-6 p-6">

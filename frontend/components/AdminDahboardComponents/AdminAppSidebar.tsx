@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
+  Bell,
 } from 'lucide-react';
 
 import {
@@ -111,6 +112,11 @@ const menuItems = [
     title: 'Inventory',
     icon: Boxes,
     href: '/admin/inventory',
+  },
+  {
+    title: 'Notifications',
+    icon: Bell,
+    href: '/admin/notifications',
   },
 ];
 

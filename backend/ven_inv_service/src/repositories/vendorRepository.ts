@@ -6,23 +6,14 @@ export class VendorRepository extends Repository<Vendor> {
     super(Vendor, dataSource.manager);
   }
 
-  /**
-   * Finds a vendor by email.
-   */
   findByEmail(email: string) {
     return this.findOne({ where: { email } });
   }
 
-  /**
-   * Finds a vendor by ID.
-   */
   findById(id: string) {
     return this.findOne({ where: { id } });
   }
 
-  /**
-   * Finds a vendor by name.
-   */
   findByName(name: string) {
     return this.findOne({ where: { name } });
   }
