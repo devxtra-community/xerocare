@@ -29,6 +29,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(httpLogger);
 
 import creditNoteRouter from './routes/creditNoteRoutes';
+import accountsRouter from './routes/accountsRoutes';
+import adminAccountsRouter from './routes/adminAccountsRoutes';
 
 /**
  * Routing: Directing users to the right department.
@@ -42,6 +44,8 @@ app.use('/usage', usageRouter);
 app.use('/payments', paymentRouter);
 app.use('/opening-balance', openingBalanceRouter);
 app.use('/credit-notes', creditNoteRouter);
+app.use('/accounts', accountsRouter);
+app.use('/accounts/admin', adminAccountsRouter);
 
 /**
  * Safety Net: Handling mistakes.

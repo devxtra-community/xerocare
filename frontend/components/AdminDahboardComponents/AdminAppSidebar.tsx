@@ -12,6 +12,16 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
+  BarChart2,
+  BookOpen,
+  DollarSign,
+  CreditCard,
+  ReceiptText,
+  Scale,
+  PieChart,
+  TrendingUp,
+  Globe,
+  FileBarChart,
 } from 'lucide-react';
 
 import {
@@ -114,14 +124,23 @@ const menuItems = [
   },
 ];
 
-/**
- * Admin dashboard sidebar navigation component.
- * Displays menu items and handles logout functionality.
- */
+const adminAccountsMenuItems = [
+  { title: 'Overview', icon: BarChart2, href: '/admin/accounts' },
+  { title: 'Cash & Bank', icon: BookOpen, href: '/admin/accounts/cash-bank' },
+  { title: 'Expenses', icon: DollarSign, href: '/admin/accounts/expenses' },
+  { title: 'Receivables', icon: ReceiptText, href: '/admin/accounts/receivable' },
+  { title: 'Payables', icon: CreditCard, href: '/admin/accounts/payable' },
+  { title: 'Profit & Loss', icon: TrendingUp, href: '/admin/accounts/profit-loss' },
+  { title: 'Equity', icon: Scale, href: '/admin/accounts/equity' },
+  { title: 'Depreciation', icon: PieChart, href: '/admin/accounts/depreciation' },
+  { title: 'Reports Hub', icon: FileBarChart, href: '/admin/accounts/reports' },
+];
+
 export default function AppSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const [accountsOpen, setAccountsOpen] = useState(pathname.startsWith('/admin/accounts'));
 
   // Auto-expand groups if child is active
   useEffect(() => {
@@ -260,6 +279,45 @@ export default function AppSidebar() {
                 );
               })}
             </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {/* Accounts — Collapsible admin section */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <button
+              onClick={() => setAccountsOpen((o) => !o)}
+              className="flex w-full items-center justify-between px-4 py-2 text-xs uppercase tracking-wide text-sidebar-accent-foreground/60 hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Globe className="h-3 w-3" /> Accounts
+              </span>
+              {accountsOpen ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+            {accountsOpen && (
+              <SidebarMenu className="space-y-0.5 px-2">
+                {adminAccountsMenuItems.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={`py-2 rounded-md text-[13px] ${isActive ? 'bg-card text-sidebar' : 'hover:bg-card/10 text-sidebar-accent-foreground/80'}`}
+                      >
+                        <a href={item.href} className="flex items-center gap-2.5 px-3 w-full">
+                          <item.icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="font-medium leading-tight">{item.title}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
