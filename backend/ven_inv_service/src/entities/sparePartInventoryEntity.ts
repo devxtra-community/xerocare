@@ -42,6 +42,9 @@ export class SparePartInventory {
   @Column({ type: 'int', default: 0 })
   quantity!: number;
 
+  @Column({ name: 'transfer_reserved_qty', type: 'int', default: 0 })
+  transfer_reserved_qty!: number;
+
   @CreateDateColumn({ name: 'created_at' })
   created_at!: Date;
 

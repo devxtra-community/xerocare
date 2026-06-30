@@ -6,6 +6,7 @@ import {
   getallproducts,
   updateproduct,
   getproductbyid,
+  getProductHistoryData,
 } from '../controllers/productController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
@@ -50,6 +51,13 @@ productRoute.get(
   authMiddleware,
   roleMiddleware(['ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE']),
   getproductbyid,
+);
+
+productRoute.get(
+  '/:id/history-data',
+  authMiddleware,
+  roleMiddleware(['ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE']),
+  getProductHistoryData,
 );
 
 /**

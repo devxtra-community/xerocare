@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getUserFromToken } from '@/lib/auth';
+import { getBranches, Branch } from '@/lib/branch';
 import { getCustomers, Customer } from '@/lib/customer';
 import { getLeads, Lead, createLead } from '@/lib/lead';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -415,6 +416,9 @@ export default function ServiceDashboardPage() {
   // General Filter/Search
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedBranch, setSelectedBranch] = useState('ALL');
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const branchFilterMounted = useRef(false);
 
   const fetchInitialData = async () => {
     try {
@@ -448,8 +452,36 @@ export default function ServiceDashboardPage() {
   useEffect(() => {
     const currentUser = getUserFromToken() as AuthUser;
     setUser(currentUser);
+    if (currentUser?.role === 'ADMIN') {
+      getBranches()
+        .then((res) => setBranches(res?.data || []))
+        .catch(() => {});
+    }
     fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!branchFilterMounted.current) {
+      branchFilterMounted.current = true;
+      return;
+    }
+    const currentUser = getUserFromToken() as AuthUser;
+    if (!currentUser || currentUser.role !== 'ADMIN') return;
+    const loadTickets = async () => {
+      try {
+        setLoading(true);
+        const ticketsList = await getServiceTickets(
+          selectedBranch !== 'ALL' ? selectedBranch : undefined,
+        );
+        setTickets(ticketsList);
+      } catch (err) {
+        console.error('Failed to load tickets for branch:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTickets();
+  }, [selectedBranch]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1675,7 +1707,8 @@ export default function ServiceDashboardPage() {
       ticket.productName?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || ticket.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesBranch = selectedBranch === 'ALL' || ticket.branchId === selectedBranch;
+    return matchesSearch && matchesStatus && matchesBranch;
   });
 
   const formatMachineName = (brand?: string, model?: string, name?: string) => {
@@ -1800,6 +1833,22 @@ export default function ServiceDashboardPage() {
               />
             </div>
 
+            {/* Branch Filter — ADMIN only */}
+            {user?.role === 'ADMIN' && (
+              <select
+                value={selectedBranch}
+                onChange={(e) => setSelectedBranch(e.target.value)}
+                className="h-9 text-xs border border-slate-200 bg-slate-50 rounded-xl px-3 outline-none focus:border-primary text-slate-600 font-medium"
+              >
+                <option value="ALL">All Branches</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -1843,9 +1892,16 @@ export default function ServiceDashboardPage() {
                     <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[11%]">
                       Ticket No
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[28%]">
+                    <TableHead
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[20%]' : 'w-[28%]'}`}
+                    >
                       Brand / Model
                     </TableHead>
+                    {user?.role === 'ADMIN' && (
+                      <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[10%]">
+                        Branch
+                      </TableHead>
+                    )}
                     <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[11%]">
                       Context
                     </TableHead>
@@ -1858,7 +1914,7 @@ export default function ServiceDashboardPage() {
                     <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[12%]">
                       Status
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 text-right w-[20%]">
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 text-right w-[18%]">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -1908,6 +1964,11 @@ export default function ServiceDashboardPage() {
                           </button>
                         </div>
                       </TableCell>
+                      {user?.role === 'ADMIN' && (
+                        <TableCell className="py-2 px-2 text-xs text-slate-600 font-medium truncate">
+                          {ticket.branchName || '—'}
+                        </TableCell>
+                      )}
                       <TableCell className="py-2 px-2">
                         <Badge context={ticket.serviceContext} />
                       </TableCell>

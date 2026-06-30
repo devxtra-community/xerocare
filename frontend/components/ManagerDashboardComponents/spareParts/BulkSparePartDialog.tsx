@@ -1,33 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Upload, Save, Trash2, Plus, FileSpreadsheet, Loader2 } from 'lucide-react';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  X,
+  Upload,
+  Save,
+  Trash2,
+  Plus,
+  FileSpreadsheet,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 import { sparePartService } from '@/services/sparePartService';
 import { warehouseService, Warehouse } from '@/services/warehouseService';
 import { vendorService } from '@/services/vendorService';
 import { lotService, Lot, LotItemType } from '@/lib/lot';
 import { brandService } from '@/services/brandService';
 import { modelService } from '@/services/modelService';
-
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
@@ -52,11 +47,29 @@ interface BulkSparePartRow {
   warehouse_id: string;
   lot_id?: string;
   mpn?: string;
-  model_id?: string;
+  description?: string;
+  yield?: string;
+  maxDiscountableAmount?: number;
+  // Internal UI tracking — stripped before submit
+  _selectedLotItemId?: string;
 }
 
-/** A spare part option derived from the selected lot's spare part items */
+interface Model {
+  id: string;
+  model_name: string;
+  model_no: string;
+  brandRelation?: { id: string; name: string };
+  brand?: { id: string; name: string };
+}
+
+interface Brand {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 interface LotSparePartOption {
+  id: string;
   sku: string;
   partName: string;
   brand: string;
@@ -65,16 +78,10 @@ interface LotSparePartOption {
   purchasePrice: number;
   wholesalePrice: number;
   mpn: string;
-  label: string; // "sku - partName"
+  label: string;
+  availableQty: number;
 }
 
-/**
- * Dialog component for bulk uploading spare parts via Excel.
- * - Parses Excel files to preview data.
- * - Validates foreign keys (Vendor, Model, Warehouse) by name matching.
- * - Allows selecting a Lot and a Product from that Lot per row.
- * - Allows manual addition/editing of rows before submission.
- */
 export default function BulkSparePartDialog({
   open,
   onOpenChange,
@@ -82,25 +89,11 @@ export default function BulkSparePartDialog({
   initialLotId,
   initialItemId,
 }: BulkSparePartDialogProps) {
-  interface Model {
-    id: string;
-    model_name: string;
-    model_no: string;
-    brandRelation?: { id: string; name: string };
-    brand?: { id: string; name: string };
-  }
-  interface Brand {
-    id: string;
-    name: string;
-    description?: string;
-  }
-
   const [rows, setRows] = useState<Partial<BulkSparePartRow>[]>([]);
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Lot state
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
   const [lots, setLots] = useState<Lot[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
@@ -109,30 +102,26 @@ export default function BulkSparePartDialog({
     if (!lotId) return [];
     const lot = lots.find((l) => l.id === lotId);
     if (!lot) return [];
-    const sparePartMap = new Map<string, LotSparePartOption>();
-    lot.items
+    return lot.items
       .filter((item) => item.itemType === LotItemType.SPARE_PART)
-      .forEach((item) => {
+      .map((item) => {
         const sp = item.sparePart;
-        const sku = sp?.sku || `NEW-${item.id}`;
+        const sku = sp?.sku || '';
         const partName = sp?.part_name || item.customSparePartName || 'Unnamed Spare';
-        const brand = sp?.brand || '';
-        const modelIds = sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'];
-        if (!sparePartMap.has(sku)) {
-          sparePartMap.set(sku, {
-            sku: sp?.sku || '',
-            partName,
-            brand,
-            modelIds,
-            purchasePrice: item.unitPrice || sp?.purchase_price || 0,
-            basePrice: sp?.base_price || item.unitPrice || 0,
-            wholesalePrice: sp?.wholesale_price || 0,
-            mpn: item.mpn || sp?.mpn || '',
-            label: `${sp?.sku || 'NEW'} - ${partName}`,
-          });
-        }
+        return {
+          id: item.id,
+          sku,
+          partName,
+          brand: sp?.brand || '',
+          modelIds: sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'],
+          purchasePrice: item.unitPrice || sp?.purchase_price || 0,
+          basePrice: sp?.base_price || item.unitPrice || 0,
+          wholesalePrice: sp?.wholesale_price || 0,
+          mpn: item.mpn || sp?.mpn || '',
+          label: `${sku || 'NEW'} - ${partName}`,
+          availableQty: Math.max(0, item.receivedQuantity - item.usedQuantity),
+        };
       });
-    return Array.from(sparePartMap.values());
   };
 
   const loadDependencies = async () => {
@@ -154,19 +143,6 @@ export default function BulkSparePartDialog({
     }
   };
 
-  useEffect(() => {
-    if (open) {
-      const prepareInitialData = async () => {
-        await loadDependencies();
-
-        if (!initialLotId) {
-          setRows([]);
-        }
-      };
-      prepareInitialData();
-    }
-  }, [open, initialLotId, initialItemId]);
-
   const createEmptyRow = useCallback(
     (): Partial<BulkSparePartRow> => ({
       sku: '',
@@ -176,31 +152,43 @@ export default function BulkSparePartDialog({
       purchase_price: 0,
       base_price: 0,
       wholesale_price: 0,
-      quantity: 0,
+      quantity: 1,
       vendor_id: '',
       warehouse_id: '',
       lot_id: initialLotId || undefined,
       mpn: '',
+      description: '',
+      yield: '',
+      maxDiscountableAmount: 0,
+      _selectedLotItemId: '',
     }),
     [initialLotId],
   );
 
-  // We need to handle the pre-filling after lots and selectedLotId are set
+  useEffect(() => {
+    if (open) {
+      loadDependencies();
+      if (!initialLotId) {
+        setRows([]);
+        setExpandedRows({});
+      }
+    }
+  }, [open]);
+
   useEffect(() => {
     if (open && initialLotId && lots.length > 0) {
       const lot = lots.find((l) => l.id === initialLotId);
       if (lot && lot.items) {
         let itemsToFill = lot.items.filter((item) => item.itemType === LotItemType.SPARE_PART);
-
         if (initialItemId) {
           itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
         }
-
         const newRows = itemsToFill.map((item) => {
           const sp = item.sparePart;
           return {
             ...createEmptyRow(),
             lot_id: initialLotId,
+            _selectedLotItemId: item.id,
             sku: sp?.sku || '',
             part_name: sp?.part_name || item.customSparePartName || '',
             brand: sp?.brand || '',
@@ -208,10 +196,13 @@ export default function BulkSparePartDialog({
             purchase_price: Number(item.unitPrice) || Number(sp?.purchase_price) || 0,
             base_price: Number(sp?.base_price) || Number(item.unitPrice) || 0,
             wholesale_price: Number(sp?.wholesale_price) || 0,
-            quantity: Math.max(0, item.receivedQuantity - item.usedQuantity),
+            quantity: Math.max(1, item.receivedQuantity - item.usedQuantity),
             vendor_id: lot.vendorId || lot.vendor?.id || '',
             warehouse_id: lot.warehouse_id || '',
             mpn: item.mpn || sp?.mpn || '',
+            description: sp?.description || '',
+            yield: sp?.yield || '',
+            maxDiscountableAmount: Number(sp?.maxDiscountableAmount || 0),
           };
         });
         setRows(newRows);
@@ -224,10 +215,10 @@ export default function BulkSparePartDialog({
     list: { id: string; name?: string; model_name?: string; warehouseName?: string }[],
   ) => {
     if (!name) return '';
-    const lowerName = String(name).toLowerCase().trim();
+    const lower = String(name).toLowerCase().trim();
     const found = list.find((item) => {
-      const itemName = (item.name || item.model_name || item.warehouseName || '').toLowerCase();
-      return itemName === lowerName || item.id === name;
+      const n = (item.name || item.model_name || item.warehouseName || '').toLowerCase();
+      return n === lower || item.id === name;
     });
     return found ? found.id : '';
   };
@@ -238,10 +229,9 @@ export default function BulkSparePartDialog({
         const getVal = (keys: string[]) => {
           for (const k of keys) {
             if (row[k] !== undefined) return row[k];
-            const lowerK = k.toLowerCase().replace(/\s/g, '');
-            for (const rowKey of Object.keys(row)) {
-              const lowerRowKey = rowKey.toLowerCase().replace(/\s/g, '');
-              if (lowerRowKey === lowerK) return row[rowKey];
+            const lk = k.toLowerCase().replace(/\s/g, '');
+            for (const rk of Object.keys(row)) {
+              if (rk.toLowerCase().replace(/\s/g, '') === lk) return row[rk];
             }
           }
           return '';
@@ -253,28 +243,23 @@ export default function BulkSparePartDialog({
           if (String(rawModel).toLowerCase().includes('universal')) {
             parsedModelIds = ['universal'];
           } else {
-            const parts = String(rawModel)
+            parsedModelIds = String(rawModel)
               .split(',')
-              .map((s) => s.trim());
-            parsedModelIds = parts.map((p) => findIdByName(p, models)).filter(Boolean);
+              .map((s) => s.trim())
+              .map((p) => findIdByName(p, models))
+              .filter(Boolean);
             if (parsedModelIds.length === 0) parsedModelIds = ['universal'];
           }
         } else {
           parsedModelIds = ['universal'];
         }
 
-        const rawVendor = getVal(['vendor_id', 'Vendor ID', 'Vendor']);
-        const rawWarehouse = getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']);
-
         const rawSku = getVal(['sku', 'SKU', 'item_code', 'Item Code']);
-        let sku = rawSku;
         const rawSelect = getVal(['Select Spare Parts from Lot', 'Select Product from Lot']);
-
+        let sku = rawSku;
         if (!sku && rawSelect) {
           const parts = rawSelect.toString().split(' - ');
-          if (parts.length > 1) {
-            sku = parts[0].trim();
-          }
+          if (parts.length > 1) sku = parts[0].trim();
         }
 
         const lotIdFromExcel = getVal(['lot_id', 'lotNumber', 'Lot ID', 'Lot', 'lot_number']);
@@ -287,14 +272,25 @@ export default function BulkSparePartDialog({
           base_price: Number(getVal(['base_price', 'Price', 'Base Price', 'Selling Price'])) || 0,
           purchase_price: Number(getVal(['purchase_price', 'Purchase Price'])) || 0,
           wholesale_price: Number(getVal(['wholesale_price', 'Wholesale Price'])) || 0,
-          quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 0,
-          vendor_id: findIdByName(String(rawVendor || ''), vendors),
-          warehouse_id: findIdByName(String(rawWarehouse || ''), warehouses),
+          quantity: Number(getVal(['quantity', 'Quantity', 'Qty'])) || 1,
+          vendor_id: findIdByName(
+            String(getVal(['vendor_id', 'Vendor ID', 'Vendor']) || ''),
+            vendors,
+          ),
+          warehouse_id: findIdByName(
+            String(getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']) || ''),
+            warehouses,
+          ),
           lot_id:
             (lotIdFromExcel ? String(lotIdFromExcel) : undefined) || initialLotId || undefined,
           mpn: String(
             getVal(['mpn', 'MPN', 'Manufacturing Part Number', 'manufacturing_part_number']) || '',
           ),
+          description: String(getVal(['description', 'Description']) || ''),
+          yield: String(getVal(['yield', 'Yield']) || ''),
+          maxDiscountableAmount:
+            Number(getVal(['maxDiscountableAmount', 'max_discount_amount', 'Max Discount'])) || 0,
+          _selectedLotItemId: '',
         };
       },
     );
@@ -310,27 +306,39 @@ export default function BulkSparePartDialog({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
-
     const reader = new FileReader();
-
     reader.onload = (event) => {
       const bstr = event.target?.result;
       const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const data = XLSX.utils.sheet_to_json(ws);
-      parseExcelData(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      parseExcelData(XLSX.utils.sheet_to_json(ws));
     };
-
     reader.readAsBinaryString(selectedFile);
   };
 
   const handleAddRow = () => {
-    setRows([...rows, createEmptyRow()]);
+    const newRow = createEmptyRow();
+    const newRows = [...rows, newRow];
+    setRows(newRows);
+    setExpandedRows((prev) => ({ ...prev, [newRows.length - 1]: true }));
   };
 
   const handleRemoveRow = (index: number) => {
     setRows(rows.filter((_, i) => i !== index));
+    setExpandedRows((prev) => {
+      const next = { ...prev };
+      delete next[index];
+      const updated: Record<number, boolean> = {};
+      Object.keys(next).forEach((k) => {
+        const idx = Number(k);
+        updated[idx > index ? idx - 1 : idx] = next[idx];
+      });
+      return updated;
+    });
+  };
+
+  const toggleRowExpanded = (index: number) => {
+    setExpandedRows((prev) => ({ ...prev, [index]: !prev[index] }));
   };
 
   const updateRow = (
@@ -358,29 +366,31 @@ export default function BulkSparePartDialog({
 
     setIsSubmitting(true);
     try {
-      const payload = validRows.map((r) => ({
-        ...r,
-        model_ids:
-          r.model_ids?.includes('universal') || !r.model_ids?.length ? undefined : r.model_ids,
-        base_price: Number(r.base_price),
-        purchase_price: Number(r.purchase_price),
-        wholesale_price: Number(r.wholesale_price),
-        quantity: Number(r.quantity),
-        lot_id: r.lot_id || undefined,
-      }));
-
-      // Strip model_id key since backend takes model_ids
-      payload.forEach((p) => {
-        if ('model_id' in p) delete p.model_id;
+      const payload = validRows.map((r) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { _selectedLotItemId, ...rest } = r as BulkSparePartRow;
+        return {
+          ...rest,
+          model_ids:
+            rest.model_ids?.includes('universal') || !rest.model_ids?.length
+              ? undefined
+              : rest.model_ids,
+          base_price: Number(rest.base_price),
+          purchase_price: Number(rest.purchase_price),
+          wholesale_price: Number(rest.wholesale_price),
+          quantity: Number(rest.quantity),
+          lot_id: rest.lot_id || undefined,
+          description: rest.description || undefined,
+          yield: rest.yield || undefined,
+          maxDiscountableAmount: Number(rest.maxDiscountableAmount || 0),
+        };
       });
 
       const result = await sparePartService.bulkUpload(payload);
 
       if (result.success) {
         toast.success(`Successfully uploaded ${result.data.success} spare parts`);
-        if (result.data.failed > 0) {
-          toast.warning(`${result.data.failed} items failed to upload`);
-        }
+        if (result.data.failed > 0) toast.warning(`${result.data.failed} items failed to upload`);
         onSuccess();
         onOpenChange(false);
       } else {
@@ -412,7 +422,7 @@ export default function BulkSparePartDialog({
           </button>
         </div>
 
-        {/* Toolbar: Upload Excel + row count */}
+        {/* Toolbar */}
         <div className="p-4 bg-muted/50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
           <div className="flex gap-4 items-center w-full sm:w-auto">
             <div className="relative">
@@ -437,262 +447,337 @@ export default function BulkSparePartDialog({
           </div>
         </div>
 
-        {/* Global Lot Selector Removed */}
-
-        {/* Table */}
-        <div className="flex-1 overflow-auto p-4">
+        {/* Rows */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {rows.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[200px]">Assign Lot</TableHead>
-                  <TableHead className="min-w-[250px]">Select Spare Parts from Lot</TableHead>
-                  <TableHead className="min-w-[180px]">
-                    Brand <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="min-w-[250px]">
-                    Part Name <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="min-w-[250px]">Compatible Model</TableHead>
-                  <TableHead className="min-w-[180px]">MPN</TableHead>
-                  <TableHead className="min-w-[180px]">
-                    SKU <span className="text-red-500">*</span>
-                  </TableHead>
-                  <TableHead className="min-w-[200px]">Vendor</TableHead>
-                  <TableHead className="min-w-[200px]">Warehouse</TableHead>
-                  <TableHead className="min-w-[120px]">Purchase Price</TableHead>
-                  <TableHead className="min-w-[120px]">Selling Price</TableHead>
-                  <TableHead className="min-w-[120px]">Wholesale Price</TableHead>
-                  <TableHead className="min-w-[100px]">Qty</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="align-top">
-                      <SearchableSelect
-                        value={row.lot_id || 'none'}
-                        onValueChange={(val) => {
-                          const newLotId = val === 'none' ? '' : val;
-                          updateRow(i, 'lot_id', newLotId);
-                          const lot = lots.find((l) => l.id === newLotId);
-                          if (lot && !row.vendor_id) updateRow(i, 'vendor_id', lot.vendorId || '');
-                          if (lot && !row.warehouse_id)
-                            updateRow(i, 'warehouse_id', lot.warehouse_id || '');
-                        }}
-                        options={lots.map((lot) => ({
-                          value: lot.id,
-                          label: lot.lotNumber,
-                          description: lot.vendor?.name || 'Unknown Vendor',
-                        }))}
-                        className="h-10"
-                        placeholder="Search lot..."
-                        emptyText="No lots found."
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {(() => {
-                        const localOptions = getLotSparePartItems(row.lot_id);
-                        return (
-                          <Select
-                            value={row.sku || ''}
-                            onValueChange={(v) => {
-                              const opt = localOptions.find((o) => o.sku === v);
-                              if (opt) {
-                                updateRow(i, 'sku', opt.sku);
-                                updateRow(i, 'part_name', opt.partName);
-                                updateRow(i, 'brand', opt.brand);
-                                updateRow(i, 'model_ids', opt.modelIds);
-                                updateRow(i, 'base_price', opt.basePrice);
-                                updateRow(i, 'purchase_price', opt.purchasePrice);
-                                updateRow(i, 'wholesale_price', opt.wholesalePrice);
-                                updateRow(i, 'mpn', opt.mpn);
-                              } else {
-                                updateRow(i, 'sku', v);
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="w-full h-10 px-3 bg-card hover:bg-muted/50 border-input text-foreground">
-                              <SelectValue placeholder="Select Part" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__" disabled className="hidden">
-                                Select from lot to auto-fill
-                              </SelectItem>
-                              {localOptions.length > 0 ? (
-                                localOptions.map((opt) => (
-                                  <SelectItem key={opt.sku} value={opt.sku}>
-                                    {opt.label}
-                                  </SelectItem>
-                                ))
-                              ) : (
-                                <SelectItem value="__none__" disabled>
-                                  {row.lot_id ? 'No spare parts in this lot' : 'Select a lot first'}
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <SearchableSelect
-                        value={row.brand || 'none'}
-                        onValueChange={(val) => {
-                          const newBrand = val === 'none' ? '' : val;
-                          updateRow(i, 'brand', newBrand);
-                          // Auto-clear model choice if brand changes
-                          if (
-                            row.model_ids &&
-                            row.model_ids.length > 0 &&
-                            !row.model_ids.includes('universal')
-                          ) {
-                            updateRow(i, 'model_ids', []);
-                          }
-                        }}
-                        options={brands.map((brand) => ({
-                          value: brand.name,
-                          label: brand.name,
-                          description: brand.description || '',
-                        }))}
-                        className="h-10"
-                        placeholder="Select Brand"
-                        emptyText="No brands found."
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        value={row.part_name}
-                        onChange={(e) => updateRow(i, 'part_name', e.target.value)}
-                        placeholder="Name"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <MultiSelect
-                        values={row.model_ids || []}
-                        onValuesChange={(vals) => updateRow(i, 'model_ids', vals)}
-                        options={[
-                          {
-                            value: 'universal',
-                            label: 'Universal (No Model)',
-                            description: 'Compatible with all models',
-                          },
-                          ...(() => {
-                            const filteredModels = row.brand
-                              ? models.filter(
-                                  (m) =>
-                                    m.brandRelation?.name === row.brand ||
-                                    m.brand?.name === row.brand,
-                                )
-                              : models;
-                            return filteredModels.map((m) => ({
-                              value: m.id,
-                              label: `${m.model_no} - ${m.model_name}`,
-                              description: '',
-                            }));
-                          })(),
-                        ]}
-                        className="h-10"
-                        placeholder="Select Models"
-                        emptyText="No models found."
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        value={row.mpn || ''}
-                        onChange={(e) => updateRow(i, 'mpn', e.target.value)}
-                        placeholder="MPN"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        value={row.sku}
-                        onChange={(e) => updateRow(i, 'sku', e.target.value)}
-                        placeholder="SKU"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <SearchableSelect
-                        value={row.vendor_id || 'none'}
-                        onValueChange={(v) =>
-                          updateRow(i, 'vendor_id', v === 'none' ? undefined : v)
-                        }
-                        options={vendors.map((v) => ({
-                          value: v.id,
-                          label: v.name,
-                        }))}
-                        className="h-10"
-                        placeholder="Select Vendor"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <SearchableSelect
-                        value={row.warehouse_id || 'none'}
-                        onValueChange={(v) =>
-                          updateRow(i, 'warehouse_id', v === 'none' ? undefined : v)
-                        }
-                        options={warehouses.map((w) => ({
-                          value: w.id,
-                          label: w.warehouseName,
-                        }))}
-                        className="h-10"
-                        placeholder="Select Warehouse"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        type="number"
-                        value={row.purchase_price}
-                        onChange={(e) => updateRow(i, 'purchase_price', Number(e.target.value))}
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        type="number"
-                        value={row.base_price}
-                        onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        type="number"
-                        value={row.wholesale_price}
-                        onChange={(e) => updateRow(i, 'wholesale_price', Number(e.target.value))}
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <Input
-                        className="h-10"
-                        type="number"
-                        value={row.quantity}
-                        onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="align-top pt-3 text-center">
+            rows.map((row, i) => {
+              const isExpanded = !!expandedRows[i];
+              const isValid = !!(row.part_name && row.sku);
+              const lotOptions = getLotSparePartItems(row.lot_id);
+              const lot = lots.find((l) => l.id === row.lot_id);
+              const filteredModels = row.brand
+                ? models.filter(
+                    (m) => m.brandRelation?.name === row.brand || m.brand?.name === row.brand,
+                  )
+                : models;
+
+              return (
+                <div
+                  key={i}
+                  className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md"
+                >
+                  {/* Summary header */}
+                  <div
+                    onClick={() => toggleRowExpanded(i)}
+                    className="p-4 bg-slate-50 border-b flex justify-between items-center cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isValid ? (
+                        <span
+                          className="h-2.5 w-2.5 rounded-full bg-green-500 shrink-0"
+                          title="Valid"
+                        />
+                      ) : (
+                        <span
+                          className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"
+                          title="Missing required fields"
+                        />
+                      )}
+                      <div className="text-left">
+                        <h4 className="font-bold text-sm text-slate-800">
+                          Spare Part #{i + 1}:{' '}
+                          <span className="text-primary">{row.part_name || 'Unnamed Part'}</span>
+                        </h4>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {row.brand || 'No Brand'} • SKU: {row.sku || 'N/A'} • Qty:{' '}
+                          {row.quantity ?? 0} • Price: {row.base_price ?? 0}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                       <button
+                        type="button"
                         onClick={() => handleRemoveRow(i)}
-                        className="text-red-500 hover:text-red-700 p-2"
+                        className="text-red-500 hover:text-red-700 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="Delete"
                       >
                         <Trash2 size={16} />
                       </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <button
+                        type="button"
+                        onClick={() => toggleRowExpanded(i)}
+                        className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded form body */}
+                  {isExpanded && (
+                    <div className="p-6 bg-white space-y-6 text-left border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Left column */}
+                        <div className="space-y-4">
+                          <Field label="Assign Lot">
+                            <SearchableSelect
+                              value={row.lot_id || ''}
+                              onValueChange={(val) => {
+                                const newLotId = val === '__none__' ? '' : val;
+                                const newLot = lots.find((l) => l.id === newLotId);
+                                const newRows = [...rows];
+                                newRows[i] = {
+                                  ...newRows[i],
+                                  lot_id: newLotId,
+                                  _selectedLotItemId: '',
+                                  vendor_id:
+                                    newLot?.vendorId || newLot?.vendor?.id || row.vendor_id || '',
+                                  warehouse_id: newLot?.warehouse_id || row.warehouse_id || '',
+                                };
+                                setRows(newRows);
+                              }}
+                              options={[
+                                { value: '__none__', label: '— None —' },
+                                ...lots.map((l) => ({
+                                  value: l.id,
+                                  label: l.lotNumber,
+                                  description: l.vendor?.name || '',
+                                })),
+                              ]}
+                              placeholder="Select Lot"
+                              emptyText="No lots"
+                            />
+                          </Field>
+
+                          {row.lot_id && (
+                            <Field label="Select Spare Part from Lot">
+                              <SearchableSelect
+                                value={row._selectedLotItemId || ''}
+                                onValueChange={(val) => {
+                                  const opt = lotOptions.find((o) => o.id === val);
+                                  if (opt) {
+                                    const newRows = [...rows];
+                                    newRows[i] = {
+                                      ...newRows[i],
+                                      _selectedLotItemId: val,
+                                      sku: opt.sku,
+                                      part_name: opt.partName,
+                                      brand: opt.brand,
+                                      model_ids: opt.modelIds,
+                                      base_price: opt.basePrice,
+                                      purchase_price: opt.purchasePrice,
+                                      wholesale_price: opt.wholesalePrice,
+                                      mpn: opt.mpn,
+                                      quantity: opt.availableQty || 1,
+                                      vendor_id:
+                                        lot?.vendorId || lot?.vendor?.id || row.vendor_id || '',
+                                      warehouse_id: lot?.warehouse_id || row.warehouse_id || '',
+                                    };
+                                    setRows(newRows);
+                                  }
+                                }}
+                                options={lotOptions.map((o) => ({
+                                  value: o.id,
+                                  label: o.label,
+                                  description: `Available: ${o.availableQty}`,
+                                }))}
+                                placeholder={
+                                  lotOptions.length === 0
+                                    ? 'No spare parts in this lot'
+                                    : 'Select from lot to auto-fill'
+                                }
+                                emptyText="No spare parts in this lot"
+                              />
+                            </Field>
+                          )}
+
+                          <Field label="Part Name *">
+                            <Input
+                              value={row.part_name || ''}
+                              onChange={(e) => updateRow(i, 'part_name', e.target.value)}
+                              placeholder="Part Name"
+                            />
+                          </Field>
+
+                          <Field label="MPN (Manufacturing Part Number)">
+                            <Input
+                              value={row.mpn || ''}
+                              onChange={(e) => updateRow(i, 'mpn', e.target.value)}
+                              placeholder="MPN (Optional)"
+                            />
+                          </Field>
+
+                          <Field label="Brand">
+                            <SearchableSelect
+                              value={row.brand || ''}
+                              onValueChange={(val) => {
+                                updateRow(i, 'brand', val);
+                                if (
+                                  row.model_ids &&
+                                  row.model_ids.length > 0 &&
+                                  !row.model_ids.includes('universal')
+                                ) {
+                                  updateRow(i, 'model_ids', []);
+                                }
+                              }}
+                              options={brands.map((b) => ({
+                                value: b.name,
+                                label: b.name,
+                                description: b.description || '',
+                              }))}
+                              placeholder="Select Brand"
+                              emptyText="No brands"
+                            />
+                          </Field>
+
+                          <Field label="Compatible Models">
+                            <MultiSelect
+                              values={row.model_ids || []}
+                              onValuesChange={(vals) => updateRow(i, 'model_ids', vals)}
+                              options={[
+                                {
+                                  value: 'universal',
+                                  label: 'Universal (No Model)',
+                                  description: 'Compatible with all models',
+                                },
+                                ...filteredModels.map((m) => ({
+                                  value: m.id,
+                                  label: `${m.model_no} - ${m.model_name}`,
+                                  description: '',
+                                })),
+                              ]}
+                              placeholder="Select Models"
+                              emptyText="No models"
+                            />
+                          </Field>
+                        </div>
+
+                        {/* Right column */}
+                        <div className="space-y-4">
+                          <Field label="SKU *">
+                            <Input
+                              value={row.sku || ''}
+                              onChange={(e) => updateRow(i, 'sku', e.target.value)}
+                              placeholder="SKU (auto-generated if empty)"
+                            />
+                          </Field>
+
+                          <Field label="Quantity">
+                            <Input
+                              type="number"
+                              min={1}
+                              value={row.quantity ?? 1}
+                              onChange={(e) => updateRow(i, 'quantity', Number(e.target.value))}
+                              placeholder="1"
+                            />
+                          </Field>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Vendor">
+                              <SearchableSelect
+                                value={row.vendor_id || ''}
+                                onValueChange={(v) =>
+                                  updateRow(i, 'vendor_id', v === '__none__' ? '' : v)
+                                }
+                                options={[
+                                  { value: '__none__', label: 'None' },
+                                  ...vendors.map((v) => ({ value: v.id, label: v.name })),
+                                ]}
+                                placeholder="Select Vendor"
+                              />
+                            </Field>
+                            <Field label="Warehouse">
+                              <SearchableSelect
+                                value={row.warehouse_id || ''}
+                                onValueChange={(v) =>
+                                  updateRow(i, 'warehouse_id', v === '__none__' ? '' : v)
+                                }
+                                options={[
+                                  { value: '__none__', label: 'None' },
+                                  ...warehouses.map((w) => ({
+                                    value: w.id,
+                                    label: w.warehouseName,
+                                  })),
+                                ]}
+                                placeholder="Select Warehouse"
+                              />
+                            </Field>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Purchase Price">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={row.purchase_price ?? 0}
+                                onChange={(e) =>
+                                  updateRow(i, 'purchase_price', Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </Field>
+                            <Field label="Selling Price">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={row.base_price ?? 0}
+                                onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
+                                placeholder="0"
+                              />
+                            </Field>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <Field label="Wholesale Price">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={row.wholesale_price ?? 0}
+                                onChange={(e) =>
+                                  updateRow(i, 'wholesale_price', Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </Field>
+                            <Field label="Max Discount (QAR)">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={row.maxDiscountableAmount ?? 0}
+                                onChange={(e) =>
+                                  updateRow(i, 'maxDiscountableAmount', Number(e.target.value))
+                                }
+                                placeholder="0"
+                              />
+                            </Field>
+                          </div>
+
+                          <Field label="Yield Specification">
+                            <Input
+                              value={row.yield || ''}
+                              onChange={(e) => updateRow(i, 'yield', e.target.value)}
+                              placeholder="Ex. 36,000 pages @ 5% coverage"
+                            />
+                          </Field>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <div className="pt-4 border-t">
+                        <BulletDescriptionInput
+                          label="Spare Part Details (Bullet Points)"
+                          value={row.description || ''}
+                          onChange={(val) => updateRow(i, 'description', val)}
+                          placeholder="Ex. High quality replacement fuser"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+            <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
               <Upload size={48} className="mb-4 opacity-20" />
               <p>Upload an Excel file to view and edit items here</p>
               <p className="text-sm">or click &quot;Add Row&quot; to start manually</p>
@@ -720,6 +805,15 @@ export default function BulkSparePartDialog({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-700 mb-1">{label}</label>
+      {children}
     </div>
   );
 }

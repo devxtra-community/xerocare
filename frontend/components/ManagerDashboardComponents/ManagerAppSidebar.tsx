@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
   Bell,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
@@ -132,7 +133,18 @@ const menuItems = [
   {
     title: 'Inventory',
     icon: Boxes,
-    href: '/manager/inventory',
+    subItems: [
+      {
+        title: 'Stock',
+        icon: Boxes,
+        href: '/manager/inventory',
+      },
+      {
+        title: 'Stock Transfers',
+        icon: ArrowRightLeft,
+        href: '/manager/stock-transfers',
+      },
+    ],
   },
   {
     title: 'Warehouse',

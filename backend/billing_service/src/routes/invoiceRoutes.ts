@@ -63,6 +63,7 @@ import {
   recordPayment,
   getInvoiceLedger,
   getMachineBillingContext,
+  getMachineHistoryData,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -524,6 +525,7 @@ router.post('/service-quotation', createServiceQuotation);
 router.get('/contract/serial/:serialNumber', getContractBySerial);
 router.get('/customer/:customerId/history', getCustomerBillingHistory);
 router.get('/machine/:productId/billing-context', getMachineBillingContext);
+router.get('/machine/:productId/history-data', getMachineHistoryData);
 
 router.patch('/:id/revise-estimate', authMiddleware, reviseEstimate);
 router.post('/:id/finance-extend-validity', authMiddleware, financeExtendValidity);

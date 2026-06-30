@@ -232,7 +232,14 @@ export class SparePartRepository {
   async findById(id: string): Promise<SparePart | null> {
     return this.masterRepo.findOne({
       where: { id },
-      relations: { model: true, models: true },
+      relations: {
+        model: true,
+        models: true,
+        branch: true,
+        warehouse: true,
+        vendor: true,
+        lot: true,
+      },
     });
   }
 }

@@ -84,9 +84,15 @@ export default function ManagerProduct() {
             const lot = await lotService.getLotById(lotId);
             const productItems = lot?.items?.filter((item) => item.itemType === 'MODEL') || [];
 
-            if (productItems.length > 1) {
+            const totalQty = productItems.reduce(
+              (sum, item) =>
+                sum + Math.max(0, (item.receivedQuantity || 0) - (item.usedQuantity || 0)),
+              0,
+            );
+
+            if (totalQty > 1) {
               setBulkDialogOpen(true);
-            } else if (productItems.length === 1) {
+            } else if (totalQty === 1) {
               setInitialItemId(productItems[0].id);
               setFormOpen(true);
             } else {

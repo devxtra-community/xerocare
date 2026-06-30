@@ -52,10 +52,14 @@ export interface ServiceTicket {
   problemFound?: string | null;
   rootCause?: string | null;
   meterReadingAtService?: number;
+  branchName?: string;
+  branchId?: string;
 }
 
-export const getServiceTickets = async (): Promise<ServiceTicket[]> => {
-  const response = await api.get('/i/service/tickets');
+export const getServiceTickets = async (branchId?: string): Promise<ServiceTicket[]> => {
+  const params: Record<string, string> = {};
+  if (branchId) params.branchId = branchId;
+  const response = await api.get('/i/service/tickets', { params });
   return response.data.data;
 };
 

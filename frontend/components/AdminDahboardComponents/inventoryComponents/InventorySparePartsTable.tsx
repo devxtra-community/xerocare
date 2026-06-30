@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ export default function InventorySparePartsTable({
 }) {
   const [data, setData] = useState<SparePartInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   // Filter States
@@ -314,6 +316,7 @@ export default function InventorySparePartsTable({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-gray-400 hover:text-primary"
+                        onClick={() => router.push(`/admin/spare-parts/${item.id}`)}
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
