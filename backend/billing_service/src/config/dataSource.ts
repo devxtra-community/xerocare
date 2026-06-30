@@ -20,6 +20,20 @@ import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { DeviceMeterReading } from '../entities/deviceMeterReadingEntity';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { AuditLog } from '../entities/auditLogEntity';
+import { CashBankAccount } from '../entities/cashBankAccountEntity';
+import { CashbookEntry } from '../entities/cashbookEntryEntity';
+import { ExpenseEntry } from '../entities/expenseEntryEntity';
+import { DepreciationBrandRule } from '../entities/depreciationBrandRuleEntity';
+import { DepreciationModelRule } from '../entities/depreciationModelRuleEntity';
+import { AssetDepreciationRegister } from '../entities/assetDepreciationRegisterEntity';
+import { DepreciationJournalEntry } from '../entities/depreciationJournalEntryEntity';
+import { ManualReceivable } from '../entities/manualReceivableEntity';
+import { ReceivablePayment } from '../entities/receivablePaymentEntity';
+import { ManualPayable } from '../entities/manualPayableEntity';
+import { PayablePayment } from '../entities/payablePaymentEntity';
+import { EquityEntry } from '../entities/equityEntryEntity';
+import { ExchangeRate } from '../entities/exchangeRateEntity';
+import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -44,6 +58,20 @@ export const Source = new DataSource({
     InvoiceLedger,
     PaymentTransaction,
     OpeningBalanceEntry,
+    CashBankAccount,
+    CashbookEntry,
+    ExpenseEntry,
+    DepreciationBrandRule,
+    DepreciationModelRule,
+    AssetDepreciationRegister,
+    DepreciationJournalEntry,
+    ManualReceivable,
+    ReceivablePayment,
+    ManualPayable,
+    PayablePayment,
+    EquityEntry,
+    ExchangeRate,
+    AccountReconciliation,
   ],
   poolSize: 1,
   extra: {
@@ -362,6 +390,256 @@ async function runPreMigrations() {
     } catch (colErr) {
       logger.warn('Failed to ensure invoices or invoice_items columns:', colErr);
     }
+    // ─── Finance Accounts Module Tables ──────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cash_bank_accounts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR NOT NULL,
+        type VARCHAR NOT NULL,
+        "bankName" VARCHAR,
+        "accountNumber" VARCHAR,
+        "branchId" UUID NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'AED',
+        "openingBalance" DECIMAL(12,2) DEFAULT 0,
+        "currentBalance" DECIMAL(12,2) DEFAULT 0,
+        notes TEXT,
+        "isActive" BOOLEAN DEFAULT true,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS cashbook_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "referenceNo" VARCHAR UNIQUE NOT NULL,
+        date DATE NOT NULL,
+        "accountId" UUID REFERENCES cash_bank_accounts(id),
+        "entryType" VARCHAR NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        category VARCHAR NOT NULL,
+        description TEXT,
+        "linkedInvoiceId" UUID,
+        "linkedPoId" UUID,
+        "linkedExpenseId" UUID,
+        "paymentMode" VARCHAR,
+        "chequeNo" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "branchId" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS expense_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "expenseNo" VARCHAR UNIQUE NOT NULL,
+        date DATE NOT NULL,
+        category VARCHAR NOT NULL,
+        "subCategory" VARCHAR,
+        description TEXT NOT NULL,
+        "branchId" UUID NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        "vatAmount" DECIMAL(12,2) DEFAULT 0,
+        "netAmount" DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'AED',
+        status VARCHAR DEFAULT 'PENDING',
+        "paidFrom" UUID REFERENCES cash_bank_accounts(id),
+        "paymentDate" DATE,
+        "paymentMode" VARCHAR,
+        "referenceNo" VARCHAR,
+        "approvedBy" UUID,
+        "receiptUrl" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS depreciation_brand_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "brandId" UUID NOT NULL UNIQUE,
+        "annualDepreciationPct" DECIMAL(5,2) NOT NULL,
+        "usefulLifeMonths" INTEGER NOT NULL DEFAULT 60,
+        "salvageValuePct" DECIMAL(5,2) NOT NULL DEFAULT 10,
+        method VARCHAR NOT NULL DEFAULT 'STRAIGHT_LINE',
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS depreciation_model_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "brandId" UUID NOT NULL,
+        "modelId" UUID NOT NULL UNIQUE,
+        "annualDepreciationPct" DECIMAL(5,2) NOT NULL,
+        "usefulLifeMonths" INTEGER NOT NULL DEFAULT 60,
+        "salvageValuePct" DECIMAL(5,2) NOT NULL DEFAULT 10,
+        method VARCHAR NOT NULL DEFAULT 'STRAIGHT_LINE',
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS asset_depreciation_register (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "productId" UUID NOT NULL UNIQUE,
+        "brandId" UUID NOT NULL,
+        "modelId" UUID NOT NULL,
+        "branchId" UUID NOT NULL,
+        "purchaseDate" DATE NOT NULL,
+        "purchasePrice" DECIMAL(12,2) NOT NULL,
+        "annualDepreciationPct" DECIMAL(5,2) NOT NULL,
+        "usefulLifeMonths" INTEGER NOT NULL,
+        "salvageValuePct" DECIMAL(5,2) NOT NULL,
+        "salvageValue" DECIMAL(12,2) NOT NULL,
+        method VARCHAR NOT NULL DEFAULT 'STRAIGHT_LINE',
+        status VARCHAR NOT NULL DEFAULT 'ACTIVE',
+        "disposalDate" DATE,
+        "disposalValue" DECIMAL(12,2),
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS depreciation_journal_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "periodYear" INTEGER NOT NULL,
+        "periodMonth" INTEGER NOT NULL,
+        "totalAmount" DECIMAL(12,2) NOT NULL,
+        "branchId" UUID NOT NULL,
+        status VARCHAR NOT NULL DEFAULT 'PENDING',
+        "postedBy" UUID,
+        "postedAt" TIMESTAMP,
+        "expenseEntryId" UUID REFERENCES expense_entries(id),
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        UNIQUE("periodYear", "periodMonth", "branchId")
+      );
+
+      CREATE TABLE IF NOT EXISTS manual_receivables (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "referenceNo" VARCHAR UNIQUE NOT NULL,
+        type VARCHAR NOT NULL,
+        "customerId" UUID,
+        "customerName" VARCHAR,
+        description TEXT,
+        amount DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) DEFAULT 'AED',
+        "issueDate" DATE NOT NULL,
+        "dueDate" DATE NOT NULL,
+        "amountPaid" DECIMAL(12,2) DEFAULT 0,
+        outstanding DECIMAL(12,2),
+        status VARCHAR DEFAULT 'PENDING',
+        "linkedInvoiceId" UUID,
+        "branchId" UUID NOT NULL,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS receivable_payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "receivableId" UUID REFERENCES manual_receivables(id),
+        "paymentDate" DATE NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        "paidToAccount" UUID REFERENCES cash_bank_accounts(id),
+        "paymentMode" VARCHAR,
+        "referenceNo" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS manual_payables (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "referenceNo" VARCHAR UNIQUE NOT NULL,
+        type VARCHAR NOT NULL,
+        "payableTo" VARCHAR NOT NULL,
+        "vendorId" UUID,
+        "employeeId" UUID,
+        description TEXT,
+        amount DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) DEFAULT 'AED',
+        "issueDate" DATE NOT NULL,
+        "dueDate" DATE NOT NULL,
+        "amountPaid" DECIMAL(12,2) DEFAULT 0,
+        outstanding DECIMAL(12,2),
+        status VARCHAR DEFAULT 'PENDING',
+        "branchId" UUID NOT NULL,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS payable_payments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "payableId" UUID REFERENCES manual_payables(id),
+        "paymentDate" DATE NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        "paidFromAccount" UUID REFERENCES cash_bank_accounts(id),
+        "paymentMode" VARCHAR,
+        "referenceNo" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS exchange_rates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "fromCurrency" VARCHAR(3) NOT NULL,
+        "toCurrency" VARCHAR(3) NOT NULL,
+        rate DECIMAL(12,6) NOT NULL,
+        "setBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        UNIQUE("fromCurrency", "toCurrency")
+      );
+
+      CREATE TABLE IF NOT EXISTS equity_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "entryNo" VARCHAR UNIQUE NOT NULL,
+        date DATE NOT NULL,
+        type VARCHAR NOT NULL,
+        description TEXT NOT NULL,
+        amount DECIMAL(14,2) NOT NULL,
+        currency VARCHAR DEFAULT 'AED',
+        "branchId" UUID NOT NULL,
+        "referenceNo" VARCHAR,
+        "linkedCashAccountId" UUID REFERENCES cash_bank_accounts(id),
+        "documentUrl" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    logger.info('Finance accounts module tables created/verified.');
+
+    // ─── Cash & Bank extended columns + reconciliation table ─────────────────
+    await client.query(`
+      ALTER TABLE cash_bank_accounts
+        ADD COLUMN IF NOT EXISTS iban VARCHAR,
+        ADD COLUMN IF NOT EXISTS "accountType" VARCHAR DEFAULT 'CURRENT',
+        ADD COLUMN IF NOT EXISTS "openingDate" DATE,
+        ADD COLUMN IF NOT EXISTS "responsiblePersonId" UUID,
+        ADD COLUMN IF NOT EXISTS "contactPerson" VARCHAR;
+
+      CREATE TABLE IF NOT EXISTS account_reconciliations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "accountId" UUID NOT NULL REFERENCES cash_bank_accounts(id) ON DELETE CASCADE,
+        "reconciliationDate" DATE NOT NULL,
+        "statementDate" DATE NOT NULL,
+        "bookBalance" DECIMAL(12,2) NOT NULL,
+        "statementBalance" DECIMAL(12,2) NOT NULL,
+        difference DECIMAL(12,2) NOT NULL,
+        "isBalanced" BOOLEAN NOT NULL DEFAULT FALSE,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    logger.info('Cash & Bank extended schema applied.');
+    // ─────────────────────────────────────────────────────────────────────────
+
     logger.info('Pre-migration enum values and tables added successfully');
 
     // Run legacy status updates

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,11 @@ import {
   InvoiceItem,
   activateContractInvoice,
   uploadContractConfirmationInvoice,
+  allocateMachinesInvoice,
 } from '@/lib/invoice';
+import { Product, getAvailableProductsByModel } from '@/lib/product';
+import { SparePart, getAvailableSparePartsByModel, getAllSpareParts } from '@/lib/spare-part';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -41,6 +45,11 @@ interface ReadingInput {
   colorA4Reading: number | null;
   colorA3Reading: number | null;
   printColor: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+}
+interface InvoiceItemWithProduct extends InvoiceItem {
+  product?: {
+    print_color?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  };
 }
 
 /**
@@ -67,15 +76,99 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
     invoice.items?.filter((i: InvoiceItem) => i.itemType === 'PRODUCT' && i.productId) || [];
   const needsReadings = invoice.saleType === 'RENT' || invoice.saleType === 'LEASE';
 
+  // Map of InvoiceItemId -> Selected ProductId (Serial Number)
+  const [allocations, setAllocations] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    invoice.items?.forEach((item) => {
+      if (item.id) {
+        // Look up in invoice.productAllocations
+        const alloc = invoice.productAllocations?.find(
+          (a) => a.productId === item.productId || a.modelId === item.modelId,
+        );
+        if (alloc) {
+          initial[item.id] = alloc.productId;
+        } else if (item.productId) {
+          initial[item.id] = item.productId;
+        }
+      }
+    });
+    return initial;
+  });
+
+  // Cache of available items by ModelId
+  const [availableItems, setAvailableItems] = useState<Record<string, (Product | SparePart)[]>>({});
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      setIsLoadingProducts(true);
+
+      const uniqueModelIds = Array.from(
+        new Set(invoice.items?.filter((i) => i.modelId).map((i) => i.modelId!) || []),
+      );
+      const sparePartIds = Array.from(
+        new Set(
+          invoice.items
+            ?.filter((i) => i.itemType === 'SPAREPART' && i.productId)
+            .map((i) => i.productId!) || [],
+        ),
+      );
+
+      const itemsMap: Record<string, (Product | SparePart)[]> = {};
+      try {
+        await Promise.all(
+          uniqueModelIds.map(async (mid) => {
+            const itemTypes = new Set(
+              invoice.items?.filter((i) => i.modelId === mid).map((i) => i.itemType),
+            );
+            let combined: (Product | SparePart)[] = [];
+            if (itemTypes.has('PRODUCT')) {
+              const products = await getAvailableProductsByModel(mid);
+              combined = [...combined, ...products];
+            }
+            if (itemTypes.has('SPAREPART')) {
+              const parts = await getAvailableSparePartsByModel(mid);
+              combined = [...combined, ...parts];
+            }
+            if (combined.length === 0) {
+              const products = await getAvailableProductsByModel(mid);
+              combined = [...combined, ...products];
+              const parts = await getAvailableSparePartsByModel(mid);
+              combined = [...combined, ...parts];
+            }
+            itemsMap[mid] = combined;
+          }),
+        );
+
+        if (sparePartIds.length > 0) {
+          const allParts = await getAllSpareParts();
+          sparePartIds.forEach((pid) => {
+            const matches = allParts.filter((p) => p.id === pid);
+            if (matches.length > 0) {
+              itemsMap[pid] = matches;
+            }
+          });
+        }
+
+        setAvailableItems(itemsMap);
+      } catch (error) {
+        console.error('Failed to fetch items', error);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+
+    if (invoice.items) fetchInventory();
+  }, [invoice]);
+
   const [readings, setReadings] = useState<Record<string, ReadingInput>>(() => {
     const initial: Record<string, ReadingInput> = {};
     rentalItems.forEach((item) => {
       // Get the product's print_color from the joined product data if available
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const itemData = item as any;
+      const itemData = item as InvoiceItemWithProduct;
       const printColor = itemData.product?.print_color || 'BOTH';
 
-      initial[item.productId || item.id!] = {
+      initial[item.id!] = {
         productId: item.productId || '',
         bwA4Reading: 0,
         bwA3Reading: 0,
@@ -86,6 +179,19 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
     });
     return initial;
   });
+
+  const getPrintColor = (item: InvoiceItem) => {
+    const selectedPid = allocations[item.id!];
+    if (selectedPid) {
+      const available = availableItems[item.modelId!] || availableItems[item.productId!] || [];
+      const prod = available.find((p) => p.id === selectedPid);
+      if (prod && 'print_color' in prod) {
+        return prod.print_color || 'BOTH';
+      }
+    }
+    const itemData = item as InvoiceItemWithProduct;
+    return itemData.product?.print_color || 'BOTH';
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -112,18 +218,30 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
       return;
     }
 
-    // Deposit is shown but optional — skip validation if not filled
-    // Backend will handle mandatory cases
-    void 0;
+    // Validate allocations are present
+    const missingAllocations = rentalItems.filter((i) => !allocations[i.id!]);
+    if (missingAllocations.length > 0) {
+      toast.error(`Please select a Serial Number for: ${missingAllocations[0].description}`);
+      return;
+    }
+
+    // Check for duplicates
+    const selectedSerials = Object.values(allocations);
+    const uniqueSerials = new Set(selectedSerials);
+    if (selectedSerials.length !== uniqueSerials.size) {
+      toast.error('Duplicate serial numbers selected! Each item must have a unique machine.');
+      return;
+    }
 
     // Validate readings if needed
     if (needsReadings) {
       for (const item of rentalItems) {
-        const r = readings[item.productId || item.id!];
+        const r = readings[item.id!];
+        const printColor = getPrintColor(item);
 
         // Validate B&W Readings
-        if (r.printColor === 'BOTH' || r.printColor === 'BLACK_WHITE') {
-          if (r.bwA4Reading === null || r.bwA4Reading < 0) {
+        if (printColor === 'BOTH' || printColor === 'BLACK_WHITE') {
+          if (!r || r.bwA4Reading === null || r.bwA4Reading < 0) {
             toast.error(`Please enter valid B&W A4 reading for ${item.description}`);
             return;
           }
@@ -134,8 +252,8 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
         }
 
         // Validate Color Readings
-        if (r.printColor === 'BOTH' || r.printColor === 'COLOUR') {
-          if (r.colorA4Reading === null || r.colorA4Reading < 0) {
+        if (printColor === 'BOTH' || printColor === 'COLOUR') {
+          if (!r || r.colorA4Reading === null || r.colorA4Reading < 0) {
             toast.error(`Please enter valid Color A4 reading for ${item.description}`);
             return;
           }
@@ -149,29 +267,29 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
 
     setIsSubmitting(true);
     try {
-      // Prepare item updates (readings)
-      const itemUpdates: {
-        id: string;
-        productId: string;
-        initialBwCount?: number;
-        initialBwA3Count?: number;
-        initialColorCount?: number;
-        initialColorA3Count?: number;
-      }[] = needsReadings
+      // 1. Save machine allocations first
+      const itemAllocUpdates = rentalItems.map((item) => ({
+        id: item.id as string,
+        productId: allocations[item.id!] as string,
+      }));
+      await allocateMachinesInvoice(invoice.id, { itemUpdates: itemAllocUpdates });
+
+      // 2. Prepare readings updates
+      const itemUpdates = needsReadings
         ? rentalItems.map((item) => {
-            const r = readings[item.productId || item.id!];
+            const r = readings[item.id!];
             return {
               id: item.id!,
-              productId: item.productId!,
-              initialBwCount: r.bwA4Reading || 0,
-              initialBwA3Count: r.bwA3Reading || 0,
-              initialColorCount: r.colorA4Reading || 0,
-              initialColorA3Count: r.colorA3Reading || 0,
+              productId: allocations[item.id!] as string,
+              initialBwCount: r?.bwA4Reading || 0,
+              initialBwA3Count: r?.bwA3Reading || 0,
+              initialColorCount: r?.colorA4Reading || 0,
+              initialColorA3Count: r?.colorA3Reading || 0,
             };
           })
         : [];
 
-      // Prepare deposit
+      // 3. Prepare deposit
       let depositPayload = undefined;
       if (isDepositNeeded && Number(depositAmount) > 0) {
         depositPayload = {
@@ -188,7 +306,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
         itemUpdates,
       });
 
-      toast.success('Contract activated successfully!');
+      toast.success('Contract processed successfully!');
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
       onSuccess();
@@ -209,11 +327,14 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
             <span className="bg-green-100 text-green-700 p-1.5 rounded-lg">
               <CheckCircle2 className="w-5 h-5" />
             </span>
-            Activate Contract - #{invoice.invoiceNumber}
+            {invoice.saleType === 'RENT' || invoice.saleType === 'LEASE'
+              ? 'Process Agreement'
+              : 'Activate Contract'}{' '}
+            - #{invoice.invoiceNumber}
           </DialogTitle>
           <DialogDescription>
-            Complete the activation flow by sending the contract, uploading the confirmation, and
-            adding readings.
+            Complete the processing flow by uploading the confirmation, reviewing machine
+            allocations, and adding initial readings.
           </DialogDescription>
         </DialogHeader>
 
@@ -353,11 +474,12 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                     </h3>
                     <div className="space-y-3">
                       {rentalItems.map((item) => {
-                        const r = readings[item.productId || item.id!];
+                        const r = readings[item.id!];
                         if (!r) return null;
 
-                        const isBw = r.printColor === 'BOTH' || r.printColor === 'BLACK_WHITE';
-                        const isColor = r.printColor === 'BOTH' || r.printColor === 'COLOUR';
+                        const printColor = getPrintColor(item);
+                        const isBw = printColor === 'BOTH' || printColor === 'BLACK_WHITE';
+                        const isColor = printColor === 'BOTH' || printColor === 'COLOUR';
 
                         return (
                           <Card
@@ -370,27 +492,73 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                   <p className="text-sm font-bold text-slate-800">
                                     {item.description}
                                   </p>
-                                  <p className="text-xs text-slate-500 font-mono mt-0.5">
-                                    SN:{' '}
-                                    {(() => {
-                                      const alloc = invoice.productAllocations?.find(
-                                        (a) =>
-                                          a.productId === item.productId ||
-                                          a.modelId === item.modelId,
-                                      );
-                                      return (
-                                        alloc?.serialNumber ||
-                                        (item as unknown as { product?: { serial_no: string } })
-                                          .product?.serial_no ||
-                                        'Unknown'
-                                      );
-                                    })()}
+                                  <p className="text-[10px] font-mono text-slate-400">
+                                    Model ID: {item.modelId || 'N/A'}
                                   </p>
                                 </div>
                                 <Badge variant="outline" className="bg-white">
-                                  {r.printColor.replace('_', ' ')}
+                                  {(printColor as string).replace('_', ' ')}
                                 </Badge>
                               </div>
+
+                              <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-100">
+                                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                  <Label className="text-xs">Machine Allocation</Label>
+                                  {(() => {
+                                    const available =
+                                      availableItems[item.modelId!] ||
+                                      availableItems[item.productId!] ||
+                                      [];
+                                    return (
+                                      <span
+                                        className={
+                                          available.length > 0 ? 'text-green-600' : 'text-red-500'
+                                        }
+                                      >
+                                        {available.length} items available
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                {isLoadingProducts ? (
+                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <Loader2 className="animate-spin h-3.5 w-3.5 text-blue-500" />
+                                    <span>Checking inventory...</span>
+                                  </div>
+                                ) : (
+                                  <SearchableSelect
+                                    options={(
+                                      availableItems[item.modelId!] ||
+                                      availableItems[item.productId!] ||
+                                      []
+                                    ).map((p) => {
+                                      const isTaken = Object.entries(allocations).some(
+                                        ([k, v]) => v === p.id && k !== item.id!,
+                                      );
+                                      return {
+                                        value: p.id,
+                                        label:
+                                          'serial_no' in p
+                                            ? p.serial_no
+                                            : `${p.sku} (Lot: ${p.lotNumber})`,
+                                        description: isTaken
+                                          ? 'Currently allocated to another item'
+                                          : undefined,
+                                        disabled: isTaken,
+                                      };
+                                    })}
+                                    value={allocations[item.id!]}
+                                    onValueChange={(val: string) => {
+                                      setAllocations({
+                                        ...allocations,
+                                        [item.id!]: val,
+                                      });
+                                    }}
+                                    placeholder="Select machine serial number..."
+                                  />
+                                )}
+                              </div>
+
                               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-white p-3 rounded-lg border border-slate-100">
                                 {isBw && (
                                   <>
@@ -405,7 +573,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                         onChange={(e) =>
                                           setReadings({
                                             ...readings,
-                                            [item.productId || item.id!]: {
+                                            [item.id!]: {
                                               ...r,
                                               bwA4Reading: e.target.value
                                                 ? Number(e.target.value)
@@ -427,7 +595,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                         onChange={(e) =>
                                           setReadings({
                                             ...readings,
-                                            [item.productId || item.id!]: {
+                                            [item.id!]: {
                                               ...r,
                                               bwA3Reading: e.target.value
                                                 ? Number(e.target.value)
@@ -453,7 +621,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                         onChange={(e) =>
                                           setReadings({
                                             ...readings,
-                                            [item.productId || item.id!]: {
+                                            [item.id!]: {
                                               ...r,
                                               colorA4Reading: e.target.value
                                                 ? Number(e.target.value)
@@ -475,7 +643,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                                         onChange={(e) =>
                                           setReadings({
                                             ...readings,
-                                            [item.productId || item.id!]: {
+                                            [item.id!]: {
                                               ...r,
                                               colorA3Reading: e.target.value
                                                 ? Number(e.target.value)
@@ -516,7 +684,9 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
               className="bg-green-600 hover:bg-green-700 shadow-green-200 min-w-[140px] font-bold shadow-md transition-all text-white"
             >
               {isSubmitting && <Loader2 className="animate-spin mr-2" size={16} />}
-              Activate Contract
+              {invoice.saleType === 'RENT' || invoice.saleType === 'LEASE'
+                ? 'Process & Activate'
+                : 'Activate Contract'}
             </Button>
           </div>
         </div>

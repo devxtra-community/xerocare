@@ -72,7 +72,9 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
           (inv.status === 'EMPLOYEE_APPROVED' ||
             inv.status === 'FINANCE_APPROVED' ||
             inv.status === 'APPROVED' ||
-            inv.contractStatus === 'PENDING_CONFIRMATION'),
+            inv.contractStatus === 'PENDING_CONFIRMATION') &&
+          inv.contractStatus !== 'ACTIVE' &&
+          inv.contractStatus !== 'COMPLETED',
       );
 
       if (saleType) {
@@ -453,7 +455,49 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 <TableCell>{inv.employeeName || 'Unknown'}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex justify-center gap-2">
-                    {inv.status === 'EMPLOYEE_APPROVED' ? (
+                    {inv.saleType === 'RENT' || inv.saleType === 'LEASE' ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={sendingEmailId === inv.id}
+                          className={
+                            inv.emailSentAt
+                              ? 'border-green-200 bg-green-50 hover:bg-green-100 text-green-700 hover:text-green-800 gap-1.5 shadow-sm'
+                              : 'border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 gap-1.5 shadow-sm'
+                          }
+                          onClick={() => handleSendEmail(inv)}
+                          title={
+                            inv.emailSentAt
+                              ? 'Resend Contract Email'
+                              : 'Send Contract Email to Customer'
+                          }
+                        >
+                          {sendingEmailId === inv.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : inv.emailSentAt ? (
+                            <CheckCircle className="h-3.5 w-3.5" />
+                          ) : (
+                            <Mail className="h-3.5 w-3.5" />
+                          )}
+                          <span>
+                            {sendingEmailId === inv.id
+                              ? 'Sending...'
+                              : inv.emailSentAt
+                                ? 'Resend Mail'
+                                : 'Send Mail'}
+                          </span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 shadow-sm"
+                          onClick={() => handleActivateClick(inv)}
+                          title="Process Agreement"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" /> Process
+                        </Button>
+                      </>
+                    ) : inv.status === 'EMPLOYEE_APPROVED' ? (
                       <Button
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-1.5"

@@ -12,6 +12,20 @@ import {
   FileQuestion,
   RotateCcw,
   FileText,
+  BookOpen,
+  BookMarked,
+  TrendingUp,
+  Scale,
+  Waves,
+  ReceiptText,
+  CreditCard,
+  Package,
+  PieChart,
+  Receipt,
+  FileDown,
+  ChevronDown,
+  ChevronRight,
+  Landmark,
   Bell,
 } from 'lucide-react';
 
@@ -39,6 +53,11 @@ import { useRouter, usePathname } from 'next/navigation';
 export default function FinanceSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const [accountsOpen, setAccountsOpen] = React.useState(pathname.startsWith('/finance/accounts'));
+
+  React.useEffect(() => {
+    if (pathname.startsWith('/finance/accounts')) setAccountsOpen(true);
+  }, [pathname]);
 
   type FinanceMenuItem = {
     title: string;
@@ -51,6 +70,22 @@ export default function FinanceSidebar() {
     group: string;
     items: FinanceMenuItem[];
   };
+
+  const accountsMenu: FinanceMenuItem[] = [
+    { title: 'Chart of Accounts', icon: BookOpen, href: '/finance/accounts/chart-of-accounts' },
+    { title: 'General Ledger', icon: BookMarked, href: '/finance/accounts/general-ledger' },
+    { title: 'Cash & Bank', icon: Landmark, href: '/finance/accounts/cash-bank' },
+    { title: 'Income Statement', icon: TrendingUp, href: '/finance/accounts/income-statement' },
+    { title: 'Balance Sheet', icon: Scale, href: '/finance/accounts/balance-sheet' },
+    { title: 'Cash Flow', icon: Waves, href: '/finance/accounts/cash-flow' },
+    { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
+    { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
+    { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
+    { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
+    { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
+    { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
+    { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
+  ];
 
   const financeMenu: FinanceMenuGroup[] = [
     {
@@ -224,6 +259,52 @@ export default function FinanceSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
+
+        {/* Accounts Section — Collapsible */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <button
+              onClick={() => setAccountsOpen((o) => !o)}
+              className="flex w-full items-center justify-between px-4 py-2 text-xs uppercase tracking-wide text-sidebar-accent-foreground/60 hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <span>Accounts</span>
+              {accountsOpen ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+
+            {accountsOpen && (
+              <SidebarMenu className="space-y-0.5 px-2">
+                {accountsMenu.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={`
+                          py-2 rounded-md text-[13px]
+                          ${
+                            isActive
+                              ? 'bg-card text-sidebar'
+                              : 'hover:bg-card/10 text-sidebar-accent-foreground/80'
+                          }
+                        `}
+                      >
+                        <a href={item.href} className="flex items-center gap-2.5 px-3 w-full">
+                          <item.icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="font-medium leading-tight">{item.title}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="bg-sidebar border-t border-white/10">

@@ -16,7 +16,17 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronRight,
+  BarChart2,
+  BookOpen,
+  DollarSign,
+  CreditCard,
+  ReceiptText,
+  Scale,
+  PieChart,
+  TrendingUp,
+  Eye,
   Bell,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
@@ -132,7 +142,18 @@ const menuItems = [
   {
     title: 'Inventory',
     icon: Boxes,
-    href: '/manager/inventory',
+    subItems: [
+      {
+        title: 'Stock',
+        icon: Boxes,
+        href: '/manager/inventory',
+      },
+      {
+        title: 'Stock Transfers',
+        icon: ArrowRightLeft,
+        href: '/manager/stock-transfers',
+      },
+    ],
   },
   {
     title: 'Warehouse',
@@ -151,10 +172,22 @@ const menuItems = [
  * Provides links to key modules: Products, Brands, Sales, Vendors, Employees, Finance, and Inventory.
  * Handles user logout functionality.
  */
+const accountsMenuItems = [
+  { title: 'Overview', icon: BarChart2, href: '/manager/accounts' },
+  { title: 'Cash & Bank', icon: BookOpen, href: '/manager/accounts/cash-bank' },
+  { title: 'Income & Expenses', icon: DollarSign, href: '/manager/accounts/expenses' },
+  { title: 'Receivables', icon: ReceiptText, href: '/manager/accounts/receivable' },
+  { title: 'Payables', icon: CreditCard, href: '/manager/accounts/payable' },
+  { title: 'Profit & Loss', icon: TrendingUp, href: '/manager/accounts/profit-loss' },
+  { title: 'Equity', icon: Scale, href: '/manager/accounts/equity' },
+  { title: 'Depreciation', icon: PieChart, href: '/manager/accounts/depreciation' },
+];
+
 export default function ManagerSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const [accountsOpen, setAccountsOpen] = useState(pathname.startsWith('/manager/accounts'));
   const [expiryCount, setExpiryCount] = useState(0);
 
   useEffect(() => {
@@ -317,6 +350,45 @@ export default function ManagerSidebar() {
                 );
               })}
             </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        {/* Accounts — Collapsible read-only section */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <button
+              onClick={() => setAccountsOpen((o) => !o)}
+              className="flex w-full items-center justify-between px-4 py-2 text-xs uppercase tracking-wide text-sidebar-accent-foreground/60 hover:text-sidebar-accent-foreground transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Eye className="h-3 w-3" /> Accounts (View Only)
+              </span>
+              {accountsOpen ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+            {accountsOpen && (
+              <SidebarMenu className="space-y-0.5 px-2">
+                {accountsMenuItems.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={`py-2 rounded-md text-[13px] ${isActive ? 'bg-card text-sidebar' : 'hover:bg-card/10 text-sidebar-accent-foreground/80'}`}
+                      >
+                        <a href={item.href} className="flex items-center gap-2.5 px-3 w-full">
+                          <item.icon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="font-medium leading-tight">{item.title}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            )}
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>

@@ -28,6 +28,31 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { format } from 'date-fns';
 
+interface UsageInvoiceItem extends InvoiceItem {
+  allocationId?: string;
+  allocation?: {
+    serialNumber?: string;
+    modelId?: string;
+  };
+  startBwA4?: number;
+  endBwA4?: number;
+  startBwA3?: number;
+  endBwA3?: number;
+  startColorA4?: number;
+  endColorA4?: number;
+  startColorA3?: number;
+  endColorA3?: number;
+}
+
+interface UsageInvoice extends Omit<Invoice, 'items'> {
+  items?: UsageInvoiceItem[];
+  periodStart?: string;
+  periodEnd?: string;
+  discountBwCopies?: number;
+  discountColorCopies?: number;
+  remarks?: string;
+}
+
 interface UsageRecordingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -195,14 +220,16 @@ export default function UsageRecordingModal({
     const activeAllocs =
       contract?.productAllocations?.filter((a) => a.status === 'ALLOCATED') || [];
 
+    const uniqueActiveSerials = new Set(activeAllocs.map((a) => a.serialNumber || a.id));
+
     // Priority 1: If we have previous usage record, try to get specific machine readings
     if (prevUsage) {
       // If there is exactly one active machine, use its reading from the previous record.
-      if (activeAllocs.length === 1) {
+      if (uniqueActiveSerials.size === 1) {
         if (prevUsage.items && prevUsage.items.length > 0) {
           const activeItem = prevUsage.items.find(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (i: any) => i.allocationId === activeAllocs[0].id,
+            (i: any) => activeAllocs.some((a) => a.id === i.allocationId),
           );
           if (activeItem) {
             return {
@@ -260,15 +287,37 @@ export default function UsageRecordingModal({
 
     if (editingInvoice) {
       // --- Initialization for EDITING ---
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inv = editingInvoice as any;
+      const inv = editingInvoice as unknown as UsageInvoice;
       const start = (inv.billingPeriodStart || inv.periodStart || '').split('T')[0];
       const end = (inv.billingPeriodEnd || inv.periodEnd || '').split('T')[0];
 
       let initialDiscountType: 'NONE' | 'AMOUNT' | 'COPIES' = 'NONE';
-      if (inv.discountAmount > 0) initialDiscountType = 'AMOUNT';
-      else if (inv.discountBwCopies > 0 || inv.discountColorCopies > 0)
+      if (inv.discountAmount && inv.discountAmount > 0) initialDiscountType = 'AMOUNT';
+      else if (
+        (inv.discountBwCopies && inv.discountBwCopies > 0) ||
+        (inv.discountColorCopies && inv.discountColorCopies > 0)
+      )
         initialDiscountType = 'COPIES';
+
+      const uniqueItemsMap = new Map<string, UsageInvoiceItem>();
+      (inv.items || []).forEach((item) => {
+        if (item.allocationId) {
+          uniqueItemsMap.set(item.allocationId, item);
+        }
+      });
+      const uniqueItemsList = Array.from(uniqueItemsMap.values()).map((item) => ({
+        allocationId: item.allocationId || '',
+        serialNumber: item.allocation?.serialNumber,
+        modelId: item.allocation?.modelId,
+        startBwA4: item.startBwA4 || 0,
+        endBwA4: item.endBwA4 || 0,
+        startBwA3: item.startBwA3 || 0,
+        endBwA3: item.endBwA3 || 0,
+        startColorA4: item.startColorA4 || 0,
+        endColorA4: item.endColorA4 || 0,
+        startColorA3: item.startColorA3 || 0,
+        endColorA3: item.endColorA3 || 0,
+      }));
 
       setFormData((prev) => ({
         ...prev,
@@ -283,30 +332,15 @@ export default function UsageRecordingModal({
         discountBwCopies: inv.discountBwCopies ? String(inv.discountBwCopies) : '',
         discountColorCopies: inv.discountColorCopies ? String(inv.discountColorCopies) : '',
         remarks: inv.financeRemarks || inv.remarks || '',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: (inv.items || []).map((item: any) => ({
-          allocationId: item.allocationId,
-          serialNumber: item.allocation?.serialNumber,
-          modelId: item.allocation?.modelId,
-          startBwA4: item.startBwA4 || 0,
-          endBwA4: item.endBwA4 || 0,
-          startBwA3: item.startBwA3 || 0,
-          endBwA3: item.endBwA3 || 0,
-          startColorA4: item.startColorA4 || 0,
-          endColorA4: item.endColorA4 || 0,
-          startColorA3: item.startColorA3 || 0,
-          endColorA3: item.endColorA3 || 0,
-        })),
+        items: uniqueItemsList,
       }));
 
-      // If exactly one active machine, populate aggregate counts from its specific reading
       const activeAllocs =
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        contract.productAllocations?.filter((pa: any) => pa.status === 'ALLOCATED') || [];
-      if (activeAllocs.length === 1) {
+        contract.productAllocations?.filter((pa) => pa.status === 'ALLOCATED') || [];
+      const uniqueActiveSerials = new Set(activeAllocs.map((pa) => pa.serialNumber || pa.id));
+      if (uniqueActiveSerials.size === 1) {
         const activeId = activeAllocs[0].id;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const activeItem = inv.items?.find((i: any) => i.allocationId === activeId);
+        const activeItem = inv.items?.find((i) => i.allocationId === activeId);
         if (activeItem) {
           setFormData((prev) => ({
             ...prev,
@@ -415,19 +449,39 @@ export default function UsageRecordingModal({
         });
       }
 
-      const aggBwA4 = items.reduce(
+      // Deduplicate items by allocationId
+      const uniqueItemsMap = new Map<string, (typeof items)[0]>();
+      items.forEach((it) => {
+        if (it.allocationId) {
+          uniqueItemsMap.set(it.allocationId, it);
+        }
+      });
+      const uniqueItems = Array.from(uniqueItemsMap.values());
+
+      // Deduplicate by serialNumber for aggregate initial counts calculation to avoid duplicate sums
+      const uniqueSerialsMap = new Map<string, (typeof items)[0]>();
+      uniqueItems.forEach((it) => {
+        const key = it.serialNumber || it.allocationId;
+        const existing = uniqueSerialsMap.get(key);
+        if (!existing || it.status === 'ALLOCATED') {
+          uniqueSerialsMap.set(key, it);
+        }
+      });
+      const uniqueSerialItems = Array.from(uniqueSerialsMap.values());
+
+      const aggBwA4 = uniqueSerialItems.reduce(
         (s, it) => s + (it.status === 'ALLOCATED' ? it.endBwA4 || 0 : 0),
         0,
       );
-      const aggBwA3 = items.reduce(
+      const aggBwA3 = uniqueSerialItems.reduce(
         (s, it) => s + (it.status === 'ALLOCATED' ? it.endBwA3 || 0 : 0),
         0,
       );
-      const aggClrA4 = items.reduce(
+      const aggClrA4 = uniqueSerialItems.reduce(
         (s, it) => s + (it.status === 'ALLOCATED' ? it.endColorA4 || 0 : 0),
         0,
       );
-      const aggClrA3 = items.reduce(
+      const aggClrA3 = uniqueSerialItems.reduce(
         (s, it) => s + (it.status === 'ALLOCATED' ? it.endColorA3 || 0 : 0),
         0,
       );
@@ -436,7 +490,7 @@ export default function UsageRecordingModal({
         ...prev,
         billingPeriodStart: startStr || prev.billingPeriodStart,
         billingPeriodEnd: endStr || prev.billingPeriodEnd,
-        items: items.length > 0 ? items : prev.items,
+        items: uniqueItems.length > 0 ? uniqueItems : prev.items,
         bwA4Count: String(aggBwA4),
         bwA3Count: String(aggBwA3),
         colorA4Count: String(aggClrA4),
@@ -578,6 +632,16 @@ export default function UsageRecordingModal({
     if (ruleItems.color || ruleItems.combo) return true;
     return products.some((p) => p.print_colour === 'COLOUR' || p.print_colour === 'BOTH');
   }, [ruleItems, products]);
+
+  // Count unique physical machines (by serialNumber) to determine if inputs should be readonly
+  const hasMultipleUniqueMachines = React.useMemo(() => {
+    const allocatedItems = formData.items.filter((i) => {
+      const a = contract?.productAllocations?.find((pa) => pa.id === i.allocationId);
+      return a?.status === 'ALLOCATED';
+    });
+    const uniqueSerials = new Set(allocatedItems.map((i) => i.serialNumber || i.allocationId));
+    return uniqueSerials.size > 1;
+  }, [formData.items, contract?.productAllocations]);
 
   // Calculate Aggregated Initial Counts from ALL Product Items
 
@@ -1348,22 +1412,14 @@ export default function UsageRecordingModal({
                           onChange={(e) => {
                             const val = e.target.value;
                             setFormData((prev) => {
-                              const activeAllocs = prev.items.filter((item) => {
-                                const a = contract?.productAllocations?.find(
-                                  (pa) => pa.id === item.allocationId,
-                                );
-                                return a?.status === 'ALLOCATED';
-                              });
-
                               return {
                                 ...prev,
                                 bwA4Count: val,
                                 items: prev.items.map((item) => {
-                                  // Only auto-update items if there's exactly one active machine
-                                  if (
-                                    activeAllocs.length === 1 &&
-                                    item.allocationId === activeAllocs[0].allocationId
-                                  ) {
+                                  const a = contract?.productAllocations?.find(
+                                    (pa) => pa.id === item.allocationId,
+                                  );
+                                  if (!hasMultipleUniqueMachines && a?.status === 'ALLOCATED') {
                                     return { ...item, endBwA4: Number(val || 0) };
                                   }
                                   return item;
@@ -1371,23 +1427,11 @@ export default function UsageRecordingModal({
                               };
                             });
                           }}
-                          readOnly={
-                            formData.items.filter((i) => {
-                              const a = contract?.productAllocations?.find(
-                                (pa) => pa.id === i.allocationId,
-                              );
-                              return a?.status === 'ALLOCATED';
-                            }).length > 1
-                          }
+                          readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.bwA4
                               ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                              : formData.items.filter((i) => {
-                                    const a = contract?.productAllocations?.find(
-                                      (pa) => pa.id === i.allocationId,
-                                    );
-                                    return a?.status === 'ALLOCATED';
-                                  }).length > 1
+                              : hasMultipleUniqueMachines
                                 ? 'bg-slate-100 cursor-not-allowed opacity-70'
                                 : ''
                           }
@@ -1421,21 +1465,14 @@ export default function UsageRecordingModal({
                           onChange={(e) => {
                             const val = e.target.value;
                             setFormData((prev) => {
-                              const activeAllocs = prev.items.filter((item) => {
-                                const a = contract?.productAllocations?.find(
-                                  (pa) => pa.id === item.allocationId,
-                                );
-                                return a?.status === 'ALLOCATED';
-                              });
-
                               return {
                                 ...prev,
                                 bwA3Count: val,
                                 items: prev.items.map((item) => {
-                                  if (
-                                    activeAllocs.length === 1 &&
-                                    item.allocationId === activeAllocs[0].allocationId
-                                  ) {
+                                  const a = contract?.productAllocations?.find(
+                                    (pa) => pa.id === item.allocationId,
+                                  );
+                                  if (!hasMultipleUniqueMachines && a?.status === 'ALLOCATED') {
                                     return { ...item, endBwA3: Number(val || 0) };
                                   }
                                   return item;
@@ -1443,23 +1480,11 @@ export default function UsageRecordingModal({
                               };
                             });
                           }}
-                          readOnly={
-                            formData.items.filter((i) => {
-                              const a = contract?.productAllocations?.find(
-                                (pa) => pa.id === i.allocationId,
-                              );
-                              return a?.status === 'ALLOCATED';
-                            }).length > 1
-                          }
+                          readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.bwA3
                               ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                              : formData.items.filter((i) => {
-                                    const a = contract?.productAllocations?.find(
-                                      (pa) => pa.id === i.allocationId,
-                                    );
-                                    return a?.status === 'ALLOCATED';
-                                  }).length > 1
+                              : hasMultipleUniqueMachines
                                 ? 'bg-slate-100 cursor-not-allowed opacity-70'
                                 : ''
                           }
@@ -1552,21 +1577,14 @@ export default function UsageRecordingModal({
                           onChange={(e) => {
                             const val = e.target.value;
                             setFormData((prev) => {
-                              const activeAllocs = prev.items.filter((item) => {
-                                const a = contract?.productAllocations?.find(
-                                  (pa) => pa.id === item.allocationId,
-                                );
-                                return a?.status === 'ALLOCATED';
-                              });
-
                               return {
                                 ...prev,
                                 colorA4Count: val,
                                 items: prev.items.map((item) => {
-                                  if (
-                                    activeAllocs.length === 1 &&
-                                    item.allocationId === activeAllocs[0].allocationId
-                                  ) {
+                                  const a = contract?.productAllocations?.find(
+                                    (pa) => pa.id === item.allocationId,
+                                  );
+                                  if (!hasMultipleUniqueMachines && a?.status === 'ALLOCATED') {
                                     return { ...item, endColorA4: Number(val || 0) };
                                   }
                                   return item;
@@ -1574,23 +1592,11 @@ export default function UsageRecordingModal({
                               };
                             });
                           }}
-                          readOnly={
-                            formData.items.filter((i) => {
-                              const a = contract?.productAllocations?.find(
-                                (pa) => pa.id === i.allocationId,
-                              );
-                              return a?.status === 'ALLOCATED';
-                            }).length > 1
-                          }
+                          readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.clrA4
                               ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                              : formData.items.filter((i) => {
-                                    const a = contract?.productAllocations?.find(
-                                      (pa) => pa.id === i.allocationId,
-                                    );
-                                    return a?.status === 'ALLOCATED';
-                                  }).length > 1
+                              : hasMultipleUniqueMachines
                                 ? 'bg-slate-100 cursor-not-allowed opacity-70'
                                 : ''
                           }
@@ -1624,21 +1630,14 @@ export default function UsageRecordingModal({
                           onChange={(e) => {
                             const val = e.target.value;
                             setFormData((prev) => {
-                              const activeAllocs = prev.items.filter((item) => {
-                                const a = contract?.productAllocations?.find(
-                                  (pa) => pa.id === item.allocationId,
-                                );
-                                return a?.status === 'ALLOCATED';
-                              });
-
                               return {
                                 ...prev,
                                 colorA3Count: val,
                                 items: prev.items.map((item) => {
-                                  if (
-                                    activeAllocs.length === 1 &&
-                                    item.allocationId === activeAllocs[0].allocationId
-                                  ) {
+                                  const a = contract?.productAllocations?.find(
+                                    (pa) => pa.id === item.allocationId,
+                                  );
+                                  if (!hasMultipleUniqueMachines && a?.status === 'ALLOCATED') {
                                     return { ...item, endColorA3: Number(val || 0) };
                                   }
                                   return item;
@@ -1646,23 +1645,11 @@ export default function UsageRecordingModal({
                               };
                             });
                           }}
-                          readOnly={
-                            formData.items.filter((i) => {
-                              const a = contract?.productAllocations?.find(
-                                (pa) => pa.id === i.allocationId,
-                              );
-                              return a?.status === 'ALLOCATED';
-                            }).length > 1
-                          }
+                          readOnly={hasMultipleUniqueMachines}
                           className={
                             getErrors.clrA3
                               ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/50'
-                              : formData.items.filter((i) => {
-                                    const a = contract?.productAllocations?.find(
-                                      (pa) => pa.id === i.allocationId,
-                                    );
-                                    return a?.status === 'ALLOCATED';
-                                  }).length > 1
+                              : hasMultipleUniqueMachines
                                 ? 'bg-slate-100 cursor-not-allowed opacity-70'
                                 : ''
                           }
@@ -1777,238 +1764,258 @@ export default function UsageRecordingModal({
             )}
 
             {!isSimplifiedLease &&
-              formData.items.filter((i) => {
-                const a = contract?.productAllocations?.find((pa) => pa.id === i.allocationId);
-                return a?.status === 'ALLOCATED';
-              }).length > 1 && (
+              (() => {
+                // Deduplicate by serialNumber for the visibility count
+                const allocatedItems = formData.items.filter((i) => {
+                  const a = contract?.productAllocations?.find((pa) => pa.id === i.allocationId);
+                  return a?.status === 'ALLOCATED';
+                });
+                const uniqueSerials = new Set(
+                  allocatedItems.map((i) => i.serialNumber || i.allocationId),
+                );
+                return uniqueSerials.size > 1;
+              })() && (
                 <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                   <h3 className="text-sm font-bold text-slate-700 pb-2 border-b flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500" />
                     Machine-Wise Readings (Required)
                   </h3>
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {formData.items
-                      .filter((item) => {
-                        // Show ALLOCATED machines OR REPLACED machines that were active in this period
+                    {(() => {
+                      // Deduplicate items by serialNumber — keep ALLOCATED over REPLACED for same serial
+                      const filtered = formData.items.filter((item) => {
                         const a = contract?.productAllocations?.find(
                           (pa) => pa.id === item.allocationId,
                         );
                         if (!a) return false;
                         if (a.status === 'ALLOCATED') return true;
-
                         // For replaced machines, only show if they were active in this period
                         const startPeriod = new Date(formData.billingPeriodStart).getTime();
                         const endPeriod = new Date(formData.billingPeriodEnd).getTime();
                         const endTs = a.endTimestamp ? new Date(a.endTimestamp).getTime() : 0;
-
                         return endTs >= startPeriod && endTs <= endPeriod;
-                      })
-                      .map((item, idx) => {
-                        const allocation = contract?.productAllocations?.find(
-                          (a) => a.id === item.allocationId,
+                      });
+                      // Deduplicate by serialNumber — prefer ALLOCATED, then first seen
+                      const seenSerials = new Map<string, (typeof filtered)[0]>();
+                      filtered.forEach((item) => {
+                        const key = item.serialNumber || item.allocationId;
+                        const existing = seenSerials.get(key);
+                        const a = contract?.productAllocations?.find(
+                          (pa) => pa.id === item.allocationId,
                         );
-                        const isReplaced = allocation?.status === 'REPLACED';
+                        const existingA = existing
+                          ? contract?.productAllocations?.find(
+                              (pa) => pa.id === existing.allocationId,
+                            )
+                          : null;
+                        if (
+                          !existing ||
+                          (a?.status === 'ALLOCATED' && existingA?.status !== 'ALLOCATED')
+                        ) {
+                          seenSerials.set(key, item);
+                        }
+                      });
+                      return Array.from(seenSerials.values());
+                    })().map((item, idx) => {
+                      const allocation = contract?.productAllocations?.find(
+                        (a) => a.id === item.allocationId,
+                      );
+                      const isReplaced = allocation?.status === 'REPLACED';
 
-                        return (
-                          <div
-                            key={item.allocationId}
-                            className={`bg-white p-3 rounded-lg border ${
-                              isReplaced ? 'border-amber-200' : 'border-slate-200 shadow-sm'
-                            } space-y-3 relative overflow-hidden`}
-                          >
-                            {isReplaced && (
-                              <div className="absolute top-0 right-0 px-2 py-0.5 bg-amber-100 text-[8px] font-black text-amber-700 rounded-bl-lg uppercase tracking-wider">
-                                Replaced
-                              </div>
-                            )}
-                            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-                              <span className="text-xs font-bold text-slate-600">
-                                Machine #{idx + 1}: {item.serialNumber || 'Unknown'}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                {item.modelId}
-                              </span>
+                      return (
+                        <div
+                          key={item.allocationId}
+                          className={`bg-white p-3 rounded-lg border ${
+                            isReplaced ? 'border-amber-200' : 'border-slate-200 shadow-sm'
+                          } space-y-3 relative overflow-hidden`}
+                        >
+                          {isReplaced && (
+                            <div className="absolute top-0 right-0 px-2 py-0.5 bg-amber-100 text-[8px] font-black text-amber-700 rounded-bl-lg uppercase tracking-wider">
+                              Replaced
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              {/* BW Section */}
-                              <div className="space-y-2">
-                                <Label className="text-[10px] font-bold uppercase text-slate-500">
-                                  B&W Readings
-                                </Label>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[9px]">
-                                    <span className="text-orange-600">
-                                      Prev A4: {item.startBwA4}
-                                    </span>
-                                    <span className="text-green-600 font-bold">
-                                      Delta: {Math.max(0, (item.endBwA4 || 0) - item.startBwA4)}
-                                    </span>
-                                  </div>
-                                  <Input
-                                    type="number"
-                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
-                                    placeholder="A4 Reading"
-                                    value={item.endBwA4 || ''}
-                                    readOnly={isReplaced}
-                                    onChange={(e) => {
-                                      const val = Number(e.target.value || 0);
-                                      setFormData((prev) => {
-                                        const newItems = prev.items.map((it) =>
-                                          it.allocationId === item.allocationId
-                                            ? { ...it, endBwA4: val }
-                                            : it,
-                                        );
-                                        const newSum = newItems.reduce((acc, it) => {
-                                          const a = contract?.productAllocations?.find(
-                                            (pa) => pa.id === it.allocationId,
-                                          );
-                                          // SUM ALL visible items deltas for the aggregate
-                                          return a?.status === 'ALLOCATED'
-                                            ? acc + (it.endBwA4 || 0)
-                                            : acc;
-                                        }, 0);
-                                        return {
-                                          ...prev,
-                                          items: newItems,
-                                          bwA4Count: String(newSum),
-                                        };
-                                      });
-                                    }}
-                                  />
+                          )}
+                          <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+                            <span className="text-xs font-bold text-slate-600">
+                              Machine #{idx + 1}: {item.serialNumber || 'Unknown'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {item.modelId}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* BW Section */}
+                            <div className="space-y-2">
+                              <Label className="text-[10px] font-bold uppercase text-slate-500">
+                                B&W Readings
+                              </Label>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px]">
+                                  <span className="text-orange-600">Prev A4: {item.startBwA4}</span>
+                                  <span className="text-green-600 font-bold">
+                                    Delta: {Math.max(0, (item.endBwA4 || 0) - item.startBwA4)}
+                                  </span>
                                 </div>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[9px]">
-                                    <span className="text-orange-600">
-                                      Prev A3: {item.startBwA3}
-                                    </span>
-                                    <span className="text-green-600 font-bold">
-                                      Delta: {Math.max(0, (item.endBwA3 || 0) - item.startBwA3)}
-                                    </span>
-                                  </div>
-                                  <Input
-                                    type="number"
-                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
-                                    placeholder="A3 Reading"
-                                    value={item.endBwA3 || ''}
-                                    readOnly={isReplaced}
-                                    onChange={(e) => {
-                                      const val = Number(e.target.value || 0);
-                                      setFormData((prev) => {
-                                        const newItems = prev.items.map((it) =>
-                                          it.allocationId === item.allocationId
-                                            ? { ...it, endBwA3: val }
-                                            : it,
+                                <Input
+                                  type="number"
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  placeholder="A4 Reading"
+                                  value={item.endBwA4 || ''}
+                                  readOnly={isReplaced}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value || 0);
+                                    setFormData((prev) => {
+                                      const newItems = prev.items.map((it) =>
+                                        it.allocationId === item.allocationId
+                                          ? { ...it, endBwA4: val }
+                                          : it,
+                                      );
+                                      const newSum = newItems.reduce((acc, it) => {
+                                        const a = contract?.productAllocations?.find(
+                                          (pa) => pa.id === it.allocationId,
                                         );
-                                        const newSum = newItems.reduce((acc, it) => {
-                                          const a = contract?.productAllocations?.find(
-                                            (pa) => pa.id === it.allocationId,
-                                          );
-                                          return a?.status === 'ALLOCATED'
-                                            ? acc + (it.endBwA3 || 0)
-                                            : acc;
-                                        }, 0);
-                                        return {
-                                          ...prev,
-                                          items: newItems,
-                                          bwA3Count: String(newSum),
-                                        };
-                                      });
-                                    }}
-                                  />
-                                </div>
+                                        // SUM ALL visible items deltas for the aggregate
+                                        return a?.status === 'ALLOCATED'
+                                          ? acc + (it.endBwA4 || 0)
+                                          : acc;
+                                      }, 0);
+                                      return {
+                                        ...prev,
+                                        items: newItems,
+                                        bwA4Count: String(newSum),
+                                      };
+                                    });
+                                  }}
+                                />
                               </div>
-                              {/* Color Section */}
-                              <div className="space-y-2">
-                                <Label className="text-[10px] font-bold uppercase text-rose-500">
-                                  Color Readings
-                                </Label>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[9px]">
-                                    <span className="text-orange-600">
-                                      Prev A4: {item.startColorA4}
-                                    </span>
-                                    <span className="text-green-600 font-bold">
-                                      Delta:{' '}
-                                      {Math.max(0, (item.endColorA4 || 0) - item.startColorA4)}
-                                    </span>
-                                  </div>
-                                  <Input
-                                    type="number"
-                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
-                                    placeholder="A4 Reading"
-                                    value={item.endColorA4 || ''}
-                                    readOnly={isReplaced}
-                                    onChange={(e) => {
-                                      const val = Number(e.target.value || 0);
-                                      setFormData((prev) => {
-                                        const newItems = prev.items.map((it) =>
-                                          it.allocationId === item.allocationId
-                                            ? { ...it, endColorA4: val }
-                                            : it,
-                                        );
-                                        const newSum = newItems.reduce((acc, it) => {
-                                          const a = contract?.productAllocations?.find(
-                                            (pa) => pa.id === it.allocationId,
-                                          );
-                                          return a?.status === 'ALLOCATED'
-                                            ? acc + (it.endColorA4 || 0)
-                                            : acc;
-                                        }, 0);
-                                        return {
-                                          ...prev,
-                                          items: newItems,
-                                          colorA4Count: String(newSum),
-                                        };
-                                      });
-                                    }}
-                                  />
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px]">
+                                  <span className="text-orange-600">Prev A3: {item.startBwA3}</span>
+                                  <span className="text-green-600 font-bold">
+                                    Delta: {Math.max(0, (item.endBwA3 || 0) - item.startBwA3)}
+                                  </span>
                                 </div>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[9px]">
-                                    <span className="text-orange-600">
-                                      Prev A3: {item.startColorA3}
-                                    </span>
-                                    <span className="text-green-600 font-bold">
-                                      Delta:{' '}
-                                      {Math.max(0, (item.endColorA3 || 0) - item.startColorA3)}
-                                    </span>
-                                  </div>
-                                  <Input
-                                    type="number"
-                                    className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
-                                    placeholder="A3 Reading"
-                                    value={item.endColorA3 || ''}
-                                    readOnly={isReplaced}
-                                    onChange={(e) => {
-                                      const val = Number(e.target.value || 0);
-                                      setFormData((prev) => {
-                                        const newItems = prev.items.map((it) =>
-                                          it.allocationId === item.allocationId
-                                            ? { ...it, endColorA3: val }
-                                            : it,
+                                <Input
+                                  type="number"
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  placeholder="A3 Reading"
+                                  value={item.endBwA3 || ''}
+                                  readOnly={isReplaced}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value || 0);
+                                    setFormData((prev) => {
+                                      const newItems = prev.items.map((it) =>
+                                        it.allocationId === item.allocationId
+                                          ? { ...it, endBwA3: val }
+                                          : it,
+                                      );
+                                      const newSum = newItems.reduce((acc, it) => {
+                                        const a = contract?.productAllocations?.find(
+                                          (pa) => pa.id === it.allocationId,
                                         );
-                                        const newSum = newItems.reduce((acc, it) => {
-                                          const a = contract?.productAllocations?.find(
-                                            (pa) => pa.id === it.allocationId,
-                                          );
-                                          return a?.status === 'ALLOCATED'
-                                            ? acc + (it.endColorA3 || 0)
-                                            : acc;
-                                        }, 0);
-                                        return {
-                                          ...prev,
-                                          items: newItems,
-                                          colorA3Count: String(newSum),
-                                        };
-                                      });
-                                    }}
-                                  />
+                                        return a?.status === 'ALLOCATED'
+                                          ? acc + (it.endBwA3 || 0)
+                                          : acc;
+                                      }, 0);
+                                      return {
+                                        ...prev,
+                                        items: newItems,
+                                        bwA3Count: String(newSum),
+                                      };
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            {/* Color Section */}
+                            <div className="space-y-2">
+                              <Label className="text-[10px] font-bold uppercase text-rose-500">
+                                Color Readings
+                              </Label>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px]">
+                                  <span className="text-orange-600">
+                                    Prev A4: {item.startColorA4}
+                                  </span>
+                                  <span className="text-green-600 font-bold">
+                                    Delta: {Math.max(0, (item.endColorA4 || 0) - item.startColorA4)}
+                                  </span>
                                 </div>
+                                <Input
+                                  type="number"
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  placeholder="A4 Reading"
+                                  value={item.endColorA4 || ''}
+                                  readOnly={isReplaced}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value || 0);
+                                    setFormData((prev) => {
+                                      const newItems = prev.items.map((it) =>
+                                        it.allocationId === item.allocationId
+                                          ? { ...it, endColorA4: val }
+                                          : it,
+                                      );
+                                      const newSum = newItems.reduce((acc, it) => {
+                                        const a = contract?.productAllocations?.find(
+                                          (pa) => pa.id === it.allocationId,
+                                        );
+                                        return a?.status === 'ALLOCATED'
+                                          ? acc + (it.endColorA4 || 0)
+                                          : acc;
+                                      }, 0);
+                                      return {
+                                        ...prev,
+                                        items: newItems,
+                                        colorA4Count: String(newSum),
+                                      };
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[9px]">
+                                  <span className="text-orange-600">
+                                    Prev A3: {item.startColorA3}
+                                  </span>
+                                  <span className="text-green-600 font-bold">
+                                    Delta: {Math.max(0, (item.endColorA3 || 0) - item.startColorA3)}
+                                  </span>
+                                </div>
+                                <Input
+                                  type="number"
+                                  className={`h-8 text-xs ${isReplaced ? 'bg-amber-50/50' : ''}`}
+                                  placeholder="A3 Reading"
+                                  value={item.endColorA3 || ''}
+                                  readOnly={isReplaced}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value || 0);
+                                    setFormData((prev) => {
+                                      const newItems = prev.items.map((it) =>
+                                        it.allocationId === item.allocationId
+                                          ? { ...it, endColorA3: val }
+                                          : it,
+                                      );
+                                      const newSum = newItems.reduce((acc, it) => {
+                                        const a = contract?.productAllocations?.find(
+                                          (pa) => pa.id === it.allocationId,
+                                        );
+                                        return a?.status === 'ALLOCATED'
+                                          ? acc + (it.endColorA3 || 0)
+                                          : acc;
+                                      }, 0);
+                                      return {
+                                        ...prev,
+                                        items: newItems,
+                                        colorA3Count: String(newSum),
+                                      };
+                                    });
+                                  }}
+                                />
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

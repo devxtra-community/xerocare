@@ -236,7 +236,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
         setNotes(record.notes || '');
       }
     }
-  }, [open, record]);
+  }, [open, record, handleInvoiceChange]);
 
   useEffect(() => {
     if (!open) {
