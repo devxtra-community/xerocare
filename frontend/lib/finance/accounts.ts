@@ -277,30 +277,39 @@ export async function fetchARInvoices(params?: {
 // PAYMENTS — for cash flow + AR
 // ─────────────────────────────────────────────
 
-// Derives payment records from invoice paidAmount — no bulk payment endpoint exists in billing service
+interface CashbookReceipt {
+  id: string;
+  linkedInvoiceId?: string;
+  amount: number;
+  paymentMode?: string;
+  date: string;
+  branchId: string;
+}
+
+// Real customer receipts from the cashbook (auto-posted from invoice payments).
 export async function fetchPayments(params?: {
   branchId?: string;
   fromDate?: string;
   toDate?: string;
 }): Promise<PaymentRecord[]> {
-  const res = await api.get('/b/invoices');
-  const invoices: InvoiceSummary[] = res.data?.data ?? res.data ?? [];
-  return invoices
-    .filter((inv) => (inv.paidAmount ?? 0) > 0)
-    .filter((inv) => {
-      if (!params?.fromDate && !params?.toDate) return true;
-      const d = inv.createdAt?.slice(0, 10) ?? '';
-      return (!params.fromDate || d >= params.fromDate) && (!params.toDate || d <= params.toDate);
-    })
-    .map((inv) => ({
-      id: inv.id,
-      invoiceId: inv.id,
-      amount: inv.paidAmount ?? 0,
-      method: 'BANK_TRANSFER',
-      paymentDate: inv.dueDate ?? inv.createdAt,
-      currency: inv.currency,
-      branchId: inv.branchId,
-    }));
+  const res = await api.get('/b/accounts/cashbook', {
+    params: {
+      entryType: 'RECEIPT',
+      fromDate: params?.fromDate,
+      toDate: params?.toDate,
+      branchId: params?.branchId,
+    },
+  });
+  const entries: CashbookReceipt[] = res.data?.data ?? res.data ?? [];
+  return entries.map((e) => ({
+    id: e.id,
+    invoiceId: e.linkedInvoiceId ?? '',
+    amount: Number(e.amount),
+    method: e.paymentMode ?? 'CASH',
+    paymentDate: e.date,
+    currency: '',
+    branchId: e.branchId,
+  }));
 }
 
 // ─────────────────────────────────────────────

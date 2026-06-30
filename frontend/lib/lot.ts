@@ -56,6 +56,8 @@ export interface Lot {
   purchaseDate: string;
   totalAmount: number;
   status: LotStatus;
+  /** Copied from the awarding RFQ. Undefined for manually-created lots. */
+  purchaseOrigin?: import('./purchaseOrigin').PurchaseOrigin;
   branch_id?: string;
   notes?: string;
   warehouseId?: string;

@@ -40,6 +40,8 @@ import { InventoryReservation } from '../entities/inventoryReservationEntity';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
 import { ServiceContract } from '../entities/serviceContractEntity';
+import { StockTransfer } from '../entities/stockTransferEntity';
+import { StockTransferItem } from '../entities/stockTransferItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -82,6 +84,8 @@ export const Source = new DataSource({
     ServicePartUsageLog,
     ServiceTicketActivity,
     ServiceContract,
+    StockTransfer,
+    StockTransferItem,
   ],
   poolSize: 1,
   extra: {
@@ -177,6 +181,30 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           DELETE FROM vendors WHERE TRIM(email) = '' OR TRIM(name) = '';
         `);
         logger.info('Cleaned up blank vendor records.');
+
+        // --- Domestic vs International purchase classification ---
+        // Snapshotted purchase_origin on rfqs, lots and purchases. Enum type names
+        // follow TypeORM's <table>_<column>_enum convention so a future synchronize
+        // pass will not try to recreate them.
+        await Source.query(`
+          DO $$ BEGIN
+            CREATE TYPE rfqs_purchase_origin_enum AS ENUM ('DOMESTIC', 'INTERNATIONAL');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE TYPE lots_purchase_origin_enum AS ENUM ('DOMESTIC', 'INTERNATIONAL');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE TYPE purchases_purchase_origin_enum AS ENUM ('DOMESTIC', 'INTERNATIONAL');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+          ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS purchase_origin rfqs_purchase_origin_enum;
+          ALTER TABLE lots ADD COLUMN IF NOT EXISTS purchase_origin lots_purchase_origin_enum;
+          ALTER TABLE purchases ADD COLUMN IF NOT EXISTS purchase_origin purchases_purchase_origin_enum;
+
+          CREATE INDEX IF NOT EXISTS idx_lots_purchase_origin ON lots (purchase_origin);
+          CREATE INDEX IF NOT EXISTS idx_purchases_purchase_origin ON purchases (purchase_origin);
+        `);
+        logger.info('Guaranteed purchase_origin columns exist on rfqs, lots, purchases.');
 
         // --- Currency columns on service_estimates ---
         await Source.query(`
@@ -708,6 +736,55 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         } catch (contractSchemaErr) {
           logger.error('Failed to create service_contracts schema:', contractSchemaErr);
         }
+
+        // --- Stock Transfer Schema ---
+        // Drop stale tables if they have the old schema (missing requesting_branch_id)
+        const staleCheck = await Source.query(`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_name = 'stock_transfers' AND column_name = 'requesting_branch_id'
+        `);
+        if (staleCheck.length === 0) {
+          logger.info('Dropping stale stock_transfers tables and recreating with new schema...');
+          await Source.query(`DROP TABLE IF EXISTS stock_transfer_items CASCADE`);
+          await Source.query(`DROP TABLE IF EXISTS stock_transfers CASCADE`);
+        }
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS stock_transfers (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            transfer_number VARCHAR(30) NOT NULL UNIQUE,
+            transfer_type VARCHAR(20) NOT NULL DEFAULT 'INTER_BRANCH',
+            status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
+            requesting_branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            requesting_warehouse_id UUID REFERENCES warehouses(id),
+            source_branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+            source_warehouse_id UUID REFERENCES warehouses(id),
+            requested_by_id UUID NOT NULL,
+            responded_by_id UUID,
+            notes TEXT,
+            rejection_reason TEXT,
+            responded_at TIMESTAMP,
+            dispatched_at TIMESTAMP,
+            received_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+        `);
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS stock_transfer_items (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            transfer_id UUID NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+            item_type VARCHAR(20) NOT NULL,
+            spare_part_id UUID REFERENCES spare_parts(id),
+            product_id UUID REFERENCES products(id),
+            requested_qty INT NOT NULL DEFAULT 1,
+            fulfilled_qty INT,
+            received_qty INT,
+            source_warehouse_id UUID REFERENCES warehouses(id),
+            destination_warehouse_id UUID REFERENCES warehouses(id),
+            item_name VARCHAR(255)
+          );
+        `);
+        logger.info('Guaranteed stock_transfers schema exists.');
       }
       return Source;
     } catch (error: unknown) {

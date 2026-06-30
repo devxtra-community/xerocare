@@ -26,6 +26,7 @@ export interface CashBankAccount {
   contactPerson?: string;
   notes?: string;
   isActive: boolean;
+  isDefault?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,9 +76,32 @@ export interface CashbookEntry {
   paymentMode?: string;
   chequeNo?: string;
   notes?: string;
+  sourceType?: string;
+  sourceId?: string;
   createdBy: string;
   branchId: string;
   createdAt: string;
+}
+
+export interface DayBookDay {
+  date: string;
+  totalReceipts: number;
+  totalPayments: number;
+  net: number;
+  transactionCount: number;
+  entries: CashbookEntry[];
+}
+
+export interface DayBook {
+  fromDate: string;
+  toDate: string;
+  days: DayBookDay[];
+  totals: {
+    totalReceipts: number;
+    totalPayments: number;
+    net: number;
+    transactionCount: number;
+  };
 }
 
 export interface ExpenseEntry {
@@ -367,6 +391,26 @@ export async function createCashbookEntry(data: Partial<CashbookEntry>): Promise
   return res.data?.data;
 }
 
+// ─── Day Book ──────────────────────────────────────────────────────────────────
+
+export async function fetchDayBook(params?: {
+  fromDate?: string;
+  toDate?: string;
+  accountId?: string;
+  branchId?: string;
+  branchIds?: string;
+}): Promise<DayBook> {
+  const res = await api.get(`${BASE}/daybook`, { params });
+  return (
+    res.data?.data ?? {
+      fromDate: '',
+      toDate: '',
+      days: [],
+      totals: { totalReceipts: 0, totalPayments: 0, net: 0, transactionCount: 0 },
+    }
+  );
+}
+
 // ─── Expense Entries ─────────────────────────────────────────────────────────
 
 export async function fetchExpenseEntries(params?: {
@@ -396,6 +440,14 @@ export async function updateExpenseEntry(
 
 export async function approveExpenseEntry(id: string): Promise<ExpenseEntry> {
   const res = await api.patch(`${BASE}/expenses/${id}/approve`);
+  return res.data?.data;
+}
+
+export async function payExpenseEntry(
+  id: string,
+  data: { paidFrom?: string; paymentMode?: string; paymentDate?: string; referenceNo?: string },
+): Promise<ExpenseEntry> {
+  const res = await api.patch(`${BASE}/expenses/${id}/pay`, data);
   return res.data?.data;
 }
 

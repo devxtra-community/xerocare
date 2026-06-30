@@ -22,6 +22,7 @@ import {
   TrendingUp,
   Globe,
   FileBarChart,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 import {
@@ -120,7 +121,18 @@ const menuItems = [
   {
     title: 'Inventory',
     icon: Boxes,
-    href: '/admin/inventory',
+    subItems: [
+      {
+        title: 'Stock',
+        icon: Boxes,
+        href: '/admin/inventory',
+      },
+      {
+        title: 'Stock Transfers',
+        icon: ArrowRightLeft,
+        href: '/admin/stock-transfers',
+      },
+    ],
   },
 ];
 

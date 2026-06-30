@@ -57,6 +57,10 @@ export class CashBankAccount {
   @Column({ default: true })
   isActive!: boolean;
 
+  // Branch default account for auto-posting receipts/payments by method (one CASH + one BANK)
+  @Column({ default: false })
+  isDefault!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -8,12 +8,14 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
+  Index,
 } from 'typeorm';
 import { Lot } from './lotEntity';
 import { Vendor } from './vendorEntity';
 import { Branch } from './branchEntity';
 import { PurchasePayment } from './purchasePaymentEntity';
 import { PurchaseCost } from './purchaseCostEntity';
+import { PurchaseOrigin } from './enums/purchaseOrigin';
 
 @Entity('purchases')
 export class Purchase {
@@ -64,6 +66,17 @@ export class Purchase {
 
   @Column({ name: 'total_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
   totalAmount!: number;
+
+  // Snapshot copied from the lot/RFQ at creation. Powers domestic vs international
+  // spend reporting without re-joining vendor/branch country at query time.
+  @Column({
+    name: 'purchase_origin',
+    type: 'enum',
+    enum: PurchaseOrigin,
+    nullable: true,
+  })
+  @Index()
+  purchaseOrigin?: PurchaseOrigin;
 
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy?: string;

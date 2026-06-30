@@ -16,6 +16,7 @@ import { UsageRepository } from '../repositories/usageRepository';
 import { SecurityDepositMode, Invoice } from '../entities/invoiceEntity';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { logger } from '../config/logger';
+import { postCashbookEntry } from './cashbookService';
 import { RentType } from '../entities/enums/rentType';
 import { RentPeriod } from '../entities/enums/rentPeriod';
 import { LeaseType } from '../entities/enums/leaseType';
@@ -4399,6 +4400,30 @@ export class BillingService {
           oldStatus,
           InvoiceStatus.PAID,
         );
+      }
+    }
+
+    // Mirror the receipt into the cashbook / day book and move the cash/bank balance.
+    // Best-effort: a posting failure must never break payment recording.
+    if (invoice.branchId) {
+      try {
+        await postCashbookEntry({
+          date: transaction.transactionDate,
+          entryType: 'RECEIPT',
+          amount: Number(transaction.amount),
+          category: 'Customer Payment',
+          branchId: invoice.branchId,
+          createdBy: userId || 'SYSTEM',
+          paymentMode: transaction.paymentMode,
+          autoResolveAccount: true,
+          linkedInvoiceId: invoiceId,
+          description: `Receipt for invoice ${invoice.invoiceNumber}`,
+          chequeNo: transaction.referenceNumber,
+          sourceType: 'INVOICE_PAYMENT',
+          sourceId: transaction.id,
+        });
+      } catch (err) {
+        logger.error('Failed to post invoice receipt to cashbook', err);
       }
     }
 

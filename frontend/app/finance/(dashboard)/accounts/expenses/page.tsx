@@ -15,12 +15,14 @@ import {
   BarChart2,
   ChevronDown,
   ChevronUp,
+  Wallet,
 } from 'lucide-react';
 import {
   fetchExpenseEntries,
   createExpenseEntry,
   updateExpenseEntry,
   approveExpenseEntry,
+  payExpenseEntry,
   deleteExpenseEntry,
   fetchCashBankAccounts,
   fetchExpenseCharts,
@@ -424,6 +426,111 @@ function ExpenseModal({
   );
 }
 
+function PayExpenseModal({
+  expense,
+  accounts,
+  onClose,
+  onPaid,
+}: {
+  expense: ExpenseEntry;
+  accounts: { id: string; name: string; type: string }[];
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [paidFrom, setPaidFrom] = useState(expense.paidFrom ?? '');
+  const [paymentMode, setPaymentMode] = useState(expense.paymentMode ?? PAYMENT_MODES[0]);
+  const [paymentDate, setPaymentDate] = useState(today);
+
+  const payMut = useMutation({
+    mutationFn: () =>
+      payExpenseEntry(expense.id, {
+        paidFrom: paidFrom || undefined,
+        paymentMode,
+        paymentDate,
+      }),
+    onSuccess: () => {
+      toast.success('Expense marked as paid');
+      onPaid();
+    },
+    onError: () => toast.error('Failed to mark as paid'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h3 className="font-bold text-slate-800">Mark Expense Paid</h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-slate-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4 px-6 py-5">
+          <p className="text-sm text-muted-foreground">
+            {expense.expenseNo} · {expense.category.replace(/_/g, ' ')} ·{' '}
+            <span className="font-semibold text-red-600">
+              {formatCurrency(Number(expense.netAmount), expense.currency)}
+            </span>
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600">Payment Mode</label>
+            <Select value={paymentMode} onValueChange={setPaymentMode}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_MODES.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600">
+              Paid From Account{' '}
+              <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <Select value={paidFrom} onValueChange={setPaidFrom}>
+              <SelectTrigger>
+                <SelectValue placeholder="Auto (branch default by mode)" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name} ({a.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-600">Payment Date</label>
+            <input
+              type="date"
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={payMut.isPending}
+            onClick={() => payMut.mutate()}
+          >
+            {payMut.isPending ? 'Saving...' : 'Mark Paid'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ExpenseManagementPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -432,6 +539,7 @@ export default function ExpenseManagementPage() {
   const [toDate, setToDate] = useState(today);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ExpenseEntry | null>(null);
+  const [paying, setPaying] = useState<ExpenseEntry | null>(null);
   const [chartsOpen, setChartsOpen] = useState(true);
 
   const qc = useQueryClient();
@@ -819,6 +927,15 @@ export default function ExpenseManagementPage() {
                           <CheckCircle className="h-3.5 w-3.5" />
                         </button>
                       )}
+                      {e.status !== 'PAID' && e.status !== 'REJECTED' && (
+                        <button
+                          onClick={() => setPaying(e)}
+                          title="Mark Paid"
+                          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                        >
+                          <Wallet className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setEditing(e);
@@ -854,6 +971,18 @@ export default function ExpenseManagementPage() {
           branches={branches}
           onClose={() => setShowModal(false)}
           onSaved={() => setShowModal(false)}
+        />
+      )}
+
+      {paying && (
+        <PayExpenseModal
+          expense={paying}
+          accounts={accounts}
+          onClose={() => setPaying(null)}
+          onPaid={() => {
+            setPaying(null);
+            qc.invalidateQueries({ queryKey: ['expense-entries'] });
+          }}
         />
       )}
     </div>

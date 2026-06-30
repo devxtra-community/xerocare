@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Search, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
+import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 
 interface RfqTableProps {
   basePath: string;
@@ -24,6 +26,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
   const router = useRouter();
   const [rfqs, setRfqs] = useState<Rfq[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
   const [loading, setLoading] = useState(true);
 
   const fetchRfqs = async () => {
@@ -42,8 +45,10 @@ export default function RfqTable({ basePath }: RfqTableProps) {
     fetchRfqs();
   }, []);
 
-  const filteredRfqs = rfqs.filter((rfq) =>
-    rfq.rfq_number.toLowerCase().includes(searchQuery.toLowerCase()),
+  const filteredRfqs = rfqs.filter(
+    (rfq) =>
+      rfq.rfq_number.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      (originFilter === 'ALL' || rfq.purchase_origin === originFilter),
   );
 
   const getStatusBadgeVariant = (status: RfqStatus) => {
@@ -67,14 +72,27 @@ export default function RfqTable({ basePath }: RfqTableProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search by RFQ number..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 h-10 w-full bg-white border-slate-200 focus-visible:ring-primary shadow-sm rounded-lg"
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search by RFQ number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 h-10 w-full bg-white border-slate-200 focus-visible:ring-primary shadow-sm rounded-lg"
+            />
+          </div>
+
+          <select
+            value={originFilter}
+            onChange={(e) => setOriginFilter(e.target.value as 'ALL' | PurchaseOrigin)}
+            className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm focus-visible:ring-primary"
+            aria-label="Filter by purchase origin"
+          >
+            <option value="ALL">All Origins</option>
+            <option value={PurchaseOrigin.DOMESTIC}>Domestic</option>
+            <option value={PurchaseOrigin.INTERNATIONAL}>International</option>
+          </select>
         </div>
 
         <Button
@@ -98,6 +116,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                 <TableHead className="font-semibold text-slate-600 text-center">Items</TableHead>
                 <TableHead className="font-semibold text-slate-600 text-center">Vendors</TableHead>
                 <TableHead className="font-semibold text-slate-600 text-center">Status</TableHead>
+                <TableHead className="font-semibold text-slate-600 text-center">Origin</TableHead>
                 <TableHead className="text-right font-semibold text-slate-600">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -120,6 +139,9 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                         {rfq.status.replace('_', ' ')}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <PurchaseOriginBadge origin={rfq.purchase_origin} />
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
@@ -135,7 +157,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-slate-500">
+                  <TableCell colSpan={7} className="h-32 text-center text-slate-500">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <p>No RFQs found.</p>
                       <Button

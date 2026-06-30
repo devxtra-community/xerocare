@@ -16,6 +16,25 @@ export class PurchaseController {
     }
   }
 
+  async getSpendByOrigin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userBranchId = req.user?.branchId;
+      const isAdmin = req.user?.role === 'ADMIN';
+
+      // Admins may filter by any branch; non-admins are locked to their own branch.
+      const requestedBranchId = req.query.branchId ? String(req.query.branchId) : undefined;
+      const branchId = isAdmin ? requestedBranchId : userBranchId;
+
+      const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+      const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+
+      const summary = await purchaseService.getSpendByOrigin({ branchId, startDate, endDate });
+      res.status(200).json({ success: true, data: summary });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getPurchaseByLotId(req: Request, res: Response, next: NextFunction) {
     try {
       const lotId = String(req.params.lotId);

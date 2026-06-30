@@ -8,9 +8,11 @@ import {
   deleteCashBankAccount,
   getCashbookEntries,
   createCashbookEntry,
+  getDayBook,
   getExpenseEntries,
   createExpenseEntry,
   updateExpenseEntry,
+  payExpenseEntry,
   approveExpenseEntry,
   deleteExpenseEntry,
   getDepreciationBrandRules,
@@ -88,10 +90,14 @@ router.delete('/cash-bank/:id', deleteCashBankAccount);
 router.get('/cashbook', getCashbookEntries);
 router.post('/cashbook', createCashbookEntry);
 
+// Day Book (per-day cash receipts/payments summary)
+router.get('/daybook', getDayBook);
+
 // Expense Entries
 router.get('/expenses', getExpenseEntries);
 router.post('/expenses', createExpenseEntry);
 router.put('/expenses/:id', updateExpenseEntry);
+router.patch('/expenses/:id/pay', payExpenseEntry);
 router.patch('/expenses/:id/approve', approveExpenseEntry);
 router.delete('/expenses/:id', deleteExpenseEntry);
 router.get('/expenses/charts', getExpenseCharts);

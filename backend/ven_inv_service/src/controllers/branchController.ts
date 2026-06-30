@@ -72,4 +72,10 @@ export class BranchController {
     const branch = await this.service.getBranchById(branchId);
     res.json({ success: true, data: branch });
   };
+
+  // All branches regardless of requester's branch — used for stock transfer source selection
+  listAll = async (req: Request, res: Response) => {
+    const branches = await this.service.getBranches();
+    res.json({ success: true, data: branches });
+  };
 }

@@ -56,6 +56,13 @@ export class CashbookEntry {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  // Auto-posting source link (idempotency). e.g. INVOICE_PAYMENT | EXPENSE
+  @Column({ type: 'varchar', nullable: true })
+  sourceType?: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  sourceId?: string;
+
   @Column()
   createdBy!: string;
 

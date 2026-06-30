@@ -43,6 +43,8 @@ export interface Rfq {
   items: Record<string, unknown>[];
   vendors: Record<string, unknown>[];
   creator?: Record<string, unknown>;
+  /** Snapshotted at award time. Undefined until the RFQ is awarded. */
+  purchase_origin?: import('./purchaseOrigin').PurchaseOrigin;
 }
 
 export async function createRfq(data: { vendorIds: string[]; items: RfqItem[] }) {

@@ -19,6 +19,8 @@ import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { AppError } from '../errors/appError';
 import { calculateDepreciation, generateDepreciationSchedule } from '../utils/depreciation';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
+import { postCashbookEntry } from '../services/cashbookService';
+import { logger } from '../config/logger';
 
 // ─── PERIOD HELPER ─────────────────────────────────────────────────────────────
 
@@ -133,27 +135,23 @@ export const createCashbookEntry = async (req: Request, res: Response, next: Nex
       req.body.referenceNo = `CB-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
     }
 
-    let saved!: CashbookEntry;
-    await Source.transaction(async (em) => {
-      const entryRepo = em.getRepository(CashbookEntry);
-      const accountRepo = em.getRepository(CashBankAccount);
-
-      const entry = entryRepo.create({
-        ...req.body,
-        createdBy: req.user?.userId ?? req.body.createdBy,
-      }) as unknown as CashbookEntry;
-      saved = await entryRepo.save(entry);
-
-      // Update account balance atomically
-      if (entry.accountId) {
-        const account = await accountRepo.findOne({ where: { id: entry.accountId } });
-        if (account) {
-          const delta =
-            entry.entryType === 'RECEIPT' ? Number(entry.amount) : -Number(entry.amount);
-          account.currentBalance = Number(account.currentBalance) + delta;
-          await accountRepo.save(account);
-        }
-      }
+    const saved = await postCashbookEntry({
+      referenceNo: req.body.referenceNo,
+      date: req.body.date,
+      entryType: req.body.entryType,
+      amount: Number(req.body.amount),
+      category: req.body.category,
+      branchId: req.body.branchId,
+      createdBy: req.user?.userId ?? req.body.createdBy,
+      paymentMode: req.body.paymentMode,
+      accountId: req.body.accountId,
+      linkedInvoiceId: req.body.linkedInvoiceId,
+      linkedPoId: req.body.linkedPoId,
+      linkedExpenseId: req.body.linkedExpenseId,
+      description: req.body.description,
+      chequeNo: req.body.chequeNo,
+      notes: req.body.notes,
+      // manual entries only move an explicitly chosen account (preserve prior behavior)
     });
 
     res.status(201).json({ success: true, data: saved });
@@ -162,7 +160,117 @@ export const createCashbookEntry = async (req: Request, res: Response, next: Nex
   }
 };
 
+// ─── DAY BOOK ─────────────────────────────────────────────────────────────────
+
+function toYmd(d: Date | string): string {
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  return String(d).slice(0, 10);
+}
+
+interface DayBookDay {
+  date: string;
+  totalReceipts: number;
+  totalPayments: number;
+  net: number;
+  transactionCount: number;
+  entries: CashbookEntry[];
+}
+
+// Cash day book: per-day total earnings (receipts), total expenses (payments) and transactions,
+// built from real cashbook entries (auto-posted invoice receipts + expense payments + manual).
+export const getDayBook = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const repo = Source.getRepository(CashbookEntry);
+    const { fromDate, toDate, accountId } = req.query;
+    const today = new Date().toISOString().slice(0, 10);
+    const from = (fromDate as string) || today;
+    const to = (toDate as string) || from;
+
+    const qb = repo.createQueryBuilder('e');
+    applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
+    qb.andWhere('e.date >= :from', { from }).andWhere('e.date <= :to', { to });
+    if (accountId) qb.andWhere('e.accountId = :accountId', { accountId });
+    qb.orderBy('e.date', 'DESC').addOrderBy('e.createdAt', 'DESC');
+    const entries = await qb.getMany();
+
+    const dayMap = new Map<string, DayBookDay>();
+    let grandReceipts = 0;
+    let grandPayments = 0;
+    for (const e of entries) {
+      const key = toYmd(e.date);
+      let day = dayMap.get(key);
+      if (!day) {
+        day = {
+          date: key,
+          totalReceipts: 0,
+          totalPayments: 0,
+          net: 0,
+          transactionCount: 0,
+          entries: [],
+        };
+        dayMap.set(key, day);
+      }
+      const amt = Number(e.amount);
+      if (e.entryType === 'RECEIPT') {
+        day.totalReceipts += amt;
+        grandReceipts += amt;
+      } else {
+        day.totalPayments += amt;
+        grandPayments += amt;
+      }
+      day.transactionCount += 1;
+      day.entries.push(e);
+    }
+
+    const days = Array.from(dayMap.values())
+      .map((d) => ({ ...d, net: d.totalReceipts - d.totalPayments }))
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+
+    res.json({
+      success: true,
+      data: {
+        fromDate: from,
+        toDate: to,
+        days,
+        totals: {
+          totalReceipts: grandReceipts,
+          totalPayments: grandPayments,
+          net: grandReceipts - grandPayments,
+          transactionCount: entries.length,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── EXPENSE ENTRIES ──────────────────────────────────────────────────────────
+
+// Posts a PAID expense into the cashbook (day book) as a PAYMENT. Best-effort + idempotent.
+async function postExpensePayment(expense: ExpenseEntry, userId?: string): Promise<void> {
+  try {
+    await postCashbookEntry({
+      date: expense.paymentDate ?? expense.date,
+      entryType: 'PAYMENT',
+      amount: Number(expense.netAmount),
+      category: expense.category,
+      branchId: expense.branchId,
+      createdBy: userId ?? expense.createdBy ?? 'SYSTEM',
+      paymentMode: expense.paymentMode,
+      accountId: expense.paidFrom,
+      autoResolveAccount: true,
+      linkedExpenseId: expense.id,
+      description: expense.description,
+      chequeNo: expense.referenceNo,
+      notes: expense.notes,
+      sourceType: 'EXPENSE',
+      sourceId: expense.id,
+    });
+  } catch (err) {
+    logger.error('Failed to post expense payment to cashbook', err);
+  }
+}
 
 export const getExpenseEntries = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -194,6 +302,10 @@ export const createExpenseEntry = async (req: Request, res: Response, next: Next
       createdBy: req.user?.userId ?? req.body.createdBy,
     }) as unknown as ExpenseEntry;
     const saved = await repo.save(entry);
+    // If created already-paid, mirror it into the day book.
+    if (saved.status === 'PAID') {
+      await postExpensePayment(saved, req.user?.userId);
+    }
     res.status(201).json({ success: true, data: saved });
   } catch (err) {
     next(err);
@@ -206,8 +318,43 @@ export const updateExpenseEntry = async (req: Request, res: Response, next: Next
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Expense not found', 404);
+    const wasPaid = entry.status === 'PAID';
     Object.assign(entry, req.body);
     const saved = await repo.save(entry);
+    // Post to the day book only on the transition into PAID (idempotent guard also protects).
+    if (saved.status === 'PAID' && !wasPaid) {
+      await postExpensePayment(saved, req.user?.userId);
+    }
+    res.json({ success: true, data: saved });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Mark an expense PAID (records payment details) and post it to the cashbook / day book.
+export const payExpenseEntry = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const repo = Source.getRepository(ExpenseEntry);
+    const id = req.params.id as string;
+    const entry = await repo.findOne({ where: { id } });
+    if (!entry) throw new AppError('Expense not found', 404);
+    if (entry.status === 'PAID') throw new AppError('Expense is already paid', 400);
+
+    const { paidFrom, paymentMode, paymentDate, referenceNo } = req.body as {
+      paidFrom?: string;
+      paymentMode?: string;
+      paymentDate?: string;
+      referenceNo?: string;
+    };
+
+    entry.status = 'PAID';
+    entry.paidFrom = paidFrom ?? entry.paidFrom;
+    entry.paymentMode = paymentMode ?? entry.paymentMode;
+    entry.paymentDate = paymentDate ? new Date(paymentDate) : (entry.paymentDate ?? new Date());
+    entry.referenceNo = referenceNo ?? entry.referenceNo;
+    const saved = await repo.save(entry);
+
+    await postExpensePayment(saved, req.user?.userId);
     res.json({ success: true, data: saved });
   } catch (err) {
     next(err);

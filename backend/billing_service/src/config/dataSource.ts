@@ -621,7 +621,17 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "accountType" VARCHAR DEFAULT 'CURRENT',
         ADD COLUMN IF NOT EXISTS "openingDate" DATE,
         ADD COLUMN IF NOT EXISTS "responsiblePersonId" UUID,
-        ADD COLUMN IF NOT EXISTS "contactPerson" VARCHAR;
+        ADD COLUMN IF NOT EXISTS "contactPerson" VARCHAR,
+        ADD COLUMN IF NOT EXISTS "isDefault" BOOLEAN DEFAULT false;
+
+      -- Cashbook auto-posting source tracking (idempotency for receipts/expense payments)
+      ALTER TABLE cashbook_entries
+        ADD COLUMN IF NOT EXISTS "sourceType" VARCHAR,
+        ADD COLUMN IF NOT EXISTS "sourceId" UUID;
+
+      CREATE UNIQUE INDEX IF NOT EXISTS "uniq_cashbook_source"
+        ON cashbook_entries ("sourceType", "sourceId")
+        WHERE "sourceType" IS NOT NULL;
 
       CREATE TABLE IF NOT EXISTS account_reconciliations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

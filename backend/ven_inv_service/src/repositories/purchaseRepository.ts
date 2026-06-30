@@ -101,6 +101,46 @@ export class PurchaseRepository {
     });
   }
 
+  /**
+   * Aggregates total purchase spend split by origin (Domestic vs International),
+   * optionally scoped by branch and a purchase-date range. Sums purchases.total_amount,
+   * which carries the full landed cost. Rows with a null origin (legacy/in-flight)
+   * are returned under the 'UNCLASSIFIED' key so totals always reconcile.
+   */
+  async getSpendByOrigin(filters: {
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{ domestic: number; international: number; unclassified: number }> {
+    const qb = this.repo
+      .createQueryBuilder('purchase')
+      .leftJoin('purchase.lot', 'lot')
+      .select('purchase.purchase_origin', 'origin')
+      .addSelect('COALESCE(SUM(purchase.total_amount), 0)', 'total')
+      .groupBy('purchase.purchase_origin');
+
+    if (filters.branchId) {
+      qb.andWhere('purchase.branch_id = :branchId', { branchId: filters.branchId });
+    }
+    if (filters.startDate) {
+      qb.andWhere('lot.purchase_date >= :startDate', { startDate: filters.startDate });
+    }
+    if (filters.endDate) {
+      qb.andWhere('lot.purchase_date <= :endDate', { endDate: filters.endDate });
+    }
+
+    const rows = await qb.getRawMany<{ origin: string | null; total: string }>();
+
+    const result = { domestic: 0, international: 0, unclassified: 0 };
+    for (const row of rows) {
+      const amount = Number(row.total) || 0;
+      if (row.origin === 'DOMESTIC') result.domestic = amount;
+      else if (row.origin === 'INTERNATIONAL') result.international = amount;
+      else result.unclassified += amount;
+    }
+    return result;
+  }
+
   async getPurchaseById(id: string, branchId?: string) {
     const where: { id: string; branchId?: string } = { id };
     if (branchId) where.branchId = branchId;

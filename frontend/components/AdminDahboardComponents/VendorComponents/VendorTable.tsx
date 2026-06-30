@@ -1213,6 +1213,11 @@ function VendorFormModal({
                   toast.error('Enter a valid email address');
                   return;
                 }
+                // Country drives Domestic vs International purchase classification — required.
+                if (!form.countryCode) {
+                  toast.error('Country is required');
+                  return;
+                }
 
                 // Auto-commit bank draft if the inline form is open and has any data
                 let finalBankAccounts = form.bankAccounts;

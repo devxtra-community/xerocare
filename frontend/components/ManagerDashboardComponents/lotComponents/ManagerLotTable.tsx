@@ -10,6 +10,8 @@ import StatCard from '@/components/StatCard';
 import { Lot, lotService } from '@/lib/lot';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
+import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
+import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 import AddLotDialog from './AddLotDialog';
 import LotDetailsDialog from './LotDetailsDialog';
 
@@ -21,6 +23,7 @@ import LotDetailsDialog from './LotDetailsDialog';
 export default function ManagerLotTable() {
   const [lots, setLots] = useState<Lot[]>([]);
   const [search, setSearch] = useState('');
+  const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
 
@@ -79,7 +82,21 @@ export default function ManagerLotTable() {
           />
         </div>
 
-        <Button className="bg-primary text-white gap-2" onClick={() => setAddDialogOpen(true)}>
+        <select
+          value={originFilter}
+          onChange={(e) => setOriginFilter(e.target.value as 'ALL' | PurchaseOrigin)}
+          className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm ml-3"
+          aria-label="Filter by purchase origin"
+        >
+          <option value="ALL">All Origins</option>
+          <option value={PurchaseOrigin.DOMESTIC}>Domestic</option>
+          <option value={PurchaseOrigin.INTERNATIONAL}>International</option>
+        </select>
+
+        <Button
+          className="bg-primary text-white gap-2 ml-auto"
+          onClick={() => setAddDialogOpen(true)}
+        >
           <Plus size={16} /> Add Lot
         </Button>
       </div>
@@ -139,6 +156,12 @@ export default function ManagerLotTable() {
               },
             },
             {
+              id: 'origin',
+              header: 'ORIGIN',
+              className: 'font-semibold text-[11px] text-primary uppercase',
+              cell: (lot: Lot) => <PurchaseOriginBadge origin={lot.purchaseOrigin} />,
+            },
+            {
               id: 'actions',
               header: 'ACTION',
               className: 'font-semibold text-[11px] text-primary uppercase text-right',
@@ -154,7 +177,11 @@ export default function ManagerLotTable() {
               ),
             },
           ]}
-          data={lots}
+          data={
+            originFilter === 'ALL'
+              ? lots
+              : lots.filter((lot) => lot.purchaseOrigin === originFilter)
+          }
           loading={loading}
           emptyMessage="No lots found matching your search."
           keyExtractor={(lot) => lot.id}

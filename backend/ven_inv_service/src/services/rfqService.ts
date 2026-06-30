@@ -15,6 +15,8 @@ import * as xlsx from 'xlsx';
 import * as ExcelJS from 'exceljs';
 import { logger } from '../config/logger';
 import { Vendor } from '../entities/vendorEntity';
+import { Branch } from '../entities/branchEntity';
+import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
 
 interface CreateRfqDto {
   branchId: string;
@@ -870,9 +872,26 @@ export class RfqService {
         await manager.save(vendor);
       }
 
+      // Snapshot domestic vs international classification ONCE, at award time —
+      // this is the first point a single winning vendor is known. Compares the
+      // awarded vendor's country to the purchasing branch's country. Never
+      // recalculated afterwards, even if the vendor's country is later edited.
+      const branch = await manager.findOne(Branch, { where: { id: rfq.branch_id } });
+      const awardedVendorCountry =
+        targetVendor.vendor?.countryCode ??
+        (await manager.findOne(Vendor, { where: { id: targetVendor.vendor_id } }))?.countryCode;
+      rfq.purchase_origin = classifyPurchaseOrigin(branch?.country_code, awardedVendorCountry);
+
       rfq.status = RfqStatus.AWARDED;
       rfq.awarded_vendor_id = targetVendor.vendor_id;
       await manager.save(rfq);
+
+      logger.info('Purchase origin classified at award', {
+        rfqId,
+        branchCountry: branch?.country_code,
+        vendorCountry: awardedVendorCountry,
+        purchaseOrigin: rfq.purchase_origin,
+      });
 
       // Notify RFQ creator on award
       if (rfq.created_by) {
@@ -930,6 +949,8 @@ export class RfqService {
         warehouse_id: warehouseId,
         createdBy: userId,
         notes: `Auto-generated from RFQ ${rfq.rfq_number}`,
+        // Carry the snapshot down so lot-level spend reporting is tagged too.
+        purchaseOrigin: rfq.purchase_origin,
       });
 
       await manager.save(lot);
@@ -1001,6 +1022,8 @@ export class RfqService {
         groundfieldCost: 0,
         totalAmount: lot.totalAmount,
         createdBy: userId,
+        // Snapshot on the financial record powers the spend dashboard directly.
+        purchaseOrigin: rfq.purchase_origin,
       });
       await manager.save(purchase);
 
