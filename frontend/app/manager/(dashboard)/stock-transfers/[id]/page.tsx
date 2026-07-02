@@ -1,734 +1,466 @@
 'use client';
-
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, Package, CheckCircle, XCircle, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import {
   getStockTransfer,
-  submitTransfer,
-  respondToTransfer,
+  approveTransfer,
+  rejectTransfer,
   dispatchTransfer,
   receiveTransfer,
   cancelTransfer,
-  getBranchInventory,
+  submitTransfer,
   StockTransfer,
+  StockTransferItem,
   STATUS_LABELS,
   STATUS_COLORS,
-  RespondPayload,
 } from '@/lib/stockTransfer';
-import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
 import { toast } from 'sonner';
-import {
-  ArrowLeft,
-  Check,
-  X,
-  Truck,
-  PackageCheck,
-  Send,
-  Ban,
-  AlertTriangle,
-  Info,
-} from 'lucide-react';
+import { format } from 'date-fns';
 
-type DialogType = 'respond' | 'dispatch' | 'receive' | 'cancel' | null;
+function StatusTimeline({ transfer }: { transfer: StockTransfer }) {
+  const steps = [
+    { key: 'DRAFT', label: 'Draft', date: transfer.created_at },
+    { key: 'PENDING_APPROVAL', label: 'Submitted', date: null },
+    { key: 'APPROVED', label: 'Approved', date: null },
+    { key: 'IN_TRANSIT', label: 'Dispatched', date: transfer.dispatched_at },
+    { key: 'COMPLETED', label: 'Completed', date: transfer.received_at },
+  ];
+  const statusOrder = [
+    'DRAFT',
+    'PENDING_APPROVAL',
+    'APPROVED',
+    'IN_TRANSIT',
+    'RECEIVED',
+    'PARTIALLY_RECEIVED',
+    'COMPLETED',
+  ];
+  const currentIdx = statusOrder.indexOf(transfer.status);
 
-interface BranchInventoryItem {
-  spare_part_id: string;
-  part_name: string;
-  sku: string;
-  warehouse_id: string;
-  warehouse_name: string;
-  quantity: number;
+  return (
+    <div className="flex items-start gap-0 overflow-x-auto pb-2">
+      {steps.map((s, i) => {
+        const sIdx = statusOrder.indexOf(s.key);
+        const done = sIdx <= currentIdx && !['REJECTED', 'CANCELLED'].includes(transfer.status);
+        return (
+          <React.Fragment key={s.key}>
+            <div className="flex flex-col items-center min-w-[80px] text-center">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 ${done ? 'bg-primary border-primary text-white' : 'bg-white border-slate-200 text-slate-300'}`}
+              >
+                {done ? <CheckCircle className="h-3.5 w-3.5" /> : i + 1}
+              </div>
+              <div
+                className={`text-xs mt-1 font-medium ${done ? 'text-slate-700' : 'text-slate-300'}`}
+              >
+                {s.label}
+              </div>
+              {s.date && done && (
+                <div className="text-[10px] text-slate-400">
+                  {format(new Date(s.date), 'dd MMM')}
+                </div>
+              )}
+            </div>
+            {i < steps.length - 1 && (
+              <div
+                className={`flex-1 h-0.5 mt-3.5 min-w-[16px] ${done ? 'bg-primary' : 'bg-slate-200'}`}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
 }
 
-export default function ManagerStockTransferDetailPage() {
+export default function ManagerTransferDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
-
   const [transfer, setTransfer] = useState<StockTransfer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dialog, setDialog] = useState<DialogType>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [acting, setActing] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [receiveQtys, setReceiveQtys] = useState<Record<string, number>>({});
 
-  const [respondItems, setRespondItems] = useState<
-    { itemId: string; fulfilled_qty: number; source_warehouse_id: string }[]
-  >([]);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [branchInventory, setBranchInventory] = useState<BranchInventoryItem[]>([]);
-
-  const [myWarehouses, setMyWarehouses] = useState<Warehouse[]>([]);
-  const [destWarehouseId, setDestWarehouseId] = useState('');
-  const [receiveQtys, setReceiveQtys] = useState<{ itemId: string; received_qty: number }[]>([]);
-
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const t = await getStockTransfer(id);
-      setTransfer(t);
+      const data = await getStockTransfer(id);
+      setTransfer(data);
+      if (data.items) {
+        const init: Record<string, number> = {};
+        for (const item of data.items) {
+          const dispatched = item.dispatched_qty ?? item.requested_qty;
+          init[item.id] = dispatched - (item.received_qty ?? 0);
+        }
+        setReceiveQtys(init);
+      }
     } catch {
-      toast.error('Transfer not found');
-      router.back();
+      toast.error('Failed to load transfer');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
 
-  const openRespondDialog = async () => {
-    if (!transfer) return;
-    setDialog('respond');
-    setIsRejecting(false);
-    setRejectionReason('');
-    setRespondItems(
-      transfer.items.map((i) => ({
-        itemId: i.id,
-        fulfilled_qty: i.requested_qty,
-        source_warehouse_id: '',
-      })),
-    );
+  const act = async (fn: () => Promise<StockTransfer>) => {
+    setActing(true);
     try {
-      const inv = await getBranchInventory(transfer.source_branch_id);
-      setBranchInventory(inv.inventory);
-    } catch {
-      setBranchInventory([]);
-    }
-  };
-
-  const openReceiveDialog = async () => {
-    if (!transfer) return;
-    setDialog('receive');
-    setDestWarehouseId('');
-    setReceiveQtys(
-      transfer.items
-        .filter((i) => (i.fulfilled_qty ?? 0) > 0)
-        .map((i) => ({ itemId: i.id, received_qty: i.fulfilled_qty ?? i.requested_qty })),
-    );
-    try {
-      const wh = await getMyBranchWarehouses();
-      setMyWarehouses(wh.data ?? []);
-    } catch {
-      setMyWarehouses([]);
-    }
-  };
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
-      await submitTransfer(id);
-      toast.success('Request submitted to source branch manager');
-      await load();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message ?? e?.message ?? 'Error');
+      const updated = await fn();
+      setTransfer(updated);
+      toast.success('Done');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action failed';
+      toast.error(msg);
     } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleRespond = async () => {
-    setSubmitting(true);
-    try {
-      const payload: RespondPayload = isRejecting
-        ? {
-            items: respondItems,
-            rejection_reason: rejectionReason || 'Cannot fulfill this request',
-          }
-        : { items: respondItems };
-      await respondToTransfer(id, payload);
-      toast.success(isRejecting ? 'Request rejected' : 'Response sent to requesting branch');
-      setDialog(null);
-      await load();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message ?? e?.message ?? 'Error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDispatch = async () => {
-    setSubmitting(true);
-    try {
-      await dispatchTransfer(id);
-      toast.success('Dispatched — items deducted from your inventory');
-      setDialog(null);
-      await load();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message ?? e?.message ?? 'Error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleReceive = async () => {
-    if (!destWarehouseId) {
-      toast.error('Select a warehouse');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await receiveTransfer(id, { destination_warehouse_id: destWarehouseId, items: receiveQtys });
-      toast.success('Stock received and added to your inventory');
-      setDialog(null);
-      await load();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message ?? e?.message ?? 'Error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleCancel = async () => {
-    setSubmitting(true);
-    try {
-      await cancelTransfer(id);
-      toast.success('Transfer cancelled');
-      setDialog(null);
-      await load();
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message ?? e?.message ?? 'Error');
-    } finally {
-      setSubmitting(false);
+      setActing(false);
     }
   };
 
   if (loading)
-    return <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>;
-  if (!transfer) return null;
+    return (
+      <div className="bg-blue-100 min-h-screen p-6 flex items-center justify-center text-slate-400">
+        Loading transfer...
+      </div>
+    );
+  if (!transfer)
+    return (
+      <div className="bg-blue-100 min-h-screen p-6 flex items-center justify-center text-slate-400">
+        Transfer not found.
+      </div>
+    );
 
-  const canSubmit = transfer.status === 'DRAFT';
-  const canRespond = transfer.status === 'PENDING';
-  const canDispatch = transfer.status === 'ACCEPTED' || transfer.status === 'PARTIALLY_ACCEPTED';
-  const canReceive = transfer.status === 'IN_TRANSIT';
-  const canCancel = transfer.status === 'DRAFT' || transfer.status === 'PENDING';
-
-  const getWarehousesWithPart = (sparePartId: string) =>
-    branchInventory.filter((i) => i.spare_part_id === sparePartId && i.quantity > 0);
+  const isRejectedOrCancelled = ['REJECTED', 'CANCELLED'].includes(transfer.status);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-5">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 font-mono">
-              {transfer.transfer_number}
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span
-                className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_COLORS[transfer.status]}`}
-              >
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-primary font-mono">
+                {transfer.transfer_number}
+              </h1>
+              <Badge className={`${STATUS_COLORS[transfer.status]} border-0 text-xs`}>
                 {STATUS_LABELS[transfer.status]}
-              </span>
-              <span className="text-xs text-gray-400">
+              </Badge>
+              <Badge
+                className={`border-0 text-xs ${transfer.transfer_type === 'INTER_BRANCH' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}
+              >
                 {transfer.transfer_type === 'INTER_BRANCH' ? 'Inter-Branch' : 'Intra-Branch'}
-              </span>
+              </Badge>
             </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {canSubmit && (
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
-            >
-              <Send className="h-4 w-4" /> Submit
-            </button>
-          )}
-          {canRespond && (
-            <button
-              onClick={openRespondDialog}
-              className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
-            >
-              <Check className="h-4 w-4" /> Respond
-            </button>
-          )}
-          {canDispatch && (
-            <button
-              onClick={() => setDialog('dispatch')}
-              className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-purple-700"
-            >
-              <Truck className="h-4 w-4" /> Dispatch
-            </button>
-          )}
-          {canReceive && (
-            <button
-              onClick={openReceiveDialog}
-              className="flex items-center gap-1.5 bg-teal-600 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-teal-700"
-            >
-              <PackageCheck className="h-4 w-4" /> Receive
-            </button>
-          )}
-          {canCancel && (
-            <button
-              onClick={() => setDialog('cancel')}
-              className="flex items-center gap-1.5 border border-red-300 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50"
-            >
-              <Ban className="h-4 w-4" /> Cancel
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Status guidance banner */}
-      {transfer.status === 'PENDING' && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-          <Info className="h-5 w-5 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">Action required — incoming request</p>
-            <p className="text-amber-700 mt-0.5">
-              This branch is requesting stock from your branch. Check your inventory and click{' '}
-              <strong>Respond</strong> to accept, partially fulfill, or reject.
+            <p className="text-sm text-slate-500 mt-0.5">
+              {transfer.source_branch?.name} → {transfer.destination_branch?.name}
             </p>
           </div>
         </div>
-      )}
-      {transfer.status === 'IN_TRANSIT' && (
-        <div className="flex items-start gap-3 bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-800">
-          <Truck className="h-5 w-5 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold">Stock is on the way</p>
-            <p className="mt-0.5">
-              When the physical items arrive at your branch, click <strong>Receive</strong> to add
-              them to your inventory.
-            </p>
-          </div>
-        </div>
-      )}
 
-      {/* Info */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <p className="text-xs text-gray-400 mb-0.5">Requesting Branch</p>
-          <p className="font-semibold text-gray-800">{transfer.requesting_branch?.name ?? '—'}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-400 mb-0.5">Source Branch</p>
-          <p className="font-semibold text-gray-800">{transfer.source_branch?.name ?? '—'}</p>
-        </div>
-        {transfer.notes && (
-          <div className="col-span-2">
-            <p className="text-xs text-gray-400 mb-0.5">Notes</p>
-            <p className="text-gray-700">{transfer.notes}</p>
-          </div>
-        )}
-        {transfer.rejection_reason && (
-          <div className="col-span-2">
-            <p className="text-xs text-red-400 mb-0.5">Rejection Reason</p>
-            <p className="text-red-700 bg-red-50 rounded p-2">{transfer.rejection_reason}</p>
-          </div>
-        )}
-        {transfer.dispatched_at && (
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Dispatched</p>
-            <p className="font-medium text-gray-700">
-              {new Date(transfer.dispatched_at).toLocaleString()}
-            </p>
-          </div>
-        )}
-        {transfer.received_at && (
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Received</p>
-            <p className="font-medium text-gray-700">
-              {new Date(transfer.received_at).toLocaleString()}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Items table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-700">Items</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 bg-gray-50 text-left">
-              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Item</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">
-                Requested
-              </th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">
-                Fulfilled
-              </th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-center">
-                Received
-              </th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-gray-500">Source WH</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {transfer.items.map((item) => (
-              <tr key={item.id}>
-                <td className="px-4 py-3 font-medium text-gray-800">
-                  {item.spare_part?.part_name ??
-                    item.product?.serial_number ??
-                    item.item_name ??
-                    '—'}
-                </td>
-                <td className="px-4 py-3 text-center text-gray-700">{item.requested_qty}</td>
-                <td className="px-4 py-3 text-center">
-                  {item.fulfilled_qty != null ? (
-                    <span
-                      className={
-                        item.fulfilled_qty === 0
-                          ? 'text-red-500'
-                          : item.fulfilled_qty < item.requested_qty
-                            ? 'text-amber-600'
-                            : 'text-green-600'
-                      }
-                    >
-                      {item.fulfilled_qty}
-                    </span>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  {item.received_qty != null ? (
-                    <span className="text-teal-600">{item.received_qty}</span>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">
-                  {item.source_warehouse?.warehouseName ?? '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* RESPOND DIALOG */}
-      {dialog === 'respond' && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Respond to Request</h2>
-              <button onClick={() => setDialog(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-5">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setIsRejecting(false)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!isRejecting ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                >
-                  Accept / Partial
-                </button>
-                <button
-                  onClick={() => setIsRejecting(true)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium ${isRejecting ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}
-                >
-                  Reject All
-                </button>
-              </div>
-
-              {isRejecting ? (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Why can&apos;t you fulfill this?
-                  </label>
-                  <textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    rows={3}
-                    placeholder="Out of stock, discontinued, etc."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Set the quantity you can provide for each item. Use 0 if you cannot send that
-                    item. The requester will be notified.
-                  </p>
-                  {transfer.items.map((item, idx) => {
-                    const ri = respondItems[idx];
-                    const partsWhs = item.spare_part_id
-                      ? getWarehousesWithPart(item.spare_part_id)
-                      : [];
-                    return (
-                      <div
-                        key={item.id}
-                        className="border border-gray-200 rounded-xl p-4 space-y-3"
-                      >
-                        <div>
-                          <p className="font-semibold text-gray-800 text-sm">
-                            {item.spare_part?.part_name ?? item.item_name ?? '—'}
-                          </p>
-                          <p className="text-xs text-gray-400">Requested: {item.requested_qty}</p>
-                        </div>
-                        {partsWhs.length > 0 && (
-                          <div className="text-xs space-y-0.5">
-                            <p className="font-medium text-gray-600">Your branch stock:</p>
-                            {partsWhs.map((pw) => (
-                              <div
-                                key={pw.warehouse_id}
-                                className="flex justify-between px-2 py-1 bg-green-50 rounded text-green-700"
-                              >
-                                <span>{pw.warehouse_name}</span>
-                                <span className="font-semibold">{pw.quantity} units</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {partsWhs.length === 0 && item.spare_part_id && (
-                          <p className="text-xs text-red-500 bg-red-50 rounded px-2 py-1">
-                            Not available in your branch inventory
-                          </p>
-                        )}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Qty to send
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={item.requested_qty}
-                              value={ri?.fulfilled_qty ?? 0}
-                              onChange={(e) => {
-                                const v = parseInt(e.target.value) || 0;
-                                setRespondItems((prev) =>
-                                  prev.map((r, i) => (i === idx ? { ...r, fulfilled_qty: v } : r)),
-                                );
-                              }}
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              From warehouse
-                            </label>
-                            <select
-                              value={ri?.source_warehouse_id ?? ''}
-                              onChange={(e) =>
-                                setRespondItems((prev) =>
-                                  prev.map((r, i) =>
-                                    i === idx ? { ...r, source_warehouse_id: e.target.value } : r,
-                                  ),
-                                )
-                              }
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            >
-                              <option value="">Select warehouse...</option>
-                              {partsWhs.map((pw) => (
-                                <option key={pw.warehouse_id} value={pw.warehouse_id}>
-                                  {pw.warehouse_name} ({pw.quantity})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                onClick={() => setDialog(null)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2">
+          {transfer.status === 'DRAFT' && (
+            <>
+              <Button
+                size="sm"
+                onClick={() => act(() => submitTransfer(transfer.id))}
+                disabled={acting}
+              >
+                Submit for Approval
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => act(() => cancelTransfer(transfer.id))}
+                disabled={acting}
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleRespond}
-                disabled={submitting}
-                className={`flex-1 py-2.5 rounded-lg font-medium disabled:opacity-60 ${isRejecting ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+              </Button>
+            </>
+          )}
+          {transfer.status === 'PENDING_APPROVAL' && (
+            <>
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => act(() => approveTransfer(transfer.id))}
+                disabled={acting}
+                title="Only a different manager or Admin can approve"
               >
-                {submitting ? 'Sending...' : isRejecting ? 'Reject Request' : 'Send Response'}
-              </button>
-            </div>
-          </div>
+                <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setRejectOpen(true)}
+                disabled={acting}
+              >
+                <XCircle className="h-3.5 w-3.5 mr-1.5" /> Reject
+              </Button>
+            </>
+          )}
+          {transfer.status === 'APPROVED' && (
+            <>
+              <Button
+                size="sm"
+                onClick={() => act(() => dispatchTransfer(transfer.id))}
+                disabled={acting}
+              >
+                <Truck className="h-3.5 w-3.5 mr-1.5" /> Mark Dispatched
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => act(() => cancelTransfer(transfer.id))}
+                disabled={acting}
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+          {(transfer.status === 'IN_TRANSIT' || transfer.status === 'PARTIALLY_RECEIVED') && (
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setReceiveOpen(true)}
+              disabled={acting}
+            >
+              <Package className="h-3.5 w-3.5 mr-1.5" /> Confirm Receipt
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Self-approval warning for PENDING_APPROVAL */}
+      {transfer.status === 'PENDING_APPROVAL' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+          Waiting for approval. If you created this transfer, you cannot approve it yourself —
+          another manager or Admin must approve.
         </div>
       )}
 
-      {/* DISPATCH DIALOG */}
-      {dialog === 'dispatch' && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Confirm Dispatch</h2>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                <div className="text-sm text-amber-700">
-                  <p className="font-semibold mb-1">Stock will be deducted from your inventory</p>
-                  <p>
-                    Once dispatched, the requesting branch can receive and add these items to their
-                    inventory.
-                  </p>
-                </div>
-              </div>
-              {transfer.items
-                .filter((i) => (i.fulfilled_qty ?? 0) > 0)
-                .map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between text-sm bg-gray-50 rounded px-3 py-2"
-                  >
-                    <span>{item.spare_part?.part_name ?? item.item_name ?? '—'}</span>
-                    <span className="font-medium">× {item.fulfilled_qty}</span>
-                  </div>
-                ))}
-            </div>
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                onClick={() => setDialog(null)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleDispatch}
-                disabled={submitting}
-                className="flex-1 bg-purple-600 text-white py-2.5 rounded-lg font-medium hover:bg-purple-700 disabled:opacity-60"
-              >
-                {submitting ? 'Dispatching...' : 'Confirm Dispatch'}
-              </button>
-            </div>
-          </div>
+      {!isRejectedOrCancelled && (
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100">
+          <StatusTimeline transfer={transfer} />
         </div>
       )}
 
-      {/* RECEIVE DIALOG */}
-      {dialog === 'receive' && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Receive Stock</h2>
-              <button onClick={() => setDialog(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Add to which warehouse?
-                </label>
-                <select
-                  value={destWarehouseId}
-                  onChange={(e) => setDestWarehouseId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+      {isRejectedOrCancelled && transfer.rejection_reason && (
+        <div className="bg-red-50 rounded-xl p-4 border border-red-100 text-sm text-red-700">
+          <span className="font-semibold">Rejection reason:</span> {transfer.rejection_reason}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100 space-y-2">
+          <h3 className="font-semibold text-xs text-slate-500 uppercase tracking-wide">Source</h3>
+          <div className="font-medium text-slate-800">{transfer.source_branch?.name}</div>
+          <div className="text-sm text-slate-500">{transfer.source_warehouse?.warehouseName}</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100 space-y-2">
+          <h3 className="font-semibold text-xs text-slate-500 uppercase tracking-wide">
+            Destination
+          </h3>
+          <div className="font-medium text-slate-800">{transfer.destination_branch?.name}</div>
+          <div className="text-sm text-slate-500">
+            {transfer.destination_warehouse?.warehouseName}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-blue-100 space-y-2">
+        <div>
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            Reason
+          </span>
+          <p className="text-sm text-slate-700 mt-1">{transfer.reason}</p>
+        </div>
+        {transfer.notes && (
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Notes
+            </span>
+            <p className="text-sm text-slate-700 mt-1">{transfer.notes}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-50">
+          <h3 className="font-semibold text-slate-700">Transfer Items</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-blue-50 bg-blue-50/50">
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Item</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-slate-600">Type</th>
+                <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Requested</th>
+                <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Dispatched</th>
+                <th className="text-center px-4 py-2.5 font-semibold text-slate-600">Received</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(transfer.items ?? []).map((item: StockTransferItem) => (
+                <tr key={item.id} className="border-b border-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">
+                    {item.item_type === 'PRODUCT'
+                      ? (item.product?.name ?? item.product_id)
+                      : (item.spare_part?.item_name ?? item.spare_part_id)}
+                    <div className="text-xs text-slate-400 font-normal">
+                      {item.item_type === 'PRODUCT'
+                        ? `SN: ${item.product?.serial_no ?? '—'}`
+                        : (item.spare_part?.item_code ?? '')}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge
+                      className={`border-0 text-xs ${item.item_type === 'PRODUCT' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}
+                    >
+                      {item.item_type === 'PRODUCT' ? 'Machine' : 'Spare Part'}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 text-center">{item.requested_qty}</td>
+                  <td className="px-4 py-3 text-center">{item.dispatched_qty ?? '—'}</td>
+                  <td className="px-4 py-3 text-center">
+                    {item.received_qty != null ? (
+                      <span
+                        className={
+                          item.received_qty < (item.dispatched_qty ?? item.requested_qty)
+                            ? 'text-orange-600 font-medium'
+                            : 'text-emerald-600 font-medium'
+                        }
+                      >
+                        {item.received_qty}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Reject Dialog */}
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Transfer</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            placeholder="Reason for rejection..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!rejectReason.trim() || acting}
+              onClick={() => {
+                setRejectOpen(false);
+                act(() => rejectTransfer(transfer.id, rejectReason));
+              }}
+            >
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receive Dialog */}
+      <Dialog open={receiveOpen} onOpenChange={setReceiveOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm Receipt</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 max-h-64 overflow-y-auto">
+            {(transfer.items ?? []).map((item) => {
+              const dispatched = item.dispatched_qty ?? item.requested_qty;
+              const remaining = dispatched - (item.received_qty ?? 0);
+              if (remaining <= 0) return null;
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg"
                 >
-                  <option value="">Select warehouse...</option>
-                  {myWarehouses.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.warehouseName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-700 mb-2">
-                  Confirm quantities received
-                </p>
-                <div className="space-y-2">
-                  {transfer.items
-                    .filter((i) => (i.fulfilled_qty ?? 0) > 0)
-                    .map((item) => {
-                      const rq = receiveQtys.find((r) => r.itemId === item.id);
-                      return (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5"
-                        >
-                          <div className="flex-1 text-sm">
-                            <p className="font-medium text-gray-800">
-                              {item.spare_part?.part_name ?? item.item_name ?? '—'}
-                            </p>
-                            <p className="text-xs text-gray-400">Sent: {item.fulfilled_qty}</p>
-                          </div>
-                          <input
-                            type="number"
-                            min={0}
-                            max={item.fulfilled_qty ?? item.requested_qty}
-                            value={rq?.received_qty ?? 0}
-                            onChange={(e) => {
-                              const v = parseInt(e.target.value) || 0;
-                              setReceiveQtys((prev) =>
-                                prev.map((r) =>
-                                  r.itemId === item.id ? { ...r, received_qty: v } : r,
-                                ),
-                              );
-                            }}
-                            className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          />
-                        </div>
-                      );
-                    })}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {item.item_type === 'PRODUCT'
+                        ? (item.product?.name ?? item.product_id)
+                        : (item.spare_part?.item_name ?? item.spare_part_id)}
+                    </div>
+                    <div className="text-xs text-slate-400">Remaining: {remaining}</div>
+                  </div>
+                  {item.item_type === 'SPARE_PART' ? (
+                    <Input
+                      type="number"
+                      min={0}
+                      max={remaining}
+                      value={receiveQtys[item.id] ?? remaining}
+                      onChange={(e) =>
+                        setReceiveQtys((prev) => ({
+                          ...prev,
+                          [item.id]: Math.min(
+                            remaining,
+                            Math.max(0, parseInt(e.target.value) || 0),
+                          ),
+                        }))
+                      }
+                      className="w-20 h-8 text-sm"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-slate-600">1 unit</span>
+                  )}
                 </div>
-              </div>
-            </div>
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                onClick={() => setDialog(null)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleReceive}
-                disabled={submitting}
-                className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg font-medium hover:bg-teal-700 disabled:opacity-60"
-              >
-                {submitting ? 'Receiving...' : 'Confirm Receipt'}
-              </button>
-            </div>
+              );
+            })}
           </div>
-        </div>
-      )}
-
-      {/* CANCEL DIALOG */}
-      {dialog === 'cancel' && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-bold text-gray-900">Cancel Transfer?</h2>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600">
-                This will cancel the transfer. The source branch will no longer see it as pending.
-              </p>
-            </div>
-            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-              <button
-                onClick={() => setDialog(null)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
-              >
-                Keep
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={submitting}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded-lg font-medium hover:bg-red-700 disabled:opacity-60"
-              >
-                {submitting ? 'Cancelling...' : 'Cancel Transfer'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReceiveOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700"
+              disabled={acting}
+              onClick={() => {
+                setReceiveOpen(false);
+                const itemsToReceive = Object.entries(receiveQtys)
+                  .filter(([, qty]) => qty > 0)
+                  .map(([itemId, received_qty]) => ({ itemId, received_qty }));
+                act(() => receiveTransfer(transfer.id, itemsToReceive));
+              }}
+            >
+              Confirm Receipt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

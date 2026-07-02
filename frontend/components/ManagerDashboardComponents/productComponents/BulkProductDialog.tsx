@@ -70,7 +70,8 @@ export function BulkProductDialog({
       getBrands(),
     ]);
 
-    if (vResult.status === 'fulfilled') setVendors(vResult.value);
+    const loadedVendors = vResult.status === 'fulfilled' ? vResult.value : [];
+    if (vResult.status === 'fulfilled') setVendors(loadedVendors);
     else if (vResult.status === 'rejected')
       console.error('Failed to load vendors:', vResult.reason);
 
@@ -81,7 +82,8 @@ export function BulkProductDialog({
     if (lResult.status === 'fulfilled') setLots(lResult.value.data || []);
     else if (lResult.status === 'rejected') console.error('Failed to load lots:', lResult.reason);
 
-    if (mResult.status === 'fulfilled') setModels(mResult.value.data || []);
+    const loadedModels = mResult.status === 'fulfilled' ? mResult.value.data || [] : [];
+    if (mResult.status === 'fulfilled') setModels(loadedModels);
     else if (mResult.status === 'rejected') console.error('Failed to load models:', mResult.reason);
 
     if (bResult.status === 'fulfilled' && bResult.value.success) setBrands(bResult.value.data);
@@ -91,6 +93,8 @@ export function BulkProductDialog({
     if (vResult.status === 'rejected' && wResult.status === 'rejected') {
       toast.error('Failed to load dependencies');
     }
+
+    return { loadedModels, loadedVendors };
   };
 
   const createEmptyRow = (): Partial<BulkProductRow> => ({
@@ -121,7 +125,7 @@ export function BulkProductDialog({
       setFile(null);
       setExpandedRows({});
       const prepareInitialData = async () => {
-        await loadDependencies();
+        const { loadedModels, loadedVendors } = await loadDependencies();
 
         if (initialLotId) {
           // Find the specific lot and pre-fill rows
@@ -135,10 +139,19 @@ export function BulkProductDialog({
               itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
             }
 
+            // Ensure lot's vendor is in the dropdown even if filtered out (e.g. inactive)
+            const vendorId = lot.vendorId || lot.vendor?.id || '';
+            if (vendorId && lot.vendor && !loadedVendors.find((v) => String(v.id) === vendorId)) {
+              setVendors([
+                ...loadedVendors,
+                { id: lot.vendor.id as unknown as number, name: lot.vendor.name },
+              ]);
+            }
+
             const newRows: Partial<BulkProductRow>[] = [];
             itemsToFill.forEach((item) => {
               const modelId = item.modelId ?? item.model?.id ?? '';
-              const model = models.find((m) => m.id === modelId);
+              const model = loadedModels.find((m: Model) => m.id === modelId);
               const brandName =
                 model?.brandRelation?.name ||
                 model?.brand?.name ||
@@ -152,10 +165,10 @@ export function BulkProductDialog({
                   model_id: modelId,
                   model_no: modelId,
                   brand: brandName,
-                  vendor_id: lot.vendorId || lot.vendor?.id || '',
+                  vendor_id: vendorId,
                   warehouse_id: lot.warehouseId || lot.warehouse_id || '',
                   purchase_price: Number(item.unitPrice) || 0,
-                  sale_price: Number(item.selling_price) || 0,
+                  sale_price: Number(item.sellingPrice) || 0,
                   name: item.customProductName || model?.model_name || '',
                   description: model?.description || '',
                 });
@@ -171,7 +184,7 @@ export function BulkProductDialog({
 
       prepareInitialData();
     }
-  }, [open, initialLotId, initialItemId, models]);
+  }, [open, initialLotId, initialItemId]);
 
   /**
    * Converts an Excel serial date number to a YYYY-MM-DD string.
@@ -551,7 +564,7 @@ export function BulkProductDialog({
                                     updateRow(
                                       i,
                                       'sale_price',
-                                      Number(item.selling_price) || row.sale_price || 0,
+                                      Number(item.sellingPrice) || row.sale_price || 0,
                                     );
                                     updateRow(
                                       i,

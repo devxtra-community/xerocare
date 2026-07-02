@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
-import { IsNull, FindOptionsWhere } from 'typeorm';
+import { IsNull, FindOptionsWhere, In } from 'typeorm';
 import {
   generateServiceQuotationPdf,
   generateServiceCompletionBillPdf,
@@ -1861,6 +1861,8 @@ export class ServiceController {
     try {
       if (!req.user) throw new Error('User not identified');
 
+      const { branchId: branchIdFilter } = req.query;
+
       const ticketRepo = Source.getRepository(ServiceTicket);
       let query = ticketRepo
         .createQueryBuilder('ticket')
@@ -1868,6 +1870,8 @@ export class ServiceController {
 
       if (req.user.role !== 'ADMIN' && req.user.branchId) {
         query = query.where('ticket.branchId = :branchId', { branchId: req.user.branchId });
+      } else if (req.user.role === 'ADMIN' && branchIdFilter && branchIdFilter !== 'ALL') {
+        query = query.where('ticket.branchId = :branchId', { branchId: branchIdFilter });
       }
 
       if (req.user.role === 'EMPLOYEE' && req.user.employeeJob === 'SERVICE_TECHNICIAN') {
@@ -1877,6 +1881,18 @@ export class ServiceController {
       }
 
       const tickets = await query.orderBy('ticket.created_at', 'DESC').getMany();
+
+      if (req.user.role === 'ADMIN' && tickets.length > 0) {
+        const branchIds = [...new Set(tickets.map((t) => t.branchId).filter(Boolean))];
+        const branchRepo = Source.getRepository(Branch);
+        const branches = await branchRepo.find({ where: { id: In(branchIds) } });
+        const branchMap = new Map(branches.map((b) => [b.id, b.name]));
+        const enriched = tickets.map((t) => ({
+          ...t,
+          branchName: branchMap.get(t.branchId) ?? '',
+        }));
+        return res.status(200).json({ success: true, data: enriched });
+      }
 
       res.status(200).json({ success: true, data: tickets });
     } catch (error) {

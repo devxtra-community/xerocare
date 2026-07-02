@@ -1,582 +1,571 @@
 'use client';
-
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { getBranches, getAllBranches, Branch } from '@/lib/branch';
+import { getWarehouses, Warehouse } from '@/lib/warehouse';
 import {
   createStockTransfer,
-  getAllBranches,
+  submitTransfer,
   TransferType,
-  TransferItemType,
+  CreateTransferPayload,
 } from '@/lib/stockTransfer';
-import { getAllSpareParts, SparePart } from '@/lib/spare-part';
-import { getAllProducts, Product } from '@/lib/product';
-import { getWarehouses, Warehouse } from '@/lib/warehouse';
+import api from '@/lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Trash2, ArrowRightLeft, ChevronRight, Package, Settings } from 'lucide-react';
 
-interface Branch {
-  id: string;
-  name: string;
-}
-
-interface DraftItem {
-  tempId: string;
-  item_type: TransferItemType;
+interface LineItem {
+  item_type: 'SPARE_PART' | 'PRODUCT';
   spare_part_id?: string;
   product_id?: string;
   requested_qty: number;
-  item_name: string;
+  unit_cost: number;
+  label: string;
+  availableQty?: number;
 }
 
-export default function AdminNewStockTransferPage() {
-  const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
+const STEPS = ['Transfer Type', 'Source', 'Destination', 'Items & Submit'];
 
-  const [transferType, setTransferType] = useState<TransferType>('INTER_BRANCH');
+export default function NewTransferPage() {
+  const router = useRouter();
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  // Step 1
+  const [transferType, setTransferType] = useState<TransferType>('INTRA_BRANCH');
+
+  // Step 2
   const [branches, setBranches] = useState<Branch[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [sourceBranchId, setSourceBranchId] = useState('');
-  const [requestingBranchId, setRequestingBranchId] = useState('');
   const [sourceWarehouseId, setSourceWarehouseId] = useState('');
+
+  // Step 3
+  const [destBranchId, setDestBranchId] = useState('');
   const [destWarehouseId, setDestWarehouseId] = useState('');
-  const [items, setItems] = useState<DraftItem[]>([]);
-  const [spareParts, setSpareParts] = useState<SparePart[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [spSearch, setSpSearch] = useState('');
-  const [productSearch, setProductSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'spare_parts' | 'products'>('spare_parts');
+
+  // Step 4
+  const [items, setItems] = useState<LineItem[]>([]);
+  const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<
+    {
+      id: string;
+      label: string;
+      type: 'SPARE_PART' | 'PRODUCT';
+      cost: number;
+      available?: number;
+    }[]
+  >([]);
+  const [searching, setSearching] = useState(false);
+  const [submitAfter, setSubmitAfter] = useState(false);
 
   useEffect(() => {
     getAllBranches()
       .then(setBranches)
-      .catch(() => toast.error('Failed to load branches'));
-    getAllSpareParts()
-      .then((r) => setSpareParts(r ?? []))
-      .catch(() => {});
-    getAllProducts({ status: 'AVAILABLE' })
-      .then((r) => setProducts(r ?? []))
-      .catch(() => {});
-    getWarehouses()
-      .then((r) => setWarehouses(r ?? []))
-      .catch(() => {});
+      .catch(() =>
+        getBranches().then((res) => setBranches(Array.isArray(res) ? res : (res.data ?? []))),
+      );
+    getWarehouses().then((res) => {
+      const arr = Array.isArray(res) ? res : (res.data ?? []);
+      setWarehouses(arr);
+    });
   }, []);
 
-  const filteredParts = spareParts.filter(
-    (p) =>
-      p.part_name.toLowerCase().includes(spSearch.toLowerCase()) ||
-      p.sku.toLowerCase().includes(spSearch.toLowerCase()),
-  );
+  const sourceWarehouses = warehouses.filter((w) => w.branchId === sourceBranchId || !w.branchId);
+  const destWarehouses = warehouses.filter((w) => {
+    if (transferType === 'INTRA_BRANCH') return w.branchId === sourceBranchId || !w.branchId;
+    return w.branchId === destBranchId || !w.branchId;
+  });
+  const destBranches =
+    transferType === 'INTRA_BRANCH'
+      ? branches.filter((b) => b.id === sourceBranchId)
+      : branches.filter((b) => b.id !== sourceBranchId);
 
-  const filteredProducts = products.filter(
-    (p) =>
-      (p.serial_no || '').toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.model?.model_name || p.name || '').toLowerCase().includes(productSearch.toLowerCase()),
-  );
-
-  const addSparePart = (part: SparePart) => {
-    if (items.some((i) => i.spare_part_id === part.id)) {
-      toast.error('Already added');
-      return;
-    }
-    setItems((prev) => [
-      ...prev,
-      {
-        tempId: crypto.randomUUID(),
-        item_type: 'SPARE_PART',
-        spare_part_id: part.id,
-        requested_qty: 1,
-        item_name: part.part_name,
-      },
-    ]);
-    setSpSearch('');
+  const canNext = () => {
+    if (step === 0) return true;
+    if (step === 1) return !!sourceBranchId && !!sourceWarehouseId;
+    if (step === 2) return !!destBranchId && !!destWarehouseId;
+    if (step === 3) return items.length > 0 && !!reason;
+    return false;
   };
 
-  const addProduct = (product: Product) => {
-    if (items.some((i) => i.product_id === product.id)) {
-      toast.error('Already added');
-      return;
-    }
-    setItems((prev) => [
-      ...prev,
-      {
-        tempId: crypto.randomUUID(),
-        item_type: 'PRODUCT',
-        product_id: product.id,
-        requested_qty: 1,
-        item_name: `${product.model?.model_name ?? product.name} (${product.serial_no})`,
-      },
-    ]);
-    setProductSearch('');
-  };
-
-  const updateQty = (tempId: string, qty: number) => {
-    setItems((prev) => prev.map((i) => (i.tempId === tempId ? { ...i, requested_qty: qty } : i)));
-  };
-
-  const removeItem = (tempId: string) => {
-    setItems((prev) => prev.filter((i) => i.tempId !== tempId));
-  };
-
-  const handleSubmit = async (asDraft: boolean) => {
-    if (transferType === 'INTER_BRANCH' && (!sourceBranchId || !requestingBranchId)) {
-      toast.error('Select both branches');
-      return;
-    }
-    if (items.length === 0) {
-      toast.error('Add at least one item');
-      return;
-    }
-    setSubmitting(true);
+  const handleSearch = async () => {
+    if (!searchQuery.trim() || !sourceWarehouseId) return;
+    setSearching(true);
     try {
-      const transfer = await createStockTransfer({
+      const [spRes, prodRes] = await Promise.allSettled([
+        api.get(`/i/spare-parts?search=${encodeURIComponent(searchQuery)}`),
+        api.get(`/i/products?search=${encodeURIComponent(searchQuery)}`),
+      ]);
+
+      const results: typeof searchResults = [];
+
+      if (spRes.status === 'fulfilled') {
+        const parts = spRes.value.data?.data ?? spRes.value.data ?? [];
+        for (const p of parts.slice(0, 5)) {
+          // get per-warehouse qty
+          let available = 0;
+          try {
+            const stockRes = await api.get(`/i/spare-parts/${p.id}/stock`);
+            const inv = (stockRes.data?.data ?? []).find(
+              (i: { warehouse_id: string; quantity: number }) =>
+                i.warehouse_id === sourceWarehouseId,
+            );
+            available = inv?.quantity ?? 0;
+          } catch {
+            // ignore
+          }
+          results.push({
+            id: p.id,
+            label: `${p.item_name} (${p.item_code})`,
+            type: 'SPARE_PART',
+            cost: p.unit_price ?? 0,
+            available,
+          });
+        }
+      }
+
+      if (prodRes.status === 'fulfilled') {
+        const prods = prodRes.value.data?.data ?? prodRes.value.data ?? [];
+        for (const p of prods
+          .filter((x: { warehouse_id: string }) => x.warehouse_id === sourceWarehouseId)
+          .slice(0, 5)) {
+          results.push({
+            id: p.id,
+            label: `${p.name} — SN: ${p.serial_no}`,
+            type: 'PRODUCT',
+            cost: p.purchase_price ?? 0,
+            available: 1,
+          });
+        }
+      }
+
+      setSearchResults(results);
+    } catch {
+      toast.error('Search failed');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const addItem = (r: (typeof searchResults)[0]) => {
+    if (items.find((i) => (i.spare_part_id ?? i.product_id) === r.id)) {
+      toast.info('Item already added');
+      return;
+    }
+    setItems((prev) => [
+      ...prev,
+      {
+        item_type: r.type,
+        spare_part_id: r.type === 'SPARE_PART' ? r.id : undefined,
+        product_id: r.type === 'PRODUCT' ? r.id : undefined,
+        requested_qty: 1,
+        unit_cost: r.cost,
+        label: r.label,
+        availableQty: r.available,
+      },
+    ]);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload: CreateTransferPayload = {
         transfer_type: transferType,
         source_branch_id: sourceBranchId,
-        requesting_branch_id: requestingBranchId || undefined,
-        source_warehouse_id: transferType === 'INTRA_BRANCH' ? sourceWarehouseId : undefined,
-        requesting_warehouse_id: transferType === 'INTRA_BRANCH' ? destWarehouseId : undefined,
+        source_warehouse_id: sourceWarehouseId,
+        destination_branch_id: destBranchId,
+        destination_warehouse_id: destWarehouseId,
+        reason,
         notes: notes || undefined,
         items: items.map((i) => ({
           item_type: i.item_type,
           spare_part_id: i.spare_part_id,
           product_id: i.product_id,
           requested_qty: i.requested_qty,
-          item_name: i.item_name,
+          unit_cost: i.unit_cost,
         })),
-      });
+      };
 
-      if (!asDraft) {
-        const { submitTransfer } = await import('@/lib/stockTransfer');
+      const transfer = await createStockTransfer(payload);
+
+      if (submitAfter) {
         await submitTransfer(transfer.id);
-        toast.success('Transfer submitted');
+        toast.success('Transfer created and submitted for approval');
       } else {
-        toast.success('Draft saved');
+        toast.success('Transfer saved as draft');
       }
-      router.push('/admin/stock-transfers');
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message ?? e?.message ?? 'Error');
+
+      router.push(`/admin/stock-transfers/${transfer.id}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create transfer';
+      toast.error(msg);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => router.back()}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">New Stock Transfer</h1>
-          <p className="text-xs text-gray-500">Step {step} of 4</p>
+    <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-bold text-primary">New Stock Transfer</h1>
         </div>
-      </div>
 
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4].map((s) => (
-          <div
-            key={s}
-            className={`h-2 w-10 rounded-full transition-colors ${s <= step ? 'bg-indigo-600' : 'bg-gray-200'}`}
-          />
-        ))}
-      </div>
-
-      {/* Step 1 — Type */}
-      {step === 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-800">Choose Transfer Type</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => setTransferType('INTER_BRANCH')}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${transferType === 'INTER_BRANCH' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
-            >
-              <ArrowRightLeft className="h-6 w-6 mb-2 text-indigo-600" />
-              <div className="font-semibold text-gray-800">Inter-Branch</div>
-              <div className="text-xs text-gray-500 mt-1">
-                Transfer between two different branches
-              </div>
-            </button>
-            <button
-              onClick={() => setTransferType('INTRA_BRANCH')}
-              className={`p-4 rounded-xl border-2 text-left transition-all ${transferType === 'INTRA_BRANCH' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'}`}
-            >
-              <ArrowRightLeft className="h-6 w-6 mb-2 text-purple-600" />
-              <div className="font-semibold text-gray-800">Intra-Branch</div>
-              <div className="text-xs text-gray-500 mt-1">
-                Move between warehouses within a branch
-              </div>
-            </button>
-          </div>
-          <button
-            onClick={() => setStep(2)}
-            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-          >
-            Continue <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Step 2 — Branch/Warehouse selection */}
-      {step === 2 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          {transferType === 'INTER_BRANCH' ? (
-            <>
-              <h2 className="text-base font-semibold text-gray-800">Select Branches</h2>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Source Branch (sending)
-                  </label>
-                  <select
-                    value={sourceBranchId}
-                    onChange={(e) => setSourceBranchId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select source branch...</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Requesting Branch (receiving)
-                  </label>
-                  <select
-                    value={requestingBranchId}
-                    onChange={(e) => setRequestingBranchId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select requesting branch...</option>
-                    {branches
-                      .filter((b) => b.id !== sourceBranchId)
-                      .map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="text-base font-semibold text-gray-800">Select Warehouses</h2>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    From Warehouse
-                  </label>
-                  <select
-                    value={sourceWarehouseId}
-                    onChange={(e) => setSourceWarehouseId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select source warehouse...</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.warehouseName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    To Warehouse
-                  </label>
-                  <select
-                    value={destWarehouseId}
-                    onChange={(e) => setDestWarehouseId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select destination warehouse...</option>
-                    {warehouses
-                      .filter((w) => w.id !== sourceWarehouseId)
-                      .map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.warehouseName}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStep(1)}
-              className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Back
-            </button>
-            <button
-              onClick={() => {
-                if (transferType === 'INTER_BRANCH' && (!sourceBranchId || !requestingBranchId)) {
-                  toast.error('Select both branches');
-                  return;
-                }
-                if (transferType === 'INTRA_BRANCH' && (!sourceWarehouseId || !destWarehouseId)) {
-                  toast.error('Select both warehouses');
-                  return;
-                }
-                setStep(3);
-              }}
-              className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-            >
-              Continue <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3 — Items */}
-      {step === 3 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-800">Add Items</h2>
-
-          {/* Tabs */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-            <button
-              onClick={() => setActiveTab('spare_parts')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'spare_parts' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <Settings className="h-3.5 w-3.5" />
-              Spare Parts
-            </button>
-            <button
-              onClick={() => setActiveTab('products')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <Package className="h-3.5 w-3.5" />
-              Products / Machines
-            </button>
-          </div>
-
-          {/* Spare Parts Search */}
-          {activeTab === 'spare_parts' && (
-            <div className="space-y-2">
-              <input
-                value={spSearch}
-                onChange={(e) => setSpSearch(e.target.value)}
-                placeholder="Search by part name or SKU..."
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              {spSearch && filteredParts.length > 0 && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto divide-y divide-gray-100">
-                  {filteredParts.slice(0, 10).map((part) => (
-                    <button
-                      key={part.id}
-                      onClick={() => addSparePart(part)}
-                      className="w-full px-3 py-2 text-left hover:bg-indigo-50 text-sm"
-                    >
-                      <div className="font-medium text-gray-800">{part.part_name}</div>
-                      <div className="text-xs text-gray-400">{part.sku}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {spSearch && filteredParts.length === 0 && (
-                <p className="text-xs text-gray-400 px-1">
-                  No spare parts found matching &ldquo;{spSearch}&rdquo;
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Products Search */}
-          {activeTab === 'products' && (
-            <div className="space-y-2">
-              <input
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="Search by model name or serial number..."
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              {productSearch && filteredProducts.length > 0 && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto divide-y divide-gray-100">
-                  {filteredProducts.slice(0, 10).map((product) => (
-                    <button
-                      key={product.id}
-                      onClick={() => addProduct(product)}
-                      className="w-full px-3 py-2 text-left hover:bg-indigo-50 text-sm"
-                    >
-                      <div className="font-medium text-gray-800">
-                        {product.model?.model_name ?? product.name}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        Serial: {product.serial_no} · {product.product_status}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {productSearch && filteredProducts.length === 0 && (
-                <p className="text-xs text-gray-400 px-1">
-                  No products found matching &ldquo;{productSearch}&rdquo;
-                </p>
-              )}
-              <p className="text-xs text-gray-400">Only AVAILABLE products shown.</p>
-            </div>
-          )}
-
-          {/* Items list */}
-          {items.length > 0 && (
-            <div className="space-y-2 mt-2">
-              <p className="text-xs font-medium text-gray-600">Items ({items.length})</p>
-              {items.map((item) => (
-                <div
-                  key={item.tempId}
-                  className="flex items-center gap-3 bg-gray-50 rounded-lg p-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-800 truncate">
-                      {item.item_name}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {item.item_type === 'SPARE_PART' ? 'Spare Part' : 'Product / Machine'}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-gray-500">Qty:</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={item.requested_qty}
-                      onChange={(e) => updateQty(item.tempId, parseInt(e.target.value) || 1)}
-                      disabled={item.item_type === 'PRODUCT'}
-                      className="w-16 border border-gray-300 rounded px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-400"
-                    />
-                  </div>
-                  <button
-                    onClick={() => removeItem(item.tempId)}
-                    className="p-1.5 hover:bg-red-100 rounded text-red-400 hover:text-red-600 shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStep(2)}
-              className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Back
-            </button>
-            <button
-              onClick={() => {
-                if (items.length === 0) {
-                  toast.error('Add at least one item');
-                  return;
-                }
-                setStep(4);
-              }}
-              className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-            >
-              Continue <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4 — Review */}
-      {step === 4 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          <h2 className="text-base font-semibold text-gray-800">Review & Submit</h2>
-
-          <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Type</span>
-              <span className="font-medium">
-                {transferType === 'INTER_BRANCH' ? 'Inter-Branch' : 'Intra-Branch'}
-              </span>
-            </div>
-            {transferType === 'INTER_BRANCH' && (
-              <>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Source Branch</span>
-                  <span className="font-medium">
-                    {branches.find((b) => b.id === sourceBranchId)?.name}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Requesting Branch</span>
-                  <span className="font-medium">
-                    {branches.find((b) => b.id === requestingBranchId)?.name}
-                  </span>
-                </div>
-              </>
-            )}
-            <div className="flex justify-between">
-              <span className="text-gray-500">Items</span>
-              <span className="font-medium">
-                {items.filter((i) => i.item_type === 'SPARE_PART').length} spare part(s),&nbsp;
-                {items.filter((i) => i.item_type === 'PRODUCT').length} product(s)
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            {items.map((item) => (
+        {/* Step indicator */}
+        <div className="flex items-center gap-1">
+          {STEPS.map((s, i) => (
+            <React.Fragment key={s}>
               <div
-                key={item.tempId}
-                className="flex justify-between text-sm bg-gray-50 rounded px-3 py-2"
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
+                  i === step
+                    ? 'bg-primary text-white'
+                    : i < step
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-white text-slate-400'
+                }`}
               >
-                <div>
-                  <span className="text-gray-700">{item.item_name}</span>
-                  <span className="ml-2 text-xs text-gray-400">
-                    {item.item_type === 'SPARE_PART' ? '(spare part)' : '(product)'}
-                  </span>
-                </div>
-                <span className="font-medium shrink-0">× {item.requested_qty}</span>
+                {i < step ? <Check className="h-3 w-3" /> : <span>{i + 1}</span>}
+                <span className="hidden sm:inline">{s}</span>
               </div>
-            ))}
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Reason, urgency, special instructions..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setStep(3)}
-              className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Back
-            </button>
-            <button
-              onClick={() => handleSubmit(true)}
-              disabled={submitting}
-              className="flex-1 border border-indigo-600 text-indigo-600 py-2.5 rounded-lg font-medium hover:bg-indigo-50 disabled:opacity-60"
-            >
-              Save Draft
-            </button>
-            <button
-              onClick={() => handleSubmit(false)}
-              disabled={submitting}
-              className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60"
-            >
-              {submitting ? 'Submitting...' : 'Submit Transfer'}
-            </button>
-          </div>
+              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-slate-200" />}
+            </React.Fragment>
+          ))}
         </div>
-      )}
+
+        {/* Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 space-y-5">
+          {/* Step 1: Transfer Type */}
+          {step === 0 && (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-slate-700">Select Transfer Type</h2>
+              <div className="grid grid-cols-2 gap-4">
+                {(['INTRA_BRANCH', 'INTER_BRANCH'] as TransferType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setTransferType(type)}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      transferType === type
+                        ? 'border-primary bg-blue-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm text-slate-800">
+                      {type === 'INTRA_BRANCH' ? 'Intra-Branch' : 'Inter-Branch'}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      {type === 'INTRA_BRANCH'
+                        ? 'Move stock between warehouses within same branch'
+                        : 'Move stock from one branch to another branch'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Source */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-slate-700">Source Location</h2>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Source Branch</Label>
+                  <Select
+                    value={sourceBranchId}
+                    onValueChange={(v) => {
+                      setSourceBranchId(v);
+                      setSourceWarehouseId('');
+                    }}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select branch..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches
+                        .filter((b) => b.status === 'ACTIVE')
+                        .map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Source Warehouse</Label>
+                  <Select
+                    value={sourceWarehouseId}
+                    onValueChange={setSourceWarehouseId}
+                    disabled={!sourceBranchId}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sourceWarehouses
+                        .filter((w) => w.status === 'ACTIVE')
+                        .map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.warehouseName}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Destination */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <h2 className="font-semibold text-slate-700">Destination Location</h2>
+              {transferType === 'INTRA_BRANCH' && (
+                <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                  Intra-branch: destination branch locked to source branch
+                </div>
+              )}
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-medium">Destination Branch</Label>
+                  <Select
+                    value={destBranchId}
+                    onValueChange={(v) => {
+                      setDestBranchId(v);
+                      setDestWarehouseId('');
+                    }}
+                    disabled={transferType === 'INTRA_BRANCH' && !!sourceBranchId}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select branch..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {destBranches
+                        .filter((b) => b.status === 'ACTIVE')
+                        .map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Destination Warehouse</Label>
+                  <Select
+                    value={destWarehouseId}
+                    onValueChange={setDestWarehouseId}
+                    disabled={!destBranchId}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {destWarehouses
+                        .filter((w) => w.status === 'ACTIVE' && w.id !== sourceWarehouseId)
+                        .map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.warehouseName}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Items */}
+          {step === 3 && (
+            <div className="space-y-5">
+              <h2 className="font-semibold text-slate-700">Items & Details</h2>
+
+              {/* Search */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Add Items</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Search by name, code, or serial number..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    className="flex-1 text-sm"
+                  />
+                  <Button variant="outline" size="sm" onClick={handleSearch} disabled={searching}>
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    {searchResults.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => addItem(r)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 text-sm hover:bg-blue-50 border-b border-slate-100 last:border-0 text-left"
+                      >
+                        <div>
+                          <span className="font-medium">{r.label}</span>
+                          <Badge
+                            className={`ml-2 text-xs border-0 ${r.type === 'PRODUCT' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}
+                          >
+                            {r.type === 'PRODUCT' ? 'Machine' : 'Spare Part'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <span>Avail: {r.available ?? '?'}</span>
+                          <Plus className="h-3.5 w-3.5 text-primary" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Item lines */}
+              {items.length > 0 && (
+                <div className="space-y-2">
+                  {items.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-slate-800 truncate">
+                          {item.label}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          Available: {item.availableQty ?? '?'}
+                        </div>
+                      </div>
+                      {item.item_type === 'SPARE_PART' && (
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs text-slate-500 shrink-0">Qty</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={item.availableQty}
+                            value={item.requested_qty}
+                            onChange={(e) => {
+                              const qty = Math.max(1, parseInt(e.target.value) || 1);
+                              setItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx ? { ...it, requested_qty: qty } : it,
+                                ),
+                              );
+                            }}
+                            className="w-20 h-8 text-sm"
+                          />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                        className="text-red-400 hover:text-red-600 p-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Reason */}
+              <div>
+                <Label className="text-sm font-medium">
+                  Reason <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  placeholder="Why is this transfer needed?"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="mt-1 text-sm resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <Label className="text-sm font-medium">Notes (optional)</Label>
+                <Textarea
+                  placeholder="Additional remarks..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="mt-1 text-sm resize-none"
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Nav buttons */}
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            onClick={() => (step === 0 ? router.back() : setStep((s) => s - 1))}
+            disabled={saving}
+          >
+            <ArrowLeft className="h-4 w-4 mr-1.5" />
+            {step === 0 ? 'Cancel' : 'Back'}
+          </Button>
+
+          {step < STEPS.length - 1 ? (
+            <Button
+              onClick={() => {
+                if (step === 2 && transferType === 'INTRA_BRANCH') {
+                  setDestBranchId(sourceBranchId);
+                }
+                setStep((s) => s + 1);
+              }}
+              disabled={!canNext()}
+            >
+              Next
+              <ArrowRight className="h-4 w-4 ml-1.5" />
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSubmitAfter(false);
+                  handleSave();
+                }}
+                disabled={!canNext() || saving}
+              >
+                Save as Draft
+              </Button>
+              <Button
+                onClick={() => {
+                  setSubmitAfter(true);
+                  handleSave();
+                }}
+                disabled={!canNext() || saving}
+              >
+                {saving ? 'Saving...' : 'Submit for Approval'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

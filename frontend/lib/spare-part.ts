@@ -3,7 +3,7 @@ import type { Model } from './model';
 
 export interface SparePart {
   id: string;
-  sku: string; // Matches backend entity
+  sku: string;
   mpn?: string;
   part_name: string;
   brand: string;
@@ -11,20 +11,47 @@ export interface SparePart {
   description?: string;
   yield?: string;
   compatible_models?: string;
+  compatible_model?: string;
   model_ids?: string[] | string;
   model_id?: string;
-  model?: Model; // Populated when joined (e.g. via lot items)
+  model?: Model;
+  models?: Model[];
   branch_id?: string;
-  base_price: number; // Decimal string or number
+  branch?: { id: string; name: string };
+  lot_id?: string;
+  lot?: { id: string; lotNumber?: string; lot_number?: string };
+  warehouse_id?: string;
+  warehouse?: { id: string; warehouseName?: string };
+  vendor_id?: string;
+  vendor?: { id: string; name?: string };
+  base_price: number;
   purchase_price?: number;
   wholesale_price?: number;
+  tax_rate?: number;
+  max_discount_amount?: number;
+  maxDiscountableAmount?: number;
+  quantity?: number;
+  reserved_quantity?: number;
+  consumed_quantity?: number;
+  damaged_quantity?: number;
+  barcode_id?: string;
   image_url?: string;
   created_at: string;
   updated_at: string;
   lotNumber?: string;
-  compatible_model?: string;
-  maxDiscountableAmount?: number;
 }
+
+export interface SparePartStock {
+  totalStock: number;
+  warehouses: { id: string; name: string; quantity: number }[];
+}
+
+export const getSparePartStock = async (id: string): Promise<SparePartStock> => {
+  const response = await api.get<{ success: boolean; data: SparePartStock }>(
+    `/i/spareparts/${id}/stock`,
+  );
+  return response.data.data;
+};
 
 interface ApiResponse<T> {
   success: boolean;

@@ -3,33 +3,27 @@ import api from './api';
 export type TransferType = 'INTRA_BRANCH' | 'INTER_BRANCH';
 export type TransferStatus =
   | 'DRAFT'
-  | 'PENDING'
-  | 'ACCEPTED'
-  | 'PARTIALLY_ACCEPTED'
-  | 'REJECTED'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
   | 'IN_TRANSIT'
   | 'RECEIVED'
+  | 'PARTIALLY_RECEIVED'
   | 'COMPLETED'
+  | 'REJECTED'
   | 'CANCELLED';
-
 export type TransferItemType = 'SPARE_PART' | 'PRODUCT';
 
-export interface TransferItem {
+export interface StockTransferItem {
   id: string;
-  transfer_id: string;
   item_type: TransferItemType;
   spare_part_id?: string;
   product_id?: string;
-  spare_part?: { id: string; part_name: string; sku: string };
-  product?: { id: string; serial_number: string; model?: { model_name: string } };
   requested_qty: number;
-  fulfilled_qty?: number;
+  dispatched_qty?: number;
   received_qty?: number;
-  source_warehouse_id?: string;
-  source_warehouse?: { id: string; warehouseName: string };
-  destination_warehouse_id?: string;
-  destination_warehouse?: { id: string; warehouseName: string };
-  item_name?: string;
+  unit_cost: number;
+  spare_part?: { id: string; item_name: string; item_code: string; barcode_id?: string };
+  product?: { id: string; name: string; serial_no: string; barcode_id?: string };
 }
 
 export interface StockTransfer {
@@ -37,160 +31,144 @@ export interface StockTransfer {
   transfer_number: string;
   transfer_type: TransferType;
   status: TransferStatus;
-  requesting_branch_id: string;
-  requesting_branch?: { id: string; name: string };
-  requesting_warehouse_id?: string;
-  requesting_warehouse?: { id: string; warehouseName: string };
   source_branch_id: string;
-  source_branch?: { id: string; name: string };
-  source_warehouse_id?: string;
-  source_warehouse?: { id: string; warehouseName: string };
+  source_warehouse_id: string;
+  destination_branch_id: string;
+  destination_warehouse_id: string;
   requested_by_id: string;
-  responded_by_id?: string;
+  approved_by_id?: string;
+  reason: string;
   notes?: string;
   rejection_reason?: string;
-  responded_at?: string;
   dispatched_at?: string;
   received_at?: string;
-  items: TransferItem[];
   created_at: string;
-  updated_at: string;
+  items?: StockTransferItem[];
+  source_branch?: { id: string; name: string };
+  destination_branch?: { id: string; name: string };
+  source_warehouse?: { id: string; warehouseName: string };
+  destination_warehouse?: { id: string; warehouseName: string };
 }
 
 export interface CreateTransferPayload {
   transfer_type: TransferType;
   source_branch_id: string;
-  requesting_branch_id?: string;
-  source_warehouse_id?: string;
-  requesting_warehouse_id?: string;
+  source_warehouse_id: string;
+  destination_branch_id: string;
+  destination_warehouse_id: string;
+  reason: string;
   notes?: string;
   items: {
     item_type: TransferItemType;
     spare_part_id?: string;
     product_id?: string;
     requested_qty: number;
-    item_name?: string;
+    unit_cost?: number;
   }[];
 }
 
-export interface RespondPayload {
-  items: {
-    itemId: string;
-    fulfilled_qty: number;
-    source_warehouse_id?: string;
-  }[];
-  rejection_reason?: string;
-}
+export const createStockTransfer = async (
+  payload: CreateTransferPayload,
+): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    '/i/stock-transfers',
+    payload,
+  );
+  return res.data.data;
+};
 
-export interface ReceivePayload {
-  destination_warehouse_id: string;
-  items: {
-    itemId: string;
-    received_qty: number;
-  }[];
-}
+export const listStockTransfers = async (filters?: {
+  status?: TransferStatus;
+  transfer_type?: TransferType;
+  dateFrom?: string;
+  dateTo?: string;
+  branch?: string;
+}): Promise<StockTransfer[]> => {
+  const res = await api.get<{ success: boolean; data: StockTransfer[] }>('/i/stock-transfers', {
+    params: filters,
+  });
+  return res.data.data;
+};
 
-// Status display helpers
+export const getStockTransfer = async (id: string): Promise<StockTransfer> => {
+  const res = await api.get<{ success: boolean; data: StockTransfer }>(`/i/stock-transfers/${id}`);
+  return res.data.data;
+};
+
+export const submitTransfer = async (id: string): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    `/i/stock-transfers/${id}/submit`,
+  );
+  return res.data.data;
+};
+
+export const approveTransfer = async (id: string): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    `/i/stock-transfers/${id}/approve`,
+  );
+  return res.data.data;
+};
+
+export const rejectTransfer = async (id: string, reason: string): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    `/i/stock-transfers/${id}/reject`,
+    { reason },
+  );
+  return res.data.data;
+};
+
+export const dispatchTransfer = async (id: string): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    `/i/stock-transfers/${id}/dispatch`,
+  );
+  return res.data.data;
+};
+
+export const receiveTransfer = async (
+  id: string,
+  items: { itemId: string; received_qty: number }[],
+): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    `/i/stock-transfers/${id}/receive`,
+    { items },
+  );
+  return res.data.data;
+};
+
+export const cancelTransfer = async (id: string): Promise<StockTransfer> => {
+  const res = await api.post<{ success: boolean; data: StockTransfer }>(
+    `/i/stock-transfers/${id}/cancel`,
+  );
+  return res.data.data;
+};
+
+export const getPendingTransferCount = async (): Promise<number> => {
+  const res = await api.get<{ success: boolean; data: { count: number } }>(
+    '/i/stock-transfers/pending-count',
+  );
+  return res.data.data.count;
+};
+
 export const STATUS_LABELS: Record<TransferStatus, string> = {
   DRAFT: 'Draft',
-  PENDING: 'Pending Response',
-  ACCEPTED: 'Accepted',
-  PARTIALLY_ACCEPTED: 'Partially Accepted',
-  REJECTED: 'Rejected',
+  PENDING_APPROVAL: 'Pending Approval',
+  APPROVED: 'Approved',
   IN_TRANSIT: 'In Transit',
   RECEIVED: 'Received',
+  PARTIALLY_RECEIVED: 'Partially Received',
   COMPLETED: 'Completed',
+  REJECTED: 'Rejected',
   CANCELLED: 'Cancelled',
 };
 
 export const STATUS_COLORS: Record<TransferStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700',
-  PENDING: 'bg-amber-100 text-amber-700',
-  ACCEPTED: 'bg-green-100 text-green-700',
-  PARTIALLY_ACCEPTED: 'bg-blue-100 text-blue-700',
-  REJECTED: 'bg-red-100 text-red-700',
+  DRAFT: 'bg-slate-100 text-slate-700',
+  PENDING_APPROVAL: 'bg-yellow-100 text-yellow-700',
+  APPROVED: 'bg-blue-100 text-blue-700',
   IN_TRANSIT: 'bg-purple-100 text-purple-700',
-  RECEIVED: 'bg-teal-100 text-teal-700',
+  RECEIVED: 'bg-green-100 text-green-700',
+  PARTIALLY_RECEIVED: 'bg-orange-100 text-orange-700',
   COMPLETED: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
+  REJECTED: 'bg-red-100 text-red-700',
+  CANCELLED: 'bg-slate-100 text-slate-500',
 };
-
-// API functions
-export async function createStockTransfer(data: CreateTransferPayload): Promise<StockTransfer> {
-  const res = await api.post('/i/stock-transfers', data);
-  return res.data.data;
-}
-
-export async function listStockTransfers(params?: {
-  status?: string;
-  transfer_type?: string;
-  search?: string;
-}): Promise<StockTransfer[]> {
-  const res = await api.get('/i/stock-transfers', { params });
-  return res.data.data;
-}
-
-export async function getStockTransfer(id: string): Promise<StockTransfer> {
-  const res = await api.get(`/i/stock-transfers/${id}`);
-  return res.data.data;
-}
-
-export async function submitTransfer(id: string): Promise<StockTransfer> {
-  const res = await api.post(`/i/stock-transfers/${id}/submit`);
-  return res.data.data;
-}
-
-export async function respondToTransfer(
-  id: string,
-  payload: RespondPayload,
-): Promise<StockTransfer> {
-  const res = await api.post(`/i/stock-transfers/${id}/respond`, payload);
-  return res.data.data;
-}
-
-export async function dispatchTransfer(id: string): Promise<StockTransfer> {
-  const res = await api.post(`/i/stock-transfers/${id}/dispatch`);
-  return res.data.data;
-}
-
-export async function receiveTransfer(id: string, payload: ReceivePayload): Promise<StockTransfer> {
-  const res = await api.post(`/i/stock-transfers/${id}/receive`, payload);
-  return res.data.data;
-}
-
-export async function cancelTransfer(id: string): Promise<StockTransfer> {
-  const res = await api.post(`/i/stock-transfers/${id}/cancel`);
-  return res.data.data;
-}
-
-export async function getPendingTransferCount(): Promise<number> {
-  const res = await api.get('/i/stock-transfers/pending-count');
-  return res.data.data.count;
-}
-
-export async function getBranchInventory(branchId: string): Promise<{
-  inventory: Array<{
-    spare_part_id: string;
-    part_name: string;
-    sku: string;
-    warehouse_id: string;
-    warehouse_name: string;
-    quantity: number;
-  }>;
-  products: Array<{
-    id: string;
-    serial_number: string;
-    model_name: string;
-    warehouse_id: string;
-    warehouse_name: string;
-    status: string;
-  }>;
-}> {
-  const res = await api.get(`/i/stock-transfers/branch-inventory/${branchId}`);
-  return res.data.data;
-}
-
-export async function getAllBranches(): Promise<{ id: string; name: string }[]> {
-  const res = await api.get('/i/branch/all');
-  return res.data.data;
-}

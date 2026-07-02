@@ -1,36 +1,35 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middlewares/authMiddleware';
-import { roleMiddleware } from '../middlewares/roleMiddleware';
 import {
   createTransfer,
+  listTransfers,
+  getTransfer,
   submitTransfer,
-  respondTransfer,
+  approveTransfer,
+  rejectTransfer,
   dispatchTransfer,
   receiveTransfer,
   cancelTransfer,
-  listTransfers,
-  getTransfer,
   getPendingCount,
-  getBranchInventoryForTransfer,
 } from '../controllers/stockTransferController';
+import { authMiddleware } from '../middlewares/authMiddleware';
+import { roleMiddleware } from '../middlewares/roleMiddleware';
 
 const router = Router();
 
-const auth = authMiddleware;
-const managerOrAdmin = roleMiddleware(['MANAGER', 'ADMIN']);
-
-// Must be before /:id
-router.get('/pending-count', auth, managerOrAdmin, getPendingCount);
-router.get('/branch-inventory/:branchId', auth, managerOrAdmin, getBranchInventoryForTransfer);
-
-router.get('/', auth, managerOrAdmin, listTransfers);
-router.post('/', auth, managerOrAdmin, createTransfer);
-
-router.get('/:id', auth, managerOrAdmin, getTransfer);
-router.post('/:id/submit', auth, managerOrAdmin, submitTransfer);
-router.post('/:id/respond', auth, managerOrAdmin, respondTransfer);
-router.post('/:id/dispatch', auth, managerOrAdmin, dispatchTransfer);
-router.post('/:id/receive', auth, managerOrAdmin, receiveTransfer);
-router.post('/:id/cancel', auth, managerOrAdmin, cancelTransfer);
+router.get('/pending-count', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), getPendingCount);
+router.get('/', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), listTransfers);
+router.get('/:id', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), getTransfer);
+router.post('/', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), createTransfer);
+router.post('/:id/submit', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), submitTransfer);
+router.post('/:id/approve', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), approveTransfer);
+router.post('/:id/reject', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), rejectTransfer);
+router.post(
+  '/:id/dispatch',
+  authMiddleware,
+  roleMiddleware(['MANAGER', 'ADMIN']),
+  dispatchTransfer,
+);
+router.post('/:id/receive', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), receiveTransfer);
+router.post('/:id/cancel', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), cancelTransfer);
 
 export default router;

@@ -7,6 +7,7 @@ import healthRouter from './routes/health';
 import { startCustomerConsumer } from './events/consumers/customerUpdatedConsumer';
 import invoiceRouter from './routes/invoiceRoutes';
 import { getAuditLogs } from './controllers/invoiceController';
+import { getProductHistory } from './controllers/productHistoryController';
 import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -378,6 +379,13 @@ app.get(
   ['/i/spareparts/:id/stock', '/i/spare-parts/:id/stock'],
   authMiddleware,
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+
+app.get(
+  '/i/products/:id/history',
+  authMiddleware,
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE),
+  getProductHistory,
 );
 
 app.use('/i', createServiceProxy(VENDOR_INVENTORY_SERVICE_URL));

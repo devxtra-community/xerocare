@@ -3,32 +3,9 @@ import { StockTransfer, TransferStatus, TransferType } from '../entities/stockTr
 import { StockTransferItem, TransferItemType } from '../entities/stockTransferItemEntity';
 import { SparePartInventory } from '../entities/sparePartInventoryEntity';
 import { Product } from '../entities/productEntity';
+import { logger } from '../config/logger';
 
-function generateTransferNumber(): string {
-  const now = new Date();
-  const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `STR-${yyyymm}-${rand}`;
-}
-
-interface ItemInput {
-  item_type: TransferItemType;
-  spare_part_id?: string;
-  product_id?: string;
-  requested_qty: number;
-  item_name?: string;
-}
-
-interface RespondItemInput {
-  itemId: string;
-  fulfilled_qty: number;
-  source_warehouse_id?: string;
-}
-
-interface ReceiveItemInput {
-  itemId: string;
-  received_qty: number;
-}
+const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://billing_service:4004';
 
 export class StockTransferService {
   private transferRepo = Source.getRepository(StockTransfer);
@@ -36,414 +13,502 @@ export class StockTransferService {
   private spInventoryRepo = Source.getRepository(SparePartInventory);
   private productRepo = Source.getRepository(Product);
 
+  private async generateTransferNumber(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `STR-${year}${month}-`;
+
+    const latest = await this.transferRepo
+      .createQueryBuilder('t')
+      .where('t.transfer_number LIKE :prefix', { prefix: `${prefix}%` })
+      .orderBy('t.transfer_number', 'DESC')
+      .getOne();
+
+    const seq = latest ? parseInt(latest.transfer_number.split('-')[2], 10) + 1 : 1;
+
+    return `${prefix}${String(seq).padStart(4, '0')}`;
+  }
+
+  private async checkProductOnActiveLease(productId: string, serialNo: string): Promise<void> {
+    try {
+      const resp = await fetch(
+        `${BILLING_SERVICE_URL}/invoices/machine/${productId}/billing-context`,
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+      if (!resp.ok) return; // billing service unavailable — allow optimistically
+
+      const data = (await resp.json()) as { contractStatus?: string; customerName?: string };
+      if (data.contractStatus === 'ACTIVE') {
+        const who = data.customerName ? ` to ${data.customerName}` : '';
+        throw new Error(
+          `Machine ${serialNo} is currently on active lease${who} — cannot be transferred.`,
+        );
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('cannot be transferred')) throw err;
+      logger.warn(`Lease check failed for product ${productId}: ${(err as Error).message}`);
+    }
+  }
+
   async createDraft(
-    payload: {
+    body: {
       transfer_type: TransferType;
       source_branch_id: string;
-      source_warehouse_id?: string;
-      requesting_warehouse_id?: string;
-      notes?: string;
-      items: ItemInput[];
-    },
-    userId: string,
-    branchId: string,
-  ): Promise<StockTransfer> {
-    const transfer = this.transferRepo.create({
-      transfer_number: generateTransferNumber(),
-      transfer_type: payload.transfer_type,
-      status: TransferStatus.DRAFT,
-      requesting_branch_id: branchId,
-      source_branch_id: payload.source_branch_id,
-      source_warehouse_id: payload.source_warehouse_id || undefined,
-      requesting_warehouse_id: payload.requesting_warehouse_id || undefined,
-      requested_by_id: userId,
-      notes: payload.notes || undefined,
-    });
-
-    const saved = await this.transferRepo.save(transfer);
-
-    const items = payload.items.map((i) =>
-      this.itemRepo.create({
-        transfer_id: saved.id,
-        item_type: i.item_type,
-        spare_part_id: i.spare_part_id || undefined,
-        product_id: i.product_id || undefined,
-        requested_qty: i.requested_qty,
-        item_name: i.item_name || undefined,
-      }),
-    );
-
-    await this.itemRepo.save(items);
-    return this.getById(saved.id);
-  }
-
-  async submit(id: string, userId: string, branchId: string, role: string): Promise<StockTransfer> {
-    const transfer = await this.getById(id);
-    if (!transfer) throw new Error('Transfer not found');
-    if (transfer.status !== TransferStatus.DRAFT)
-      throw new Error('Only DRAFT transfers can be submitted');
-
-    const isAdmin = role === 'ADMIN';
-    if (!isAdmin && transfer.requesting_branch_id !== branchId) {
-      throw new Error('Access denied');
-    }
-    if (!isAdmin && transfer.requested_by_id !== userId) {
-      throw new Error('Only the creator can submit this transfer');
-    }
-
-    if (transfer.items.length === 0) {
-      throw new Error('Add at least one item before submitting');
-    }
-
-    // Intra-branch: requesting manager handles both sides → skip to ACCEPTED
-    const newStatus =
-      transfer.transfer_type === TransferType.INTRA_BRANCH
-        ? TransferStatus.ACCEPTED
-        : TransferStatus.PENDING;
-
-    await this.transferRepo.update(id, { status: newStatus });
-    return this.getById(id);
-  }
-
-  // Source branch manager reviews and responds to PENDING request
-  async respond(
-    id: string,
-    userId: string,
-    branchId: string,
-    role: string,
-    payload: {
-      items: RespondItemInput[];
-      rejection_reason?: string;
-    },
-  ): Promise<StockTransfer> {
-    const transfer = await this.getById(id);
-    if (!transfer) throw new Error('Transfer not found');
-    if (transfer.status !== TransferStatus.PENDING) {
-      throw new Error('Only PENDING transfers can be responded to');
-    }
-
-    const isAdmin = role === 'ADMIN';
-    if (!isAdmin && transfer.source_branch_id !== branchId) {
-      throw new Error('Access denied: You are not the source branch manager');
-    }
-
-    // Full rejection
-    if (payload.rejection_reason) {
-      await this.transferRepo.update(id, {
-        status: TransferStatus.REJECTED,
-        rejection_reason: payload.rejection_reason,
-        responded_by_id: userId,
-        responded_at: new Date(),
-      });
-      return this.getById(id);
-    }
-
-    // Update fulfilled_qty and source_warehouse_id per item
-    for (const ri of payload.items) {
-      await this.itemRepo.update(ri.itemId, {
-        fulfilled_qty: ri.fulfilled_qty,
-        source_warehouse_id: ri.source_warehouse_id || undefined,
-      });
-    }
-
-    // Determine status: all fulfilled = ACCEPTED, some = PARTIALLY_ACCEPTED
-    const allFulfilled = payload.items.every((ri) => {
-      const item = transfer.items.find((i) => i.id === ri.itemId);
-      return item && ri.fulfilled_qty >= item.requested_qty;
-    });
-    const anyFulfilled = payload.items.some((ri) => ri.fulfilled_qty > 0);
-
-    let newStatus: TransferStatus;
-    if (!anyFulfilled) {
-      newStatus = TransferStatus.REJECTED;
-    } else if (allFulfilled) {
-      newStatus = TransferStatus.ACCEPTED;
-    } else {
-      newStatus = TransferStatus.PARTIALLY_ACCEPTED;
-    }
-
-    await this.transferRepo.update(id, {
-      status: newStatus,
-      responded_by_id: userId,
-      responded_at: new Date(),
-    });
-
-    return this.getById(id);
-  }
-
-  // Source branch manager dispatches the stock
-  async dispatch(
-    id: string,
-    userId: string,
-    branchId: string,
-    role: string,
-  ): Promise<StockTransfer> {
-    const transfer = await this.getById(id);
-    if (!transfer) throw new Error('Transfer not found');
-
-    const acceptableStatuses = [TransferStatus.ACCEPTED, TransferStatus.PARTIALLY_ACCEPTED];
-    if (!acceptableStatuses.includes(transfer.status)) {
-      throw new Error('Only ACCEPTED or PARTIALLY_ACCEPTED transfers can be dispatched');
-    }
-
-    const isAdmin = role === 'ADMIN';
-    // For intra-branch, the requesting manager IS the source manager (same branch)
-    const isSourceBranch = transfer.source_branch_id === branchId;
-    const isRequestingBranch = transfer.requesting_branch_id === branchId;
-    const canDispatch =
-      isAdmin ||
-      isSourceBranch ||
-      (transfer.transfer_type === TransferType.INTRA_BRANCH && isRequestingBranch);
-
-    if (!canDispatch) throw new Error('Access denied: Not the source branch');
-
-    // Deduct from source inventory
-    const itemsToSend = transfer.items.filter((i) => (i.fulfilled_qty ?? i.requested_qty) > 0);
-
-    for (const item of itemsToSend) {
-      const qty = item.fulfilled_qty ?? item.requested_qty;
-
-      if (item.item_type === TransferItemType.SPARE_PART && item.spare_part_id) {
-        const warehouseId = item.source_warehouse_id || transfer.source_warehouse_id;
-        if (!warehouseId) continue;
-
-        const inv = await this.spInventoryRepo.findOne({
-          where: { spare_part_id: item.spare_part_id, warehouse_id: warehouseId },
-        });
-        if (!inv) throw new Error(`No inventory found for spare part in selected warehouse`);
-        if (inv.quantity < qty) throw new Error(`Insufficient stock for spare part in warehouse`);
-        await this.spInventoryRepo.update(inv.id, { quantity: inv.quantity - qty });
-      }
-
-      if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
-        // Mark product as in transit — clear warehouse_id temporarily
-        await this.productRepo.update(item.product_id, {
-          warehouse_id: null,
-          transfer_status: 'IN_TRANSIT',
-        } as never);
-      }
-    }
-
-    await this.transferRepo.update(id, {
-      status: TransferStatus.IN_TRANSIT,
-      dispatched_at: new Date(),
-    });
-    return this.getById(id);
-  }
-
-  // Requesting branch manager receives the stock
-  async receive(
-    id: string,
-    userId: string,
-    branchId: string,
-    role: string,
-    payload: {
+      source_warehouse_id: string;
+      destination_branch_id: string;
       destination_warehouse_id: string;
-      items: ReceiveItemInput[];
+      reason: string;
+      notes?: string;
+      items: {
+        item_type: TransferItemType;
+        spare_part_id?: string;
+        product_id?: string;
+        requested_qty: number;
+        unit_cost?: number;
+      }[];
     },
+    requestedById: string,
   ): Promise<StockTransfer> {
-    const transfer = await this.getById(id);
-    if (!transfer) throw new Error('Transfer not found');
-    if (transfer.status !== TransferStatus.IN_TRANSIT) {
-      throw new Error('Only IN_TRANSIT transfers can be received');
+    if (
+      body.transfer_type === TransferType.INTRA_BRANCH &&
+      body.source_branch_id !== body.destination_branch_id
+    ) {
+      throw new Error('INTRA_BRANCH transfer must have same source and destination branch.');
+    }
+    if (
+      body.transfer_type === TransferType.INTER_BRANCH &&
+      body.source_branch_id === body.destination_branch_id
+    ) {
+      throw new Error('INTER_BRANCH transfer must have different source and destination branch.');
+    }
+    if (body.source_warehouse_id === body.destination_warehouse_id) {
+      throw new Error('Source and destination warehouse must differ.');
+    }
+    if (!body.items || body.items.length === 0) {
+      throw new Error('Transfer must have at least one item.');
     }
 
-    const isAdmin = role === 'ADMIN';
-    if (!isAdmin && transfer.requesting_branch_id !== branchId) {
-      throw new Error('Access denied: Not the requesting branch');
-    }
-
-    const destWarehouseId = payload.destination_warehouse_id;
-
-    for (const ri of payload.items) {
-      await this.itemRepo.update(ri.itemId, {
-        received_qty: ri.received_qty,
-        destination_warehouse_id: destWarehouseId,
-      });
-
-      const item = transfer.items.find((i) => i.id === ri.itemId);
-      if (!item || ri.received_qty === 0) continue;
-
-      if (item.item_type === TransferItemType.SPARE_PART && item.spare_part_id) {
-        // Upsert spare part inventory at destination warehouse
-        const existing = await this.spInventoryRepo.findOne({
-          where: { spare_part_id: item.spare_part_id, warehouse_id: destWarehouseId },
+    for (const item of body.items) {
+      if (item.item_type === TransferItemType.PRODUCT) {
+        if (!item.product_id) throw new Error('product_id required for PRODUCT item.');
+        const product = await this.productRepo.findOne({ where: { id: item.product_id } });
+        if (!product) throw new Error(`Product ${item.product_id} not found.`);
+        await this.checkProductOnActiveLease(product.id, product.serial_no);
+        if (product.transfer_status && product.transfer_status !== 'NONE') {
+          throw new Error(`Machine ${product.serial_no} is already committed to another transfer.`);
+        }
+        if (product.warehouse_id !== body.source_warehouse_id) {
+          throw new Error(`Machine ${product.serial_no} is not in the selected source warehouse.`);
+        }
+      } else {
+        if (!item.spare_part_id) throw new Error('spare_part_id required for SPARE_PART item.');
+        const inv = await this.spInventoryRepo.findOne({
+          where: { spare_part_id: item.spare_part_id, warehouse_id: body.source_warehouse_id },
         });
-        if (existing) {
-          await this.spInventoryRepo.update(existing.id, {
-            quantity: existing.quantity + ri.received_qty,
-          });
-        } else {
-          await this.spInventoryRepo.save(
-            this.spInventoryRepo.create({
-              spare_part_id: item.spare_part_id,
-              warehouse_id: destWarehouseId,
-              quantity: ri.received_qty,
-            }),
+        const available = inv ? inv.quantity - inv.transfer_reserved_qty : 0;
+        if (available < item.requested_qty) {
+          throw new Error(
+            `Insufficient stock for spare part ${item.spare_part_id}. Available: ${available}, Requested: ${item.requested_qty}.`,
           );
         }
       }
+    }
 
-      if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
-        // Move product to destination warehouse + mark available
-        await this.productRepo.update(item.product_id, {
-          warehouse_id: destWarehouseId,
-          transfer_status: 'NONE',
-        } as never);
+    const transferNumber = await this.generateTransferNumber();
+
+    return Source.transaction(async (manager) => {
+      const transfer = manager.create(StockTransfer, {
+        transfer_number: transferNumber,
+        transfer_type: body.transfer_type,
+        status: TransferStatus.DRAFT,
+        source_branch_id: body.source_branch_id,
+        source_warehouse_id: body.source_warehouse_id,
+        destination_branch_id: body.destination_branch_id,
+        destination_warehouse_id: body.destination_warehouse_id,
+        requested_by_id: requestedById,
+        reason: body.reason,
+        notes: body.notes,
+      });
+      const saved = await manager.save(StockTransfer, transfer);
+
+      const itemEntities = body.items.map((i) =>
+        manager.create(StockTransferItem, {
+          transfer_id: saved.id,
+          item_type: i.item_type,
+          spare_part_id: i.spare_part_id,
+          product_id: i.product_id,
+          requested_qty: i.requested_qty,
+          unit_cost: i.unit_cost ?? 0,
+        }),
+      );
+      await manager.save(StockTransferItem, itemEntities);
+
+      return manager.findOneOrFail(StockTransfer, {
+        where: { id: saved.id },
+        relations: ['items'],
+      });
+    });
+  }
+
+  async submit(id: string, userId: string, userBranchId?: string): Promise<StockTransfer> {
+    const transfer = await this.getByIdOrFail(id);
+    this.assertBranchAccess(transfer.source_branch_id, userBranchId);
+
+    if (transfer.status !== TransferStatus.DRAFT) {
+      throw new Error(`Cannot submit transfer in status ${transfer.status}.`);
+    }
+    if (transfer.transfer_type === TransferType.INTRA_BRANCH) {
+      // Intra-branch: skip approval, go straight to APPROVED and commit stock
+      return this.doApprove(transfer, userId);
+    }
+    transfer.status = TransferStatus.PENDING_APPROVAL;
+    return this.transferRepo.save(transfer);
+  }
+
+  async approve(
+    id: string,
+    userId: string,
+    userBranchId?: string,
+    role?: string,
+  ): Promise<StockTransfer> {
+    const transfer = await this.getByIdOrFail(id);
+    this.assertBranchAccess(transfer.source_branch_id, userBranchId);
+
+    if (transfer.status !== TransferStatus.PENDING_APPROVAL) {
+      throw new Error(`Cannot approve transfer in status ${transfer.status}.`);
+    }
+    // Manager cannot approve their own request — must be a different manager or Admin
+    if (role !== 'ADMIN' && transfer.requested_by_id === userId) {
+      throw new Error(
+        'Cannot approve your own transfer request. Another manager or Admin must approve.',
+      );
+    }
+    return this.doApprove(transfer, userId);
+  }
+
+  private async doApprove(transfer: StockTransfer, userId: string): Promise<StockTransfer> {
+    const items = await this.itemRepo.find({ where: { transfer_id: transfer.id } });
+
+    return Source.transaction(async (manager) => {
+      for (const item of items) {
+        if (item.item_type === TransferItemType.SPARE_PART && item.spare_part_id) {
+          const inv = await manager.findOne(SparePartInventory, {
+            where: {
+              spare_part_id: item.spare_part_id,
+              warehouse_id: transfer.source_warehouse_id,
+            },
+          });
+          if (!inv)
+            throw new Error(`Inventory record not found for spare part ${item.spare_part_id}.`);
+          const available = inv.quantity - inv.transfer_reserved_qty;
+          if (available < item.requested_qty) {
+            throw new Error(
+              `Insufficient stock for spare part ${item.spare_part_id}. Available: ${available}.`,
+            );
+          }
+          inv.transfer_reserved_qty += item.requested_qty;
+          await manager.save(SparePartInventory, inv);
+        } else if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
+          const product = await manager.findOne(Product, { where: { id: item.product_id } });
+          if (!product) throw new Error(`Product ${item.product_id} not found.`);
+          product.transfer_status = 'COMMITTED';
+          await manager.save(Product, product);
+        }
+      }
+
+      transfer.status = TransferStatus.APPROVED;
+      transfer.approved_by_id = userId;
+      return manager.save(StockTransfer, transfer);
+    });
+  }
+
+  async reject(
+    id: string,
+    userId: string,
+    reason: string,
+    userBranchId?: string,
+  ): Promise<StockTransfer> {
+    const transfer = await this.getByIdOrFail(id);
+    this.assertBranchAccess(transfer.source_branch_id, userBranchId);
+
+    if (
+      transfer.status !== TransferStatus.PENDING_APPROVAL &&
+      transfer.status !== TransferStatus.APPROVED
+    ) {
+      throw new Error(`Cannot reject transfer in status ${transfer.status}.`);
+    }
+    await this.releaseCommittedStock(transfer);
+
+    transfer.status = TransferStatus.REJECTED;
+    transfer.rejection_reason = reason;
+    return this.transferRepo.save(transfer);
+  }
+
+  async dispatch(id: string, userId: string, userBranchId?: string): Promise<StockTransfer> {
+    const transfer = await this.getByIdOrFail(id);
+    this.assertBranchAccess(transfer.source_branch_id, userBranchId);
+
+    if (transfer.status !== TransferStatus.APPROVED) {
+      throw new Error(`Cannot dispatch transfer in status ${transfer.status}.`);
+    }
+    const items = await this.itemRepo.find({ where: { transfer_id: transfer.id } });
+
+    return Source.transaction(async (manager) => {
+      for (const item of items) {
+        if (item.item_type === TransferItemType.SPARE_PART && item.spare_part_id) {
+          const inv = await manager.findOne(SparePartInventory, {
+            where: {
+              spare_part_id: item.spare_part_id,
+              warehouse_id: transfer.source_warehouse_id,
+            },
+          });
+          if (!inv) throw new Error(`Inventory not found for spare part ${item.spare_part_id}.`);
+          inv.quantity -= item.requested_qty;
+          inv.transfer_reserved_qty = Math.max(0, inv.transfer_reserved_qty - item.requested_qty);
+          await manager.save(SparePartInventory, inv);
+
+          item.dispatched_qty = item.requested_qty;
+          await manager.save(StockTransferItem, item);
+        } else if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
+          const product = await manager.findOne(Product, { where: { id: item.product_id } });
+          if (!product) throw new Error(`Product ${item.product_id} not found.`);
+          product.transfer_status = 'IN_TRANSIT';
+          await manager.save(Product, product);
+
+          item.dispatched_qty = 1;
+          await manager.save(StockTransferItem, item);
+        }
+      }
+
+      transfer.status = TransferStatus.IN_TRANSIT;
+      transfer.dispatched_at = new Date();
+      return manager.save(StockTransfer, transfer);
+    });
+  }
+
+  async receive(
+    id: string,
+    userId: string,
+    receivedItems: { itemId: string; received_qty: number }[],
+    userBranchId?: string,
+  ): Promise<StockTransfer> {
+    const transfer = await this.getByIdOrFail(id);
+    this.assertBranchAccess(transfer.destination_branch_id, userBranchId);
+
+    if (
+      transfer.status !== TransferStatus.IN_TRANSIT &&
+      transfer.status !== TransferStatus.PARTIALLY_RECEIVED
+    ) {
+      throw new Error(`Cannot receive transfer in status ${transfer.status}.`);
+    }
+    const items = await this.itemRepo.find({ where: { transfer_id: transfer.id } });
+
+    return Source.transaction(async (manager) => {
+      for (const ri of receivedItems) {
+        const item = items.find((i) => i.id === ri.itemId);
+        if (!item) throw new Error(`Transfer item ${ri.itemId} not found.`);
+
+        const prevReceived = item.received_qty ?? 0;
+        const alreadyReceived = prevReceived;
+        const dispatched = item.dispatched_qty ?? item.requested_qty;
+        const remaining = dispatched - alreadyReceived;
+
+        if (ri.received_qty > remaining) {
+          throw new Error(
+            `Cannot receive ${ri.received_qty} for item ${ri.itemId}. Remaining: ${remaining}.`,
+          );
+        }
+
+        if (item.item_type === TransferItemType.SPARE_PART && item.spare_part_id) {
+          let destInv = await manager.findOne(SparePartInventory, {
+            where: {
+              spare_part_id: item.spare_part_id,
+              warehouse_id: transfer.destination_warehouse_id,
+            },
+          });
+          if (!destInv) {
+            destInv = manager.create(SparePartInventory, {
+              spare_part_id: item.spare_part_id,
+              warehouse_id: transfer.destination_warehouse_id,
+              quantity: 0,
+              transfer_reserved_qty: 0,
+            });
+          }
+          destInv.quantity += ri.received_qty;
+          await manager.save(SparePartInventory, destInv);
+        } else if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
+          const product = await manager.findOne(Product, { where: { id: item.product_id } });
+          if (!product) throw new Error(`Product ${item.product_id} not found.`);
+          product.warehouse_id = transfer.destination_warehouse_id;
+          product.transfer_status = 'NONE';
+          await manager.save(Product, product);
+        }
+
+        item.received_qty = alreadyReceived + ri.received_qty;
+        await manager.save(StockTransferItem, item);
+      }
+
+      // Recalculate total across all items
+      const allItems = await manager.find(StockTransferItem, {
+        where: { transfer_id: transfer.id },
+      });
+      const grandDispatched = allItems.reduce(
+        (s, i) => s + (i.dispatched_qty ?? i.requested_qty),
+        0,
+      );
+      const grandReceived = allItems.reduce((s, i) => s + (i.received_qty ?? 0), 0);
+
+      if (grandReceived >= grandDispatched) {
+        transfer.status = TransferStatus.COMPLETED;
+      } else {
+        transfer.status = TransferStatus.PARTIALLY_RECEIVED;
+      }
+      transfer.received_at = new Date();
+      return manager.save(StockTransfer, transfer);
+    });
+  }
+
+  async cancel(id: string, userId: string, userBranchId?: string): Promise<StockTransfer> {
+    const transfer = await this.getByIdOrFail(id);
+
+    const cancellableStatuses = [
+      TransferStatus.DRAFT,
+      TransferStatus.PENDING_APPROVAL,
+      TransferStatus.APPROVED,
+    ];
+    if (!cancellableStatuses.includes(transfer.status)) {
+      throw new Error(`Cannot cancel transfer in status ${transfer.status}.`);
+    }
+    if (userBranchId) {
+      const isSourceOrDest =
+        transfer.source_branch_id === userBranchId ||
+        transfer.destination_branch_id === userBranchId;
+      if (!isSourceOrDest) {
+        throw new Error('Access denied: not your branch transfer.');
       }
     }
 
-    // Update transfer with destination warehouse
-    await this.transferRepo.update(id, {
-      status: TransferStatus.RECEIVED,
-      requesting_warehouse_id: destWarehouseId,
-      received_at: new Date(),
+    if (transfer.status === TransferStatus.APPROVED) {
+      await this.releaseCommittedStock(transfer);
+    }
+
+    transfer.status = TransferStatus.CANCELLED;
+    return this.transferRepo.save(transfer);
+  }
+
+  private async releaseCommittedStock(transfer: StockTransfer): Promise<void> {
+    const items = await this.itemRepo.find({ where: { transfer_id: transfer.id } });
+
+    await Source.transaction(async (manager) => {
+      for (const item of items) {
+        if (item.item_type === TransferItemType.SPARE_PART && item.spare_part_id) {
+          const inv = await manager.findOne(SparePartInventory, {
+            where: {
+              spare_part_id: item.spare_part_id,
+              warehouse_id: transfer.source_warehouse_id,
+            },
+          });
+          if (inv) {
+            inv.transfer_reserved_qty = Math.max(0, inv.transfer_reserved_qty - item.requested_qty);
+            await manager.save(SparePartInventory, inv);
+          }
+        } else if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
+          const product = await manager.findOne(Product, { where: { id: item.product_id } });
+          if (product) {
+            product.transfer_status = 'NONE';
+            await manager.save(Product, product);
+          }
+        }
+      }
     });
-
-    return this.getById(id);
   }
 
-  async cancel(id: string, userId: string, branchId: string, role: string): Promise<StockTransfer> {
-    const transfer = await this.getById(id);
-    if (!transfer) throw new Error('Transfer not found');
-
-    const cancellable = [TransferStatus.DRAFT, TransferStatus.PENDING];
-    if (!cancellable.includes(transfer.status)) {
-      throw new Error('Only DRAFT or PENDING transfers can be cancelled');
-    }
-
-    const isAdmin = role === 'ADMIN';
-    if (
-      !isAdmin &&
-      transfer.requesting_branch_id !== branchId &&
-      transfer.source_branch_id !== branchId
-    ) {
-      throw new Error('Access denied');
-    }
-
-    await this.transferRepo.update(id, { status: TransferStatus.CANCELLED });
-    return this.getById(id);
-  }
-
-  async list(
-    userId: string,
-    branchId: string | undefined,
-    role: string,
-    filters: { status?: string; transfer_type?: string; search?: string },
-  ): Promise<StockTransfer[]> {
+  async list(filters: {
+    branchId?: string;
+    status?: TransferStatus;
+    transfer_type?: TransferType;
+    dateFrom?: string;
+    dateTo?: string;
+    role?: string;
+  }): Promise<StockTransfer[]> {
     const qb = this.transferRepo
       .createQueryBuilder('t')
-      .leftJoinAndSelect('t.requesting_branch', 'rb')
       .leftJoinAndSelect('t.source_branch', 'sb')
-      .leftJoinAndSelect('t.requesting_warehouse', 'rw')
+      .leftJoinAndSelect('t.destination_branch', 'db')
       .leftJoinAndSelect('t.source_warehouse', 'sw')
-      .leftJoinAndSelect('t.items', 'items')
-      .leftJoinAndSelect('items.spare_part', 'sp')
-      .leftJoinAndSelect('items.product', 'pr')
-      .leftJoinAndSelect('items.source_warehouse', 'isw')
-      .leftJoinAndSelect('items.destination_warehouse', 'idw')
+      .leftJoinAndSelect('t.destination_warehouse', 'dw')
       .orderBy('t.created_at', 'DESC');
 
-    // Non-admin: see transfers where their branch is either side
-    if (role !== 'ADMIN' && branchId) {
-      qb.where('t.requesting_branch_id = :branchId OR t.source_branch_id = :branchId', {
-        branchId,
+    if (filters.branchId && filters.role !== 'ADMIN') {
+      qb.andWhere('(t.source_branch_id = :bid OR t.destination_branch_id = :bid)', {
+        bid: filters.branchId,
       });
     }
-
     if (filters.status) {
       qb.andWhere('t.status = :status', { status: filters.status });
     }
     if (filters.transfer_type) {
-      qb.andWhere('t.transfer_type = :transfer_type', { transfer_type: filters.transfer_type });
+      qb.andWhere('t.transfer_type = :tt', { tt: filters.transfer_type });
     }
-    if (filters.search) {
-      qb.andWhere('t.transfer_number ILIKE :search', { search: `%${filters.search}%` });
+    if (filters.dateFrom) {
+      qb.andWhere('t.created_at >= :from', { from: filters.dateFrom });
+    }
+    if (filters.dateTo) {
+      qb.andWhere('t.created_at <= :to', { to: filters.dateTo });
     }
 
     return qb.getMany();
   }
 
-  async getById(id: string): Promise<StockTransfer> {
-    const transfer = await this.transferRepo
-      .createQueryBuilder('t')
-      .leftJoinAndSelect('t.requesting_branch', 'rb')
-      .leftJoinAndSelect('t.source_branch', 'sb')
-      .leftJoinAndSelect('t.requesting_warehouse', 'rw')
-      .leftJoinAndSelect('t.source_warehouse', 'sw')
-      .leftJoinAndSelect('t.items', 'items')
-      .leftJoinAndSelect('items.spare_part', 'sp')
-      .leftJoinAndSelect('items.product', 'pr')
-      .leftJoinAndSelect('items.source_warehouse', 'isw')
-      .leftJoinAndSelect('items.destination_warehouse', 'idw')
-      .where('t.id = :id', { id })
-      .getOne();
+  async getById(id: string): Promise<StockTransfer | null> {
+    return this.transferRepo.findOne({
+      where: { id },
+      relations: [
+        'items',
+        'items.spare_part',
+        'items.product',
+        'source_branch',
+        'destination_branch',
+        'source_warehouse',
+        'destination_warehouse',
+      ],
+    });
+  }
 
-    if (!transfer) throw new Error('Transfer not found');
+  async getPendingCount(branchId: string, role: string): Promise<number> {
+    const qb = this.transferRepo.createQueryBuilder('t');
+
+    if (role === 'ADMIN') {
+      qb.where('t.status IN (:...statuses)', {
+        statuses: [TransferStatus.PENDING_APPROVAL, TransferStatus.IN_TRANSIT],
+      });
+    } else {
+      qb.where(
+        `(
+          (t.source_branch_id = :bid AND t.status = :approved) OR
+          (t.destination_branch_id = :bid AND t.status IN (:...inboundStatuses))
+        )`,
+        {
+          bid: branchId,
+          approved: TransferStatus.PENDING_APPROVAL,
+          inboundStatuses: [TransferStatus.IN_TRANSIT, TransferStatus.PARTIALLY_RECEIVED],
+        },
+      );
+    }
+    return qb.getCount();
+  }
+
+  private async getByIdOrFail(id: string): Promise<StockTransfer> {
+    const transfer = await this.transferRepo.findOne({ where: { id } });
+    if (!transfer) throw new Error(`Transfer ${id} not found.`);
     return transfer;
   }
 
-  // Count of transfers needing attention for a given branch
-  async getPendingCount(branchId: string | undefined, role: string): Promise<number> {
-    if (role === 'ADMIN') {
-      return this.transferRepo.count({ where: { status: TransferStatus.PENDING } });
+  private assertBranchAccess(transferBranchId: string, userBranchId?: string): void {
+    if (!userBranchId) return; // ADMIN has no branchId — always allowed
+    if (transferBranchId !== userBranchId) {
+      throw new Error('Access denied: not your branch transfer.');
     }
-    if (!branchId) return 0;
-    // Source branch: PENDING requests they need to respond to
-    const pendingForSource = await this.transferRepo.count({
-      where: { source_branch_id: branchId, status: TransferStatus.PENDING },
-    });
-    // Requesting branch: IN_TRANSIT items ready to receive
-    const inTransitForDest = await this.transferRepo.count({
-      where: { requesting_branch_id: branchId, status: TransferStatus.IN_TRANSIT },
-    });
-    return pendingForSource + inTransitForDest;
-  }
-
-  // Get branch inventory for all warehouses in a branch (for source manager's respond view)
-  async getBranchInventory(branchId: string): Promise<Record<string, unknown>[]> {
-    const result = await Source.query(
-      `
-      SELECT
-        sp.id AS spare_part_id,
-        sp.part_name,
-        sp.item_code AS sku,
-        w.id AS warehouse_id,
-        w.warehouse_name,
-        spi.quantity
-      FROM spare_part_inventories spi
-      JOIN spare_parts sp ON sp.id = spi.spare_part_id
-      JOIN warehouses w ON w.id = spi.warehouse_id
-      WHERE w.branch_id = $1 AND spi.quantity > 0
-      ORDER BY sp.part_name, w.warehouse_name
-    `,
-      [branchId],
-    );
-    return result;
-  }
-
-  // Get products available in a branch (for source manager's respond view)
-  async getBranchProducts(branchId: string): Promise<Record<string, unknown>[]> {
-    const result = await Source.query(
-      `
-      SELECT
-        p.id,
-        p.serial_number,
-        p.model_id,
-        m.model_name,
-        w.id AS warehouse_id,
-        w.warehouse_name,
-        p.status
-      FROM products p
-      JOIN warehouses w ON w.id = p.warehouse_id
-      JOIN models m ON m.id = p.model_id
-      WHERE w.branch_id = $1 AND p.status = 'AVAILABLE'
-      ORDER BY m.model_name, p.serial_number
-    `,
-      [branchId],
-    );
-    return result;
   }
 }
-
-export const stockTransferService = new StockTransferService();

@@ -19,12 +19,21 @@ import {
   Hash,
   Eye,
   X,
+  History,
+  Boxes,
+  Wrench,
+  TrendingUp,
+  LogIn,
+  LogOut,
+  RefreshCw,
 } from 'lucide-react';
 import Image from 'next/image';
 import { getProductById, Product as BaseProduct } from '@/lib/product';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import Barcode from 'react-barcode';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getProductHistory, ProductHistoryResponse, HistoryEvent } from '@/lib/productHistory';
 
 interface ProductFeature {
   subHeading: string;
@@ -66,6 +75,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [history, setHistory] = useState<ProductHistoryResponse | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -88,6 +99,19 @@ export default function ProductDetailPage() {
       fetchProduct();
     }
   }, [id]);
+
+  const fetchHistory = async () => {
+    if (history || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const data = await getProductHistory(id);
+      setHistory(data);
+    } catch {
+      toast.error('Failed to load lifecycle history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -168,243 +192,280 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* DETAILED INFO GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Image, Price, Barcode */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Image Container */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col items-center">
-            <div className="aspect-square relative w-full rounded-xl border border-slate-100 bg-slate-50/50 overflow-hidden flex items-center justify-center group">
-              {product.imageUrl ? (
-                <>
-                  <Image
-                    src={product.imageUrl}
-                    alt={product.name}
-                    fill
-                    className="object-contain p-4"
-                    unoptimized
-                  />
-                  <div
-                    className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                    onClick={() => setPreviewImage(product.imageUrl || null)}
-                  >
-                    <Eye size={20} className="text-white" />
+      <Tabs defaultValue="details" className="w-full">
+        <TabsList className="bg-white/50 border border-blue-100/50 p-1 h-11 w-max mb-2">
+          <TabsTrigger
+            value="details"
+            className="px-5 data-[state=active]:bg-primary data-[state=active]:text-white text-xs font-bold uppercase transition-all"
+          >
+            <Package className="h-3.5 w-3.5 mr-1.5" />
+            Details
+          </TabsTrigger>
+          <TabsTrigger
+            value="lifecycle"
+            className="px-5 data-[state=active]:bg-primary data-[state=active]:text-white text-xs font-bold uppercase transition-all"
+            onClick={fetchHistory}
+          >
+            <History className="h-3.5 w-3.5 mr-1.5" />
+            Lifecycle
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="lifecycle" className="focus-visible:outline-none focus-visible:ring-0">
+          <LifecycleTab history={history} loading={historyLoading} />
+        </TabsContent>
+
+        <TabsContent value="details" className="focus-visible:outline-none focus-visible:ring-0">
+          {/* DETAILED INFO GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column: Image, Price, Barcode */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Image Container */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col items-center">
+                <div className="aspect-square relative w-full rounded-xl border border-slate-100 bg-slate-50/50 overflow-hidden flex items-center justify-center group">
+                  {product.imageUrl ? (
+                    <>
+                      <Image
+                        src={product.imageUrl}
+                        alt={product.name}
+                        fill
+                        className="object-contain p-4"
+                        unoptimized
+                      />
+                      <div
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+                        onClick={() => setPreviewImage(product.imageUrl || null)}
+                      >
+                        <Eye size={20} className="text-white" />
+                      </div>
+                    </>
+                  ) : (
+                    <Package size={64} className="text-slate-300" />
+                  )}
+                </div>
+              </div>
+
+              {/* Pricing Card */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
+                  Pricing Details
+                </h4>
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+                  <p className="text-[10px] font-semibold text-blue-600 tracking-wider uppercase mb-1">
+                    Selling Price
+                  </p>
+                  <p className="text-3xl font-extrabold text-blue-800">
+                    {formatCurrency(product.sale_price)}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
+                      Wholesale Price
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {formatCurrency(product.wholesale_price || 0)}
+                    </p>
                   </div>
-                </>
-              ) : (
-                <Package size={64} className="text-slate-300" />
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
+                      Tax Rate
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">{product.tax_rate}%</p>
+                  </div>
+                </div>
+                {product.purchase_price && (
+                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
+                      Purchase Price
+                    </p>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {formatCurrency(product.purchase_price)}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Barcode Card */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col items-center">
+                <div className="flex justify-between items-center w-full mb-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Product Barcode
+                  </h4>
+                  <button
+                    onClick={() =>
+                      handleCopy(product.barcode_id || `XC-P-${product.serial_no}`, 'Barcode ID')
+                    }
+                    className="text-slate-400 hover:text-primary p-1 rounded hover:bg-slate-50 transition-colors"
+                  >
+                    {copiedField === 'Barcode ID' ? (
+                      <Check size={14} className="text-green-500" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 flex items-center justify-center w-full shadow-inner">
+                  <Barcode
+                    value={product.barcode_id || `XC-P-${product.serial_no}`}
+                    width={1.6}
+                    height={55}
+                    fontSize={12}
+                    margin={5}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Spec Sheet, Desc, Features, Consumables */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Specifications Sheet */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-6 pb-3 border-b border-slate-100">
+                  <Info size={16} className="text-primary" /> Technical Specifications
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                  <SpecRow icon={<Package size={16} />} label="Product Name" value={product.name} />
+                  <SpecRow icon={<Hash size={16} />} label="Brand" value={product.brand} />
+                  <SpecRow
+                    icon={<Info size={16} />}
+                    label="Model"
+                    value={
+                      product.model
+                        ? `${product.model.model_no}${
+                            product.model.model_name || product.model.modelName
+                              ? ` - ${product.model.model_name || product.model.modelName}`
+                              : ''
+                          }`
+                        : product.model_id || '—'
+                    }
+                  />
+                  <SpecRow
+                    icon={<Calendar size={16} />}
+                    label="Manufacturing Date (MFD)"
+                    value={mfdDate}
+                  />
+                  <SpecRow
+                    icon={<Warehouse size={16} />}
+                    label="Warehouse"
+                    value={
+                      product.warehouse_name ||
+                      product.warehouse?.warehouseName ||
+                      product.warehouse?.warehouse_name ||
+                      '—'
+                    }
+                  />
+                  <SpecRow
+                    icon={<Truck size={16} />}
+                    label="Vendor"
+                    value={
+                      product.vendor_name ||
+                      product.vendor?.name ||
+                      product.vendor?.vendor_name ||
+                      '—'
+                    }
+                  />
+                  <SpecRow
+                    icon={<Hash size={16} />}
+                    label="Lot ID"
+                    value={product.lot?.lotNumber || product.lot?.lot_number || '—'}
+                    hasCopy
+                    onCopy={() =>
+                      handleCopy(product.lot?.lotNumber || product.lot?.lot_number || '', 'Lot ID')
+                    }
+                    copied={copiedField === 'Lot ID'}
+                  />
+                  <SpecRow
+                    icon={<Hash size={16} />}
+                    label="Serial Number"
+                    value={product.serial_no}
+                    hasCopy
+                    onCopy={() => handleCopy(product.serial_no, 'Serial Number')}
+                    copied={copiedField === 'Serial Number'}
+                  />
+                </div>
+              </div>
+
+              {/* Description */}
+              {product.description && (
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <FileText size={16} className="text-slate-400" /> Description
+                  </h4>
+                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed shadow-inner">
+                    {product.description}
+                  </div>
+                </div>
+              )}
+
+              {/* Key Features */}
+              {product.features && product.features.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                  <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <List size={16} className="text-emerald-500" /> Key Features
+                  </h4>
+                  <div className="bg-emerald-50/20 p-5 rounded-xl border border-emerald-100/50 space-y-4">
+                    {product.features.map((f: ProductFeature, i: number) => (
+                      <div key={i} className="group">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                            {f.subHeading}
+                          </p>
+                        </div>
+                        <p className="text-sm text-slate-600 leading-relaxed pl-3.5">
+                          {f.description}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Replacement Consumables */}
+              {product.consumables && product.consumables.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <Layers size={16} className="text-slate-400" /> Replacement Consumables
+                  </h4>
+                  <div className="overflow-hidden border border-slate-200/60 rounded-xl shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 font-bold uppercase tracking-wider">
+                            Part Number
+                          </th>
+                          <th className="px-4 py-3 font-bold uppercase tracking-wider">
+                            Description
+                          </th>
+                          <th className="px-4 py-3 font-bold uppercase tracking-wider">Yield</th>
+                          <th className="px-4 py-3 font-bold uppercase tracking-wider text-right">
+                            Price
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {product.consumables.map((c: ProductConsumable, i: number) => (
+                          <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 font-semibold text-slate-800">
+                              {c.partName || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600">{c.description || '—'}</td>
+                            <td className="px-4 py-3 text-slate-600">{c.yield || '—'}</td>
+                            <td className="px-4 py-3 font-bold text-primary text-right">
+                              {formatCurrency(Number(c.price || 0))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               )}
             </div>
           </div>
-
-          {/* Pricing Card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-2">
-              Pricing Details
-            </h4>
-            <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
-              <p className="text-[10px] font-semibold text-blue-600 tracking-wider uppercase mb-1">
-                Selling Price
-              </p>
-              <p className="text-3xl font-extrabold text-blue-800">
-                {formatCurrency(product.sale_price)}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
-                  Wholesale Price
-                </p>
-                <p className="text-sm font-semibold text-slate-700">
-                  {formatCurrency(product.wholesale_price || 0)}
-                </p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">Tax Rate</p>
-                <p className="text-sm font-semibold text-slate-700">{product.tax_rate}%</p>
-              </div>
-            </div>
-            {product.purchase_price && (
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                <p className="text-[9px] font-semibold text-slate-400 uppercase mb-0.5">
-                  Purchase Price
-                </p>
-                <p className="text-sm font-semibold text-slate-700">
-                  {formatCurrency(product.purchase_price)}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Barcode Card */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col items-center">
-            <div className="flex justify-between items-center w-full mb-3">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Product Barcode
-              </h4>
-              <button
-                onClick={() =>
-                  handleCopy(product.barcode_id || `XC-P-${product.serial_no}`, 'Barcode ID')
-                }
-                className="text-slate-400 hover:text-primary p-1 rounded hover:bg-slate-50 transition-colors"
-              >
-                {copiedField === 'Barcode ID' ? (
-                  <Check size={14} className="text-green-500" />
-                ) : (
-                  <Copy size={14} />
-                )}
-              </button>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/50 flex items-center justify-center w-full shadow-inner">
-              <Barcode
-                value={product.barcode_id || `XC-P-${product.serial_no}`}
-                width={1.6}
-                height={55}
-                fontSize={12}
-                margin={5}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Spec Sheet, Desc, Features, Consumables */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Specifications Sheet */}
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-6 pb-3 border-b border-slate-100">
-              <Info size={16} className="text-primary" /> Technical Specifications
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-              <SpecRow icon={<Package size={16} />} label="Product Name" value={product.name} />
-              <SpecRow icon={<Hash size={16} />} label="Brand" value={product.brand} />
-              <SpecRow
-                icon={<Info size={16} />}
-                label="Model"
-                value={
-                  product.model
-                    ? `${product.model.model_no}${
-                        product.model.model_name || product.model.modelName
-                          ? ` - ${product.model.model_name || product.model.modelName}`
-                          : ''
-                      }`
-                    : product.model_id || '—'
-                }
-              />
-              <SpecRow
-                icon={<Calendar size={16} />}
-                label="Manufacturing Date (MFD)"
-                value={mfdDate}
-              />
-              <SpecRow
-                icon={<Warehouse size={16} />}
-                label="Warehouse"
-                value={
-                  product.warehouse_name ||
-                  product.warehouse?.warehouseName ||
-                  product.warehouse?.warehouse_name ||
-                  '—'
-                }
-              />
-              <SpecRow
-                icon={<Truck size={16} />}
-                label="Vendor"
-                value={
-                  product.vendor_name || product.vendor?.name || product.vendor?.vendor_name || '—'
-                }
-              />
-              <SpecRow
-                icon={<Hash size={16} />}
-                label="Lot ID"
-                value={product.lot?.lotNumber || product.lot?.lot_number || '—'}
-                hasCopy
-                onCopy={() =>
-                  handleCopy(product.lot?.lotNumber || product.lot?.lot_number || '', 'Lot ID')
-                }
-                copied={copiedField === 'Lot ID'}
-              />
-              <SpecRow
-                icon={<Hash size={16} />}
-                label="Serial Number"
-                value={product.serial_no}
-                hasCopy
-                onCopy={() => handleCopy(product.serial_no, 'Serial Number')}
-                copied={copiedField === 'Serial Number'}
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          {product.description && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <FileText size={16} className="text-slate-400" /> Description
-              </h4>
-              <div className="bg-slate-50 p-5 rounded-xl border border-slate-100 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed shadow-inner">
-                {product.description}
-              </div>
-            </div>
-          )}
-
-          {/* Key Features */}
-          {product.features && product.features.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <List size={16} className="text-emerald-500" /> Key Features
-              </h4>
-              <div className="bg-emerald-50/20 p-5 rounded-xl border border-emerald-100/50 space-y-4">
-                {product.features.map((f: ProductFeature, i: number) => (
-                  <div key={i} className="group">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
-                        {f.subHeading}
-                      </p>
-                    </div>
-                    <p className="text-sm text-slate-600 leading-relaxed pl-3.5">{f.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Replacement Consumables */}
-          {product.consumables && product.consumables.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
-                <Layers size={16} className="text-slate-400" /> Replacement Consumables
-              </h4>
-              <div className="overflow-hidden border border-slate-200/60 rounded-xl shadow-sm">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3 font-bold uppercase tracking-wider">Part Number</th>
-                      <th className="px-4 py-3 font-bold uppercase tracking-wider">Description</th>
-                      <th className="px-4 py-3 font-bold uppercase tracking-wider">Yield</th>
-                      <th className="px-4 py-3 font-bold uppercase tracking-wider text-right">
-                        Price
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {product.consumables.map((c: ProductConsumable, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-800">
-                          {c.partName || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{c.description || '—'}</td>
-                        <td className="px-4 py-3 text-slate-600">{c.yield || '—'}</td>
-                        <td className="px-4 py-3 font-bold text-primary text-right">
-                          {formatCurrency(Number(c.price || 0))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Image Preview Overlay Modal */}
       {previewImage && (
@@ -465,6 +526,243 @@ function SpecRow({
         >
           {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
         </button>
+      )}
+    </div>
+  );
+}
+
+function eventIcon(type: string) {
+  switch (type) {
+    case 'RECEIVED':
+      return <Boxes size={16} className="text-emerald-600" />;
+    case 'ALLOCATED':
+      return <LogIn size={16} className="text-blue-600" />;
+    case 'DEALLOCATED':
+      return <LogOut size={16} className="text-slate-500" />;
+    case 'REPLACED':
+      return <RefreshCw size={16} className="text-orange-500" />;
+    case 'SERVICE_TICKET':
+      return <Wrench size={16} className="text-red-500" />;
+    case 'USAGE_RECORD':
+      return <TrendingUp size={16} className="text-violet-500" />;
+    default:
+      return <Info size={16} className="text-slate-400" />;
+  }
+}
+
+function eventColor(type: string) {
+  switch (type) {
+    case 'RECEIVED':
+      return 'border-emerald-300 bg-emerald-50';
+    case 'ALLOCATED':
+      return 'border-blue-300 bg-blue-50';
+    case 'DEALLOCATED':
+      return 'border-slate-300 bg-slate-50';
+    case 'REPLACED':
+      return 'border-orange-300 bg-orange-50';
+    case 'SERVICE_TICKET':
+      return 'border-red-300 bg-red-50';
+    case 'USAGE_RECORD':
+      return 'border-violet-300 bg-violet-50';
+    default:
+      return 'border-slate-200 bg-white';
+  }
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function EventCard({ event }: { event: HistoryEvent }) {
+  const d = event.data;
+  return (
+    <div className={`rounded-xl border p-4 shadow-sm ${eventColor(event.type)}`}>
+      <div className="flex items-center gap-2 mb-2">
+        {eventIcon(event.type)}
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+          {event.type.replace('_', ' ')}
+        </span>
+        <span className="ml-auto text-xs text-slate-400">{formatDate(event.timestamp)}</span>
+      </div>
+      <div className="text-xs text-slate-700 space-y-0.5">
+        {event.type === 'RECEIVED' && (
+          <>
+            {d.lotNumber && (
+              <p>
+                Lot: <span className="font-semibold">{String(d.lotNumber)}</span>
+              </p>
+            )}
+            {d.vendor && (
+              <p>
+                Vendor: <span className="font-semibold">{String(d.vendor)}</span>
+              </p>
+            )}
+            {d.warehouse && (
+              <p>
+                Warehouse: <span className="font-semibold">{String(d.warehouse)}</span>
+              </p>
+            )}
+          </>
+        )}
+        {(event.type === 'ALLOCATED' ||
+          event.type === 'DEALLOCATED' ||
+          event.type === 'REPLACED') && (
+          <>
+            {d.invoiceNumber && (
+              <p>
+                Contract: <span className="font-semibold">{String(d.invoiceNumber)}</span>
+              </p>
+            )}
+            {d.billType && (
+              <p>
+                Type: <span className="font-semibold">{String(d.billType)}</span>
+              </p>
+            )}
+            {d.reason && (
+              <p>
+                Reason: <span className="font-semibold">{String(d.reason)}</span>
+              </p>
+            )}
+          </>
+        )}
+        {event.type === 'SERVICE_TICKET' && (
+          <>
+            <p>
+              Ticket: <span className="font-semibold">{String(d.ticketNumber || '—')}</span>
+            </p>
+            <p>
+              Issue: <span className="font-semibold">{String(d.issueDescription || '—')}</span>
+            </p>
+            <p>
+              Status: <span className="font-semibold">{String(d.status || '—')}</span>
+            </p>
+            {d.completedAt && (
+              <p>
+                Completed:{' '}
+                <span className="font-semibold">{formatDate(String(d.completedAt))}</span>
+              </p>
+            )}
+          </>
+        )}
+        {event.type === 'USAGE_RECORD' && (
+          <>
+            <p>
+              Period:{' '}
+              <span className="font-semibold">
+                {formatDate(String(d.billingPeriodStart))} —{' '}
+                {formatDate(String(d.billingPeriodEnd))}
+              </span>
+            </p>
+            <p>
+              B&W copies:{' '}
+              <span className="font-semibold">{Number(d.bwCopies || 0).toLocaleString()}</span>
+            </p>
+            {Number(d.colorCopies) > 0 && (
+              <p>
+                Colour copies:{' '}
+                <span className="font-semibold">{Number(d.colorCopies).toLocaleString()}</span>
+              </p>
+            )}
+            <p>
+              Charge:{' '}
+              <span className="font-semibold">
+                {Number(d.totalCharge || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LifecycleTab({
+  history,
+  loading,
+}: {
+  history: ProductHistoryResponse | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-slate-400">Loading lifecycle history…</p>
+      </div>
+    );
+  }
+
+  if (!history) return null;
+
+  const mh = history.machineHistory;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary card */}
+      {mh && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: 'Service Visits', value: mh.totalServiceVisits },
+            { label: 'PM Visits', value: mh.totalPreventativeVisits },
+            {
+              label: 'Last Service',
+              value: mh.lastServiceDate ? formatDate(mh.lastServiceDate) : '—',
+            },
+            {
+              label: 'Parts Spend',
+              value: Number(mh.totalPartsSpend).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+              }),
+            },
+            {
+              label: 'Labour Spend',
+              value: Number(mh.totalLabourSpend).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+              }),
+            },
+            {
+              label: 'Lifetime Cost',
+              value: Number(mh.totalLifetimeCost).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+              }),
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm"
+            >
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                {stat.label}
+              </p>
+              <p className="text-sm font-bold text-slate-800">{String(stat.value)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Timeline */}
+      {history.events.length === 0 ? (
+        <div className="text-center py-16 text-slate-400 text-sm">
+          No lifecycle events recorded yet.
+        </div>
+      ) : (
+        <div className="relative">
+          <div className="absolute left-4 top-0 bottom-0 w-px bg-slate-200" />
+          <div className="space-y-4 pl-10">
+            {history.events.map((event, i) => (
+              <div key={i} className="relative">
+                <div className="absolute -left-6 top-4 w-4 h-4 rounded-full bg-white border-2 border-slate-300 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                </div>
+                <EventCard event={event} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

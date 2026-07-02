@@ -23,6 +23,8 @@ import {
   Globe,
   FileBarChart,
   ArrowRightLeft,
+  Bell,
+  Wrench,
 } from 'lucide-react';
 
 import {
@@ -133,6 +135,27 @@ const menuItems = [
         href: '/admin/stock-transfers',
       },
     ],
+  },
+  {
+    title: 'Service',
+    icon: Wrench,
+    subItems: [
+      {
+        title: 'Tickets',
+        icon: FileText,
+        href: '/admin/service',
+      },
+      {
+        title: 'Contracts',
+        icon: FileText,
+        href: '/admin/service/contracts',
+      },
+    ],
+  },
+  {
+    title: 'Notifications',
+    icon: Bell,
+    href: '/admin/notifications',
   },
 ];
 

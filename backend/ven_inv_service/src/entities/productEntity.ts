@@ -180,6 +180,15 @@ export class Product {
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customer_id?: string | null;
 
+  @Column({
+    name: 'transfer_status',
+    type: 'varchar',
+    length: 20,
+    default: 'NONE',
+    nullable: true,
+  })
+  transfer_status?: 'NONE' | 'COMMITTED' | 'IN_TRANSIT';
+
   @BeforeInsert()
   generateBarcodeId() {
     if (!this.barcode_id && this.serial_no) {

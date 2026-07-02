@@ -45,7 +45,7 @@ export interface LotItem {
   mpn?: string;
   compatibleModels?: string;
   modelIds?: string[];
-  selling_price?: number;
+  sellingPrice?: number;
 }
 
 export interface Lot {

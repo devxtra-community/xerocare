@@ -737,54 +737,72 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.error('Failed to create service_contracts schema:', contractSchemaErr);
         }
 
-        // --- Stock Transfer Schema ---
-        // Drop stale tables if they have the old schema (missing requesting_branch_id)
-        const staleCheck = await Source.query(`
-          SELECT column_name FROM information_schema.columns
-          WHERE table_name = 'stock_transfers' AND column_name = 'requesting_branch_id'
-        `);
-        if (staleCheck.length === 0) {
-          logger.info('Dropping stale stock_transfers tables and recreating with new schema...');
-          await Source.query(`DROP TABLE IF EXISTS stock_transfer_items CASCADE`);
-          await Source.query(`DROP TABLE IF EXISTS stock_transfers CASCADE`);
+        // --- Stock Transfer Module Schema ---
+        try {
+          await Source.query(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfers_transfer_type_enum') THEN
+                CREATE TYPE stock_transfers_transfer_type_enum AS ENUM ('INTRA_BRANCH', 'INTER_BRANCH');
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfers_status_enum') THEN
+                CREATE TYPE stock_transfers_status_enum AS ENUM (
+                  'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_TRANSIT',
+                  'RECEIVED', 'PARTIALLY_RECEIVED', 'COMPLETED', 'REJECTED', 'CANCELLED'
+                );
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfer_items_item_type_enum') THEN
+                CREATE TYPE stock_transfer_items_item_type_enum AS ENUM ('SPARE_PART', 'PRODUCT');
+              END IF;
+            END
+            $$;
+          `);
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS stock_transfers (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              transfer_number VARCHAR(50) NOT NULL UNIQUE,
+              transfer_type stock_transfers_transfer_type_enum NOT NULL,
+              status stock_transfers_status_enum NOT NULL DEFAULT 'DRAFT',
+              source_branch_id UUID NOT NULL,
+              source_warehouse_id UUID NOT NULL,
+              destination_branch_id UUID NOT NULL,
+              destination_warehouse_id UUID NOT NULL,
+              requested_by_id UUID NOT NULL,
+              approved_by_id UUID NULL,
+              reason TEXT NOT NULL,
+              notes TEXT NULL,
+              rejection_reason TEXT NULL,
+              dispatched_at TIMESTAMP NULL,
+              received_at TIMESTAMP NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+          `);
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS stock_transfer_items (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              transfer_id UUID NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+              item_type stock_transfer_items_item_type_enum NOT NULL,
+              spare_part_id UUID NULL,
+              product_id UUID NULL,
+              requested_qty INT NOT NULL DEFAULT 1,
+              dispatched_qty INT NULL,
+              received_qty INT NULL,
+              unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+          `);
+          await Source.query(`
+            ALTER TABLE spare_part_inventories
+            ADD COLUMN IF NOT EXISTS transfer_reserved_qty INT NOT NULL DEFAULT 0;
+          `);
+          await Source.query(`
+            ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(20) DEFAULT 'NONE';
+          `);
+          logger.info('Guaranteed stock_transfers schema exists.');
+        } catch (stockTransferErr) {
+          logger.error('Failed to create stock_transfers schema:', stockTransferErr);
         }
-        await Source.query(`
-          CREATE TABLE IF NOT EXISTS stock_transfers (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            transfer_number VARCHAR(30) NOT NULL UNIQUE,
-            transfer_type VARCHAR(20) NOT NULL DEFAULT 'INTER_BRANCH',
-            status VARCHAR(30) NOT NULL DEFAULT 'DRAFT',
-            requesting_branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-            requesting_warehouse_id UUID REFERENCES warehouses(id),
-            source_branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
-            source_warehouse_id UUID REFERENCES warehouses(id),
-            requested_by_id UUID NOT NULL,
-            responded_by_id UUID,
-            notes TEXT,
-            rejection_reason TEXT,
-            responded_at TIMESTAMP,
-            dispatched_at TIMESTAMP,
-            received_at TIMESTAMP,
-            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-          );
-        `);
-        await Source.query(`
-          CREATE TABLE IF NOT EXISTS stock_transfer_items (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            transfer_id UUID NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
-            item_type VARCHAR(20) NOT NULL,
-            spare_part_id UUID REFERENCES spare_parts(id),
-            product_id UUID REFERENCES products(id),
-            requested_qty INT NOT NULL DEFAULT 1,
-            fulfilled_qty INT,
-            received_qty INT,
-            source_warehouse_id UUID REFERENCES warehouses(id),
-            destination_warehouse_id UUID REFERENCES warehouses(id),
-            item_name VARCHAR(255)
-          );
-        `);
-        logger.info('Guaranteed stock_transfers schema exists.');
       }
       return Source;
     } catch (error: unknown) {
