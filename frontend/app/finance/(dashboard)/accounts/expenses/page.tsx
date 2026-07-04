@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import EmployeeRequestsTab from '@/components/expenses/EmployeeRequestsTab';
+import { getUserFromToken } from '@/lib/auth';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
   Download,
@@ -27,7 +30,6 @@ import {
   type ExpenseEntry,
 } from '@/lib/finance/accountsApi';
 import { StackedBarChart, SimpleBarChart } from '@/components/accounts/charts';
-import { fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -93,23 +95,21 @@ const thisMonthStart = `${today.slice(0, 7)}-01`;
 function ExpenseModal({
   expense,
   accounts,
-  branches,
   onClose,
   onSaved,
 }: {
   expense?: ExpenseEntry | null;
   accounts: { id: string; name: string; type: string }[];
-  branches: { id: string; name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const currentUser = getUserFromToken();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     expenseNo: expense?.expenseNo ?? '',
     date: expense?.date?.slice(0, 10) ?? today,
     category: expense?.category ?? 'OTHER',
     subCategory: expense?.subCategory ?? '',
-    branchId: expense?.branchId ?? branches[0]?.id ?? '',
     description: expense?.description ?? '',
     amount: expense?.amount?.toString() ?? '',
     currency: expense?.currency ?? 'AED',
@@ -187,6 +187,15 @@ function ExpenseModal({
         <div className="px-6 py-4 space-y-3 max-h-96 overflow-y-auto">
           {step === 1 && (
             <>
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+                <span className="text-sm text-blue-600">Branch:</span>
+                <span className="text-sm font-medium text-blue-800">
+                  {currentUser?.branchId
+                    ? `Branch ${currentUser.branchId.slice(0, 8)}…`
+                    : 'Your Branch'}
+                </span>
+                <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Expense #</label>
@@ -217,21 +226,6 @@ function ExpenseModal({
                     {EXPENSE_CATEGORIES.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c.replace(/_/g, ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Branch</label>
-                <Select value={form.branchId} onValueChange={(v) => set('branchId', v)}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -425,6 +419,10 @@ function ExpenseModal({
 }
 
 export default function ExpenseManagementPage() {
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'expenses' | 'requests'>(
+    searchParams?.get('tab') === 'requests' ? 'requests' : 'expenses',
+  );
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -451,12 +449,6 @@ export default function ExpenseManagementPage() {
     queryKey: ['cash-bank-accounts'],
     queryFn: () => fetchCashBankAccounts(),
     staleTime: 60_000,
-  });
-
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => fetchBranches(),
-    staleTime: 300_000,
   });
 
   const { data: chartData } = useQuery({
@@ -537,324 +529,364 @@ export default function ExpenseManagementPage() {
     XLSX.writeFile(wb, `Expenses_${fromDate}_${toDate}.xlsx`);
   };
 
-  if (isLoading) {
-    return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex items-center justify-center">
-        <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="bg-blue-50/50 min-h-full p-6 flex items-center justify-center">
-        <div className="rounded-xl bg-red-50 border border-red-200 p-8 text-center space-y-3 max-w-sm w-full">
-          <p className="text-red-700 font-medium">Failed to load expenses. Please retry.</p>
-          <button
-            onClick={() => refetch()}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Expense Management</h3>
-          <p className="text-muted-foreground">
-            Track, approve, and categorize all business expenses
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
-          />
-          <span className="text-xs text-muted-foreground">to</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
-          />
-          <Button onClick={exportExcel} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" /> Export
-          </Button>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setShowModal(true);
-            }}
-            className="gap-2 bg-primary text-primary-foreground"
-          >
-            <Plus className="h-4 w-4" /> Add Expense
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard
-          title="This Period Total"
-          value={formatCurrency(totalMonth)}
-          subtitle="All categories"
-        />
-        <StatCard title="Approved" value={formatCurrency(approvedTotal)} subtitle="This period" />
-        <StatCard
-          title="Pending Approval"
-          value={pendingCount.toString()}
-          subtitle="Awaiting review"
-        />
-        <StatCard title="Entries" value={expenses.length.toString()} subtitle="Total records" />
-      </div>
-
-      {/* Charts section */}
-      <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+      {/* Tab switcher */}
+      <div className="flex gap-1 bg-card border border-slate-200 rounded-xl p-1 w-fit shadow-sm">
         <button
-          onClick={() => setChartsOpen((o) => !o)}
-          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+          onClick={() => setActiveTab('expenses')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === 'expenses'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-slate-700'
+          }`}
         >
-          <span className="flex items-center gap-2 font-semibold text-gray-800">
-            <BarChart2 className="h-4 w-4 text-blue-500" />
-            Analytics & Charts
-          </span>
-          {chartsOpen ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
-          )}
+          Expense Management
         </button>
-        {chartsOpen && (
-          <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Monthly Trend (Stacked)
-              </h4>
-              <StackedBarChart
-                data={chartData?.monthlyTrend ?? []}
-                xKey="month"
-                keys={chartData?.categories ?? EXPENSE_CATEGORIES}
-              />
+        <button
+          onClick={() => setActiveTab('requests')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+            activeTab === 'requests'
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-slate-700'
+          }`}
+        >
+          Employee Requests
+        </button>
+      </div>
+
+      {activeTab === 'requests' && <EmployeeRequestsTab />}
+
+      {activeTab === 'expenses' && (
+        <>
+          {isLoading && (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Expense Breakdown
-              </h4>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={donutData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="40%"
-                    cy="50%"
-                    outerRadius={80}
-                    innerRadius={45}
-                    label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                  >
-                    {donutData.map((entry) => (
-                      <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name] ?? '#94a3b8'} />
-                    ))}
-                  </Pie>
-                  <Legend
-                    layout="vertical"
-                    align="right"
-                    verticalAlign="middle"
-                    formatter={(v) => <span className="text-xs">{v.replace(/_/g, ' ')}</span>}
+          )}
+          {isError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 p-8 text-center space-y-3 max-w-sm w-full mx-auto">
+              <p className="text-red-700 font-medium">Failed to load expenses. Please retry.</p>
+              <button
+                onClick={() => refetch()}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!isLoading && !isError && (
+            <>
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">
+                    Expense Management
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Track, approve, and categorize all business expenses
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
                   />
-                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Status Distribution
-              </h4>
-              <SimpleBarChart
-                data={chartData?.statusDistribution ?? []}
-                xKey="name"
-                bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
-                height={200}
-              />
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Top 6 Months by Spend
-              </h4>
-              <SimpleBarChart
-                data={chartData?.topMonths ?? []}
-                xKey="month"
-                bars={[{ key: 'total', color: '#10b981', label: 'Total' }]}
-                height={200}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                  />
+                  <Button onClick={exportExcel} variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" /> Export
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setEditing(null);
+                      setShowModal(true);
+                    }}
+                    className="gap-2 bg-primary text-primary-foreground"
+                  >
+                    <Plus className="h-4 w-4" /> Add Expense
+                  </Button>
+                </div>
+              </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-10 bg-muted/50 border-none"
-            placeholder="Search description or expense #..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-44 bg-card border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Categories</SelectItem>
-              {EXPENSE_CATEGORIES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c.replace(/_/g, ' ')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-36 bg-card border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
-              <SelectItem value="PAID">Paid</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+              {/* Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatCard
+                  title="This Period Total"
+                  value={formatCurrency(totalMonth)}
+                  subtitle="All categories"
+                />
+                <StatCard
+                  title="Approved"
+                  value={formatCurrency(approvedTotal)}
+                  subtitle="This period"
+                />
+                <StatCard
+                  title="Pending Approval"
+                  value={pendingCount.toString()}
+                  subtitle="Awaiting review"
+                />
+                <StatCard
+                  title="Entries"
+                  value={expenses.length.toString()}
+                  subtitle="Total records"
+                />
+              </div>
 
-      {/* Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-        <Table>
-          <TableHeader className="bg-muted/40">
-            <TableRow>
-              <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Date
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Expense #
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Category
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Description
-              </TableHead>
-              <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Amount
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Status
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-16 text-muted-foreground">
-                  No expenses found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((e) => (
-                <TableRow key={e.id} className="hover:bg-blue-50/50 transition-colors">
-                  <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
-                    {e.date?.slice(0, 10)}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-blue-600 font-bold">
-                    {e.expenseNo}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className="px-2 py-0.5 rounded-md text-xs font-semibold"
-                      style={{
-                        background: `${CATEGORY_COLORS[e.category] ?? '#94a3b8'}20`,
-                        color: CATEGORY_COLORS[e.category] ?? '#94a3b8',
-                      }}
-                    >
-                      {e.category.replace(/_/g, ' ')}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                    {e.description}
-                  </TableCell>
-                  <TableCell className="text-right font-bold text-red-600">
-                    {formatCurrency(Number(e.amount), e.currency)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[e.status] ?? ''}`}
-                    >
-                      {e.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="pr-4">
-                    <div className="flex items-center gap-1">
-                      {e.status === 'PENDING' && (
-                        <button
-                          onClick={() => approveMut.mutate(e.id)}
-                          title="Approve"
-                          className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => {
-                          setEditing(e);
-                          setShowModal(true);
-                        }}
-                        className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                        title="Edit"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm('Delete this expense?')) deleteMut.mutate(e.id);
-                        }}
-                        className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+              {/* Charts section */}
+              <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+                <button
+                  onClick={() => setChartsOpen((o) => !o)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+                >
+                  <span className="flex items-center gap-2 font-semibold text-gray-800">
+                    <BarChart2 className="h-4 w-4 text-blue-500" />
+                    Analytics & Charts
+                  </span>
+                  {chartsOpen ? (
+                    <ChevronUp className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+                {chartsOpen && (
+                  <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        Monthly Trend (Stacked)
+                      </h4>
+                      <StackedBarChart
+                        data={chartData?.monthlyTrend ?? []}
+                        xKey="month"
+                        keys={chartData?.categories ?? EXPENSE_CATEGORIES}
+                      />
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        Expense Breakdown
+                      </h4>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie
+                            data={donutData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="40%"
+                            cy="50%"
+                            outerRadius={80}
+                            innerRadius={45}
+                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                          >
+                            {donutData.map((entry) => (
+                              <Cell
+                                key={entry.name}
+                                fill={CATEGORY_COLORS[entry.name] ?? '#94a3b8'}
+                              />
+                            ))}
+                          </Pie>
+                          <Legend
+                            layout="vertical"
+                            align="right"
+                            verticalAlign="middle"
+                            formatter={(v) => (
+                              <span className="text-xs">{v.replace(/_/g, ' ')}</span>
+                            )}
+                          />
+                          <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        Status Distribution
+                      </h4>
+                      <SimpleBarChart
+                        data={chartData?.statusDistribution ?? []}
+                        xKey="name"
+                        bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
+                        height={200}
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        Top 6 Months by Spend
+                      </h4>
+                      <SimpleBarChart
+                        data={chartData?.topMonths ?? []}
+                        xKey="month"
+                        bars={[{ key: 'total', color: '#10b981', label: 'Total' }]}
+                        height={200}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
 
-      {showModal && (
-        <ExpenseModal
-          expense={editing}
-          accounts={accounts}
-          branches={branches}
-          onClose={() => setShowModal(false)}
-          onSaved={() => setShowModal(false)}
-        />
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-10 bg-muted/50 border-none"
+                    placeholder="Search description or expense #..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-44 bg-card border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Categories</SelectItem>
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c.replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-36 bg-card border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Status</SelectItem>
+                      <SelectItem value="PENDING">Pending</SelectItem>
+                      <SelectItem value="APPROVED">Approved</SelectItem>
+                      <SelectItem value="PAID">Paid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+                <Table>
+                  <TableHeader className="bg-muted/40">
+                    <TableRow>
+                      <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Date
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Expense #
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Category
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Description
+                      </TableHead>
+                      <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Amount
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-16 text-muted-foreground">
+                          No expenses found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filtered.map((e) => (
+                        <TableRow key={e.id} className="hover:bg-blue-50/50 transition-colors">
+                          <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
+                            {e.date?.slice(0, 10)}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                            {e.expenseNo}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className="px-2 py-0.5 rounded-md text-xs font-semibold"
+                              style={{
+                                background: `${CATEGORY_COLORS[e.category] ?? '#94a3b8'}20`,
+                                color: CATEGORY_COLORS[e.category] ?? '#94a3b8',
+                              }}
+                            >
+                              {e.category.replace(/_/g, ' ')}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                            {e.description}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-red-600">
+                            {formatCurrency(Number(e.amount), e.currency)}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[e.status] ?? ''}`}
+                            >
+                              {e.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="pr-4">
+                            <div className="flex items-center gap-1">
+                              {e.status === 'PENDING' && (
+                                <button
+                                  onClick={() => approveMut.mutate(e.id)}
+                                  title="Approve"
+                                  className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setEditing(e);
+                                  setShowModal(true);
+                                }}
+                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                title="Edit"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm('Delete this expense?')) deleteMut.mutate(e.id);
+                                }}
+                                className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {showModal && (
+                <ExpenseModal
+                  expense={editing}
+                  accounts={accounts}
+                  onClose={() => setShowModal(false)}
+                  onSaved={() => setShowModal(false)}
+                />
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );

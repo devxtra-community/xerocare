@@ -12,6 +12,7 @@ import {
   Calendar,
   FileQuestion,
   RotateCcw,
+  Receipt,
 } from 'lucide-react';
 
 import {
@@ -43,6 +44,12 @@ const menuItems = [
     title: 'Leave',
     icon: Calendar,
     href: '/employee/leave',
+    modules: ['*'], // Always accessible
+  },
+  {
+    title: 'My Expenses',
+    icon: Receipt,
+    href: '/employee/expenses',
     modules: ['*'], // Always accessible
   },
   {

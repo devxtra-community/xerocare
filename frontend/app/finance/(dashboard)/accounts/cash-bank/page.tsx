@@ -34,7 +34,7 @@ import {
   type CashBankAccount,
   type CashBankTransactionEntry,
 } from '@/lib/finance/accountsApi';
-import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -105,7 +105,6 @@ function BalanceText({ amount, currency = 'AED' }: { amount: number; currency?: 
 interface AccountFormData {
   name: string;
   type: 'CASH' | 'BANK';
-  branchId: string;
   currency: string;
   openingBalance: string;
   openingDate: string;
@@ -120,21 +119,19 @@ interface AccountFormData {
 function AccountModal({
   account,
   defaultType,
-  branches,
   onClose,
   onSaved,
 }: {
   account?: CashBankAccount | null;
   defaultType?: 'CASH' | 'BANK';
-  branches: { id: string; name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isEdit = !!account;
+  const currentUser = getUserFromToken();
   const [form, setForm] = useState<AccountFormData>({
     name: account?.name ?? '',
     type: account?.type ?? defaultType ?? 'CASH',
-    branchId: account?.branchId ?? branches[0]?.id ?? '',
     currency: account?.currency ?? 'AED',
     openingBalance: account?.openingBalance?.toString() ?? '0',
     openingDate: account?.openingDate?.slice(0, 10) ?? today,
@@ -153,7 +150,6 @@ function AccountModal({
       const payload = {
         name: form.name.trim(),
         type: form.type,
-        branchId: form.branchId,
         currency: form.currency,
         notes: form.notes || undefined,
         ...(form.type === 'BANK' && {
@@ -189,7 +185,6 @@ function AccountModal({
 
   const valid =
     form.name.trim().length >= 3 &&
-    form.branchId &&
     (form.type === 'CASH' ||
       (form.bankName.trim().length > 0 && form.accountNumber.trim().length > 0));
 
@@ -200,6 +195,15 @@ function AccountModal({
           <DialogTitle>{isEdit ? 'Edit Account' : 'Add Account'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+            <span className="text-sm text-blue-600">Branch:</span>
+            <span className="text-sm font-medium text-blue-800">
+              {currentUser?.branchId
+                ? `Branch ${currentUser.branchId.slice(0, 8)}…`
+                : 'Your Branch'}
+            </span>
+            <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
+          </div>
           {!isEdit && (
             <div>
               <label className="text-sm font-medium text-slate-700">Account Type *</label>
@@ -232,53 +236,25 @@ function AccountModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm font-medium text-slate-700">Branch *</label>
-              <Select
-                value={form.branchId}
-                onValueChange={(v) => set('branchId', v)}
-                disabled={isEdit}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {branches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isEdit && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  🔒 Cannot change after creation
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-slate-700">Currency *</label>
-              <Select
-                value={form.currency}
-                onValueChange={(v) => set('currency', v)}
-                disabled={isEdit}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AED">AED — Dirham</SelectItem>
-                  <SelectItem value="QAR">QAR — Qatari Riyal</SelectItem>
-                  <SelectItem value="USD">USD — US Dollar</SelectItem>
-                </SelectContent>
-              </Select>
-              {isEdit && (
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  🔒 Cannot change after creation
-                </p>
-              )}
-            </div>
+          <div>
+            <label className="text-sm font-medium text-slate-700">Currency *</label>
+            <Select
+              value={form.currency}
+              onValueChange={(v) => set('currency', v)}
+              disabled={isEdit}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AED">AED — Dirham</SelectItem>
+                <SelectItem value="QAR">QAR — Qatari Riyal</SelectItem>
+                <SelectItem value="USD">USD — US Dollar</SelectItem>
+              </SelectContent>
+            </Select>
+            {isEdit && (
+              <p className="text-xs text-muted-foreground mt-0.5">Cannot change after creation</p>
+            )}
           </div>
 
           {form.type === 'BANK' && (
@@ -1437,12 +1413,6 @@ export default function CashBankPage() {
     enabled: tab === 'cashbook' || tab === 'transfer',
   });
 
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches'],
-    queryFn: fetchBranches,
-    staleTime: 300_000,
-  });
-
   const deactivateMut = useMutation({
     mutationFn: (id: string) => deactivateCashBankAccount(id),
     onSuccess: () => {
@@ -2057,18 +2027,12 @@ export default function CashBankPage() {
       {modal?.kind === 'add-account' && (
         <AccountModal
           defaultType={modal.defaultType}
-          branches={branches}
           onClose={() => setModal(null)}
           onSaved={refetchAll}
         />
       )}
       {modal?.kind === 'edit-account' && (
-        <AccountModal
-          account={modal.account}
-          branches={branches}
-          onClose={() => setModal(null)}
-          onSaved={refetchAll}
-        />
+        <AccountModal account={modal.account} onClose={() => setModal(null)} onSaved={refetchAll} />
       )}
       {modal?.kind === 'cash-action' && (
         <CashActionModal

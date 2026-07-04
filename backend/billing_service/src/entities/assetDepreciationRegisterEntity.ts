@@ -11,8 +11,17 @@ export class AssetDepreciationRegister {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ unique: true })
-  productId!: string;
+  @Column({ nullable: true })
+  productId?: string;
+
+  @Column({ default: 'PRINTER_PRODUCT' })
+  assetType!: string; // PRINTER_PRODUCT | MANUAL_ASSET
+
+  @Column({ default: 'PRINTER_EQUIPMENT' })
+  assetCategory!: string; // from ASSET_CATEGORIES keys
+
+  @Column({ nullable: true })
+  assetName?: string; // for non-printer assets
 
   @Column()
   brandId!: string;

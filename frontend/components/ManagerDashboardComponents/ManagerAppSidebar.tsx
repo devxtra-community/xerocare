@@ -25,6 +25,7 @@ import {
   PieChart,
   TrendingUp,
   Eye,
+  Receipt,
 } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
@@ -126,7 +127,11 @@ const menuItems = [
     icon: Users,
     href: '/manager/employees',
   },
-
+  {
+    title: 'My Expenses',
+    icon: Receipt,
+    href: '/manager/expenses',
+  },
   {
     title: 'Finance',
     icon: Wallet,
