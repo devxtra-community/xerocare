@@ -11,7 +11,13 @@ export class NotificationPublisher {
     message: string;
     type: string;
     referenceId: string;
-    referenceType: 'QUOTATION' | 'TEMPLATE' | 'CONTRACT' | 'SERVICE' | 'SERVICE_TICKET';
+    referenceType:
+      | 'QUOTATION'
+      | 'TEMPLATE'
+      | 'CONTRACT'
+      | 'SERVICE'
+      | 'SERVICE_TICKET'
+      | 'STOCK_TRANSFER';
   }) {
     try {
       const channel = await getRabbitChannel();

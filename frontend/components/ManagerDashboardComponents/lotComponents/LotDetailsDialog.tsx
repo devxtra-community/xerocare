@@ -328,7 +328,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <User size={14} className="text-slate-400" />
-                      {lot.vendor?.name}
+                      {lot.vendor?.name ?? (lot.transferOrigin ? 'Internal Transfer' : '—')}
                     </div>
                   </div>
                 </div>

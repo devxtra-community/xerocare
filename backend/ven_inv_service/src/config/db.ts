@@ -737,8 +737,23 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.error('Failed to create service_contracts schema:', contractSchemaErr);
         }
 
-        // --- Stock Transfer Module Schema ---
+        // --- Stock Transfer Module Schema (lot-integrated redesign) ---
         try {
+          // Recreate when tables predate the current design (marker column: items.model_id).
+          const staleCheck = await Source.query(`
+            SELECT 1 FROM information_schema.tables WHERE table_name = 'stock_transfers'
+            AND NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_name = 'stock_transfer_items' AND column_name = 'model_id'
+            )
+          `);
+          if (staleCheck.length > 0) {
+            logger.info('Dropping outdated stock_transfers tables and recreating (new design)...');
+            await Source.query(`DROP TABLE IF EXISTS stock_transfer_items CASCADE`);
+            await Source.query(`DROP TABLE IF EXISTS stock_transfers CASCADE`);
+            await Source.query(`DROP TYPE IF EXISTS stock_transfers_status_enum`);
+            await Source.query(`DROP TYPE IF EXISTS stock_transfer_items_item_status_enum`);
+          }
           await Source.query(`
             DO $$
             BEGIN
@@ -747,12 +762,14 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
               END IF;
               IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfers_status_enum') THEN
                 CREATE TYPE stock_transfers_status_enum AS ENUM (
-                  'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_TRANSIT',
-                  'RECEIVED', 'PARTIALLY_RECEIVED', 'COMPLETED', 'REJECTED', 'CANCELLED'
+                  'DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'IN_TRANSIT', 'COMPLETED', 'CANCELLED'
                 );
               END IF;
               IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfer_items_item_type_enum') THEN
                 CREATE TYPE stock_transfer_items_item_type_enum AS ENUM ('SPARE_PART', 'PRODUCT');
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfer_items_item_status_enum') THEN
+                CREATE TYPE stock_transfer_items_item_status_enum AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
               END IF;
             END
             $$;
@@ -764,7 +781,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
               transfer_type stock_transfers_transfer_type_enum NOT NULL,
               status stock_transfers_status_enum NOT NULL DEFAULT 'DRAFT',
               source_branch_id UUID NOT NULL,
-              source_warehouse_id UUID NOT NULL,
+              source_warehouse_id UUID NULL,
               destination_branch_id UUID NOT NULL,
               destination_warehouse_id UUID NOT NULL,
               requested_by_id UUID NOT NULL,
@@ -772,6 +789,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
               reason TEXT NOT NULL,
               notes TEXT NULL,
               rejection_reason TEXT NULL,
+              lot_id UUID NULL,
               dispatched_at TIMESTAMP NULL,
               received_at TIMESTAMP NULL,
               created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -783,8 +801,13 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
               transfer_id UUID NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
               item_type stock_transfer_items_item_type_enum NOT NULL,
               spare_part_id UUID NULL,
+              model_id UUID NULL,
               product_id UUID NULL,
               requested_qty INT NOT NULL DEFAULT 1,
+              approved_qty INT NULL,
+              item_status stock_transfer_items_item_status_enum NOT NULL DEFAULT 'PENDING',
+              assigned_product_ids TEXT NULL,
+              source_warehouse_id UUID NULL,
               dispatched_qty INT NULL,
               received_qty INT NULL,
               unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -798,6 +821,16 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           await Source.query(`
             ALTER TABLE products
             ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(20) DEFAULT 'NONE';
+          `);
+          // Lots double as the receiving vehicle for transfers: vendor optional, origin flagged.
+          await Source.query(`
+            ALTER TABLE lots ALTER COLUMN vendor_id DROP NOT NULL;
+          `);
+          await Source.query(`
+            ALTER TABLE lots ADD COLUMN IF NOT EXISTS transfer_origin BOOLEAN NOT NULL DEFAULT FALSE;
+          `);
+          await Source.query(`
+            ALTER TABLE lots ADD COLUMN IF NOT EXISTS transfer_id UUID NULL;
           `);
           logger.info('Guaranteed stock_transfers schema exists.');
         } catch (stockTransferErr) {

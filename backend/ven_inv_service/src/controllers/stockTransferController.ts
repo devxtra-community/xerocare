@@ -82,7 +82,17 @@ export const approveTransfer = async (req: Request, res: Response) => {
     const userId = req.user!.userId;
     const role = req.user?.role;
     const branchId = role === 'ADMIN' ? undefined : req.user?.branchId;
-    const transfer = await service.approve(String(req.params.id), userId, branchId, role);
+    // lines: [{ item_id, approved_qty, assigned_product_ids? }] — giver's edits + serial picks
+    const { lines } = req.body as {
+      lines?: { item_id: string; approved_qty: number; assigned_product_ids?: string[] }[];
+    };
+    const transfer = await service.approve(
+      String(req.params.id),
+      userId,
+      lines ?? [],
+      branchId,
+      role,
+    );
     return res.json({ success: true, data: transfer });
   } catch (err) {
     logger.error('approveTransfer error:', err);
@@ -124,21 +134,28 @@ export const dispatchTransfer = async (req: Request, res: Response) => {
   }
 };
 
-export const receiveTransfer = async (req: Request, res: Response) => {
+// Receiving happens through the linked lot (lot confirm completes the transfer).
+export const getBranchInventoryForTransfer = async (req: Request, res: Response) => {
   try {
-    const userId = req.user!.userId;
-    const branchId = req.user?.role === 'ADMIN' ? undefined : req.user?.branchId;
-    const { items } = req.body as { items: { itemId: string; received_qty: number }[] };
-    if (!items || items.length === 0) {
-      return res.status(400).json({ success: false, message: 'items array required' });
-    }
-    const transfer = await service.receive(String(req.params.id), userId, items, branchId);
-    return res.json({ success: true, data: transfer });
+    const branchId = String(req.params.branchId);
+    const warehouseId = req.query.warehouseId ? String(req.query.warehouseId) : undefined;
+    const data = await service.getBranchInventory(branchId, warehouseId);
+    return res.json({ success: true, data });
   } catch (err) {
-    logger.error('receiveTransfer error:', err);
-    const message = err instanceof Error ? err.message : 'Internal server error';
-    const code = message.includes('Access denied') ? 403 : 400;
-    return res.status(code).json({ success: false, message });
+    logger.error('getBranchInventoryForTransfer error:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+export const getAssignableProducts = async (req: Request, res: Response) => {
+  try {
+    const branchId = String(req.params.branchId);
+    const modelId = String(req.params.modelId);
+    const data = await service.getAssignableProducts(branchId, modelId);
+    return res.json({ success: true, data });
+  } catch (err) {
+    logger.error('getAssignableProducts error:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 

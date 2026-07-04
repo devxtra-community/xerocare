@@ -31,12 +31,13 @@ export class Lot {
   @Index()
   lotNumber!: string;
 
-  @Column({ name: 'vendor_id', type: 'uuid' })
-  vendorId!: string;
+  // Nullable: internal stock-transfer lots have no vendor.
+  @Column({ name: 'vendor_id', type: 'uuid', nullable: true })
+  vendorId?: string;
 
-  @ManyToOne(() => Vendor)
+  @ManyToOne(() => Vendor, { nullable: true })
   @JoinColumn({ name: 'vendor_id' })
-  vendor!: Vendor;
+  vendor?: Vendor;
 
   @Column({ name: 'purchase_date', type: 'date' })
   purchaseDate!: Date;
@@ -58,6 +59,13 @@ export class Lot {
   purchaseOrigin?: PurchaseOrigin;
 
   // -------------
+
+  // True for lots auto-created by a stock transfer — no vendor, no amounts in the UI.
+  @Column({ name: 'transfer_origin', type: 'boolean', default: false })
+  transferOrigin!: boolean;
+
+  @Column({ name: 'transfer_id', type: 'uuid', nullable: true })
+  transferId?: string;
 
   @Column({ name: 'branch_id', nullable: true })
   branch_id?: string;
