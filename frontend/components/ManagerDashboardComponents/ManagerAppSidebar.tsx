@@ -25,6 +25,8 @@ import {
   PieChart,
   TrendingUp,
   Eye,
+  Bell,
+  ArrowRightLeft,
   Receipt,
 } from 'lucide-react';
 
@@ -145,12 +147,28 @@ const menuItems = [
   {
     title: 'Inventory',
     icon: Boxes,
-    href: '/manager/inventory',
+    subItems: [
+      {
+        title: 'Stock',
+        icon: Boxes,
+        href: '/manager/inventory',
+      },
+      {
+        title: 'Stock Transfers',
+        icon: ArrowRightLeft,
+        href: '/manager/stock-transfers',
+      },
+    ],
   },
   {
     title: 'Warehouse',
     icon: Package,
     href: '/manager/warehouse',
+  },
+  {
+    title: 'Notifications',
+    icon: Bell,
+    href: '/manager/notifications',
   },
 ];
 

@@ -50,6 +50,8 @@ type Vendor = {
   outstandingAmount: number;
   status: 'Active' | 'On Hold';
   currency: string;
+  countryCode?: string;
+  countryName?: string;
 };
 
 type VendorFormData = {
@@ -60,7 +62,14 @@ type VendorFormData = {
   email: string;
   status: 'Active' | 'On Hold';
   currency: string;
+  countryCode?: string;
+  countryName?: string;
 };
+
+// ISO 3166 country list, shared with the branch/admin-vendor country selectors.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const countryList = require('country-list') as { getData: () => { code: string; name: string }[] };
+const COUNTRY_OPTIONS: { code: string; name: string }[] = countryList.getData();
 
 /**
  * Vendor Management Table Component.
@@ -107,6 +116,8 @@ export default function VendorTable({
         contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
         currency: data.currency,
+        countryCode: data.countryCode,
+        countryName: data.countryName,
       };
 
       if (editingVendor) {
@@ -364,6 +375,8 @@ function VendorFormModal({
     email: '',
     status: 'Active',
     currency: 'QAR',
+    countryCode: undefined,
+    countryName: undefined,
   });
 
   React.useEffect(() => {
@@ -377,6 +390,8 @@ function VendorFormModal({
           email: initialData.email,
           status: initialData.status,
           currency: initialData.currency || 'QAR',
+          countryCode: initialData.countryCode,
+          countryName: initialData.countryName,
         });
       } else {
         setForm({
@@ -387,6 +402,8 @@ function VendorFormModal({
           email: '',
           status: 'Active',
           currency: 'QAR',
+          countryCode: undefined,
+          countryName: undefined,
         });
       }
     }
@@ -495,6 +512,33 @@ function VendorFormModal({
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Country <span className="text-red-500">*</span>
+              </label>
+              <Select
+                value={form.countryCode}
+                onValueChange={(value) =>
+                  setForm({
+                    ...form,
+                    countryCode: value,
+                    countryName: COUNTRY_OPTIONS.find((c) => c.code === value)?.name,
+                  })
+                }
+              >
+                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl max-h-64">
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="col-span-2 space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Status
@@ -524,7 +568,25 @@ function VendorFormModal({
             >
               Cancel
             </button>
-            <Button className="h-12 px-10" onClick={() => onConfirm(form)}>
+            <Button
+              className="h-12 px-10"
+              onClick={() => {
+                if (!form.name.trim()) {
+                  toast.error('Vendor name is required');
+                  return;
+                }
+                if (!form.email.trim()) {
+                  toast.error('Email is required');
+                  return;
+                }
+                // Country drives Domestic vs International classification — required.
+                if (!form.countryCode) {
+                  toast.error('Country is required');
+                  return;
+                }
+                onConfirm(form);
+              }}
+            >
               {initialData ? 'Update' : 'Confirm'}
             </Button>
           </div>

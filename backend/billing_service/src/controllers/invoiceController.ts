@@ -7,6 +7,7 @@ import { MulterS3File } from '../types/multer-s3-file';
 import { Source } from '../config/dataSource';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { UsageRecord } from '../entities/usageRecordEntity';
 import { EmployeeRole } from '../constants/employeeRole';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 
@@ -1646,12 +1647,14 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
 
     const saleInvoice = await Source.query(
       `
-      SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty
+      SELECT i.id, i."createdAt", i."effectiveFrom", ii.warranty,
+             i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit"
       FROM invoices i
       JOIN invoice_items ii ON i.id = ii."invoiceId"
       WHERE i.type = 'FINAL'
         AND (i."billType" = 'SALE' OR (i."billType" IS NULL AND i."saleType" = 'PRODUCT_SALE'))
         AND ii."productId" = $1
+      ORDER BY i."createdAt" DESC
       LIMIT 1;
     `,
       [productId],
@@ -1659,7 +1662,8 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
 
     const leaseInvoice = await Source.query(
       `
-      SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit"
+      SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit",
+             i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit"
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
       WHERE i.type = 'PROFORMA'
@@ -1691,6 +1695,64 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
           latestAllocation && latestAllocation.length > 0 ? latestAllocation[0] : null,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMachineHistoryData = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { productId } = req.params;
+    const serialNumber = req.query.serialNumber as string;
+
+    const allocations = await Source.query<
+      Array<{
+        id: string;
+        contractId: string;
+        serialNumber: string;
+        status: string;
+        startTimestamp: string;
+        endTimestamp: string | null;
+        replacementReason: string | null;
+        invoiceNumber: string;
+        billType: string;
+        contractStatus: string;
+        customerId: string | null;
+      }>
+    >(
+      `SELECT pa.id, pa."contractId", pa."serialNumber", pa.status,
+              pa."startTimestamp", pa."endTimestamp", pa."replacementReason",
+              i."invoiceNumber", i."billType", i."contractStatus", i."customerId"
+       FROM product_allocations pa
+       JOIN invoices i ON pa."contractId" = i.id
+       WHERE pa."productId" = $1 OR pa."serialNumber" = $2
+       ORDER BY pa."startTimestamp" ASC`,
+      [productId, serialNumber || ''],
+    );
+
+    const contractIds = [...new Set(allocations.map((a) => a.contractId))];
+
+    let usageRecords: UsageRecord[] = [];
+    if (contractIds.length > 0) {
+      usageRecords = await Source.getRepository(UsageRecord).find({
+        where: contractIds.map((cid) => ({ contractId: cid })),
+        order: { createdAt: 'ASC' },
+        select: [
+          'id',
+          'contractId',
+          'billingPeriodStart',
+          'billingPeriodEnd',
+          'bwA4Delta',
+          'bwA3Delta',
+          'colorA4Delta',
+          'colorA3Delta',
+          'totalCharge',
+          'createdAt',
+        ],
+      });
+    }
+
+    return res.status(200).json({ success: true, data: { allocations, usageRecords } });
   } catch (error) {
     next(error);
   }

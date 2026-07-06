@@ -83,6 +83,23 @@ export default function AddSparePartDialog({
   const [selectedLotItemId, setSelectedLotItemId] = useState<string>('');
   const isNoLot = formData.lot_id === 'no-lot';
 
+  const loadDependencies = async () => {
+    try {
+      const [whRes, vendorRes, lotsRes, brandsRes] = await Promise.all([
+        warehouseService.getWarehousesByBranch(),
+        vendorService.getVendors(),
+        lotService.getAllLots(),
+        brandService.getAllBrands(),
+      ]);
+      setWarehouses(whRes || []);
+      setVendors(vendorRes || []);
+      setLots(lotsRes.data || []);
+      setBrands(brandsRes || []);
+    } catch (error) {
+      console.error('Failed to load dependencies', error);
+    }
+  };
+
   useEffect(() => {
     if (open) {
       loadDependencies();
@@ -106,23 +123,6 @@ export default function AddSparePartDialog({
       fetchModelsForBrand();
     }
   }, [formData.brand, open]);
-
-  const loadDependencies = async () => {
-    try {
-      const [whRes, vendorRes, lotsRes, brandsRes] = await Promise.all([
-        warehouseService.getWarehousesByBranch(),
-        vendorService.getVendors(),
-        lotService.getAllLots(),
-        brandService.getAllBrands(),
-      ]);
-      setWarehouses(whRes || []);
-      setVendors(vendorRes || []);
-      setLots(lotsRes.data || []);
-      setBrands(brandsRes || []);
-    } catch (error) {
-      console.error('Failed to load dependencies', error);
-    }
-  };
 
   useEffect(() => {
     if (open && initialLotId && lots.length > 0) {

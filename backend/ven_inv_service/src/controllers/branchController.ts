@@ -61,6 +61,14 @@ export class BranchController {
   };
 
   /**
+   * Lists ALL branches regardless of requester's branch — used for stock transfer destination selection.
+   */
+  listAll = async (_req: Request, res: Response) => {
+    const branches = await this.service.getBranches();
+    res.json({ success: true, data: branches });
+  };
+
+  /**
    * Retrieves the current user's branch.
    */
   getMyBranch = async (req: Request, res: Response) => {

@@ -15,6 +15,8 @@ import {
 import { purchaseService, Purchase } from '@/services/purchaseService';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
+import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 import AddPurchaseDialog from './AddPurchaseDialog';
 import EditPurchaseDialog from './EditPurchaseDialog';
 import AddPaymentModal from './AddPaymentModal';
@@ -29,6 +31,7 @@ import PurchaseStats from './PurchaseStats';
 export default function ManagerPurchaseTable() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [search, setSearch] = useState('');
+  const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
   const [loading, setLoading] = useState(true);
 
   // Dialog states
@@ -55,14 +58,22 @@ export default function ManagerPurchaseTable() {
     fetchPurchases();
   }, []);
 
-  const filtered = purchases.filter((p) =>
-    `${p.lotId} ${p.vendorId} ${p.lot?.lotNumber || ''}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
+  const filtered = purchases.filter(
+    (p) =>
+      `${p.lotId} ${p.vendorId} ${p.lot?.lotNumber || ''}`
+        .toLowerCase()
+        .includes(search.toLowerCase()) &&
+      (originFilter === 'ALL' || p.purchaseOrigin === originFilter),
   );
 
   // Stats calculation
   const totalCost = purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+  const domesticSpend = purchases
+    .filter((p) => p.purchaseOrigin === PurchaseOrigin.DOMESTIC)
+    .reduce((sum, p) => sum + Number(p.totalAmount), 0);
+  const internationalSpend = purchases
+    .filter((p) => p.purchaseOrigin === PurchaseOrigin.INTERNATIONAL)
+    .reduce((sum, p) => sum + Number(p.totalAmount), 0);
   const totalPaid = purchases.reduce((sum, p) => sum + Number(p.paidAmount), 0);
   const totalVendors = new Set(purchases.map((p) => p.vendorId)).size;
   const totalRecords = purchases.length;
@@ -102,6 +113,27 @@ export default function ManagerPurchaseTable() {
         totalPaid={totalPaid}
       />
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-5 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-widest text-green-700">
+            Domestic Spend
+          </p>
+          <p className="mt-1 text-2xl font-black text-green-800">{formatCurrency(domesticSpend)}</p>
+          <p className="mt-1 text-xs font-medium text-green-600/80">
+            Vendor country matches branch country
+          </p>
+        </div>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <p className="text-[11px] font-black uppercase tracking-widest text-blue-700">
+            International Spend
+          </p>
+          <p className="mt-1 text-2xl font-black text-blue-800">
+            {formatCurrency(internationalSpend)}
+          </p>
+          <p className="mt-1 text-xs font-medium text-blue-600/80">Cross-border vendor purchases</p>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-4">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -112,6 +144,17 @@ export default function ManagerPurchaseTable() {
             className="pl-9 h-11 rounded-xl border-slate-200 bg-white"
           />
         </div>
+
+        <select
+          value={originFilter}
+          onChange={(e) => setOriginFilter(e.target.value as 'ALL' | PurchaseOrigin)}
+          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
+          aria-label="Filter by purchase origin"
+        >
+          <option value="ALL">All Origins</option>
+          <option value={PurchaseOrigin.DOMESTIC}>Domestic</option>
+          <option value={PurchaseOrigin.INTERNATIONAL}>International</option>
+        </select>
 
         <Button
           className="bg-primary hover:bg-primary/90 text-white gap-2 h-11 px-6 rounded-xl font-bold italic shadow-lg shadow-primary/10 transition-all active:scale-95"
@@ -132,6 +175,7 @@ export default function ManagerPurchaseTable() {
                 'Paid Amount',
                 'Balance',
                 'Status',
+                'Origin',
                 'Action',
               ].map((h) => (
                 <TableHead
@@ -147,7 +191,7 @@ export default function ManagerPurchaseTable() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12">
+                <TableCell colSpan={8} className="text-center py-12">
                   <div className="flex items-center justify-center gap-2 text-slate-400 animate-pulse font-bold italic">
                     <div className="h-2 w-2 bg-primary rounded-full animate-bounce" />
                     Syncing Ledger...
@@ -156,7 +200,7 @@ export default function ManagerPurchaseTable() {
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-slate-400 italic">
+                <TableCell colSpan={8} className="text-center py-12 text-slate-400 italic">
                   No lot amount records found matching your search.
                 </TableCell>
               </TableRow>
@@ -190,6 +234,9 @@ export default function ManagerPurchaseTable() {
                     >
                       {p.status}
                     </span>
+                  </TableCell>
+                  <TableCell className="px-6 py-4">
+                    <PurchaseOriginBadge origin={p.purchaseOrigin} />
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="flex gap-4">

@@ -3,6 +3,9 @@ import { EmployeeRepository } from '../repositories/employeeRepository';
 import { LeaveStatus } from '../constants/leaveStatus';
 import { LeaveType } from '../constants/leaveType';
 import { AppError } from '../errors/appError';
+import { Source } from '../config/dataSource';
+import { Notification } from '../entities/notificationEntity';
+import { Employee } from '../entities/employeeEntities';
 
 interface SubmitLeaveApplicationData {
   start_date: string;
@@ -67,6 +70,33 @@ export class LeaveApplicationService {
       status: LeaveStatus.PENDING,
     });
 
+    // Notify branch manager of leave submission
+    try {
+      const employeeRepo = Source.getRepository(Employee);
+      const notificationRepo = Source.getRepository(Notification);
+
+      const manager = await employeeRepo.findOne({
+        where: { branch_id: employee.branch_id!, role: 'MANAGER' as never },
+      });
+
+      const employeeName =
+        `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || 'An employee';
+
+      if (manager) {
+        await notificationRepo.save(
+          notificationRepo.create({
+            employee_id: manager.id,
+            title: 'Leave Application Submitted',
+            message: `${employeeName} has submitted a ${data.leave_type} leave request from ${data.start_date} to ${data.end_date}.`,
+            type: 'LEAVE_SUBMITTED',
+            data: { leaveId: leaveApplication.id, employeeId },
+          }),
+        );
+      }
+    } catch {
+      // Non-blocking
+    }
+
     return leaveApplication;
   }
 
@@ -124,6 +154,22 @@ export class LeaveApplicationService {
 
     await this.leaveRepo.updateStatus(leaveId, LeaveStatus.APPROVED, reviewerId);
 
+    // Notify employee of approval
+    try {
+      const notificationRepo = Source.getRepository(Notification);
+      await notificationRepo.save(
+        notificationRepo.create({
+          employee_id: leaveApplication.employee_id,
+          title: 'Leave Approved',
+          message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date.toDateString()} to ${leaveApplication.end_date.toDateString()} has been approved.`,
+          type: 'LEAVE_APPROVED',
+          data: { leaveId },
+        }),
+      );
+    } catch {
+      // Non-blocking
+    }
+
     return this.leaveRepo.findById(leaveId);
   }
 
@@ -146,6 +192,22 @@ export class LeaveApplicationService {
     }
 
     await this.leaveRepo.updateStatus(leaveId, LeaveStatus.REJECTED, reviewerId, reason.trim());
+
+    // Notify employee of rejection
+    try {
+      const notificationRepo = Source.getRepository(Notification);
+      await notificationRepo.save(
+        notificationRepo.create({
+          employee_id: leaveApplication.employee_id,
+          title: 'Leave Rejected',
+          message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date.toDateString()} to ${leaveApplication.end_date.toDateString()} was rejected. Reason: ${reason.trim()}`,
+          type: 'LEAVE_REJECTED',
+          data: { leaveId },
+        }),
+      );
+    } catch {
+      // Non-blocking
+    }
 
     return this.leaveRepo.findById(leaveId);
   }

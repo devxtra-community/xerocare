@@ -40,6 +40,12 @@ export class PurchaseService {
     return purchases.map((p) => this.enrichPurchase(p));
   }
 
+  async getSpendByOrigin(filters: { branchId?: string; startDate?: string; endDate?: string }) {
+    const summary = await this.purchaseRepo.getSpendByOrigin(filters);
+    logger.info('Computed spend by origin', { ...filters, ...summary });
+    return summary;
+  }
+
   async getPurchaseByLotId(lotId: string, branchId?: string) {
     const purchase = await this.purchaseRepo.getPurchaseByLotId(lotId, branchId);
     if (!purchase) return null;

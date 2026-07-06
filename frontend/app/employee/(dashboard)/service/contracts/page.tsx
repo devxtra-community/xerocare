@@ -120,10 +120,6 @@ export default function ServiceContractsPage() {
     }
   }, [formState.customerId]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -142,6 +138,10 @@ export default function ServiceContractsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleOpenCreateModal = () => {
     setEditingContract(null);

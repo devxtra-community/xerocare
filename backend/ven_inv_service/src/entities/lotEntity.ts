@@ -12,6 +12,7 @@ import {
 import { Vendor } from './vendorEntity';
 import { LotItem } from './lotItemEntity';
 import { Warehouse } from './warehouseEntity';
+import { PurchaseOrigin } from './enums/purchaseOrigin';
 
 export enum LotStatus {
   PENDING = 'PENDING',
@@ -45,6 +46,16 @@ export class Lot {
 
   @Column({ type: 'enum', enum: LotStatus, default: LotStatus.PENDING })
   status!: LotStatus;
+
+  // Copied from the awarding RFQ at lot creation. Snapshot — never recalculated.
+  @Column({
+    name: 'purchase_origin',
+    type: 'enum',
+    enum: PurchaseOrigin,
+    nullable: true,
+  })
+  @Index()
+  purchaseOrigin?: PurchaseOrigin;
 
   // -------------
 

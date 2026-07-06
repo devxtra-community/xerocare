@@ -23,6 +23,7 @@ import rfqRouter from './routes/rfqRoute';
 import purchaseRouter from './routes/purchaseRoutes';
 import { httpLogger } from './middlewares/httpLogger';
 import serviceRouter from './routes/serviceRoutes';
+import stockTransferRouter from './routes/stockTransferRoutes';
 
 /**
  * This is the main engine for the Vendor & Inventory Service.
@@ -66,6 +67,7 @@ app.use('/lots', lotRouter);
 app.use('/rfq', rfqRouter);
 app.use('/purchases', purchaseRouter);
 app.use('/service', serviceRouter);
+app.use('/stock-transfers', stockTransferRouter);
 
 /**
  * Safety Net: Handling mistakes.

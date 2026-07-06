@@ -57,8 +57,15 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   const fetchNotifications = async () => {
     try {
       const response = await api.get('/e/notifications/my');
-      setNotifications(response.data);
-      setUnreadCount(response.data.filter((n: Notification) => !n.is_read).length);
+      const data = response.data;
+      // Support both old array shape and new { notifications, unreadCount } shape
+      if (Array.isArray(data)) {
+        setNotifications(data);
+        setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
+      } else {
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unreadCount ?? 0);
+      }
     } catch (error) {
       console.error('Failed to fetch notifications', error);
     }
@@ -95,6 +102,10 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
     };
     fetchProfile();
     fetchNotifications();
+
+    // Poll every 30 seconds for new notifications
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const markAsRead = async (id: string) => {
@@ -193,7 +204,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
               {notifications.length === 0 ? (
                 <div className="p-8 text-center text-sm text-gray-500">No notifications yet</div>
               ) : (
-                notifications.map((notification) => (
+                notifications.slice(0, 8).map((notification) => (
                   <DropdownMenuItem
                     key={notification.id}
                     className={`flex flex-col items-start gap-1 p-4 cursor-pointer focus:bg-primary/5 ${!notification.is_read ? 'bg-primary/5' : ''}`}
@@ -218,6 +229,16 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                   </DropdownMenuItem>
                 ))
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="flex justify-center p-3 text-xs font-semibold text-primary cursor-pointer hover:bg-primary/5"
+                onClick={() => {
+                  const role = user.role.toLowerCase();
+                  router.push(`/${role}/notifications`);
+                }}
+              >
+                View all notifications
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

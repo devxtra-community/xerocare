@@ -1304,7 +1304,7 @@ function QuotationFormModal({
   const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
 
   // ── WARRANTY state ──────────────────────────────────────────────────────
-  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies'>('none');
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('none');
   const [warrantyDurationValue, setWarrantyDurationValue] = useState('');
   const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('months');
   const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('');
@@ -1448,7 +1448,7 @@ function QuotationFormModal({
 
     // Warranty initial mapping
     if (initialData.warrantyType)
-      setWarrantyType(initialData.warrantyType as 'none' | 'duration' | 'copies');
+      setWarrantyType(initialData.warrantyType as 'none' | 'duration' | 'copies' | 'both');
     if (initialData.warrantyDurationValue)
       setWarrantyDurationValue(String(initialData.warrantyDurationValue));
     if (initialData.warrantyDurationUnit)
@@ -2157,6 +2157,22 @@ function QuotationFormModal({
         discountAmount: totalDiscount,
         effectiveFrom: new Date().toISOString().split('T')[0],
         effectiveTo: validityDate.toISOString().split('T')[0],
+        // Warranty — only for PRODUCT_SALE
+        ...(quotationType === 'PRODUCT_SALE' && {
+          warrantyType,
+          warrantyDurationValue:
+            (warrantyType === 'duration' || warrantyType === 'both') && warrantyDurationValue
+              ? Number(warrantyDurationValue)
+              : undefined,
+          warrantyDurationUnit:
+            warrantyType === 'duration' || warrantyType === 'both'
+              ? warrantyDurationUnit
+              : undefined,
+          warrantyCopyLimit:
+            (warrantyType === 'copies' || warrantyType === 'both') && warrantyCopyLimit
+              ? Number(warrantyCopyLimit)
+              : undefined,
+        }),
         items: saleItems.map((it, idx) => {
           let desc = it.isManual
             ? `[BN:${it.brand || ''}][MN:${it.model || ''}][PN:${it.productName || ''}][HS:${it.hsCode || ''}] ${it.description || ''}`
@@ -2281,12 +2297,15 @@ function QuotationFormModal({
         // Warranty
         warrantyType,
         warrantyDurationValue:
-          warrantyType === 'duration' && warrantyDurationValue
+          (warrantyType === 'duration' || warrantyType === 'both') && warrantyDurationValue
             ? Number(warrantyDurationValue)
             : undefined,
-        warrantyDurationUnit: warrantyType === 'duration' ? warrantyDurationUnit : undefined,
+        warrantyDurationUnit:
+          warrantyType === 'duration' || warrantyType === 'both' ? warrantyDurationUnit : undefined,
         warrantyCopyLimit:
-          warrantyType === 'copies' && warrantyCopyLimit ? Number(warrantyCopyLimit) : undefined,
+          (warrantyType === 'copies' || warrantyType === 'both') && warrantyCopyLimit
+            ? Number(warrantyCopyLimit)
+            : undefined,
 
         // Warranty
         // For FSM Leases, we need rentType and monthly rent mapped dynamically
@@ -3174,6 +3193,98 @@ function QuotationFormModal({
                       </p>
                     </div>
                   )}
+
+                  {/* Warranty Configuration — PRODUCT_SALE only */}
+                  {quotationType === 'PRODUCT_SALE' && (
+                    <div className="bg-card p-5 rounded-xl border border-amber-100 bg-amber-50/20 shadow-sm space-y-4 mt-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-400" /> Warranty
+                          Configuration
+                        </label>
+                        <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 border-none text-[9px] font-black tracking-widest px-2 py-0.5">
+                          SALE SPECIFIC
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">
+                            Warranty Type
+                          </label>
+                          <Select
+                            value={warrantyType}
+                            onValueChange={(v) =>
+                              setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both')
+                            }
+                          >
+                            <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Warranty</SelectItem>
+                              <SelectItem value="duration">By Duration (Time-based)</SelectItem>
+                              <SelectItem value="copies">By Count of Copies</SelectItem>
+                              <SelectItem value="both">
+                                Both (Duration &amp; Copies, whichever first)
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {(warrantyType === 'duration' || warrantyType === 'both') && (
+                          <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">
+                                Duration Value
+                              </label>
+                              <Input
+                                type="number"
+                                placeholder="e.g. 6"
+                                value={warrantyDurationValue}
+                                onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                                className="h-9 text-sm border-amber-100 shadow-sm"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase">
+                                Unit
+                              </label>
+                              <Select
+                                value={warrantyDurationUnit}
+                                onValueChange={(v) =>
+                                  setWarrantyDurationUnit(v as 'months' | 'years')
+                                }
+                              >
+                                <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="months">Months</SelectItem>
+                                  <SelectItem value="years">Years</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+
+                        {(warrantyType === 'copies' || warrantyType === 'both') && (
+                          <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">
+                              Warranty Copy Limit (Total)
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="e.g. 100000"
+                              value={warrantyCopyLimit}
+                              onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                              className="h-9 text-sm border-amber-100 shadow-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {/* ── RENT FIELDS ───────────────────────────────────────────── */}
@@ -4018,7 +4129,7 @@ function QuotationFormModal({
                         <Select
                           value={warrantyType}
                           onValueChange={(v) =>
-                            setWarrantyType(v as 'none' | 'duration' | 'copies')
+                            setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both')
                           }
                         >
                           <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
@@ -4028,15 +4139,18 @@ function QuotationFormModal({
                             <SelectItem value="none">No Warranty</SelectItem>
                             <SelectItem value="duration">By Duration (Time-based)</SelectItem>
                             <SelectItem value="copies">By Count of Copies</SelectItem>
+                            <SelectItem value="both">
+                              Both (Duration &amp; Copies, whichever first)
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
-                      {warrantyType === 'duration' && (
+                      {(warrantyType === 'duration' || warrantyType === 'both') && (
                         <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-1">
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-500 uppercase">
-                              Value
+                              Duration Value
                             </label>
                             <Input
                               type="number"
@@ -4068,7 +4182,7 @@ function QuotationFormModal({
                         </div>
                       )}
 
-                      {warrantyType === 'copies' && (
+                      {(warrantyType === 'copies' || warrantyType === 'both') && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
                           <label className="text-[10px] font-bold text-slate-500 uppercase">
                             Warranty Copy Limit (Total)

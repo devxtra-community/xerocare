@@ -61,6 +61,12 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [paymentReference, setPaymentReference] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Warranty states (for product sales)
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('none');
+  const [warrantyDurationValue, setWarrantyDurationValue] = useState('');
+  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('months');
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('');
+
   const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
   const [sparePartStocks, setSparePartStocks] = useState<
     Record<
@@ -345,6 +351,22 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
         paymentMode: paymentAmount > 0 ? paymentMode : undefined,
         paymentReference: paymentAmount > 0 ? paymentReference : undefined,
         notes,
+        // Warranty fields (only when at least one PRODUCT item)
+        ...(items.some((it) => it.itemType === 'PRODUCT') && {
+          warrantyType,
+          warrantyDurationValue:
+            (warrantyType === 'duration' || warrantyType === 'both') && warrantyDurationValue
+              ? Number(warrantyDurationValue)
+              : undefined,
+          warrantyDurationUnit:
+            warrantyType === 'duration' || warrantyType === 'both'
+              ? warrantyDurationUnit
+              : undefined,
+          warrantyCopyLimit:
+            (warrantyType === 'copies' || warrantyType === 'both') && warrantyCopyLimit
+              ? Number(warrantyCopyLimit)
+              : undefined,
+        }),
       };
 
       const res = await api.post('/b/invoices/direct-sale', payload);
@@ -901,6 +923,81 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               </div>
             </div>
           </div>
+
+          {/* Warranty Section — shown when at least one PRODUCT item */}
+          {items.some((it) => it.itemType === 'PRODUCT') && (
+            <div className="bg-amber-50/20 p-5 rounded-xl border border-amber-100 space-y-4">
+              <h3 className="text-sm font-semibold text-amber-600 uppercase tracking-wide flex items-center gap-2">
+                Warranty Configuration
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Warranty Type
+                  </label>
+                  <select
+                    className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-400"
+                    value={warrantyType}
+                    onChange={(e) =>
+                      setWarrantyType(e.target.value as 'none' | 'duration' | 'copies' | 'both')
+                    }
+                  >
+                    <option value="none">No Warranty</option>
+                    <option value="duration">By Duration (Time-based)</option>
+                    <option value="copies">By Count of Copies</option>
+                    <option value="both">Both (Duration &amp; Copies, whichever first)</option>
+                  </select>
+                </div>
+
+                {(warrantyType === 'duration' || warrantyType === 'both') && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Duration Value
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                        placeholder="e.g. 12"
+                        value={warrantyDurationValue}
+                        onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Unit
+                      </label>
+                      <select
+                        className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-amber-400"
+                        value={warrantyDurationUnit}
+                        onChange={(e) =>
+                          setWarrantyDurationUnit(e.target.value as 'months' | 'years')
+                        }
+                      >
+                        <option value="months">Months</option>
+                        <option value="years">Years</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {(warrantyType === 'copies' || warrantyType === 'both') && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Warranty Copy Limit (Total)
+                    </label>
+                    <input
+                      type="number"
+                      className="w-full border border-amber-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                      placeholder="e.g. 100000"
+                      value={warrantyCopyLimit}
+                      onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">

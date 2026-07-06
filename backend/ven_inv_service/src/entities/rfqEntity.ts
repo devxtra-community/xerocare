@@ -13,6 +13,7 @@ import { EmployeeManager } from './employeeManagerEntity';
 import { Vendor } from './vendorEntity';
 import { RfqItem } from './rfqItemEntity';
 import { RfqVendor } from './rfqVendorEntity';
+import { PurchaseOrigin } from './enums/purchaseOrigin';
 
 export enum RfqStatus {
   DRAFT = 'DRAFT',
@@ -51,6 +52,15 @@ export class Rfq {
 
   @Column({ type: 'uuid', nullable: true })
   awarded_vendor_id?: string;
+
+  // Snapshotted once at award time (see RfqService.awardVendor). Never recalculated.
+  @Column({
+    name: 'purchase_origin',
+    type: 'enum',
+    enum: PurchaseOrigin,
+    nullable: true,
+  })
+  purchase_origin?: PurchaseOrigin;
 
   @ManyToOne(() => Vendor, { nullable: true })
   @JoinColumn({ name: 'awarded_vendor_id' })

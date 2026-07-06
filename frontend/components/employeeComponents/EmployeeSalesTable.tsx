@@ -101,6 +101,39 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
+  const fetchPendingQuotations = async () => {
+    try {
+      setLoadingQuotations(true);
+      let data: Invoice[] = [];
+      try {
+        data = await getBranchInvoices();
+      } catch (err) {
+        console.error('getBranchInvoices failed, falling back to getMyInvoices:', err);
+        data = await getMyInvoices();
+      }
+
+      const pending = data.filter(
+        (inv) =>
+          inv.type === 'QUOTATION' &&
+          (inv.status === 'FINANCE_APPROVED' ||
+            inv.status === 'CUSTOMER_ACCEPTED' ||
+            inv.status === 'SENT_TO_CUSTOMER') &&
+          (inv.saleType === 'SALE' ||
+            inv.saleType === 'PRODUCT_SALE' ||
+            inv.saleType === 'SPAREPART_SALE'),
+      );
+      setPendingQuotations(pending);
+      setIsConverterOpen(true);
+    } catch (error: unknown) {
+      console.error(error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const msg = err.response?.data?.message || 'Failed to fetch pending quotations';
+      toast.error(msg);
+    } finally {
+      setLoadingQuotations(false);
+    }
+  };
+
   useEffect(() => {
     if (convertId) {
       fetchPendingQuotations();
@@ -179,39 +212,6 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   }, [filteredInvoices.length, setTotal]);
 
   const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
-
-  const fetchPendingQuotations = async () => {
-    try {
-      setLoadingQuotations(true);
-      let data: Invoice[] = [];
-      try {
-        data = await getBranchInvoices();
-      } catch (err) {
-        console.error('getBranchInvoices failed, falling back to getMyInvoices:', err);
-        data = await getMyInvoices();
-      }
-
-      const pending = data.filter(
-        (inv) =>
-          inv.type === 'QUOTATION' &&
-          (inv.status === 'FINANCE_APPROVED' ||
-            inv.status === 'CUSTOMER_ACCEPTED' ||
-            inv.status === 'SENT_TO_CUSTOMER') &&
-          (inv.saleType === 'SALE' ||
-            inv.saleType === 'PRODUCT_SALE' ||
-            inv.saleType === 'SPAREPART_SALE'),
-      );
-      setPendingQuotations(pending);
-      setIsConverterOpen(true);
-    } catch (error: unknown) {
-      console.error(error);
-      const err = error as { response?: { data?: { message?: string } } };
-      const msg = err.response?.data?.message || 'Failed to fetch pending quotations';
-      toast.error(msg);
-    } finally {
-      setLoadingQuotations(false);
-    }
-  };
 
   const handleConvertQuotation = async (qId: string) => {
     const q = pendingQuotations.find((inv) => inv.id === qId);

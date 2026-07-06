@@ -45,7 +45,7 @@ export interface LotItem {
   mpn?: string;
   compatibleModels?: string;
   modelIds?: string[];
-  selling_price?: number;
+  sellingPrice?: number;
 }
 
 export interface Lot {
@@ -56,6 +56,8 @@ export interface Lot {
   purchaseDate: string;
   totalAmount: number;
   status: LotStatus;
+  /** Copied from the awarding RFQ. Undefined for manually-created lots. */
+  purchaseOrigin?: import('./purchaseOrigin').PurchaseOrigin;
   branch_id?: string;
   notes?: string;
   warehouseId?: string;

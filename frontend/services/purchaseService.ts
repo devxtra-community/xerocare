@@ -35,6 +35,8 @@ export interface Purchase {
   paidAmount: number; // How much money we have already sent
   remainingAmount: number; // Money we still owe the vendor
   status: 'UNPAID' | 'PARTIAL' | 'PAID';
+  /** Domestic vs International — snapshot copied from the lot/RFQ at creation. */
+  purchaseOrigin?: import('@/lib/purchaseOrigin').PurchaseOrigin;
   lotId: string; // The group of items (Lot) this purchase is for
   vendorId: string;
   branchId: string;
@@ -87,6 +89,19 @@ export const purchaseService = {
    */
   getAllPurchases: async (): Promise<Purchase[]> => {
     const response = await api.get('/i/purchases');
+    return response.data.data;
+  },
+
+  /**
+   * Total spend split by Domestic vs International, for the dashboard cards.
+   * Admins may pass branchId; non-admins are scoped to their own branch server-side.
+   */
+  getSpendByOrigin: async (params?: {
+    branchId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<import('@/lib/purchaseOrigin').SpendByOrigin> => {
+    const response = await api.get('/i/purchases/spend-by-origin', { params });
     return response.data.data;
   },
 

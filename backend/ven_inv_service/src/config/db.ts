@@ -40,6 +40,8 @@ import { InventoryReservation } from '../entities/inventoryReservationEntity';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
 import { ServiceContract } from '../entities/serviceContractEntity';
+import { StockTransfer } from '../entities/stockTransferEntity';
+import { StockTransferItem } from '../entities/stockTransferItemEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -82,6 +84,8 @@ export const Source = new DataSource({
     ServicePartUsageLog,
     ServiceTicketActivity,
     ServiceContract,
+    StockTransfer,
+    StockTransferItem,
   ],
   poolSize: 1,
   extra: {
@@ -162,6 +166,45 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS exchange_rate_fetched_at TIMESTAMP;
         `);
         logger.info('Guaranteed rfq_vendors currency columns exist.');
+
+        // --- Vendor country, currency & bank accounts columns ---
+        await Source.query(`
+          ALTER TABLE vendors
+          ADD COLUMN IF NOT EXISTS country_code VARCHAR(2),
+          ADD COLUMN IF NOT EXISTS country_name VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS bank_accounts JSONB DEFAULT '[]'::jsonb;
+        `);
+        logger.info('Guaranteed vendor country, currency & bank accounts columns exist.');
+
+        // --- Remove blank/zombie vendors (empty name or email) ---
+        await Source.query(`
+          DELETE FROM vendors WHERE TRIM(email) = '' OR TRIM(name) = '';
+        `);
+        logger.info('Cleaned up blank vendor records.');
+
+        // --- Domestic vs International purchase classification ---
+        // Snapshotted purchase_origin on rfqs, lots and purchases. Enum type names
+        // follow TypeORM's <table>_<column>_enum convention so a future synchronize
+        // pass will not try to recreate them.
+        await Source.query(`
+          DO $$ BEGIN
+            CREATE TYPE rfqs_purchase_origin_enum AS ENUM ('DOMESTIC', 'INTERNATIONAL');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE TYPE lots_purchase_origin_enum AS ENUM ('DOMESTIC', 'INTERNATIONAL');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE TYPE purchases_purchase_origin_enum AS ENUM ('DOMESTIC', 'INTERNATIONAL');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+          ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS purchase_origin rfqs_purchase_origin_enum;
+          ALTER TABLE lots ADD COLUMN IF NOT EXISTS purchase_origin lots_purchase_origin_enum;
+          ALTER TABLE purchases ADD COLUMN IF NOT EXISTS purchase_origin purchases_purchase_origin_enum;
+
+          CREATE INDEX IF NOT EXISTS idx_lots_purchase_origin ON lots (purchase_origin);
+          CREATE INDEX IF NOT EXISTS idx_purchases_purchase_origin ON purchases (purchase_origin);
+        `);
+        logger.info('Guaranteed purchase_origin columns exist on rfqs, lots, purchases.');
 
         // --- Currency columns on service_estimates ---
         await Source.query(`
@@ -692,6 +735,73 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.info('Guaranteed service_contracts table and enum exist.');
         } catch (contractSchemaErr) {
           logger.error('Failed to create service_contracts schema:', contractSchemaErr);
+        }
+
+        // --- Stock Transfer Module Schema ---
+        try {
+          await Source.query(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfers_transfer_type_enum') THEN
+                CREATE TYPE stock_transfers_transfer_type_enum AS ENUM ('INTRA_BRANCH', 'INTER_BRANCH');
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfers_status_enum') THEN
+                CREATE TYPE stock_transfers_status_enum AS ENUM (
+                  'DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'IN_TRANSIT',
+                  'RECEIVED', 'PARTIALLY_RECEIVED', 'COMPLETED', 'REJECTED', 'CANCELLED'
+                );
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'stock_transfer_items_item_type_enum') THEN
+                CREATE TYPE stock_transfer_items_item_type_enum AS ENUM ('SPARE_PART', 'PRODUCT');
+              END IF;
+            END
+            $$;
+          `);
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS stock_transfers (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              transfer_number VARCHAR(50) NOT NULL UNIQUE,
+              transfer_type stock_transfers_transfer_type_enum NOT NULL,
+              status stock_transfers_status_enum NOT NULL DEFAULT 'DRAFT',
+              source_branch_id UUID NOT NULL,
+              source_warehouse_id UUID NOT NULL,
+              destination_branch_id UUID NOT NULL,
+              destination_warehouse_id UUID NOT NULL,
+              requested_by_id UUID NOT NULL,
+              approved_by_id UUID NULL,
+              reason TEXT NOT NULL,
+              notes TEXT NULL,
+              rejection_reason TEXT NULL,
+              dispatched_at TIMESTAMP NULL,
+              received_at TIMESTAMP NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+          `);
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS stock_transfer_items (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              transfer_id UUID NOT NULL REFERENCES stock_transfers(id) ON DELETE CASCADE,
+              item_type stock_transfer_items_item_type_enum NOT NULL,
+              spare_part_id UUID NULL,
+              product_id UUID NULL,
+              requested_qty INT NOT NULL DEFAULT 1,
+              dispatched_qty INT NULL,
+              received_qty INT NULL,
+              unit_cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+          `);
+          await Source.query(`
+            ALTER TABLE spare_part_inventories
+            ADD COLUMN IF NOT EXISTS transfer_reserved_qty INT NOT NULL DEFAULT 0;
+          `);
+          await Source.query(`
+            ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(20) DEFAULT 'NONE';
+          `);
+          logger.info('Guaranteed stock_transfers schema exists.');
+        } catch (stockTransferErr) {
+          logger.error('Failed to create stock_transfers schema:', stockTransferErr);
         }
       }
       return Source;

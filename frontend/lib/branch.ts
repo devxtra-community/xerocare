@@ -82,6 +82,11 @@ export async function getBranches() {
   return res.data;
 }
 
+export async function getAllBranches(): Promise<Branch[]> {
+  const res = await api.get<{ success: boolean; data: Branch[] }>('/i/branch/all');
+  return res.data.data;
+}
+
 export async function updateBranch(id: string, data: UpdateBranchPayload) {
   const res = await api.put(`/i/branch/${id}`, data);
   return res.data;

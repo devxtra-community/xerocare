@@ -5,6 +5,10 @@ import { logger } from '../config/logger';
 import { BulkProductRow } from '../dto/product.dto';
 import { MulterS3File } from '../types/multer-s3-file';
 import { ProductStatus } from '../entities/productEntity';
+import { Source } from '../config/db';
+import { Product } from '../entities/productEntity';
+import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
+import { ServiceTicket } from '../entities/serviceTicketEntity';
 
 const service = new ProductService();
 
@@ -307,6 +311,34 @@ export const getproductbyid = async (req: Request, res: Response, next: NextFunc
       success: true,
       data: product,
       message: 'Product fetched successfully',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getProductHistoryData = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+
+    const product = await Source.getRepository(Product).findOne({
+      where: { id },
+      relations: ['model', 'warehouse', 'vendor', 'lot'],
+    });
+    if (!product) throw new AppError('Product not found', 404);
+
+    const machineHistory = await Source.getRepository(MachineServiceHistory).findOne({
+      where: { productId: id },
+    });
+
+    const tickets = await Source.getRepository(ServiceTicket).find({
+      where: [{ productId: id }, { serialNumber: product.serial_no }],
+      order: { created_at: 'ASC' },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { product, machineHistory, tickets },
     });
   } catch (err) {
     next(err);

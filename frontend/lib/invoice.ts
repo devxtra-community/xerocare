@@ -136,7 +136,7 @@ export interface Invoice {
   effectiveFrom?: string;
   effectiveTo?: string;
   // Warranty
-  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyType?: 'none' | 'duration' | 'copies' | 'both';
   warrantyDurationValue?: number;
   warrantyDurationUnit?: 'months' | 'years';
   warrantyCopyLimit?: number;
@@ -326,7 +326,7 @@ export interface CreateInvoicePayload {
   effectiveTo?: string;
 
   // Warranty
-  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyType?: 'none' | 'duration' | 'copies' | 'both';
   warrantyDurationValue?: number;
   warrantyDurationUnit?: 'months' | 'years';
   warrantyCopyLimit?: number;

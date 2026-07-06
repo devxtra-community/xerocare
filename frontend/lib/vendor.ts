@@ -1,5 +1,16 @@
 import api from './api';
 
+export interface BankAccount {
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  routingNumber?: string;
+  swiftCode?: string;
+  iban?: string;
+  ifscCode?: string;
+  isPrimary?: boolean;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -23,6 +34,9 @@ export interface Vendor {
     bankName: string;
   };
   currency?: string;
+  countryCode?: string;
+  countryName?: string;
+  bankAccounts?: BankAccount[];
 }
 
 export async function createVendor(data: Partial<Vendor>) {

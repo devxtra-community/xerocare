@@ -39,7 +39,7 @@ export interface LeaseAgreementDetails {
   endDate: string;
   monthlyEmi: number; // periodic payment (monthly rent for FSM, EMI for EMI-type)
   totalLeaseValue?: number; // total lease value (FSM: total contract value; EMI: totalAmount)
-  warrantyType?: 'none' | 'duration' | 'copies';
+  warrantyType?: 'none' | 'duration' | 'copies' | 'both';
   warrantyDurationValue?: number;
   warrantyDurationUnit?: 'months' | 'years';
   warrantyCopyLimit?: number;

@@ -627,7 +627,7 @@ export function ProductFormModal({
             />
           </Field>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Field label="Purchase Price">
               <Input
                 type="number"
@@ -635,6 +635,14 @@ export function ProductFormModal({
                 onChange={(e) => setForm({ ...form, purchase_price: Number(e.target.value) })}
                 placeholder="0"
                 required
+              />
+            </Field>
+            <Field label="Wholesale Price">
+              <Input
+                type="number"
+                value={form.wholesale_price}
+                onChange={(e) => setForm({ ...form, wholesale_price: Number(e.target.value) })}
+                placeholder="0"
               />
             </Field>
             <Field label="Sale Price">
@@ -646,6 +654,14 @@ export function ProductFormModal({
                 required
               />
             </Field>
+            <Field label="Max Discount">
+              <Input
+                type="number"
+                value={form.max_discount_amount}
+                onChange={(e) => setForm({ ...form, max_discount_amount: Number(e.target.value) })}
+                placeholder="0"
+              />
+            </Field>
             <Field label="Tax Rate (%)">
               <Input
                 type="number"
@@ -655,23 +671,11 @@ export function ProductFormModal({
                 required
               />
             </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Max Discount">
+            <Field label="HS Code">
               <Input
-                type="number"
-                value={form.max_discount_amount}
-                onChange={(e) => setForm({ ...form, max_discount_amount: Number(e.target.value) })}
-                placeholder="0"
-              />
-            </Field>
-            <Field label="Wholesale Price">
-              <Input
-                type="number"
-                value={form.wholesale_price}
-                onChange={(e) => setForm({ ...form, wholesale_price: Number(e.target.value) })}
-                placeholder="0"
+                value={form.hs_code || ''}
+                onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
+                placeholder="HS Code"
               />
             </Field>
             <Field label="Print Colour">
@@ -690,13 +694,6 @@ export function ProductFormModal({
                   <SelectItem value="BOTH">Both</SelectItem>
                 </SelectContent>
               </Select>
-            </Field>
-            <Field label="HS Code">
-              <Input
-                value={form.hs_code || ''}
-                onChange={(e) => setForm({ ...form, hs_code: e.target.value })}
-                placeholder="HS Code"
-              />
             </Field>
           </div>
 

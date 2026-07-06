@@ -70,7 +70,8 @@ export function BulkProductDialog({
       getBrands(),
     ]);
 
-    if (vResult.status === 'fulfilled') setVendors(vResult.value);
+    const loadedVendors = vResult.status === 'fulfilled' ? vResult.value : [];
+    if (vResult.status === 'fulfilled') setVendors(loadedVendors);
     else if (vResult.status === 'rejected')
       console.error('Failed to load vendors:', vResult.reason);
 
@@ -81,7 +82,8 @@ export function BulkProductDialog({
     if (lResult.status === 'fulfilled') setLots(lResult.value.data || []);
     else if (lResult.status === 'rejected') console.error('Failed to load lots:', lResult.reason);
 
-    if (mResult.status === 'fulfilled') setModels(mResult.value.data || []);
+    const loadedModels = mResult.status === 'fulfilled' ? mResult.value.data || [] : [];
+    if (mResult.status === 'fulfilled') setModels(loadedModels);
     else if (mResult.status === 'rejected') console.error('Failed to load models:', mResult.reason);
 
     if (bResult.status === 'fulfilled' && bResult.value.success) setBrands(bResult.value.data);
@@ -91,64 +93,9 @@ export function BulkProductDialog({
     if (vResult.status === 'rejected' && wResult.status === 'rejected') {
       toast.error('Failed to load dependencies');
     }
+
+    return { loadedModels, loadedVendors };
   };
-
-  useEffect(() => {
-    if (open) {
-      setFile(null);
-      setExpandedRows({});
-      const prepareInitialData = async () => {
-        await loadDependencies();
-
-        if (initialLotId) {
-          // Find the specific lot and pre-fill rows
-          const lotResponse = await lotService.getLotById(initialLotId);
-          const lot = lotResponse; // getLotById likely returns the lot directly
-
-          if (lot && lot.items) {
-            let itemsToFill = lot.items.filter((item) => item.itemType === LotItemType.MODEL);
-
-            if (initialItemId) {
-              itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
-            }
-
-            const newRows: Partial<BulkProductRow>[] = [];
-            itemsToFill.forEach((item) => {
-              const modelId = item.modelId ?? item.model?.id ?? '';
-              const model = models.find((m) => m.id === modelId);
-              const brandName =
-                model?.brandRelation?.name ||
-                model?.brand?.name ||
-                item.model?.brandRelation?.name ||
-                '';
-              const qty = Math.max(0, item.receivedQuantity - item.usedQuantity);
-              for (let i = 0; i < qty; i++) {
-                newRows.push({
-                  ...createEmptyRow(),
-                  lot_id: initialLotId,
-                  model_id: modelId,
-                  model_no: modelId,
-                  brand: brandName,
-                  vendor_id: lot.vendorId || lot.vendor?.id || '',
-                  warehouse_id: lot.warehouseId || lot.warehouse_id || '',
-                  purchase_price: Number(item.unitPrice) || 0,
-                  sale_price: Number(item.selling_price) || 0,
-                  name: item.customProductName || model?.model_name || '',
-                  description: model?.description || '',
-                });
-              }
-            });
-
-            setRows(newRows);
-          }
-        } else {
-          setRows([]);
-        }
-      };
-
-      prepareInitialData();
-    }
-  }, [open, initialLotId, initialItemId, models]);
 
   const createEmptyRow = (): Partial<BulkProductRow> => ({
     model_id: '',
@@ -172,6 +119,72 @@ export function BulkProductDialog({
     features: [],
     consumables: [],
   });
+
+  useEffect(() => {
+    if (open) {
+      setFile(null);
+      setExpandedRows({});
+      const prepareInitialData = async () => {
+        const { loadedModels, loadedVendors } = await loadDependencies();
+
+        if (initialLotId) {
+          // Find the specific lot and pre-fill rows
+          const lotResponse = await lotService.getLotById(initialLotId);
+          const lot = lotResponse; // getLotById likely returns the lot directly
+
+          if (lot && lot.items) {
+            let itemsToFill = lot.items.filter((item) => item.itemType === LotItemType.MODEL);
+
+            if (initialItemId) {
+              itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
+            }
+
+            // Ensure lot's vendor is in the dropdown even if filtered out (e.g. inactive)
+            const vendorId = lot.vendorId || lot.vendor?.id || '';
+            if (vendorId && lot.vendor && !loadedVendors.find((v) => String(v.id) === vendorId)) {
+              setVendors([
+                ...loadedVendors,
+                { id: lot.vendor.id as unknown as number, name: lot.vendor.name },
+              ]);
+            }
+
+            const newRows: Partial<BulkProductRow>[] = [];
+            itemsToFill.forEach((item) => {
+              const modelId = item.modelId ?? item.model?.id ?? '';
+              const model = loadedModels.find((m: Model) => m.id === modelId);
+              const brandName =
+                model?.brandRelation?.name ||
+                model?.brand?.name ||
+                item.model?.brandRelation?.name ||
+                '';
+              const qty = Math.max(0, item.receivedQuantity - item.usedQuantity);
+              for (let i = 0; i < qty; i++) {
+                newRows.push({
+                  ...createEmptyRow(),
+                  lot_id: initialLotId,
+                  model_id: modelId,
+                  model_no: modelId,
+                  brand: brandName,
+                  vendor_id: vendorId,
+                  warehouse_id: lot.warehouseId || lot.warehouse_id || '',
+                  purchase_price: Number(item.unitPrice) || 0,
+                  sale_price: Number(item.sellingPrice) || 0,
+                  name: item.customProductName || model?.model_name || '',
+                  description: model?.description || '',
+                });
+              }
+            });
+
+            setRows(newRows);
+          }
+        } else {
+          setRows([]);
+        }
+      };
+
+      prepareInitialData();
+    }
+  }, [open, initialLotId, initialItemId]);
 
   /**
    * Converts an Excel serial date number to a YYYY-MM-DD string.
@@ -551,7 +564,7 @@ export function BulkProductDialog({
                                     updateRow(
                                       i,
                                       'sale_price',
-                                      Number(item.selling_price) || row.sale_price || 0,
+                                      Number(item.sellingPrice) || row.sale_price || 0,
                                     );
                                     updateRow(
                                       i,

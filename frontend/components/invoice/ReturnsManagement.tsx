@@ -36,10 +36,6 @@ export default function ReturnsManagement() {
   const [returnNote, setReturnNote] = useState<string>('');
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    fetchInvoices();
-  }, []);
-
   const fetchInvoices = async () => {
     try {
       setLoading(true);
@@ -59,6 +55,10 @@ export default function ReturnsManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(

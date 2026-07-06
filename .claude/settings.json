@@ -1,5 +1,14 @@
 {
   "permissions": {
-    "allow": ["Bash(pnpm typecheck *)", "Bash(pnpm -r typecheck)"]
+    "allow": [
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm -r typecheck)",
+      "Bash(awk '{print $1, $2, $11, $12}')",
+      "Bash(pm2 list *)",
+      "Bash(npm install *)",
+      "Bash(pnpm --filter employee_service typecheck)",
+      "Bash(pnpm --filter ven_inv_service typecheck)",
+      "Bash(pnpm --filter billing_service typecheck)"
+    ]
   }
 }

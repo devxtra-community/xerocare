@@ -14,6 +14,7 @@ import {
   FileText,
   BookOpen,
   BookMarked,
+  CalendarDays,
   TrendingUp,
   Scale,
   Waves,
@@ -26,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   Landmark,
+  Bell,
   Banknote,
 } from 'lucide-react';
 
@@ -78,6 +80,7 @@ export default function FinanceSidebar() {
     { title: 'Income Statement', icon: TrendingUp, href: '/finance/accounts/income-statement' },
     { title: 'Balance Sheet', icon: Scale, href: '/finance/accounts/balance-sheet' },
     { title: 'Cash Flow', icon: Waves, href: '/finance/accounts/cash-flow' },
+    { title: 'Day Book', icon: CalendarDays, href: '/finance/accounts/day-book' },
     { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
     { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
     { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
@@ -141,6 +144,16 @@ export default function FinanceSidebar() {
           title: 'Opening Balances',
           icon: FileText,
           href: '/finance/opening-balances',
+        },
+      ],
+    },
+    {
+      group: 'Account',
+      items: [
+        {
+          title: 'Notifications',
+          icon: Bell,
+          href: '/finance/notifications',
         },
       ],
     },

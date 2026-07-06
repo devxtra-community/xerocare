@@ -7,6 +7,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', purchaseController.getAllPurchases);
+router.get('/spend-by-origin', purchaseController.getSpendByOrigin);
 router.get('/lot/:lotId', purchaseController.getPurchaseByLotId);
 router.get('/:id', purchaseController.getPurchaseById);
 router.post('/:id/payments', purchaseController.addPayment);

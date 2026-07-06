@@ -38,15 +38,6 @@ export default function EmployeeDashboardPage() {
   const [selectedContract, setSelectedContract] = useState<Invoice | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
 
-  useEffect(() => {
-    const currentUser = getUserFromToken() as unknown as UserInfo | null;
-    setUser(currentUser);
-
-    if (currentUser?.employeeJob === EmployeeJob.TECHNICIAN) {
-      fetchContracts();
-    }
-  }, []);
-
   const fetchContracts = async () => {
     try {
       setLoading(true);
@@ -65,6 +56,15 @@ export default function EmployeeDashboardPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const currentUser = getUserFromToken() as unknown as UserInfo | null;
+    setUser(currentUser);
+
+    if (currentUser?.employeeJob === EmployeeJob.TECHNICIAN) {
+      fetchContracts();
+    }
+  }, []);
 
   const filteredContracts = contracts.filter(
     (c) =>
