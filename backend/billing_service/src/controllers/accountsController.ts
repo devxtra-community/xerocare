@@ -148,7 +148,7 @@ export const getCashbookEntries = async (req: Request, res: Response, next: Next
   try {
     const repo = Source.getRepository(CashbookEntry);
     const { accountId, fromDate, toDate, entryType } = req.query;
-    const qb = repo.createQueryBuilder('e');
+    const qb = repo.createQueryBuilder('e').leftJoinAndSelect('e.account', 'account');
     applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     if (accountId) qb.andWhere('e.accountId = :accountId', { accountId });
     if (entryType) qb.andWhere('e.entryType = :entryType', { entryType });
@@ -592,9 +592,12 @@ export const getDepreciationSchedule = async (req: Request, res: Response, next:
 export const getDepreciationJournals = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(DepreciationJournalEntry);
-    const { branchId } = req.query;
-    const where = branchId ? { branchId: branchId as string } : {};
-    const journals = await repo.find({ where, order: { periodYear: 'DESC', periodMonth: 'DESC' } });
+    const qb = repo
+      .createQueryBuilder('j')
+      .orderBy('j.periodYear', 'DESC')
+      .addOrderBy('j.periodMonth', 'DESC');
+    applyBranchQB(qb as never, 'j', req.branchFilter ?? []);
+    const journals = await qb.getMany();
     res.json({ success: true, data: journals });
   } catch (err) {
     next(err);
@@ -1290,9 +1293,8 @@ export const getBalanceSheet = async (req: Request, res: Response, next: NextFun
 export const getExpenseCharts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(ExpenseEntry);
-    const { branchId } = req.query;
     const qb = repo.createQueryBuilder('e');
-    if (branchId) qb.andWhere('e.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     const rows = await qb.getMany();
 
     const monthlyMap: Record<string, Record<string, number>> = {};
@@ -1335,9 +1337,8 @@ export const getExpenseCharts = async (req: Request, res: Response, next: NextFu
 export const getReceivableCharts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(ManualReceivable);
-    const { branchId } = req.query;
     const qb = repo.createQueryBuilder('r');
-    if (branchId) qb.andWhere('r.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'r', req.branchFilter ?? []);
     const rows = await qb.getMany();
 
     const typeMap: Record<string, number> = {};
@@ -1379,9 +1380,8 @@ export const getReceivableCharts = async (req: Request, res: Response, next: Nex
 export const getPayableCharts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(ManualPayable);
-    const { branchId } = req.query;
     const qb = repo.createQueryBuilder('p');
-    if (branchId) qb.andWhere('p.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'p', req.branchFilter ?? []);
     const rows = await qb.getMany();
 
     const typeMap: Record<string, number> = {};
@@ -1413,9 +1413,8 @@ export const getPayableCharts = async (req: Request, res: Response, next: NextFu
 export const getDepreciationCharts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const assetRepo3 = Source.getRepository(AssetDepreciationRegister);
-    const { branchId } = req.query;
     const qb = assetRepo3.createQueryBuilder('a');
-    if (branchId) qb.andWhere('a.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'a', req.branchFilter ?? []);
     const assets = await qb.getMany();
 
     const brandMap: Record<string, { cost: number; nbv: number }> = {};
@@ -1463,9 +1462,8 @@ export const getDepreciationCharts = async (req: Request, res: Response, next: N
 export const getEquityCharts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(EquityEntry);
-    const { branchId } = req.query;
     const qb = repo.createQueryBuilder('e');
-    if (branchId) qb.andWhere('e.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     qb.orderBy('e.date', 'ASC');
     const rows = await qb.getMany();
 

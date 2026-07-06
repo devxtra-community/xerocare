@@ -47,8 +47,8 @@ app.use('/opening-balance', openingBalanceRouter);
 app.use('/credit-notes', creditNoteRouter);
 // expense request routes mount BEFORE /accounts to avoid parseBranchFilter blocking non-finance roles
 app.use('/expenses/requests', expenseRequestRouter);
-app.use('/accounts', accountsRouter);
 app.use('/accounts/admin', adminAccountsRouter);
+app.use('/accounts', accountsRouter);
 
 /**
  * Safety Net: Handling mistakes.
