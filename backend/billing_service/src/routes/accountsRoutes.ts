@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/authMiddleware';
-import { parseBranchFilter } from '../middlewares/branchFilterMiddleware';
+import { parseBranchFilter, requireWriteAccess } from '../middlewares/branchFilterMiddleware';
 import {
   getCashBankAccounts,
   createCashBankAccount,
@@ -73,6 +73,14 @@ const router = Router();
 // All routes require auth + branch filter enforcement
 router.use(authMiddleware);
 router.use(parseBranchFilter);
+
+// MANAGER is read-only — block all mutating methods
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return requireWriteAccess(req, res, next);
+  }
+  next();
+});
 
 // Cheques sub-router (inherits auth + parseBranchFilter above)
 router.use('/cheques', chequesRouter);

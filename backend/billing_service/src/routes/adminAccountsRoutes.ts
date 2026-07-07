@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/authMiddleware';
-import { parseBranchFilter } from '../middlewares/branchFilterMiddleware';
+import { parseBranchFilter, requireWriteAccess } from '../middlewares/branchFilterMiddleware';
 import {
   getExchangeRates,
   setExchangeRate,
@@ -15,6 +15,14 @@ const router = Router();
 
 router.use(authMiddleware);
 router.use(parseBranchFilter);
+
+// MANAGER is read-only for admin endpoints too
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return requireWriteAccess(req, res, next);
+  }
+  next();
+});
 
 // Exchange rates (admin-set)
 router.get('/exchange-rates', getExchangeRates);

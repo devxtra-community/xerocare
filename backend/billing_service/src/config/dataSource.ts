@@ -736,7 +736,6 @@ async function runPreMigrations() {
       );
     `);
     logger.info('Cheque management tables created.');
-    // ─────────────────────────────────────────────────────────────────────────
 
     logger.info('Pre-migration enum values and tables added successfully');
 

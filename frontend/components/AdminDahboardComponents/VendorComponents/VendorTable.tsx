@@ -64,6 +64,7 @@ type BankAccount = {
   bankName: string;
   accountHolderName: string;
   accountNumber: string;
+  accountType?: 'Savings Account' | 'Current Account' | 'Business Account';
   routingNumber?: string;
   swiftCode?: string;
   iban?: string;
@@ -714,6 +715,7 @@ const BLANK_BANK: BankAccount = {
   bankName: '',
   accountHolderName: '',
   accountNumber: '',
+  accountType: undefined,
   routingNumber: '',
   swiftCode: '',
   iban: '',
@@ -1046,7 +1048,14 @@ function VendorFormModal({
                         )}
                       </div>
                       <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
-                      <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                        {acc.accountType && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                            {acc.accountType}
+                          </span>
+                        )}
+                      </div>
                       {(acc.swiftCode || acc.iban || acc.ifscCode) && (
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
@@ -1122,6 +1131,29 @@ function VendorFormModal({
                       }
                       className="h-9 text-sm font-mono rounded-lg bg-card border-none shadow-sm"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      Account Type
+                    </label>
+                    <Select
+                      value={bankDraft.accountType || ''}
+                      onValueChange={(v) =>
+                        setBankDraft((d) => ({
+                          ...d,
+                          accountType: v as BankAccount['accountType'],
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 text-sm rounded-lg bg-card border-none shadow-sm">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Savings Account">Savings Account</SelectItem>
+                        <SelectItem value="Current Account">Current Account</SelectItem>
+                        <SelectItem value="Business Account">Business Account</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase">
