@@ -1137,6 +1137,99 @@ export function QuotationViewDialog({
                 }}
               />
             )}
+
+            {/* --- Warranty Details Section (Lease and Product/Spare Part Sale) --- */}
+            {(isLease || isSale) && quotation.warrantyType && quotation.warrantyType !== 'none' && (
+              <div
+                className="flex flex-col mt-4 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700"
+                style={{ maxWidth: '900px', margin: '16px auto 32px' }}
+              >
+                <div className="border border-red-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
+                  <div className="flex items-center justify-between border-b border-red-50 pb-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center">
+                        <span className="text-emerald-600">🛡️</span>
+                      </div>
+                      <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
+                        Warranty Details
+                      </h3>
+                    </div>
+                    <div className="bg-emerald-100 px-3 py-1 rounded-full">
+                      <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">
+                        Guaranteed Coverage
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-2">
+                    <div>
+                      <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1">
+                        Identification
+                      </p>
+                      <div className="space-y-3">
+                        <div className="flex justify-between border-b border-slate-50 pb-2">
+                          <span className="text-[12px] text-slate-500 font-normal">
+                            Warranty Type
+                          </span>
+                          <span className="text-[12px] font-normal text-slate-900 uppercase italic">
+                            {quotation.warrantyType === 'duration'
+                              ? 'By Duration'
+                              : quotation.warrantyType === 'copies'
+                                ? 'By Count of Copies'
+                                : 'By Duration & Count of Copies'}
+                          </span>
+                        </div>
+
+                        {(quotation.warrantyType === 'duration' ||
+                          quotation.warrantyType === 'both') && (
+                          <div className="flex justify-between border-b border-slate-50 pb-2">
+                            <span className="text-[12px] text-slate-500 font-normal">
+                              Coverage Period
+                            </span>
+                            <span className="text-[12px] font-normal text-slate-900 uppercase">
+                              {quotation.warrantyDurationValue} {quotation.warrantyDurationUnit}
+                            </span>
+                          </div>
+                        )}
+
+                        {(quotation.warrantyType === 'copies' ||
+                          quotation.warrantyType === 'both') && (
+                          <div className="flex justify-between border-b border-slate-50 pb-2">
+                            <span className="text-[12px] text-slate-500 font-normal">
+                              Maximum Copy Limit
+                            </span>
+                            <span className="text-[12px] font-normal text-slate-900">
+                              {Number(quotation.warrantyCopyLimit || 0).toLocaleString()} COPIES
+                            </span>
+                          </div>
+                        )}
+
+                        {quotation.warrantyType === 'both' && (
+                          <p className="text-[10px] text-slate-400 font-normal italic pt-1">
+                            Whichever comes first — warranty ends as soon as either the coverage
+                            period or the copy limit above is reached.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-center">
+                      <p className="text-[10px] font-normal text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                        Terms & Limitations
+                      </p>
+                      <p className="text-[11px] text-amber-900 leading-relaxed font-normal">
+                        Technical support and replacement parts are provided free of charge during
+                        the warranty period specified above. After the warranty period expires, or
+                        once the applicable usage limit is reached, all technical support services,
+                        spare parts, repairs, and related charges will be billable at the prevailing
+                        rates.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           {/* Footer Actions */}
           <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center">
@@ -1545,7 +1638,9 @@ export function QuotationViewDialog({
                               {isSale && (
                                 <>
                                   <td className="py-3 px-3 text-center border-r-2 border-red-50 align-top font-normal text-slate-900 text-sm">
-                                    {item.discount ? `${item.discount}%` : '0%'}
+                                    {Number(item.discount || 0).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
                                   </td>
                                   <td className="py-3 px-4 text-right border-r-2 border-red-50 align-top font-normal text-slate-800 text-sm">
                                     {Number(item.unitPrice || 0).toLocaleString(undefined, {
@@ -2082,84 +2177,92 @@ export function QuotationViewDialog({
                   </div>
                 )}
 
-                {/* --- Warranty Details Section (Lease Only) --- */}
-                {isLease && quotation.warrantyType && quotation.warrantyType !== 'none' && (
-                  <div className="flex flex-col mt-8 pl-12 pr-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="border border-red-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
-                      <div className="flex items-center justify-between border-b border-red-50 pb-3 mb-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center">
-                            <span className="text-emerald-600">🛡️</span>
-                          </div>
-                          <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
-                            Warranty Details
-                          </h3>
-                        </div>
-                        <div className="bg-emerald-100 px-3 py-1 rounded-full">
-                          <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">
-                            Guaranteed Coverage
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-8">
-                        <div>
-                          <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1">
-                            Identification
-                          </p>
-                          <div className="space-y-3">
-                            <div className="flex justify-between border-b border-slate-50 pb-2">
-                              <span className="text-[12px] text-slate-500 font-normal">
-                                Warranty Type
-                              </span>
-                              <span className="text-[12px] font-normal text-slate-900 uppercase italic">
-                                {quotation.warrantyType === 'duration'
-                                  ? 'By Duration'
-                                  : 'By Count of Copies'}
-                              </span>
+                {/* --- Warranty Details Section (Lease and Product/Spare Part Sale) --- */}
+                {(isLease || isSale) &&
+                  quotation.warrantyType &&
+                  quotation.warrantyType !== 'none' && (
+                    <div className="flex flex-col mt-8 pl-12 pr-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      <div className="border border-red-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
+                        <div className="flex items-center justify-between border-b border-red-50 pb-3 mb-6">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center">
+                              <span className="text-emerald-600">🛡️</span>
                             </div>
-
-                            {quotation.warrantyType === 'duration' && (
-                              <div className="flex justify-between border-b border-slate-50 pb-2">
-                                <span className="text-[12px] text-slate-500 font-normal">
-                                  Coverage Period
-                                </span>
-                                <span className="text-[12px] font-normal text-slate-900 uppercase">
-                                  {quotation.warrantyDurationValue} {quotation.warrantyDurationUnit}
-                                </span>
-                              </div>
-                            )}
-
-                            {quotation.warrantyType === 'copies' && (
-                              <div className="flex justify-between border-b border-slate-50 pb-2">
-                                <span className="text-[12px] text-slate-500 font-normal">
-                                  Maximum Copy Limit
-                                </span>
-                                <span className="text-[12px] font-normal text-slate-900">
-                                  {Number(quotation.warrantyCopyLimit || 0).toLocaleString()} COPIES
-                                </span>
-                              </div>
-                            )}
+                            <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
+                              Warranty Details
+                            </h3>
+                          </div>
+                          <div className="bg-emerald-100 px-3 py-1 rounded-full">
+                            <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">
+                              Guaranteed Coverage
+                            </p>
                           </div>
                         </div>
 
-                        <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-center">
-                          <p className="text-[10px] font-normal text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                            Terms & Limitations
-                          </p>
-                          <p className="text-[11px] text-amber-900 leading-relaxed font-normal">
-                            Technical support and replacement parts are provided free of charge
-                            during the warranty period specified above. After the warranty period
-                            expires, or once the applicable usage limit is reached, all technical
-                            support services, spare parts, repairs, and related charges will be
-                            billable at the prevailing rates.
-                          </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-8">
+                          <div>
+                            <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1">
+                              Identification
+                            </p>
+                            <div className="space-y-3">
+                              <div className="flex justify-between border-b border-slate-50 pb-2">
+                                <span className="text-[12px] text-slate-500 font-normal">
+                                  Warranty Type
+                                </span>
+                                <span className="text-[12px] font-normal text-slate-900 uppercase italic">
+                                  {quotation.warrantyType === 'duration'
+                                    ? 'By Duration'
+                                    : quotation.warrantyType === 'copies'
+                                      ? 'By Count of Copies'
+                                      : 'By Duration & Count of Copies'}
+                                </span>
+                              </div>
+
+                              {(quotation.warrantyType === 'duration' ||
+                                quotation.warrantyType === 'both') && (
+                                <div className="flex justify-between border-b border-slate-50 pb-2">
+                                  <span className="text-[12px] text-slate-500 font-normal">
+                                    Coverage Period
+                                  </span>
+                                  <span className="text-[12px] font-normal text-slate-900 uppercase">
+                                    {quotation.warrantyDurationValue}{' '}
+                                    {quotation.warrantyDurationUnit}
+                                  </span>
+                                </div>
+                              )}
+
+                              {(quotation.warrantyType === 'copies' ||
+                                quotation.warrantyType === 'both') && (
+                                <div className="flex justify-between border-b border-slate-50 pb-2">
+                                  <span className="text-[12px] text-slate-500 font-normal">
+                                    Maximum Copy Limit
+                                  </span>
+                                  <span className="text-[12px] font-normal text-slate-900">
+                                    {Number(quotation.warrantyCopyLimit || 0).toLocaleString()}{' '}
+                                    COPIES
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-center">
+                            <p className="text-[10px] font-normal text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              Terms & Limitations
+                            </p>
+                            <p className="text-[11px] text-amber-900 leading-relaxed font-normal">
+                              Technical support and replacement parts are provided free of charge
+                              during the warranty period specified above. After the warranty period
+                              expires, or once the applicable usage limit is reached, all technical
+                              support services, spare parts, repairs, and related charges will be
+                              billable at the prevailing rates.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Footer Content precisely from reference */}

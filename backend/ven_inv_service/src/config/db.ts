@@ -176,6 +176,45 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed vendor country, currency & bank accounts columns exist.');
 
+        // --- Branch-scoped vendors ---
+        // Vendors belong to a branch; name/email uniqueness is per branch (NULL
+        // branch = legacy/global, admin-only). Old global unique constraints on
+        // name/email are dropped and replaced with composite unique indexes.
+        await Source.query(`
+          ALTER TABLE vendors ADD COLUMN IF NOT EXISTS branch_id UUID;
+          CREATE INDEX IF NOT EXISTS idx_vendors_branch_id ON vendors (branch_id);
+
+          DO $$
+          DECLARE c RECORD;
+          BEGIN
+            FOR c IN
+              SELECT conname FROM pg_constraint
+              WHERE conrelid = 'vendors'::regclass AND contype = 'u'
+            LOOP
+              EXECUTE format('ALTER TABLE vendors DROP CONSTRAINT %I', c.conname);
+            END LOOP;
+            FOR c IN
+              SELECT indexname AS conname FROM pg_indexes
+              WHERE tablename = 'vendors'
+                AND indexdef ILIKE '%UNIQUE%'
+                AND indexname NOT IN ('uq_vendors_branch_name', 'uq_vendors_branch_email')
+                -- constraint-backed indexes (PK, UNIQUE) are handled above and
+                -- cannot be dropped directly
+                AND indexname NOT IN (
+                  SELECT conname FROM pg_constraint WHERE conrelid = 'vendors'::regclass
+                )
+            LOOP
+              EXECUTE format('DROP INDEX IF EXISTS %I', c.conname);
+            END LOOP;
+          END $$;
+
+          CREATE UNIQUE INDEX IF NOT EXISTS uq_vendors_branch_name
+            ON vendors (COALESCE(branch_id::text, 'GLOBAL'), name);
+          CREATE UNIQUE INDEX IF NOT EXISTS uq_vendors_branch_email
+            ON vendors (COALESCE(branch_id::text, 'GLOBAL'), email);
+        `);
+        logger.info('Guaranteed branch-scoped vendor column and unique indexes exist.');
+
         // --- Remove blank/zombie vendors (empty name or email) ---
         await Source.query(`
           DELETE FROM vendors WHERE TRIM(email) = '' OR TRIM(name) = '';
@@ -833,6 +872,18 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ALTER TABLE lots ADD COLUMN IF NOT EXISTS transfer_id UUID NULL;
           `);
           logger.info('Guaranteed stock_transfers schema exists.');
+
+          // --- HS Code on lot items, carried over from the RFQ item ---
+          await Source.query(`
+            ALTER TABLE lot_items ADD COLUMN IF NOT EXISTS hs_code VARCHAR(50);
+          `);
+          logger.info('Guaranteed lot_items.hs_code column exists.');
+
+          // --- Receipt/screenshot attachment on vendor payments ---
+          await Source.query(`
+            ALTER TABLE purchase_payments ADD COLUMN IF NOT EXISTS attachment_url VARCHAR(500);
+          `);
+          logger.info('Guaranteed purchase_payments.attachment_url column exists.');
         } catch (stockTransferErr) {
           logger.error('Failed to create stock_transfers schema:', stockTransferErr);
         }

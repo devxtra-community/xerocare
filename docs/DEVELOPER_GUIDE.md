@@ -125,6 +125,19 @@ The gateway **strips the prefix** (`^/e/` → `/`) before forwarding to the inte
 
 > **Note:** `SERVICE_HELP_DESK` and `SERVICE_TECHNICIAN` are employee job sub-roles stored in `employeeJob`.
 
+### MANAGER Role Inheritance
+
+Every service's `requireRole`/`roleMiddleware` (`api_gateway`, `billing_service`, `crm_service`, `employee_service`, `ven_inv_service`) treats `MANAGER` as implicitly satisfying any route that allows `HR`, `FINANCE`, or `EMPLOYEE` — a manager is assumed to have branch-scoped authority over all of those roles' actions. This is a blanket rule applied in the middleware itself, **not** per-route: a route documented as `ADMIN, FINANCE` also silently admits `MANAGER` unless stated otherwise.
+
+```ts
+const MANAGER_INHERITED_ROLES = ['MANAGER', 'HR', 'FINANCE', 'EMPLOYEE'];
+// requireRole(...allowedRoles) passes for MANAGER if allowedRoles ∩ MANAGER_INHERITED_ROLES is non-empty
+```
+
+Routes that must stay closed to managers (true global/cross-branch admin actions, e.g. `GET /invoices/sales/global-overview`) use `requireStrictRole` instead (currently only implemented in `api_gateway/src/middleware/roleMiddleware.ts`) — plain role-list check, no inheritance.
+
+**How to apply when reading route tables below:** an "Auth Roles" column listing `HR`, `FINANCE`, and/or `EMPLOYEE` (in any combination, any service) implicitly also allows `MANAGER`, even where not written explicitly. `ADMIN`-only routes and anything behind `requireStrictRole` remain closed to managers.
+
 ---
 
 ## 4. Authentication & JWT
@@ -412,6 +425,8 @@ This service owns all **HR functionality**: user accounts, authentication, leave
 **Leave Types:** `ANNUAL`, `SICK`, `EMERGENCY`, `UNPAID`, `MATERNITY`, `PATERNITY`  
 **Leave Statuses:** `PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`
 
+> `ADMIN, HR` rows above implicitly also allow `MANAGER` (see [MANAGER Role Inheritance](#manager-role-inheritance)). `GET /leave-applications/:id` additionally lets a manager view (not just the owner/HR/admin) any application from an employee in their own branch.
+
 ### 6.5 Payroll Routes — `/payroll`
 
 | Method | Path                           | Auth              | Description                                         |
@@ -534,6 +549,13 @@ When an `employee.*` RabbitMQ event arrives:
 | `DELETE` | `/vendors/:id`                  | ADMIN, MANAGER     | Remove a vendor.                                              |
 | `POST`   | `/vendors/:id/request-products` | ADMIN, MANAGER     | Create a product request to a vendor (initiates procurement). |
 | `GET`    | `/vendors/:id/requests`         | ADMIN, MANAGER     | List all product requests to a vendor.                        |
+
+**Vendors are branch-scoped:** each vendor has a `branch_id` (nullable = legacy/global vendor, admin-only until assigned). Name/email uniqueness is enforced **per branch**, not globally, so two branches may register the same real-world vendor as separate rows.
+
+- `createVendor`: a `MANAGER` always creates the vendor in their own branch (`req.user.branchId`); an `ADMIN` may pass `branchId` in the body or omit it to create a global vendor.
+- `updateVendor`: only `ADMIN` may change `branchId` (moves a vendor to another branch) — the field is stripped from the request body for any other role.
+- Purchasing (`purchaseService`) is restricted to the vendor's own branch: a manager attempting to buy from another branch's vendor gets `403 This vendor belongs to another branch`. Admins (no `branchId` passed) skip this guard.
+- `findActive`/`findByIdActive` join the `branch` relation so vendor lists/detail views can show which branch owns the vendor.
 
 ### 7.3 Product Routes — `/products`
 
@@ -663,6 +685,8 @@ A **Lot** represents a bulk shipment of goods received from a vendor. Each lot g
 - `currency_code`, `exchange_rate_snapshot` — currency and exchange rate locked at lot creation time
 - `status`: `PENDING | RECEIVED | PARTIAL`
 
+**Lot Item Fields** (`lot_items` table): `mpn`, `hs_code` (customs Harmonized System code, carried over from the originating RFQ item when a lot is created from an awarded RFQ), `compatible_models`, `unit_price`, `selling_price`, `total_price`, `model_ids`.
+
 ### 7.10 RFQ Routes — `/rfq`
 
 An **RFQ (Request for Quotation)** is sent to multiple vendors to get competitive pricing.
@@ -685,21 +709,26 @@ An **RFQ (Request for Quotation)** is sent to multiple vendors to get competitiv
 **RFQ Vendor Quote Currency Logic:**
 
 - A vendor quotes in their own currency (`vendor_currency_code`, `vendor_amount`).
-- The system converts to the branch's currency using the current rate from the `exchange_rates` table.
-- The rate is **locked at quote time** (`exchange_rate_snapshot`, `exchange_rate_fetched_at`) so future rate changes never affect historical price comparisons.
+- The system converts to the branch's currency using the current rate from the `exchange_rates` table via the shared `getExchangeRate()` util (`backend/ven_inv_service/src/utils/exchangeRate.ts` — also used by `stockTransferService`).
+- The rate is **locked at quote time** (`exchange_rate_snapshot`, `exchange_rate_fetched_at`) so future rate changes never affect historical price comparisons. Quote-time conversion is best-effort (a failed live fetch still saves the quote, unconverted).
+- **Awarding is stricter:** `awardVendor` re-fetches a fresh rate at award time and **hard-fails with `503`** if no rate is available — the award-time snapshot is the authoritative rate for the downstream lot/purchase/inventory currency values, so an unconverted award is not allowed.
+- **Out-of-stock exclusion:** vendor items with `stock_status = OUT_OF_STOCK` are quoted at `0` and are excluded from "lowest price" / "cheapest vendor" comparisons (both per-item in `getComparison` and vendor-level `isCheapest`), and a vendor who marked every requested item out of stock can never be flagged cheapest.
+- Comparisons use the branch-currency converted amount when available (`convertedUnitPrice` / `branch_converted_amount`), falling back to the raw quoted amount otherwise.
 
 ### 7.11 Purchase Routes — `/purchases`
 
 Purchases are financial records tracking payments made to vendors for lots.
 
-| Method  | Path                      | Auth              | Description                                       |
-| ------- | ------------------------- | ----------------- | ------------------------------------------------- |
-| `GET`   | `/purchases/`             | any authenticated | List all purchases.                               |
-| `GET`   | `/purchases/lot/:lotId`   | any authenticated | Get the purchase record for a specific lot.       |
-| `GET`   | `/purchases/:id`          | any authenticated | Get one purchase.                                 |
-| `POST`  | `/purchases/:id/payments` | any authenticated | Record a payment made to a vendor.                |
-| `POST`  | `/purchases/:id/costs`    | any authenticated | Record additional costs (shipping, duties, etc.). |
-| `PATCH` | `/purchases/:id`          | any authenticated | Update purchase details.                          |
+| Method  | Path                      | Auth              | Description                                                       |
+| ------- | ------------------------- | ----------------- | ----------------------------------------------------------------- |
+| `GET`   | `/purchases/`             | any authenticated | List all purchases.                                               |
+| `GET`   | `/purchases/lot/:lotId`   | any authenticated | Get the purchase record for a specific lot.                       |
+| `GET`   | `/purchases/:id`          | any authenticated | Get one purchase.                                                 |
+| `POST`  | `/purchases/:id/payments` | any authenticated | Record a payment made to a vendor, with an optional receipt file. |
+| `POST`  | `/purchases/:id/costs`    | any authenticated | Record additional costs (shipping, duties, etc.).                 |
+| `PATCH` | `/purchases/:id`          | any authenticated | Update purchase details.                                          |
+
+**Payment receipt upload:** `POST /purchases/:id/payments` accepts a multipart field named `receipt` (`uploadReceiptFile` middleware — `multer-S3` straight to the R2 bucket, key `receipts/{timestamp}-{originalname}`, 10MB limit, image/\* or `application/pdf` only). The resulting object URL is stored on `purchase_payments.attachment_url`.
 
 ### 7.12 Background Workers in ven_inv_service
 
@@ -714,7 +743,7 @@ Four RabbitMQ consumers run as background workers:
 
 **DLQ Monitor** (`dlqMonitorService.ts`): Polls the dead-letter queue every 5 minutes. Messages that fail 3 times are logged and discarded to prevent queue buildup.
 
-**Preventative Maintenance Scheduler** (`preventativeMaintenanceJob.ts`): Scans `products.nextScheduledMaintenanceDate` and auto-creates service tickets for machines due for maintenance.
+**Preventative Maintenance Scheduler** (`preventativeMaintenanceJob.ts`): Fetches active rent machine allocations from `billing_service` over HTTP (`GET {BILLING_SERVICE_URL}/invoices/allocations/active-rent` — `product_allocations`/`invoices` live in billing's own database, not ven_inv's, so this can no longer be a local join), then scans `products.nextScheduledMaintenanceDate` and auto-creates service tickets for machines due for maintenance.
 
 ---
 
@@ -847,70 +876,71 @@ layoutId                    UUID nullable
 
 **File:** `backend/billing_service/src/routes/invoiceRoutes.ts`
 
-| Method   | Path                                                   | Auth                                            | Description                                                                   |
-| -------- | ------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------- |
-| `POST`   | `/invoices/quotation`                                  | EMPLOYEE (SALES/RENT_AND_LEASE), ADMIN, MANAGER | Create a new quotation.                                                       |
-| `POST`   | `/invoices/direct-sale`                                | ADMIN, MANAGER, FINANCE, EMPLOYEE               | Create a final invoice bypassing the quotation flow.                          |
-| `PUT`    | `/invoices/quotation/:id`                              | EMPLOYEE                                        | Edit a draft quotation before submission.                                     |
-| `POST`   | `/invoices/quotation/template`                         | MANAGER, ADMIN                                  | Create a reusable quotation template.                                         |
-| `GET`    | `/invoices/quotation/template`                         | MANAGER, ADMIN                                  | List all templates.                                                           |
-| `GET`    | `/invoices/quotation/template/:id/assignments`         | MANAGER, ADMIN                                  | List which employees this template is assigned to.                            |
-| `POST`   | `/invoices/quotation/template/:id/assign`              | MANAGER, ADMIN                                  | Assign template to one or more employees.                                     |
-| `POST`   | `/invoices/quotation/template/:id/retake-all`          | MANAGER, ADMIN                                  | Revoke all template assignments.                                              |
-| `POST`   | `/invoices/quotation/:id/retake`                       | MANAGER, ADMIN                                  | Revoke single template assignment.                                            |
-| `POST`   | `/invoices/quotation/:id/assign-customer`              | EMPLOYEE (SALES/RENT_AND_LEASE)                 | Link a customer to an assigned quotation.                                     |
-| `GET`    | `/invoices/quotation/assigned`                         | EMPLOYEE                                        | Get quotations currently assigned to me.                                      |
-| `GET`    | `/invoices/:id/download-premium`                       | any authenticated                               | Download premium-formatted invoice PDF.                                       |
-| `POST`   | `/invoices/:id/employee-approve`                       | EMPLOYEE                                        | Submit quotation for Finance review.                                          |
-| `POST`   | `/invoices/:id/request-validity-extension`             | EMPLOYEE                                        | Request Finance to extend quotation validity.                                 |
-| `POST`   | `/invoices/:id/reassign-customer`                      | EMPLOYEE, MANAGER, ADMIN                        | Change the customer on a quotation.                                           |
-| `POST`   | `/invoices/:id/allocate-machines`                      | any authenticated                               | Finance assigns inventory items to this transaction.                          |
-| `POST`   | `/invoices/:id/activate-contract`                      | any authenticated                               | Activate contract after machine allocation.                                   |
-| `POST`   | `/invoices/:id/upload-confirmation`                    | any authenticated                               | Upload signed contract document to R2.                                        |
-| `POST`   | `/invoices/:id/finance-reject`                         | any authenticated                               | Finance rejects the quotation or transaction.                                 |
-| `POST`   | `/invoices/:id/finance-approve-quotation`              | any authenticated                               | Finance approves quotation pricing.                                           |
-| `POST`   | `/invoices/:id/convert-to-transaction`                 | any authenticated                               | Employee converts approved quotation to Proforma.                             |
-| `PUT`    | `/invoices/:id/approve`                                | any authenticated                               | Record customer deposit + advance to FINANCE_APPROVED.                        |
-| `PUT`    | `/invoices/:id/status`                                 | any authenticated                               | Generic status change.                                                        |
-| `POST`   | `/invoices/:id/payments`                               | any authenticated                               | Record a payment transaction on an invoice.                                   |
-| `GET`    | `/invoices/:id/ledger`                                 | any authenticated                               | Get the full payment ledger for an invoice.                                   |
-| `GET`    | `/invoices/my-invoices`                                | any authenticated                               | Invoices created by calling user.                                             |
-| `GET`    | `/invoices/`                                           | any authenticated                               | All invoices.                                                                 |
-| `GET`    | `/invoices/stats`                                      | any authenticated                               | Dashboard invoice statistics.                                                 |
-| `GET`    | `/invoices/stats/available-years`                      | any authenticated                               | Years for which invoice data exists.                                          |
-| `GET`    | `/invoices/sales/admin-stats`                          | ADMIN                                           | Admin-level sales analytics.                                                  |
-| `GET`    | `/invoices/sales/branch-overview`                      | any authenticated                               | Branch-level sales chart data.                                                |
-| `GET`    | `/invoices/sales/branch-totals`                        | any authenticated                               | Branch-level revenue totals.                                                  |
-| `GET`    | `/invoices/sales/branch-finance-stats`                 | any authenticated                               | Branch financial health breakdown.                                            |
-| `GET`    | `/invoices/sales/global-overview`                      | any authenticated                               | Company-wide sales chart.                                                     |
-| `GET`    | `/invoices/sales/global-totals`                        | any authenticated                               | Company-wide revenue totals.                                                  |
-| `POST`   | `/invoices/settlements/generate`                       | ADMIN, FINANCE                                  | Generate final consolidated invoice for a contract.                           |
-| `POST`   | `/invoices/settlements/next-month`                     | ADMIN, FINANCE                                  | Create the next billing period invoice for a rent/lease contract.             |
-| `POST`   | `/invoices/settlements/consolidate`                    | ADMIN, FINANCE                                  | Merge multiple billing invoices into one consolidated invoice.                |
-| `GET`    | `/invoices/pending-counts`                             | any authenticated                               | Counts of items awaiting action (for badge notifications).                    |
-| `GET`    | `/invoices/alerts`                                     | ADMIN, FINANCE                                  | Overdue collection alerts.                                                    |
-| `GET`    | `/invoices/completed-collections`                      | ADMIN, FINANCE                                  | Paid/settled contract records.                                                |
-| `POST`   | `/invoices/allocations/replace`                        | ADMIN, FINANCE                                  | Swap a machine in an active contract.                                         |
-| `GET`    | `/invoices/completed-collections/:contractId/download` | ADMIN, FINANCE                                  | Download consolidated PDF of a completed contract.                            |
-| `POST`   | `/invoices/completed-collections/:contractId/send`     | ADMIN, FINANCE                                  | Email the completed contract PDF to the customer.                             |
-| `POST`   | `/invoices/:id/returns`                                | ADMIN, MANAGER, FINANCE, EMPLOYEE               | Record a return and issue a credit note.                                      |
-| `GET`    | `/invoices/branch-invoices`                            | any authenticated                               | Invoices for the caller's branch.                                             |
-| `GET`    | `/invoices/history`                                    | ADMIN, FINANCE, EMPLOYEE                        | Invoice audit/change history.                                                 |
-| `GET`    | `/invoices/finance/report`                             | ADMIN, MANAGER, FINANCE                         | Financial report (filterable by date range and sale type).                    |
-| `PUT`    | `/invoices/:id/usage`                                  | ADMIN, FINANCE, MANAGER, TECHNICIAN             | Update meter readings on a FINAL invoice.                                     |
-| `POST`   | `/invoices/:id/notify/email`                           | any authenticated                               | Send an email notification about this invoice.                                |
-| `POST`   | `/invoices/:id/notify/whatsapp`                        | any authenticated                               | Send a WhatsApp notification about this invoice.                              |
-| `GET`    | `/invoices/:contractId/allocations`                    | any authenticated                               | List machines currently allocated to a contract.                              |
-| `GET`    | `/invoices/:id/respond`                                | **public** (no auth)                            | Customer accepts or rejects a quotation via the email link.                   |
-| `GET`    | `/invoices/:id`                                        | any authenticated                               | Get one invoice.                                                              |
-| `DELETE` | `/invoices/:id`                                        | MANAGER, ADMIN                                  | Delete an invoice or template.                                                |
-| `GET`    | `/invoices/audit-logs/:id`                             | any authenticated                               | Get the full audit trail for an invoice/contract.                             |
-| `POST`   | `/invoices/service-quotation`                          | **public** (internal callback)                  | Called by ven_inv_service to create a billing invoice for a service estimate. |
-| `GET`    | `/invoices/contract/serial/:serialNumber`              | any                                             | Find the active contract for a machine by serial number.                      |
-| `GET`    | `/invoices/customer/:customerId/history`               | any                                             | Billing history for a customer.                                               |
-| `GET`    | `/invoices/machine/:productId/billing-context`         | any                                             | Get the active contract context for a machine.                                |
-| `PATCH`  | `/invoices/:id/revise-estimate`                        | any authenticated                               | Revise service estimate cost on an invoice.                                   |
-| `POST`   | `/invoices/:id/finance-extend-validity`                | any authenticated                               | Finance extends the validity period of a quotation.                           |
+| Method   | Path                                                   | Auth                                             | Description                                                                                                                                                                          |
+| -------- | ------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST`   | `/invoices/quotation`                                  | EMPLOYEE (SALES/RENT_AND_LEASE), ADMIN, MANAGER  | Create a new quotation.                                                                                                                                                              |
+| `POST`   | `/invoices/direct-sale`                                | ADMIN, MANAGER, FINANCE, EMPLOYEE                | Create a final invoice bypassing the quotation flow.                                                                                                                                 |
+| `PUT`    | `/invoices/quotation/:id`                              | EMPLOYEE                                         | Edit a draft quotation before submission.                                                                                                                                            |
+| `POST`   | `/invoices/quotation/template`                         | MANAGER, ADMIN                                   | Create a reusable quotation template.                                                                                                                                                |
+| `GET`    | `/invoices/quotation/template`                         | MANAGER, ADMIN                                   | List all templates.                                                                                                                                                                  |
+| `GET`    | `/invoices/quotation/template/:id/assignments`         | MANAGER, ADMIN                                   | List which employees this template is assigned to.                                                                                                                                   |
+| `POST`   | `/invoices/quotation/template/:id/assign`              | MANAGER, ADMIN                                   | Assign template to one or more employees.                                                                                                                                            |
+| `POST`   | `/invoices/quotation/template/:id/retake-all`          | MANAGER, ADMIN                                   | Revoke all template assignments.                                                                                                                                                     |
+| `POST`   | `/invoices/quotation/:id/retake`                       | MANAGER, ADMIN                                   | Revoke single template assignment.                                                                                                                                                   |
+| `POST`   | `/invoices/quotation/:id/assign-customer`              | EMPLOYEE (SALES/RENT_AND_LEASE)                  | Link a customer to an assigned quotation.                                                                                                                                            |
+| `GET`    | `/invoices/quotation/assigned`                         | EMPLOYEE                                         | Get quotations currently assigned to me.                                                                                                                                             |
+| `GET`    | `/invoices/:id/download-premium`                       | any authenticated                                | Download premium-formatted invoice PDF.                                                                                                                                              |
+| `POST`   | `/invoices/:id/employee-approve`                       | EMPLOYEE                                         | Submit quotation for Finance review.                                                                                                                                                 |
+| `POST`   | `/invoices/:id/request-validity-extension`             | EMPLOYEE                                         | Request Finance to extend quotation validity.                                                                                                                                        |
+| `POST`   | `/invoices/:id/reassign-customer`                      | EMPLOYEE, MANAGER, ADMIN                         | Change the customer on a quotation.                                                                                                                                                  |
+| `POST`   | `/invoices/:id/allocate-machines`                      | any authenticated                                | Finance assigns inventory items to this transaction.                                                                                                                                 |
+| `POST`   | `/invoices/:id/activate-contract`                      | any authenticated                                | Activate contract after machine allocation.                                                                                                                                          |
+| `POST`   | `/invoices/:id/upload-confirmation`                    | any authenticated                                | Upload signed contract document to R2.                                                                                                                                               |
+| `POST`   | `/invoices/:id/finance-reject`                         | ADMIN, FINANCE, MANAGER                          | Finance rejects the quotation or transaction.                                                                                                                                        |
+| `POST`   | `/invoices/:id/finance-approve-quotation`              | ADMIN, FINANCE, MANAGER                          | Finance approves quotation pricing.                                                                                                                                                  |
+| `POST`   | `/invoices/:id/convert-to-transaction`                 | any authenticated                                | Employee converts approved quotation to Proforma.                                                                                                                                    |
+| `PUT`    | `/invoices/:id/approve`                                | any authenticated                                | Record customer deposit + advance to FINANCE_APPROVED.                                                                                                                               |
+| `PUT`    | `/invoices/:id/status`                                 | any authenticated                                | Generic status change.                                                                                                                                                               |
+| `POST`   | `/invoices/:id/payments`                               | any authenticated                                | Record a payment transaction on an invoice.                                                                                                                                          |
+| `GET`    | `/invoices/:id/ledger`                                 | any authenticated                                | Get the full payment ledger for an invoice.                                                                                                                                          |
+| `GET`    | `/invoices/my-invoices`                                | any authenticated                                | Invoices created by calling user.                                                                                                                                                    |
+| `GET`    | `/invoices/`                                           | any authenticated                                | All invoices.                                                                                                                                                                        |
+| `GET`    | `/invoices/stats`                                      | any authenticated                                | Dashboard invoice statistics.                                                                                                                                                        |
+| `GET`    | `/invoices/stats/available-years`                      | any authenticated                                | Years for which invoice data exists.                                                                                                                                                 |
+| `GET`    | `/invoices/sales/admin-stats`                          | ADMIN                                            | Admin-level sales analytics.                                                                                                                                                         |
+| `GET`    | `/invoices/sales/branch-overview`                      | any authenticated                                | Branch-level sales chart data.                                                                                                                                                       |
+| `GET`    | `/invoices/sales/branch-totals`                        | any authenticated                                | Branch-level revenue totals.                                                                                                                                                         |
+| `GET`    | `/invoices/sales/branch-finance-stats`                 | any authenticated                                | Branch financial health breakdown.                                                                                                                                                   |
+| `GET`    | `/invoices/sales/global-overview`                      | ADMIN, FINANCE (strict — no MANAGER inheritance) | Company-wide sales chart.                                                                                                                                                            |
+| `GET`    | `/invoices/sales/global-totals`                        | ADMIN, FINANCE (strict — no MANAGER inheritance) | Company-wide revenue totals.                                                                                                                                                         |
+| `POST`   | `/invoices/settlements/generate`                       | ADMIN, FINANCE                                   | Generate final consolidated invoice for a contract.                                                                                                                                  |
+| `POST`   | `/invoices/settlements/next-month`                     | ADMIN, FINANCE                                   | Create the next billing period invoice for a rent/lease contract.                                                                                                                    |
+| `POST`   | `/invoices/settlements/consolidate`                    | ADMIN, FINANCE                                   | Merge multiple billing invoices into one consolidated invoice.                                                                                                                       |
+| `GET`    | `/invoices/pending-counts`                             | any authenticated                                | Counts of items awaiting action (for badge notifications).                                                                                                                           |
+| `GET`    | `/invoices/alerts`                                     | ADMIN, FINANCE                                   | Overdue collection alerts.                                                                                                                                                           |
+| `GET`    | `/invoices/completed-collections`                      | ADMIN, FINANCE                                   | Paid/settled contract records.                                                                                                                                                       |
+| `POST`   | `/invoices/allocations/replace`                        | ADMIN, FINANCE                                   | Swap a machine in an active contract.                                                                                                                                                |
+| `GET`    | `/invoices/completed-collections/:contractId/download` | ADMIN, FINANCE                                   | Download consolidated PDF of a completed contract.                                                                                                                                   |
+| `POST`   | `/invoices/completed-collections/:contractId/send`     | ADMIN, FINANCE                                   | Email the completed contract PDF to the customer.                                                                                                                                    |
+| `POST`   | `/invoices/:id/returns`                                | ADMIN, MANAGER, FINANCE, EMPLOYEE                | Record a return and issue a credit note.                                                                                                                                             |
+| `GET`    | `/invoices/branch-invoices`                            | any authenticated                                | Invoices for the caller's branch.                                                                                                                                                    |
+| `GET`    | `/invoices/history`                                    | ADMIN, FINANCE, EMPLOYEE                         | Invoice audit/change history.                                                                                                                                                        |
+| `GET`    | `/invoices/finance/report`                             | ADMIN, MANAGER, FINANCE                          | Financial report (filterable by date range and sale type).                                                                                                                           |
+| `PUT`    | `/invoices/:id/usage`                                  | ADMIN, FINANCE, MANAGER, TECHNICIAN              | Update meter readings on a FINAL invoice.                                                                                                                                            |
+| `POST`   | `/invoices/:id/notify/email`                           | any authenticated                                | Send an email notification about this invoice.                                                                                                                                       |
+| `POST`   | `/invoices/:id/notify/whatsapp`                        | any authenticated                                | Send a WhatsApp notification about this invoice.                                                                                                                                     |
+| `GET`    | `/invoices/:contractId/allocations`                    | any authenticated                                | List machines currently allocated to a contract.                                                                                                                                     |
+| `GET`    | `/invoices/:id/respond`                                | **public** (no auth)                             | Customer accepts or rejects a quotation via the email link.                                                                                                                          |
+| `GET`    | `/invoices/:id`                                        | any authenticated                                | Get one invoice.                                                                                                                                                                     |
+| `DELETE` | `/invoices/:id`                                        | MANAGER, ADMIN                                   | Delete an invoice or template.                                                                                                                                                       |
+| `GET`    | `/invoices/audit-logs/:id`                             | any authenticated                                | Get the full audit trail for an invoice/contract.                                                                                                                                    |
+| `POST`   | `/invoices/service-quotation`                          | **public** (internal callback)                   | Called by ven_inv_service to create a billing invoice for a service estimate.                                                                                                        |
+| `GET`    | `/invoices/contract/serial/:serialNumber`              | any                                              | Find the active contract for a machine by serial number.                                                                                                                             |
+| `GET`    | `/invoices/customer/:customerId/history`               | any                                              | Billing history for a customer.                                                                                                                                                      |
+| `GET`    | `/invoices/machine/:productId/billing-context`         | any                                              | Get the active contract context for a machine.                                                                                                                                       |
+| `PATCH`  | `/invoices/:id/revise-estimate`                        | any authenticated                                | Revise service estimate cost on an invoice.                                                                                                                                          |
+| `POST`   | `/invoices/:id/finance-extend-validity`                | any authenticated                                | Finance extends the validity period of a quotation.                                                                                                                                  |
+| `GET`    | `/invoices/allocations/active-rent`                    | **public** (internal service-to-service)         | Active rent machine allocations (contractId, productId, serialNumber, branchId, customerId) across all contracts — consumed by ven_inv_service's preventative maintenance scheduler. |
 
 **Key Billing Business Logic:**
 
@@ -1196,7 +1226,7 @@ Triggered by `startReminderCronJobs()` — uses `node-cron`.
 
 ### ven_inv_service Preventative Maintenance Job
 
-**`preventativeMaintenanceJob.ts`**: Scans `products.nextScheduledMaintenanceDate`. For any machine whose date has arrived or passed without an existing open ticket, auto-creates a `SERVICE` type ticket with `serviceContext = 'PREVENTATIVE_MAINTENANCE'`.
+**`preventativeMaintenanceJob.ts`**: Fetches active rent allocations from billing_service's internal `GET /invoices/allocations/active-rent` endpoint (cross-service HTTP call — the underlying `product_allocations`/`invoices` tables live in billing's own database), then scans `products.nextScheduledMaintenanceDate`. For any machine whose date has arrived or passed without an existing open ticket, auto-creates a `SERVICE` type ticket with `serviceContext = 'PREVENTATIVE_MAINTENANCE'`.
 
 ---
 
@@ -1325,16 +1355,27 @@ UNIQUE(from_currency, to_currency)
 **Table: `vendors`**
 
 ```sql
-id          UUID PRIMARY KEY
-name        VARCHAR
-email       VARCHAR
-phone       VARCHAR
-address     TEXT
-company_name VARCHAR
-tax_number  VARCHAR
-status      VARCHAR
-created_at  TIMESTAMP
-updated_at  TIMESTAMP
+id                 UUID PRIMARY KEY
+name               VARCHAR            -- unique per branch (see composite indexes below)
+email              VARCHAR            -- unique per branch
+branch_id          UUID nullable      -- NULL = legacy/global vendor, admin-only
+phone              VARCHAR nullable
+type               VARCHAR            -- Supplier | Distributor | Service
+contact_person     VARCHAR nullable
+total_orders       INTEGER DEFAULT 0
+purchase_value     DECIMAL(12,2) DEFAULT 0
+outstanding_amount DECIMAL(12,2) DEFAULT 0
+status             VARCHAR            -- ACTIVE | INACTIVE | DELETED
+currency           VARCHAR(10) DEFAULT 'QAR'
+country_code       VARCHAR(2) nullable
+country_name       VARCHAR(100) nullable
+bank_accounts      JSONB nullable     -- [{bankName, accountHolderName, accountNumber, routingNumber, swiftCode, iban, address, isPrimary}]
+created_at         TIMESTAMP
+updated_at         TIMESTAMP
+
+-- Composite unique indexes (replace the old global-unique name/email constraints):
+UNIQUE (COALESCE(branch_id::text, 'GLOBAL'), name)   -- uq_vendors_branch_name
+UNIQUE (COALESCE(branch_id::text, 'GLOBAL'), email)  -- uq_vendors_branch_email
 ```
 
 **Table: `products`**

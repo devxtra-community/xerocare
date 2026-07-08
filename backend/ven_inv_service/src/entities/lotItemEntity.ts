@@ -84,6 +84,9 @@ export class LotItem {
   @Column({ name: 'mpn', type: 'varchar', nullable: true })
   mpn?: string;
 
+  @Column({ name: 'hs_code', type: 'varchar', nullable: true })
+  hsCode?: string;
+
   @Column({ name: 'compatible_models', type: 'text', nullable: true })
   compatibleModels?: string;
 

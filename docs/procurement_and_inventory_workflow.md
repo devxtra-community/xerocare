@@ -58,6 +58,8 @@ graph TD
 
 The RFQ phase handles sourcing from multiple vendors. It is managed by `rfqService.ts` in the `ven_inv_service` backend.
 
+> **Vendors are branch-scoped.** Each vendor belongs to a branch (a manager can only invite/purchase from their own branch's vendors); an admin can create a global vendor or assign one to any branch. Vendor name/email only need to be unique within a branch, so two branches may register the same real-world supplier as separate vendor records.
+
 ### A. RFQ Creation
 
 1. **Manual Creation**: The branch manager creates an RFQ via the dashboard, adding individual products or spare parts.
@@ -86,9 +88,12 @@ The RFQ phase handles sourcing from multiple vendors. It is managed by `rfqServi
   - The lowest unit price for each item.
   - Percentage price difference between vendors.
   - The cheapest vendor overall based on total quoted amount.
+- **Cross-currency comparison**: a vendor may quote in their own currency. Quotes are converted to the purchasing branch's currency (rate looked up/cached in the `exchange_rates` table, snapshotted onto the quote as `exchange_rate_snapshot`) and comparison is done on the branch-currency amount.
+- **Out-of-stock exclusion**: item lines and vendors marked `OUT_OF_STOCK` are excluded from "lowest price"/"cheapest vendor" — an out-of-stock quote is priced at 0 and must never appear to "win" against a vendor who can actually deliver.
 - The manager awards the RFQ to a single vendor.
 - **Awarding Logic**:
   - The awarded vendor's status is set to `AWARDED`.
+  - A fresh vendor→branch exchange rate is fetched and snapshotted at award time — this becomes the authoritative rate for the lot/purchase/inventory values created from this RFQ. If no rate can be fetched, the award is **rejected (`503`)** rather than proceeding unconverted.
   - All other invited vendors' statuses are set to `REJECTED`.
   - Automated emails are dispatched to all vendors notifying them of the decision.
   - The RFQ status updates to `AWARDED`.
@@ -105,8 +110,8 @@ Once a vendor is awarded, the RFQ must be converted into a procurement Lot to tr
 - **Lot Creation Backend Execution (`createLotFromRfq`)**:
   1. Verifies the RFQ status is strictly `AWARDED`.
   2. Generates a unique lot number (`LOT-YYYYMM-RANDOM`).
-  3. Creates a `Lot` record with status `PENDING` linked to the awarded vendor.
-  4. Translates each quoted RFQ item into a `LotItem` record (saving expected quantities and contract prices).
+  3. Creates a `Lot` record with status `PENDING` linked to the awarded vendor. All item amounts and the lot `totalAmount` are converted into the branch's currency at the award-time exchange rate snapshot (`currencyCode`/`exchangeRateSnapshot` on the lot); everything downstream (`Purchase`, inventory purchase prices) is in branch currency from this point on.
+  4. Translates each quoted RFQ item into a `LotItem` record (saving expected quantities and contract prices, plus `hsCode` carried over from the RFQ item for customs declarations).
   5. **Auto-registers Spare Parts**: If a spare part in the RFQ does not exist in the master spare parts table, the backend automatically creates a new master `SparePart` record (with `quantity = 0`) to establish its SKU and identity.
   6. Creates a companion `Purchase` record in the database for financial tracking.
   7. Updates the RFQ status to `CLOSED`.
@@ -123,6 +128,7 @@ Once a vendor is awarded, the RFQ must be converted into a procurement Lot to tr
   - _Groundfield Cost_
 - The total purchase expense is automatically calculated as:
   $$\text{Total Cost} = \text{Item Pricing Total} + \text{Sum of Additional Costs}$$
+- Recording a vendor payment (`POST /purchases/:id/payments`) optionally accepts a receipt/proof-of-payment file (image or PDF, uploaded to R2), stored as `attachment_url` on the payment record.
 
 ### C. Lot Receiving Workflow
 

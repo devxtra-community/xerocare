@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { Vendor, VendorStatus } from '../entities/vendorEntity';
 
 export class VendorRepository extends Repository<Vendor> {
@@ -6,21 +6,34 @@ export class VendorRepository extends Repository<Vendor> {
     super(Vendor, dataSource.manager);
   }
 
-  findByEmail(email: string) {
-    return this.findOne({ where: { email } });
+  /**
+   * Uniqueness is per branch: pass the branch the vendor would live in.
+   * `null` checks among global (unassigned) vendors.
+   */
+  findByEmail(email: string, branchId?: string | null) {
+    return this.findOne({
+      where: { email, branchId: branchId ?? IsNull() },
+    });
   }
 
   findById(id: string) {
     return this.findOne({ where: { id } });
   }
 
-  findByName(name: string) {
-    return this.findOne({ where: { name } });
+  findByName(name: string, branchId?: string | null) {
+    return this.findOne({
+      where: { name, branchId: branchId ?? IsNull() },
+    });
   }
 
+  /**
+   * Active vendors. With a branchId the list is restricted to that branch's
+   * own vendors; without it (admin) every branch's vendors are returned.
+   */
   async findActive(branchId?: string) {
     const vendors = await this.find({
-      where: { status: VendorStatus.ACTIVE },
+      where: branchId ? { status: VendorStatus.ACTIVE, branchId } : { status: VendorStatus.ACTIVE },
+      relations: ['branch'],
       order: { createdAt: 'DESC' },
     });
 
@@ -38,10 +51,13 @@ export class VendorRepository extends Repository<Vendor> {
 
   /**
    * Finds an active vendor by ID, optionally with branch-specific stats.
+   * Not branch-restricted: receiving branches may need to display a vendor
+   * that belongs to the branch the stock was purchased in.
    */
   async findByIdActive(id: string, branchId?: string) {
     const vendor = await this.findOne({
       where: { id, status: VendorStatus.ACTIVE },
+      relations: ['branch'],
     });
 
     if (!vendor) return vendor;

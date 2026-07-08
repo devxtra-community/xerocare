@@ -11,9 +11,16 @@ import { ProductAllocation, AllocationStatus } from '../entities/productAllocati
 import { getBranchManagerEmail } from './billingHelpers';
 import { In, Raw } from 'typeorm';
 import cron from 'node-cron';
+import { sign } from 'jsonwebtoken';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
+import { EmployeeTarget } from '../entities/employeeTargetEntity';
+import { TargetService, getPreviousMonthStr } from './targetService';
+import {
+  TARGET_ACHIEVEMENT_FINALIZED,
+  MANAGER_TARGET_SUMMARY,
+} from '../constants/notificationTypes';
 
 const EXCHANGE = 'domain_events';
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -684,5 +691,100 @@ export function startReminderCronJobs() {
   // 2. Rent & Lease Due Reminder (Daily): Run at 9:00 AM daily
   cron.schedule('0 9 * * *', () => {
     rentLeaseDueReminderJob();
+  });
+}
+
+async function getBranchManagerId(branchId: string): Promise<string | null> {
+  try {
+    const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+    const response = await fetch(`${employeeServiceUrl}/employee?role=MANAGER&limit=100`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return null;
+    const json = await response.json();
+    const employees = json?.data?.employees || [];
+    const manager = employees.find((emp: { branch_id?: string }) => emp.branch_id === branchId);
+    return manager?.id || null;
+  } catch (err) {
+    logger.error('[CRON] Error resolving branch manager for target finalization:', err);
+    return null;
+  }
+}
+
+/**
+ * Monthly finalization: locks last month's target achievements forever (isFinalized = true)
+ * and notifies each employee plus a per-branch summary to the branch manager.
+ */
+export async function targetFinalizationJob() {
+  logger.info('[CRON] Running monthly Target Finalization Job...');
+  try {
+    const lastMonth = getPreviousMonthStr();
+    const targetRepo = Source.getRepository(EmployeeTarget);
+    const targets = await targetRepo.find({ where: { targetMonth: lastMonth } });
+    const targetService = new TargetService();
+
+    const branchTotals = new Map<
+      string,
+      { count: number; totalIncentive: number; currencyCode: string }
+    >();
+
+    for (const target of targets) {
+      try {
+        const achievement = await targetService.finalizeTarget(target.id);
+
+        const branchSummary = branchTotals.get(target.branchId) || {
+          count: 0,
+          totalIncentive: 0,
+          currencyCode: target.currencyCode,
+        };
+        branchSummary.count += 1;
+        branchSummary.totalIncentive += Number(achievement.incentiveAmount);
+        branchTotals.set(target.branchId, branchSummary);
+
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: target.employeeId,
+          title: `Incentive Finalized for ${lastMonth}`,
+          message: `Your final incentive for ${lastMonth} is ${target.currencyCode} ${achievement.incentiveAmount}.`,
+          type: TARGET_ACHIEVEMENT_FINALIZED,
+          referenceId: achievement.id,
+          referenceType: 'TARGET',
+        });
+      } catch (err) {
+        logger.error(`[CRON] Failed to finalize target ${target.id}:`, err);
+      }
+    }
+
+    for (const [branchId, summary] of branchTotals) {
+      const managerId = await getBranchManagerId(branchId);
+      if (!managerId) continue;
+      await NotificationPublisher.publishInAppRequest({
+        recipientId: managerId,
+        title: `Target Results for ${lastMonth}`,
+        message: `${summary.count} employee(s) finalized for ${lastMonth}. Total incentives: ${summary.currencyCode} ${summary.totalIncentive.toFixed(2)}.`,
+        type: MANAGER_TARGET_SUMMARY,
+        referenceId: branchId,
+        referenceType: 'TARGET',
+      });
+    }
+
+    logger.info(
+      `[CRON] Target Finalization Job completed for ${lastMonth}. Processed ${targets.length} targets.`,
+    );
+  } catch (error) {
+    logger.error('[CRON] Target Finalization Job failed:', error);
+  }
+}
+
+export function startTargetFinalizationCron() {
+  logger.info('[CRON] Initializing monthly target finalization cron...');
+  // 1:00 AM on the 1st of every month
+  cron.schedule('0 1 1 * *', () => {
+    targetFinalizationJob();
   });
 }

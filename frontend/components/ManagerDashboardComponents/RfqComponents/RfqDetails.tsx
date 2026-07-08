@@ -254,8 +254,23 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   const confirmAward = async () => {
     if (!vendorToAward) return;
     try {
-      await awardVendor(id, vendorToAward);
-      toast.success('Vendor awarded successfully');
+      const result = await awardVendor(id, vendorToAward);
+      const conv = (result as Record<string, unknown>)?.conversion as
+        | {
+            vendorCurrency?: string;
+            branchCurrency?: string;
+            rate?: number;
+            vendorAmount?: number;
+            convertedAmount?: number;
+          }
+        | undefined;
+      if (conv?.convertedAmount != null && conv.branchCurrency !== conv.vendorCurrency) {
+        toast.success(
+          `Awarded — ${formatCurrency(conv.vendorAmount || 0, conv.vendorCurrency || '')} ≈ ${formatCurrency(conv.convertedAmount, conv.branchCurrency || '')} @ ${Number(conv.rate).toFixed(4)}`,
+        );
+      } else {
+        toast.success('Vendor awarded successfully');
+      }
       fetchData();
     } catch (error: unknown) {
       toast.error(
@@ -610,7 +625,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                 key={vs.vendorId as string}
                                 className={`px-5 py-4 text-center ${vp?.isLowest ? 'bg-green-50/30' : ''}`}
                               >
-                                {vp ? (
+                                {vp && vp.stockStatus === 'OUT_OF_STOCK' ? (
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Badge variant="destructive" className="text-[9px] h-4 px-1.5">
+                                      OUT OF STOCK
+                                    </Badge>
+                                    <span className="text-[10px] text-slate-400 italic">
+                                      Not available from this vendor
+                                    </span>
+                                  </div>
+                                ) : vp ? (
                                   <div className="flex flex-col items-center gap-1.5">
                                     <div className="flex items-center gap-1">
                                       <span
@@ -626,6 +650,17 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                         <CheckCircle className="h-3 w-3 text-green-600" />
                                       )}
                                     </div>
+                                    {vp.convertedUnitPrice != null &&
+                                      !!vs.branchCurrency &&
+                                      vs.branchCurrency !== vs.vendorCurrency && (
+                                        <span className="text-[10px] font-semibold text-blue-600">
+                                          ≈{' '}
+                                          {formatCurrency(
+                                            vp.convertedUnitPrice as number,
+                                            vs.branchCurrency as string,
+                                          )}
+                                        </span>
+                                      )}
                                     {!!vp.estimatedShipmentDate && (
                                       <div className="flex items-center justify-center gap-1 text-[10px] text-orange-600 font-medium bg-orange-50 px-1.5 py-0.5 rounded-md">
                                         <Clock className="h-3 w-3" />
@@ -686,21 +721,61 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                       (vs: Record<string, unknown>) => (
                         <td key={vs.vendorId as string} className="px-5 py-6 text-center">
                           {(() => {
+                            if (vs.allOutOfStock) {
+                              return (
+                                <div className="flex flex-col items-center gap-1">
+                                  <Badge variant="destructive" className="text-[10px] px-2">
+                                    OUT OF STOCK
+                                  </Badge>
+                                  <span className="text-[11px] text-slate-400 italic">
+                                    All items are out of stock from this vendor
+                                  </span>
+                                </div>
+                              );
+                            }
                             const rfqVendor = (rfq.vendors as Record<string, unknown>[]).find(
                               (rv) => rv.vendor_id === vs.vendorId,
                             );
+                            const showConversion =
+                              vs.convertedAmount != null &&
+                              !!vs.branchCurrency &&
+                              vs.branchCurrency !== vs.vendorCurrency;
                             return (
-                              <div
-                                className={`text-xl font-black ${vs.isCheapest && (comparison.vendorsSummary as unknown[]).length > 1 ? 'text-green-600' : 'text-slate-900'}`}
-                              >
-                                {formatCurrency(
-                                  vs.totalAmount as number,
-                                  (rfqVendor?.vendor as { currency?: string })?.currency || 'QAR',
+                              <>
+                                <div
+                                  className={`text-xl font-black ${vs.isCheapest && (comparison.vendorsSummary as unknown[]).length > 1 ? 'text-green-600' : 'text-slate-900'}`}
+                                >
+                                  {formatCurrency(
+                                    vs.totalAmount as number,
+                                    (rfqVendor?.vendor as { currency?: string })?.currency ||
+                                      (vs.vendorCurrency as string) ||
+                                      'QAR',
+                                  )}
+                                </div>
+                                {showConversion && (
+                                  <>
+                                    <div className="text-sm font-bold text-blue-700 mt-1">
+                                      ≈{' '}
+                                      {formatCurrency(
+                                        vs.convertedAmount as number,
+                                        vs.branchCurrency as string,
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-0.5 font-normal">
+                                      1 {vs.vendorCurrency as string} ={' '}
+                                      {Number(vs.exchangeRate).toFixed(4)}{' '}
+                                      {vs.branchCurrency as string}
+                                      {vs.rateFetchedAt
+                                        ? ` · ${new Date(vs.rateFetchedAt as string).toLocaleDateString()}`
+                                        : ''}
+                                    </div>
+                                  </>
                                 )}
-                              </div>
+                              </>
                             );
                           })()}
-                          {!!(vs as { isCheapest?: boolean }).isCheapest &&
+                          {!vs.allOutOfStock &&
+                            !!(vs as { isCheapest?: boolean }).isCheapest &&
                             (comparison.vendorsSummary as unknown[]).length > 1 && (
                               <div className="mt-2 flex justify-center">
                                 <Badge className="bg-green-600 hover:bg-green-600 animate-pulse text-[10px] px-3">
@@ -723,11 +798,17 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                           <td key={vs.vendorId as string} className="px-5 py-6 text-center">
                             <Button
                               onClick={() => setVendorToAward(vs.vendorId as string)}
+                              disabled={!!vs.allOutOfStock}
                               variant={vs.isCheapest ? 'default' : 'outline'}
-                              className={`w-full h-11 transition-all ${vs.isCheapest ? 'bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg' : 'hover:border-primary/50 hover:text-primary'}`}
+                              className={`w-full h-11 transition-all ${vs.allOutOfStock ? 'opacity-50 cursor-not-allowed' : vs.isCheapest ? 'bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg' : 'hover:border-primary/50 hover:text-primary'}`}
+                              title={
+                                vs.allOutOfStock
+                                  ? 'Vendor has no stock for any requested item'
+                                  : undefined
+                              }
                             >
                               <CheckCircle className="mr-2 h-4 w-4" />
-                              Award Vendor
+                              {vs.allOutOfStock ? 'No Stock' : 'Award Vendor'}
                             </Button>
                           </td>
                         ),
@@ -755,6 +836,35 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               Are you sure you want to award this quotation to the selected vendor? This action is
               final and will generate a lot for the awarded items.
             </AlertDialogDescription>
+            {(() => {
+              const vs = (
+                comparison?.vendorsSummary as Record<string, unknown>[] | undefined
+              )?.find((v) => v.vendorId === vendorToAward);
+              if (
+                !vs ||
+                vs.convertedAmount == null ||
+                !vs.branchCurrency ||
+                vs.branchCurrency === vs.vendorCurrency
+              ) {
+                return null;
+              }
+              return (
+                <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center space-y-1">
+                  <div className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+                    Currency Conversion
+                  </div>
+                  <div className="text-lg font-black text-slate-800">
+                    {formatCurrency(vs.totalAmount as number, vs.vendorCurrency as string)}{' '}
+                    <span className="text-slate-400 font-semibold">→</span>{' '}
+                    {formatCurrency(vs.convertedAmount as number, vs.branchCurrency as string)}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    1 {vs.vendorCurrency as string} = {Number(vs.exchangeRate).toFixed(4)}{' '}
+                    {vs.branchCurrency as string} · a fresh live rate is snapshotted on award
+                  </div>
+                </div>
+              );
+            })()}
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3 sm:gap-2 sm:justify-center flex-col sm:flex-row w-full">
             <AlertDialogCancel className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors">

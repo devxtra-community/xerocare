@@ -18,6 +18,7 @@ export class PaymentService {
     referenceNumber?: string;
     remarks?: string;
     recordedBy: string;
+    receiptUrl?: string;
   }): Promise<PaymentLedger> {
     const invoice = await this.invoiceRepo.findOne({ where: { id: data.invoiceId } });
 
@@ -54,6 +55,7 @@ export class PaymentService {
       referenceNumber: data.referenceNumber,
       remarks: data.remarks,
       recordedBy: data.recordedBy,
+      receiptUrl: data.receiptUrl,
     });
 
     await this.paymentRepo.save(payment);

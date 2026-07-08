@@ -13,12 +13,14 @@ export function middleware(request: NextRequest) {
   // Get the path
   const path = request.nextUrl.pathname;
 
-  // Define protected routes and their allowed roles
+  // Define protected routes and their allowed roles.
+  // MANAGER has branch-wide authority: full access to HR, employee and finance sections.
   const protectedRoutes = [
     { path: '/admin', roles: ['ADMIN'] },
-    { path: '/hr', roles: ['HR'] },
+    { path: '/hr', roles: ['HR', 'MANAGER'] },
     { path: '/manager', roles: ['MANAGER'] },
-    { path: '/employee', roles: ['EMPLOYEE'] },
+    { path: '/employee', roles: ['EMPLOYEE', 'MANAGER'] },
+    { path: '/finance', roles: ['FINANCE', 'MANAGER'] },
     // Add more as needed
   ];
 
@@ -70,5 +72,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/hr/:path*', '/manager/:path*', '/employee/:path*'],
+  matcher: [
+    '/admin/:path*',
+    '/hr/:path*',
+    '/manager/:path*',
+    '/employee/:path*',
+    '/finance/:path*',
+  ],
 };

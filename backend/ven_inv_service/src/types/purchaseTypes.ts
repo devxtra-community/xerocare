@@ -16,6 +16,7 @@ export interface AddPaymentDto {
   referenceNumber?: string;
   paymentDate?: Date;
   createdBy?: string;
+  attachmentUrl?: string;
 }
 
 export interface AddCostDto {

@@ -269,7 +269,7 @@ export default function VendorProfilePage() {
                       <p className="text-[11px] font-mono font-semibold text-gray-700 mt-0.5">
                         {acc.accountNumber}
                       </p>
-                      {(acc.swiftCode || acc.iban || acc.ifscCode || acc.routingNumber) && (
+                      {(acc.swiftCode || acc.iban || acc.address || acc.routingNumber) && (
                         <div className="flex flex-wrap gap-x-3 mt-1">
                           {acc.swiftCode && (
                             <span className="text-[10px] text-gray-400">
@@ -282,9 +282,9 @@ export default function VendorProfilePage() {
                               IBAN: <span className="font-mono text-gray-600">{acc.iban}</span>
                             </span>
                           )}
-                          {acc.ifscCode && (
+                          {acc.address && (
                             <span className="text-[10px] text-gray-400">
-                              IFSC: <span className="font-mono text-gray-600">{acc.ifscCode}</span>
+                              Address: <span className="text-gray-600">{acc.address}</span>
                             </span>
                           )}
                           {acc.routingNumber && (

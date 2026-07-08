@@ -38,6 +38,7 @@ export default function EditPurchaseDialog({
 }: EditPurchaseDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<UpdatePurchaseDTO>({});
+  const currencyCode = purchase.branch?.currency_code || 'AED';
 
   useEffect(() => {
     if (open && purchase) {
@@ -108,7 +109,7 @@ export default function EditPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="edit_documentationFee"
@@ -135,7 +136,7 @@ export default function EditPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="edit_labourCost"
@@ -162,7 +163,7 @@ export default function EditPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="edit_handlingFee"
@@ -189,7 +190,7 @@ export default function EditPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="edit_transportationCost"
@@ -216,7 +217,7 @@ export default function EditPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="edit_shippingCost"
@@ -243,7 +244,7 @@ export default function EditPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="edit_groundfieldCost"

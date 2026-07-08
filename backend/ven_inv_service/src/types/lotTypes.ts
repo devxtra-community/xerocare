@@ -11,6 +11,7 @@ export interface CreateLotItemDto {
   unitPrice: number;
   sellingPrice?: number;
   mpn?: string;
+  hsCode?: string;
   compatibleModels?: string;
 }
 

@@ -129,19 +129,24 @@ export class RfqController {
         const rfqItemId = (row.rfq_item_id || row.id) as string;
         if (!rfqItemId) throw new AppError('Missing item identifier in Excel', 400);
 
-        const unitPrice = parseFloat(row.unit_price as string);
         const stockStatus = String(row.stock_status || '').toUpperCase();
-        const availableQuantity = parseInt(row.available_quantity as string);
-        const estimatedShipmentDate = row.estimated_shipment_date;
-        const vendorNote = (row.vendor_note as string) || undefined;
-
-        if (isNaN(unitPrice)) throw new AppError(`Invalid unitPrice for item ${rfqItemId}`, 400);
         if (!['IN_STOCK', 'OUT_OF_STOCK', 'ON_PRODUCTION'].includes(stockStatus)) {
           throw new AppError(
             `Invalid stock_status for item ${rfqItemId}. Must be IN_STOCK, OUT_OF_STOCK, or ON_PRODUCTION`,
             400,
           );
         }
+
+        const rawUnitPrice = parseFloat(row.unit_price as string);
+        // OUT_OF_STOCK items have nothing to price — vendor leaves unit_price
+        // blank, so don't reject the whole upload over it.
+        if (isNaN(rawUnitPrice) && stockStatus !== 'OUT_OF_STOCK') {
+          throw new AppError(`Invalid unitPrice for item ${rfqItemId}`, 400);
+        }
+        const unitPrice = isNaN(rawUnitPrice) ? 0 : rawUnitPrice;
+        const availableQuantity = parseInt(row.available_quantity as string);
+        const estimatedShipmentDate = row.estimated_shipment_date;
+        const vendorNote = (row.vendor_note as string) || undefined;
 
         let parsedShipmentDate: Date | undefined = undefined;
         if (estimatedShipmentDate) {

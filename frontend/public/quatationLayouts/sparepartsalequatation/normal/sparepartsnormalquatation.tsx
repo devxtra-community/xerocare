@@ -404,7 +404,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                 </td>
                 <td style={tdStyleHelper()}>{item.qty}</td>
                 <td style={tdStyleHelper()}>{fmt(item.unitPrice)}</td>
-                <td style={tdStyleHelper()}>{item.discount ? `${item.discount}%` : '0%'}</td>
+                <td style={tdStyleHelper()}>{fmt(Number(item.discount || 0))}</td>
                 <td style={tdStyleHelper()}>{fmt(item.vat)}</td>
                 <td style={{ ...tdStyleHelper('right'), fontWeight: '300' }}>{fmt(item.amount)}</td>
               </tr>

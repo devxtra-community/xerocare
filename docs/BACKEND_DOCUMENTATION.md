@@ -145,7 +145,7 @@ This service manages all physical items, warehouse stock, and the vendors we buy
 - `/products`: Manage the catalog of items we sell.
 - `/inventory`: Track current stock levels and movements.
 - `/service/tickets`: Create and manage machine repair tasks.
-- `/vendors`: Manage supplier contact information.
+- `/vendors`: Manage supplier contact information (vendors belong to a branch — a manager only sees/buys from their own branch's vendors; admins can assign vendors across branches).
 - `/warehouses`: Tracking physical storage locations.
 
 ---

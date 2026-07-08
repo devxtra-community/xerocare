@@ -17,6 +17,7 @@ import { logger } from '../config/logger';
 import { Vendor } from '../entities/vendorEntity';
 import { Branch } from '../entities/branchEntity';
 import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
+import { getExchangeRate, round2 } from '../utils/exchangeRate';
 
 interface CreateRfqDto {
   branchId: string;
@@ -322,10 +323,10 @@ export class RfqService {
       { header: 'Compatible Models', key: 'compatible_models', width: 25 },
       { header: 'description', key: 'description', width: 30 },
       { header: 'quantity', key: 'quantity', width: 15 },
-      { header: 'unit_price', key: 'unit_price', width: 15 },
-      { header: 'total_price', key: 'total_price', width: 15 },
       { header: 'stock_status', key: 'stock_status', width: 25 },
       { header: 'available_quantity', key: 'available_quantity', width: 20 },
+      { header: 'unit_price', key: 'unit_price', width: 15 },
+      { header: 'total_price', key: 'total_price', width: 15 },
       { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
       { header: 'vendor_note', key: 'vendor_note', width: 30 },
       { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
@@ -397,10 +398,10 @@ export class RfqService {
         compatible_models: compatibleModels,
         description: desc,
         quantity: item.quantity,
-        unit_price: undefined,
-        total_price: undefined,
         stock_status: undefined,
         available_quantity: undefined,
+        unit_price: undefined,
+        total_price: undefined,
         estimated_shipment_date: undefined,
         vendor_note: undefined,
         rfq_item_id: item.id,
@@ -408,9 +409,9 @@ export class RfqService {
     }
 
     const rowCount = worksheet.rowCount;
-    // Add validations for stock_status (Column K) and estimated_shipment_date (Column M)
+    // Add validations for stock_status (Column I) and estimated_shipment_date (Column M)
     for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`K${i}`).dataValidation = {
+      worksheet.getCell(`I${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
@@ -431,6 +432,13 @@ export class RfqService {
       };
       worksheet.getCell(`M${i}`).numFmt = 'yyyy-mm-dd';
       worksheet.getCell(`M${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
+    }
+
+    // total_price (L) autofills from unit_price (K) × available_quantity (J).
+    for (let i = 2; i <= rowCount; i++) {
+      worksheet.getCell(`L${i}`).value = {
+        formula: `IF(OR($K${i}="",$J${i}=""),"",$K${i}*$J${i})`,
+      };
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -471,10 +479,10 @@ export class RfqService {
       { header: 'Compatible Models', key: 'compatible_models', width: 25 },
       { header: 'description', key: 'description', width: 30 },
       { header: 'quantity', key: 'quantity', width: 15 },
-      { header: 'unit_price', key: 'unit_price', width: 15 },
-      { header: 'total_price', key: 'total_price', width: 15 },
       { header: 'stock_status', key: 'stock_status', width: 25 },
       { header: 'available_quantity', key: 'available_quantity', width: 20 },
+      { header: 'unit_price', key: 'unit_price', width: 15 },
+      { header: 'total_price', key: 'total_price', width: 15 },
       { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
       { header: 'vendor_note', key: 'vendor_note', width: 30 },
       { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
@@ -569,9 +577,9 @@ export class RfqService {
     }
 
     const rowCount = worksheet.rowCount;
-    // Add validations for stock_status (Column K) and estimated_shipment_date (Column M)
+    // Add validations for stock_status (Column I) and estimated_shipment_date (Column M)
     for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`K${i}`).dataValidation = {
+      worksheet.getCell(`I${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
@@ -712,6 +720,28 @@ export class RfqService {
       rfqVendor.status = RfqVendorStatus.QUOTED;
       rfqVendor.total_quoted_amount = totalQuotedAmount;
       rfqVendor.quoted_at = new Date();
+
+      // Convert the quote into the purchasing branch's currency so quotes in
+      // different vendor currencies can be compared. Best effort here — the
+      // authoritative rate is re-fetched and snapshotted at award time.
+      try {
+        const branch = await manager.findOne(Branch, { where: { id: rfq.branch_id } });
+        const branchCurrency = branch?.currency_code || 'QAR';
+        const vendorCurrency = rfqVendor.vendor_currency_code || 'QAR';
+        const { rate, fetchedAt } = await getExchangeRate(manager, vendorCurrency, branchCurrency);
+        rfqVendor.vendor_amount = totalQuotedAmount;
+        rfqVendor.branch_currency_code = branchCurrency;
+        rfqVendor.branch_converted_amount = round2(totalQuotedAmount * rate);
+        rfqVendor.exchange_rate_snapshot = rate;
+        rfqVendor.exchange_rate_fetched_at = fetchedAt;
+      } catch (err) {
+        logger.warn('Quote currency conversion failed — quote saved unconverted', {
+          rfqId,
+          vendorId,
+          error: err instanceof Error ? err.message : err,
+        });
+      }
+
       await manager.save(rfqVendor);
 
       // Check if all vendors quoted
@@ -763,20 +793,30 @@ export class RfqService {
       const vendorPrices = validQuotes
         .map((vq) => {
           const vi = vq.items?.find((i) => i.rfq_item_id === item.id);
+          const rate = vq.exchange_rate_snapshot != null ? Number(vq.exchange_rate_snapshot) : null;
+          const unitPrice = vi ? Number(vi.unit_price) : null;
           return {
             vendorId: vq.vendor_id,
             vendorName: vq.vendor?.name,
-            unitPrice: vi ? Number(vi.unit_price) : null,
+            stockStatus: vi?.stock_status ?? null,
+            unitPrice,
             totalPrice: vi ? Number(vi.total_price) : null,
+            // Branch-currency equivalents (null when no rate was snapshotted).
+            convertedUnitPrice:
+              unitPrice !== null && rate !== null ? round2(unitPrice * rate) : null,
             estimatedShipmentDate: vi ? vi.estimated_shipment_date : null,
           };
         })
         .filter((vp) => vp.unitPrice !== null);
 
+      // Vendors may quote in different currencies — compare in branch currency
+      // when converted values exist, raw otherwise. Out-of-stock lines quote
+      // 0 and must never win "lowest price" against a vendor who can deliver.
+      const comparableUnit = (vp: (typeof vendorPrices)[number]) =>
+        vp.convertedUnitPrice ?? (vp.unitPrice as number);
+      const inStockPrices = vendorPrices.filter((vp) => vp.stockStatus !== 'OUT_OF_STOCK');
       const lowestPrice =
-        vendorPrices.length > 0
-          ? Math.min(...vendorPrices.map((vp) => vp.unitPrice as number))
-          : null;
+        inStockPrices.length > 0 ? Math.min(...inStockPrices.map(comparableUnit)) : null;
 
       return {
         rfqItemId: item.id,
@@ -792,17 +832,34 @@ export class RfqService {
         lowestPrice,
         vendorPrices: vendorPrices.map((vp) => ({
           ...vp,
-          isLowest: lowestPrice !== null && vp.unitPrice === lowestPrice,
+          isLowest:
+            lowestPrice !== null &&
+            vp.stockStatus !== 'OUT_OF_STOCK' &&
+            comparableUnit(vp) === lowestPrice,
           percentDiff:
-            lowestPrice && vp.unitPrice ? ((vp.unitPrice - lowestPrice) / lowestPrice) * 100 : 0,
+            lowestPrice && vp.stockStatus !== 'OUT_OF_STOCK'
+              ? ((comparableUnit(vp) - lowestPrice) / lowestPrice) * 100
+              : 0,
         })),
       };
     });
 
+    // A vendor who marked every requested item OUT_OF_STOCK has nothing to
+    // offer — must never win "cheapest" (their total is 0) or be awardable.
+    const isVendorAllOutOfStock = (vq: RfqVendor) =>
+      (vq.items?.length ?? 0) > 0 && vq.items.every((i) => i.stock_status === 'OUT_OF_STOCK');
+
+    // Cheapest is decided on the branch-currency amount so quotes in
+    // different vendor currencies compare fairly.
+    const comparableTotal = (vq: RfqVendor) =>
+      vq.branch_converted_amount != null
+        ? Number(vq.branch_converted_amount)
+        : Number(vq.total_quoted_amount);
+    const biddableQuotes = validQuotes.filter((vq) => !isVendorAllOutOfStock(vq));
     const cheapestVendor =
-      validQuotes.length > 0
-        ? validQuotes.reduce((prev, curr) =>
-            Number(curr.total_quoted_amount) < Number(prev.total_quoted_amount) ? curr : prev,
+      biddableQuotes.length > 0
+        ? biddableQuotes.reduce((prev, curr) =>
+            comparableTotal(curr) < comparableTotal(prev) ? curr : prev,
           )
         : null;
 
@@ -814,6 +871,13 @@ export class RfqService {
         vendorId: vq.vendor_id,
         vendorName: vq.vendor?.name,
         totalAmount: Number(vq.total_quoted_amount),
+        allOutOfStock: isVendorAllOutOfStock(vq),
+        vendorCurrency: vq.vendor_currency_code || vq.vendor?.currency || 'QAR',
+        branchCurrency: vq.branch_currency_code || null,
+        convertedAmount:
+          vq.branch_converted_amount != null ? Number(vq.branch_converted_amount) : null,
+        exchangeRate: vq.exchange_rate_snapshot != null ? Number(vq.exchange_rate_snapshot) : null,
+        rateFetchedAt: vq.exchange_rate_fetched_at ?? null,
         isCheapest: cheapestVendor ? vq.id === cheapestVendor.id : false,
       })),
     };
@@ -842,6 +906,33 @@ export class RfqService {
       if (targetVendor.status !== RfqVendorStatus.QUOTED) {
         throw new AppError('Vendor has not provided a valid quote', 400);
       }
+
+      // Snapshot the live vendor→branch exchange rate at award time. This is
+      // the rate the whole downstream flow (lot, purchase record, inventory
+      // purchase prices) is priced at — awarding without a rate is not allowed.
+      const branch = await manager.findOne(Branch, { where: { id: rfq.branch_id } });
+      const branchCurrency = branch?.currency_code || 'QAR';
+      const vendorCurrency =
+        targetVendor.vendor_currency_code || targetVendor.vendor?.currency || 'QAR';
+      let awardRate: number;
+      let awardRateFetchedAt: Date;
+      try {
+        const result = await getExchangeRate(manager, vendorCurrency, branchCurrency);
+        awardRate = result.rate;
+        awardRateFetchedAt = result.fetchedAt;
+      } catch {
+        throw new AppError(
+          `Cannot award: live exchange rate ${vendorCurrency} → ${branchCurrency} is unavailable. Try again shortly.`,
+          503,
+        );
+      }
+      targetVendor.vendor_amount = Number(targetVendor.total_quoted_amount);
+      targetVendor.branch_currency_code = branchCurrency;
+      targetVendor.branch_converted_amount = round2(
+        Number(targetVendor.total_quoted_amount) * awardRate,
+      );
+      targetVendor.exchange_rate_snapshot = awardRate;
+      targetVendor.exchange_rate_fetched_at = awardRateFetchedAt;
 
       const { publishEmailJob } = await import('../queues/emailPublisher');
 
@@ -876,7 +967,6 @@ export class RfqService {
       // this is the first point a single winning vendor is known. Compares the
       // awarded vendor's country to the purchasing branch's country. Never
       // recalculated afterwards, even if the vendor's country is later edited.
-      const branch = await manager.findOne(Branch, { where: { id: rfq.branch_id } });
       const awardedVendorCountry =
         targetVendor.vendor?.countryCode ??
         (await manager.findOne(Vendor, { where: { id: targetVendor.vendor_id } }))?.countryCode;
@@ -912,8 +1002,26 @@ export class RfqService {
         }
       }
 
-      logger.info('Vendor awarded successfully', { rfqId, awardedVendorId: vendorId });
-      return { success: true, message: 'Vendor awarded successfully', rfq };
+      logger.info('Vendor awarded successfully', {
+        rfqId,
+        awardedVendorId: vendorId,
+        vendorCurrency,
+        branchCurrency,
+        awardRate,
+      });
+      return {
+        success: true,
+        message: 'Vendor awarded successfully',
+        rfq,
+        conversion: {
+          vendorCurrency,
+          branchCurrency,
+          rate: awardRate,
+          vendorAmount: Number(targetVendor.total_quoted_amount),
+          convertedAmount: targetVendor.branch_converted_amount,
+          fetchedAt: awardRateFetchedAt,
+        },
+      };
     });
   }
 
@@ -936,6 +1044,18 @@ export class RfqService {
 
       if (!awardedVendor) throw new AppError('Awarded vendor data not found', 500);
 
+      // Everything from the lot down (lot amounts, purchase record, inventory
+      // purchase prices) is stored in the BRANCH currency, converted once at
+      // the award-time snapshot rate. Older awards without a snapshot fetch
+      // the rate now instead.
+      const branch = await manager.findOne(Branch, { where: { id: rfq.branch_id } });
+      const branchCurrency = branch?.currency_code || 'QAR';
+      const vendorCurrency = awardedVendor.vendor_currency_code || 'QAR';
+      const isConverted = vendorCurrency !== branchCurrency;
+      const rate = awardedVendor.exchange_rate_snapshot
+        ? Number(awardedVendor.exchange_rate_snapshot)
+        : (await getExchangeRate(manager, vendorCurrency, branchCurrency)).rate;
+
       const date = new Date();
       const lotNumber = `LOT-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -943,12 +1063,14 @@ export class RfqService {
         lotNumber,
         vendorId: awardedVendor.vendor_id,
         purchaseDate: new Date(),
-        totalAmount: awardedVendor.total_quoted_amount,
+        totalAmount: round2(Number(awardedVendor.total_quoted_amount) * rate),
         status: LotStatus.PENDING,
         branch_id: rfq.branch_id,
         warehouse_id: warehouseId,
         createdBy: userId,
         notes: `Auto-generated from RFQ ${rfq.rfq_number}`,
+        currencyCode: branchCurrency,
+        exchangeRateSnapshot: isConverted ? rate : undefined,
         // Carry the snapshot down so lot-level spend reporting is tagged too.
         purchaseOrigin: rfq.purchase_origin,
       });
@@ -996,11 +1118,13 @@ export class RfqService {
           customProductName,
           customSparePartName,
           mpn: quotedItem.rfq_item.mpn,
+          hsCode: quotedItem.rfq_item.hs_code,
           compatibleModels: quotedItem.rfq_item.compatible_models,
           modelIds: quotedItem.rfq_item.modelIds,
           expectedQuantity: quotedItem.available_quantity ?? quotedItem.rfq_item.quantity,
-          unitPrice: quotedItem.unit_price,
-          totalPrice: quotedItem.total_price,
+          // Quoted in the vendor's currency — stored in branch currency.
+          unitPrice: round2(Number(quotedItem.unit_price) * rate),
+          totalPrice: round2(Number(quotedItem.total_price) * rate),
         });
 
         lotItemsToSave.push(lotItem);

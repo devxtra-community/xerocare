@@ -543,10 +543,12 @@ export class BillingService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const productItems = payload.items.map((item: any) => {
         const invItem = new InvoiceItem();
-        invItem.itemType = item.itemType || ItemType.PRODUCT;
+        invItem.itemType =
+          item.itemType === 'SPAREPART' ? ItemType.SPARE_PART : item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
+        invItem.discountAmount = Number(item.discount ?? item.discountAmount ?? 0);
         invItem.modelId = item.modelId;
         invItem.productId = item.productId; // Specific Serial (if Sale)
         invItem.sparePartId = item.sparePartId; // Spare Part reference (if SPAREPART_SALE)
@@ -880,10 +882,12 @@ export class BillingService {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const machineItems = payload.items.map((item: any) => {
         const invItem = new InvoiceItem();
-        invItem.itemType = item.itemType || ItemType.PRODUCT;
+        invItem.itemType =
+          item.itemType === 'SPAREPART' ? ItemType.SPARE_PART : item.itemType || ItemType.PRODUCT;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
+        invItem.discountAmount = Number(item.discount ?? item.discountAmount ?? 0);
         invItem.modelId = item.modelId;
         invItem.productId = item.productId;
 
@@ -3146,6 +3150,7 @@ export class BillingService {
         invItem.description = item.description;
         invItem.quantity = quantity;
         invItem.unitPrice = item.unitPrice;
+        invItem.discountAmount = discount;
         if (item.itemType === 'PRODUCT') {
           invItem.productId = item.productId;
           invItem.serialNumber = item.serialNumber;

@@ -32,6 +32,7 @@ import { getUserFromToken } from '@/lib/auth';
 import { brandService, Brand } from '@/services/brandService';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
+import { getMyBranch } from '@/lib/branch';
 import { MultiSelect } from '@/components/ui/multi-select';
 import * as XLSX from 'xlsx';
 import { formatCurrency } from '@/lib/format';
@@ -55,11 +56,8 @@ const lotItemSchema = z
       .any()
       .transform((val) => (val === '' ? undefined : Number(val)))
       .pipe(z.number().min(0, 'Purchase Price cannot be negative')),
-    sellingPrice: z
-      .any()
-      .transform((val) => (val === '' ? undefined : Number(val)))
-      .pipe(z.number().min(0, 'Selling Price cannot be negative').optional()),
     mpn: z.string().optional(),
+    hsCode: z.string().optional(),
     compatibleModels: z.string().optional(),
   })
   .refine(
@@ -113,6 +111,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const [isValidatingLot, setIsValidatingLot] = useState(false);
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [brandDialogOpen, setBrandDialogOpen] = useState(false);
+  const [currencyCode, setCurrencyCode] = useState('AED');
 
   const form = useForm<CreateLotFormValues>({
     resolver: zodResolver(createLotSchema) as Resolver<CreateLotFormValues>,
@@ -127,13 +126,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
           itemType: LotItemType.MODEL,
           quantity: 1,
           unitPrice: '' as unknown as number,
-          sellingPrice: '' as unknown as number,
           modelId: '',
           modelIds: [],
           sparePartId: '',
           brand: '',
           partName: '',
           mpn: '',
+          hsCode: '',
           isRequestingNewPart: true,
         },
       ],
@@ -167,6 +166,9 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   // Load initial data
   useEffect(() => {
     fetchData();
+    getMyBranch()
+      .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
+      .catch(() => setCurrencyCode('AED'));
   }, []);
 
   const watchLotNumber = form.watch('lotNumber');
@@ -549,13 +551,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                           itemType: LotItemType.MODEL,
                           quantity: 1,
                           unitPrice: '' as unknown as number,
-                          sellingPrice: '' as unknown as number,
                           modelId: '',
                           modelIds: [],
                           sparePartId: '',
                           brand: '',
                           partName: '',
                           mpn: '',
+                          hsCode: '',
                           isRequestingNewPart: true,
                         })
                       }
@@ -892,7 +894,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                         render={({ field: buyField }) => (
                                           <div className="relative">
                                             <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
-                                              Q
+                                              {currencyCode}
                                             </div>
                                             <Input
                                               type="number"
@@ -900,7 +902,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                               step="0.01"
                                               placeholder=""
                                               {...buyField}
-                                              className="h-10 pl-5 pr-1 text-right bg-white"
+                                              className="h-10 pl-9 pr-1 text-right bg-white"
                                             />
                                           </div>
                                         )}
@@ -909,25 +911,17 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
 
                                     <div className="space-y-1">
                                       <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
-                                        Selling
+                                        HS Code
                                       </Label>
                                       <FormField
                                         control={formControl}
-                                        name={`items.${index}.sellingPrice`}
-                                        render={({ field: sellField }) => (
-                                          <div className="relative">
-                                            <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">
-                                              Q
-                                            </div>
-                                            <Input
-                                              type="number"
-                                              min="0"
-                                              step="0.01"
-                                              placeholder="0.00"
-                                              {...sellField}
-                                              className="h-10 pl-5 pr-1 text-right font-bold text-blue-600 bg-white"
-                                            />
-                                          </div>
+                                        name={`items.${index}.hsCode`}
+                                        render={({ field: hsCodeField }) => (
+                                          <Input
+                                            placeholder="HS Code"
+                                            {...hsCodeField}
+                                            className="h-10 text-right bg-white"
+                                          />
                                         )}
                                       />
                                     </div>

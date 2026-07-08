@@ -10,6 +10,9 @@ import { Invoice } from '../entities/invoiceEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { EmployeeRole } from '../constants/employeeRole';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { InvoiceType } from '../entities/enums/invoiceType';
+import { BillType } from '../entities/enums/billType';
+import { ContractStatus } from '../entities/enums/contractStatus';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -797,9 +800,12 @@ export const getInvoiceHistory = async (req: Request, res: Response, next: NextF
 
     const saleType = req.query.saleType as string | undefined;
 
-    // If not Admin/Finance, restrict to creator's invoices
+    // If not Admin/Finance/Manager, restrict to creator's invoices
+    // (history is already branch-scoped, so managers see their whole branch)
     const isSpecializedRole =
-      req.user?.role === EmployeeRole.ADMIN || req.user?.role === EmployeeRole.FINANCE;
+      req.user?.role === EmployeeRole.ADMIN ||
+      req.user?.role === EmployeeRole.FINANCE ||
+      req.user?.role === EmployeeRole.MANAGER;
     const creatorId = isSpecializedRole ? undefined : req.user?.userId;
 
     const history = await reportService.getInvoiceHistory(branchId, saleType, creatorId);
@@ -1000,6 +1006,34 @@ export const getContractAllocations = async (req: Request, res: Response, next: 
       order: { startTimestamp: 'ASC' },
     });
     return res.status(200).json({ success: true, data: allocations });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Internal service-to-service endpoint: active rent machine allocations
+ * (contractId, productId, serialNumber, branchId, customerId) for any
+ * other service that needs to walk the current rent fleet — e.g.
+ * ven_inv_service's preventative-maintenance scheduler.
+ */
+export const getActiveRentAllocations = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await Source.getRepository(ProductAllocation)
+      .createQueryBuilder('pa')
+      .innerJoin(Invoice, 'i', 'pa."contractId" = i.id')
+      .where('i.type = :type', { type: InvoiceType.PROFORMA })
+      .andWhere('i."billType" = :billType', { billType: BillType.RENT })
+      .andWhere('i."contractStatus" = :contractStatus', { contractStatus: ContractStatus.ACTIVE })
+      .andWhere('pa.status = :allocStatus', { allocStatus: AllocationStatus.ALLOCATED })
+      .select('pa."productId"', 'productId')
+      .addSelect('pa."serialNumber"', 'serialNumber')
+      .addSelect('pa."contractId"', 'contractId')
+      .addSelect('i."branchId"', 'branchId')
+      .addSelect('i."customerId"', 'customerId')
+      .getRawMany();
+
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     next(error);
   }

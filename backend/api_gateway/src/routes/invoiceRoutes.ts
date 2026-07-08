@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../middleware/authMiddleware';
-import { requireRole } from '../middleware/roleMiddleware';
+import { requireRole, requireStrictRole } from '../middleware/roleMiddleware';
 import { UserRole } from '../constants/userRole';
 import { AppError } from '../errors/appError';
 
@@ -204,14 +204,18 @@ router.post(
 /**
  * Global overview of sales across the entire company.
  */
-router.get('/sales/global-overview', requireRole(UserRole.ADMIN, UserRole.FINANCE), getGlobalSales);
+router.get(
+  '/sales/global-overview',
+  requireStrictRole(UserRole.ADMIN, UserRole.FINANCE),
+  getGlobalSales,
+);
 
 /**
  * Total sales numbers for the whole company.
  */
 router.get(
   '/sales/global-totals',
-  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  requireStrictRole(UserRole.ADMIN, UserRole.FINANCE),
   getGlobalSalesTotals,
 );
 

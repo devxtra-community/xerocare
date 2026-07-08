@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PaymentService } from '../services/paymentService';
 import { AppError } from '../errors/appError';
+import { MulterS3File } from '../types/multer-s3-file';
 
 const paymentService = new PaymentService();
 
@@ -14,6 +15,13 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       throw new AppError('invoiceId, amountPaid, paymentMode, and paymentDate are required', 400);
     }
 
+    const receiptFile = req.file as MulterS3File | undefined;
+    // `.location` is the private R2 S3-API endpoint (requires SigV4 auth to GET).
+    // Public access goes through the bucket's r2.dev public URL instead.
+    const R2_BASE_URL =
+      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
+    const receiptUrl = receiptFile ? `${R2_BASE_URL}/${receiptFile.key}` : undefined;
+
     const payment = await paymentService.recordPayment({
       invoiceId,
       amountPaid: Number(amountPaid),
@@ -22,6 +30,7 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       referenceNumber,
       remarks,
       recordedBy,
+      receiptUrl,
     });
 
     res.status(201).json({

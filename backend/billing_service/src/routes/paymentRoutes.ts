@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
+import { uploadPaymentReceipt } from '../middlewares/uploadMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
 import {
   recordPayment,
@@ -11,6 +12,7 @@ import {
 const router = Router();
 
 // Allow FINANCE, ADMIN, and EMPLOYEE (for advance payments during conversion) to record payments
+// `receipt` (optional) is a proof-of-payment screenshot/PDF uploaded alongside the form fields.
 router.post(
   '/record',
   authMiddleware,
@@ -20,6 +22,7 @@ router.post(
     EmployeeRole.MANAGER,
     EmployeeRole.EMPLOYEE,
   ),
+  uploadPaymentReceipt.single('receipt'),
   recordPayment,
 );
 

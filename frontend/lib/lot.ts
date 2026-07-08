@@ -43,6 +43,7 @@ export interface LotItem {
   customProductName?: string;
   customSparePartName?: string;
   mpn?: string;
+  hsCode?: string;
   compatibleModels?: string;
   modelIds?: string[];
   sellingPrice?: number;
@@ -82,6 +83,7 @@ export interface CreateLotItemData {
   unitPrice: number;
   sellingPrice?: number;
   mpn?: string;
+  hsCode?: string;
   compatibleModels?: string;
 }
 

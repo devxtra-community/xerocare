@@ -205,6 +205,9 @@ export default function ViewPurchaseDialog({
                       <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-right">
                         Amount
                       </th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest italic text-center">
+                        Receipt
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50 text-xs">
@@ -216,6 +219,21 @@ export default function ViewPurchaseDialog({
                         <td className="px-4 py-3 text-slate-500">{p.paymentMethod}</td>
                         <td className="px-4 py-3 font-black text-slate-800 text-right">
                           {formatCurrency(p.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {p.attachmentUrl ? (
+                            <a
+                              href={p.attachmentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline font-bold"
+                              title="View receipt"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </td>
                       </tr>
                     ))}

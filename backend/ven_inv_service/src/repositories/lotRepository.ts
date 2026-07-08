@@ -54,6 +54,7 @@ export class LotRepository {
         lotItem.sellingPrice = itemData.sellingPrice || itemData.unitPrice;
         lotItem.totalPrice = itemData.quantity * itemData.unitPrice;
         lotItem.mpn = itemData.mpn;
+        lotItem.hsCode = itemData.hsCode;
         lotItem.compatibleModels = itemData.compatibleModels;
         lotItem.modelIds = itemData.modelIds;
 

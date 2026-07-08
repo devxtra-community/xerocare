@@ -2189,6 +2189,49 @@ export class ServiceController {
   };
 
   /**
+   * GET /service/tickets/achievement-summary
+   * Internal endpoint for billing_service's employee-targets module: sums the
+   * accepted deal value (CUSTOMER_APPROVED estimate totalCost) of completed
+   * tickets assigned to a technician within a date range.
+   */
+  getAchievementSummary = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { employeeId, monthStart, monthEnd } = req.query;
+      if (!employeeId || !monthStart || !monthEnd) {
+        throw new AppError('employeeId, monthStart and monthEnd are required', 400);
+      }
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+
+      const tickets = await ticketRepo
+        .createQueryBuilder('ticket')
+        .where('ticket.assignedTechnicianId = :employeeId', { employeeId })
+        .andWhere('ticket.status = :status', { status: ServiceTicketStatus.COMPLETED })
+        .andWhere('ticket.completedAt >= :monthStart AND ticket.completedAt < :monthEnd', {
+          monthStart: new Date(monthStart as string),
+          monthEnd: new Date(monthEnd as string),
+        })
+        .getMany();
+
+      let totalAmount = 0;
+      for (const ticket of tickets) {
+        const estimate = await estimateRepo.findOne({
+          where: { ticketId: ticket.id, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
+        });
+        totalAmount += estimate ? Number(estimate.totalCost) || 0 : 0;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: { totalAmount, dealCount: tickets.length },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * GET /service/technicians/:technicianId/performance
    */
   getTechnicianPerformance = async (req: Request, res: Response, next: NextFunction) => {

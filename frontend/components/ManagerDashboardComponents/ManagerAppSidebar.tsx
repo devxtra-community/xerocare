@@ -128,6 +128,94 @@ const menuItems = [
     icon: Users,
     href: '/manager/employees',
   },
+  {
+    title: 'Targets',
+    icon: TrendingUp,
+    href: '/manager/targets',
+  },
+  {
+    title: 'HR Desk',
+    icon: Users,
+    subItems: [
+      {
+        title: 'Leave Approvals',
+        icon: FileText,
+        href: '/hr/leave',
+      },
+      {
+        title: 'Attendance',
+        icon: Eye,
+        href: '/hr/attendance',
+      },
+      {
+        title: 'Payroll',
+        icon: DollarSign,
+        href: '/hr/payroll',
+      },
+    ],
+  },
+  {
+    title: 'Sales Desk',
+    icon: ShoppingCart,
+    subItems: [
+      {
+        title: 'Quotations',
+        icon: FileText,
+        href: '/employee/quotations',
+      },
+      {
+        title: 'Orders',
+        icon: ShoppingCart,
+        href: '/employee/orders',
+      },
+      {
+        title: 'Customers',
+        icon: Users,
+        href: '/employee/customers',
+      },
+      {
+        title: 'Leads',
+        icon: Award,
+        href: '/employee/leads',
+      },
+      {
+        title: 'Service',
+        icon: Settings,
+        href: '/employee/service',
+      },
+    ],
+  },
+  {
+    title: 'Finance Desk',
+    icon: Wallet,
+    subItems: [
+      {
+        title: 'Quotation Approvals',
+        icon: FileText,
+        href: '/finance/quotations',
+      },
+      {
+        title: 'Receivables (AR)',
+        icon: ReceiptText,
+        href: '/finance/ar',
+      },
+      {
+        title: 'Payables (AP)',
+        icon: CreditCard,
+        href: '/finance/ap',
+      },
+      {
+        title: 'Service Estimates',
+        icon: Settings,
+        href: '/finance/service-estimates',
+      },
+      {
+        title: 'Returns',
+        icon: RotateCcw,
+        href: '/finance/returns',
+      },
+    ],
+  },
 
   {
     title: 'Finance',

@@ -40,6 +40,7 @@ import {
   uploadContractConfirmation,
   replaceDeviceAllocation,
   getContractAllocations,
+  getActiveRentAllocations,
   processReturn,
   updateStatus,
   customerRespond,
@@ -253,12 +254,22 @@ router.post(
 /**
  * If something is wrong with a deal, the Finance team can reject it and send it back.
  */
-router.post('/:id/finance-reject', authMiddleware, financeReject);
+router.post(
+  '/:id/finance-reject',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
+  financeReject,
+);
 
 /**
  * Finance approves the quotation pricing.
  */
-router.post('/:id/finance-approve-quotation', authMiddleware, financeApproveQuotation);
+router.post(
+  '/:id/finance-approve-quotation',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
+  financeApproveQuotation,
+);
 
 /**
  * Employee converts a finance-approved quotation to a transaction.
@@ -526,6 +537,12 @@ router.get('/contract/serial/:serialNumber', getContractBySerial);
 router.get('/customer/:customerId/history', getCustomerBillingHistory);
 router.get('/machine/:productId/billing-context', getMachineBillingContext);
 router.get('/machine/:productId/history-data', getMachineHistoryData);
+
+/**
+ * Internal service-to-service: active rent machine allocations across all
+ * contracts (used by ven_inv_service's preventative-maintenance scheduler).
+ */
+router.get('/allocations/active-rent', getActiveRentAllocations);
 
 router.patch('/:id/revise-estimate', authMiddleware, reviseEstimate);
 router.post('/:id/finance-extend-validity', authMiddleware, financeExtendValidity);

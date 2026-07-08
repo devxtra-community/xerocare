@@ -65,21 +65,27 @@ export const STATUS_MAP = {
   },
 } as const;
 
-// Context/Service Context configuration
+// Context/Service Context configuration — keys must match the backend ServiceContext
+// enum (backend/ven_inv_service/src/entities/serviceTicketEntity.ts)
 export const CONTEXT_MAP = {
   CHARGEABLE: { label: 'Chargeable', className: 'bg-orange-100 text-orange-800 border-orange-200' },
-  RENT_CONTRACT: {
-    label: 'Rent — Free',
-    className: 'bg-green-100 text-green-800 border-green-200',
-  },
-  LEASE_WARRANTY: {
+  RENT: { label: 'Rent — Free', className: 'bg-green-100 text-green-800 border-green-200' },
+  WARRANTY: {
     label: 'Under Warranty',
     className: 'bg-green-100 text-green-800 border-green-200',
   },
+  LEASE_UNDER_WARRANTY: {
+    label: 'Lease — Under Warranty',
+    className: 'bg-green-100 text-green-800 border-green-200',
+  },
   LEASE_EXPIRED: { label: 'Warranty Expired', className: 'bg-red-100 text-red-800 border-red-200' },
-  AMC_CONTRACT: { label: 'AMC Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  FSMA_CONTRACT: { label: 'FSMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  SMA_CONTRACT: { label: 'SMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+  AMC: { label: 'AMC Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+  FSMA: { label: 'FSMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+  SMA: { label: 'SMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+  EXTERNAL_MACHINE: {
+    label: 'External Machine',
+    className: 'bg-slate-100 text-slate-800 border-slate-200',
+  },
 } as const;
 
 const badgeVariants = cva(

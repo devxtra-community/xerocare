@@ -34,6 +34,8 @@ import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
+import { EmployeeTarget } from '../entities/employeeTargetEntity';
+import { EmployeeTargetAchievement } from '../entities/employeeTargetAchievementEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -72,6 +74,8 @@ export const Source = new DataSource({
     EquityEntry,
     ExchangeRate,
     AccountReconciliation,
+    EmployeeTarget,
+    EmployeeTargetAchievement,
   ],
   poolSize: 1,
   extra: {
@@ -648,6 +652,51 @@ async function runPreMigrations() {
       );
     `);
     logger.info('Cash & Bank extended schema applied.');
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─── Payment ledger proof-of-payment attachment ────────────────────────────
+    await client.query(`
+      ALTER TABLE payment_ledgers
+        ADD COLUMN IF NOT EXISTS "receiptUrl" VARCHAR;
+    `);
+    logger.info('Payment ledger receiptUrl column applied.');
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─── Employee Targets & Incentives module ─────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS employee_targets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "employeeId" UUID NOT NULL,
+        "branchId" UUID NOT NULL,
+        "assignedBy" UUID NOT NULL,
+        "targetMonth" VARCHAR(7) NOT NULL,
+        "targetAmount" DECIMAL(12,2) NOT NULL,
+        "targetType" VARCHAR NOT NULL,
+        "currencyCode" VARCHAR(3) NOT NULL,
+        tiers JSONB NOT NULL DEFAULT '[]',
+        status VARCHAR NOT NULL DEFAULT 'ACTIVE',
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_employee_target_month UNIQUE ("employeeId", "targetMonth")
+      );
+
+      CREATE TABLE IF NOT EXISTS employee_target_achievements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "targetId" UUID NOT NULL REFERENCES employee_targets(id) ON DELETE CASCADE,
+        "employeeId" UUID NOT NULL,
+        "branchId" UUID NOT NULL,
+        "targetMonth" VARCHAR(7) NOT NULL,
+        "targetAmount" DECIMAL(12,2) NOT NULL,
+        "achievedAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+        "achievementPercent" DECIMAL(6,2) NOT NULL DEFAULT 0,
+        "appliedTierPercent" DECIMAL(6,2) NOT NULL DEFAULT 0,
+        "incentiveAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+        "dealCount" INT NOT NULL DEFAULT 0,
+        "calculatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "isFinalized" BOOLEAN NOT NULL DEFAULT FALSE,
+        CONSTRAINT uq_target_achievement UNIQUE ("targetId")
+      );
+    `);
+    logger.info('Employee targets & incentives tables created/verified.');
     // ─────────────────────────────────────────────────────────────────────────
 
     logger.info('Pre-migration enum values and tables added successfully');

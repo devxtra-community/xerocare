@@ -180,7 +180,7 @@ export default function ManagerPurchaseTable() {
               ].map((h) => (
                 <TableHead
                   key={h}
-                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic px-6 py-4"
+                  className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic px-3 py-3 whitespace-nowrap"
                 >
                   {h}
                 </TableHead>
@@ -207,24 +207,24 @@ export default function ManagerPurchaseTable() {
             ) : (
               filtered.map((p) => (
                 <TableRow key={p.id} className="group hover:bg-slate-50/50 transition-colors">
-                  <TableCell className="px-6 py-4 font-bold text-slate-700">
+                  <TableCell className="px-3 py-3 font-bold text-slate-700 whitespace-nowrap">
                     #{p.id.slice(0, 8)}
                   </TableCell>
-                  <TableCell className="px-6 py-4 font-medium text-slate-500">
+                  <TableCell className="px-3 py-3 font-medium text-slate-500 whitespace-nowrap">
                     {p.lot?.lotNumber || p.lotId.slice(0, 8)}
                   </TableCell>
-                  <TableCell className="px-6 py-4 font-black text-slate-800">
+                  <TableCell className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">
                     {formatCurrency(p.totalAmount)}
                   </TableCell>
-                  <TableCell className="px-6 py-4 font-bold text-emerald-600">
+                  <TableCell className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">
                     {formatCurrency(p.paidAmount)}
                   </TableCell>
-                  <TableCell className="px-6 py-4 font-bold text-primary">
+                  <TableCell className="px-3 py-3 font-bold text-primary whitespace-nowrap">
                     {formatCurrency(p.remainingAmount)}
                   </TableCell>
-                  <TableCell className="px-6 py-4">
+                  <TableCell className="px-3 py-3">
                     <span
-                      className={`px-3 py-1 rounded-full text-[10px] font-black italic border ${
+                      className={`px-2 py-1 rounded-full text-[10px] font-black italic border whitespace-nowrap ${
                         p.status === 'PAID'
                           ? 'bg-green-100 text-green-700 border-green-200'
                           : p.status === 'PARTIAL'
@@ -235,35 +235,39 @@ export default function ManagerPurchaseTable() {
                       {p.status}
                     </span>
                   </TableCell>
-                  <TableCell className="px-6 py-4">
+                  <TableCell className="px-3 py-3">
                     <PurchaseOriginBadge origin={p.purchaseOrigin} />
                   </TableCell>
-                  <TableCell className="px-6 py-4">
-                    <div className="flex gap-4">
+                  <TableCell className="px-3 py-3">
+                    <div className="flex items-center gap-2.5">
                       <button
-                        className="text-slate-400 hover:text-primary transition-colors flex items-center gap-1 text-xs font-bold"
+                        className="text-slate-400 hover:text-primary transition-colors"
                         onClick={() => handleView(p)}
+                        title="Details"
                       >
-                        <Eye size={16} /> Details
+                        <Eye size={16} />
                       </button>
                       <button
                         className="text-slate-400 hover:text-slate-700 transition-colors"
                         onClick={() => handleEdit(p)}
+                        title="Edit"
                       >
                         <Edit size={16} />
                       </button>
                       <button
-                        className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-1 text-xs font-bold"
+                        className="text-emerald-500 hover:text-emerald-600 transition-colors"
                         onClick={() => handleRecordCost(p)}
+                        title="Add Cost"
                       >
-                        <Banknote size={16} /> Cost
+                        <Banknote size={16} />
                       </button>
                       <button
-                        className="text-emerald-500 hover:text-emerald-600 transition-colors flex items-center gap-1 text-xs font-bold"
+                        className="text-emerald-500 hover:text-emerald-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         onClick={() => handleRecordPayment(p)}
                         disabled={p.status === 'PAID'}
+                        title="Record Payment"
                       >
-                        <CreditCard size={16} /> Pay
+                        <CreditCard size={16} />
                       </button>
                     </div>
                   </TableCell>

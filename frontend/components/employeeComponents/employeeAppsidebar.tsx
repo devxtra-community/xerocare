@@ -13,6 +13,8 @@ import {
   FileQuestion,
   RotateCcw,
   Bell,
+  ArrowLeft,
+  Award,
 } from 'lucide-react';
 
 import {
@@ -44,6 +46,12 @@ const menuItems = [
     title: 'Leave',
     icon: Calendar,
     href: '/employee/leave',
+    modules: ['*'], // Always accessible
+  },
+  {
+    title: 'My Achievements',
+    icon: Award,
+    href: '/employee/achievements',
     modules: ['*'], // Always accessible
   },
   {
@@ -128,15 +136,22 @@ export default function EmployeeSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
+  const [isManager, setIsManager] = useState(false);
 
   // Get user from JWT token on client-side only
   useEffect(() => {
     const user = getUserFromToken();
     setEmployeeJob(user?.employeeJob);
+    setIsManager(user?.role === 'MANAGER');
   }, []);
 
   // Filter menu items based on employee job
   const allowedMenuItems = useMemo(() => {
+    // Branch managers have access to every employee module
+    if (isManager) {
+      return menuItems;
+    }
+
     if (!employeeJob) {
       // If no job assigned, show only dashboard
       return menuItems.filter((item) => item.modules.includes('*'));
@@ -149,7 +164,7 @@ export default function EmployeeSidebar() {
       // Check if employee's job has access to any of the item's required modules
       return item.modules.some((module) => hasJobAccess(employeeJob as EmployeeJob, module));
     });
-  }, [employeeJob]);
+  }, [employeeJob, isManager]);
 
   const handleLogout = async () => {
     try {
@@ -185,6 +200,19 @@ export default function EmployeeSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
+              {isManager && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    className="py-2.5 rounded-md hover:bg-card/10 text-sidebar-accent-foreground"
+                  >
+                    <a href="/manager/dashboard" className="flex items-center gap-3 px-3">
+                      <ArrowLeft className="h-4 w-4" />
+                      <span className="font-medium">Back to Manager</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               {allowedMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton

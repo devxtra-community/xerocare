@@ -15,6 +15,7 @@ import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { generateSku } from '../utils/skuGenerator';
+import { getExchangeRate } from '../utils/exchangeRate';
 import { logger } from '../config/logger';
 
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://billing_service:4004';
@@ -93,53 +94,6 @@ export class StockTransferService {
 
   private round2(n: number): number {
     return Math.round(n * 100) / 100;
-  }
-
-  /**
-   * Rate to convert source-branch currency into destination-branch currency.
-   * Uses the cron-maintained exchange_rates table; falls back to a live fetch
-   * (and caches it back) when the pair is missing or older than 48h.
-   */
-  private async getExchangeRate(
-    manager: EntityManager,
-    fromCurrency?: string | null,
-    toCurrency?: string | null,
-  ): Promise<number> {
-    if (!fromCurrency || !toCurrency || fromCurrency === toCurrency) return 1;
-
-    const rows = (await manager.query(
-      `SELECT rate, fetched_at FROM exchange_rates WHERE from_currency = $1 AND to_currency = $2`,
-      [fromCurrency, toCurrency],
-    )) as { rate: string; fetched_at: string }[];
-    const cached = rows[0];
-    const fresh =
-      cached && Date.now() - new Date(cached.fetched_at).getTime() < 48 * 60 * 60 * 1000;
-    if (cached && fresh) return Number(cached.rate);
-
-    try {
-      const resp = await fetch(`https://api.exchangerate-api.com/v4/latest/${fromCurrency}`);
-      if (resp.ok) {
-        const data = (await resp.json()) as { rates?: Record<string, number> };
-        const live = data.rates?.[toCurrency];
-        if (live && live > 0) {
-          await manager.query(
-            `INSERT INTO exchange_rates (from_currency, to_currency, rate, fetched_at)
-             VALUES ($1, $2, $3, NOW())
-             ON CONFLICT (from_currency, to_currency) DO UPDATE
-               SET rate = EXCLUDED.rate, fetched_at = EXCLUDED.fetched_at`,
-            [fromCurrency, toCurrency, live],
-          );
-          return live;
-        }
-      }
-    } catch (err) {
-      logger.warn(`Live exchange rate fetch ${fromCurrency}->${toCurrency} failed:`, err);
-    }
-
-    if (cached) return Number(cached.rate); // stale beats nothing
-    throw new Error(
-      `Exchange rate ${fromCurrency} → ${toCurrency} is unavailable. Try again shortly.`,
-    );
   }
 
   private async notify(
@@ -534,7 +488,8 @@ export class StockTransferService {
       manager.findOne(Branch, { where: { id: transfer.destination_branch_id } }),
     ]);
     const rate = isInter
-      ? await this.getExchangeRate(manager, sourceBranch?.currency_code, destBranch?.currency_code)
+      ? (await getExchangeRate(manager, sourceBranch?.currency_code, destBranch?.currency_code))
+          .rate
       : 1;
 
     const lot = manager.create(Lot, {
