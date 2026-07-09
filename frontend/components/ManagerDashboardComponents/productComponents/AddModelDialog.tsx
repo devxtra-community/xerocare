@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -43,13 +43,13 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
   });
 
-  const brandIdValue = watch('brand_id');
+  const brandIdValue = useWatch({ control, name: 'brand_id' });
 
   const onSubmit = async (data: FormData) => {
     try {

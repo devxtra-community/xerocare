@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Plus, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -33,14 +33,13 @@ export default function ManagerTargetsPage() {
   const [loading, setLoading] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
 
-  const user = getUserFromToken();
-
-  const loadData = React.useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const data = await monthlyAchievement(month);
       setRows(data);
 
+      const user = getUserFromToken();
       const empRes = await getAllEmployees(
         1,
         200,
