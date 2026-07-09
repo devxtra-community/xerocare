@@ -224,6 +224,7 @@ export async function computeProfitAndLoss(
   const bSqlAllInv = branchSql('inv', '"branchId"', bParam);
   const bSqlAllExp = branchSql('ex', '"branchId"', bParam);
   const bSqlAllDep = branchSql('dj', '"branchId"', bParam);
+  const bSqlCn = branchSql('cn', '"branchId"', bParam);
 
   const rates = await loadExchangeRates(db, baseCurrency);
 
@@ -246,6 +247,7 @@ export async function computeProfitAndLoss(
     allTimeRevRows,
     allTimeExpAmount,
     allTimeDepAmount,
+    creditNoteRows,
   ] = await Promise.all([
     // 4001 Rental Revenue — RENT invoices (FINAL type only, period-filtered)
     db.query<CcyRow[]>(`
@@ -387,12 +389,25 @@ export async function computeProfitAndLoss(
       WHERE status = 'POSTED'
         ${bSqlAllDep}
     `),
+    // Credit note adjustments — CREDIT_EXCHANGE finalized in period
+    // Net: replacementAmount - productAmount (positive = upsell, negative = downgrade/return)
+    db.query<{ amount: string }[]>(`
+      SELECT COALESCE(SUM(COALESCE("replacementAmount", 0) - "productAmount"), 0) AS amount
+      FROM credit_notes cn
+      WHERE status = 'PRODUCT_REPLACED'
+        AND type = 'CREDIT_EXCHANGE'
+        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+        ${bSqlCn}
+    `),
   ]);
 
   // Convert revenues with currency handling
   const rentalRevenue = aggByCurrency(rentalRows, baseCurrency, rates, currencyWarnings);
   const leaseRevenue = aggByCurrency(leaseRows, baseCurrency, rates, currencyWarnings);
-  const salesRevenue = aggByCurrency(salesRows, baseCurrency, rates, currencyWarnings);
+  // Apply credit note adjustments (CREDIT_EXCHANGE net: replacementAmount - productAmount)
+  const creditNoteAdj = Number(creditNoteRows[0]?.amount ?? 0);
+  const salesRevenue =
+    aggByCurrency(salesRows, baseCurrency, rates, currencyWarnings) + creditNoteAdj;
   const serviceRevenue = aggByCurrency(serviceRows, baseCurrency, rates, currencyWarnings);
   const amcSmaRevenue = aggByCurrency(amcRows, baseCurrency, rates, currencyWarnings);
   const sparePartSalesRevenue = aggByCurrency(sparePartRows, baseCurrency, rates, currencyWarnings);

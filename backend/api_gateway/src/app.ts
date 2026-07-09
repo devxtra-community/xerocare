@@ -11,7 +11,12 @@ import { getProductHistory } from './controllers/productHistoryController';
 import { httpLogger } from './middleware/httplogger';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
-import { otpSendLimiter, otpVerifyLimiter, loginLimiter } from './middleware/rateLimitter';
+import {
+  globalRateLimiter,
+  otpSendLimiter,
+  otpVerifyLimiter,
+  loginLimiter,
+} from './middleware/rateLimitter';
 import { authMiddleware } from './middleware/authMiddleware';
 import { requireRole } from './middleware/roleMiddleware';
 import { requireServiceRole } from './middleware/serviceRoleMiddleware';
@@ -47,10 +52,11 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
+      const isDev = process.env.NODE_ENV === 'development';
       if (
         allowedOrigins.includes(origin) ||
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('http://127.0.0.1:') ||
+        (isDev && origin.startsWith('http://localhost:')) ||
+        (isDev && origin.startsWith('http://127.0.0.1:')) ||
         origin.startsWith('https://xerocare.apps.mastrovia.com')
       ) {
         callback(null, true);
@@ -68,6 +74,7 @@ app.use(
  * which makes the app feel faster and saves data.
  */
 app.use(compression());
+app.use(globalRateLimiter);
 
 /**
  * Activity Log: Record all incoming requests
@@ -117,6 +124,7 @@ app.get(
  * automatically.
  */
 app.post('/e/auth/login', loginLimiter);
+app.post('/e/admin/login', loginLimiter);
 app.post(
   ['/e/auth/login/verify', '/e/auth/forgot-password/verify', '/e/auth/magic-link/verify'],
   otpVerifyLimiter,

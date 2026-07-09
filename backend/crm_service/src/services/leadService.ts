@@ -3,6 +3,7 @@ import { ILead, LeadStatus } from '../models/leadModel';
 import { AppError } from '../errors/appError';
 import { CustomerService } from './customerService';
 import { Customer } from '../entities/customerEntity';
+import { logger } from '../config/logger';
 
 export class LeadService {
   private leadRepository: LeadRepository;
@@ -117,9 +118,45 @@ export class LeadService {
       branch_id: lead.branch_id,
     };
 
-    const customer = await this.customerService.createCustomer(customerData);
+    let customer;
+    try {
+      customer = await this.customerService.createCustomer(customerData);
+    } catch (createErr) {
+      // If a concurrent request already created a customer with this email,
+      // retrieve that record so the lead can still be linked to it.
+      if (createErr instanceof AppError && createErr.statusCode === 409 && email) {
+        const existing = await this.customerService.findByEmail(email);
+        if (existing) {
+          customer = existing;
+        } else {
+          throw createErr;
+        }
+      } else {
+        throw createErr;
+      }
+    }
 
-    await this.leadRepository.updateLeadStatus(leadId, LeadStatus.CONVERTED, customer.id);
+    try {
+      await this.leadRepository.updateLeadStatus(leadId, LeadStatus.CONVERTED, customer.id);
+    } catch (err) {
+      // MongoDB update failed after Postgres insert — roll back the customer row
+      // so the lead can be re-converted on the next attempt.
+      logger.error('Lead status update failed after customer creation — rolling back', {
+        customerId: customer.id,
+        leadId,
+        error: err,
+      });
+      try {
+        await this.customerService.hardDeleteCustomer(customer.id);
+      } catch (deleteErr) {
+        logger.error('Compensating customer deletion failed — manual cleanup required', {
+          customerId: customer.id,
+          leadId,
+          error: deleteErr,
+        });
+      }
+      throw new AppError('Failed to convert lead. Please try again.', 500);
+    }
 
     return customer.id;
   }

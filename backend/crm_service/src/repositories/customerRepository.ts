@@ -54,4 +54,12 @@ export class CustomerRepository {
     const result = await this.repo.update(id, { isActive: false });
     return (result.affected ?? 0) > 0;
   }
+
+  /**
+   * Hard deletes a customer row. Used only as a compensating action when a
+   * create-then-update sequence fails mid-way and the row has no dependants yet.
+   */
+  async hardDeleteCustomer(id: string): Promise<void> {
+    await this.repo.delete(id);
+  }
 }

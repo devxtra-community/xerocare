@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { requestRefresh } from './auth-refresh';
+import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
 
 /**
  * This is the "Messenger" of our application.
@@ -117,6 +118,7 @@ api.interceptors.response.use(
     // we immediately log the user out to protect their account.
     if (status === 401 && (errorCode === 'TOKEN_REVOKED' || errorCode === 'TOKEN_INVALID')) {
       localStorage.clear();
+      clearAccessTokenCookie();
 
       if (window.location.pathname.startsWith('/admin')) {
         window.location.href = '/adminlogin';
@@ -148,6 +150,7 @@ api.interceptors.response.use(
         const newAccessToken = await requestRefresh();
 
         localStorage.setItem('accessToken', newAccessToken);
+        setAccessTokenCookie(newAccessToken);
         api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
 
         processQueue(null, newAccessToken);
@@ -161,6 +164,7 @@ api.interceptors.response.use(
 
         // If even the background re-login fails, we must ask the user to sign in again.
         localStorage.clear();
+        clearAccessTokenCookie();
 
         if (window.location.pathname.startsWith('/admin')) {
           window.location.href = '/adminlogin';

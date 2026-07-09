@@ -282,10 +282,10 @@ export class UsageService {
         }
       }
 
-      bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
-      bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
-      colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);
-      colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
+      bwA4Delta = payload.bwA4Count - prevBwA4;
+      bwA3Delta = payload.bwA3Count - prevBwA3;
+      colorA4Delta = payload.colorA4Count - prevColorA4;
+      colorA3Delta = payload.colorA3Count - prevColorA3;
     }
 
     // 5. Backend Validations
@@ -1254,10 +1254,22 @@ export class UsageService {
     let colorA4Delta = 0;
     let colorA3Delta = 0;
 
-    // Use items to calculate deltas if provided, otherwise fallback to contract-level counts (safe only for single device)
+    // Use items to calculate deltas if provided, otherwise fallback to contract-level counts.
+    // The fallback is only correct for single-device contracts where the aggregate reading
+    // equals the one machine's reading. For multi-device contracts the caller MUST supply
+    // per-machine items — otherwise we cannot compute per-machine deltas without ambiguity.
     if (payload.items && payload.items.length > 0) {
       // Deltas will be summed from items below
     } else {
+      const existingItemCount = await this.invoiceRepo.manager.count(UsageRecordItem, {
+        where: { usageRecordId: usage.id },
+      });
+      if (existingItemCount > 1) {
+        throw new AppError(
+          'Multi-device contract: per-machine meter readings (items) are required to update usage',
+          400,
+        );
+      }
       bwA4Delta = Math.max(0, payload.bwA4Count - prevBwA4);
       bwA3Delta = Math.max(0, payload.bwA3Count - prevBwA3);
       colorA4Delta = Math.max(0, payload.colorA4Count - prevColorA4);

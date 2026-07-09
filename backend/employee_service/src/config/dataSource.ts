@@ -20,7 +20,7 @@ export const Source = new DataSource({
   ssl: process.env.EMPLOYEE_DATABASE_URL?.includes('neon.tech')
     ? { rejectUnauthorized: false }
     : false,
-  synchronize: true,
+  synchronize: false,
   entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
   poolSize: 1,
   extra: {

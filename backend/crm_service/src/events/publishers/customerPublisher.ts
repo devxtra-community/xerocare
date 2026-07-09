@@ -10,7 +10,7 @@ export const publishCustomerUpdated = async (data: { id: string; name: string })
     // Ensure exchange exists
     await channel.assertExchange(exchange, 'topic', { durable: true });
 
-    channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(data)));
+    channel.publish(exchange, routingKey, Buffer.from(JSON.stringify(data)), { persistent: true });
 
     logger.info(`Event published: ${routingKey}`, data);
   } catch (error) {

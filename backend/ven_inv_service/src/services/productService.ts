@@ -243,6 +243,24 @@ export class ProductService {
     return this.productRepo.getAllProducts(branchId, modelId, status, page, limit, search);
   }
 
+  private static readonly STATUS_TRANSITIONS: Record<ProductStatus, ProductStatus[]> = {
+    [ProductStatus.AVAILABLE]: [
+      ProductStatus.RENTED,
+      ProductStatus.LEASE,
+      ProductStatus.SOLD,
+      ProductStatus.DAMAGED,
+    ],
+    [ProductStatus.RENTED]: [
+      ProductStatus.AVAILABLE,
+      ProductStatus.DAMAGED,
+      ProductStatus.RETURNED,
+    ],
+    [ProductStatus.LEASE]: [ProductStatus.AVAILABLE, ProductStatus.DAMAGED, ProductStatus.RETURNED],
+    [ProductStatus.SOLD]: [ProductStatus.RETURNED, ProductStatus.DAMAGED],
+    [ProductStatus.DAMAGED]: [ProductStatus.AVAILABLE],
+    [ProductStatus.RETURNED]: [ProductStatus.AVAILABLE, ProductStatus.DAMAGED],
+  };
+
   /**
    * Updates a product and clears relevant caches.
    */
@@ -250,6 +268,19 @@ export class ProductService {
     const currentProduct = await this.productRepo.findOne(id);
     if (!currentProduct) {
       throw new AppError('Product not found', 404);
+    }
+
+    if (
+      data.product_status !== undefined &&
+      data.product_status !== currentProduct.product_status
+    ) {
+      const allowed = ProductService.STATUS_TRANSITIONS[currentProduct.product_status] ?? [];
+      if (!allowed.includes(data.product_status)) {
+        throw new AppError(
+          `Invalid status transition: ${currentProduct.product_status} → ${data.product_status}`,
+          400,
+        );
+      }
     }
 
     if (data.max_discount_amount !== undefined || data.sale_price !== undefined) {

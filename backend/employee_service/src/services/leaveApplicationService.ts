@@ -6,6 +6,7 @@ import { AppError } from '../errors/appError';
 import { Source } from '../config/dataSource';
 import { Notification } from '../entities/notificationEntity';
 import { Employee } from '../entities/employeeEntities';
+import { LeaveApplication } from '../entities/leaveApplicationEntity';
 
 interface SubmitLeaveApplicationData {
   start_date: string;
@@ -50,24 +51,35 @@ export class LeaveApplicationService {
       throw new AppError('Reason must be at least 10 characters long', 400);
     }
 
-    const overlappingLeaves = await this.leaveRepo.findOverlappingLeaves(
-      employeeId,
-      startDate,
-      endDate,
-    );
+    const leaveApplication = await Source.transaction(async (manager) => {
+      const leaveRepo = manager.getRepository(LeaveApplication);
 
-    if (overlappingLeaves.length > 0) {
-      throw new AppError('You already have a leave application for overlapping dates', 400);
-    }
+      const overlapping = await leaveRepo
+        .createQueryBuilder('leave')
+        .where('leave.employee_id = :employeeId', { employeeId })
+        .andWhere('leave.status != :cancelledStatus', { cancelledStatus: LeaveStatus.CANCELLED })
+        .andWhere('leave.status != :rejectedStatus', { rejectedStatus: LeaveStatus.REJECTED })
+        .andWhere('(leave.start_date <= :endDate AND leave.end_date >= :startDate)', {
+          startDate,
+          endDate,
+        })
+        .setLock('pessimistic_write')
+        .getMany();
 
-    const leaveApplication = await this.leaveRepo.createLeaveApplication({
-      employee_id: employeeId,
-      branch_id: employee.branch_id,
-      start_date: startDate,
-      end_date: endDate,
-      leave_type: data.leave_type,
-      reason: data.reason.trim(),
-      status: LeaveStatus.PENDING,
+      if (overlapping.length > 0) {
+        throw new AppError('You already have a leave application for overlapping dates', 400);
+      }
+
+      const newLeave = leaveRepo.create({
+        employee_id: employeeId,
+        branch_id: employee.branch_id!,
+        start_date: startDate,
+        end_date: endDate,
+        leave_type: data.leave_type,
+        reason: data.reason.trim(),
+        status: LeaveStatus.PENDING,
+      });
+      return leaveRepo.save(newLeave) as Promise<LeaveApplication>;
     });
 
     // Notify branch manager of leave submission

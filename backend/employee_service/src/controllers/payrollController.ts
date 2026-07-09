@@ -135,7 +135,17 @@ export class PayrollController {
         leave_days: 0,
       });
 
-      await payrollRepo.save(newPayroll);
+      try {
+        await payrollRepo.save(newPayroll);
+      } catch (saveErr: unknown) {
+        const pgErr = saveErr as { code?: string };
+        if (pgErr.code === '23505') {
+          return res
+            .status(409)
+            .json({ message: 'Payroll record already exists for this month and year' });
+        }
+        throw saveErr;
+      }
 
       if (status === PayrollStatus.PAID) {
         const notificationRepo = Source.getRepository(Notification);

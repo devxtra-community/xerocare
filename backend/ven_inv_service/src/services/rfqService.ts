@@ -892,8 +892,8 @@ export class RfqService {
       });
 
       if (!rfq) throw new AppError('RFQ not found', 404);
-      if (![RfqStatus.PARTIAL_QUOTED, RfqStatus.FULLY_QUOTED].includes(rfq.status)) {
-        throw new AppError('RFQ must be fully or partially quoted before award', 400);
+      if (rfq.status !== RfqStatus.FULLY_QUOTED) {
+        throw new AppError('RFQ must be fully quoted (all vendors responded) before award', 400);
       }
 
       const allVendors = await manager.find(RfqVendor, {

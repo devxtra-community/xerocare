@@ -599,6 +599,27 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      const allowedDiagnoseStatuses: ServiceTicketStatus[] = [
+        ServiceTicketStatus.ASSIGNED,
+        ServiceTicketStatus.DIAGNOSED,
+        ServiceTicketStatus.FREE_SERVICE,
+      ];
+      if (!allowedDiagnoseStatuses.includes(ticket.status)) {
+        throw new AppError(`Cannot diagnose ticket with current status: ${ticket.status}`, 400);
+      }
+
+      if (meterReading !== undefined && meterReading !== null && ticket.productId) {
+        const product = await Source.getRepository(Product).findOne({
+          where: { id: ticket.productId },
+        });
+        if (product?.meter_reading && meterReading < product.meter_reading) {
+          throw new AppError(
+            `Meter reading ${meterReading} cannot be less than the current reading ${product.meter_reading}`,
+            400,
+          );
+        }
+      }
+
       const isFreeContext = ticket.track === 'A';
 
       // Validate discount <= total maxDiscountableAmount across parts
@@ -1624,6 +1645,25 @@ export class ServiceController {
         relations: ['items'],
       });
       if (!ticket) throw new Error('Ticket not found');
+
+      const allowedCompleteStatuses: ServiceTicketStatus[] = [
+        ServiceTicketStatus.IN_PROGRESS,
+        ServiceTicketStatus.FREE_SERVICE,
+        ServiceTicketStatus.CUSTOMER_APPROVED,
+      ];
+      if (!allowedCompleteStatuses.includes(ticket.status)) {
+        throw new AppError(`Cannot complete ticket with current status: ${ticket.status}`, 400);
+      }
+
+      if (meterReading !== undefined && meterReading !== null) {
+        const previousReading = ticket.meterReadingAtService ?? 0;
+        if (meterReading < previousReading) {
+          throw new AppError(
+            `Completion meter reading ${meterReading} cannot be less than diagnosis reading ${previousReading}`,
+            400,
+          );
+        }
+      }
 
       ticket.repairCompletedAt = new Date();
       if (ticket.repairStartedAt) {

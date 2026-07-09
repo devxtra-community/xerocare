@@ -211,6 +211,13 @@ export const requestMagicLink = async (req: Request, res: Response, next: NextFu
   try {
     const email = req.body.email.toLowerCase().trim();
 
+    // Silently succeed for unknown emails — same behaviour as forgotPassword —
+    // so callers cannot enumerate which addresses are registered.
+    const user = await authService.findUserByEmail(email);
+    if (!user) {
+      return res.json({ message: 'If account exists, magic link sent', success: true });
+    }
+
     await magicLinkService.sendMagicLink(email);
 
     return res.json({

@@ -28,12 +28,24 @@ router.post('/tickets/:id/diagnose', controller.diagnoseTicket);
 router.get('/tickets/:id/estimates', controller.getTicketEstimates);
 router.post('/tickets/:id/estimates', controller.createEstimate);
 router.post('/tickets/:id/estimates/submit', controller.submitEstimateForApproval);
-router.post('/estimates/:estimateId/approve-finance', controller.approveEstimateFinance);
-router.post('/estimates/:estimateId/reject-finance', controller.rejectEstimateFinance);
+router.post(
+  '/estimates/:estimateId/approve-finance',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.approveEstimateFinance,
+);
+router.post(
+  '/estimates/:estimateId/reject-finance',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.rejectEstimateFinance,
+);
 router.post('/estimates/:estimateId/approve-customer', controller.approveEstimateCustomer);
 router.post('/estimates/:estimateId/reject-customer', controller.rejectEstimateCustomer);
 router.post('/tickets/:id/estimates/revisions', controller.createEstimateRevision);
-router.post('/estimates/revisions/:revisionId/approve-finance', controller.approveRevisionFinance);
+router.post(
+  '/estimates/revisions/:revisionId/approve-finance',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.approveRevisionFinance,
+);
 router.post(
   '/estimates/revisions/:revisionId/approve-customer',
   controller.approveRevisionCustomer,
@@ -41,8 +53,16 @@ router.post(
 router.post('/tickets/:id/start-repair', controller.startRepair);
 router.post('/tickets/:id/quote', controller.submitQuotation);
 router.patch('/tickets/:id/quotation-link', controller.patchQuotationLink);
-router.patch('/tickets/:id/finance-approved', controller.financeApproved);
-router.patch('/tickets/:id/finance-rejected', controller.financeRejected);
+router.patch(
+  '/tickets/:id/finance-approved',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.financeApproved,
+);
+router.patch(
+  '/tickets/:id/finance-rejected',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.financeRejected,
+);
 router.post('/tickets/:id/extend-validity', controller.extendValidity);
 router.patch('/tickets/:id/revise-estimate', controller.reviseEstimate);
 router.get('/tickets/:id/revisions', controller.getRevisions);

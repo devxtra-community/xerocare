@@ -146,8 +146,20 @@ export class PurchaseController {
         else if (ids.length > 1)
           branchClause = `AND p.branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
       }
-      const dateFromClause = dateFrom ? `AND p.created_at::date >= '${dateFrom}'` : '';
-      const dateToClause = dateTo ? `AND p.created_at::date <= '${dateTo}'` : '';
+
+      const queryParams: string[] = [];
+      let paramIdx = 1;
+
+      let dateFromClause = '';
+      if (dateFrom) {
+        dateFromClause = `AND p.created_at::date >= $${paramIdx++}::date`;
+        queryParams.push(dateFrom);
+      }
+      let dateToClause = '';
+      if (dateTo) {
+        dateToClause = `AND p.created_at::date <= $${paramIdx++}::date`;
+        queryParams.push(dateTo);
+      }
 
       // Group by currency so Billing can apply per-currency exchange-rate conversion
       const rows = await Source.query<
@@ -156,7 +168,8 @@ export class PurchaseController {
           purchase_cost: string;
           shipping_handling: string;
         }[]
-      >(`
+      >(
+        `
         SELECT
           COALESCE(p.currency_code, 'AED') AS currency_code,
           COALESCE(SUM(p.purchase_amount + p.labour_cost + p.documentation_fee), 0) AS purchase_cost,
@@ -167,7 +180,9 @@ export class PurchaseController {
           ${dateFromClause}
           ${dateToClause}
         GROUP BY p.currency_code
-      `);
+      `,
+        queryParams,
+      );
 
       // Billing service will do the currency conversion.
       // We just return the per-currency breakdown plus a flat total for callers

@@ -70,7 +70,8 @@ export class NotificationController {
   static async createInternal(req: Request, res: Response) {
     try {
       const internalHeader = req.headers['x-internal-service'];
-      if (!internalHeader) {
+      const expectedSecret = process.env.INTERNAL_SERVICE_SECRET;
+      if (!internalHeader || !expectedSecret || internalHeader !== expectedSecret) {
         return res.status(403).json({ message: 'Forbidden' });
       }
 

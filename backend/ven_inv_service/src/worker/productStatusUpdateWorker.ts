@@ -101,8 +101,17 @@ export async function startProductStatusConsumer() {
       const product = await productRepo.findOne(productId);
 
       if (!product) {
-        logger.error('Product not found', { productId });
-        channel.ack(msg); // ACK to prevent infinite retries
+        // Product may not yet be visible if billing and inventory DB writes raced.
+        // On the first delivery give it one requeue; on redelivery the window has
+        // closed — nack without requeue so the message goes to the DLQ (if configured)
+        // rather than looping forever.
+        if (msg.fields.redelivered) {
+          logger.error('Product not found on redelivery — discarding to DLQ', { productId });
+          channel.nack(msg, false, false);
+        } else {
+          logger.warn('Product not found on first delivery — requeueing once', { productId });
+          channel.nack(msg, false, true);
+        }
         return;
       }
 

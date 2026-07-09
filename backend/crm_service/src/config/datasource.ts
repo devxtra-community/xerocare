@@ -8,7 +8,7 @@ export const Source = new DataSource({
   type: 'postgres',
   url: process.env.CRM_DATABASE_URL,
   ssl: process.env.CRM_DATABASE_URL?.includes('neon.tech') ? { rejectUnauthorized: false } : false,
-  synchronize: true,
+  synchronize: false,
   logging: false,
   entities: [Customer],
   poolSize: 1,

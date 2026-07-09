@@ -35,6 +35,13 @@ export class CustomerService {
   }
 
   /**
+   * Retrieves a customer by email address.
+   */
+  async findByEmail(email: string): Promise<Customer | null> {
+    return this.customerRepository.findByEmail(email);
+  }
+
+  /**
    * Retrieves a single customer by ID.
    */
   async getCustomerById(id: string): Promise<Customer> {
@@ -80,5 +87,15 @@ export class CustomerService {
       throw new AppError('Customer not found for deletion', 404);
     }
     logger.info('Customer deleted successfully', { customerId: id });
+  }
+
+  /**
+   * Hard deletes a customer row. Only for compensating a failed lead conversion
+   * where the Postgres insert succeeded but the MongoDB update failed, and the
+   * row has no other references yet.
+   */
+  async hardDeleteCustomer(id: string): Promise<void> {
+    await this.customerRepository.hardDeleteCustomer(id);
+    logger.info('Customer hard-deleted (compensation)', { customerId: id });
   }
 }

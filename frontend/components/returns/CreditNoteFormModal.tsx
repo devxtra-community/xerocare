@@ -156,6 +156,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       setCustomers(await getCustomers());
     } catch (e) {
       console.error(e);
+      toast.error('Failed to load customers');
     }
   };
 
@@ -165,6 +166,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       setCustomerDetails(await getCustomerById(id));
     } catch (e) {
       console.error(e);
+      toast.error('Failed to load customer details');
     } finally {
       setLoadingCustomer(false);
     }
@@ -200,6 +202,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
         }
       } catch (e) {
         console.error(e);
+        toast.error('Failed to load invoices');
       } finally {
         setLoadingInvoices(false);
       }
@@ -217,8 +220,9 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       if (res.data.success) {
         setSelectedInvoice(res.data.data);
       }
-    } catch {
-      // Fallback handled by state remaining stable or being set to null elsewhere
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load invoice details');
     }
   }, []);
 

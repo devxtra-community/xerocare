@@ -32,7 +32,7 @@ export class OtpService {
   async verifyOtp(email: string, otp: string, purpose: OtpPurpose) {
     const key = this.getKey(email, purpose);
 
-    if (process.env.NODE_ENV !== 'production' && otp === '123456') {
+    if (process.env.NODE_ENV === 'development' && otp === '123456') {
       await redis.del(key);
       return true;
     }

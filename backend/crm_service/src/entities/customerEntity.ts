@@ -16,7 +16,7 @@ export class Customer {
   name!: string;
 
   @Column({ nullable: true })
-  @Index()
+  @Index({ unique: true })
   email?: string;
 
   @Column({ nullable: true })

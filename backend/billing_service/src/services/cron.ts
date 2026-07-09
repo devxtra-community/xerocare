@@ -207,6 +207,38 @@ export async function expireContractsJob() {
       );
 
       logger.info(`[CRON] Published contract.expired event for contract ${contract.invoiceNumber}`);
+
+      // Release products allocated under this contract back to RETURNED status
+      try {
+        const { emitProductStatusUpdate } = await import('../events/publisher/productStatusEvent');
+        const allocationRepo = Source.getRepository(ProductAllocation);
+        const allocations = await allocationRepo.find({
+          where: { contractId: contract.id, status: AllocationStatus.ALLOCATED },
+        });
+        for (const alloc of allocations) {
+          if (alloc.productId) {
+            await emitProductStatusUpdate({
+              productId: alloc.productId,
+              billType: 'RETURNED',
+              invoiceId: contract.id,
+              approvedBy: 'SYSTEM_CRON',
+              approvedAt: new Date(),
+              customerId: contract.customerId,
+            });
+          }
+        }
+        logger.info(
+          `[CRON] Emitted RETURNED for ${allocations.length} product(s) on contract expiry`,
+          {
+            contractId: contract.id,
+          },
+        );
+      } catch (err) {
+        logger.error('[CRON] Failed to emit product status updates on contract expiry', {
+          contractId: contract.id,
+          error: err,
+        });
+      }
     }
 
     logger.info('[CRON] Contract Expiry & Status Update Job completed successfully.');

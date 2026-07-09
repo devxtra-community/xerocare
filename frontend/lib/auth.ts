@@ -2,6 +2,9 @@ import api from './api';
 import { jwtDecode } from 'jwt-decode';
 import { EmployeeJob } from './employeeJob';
 import { FinanceJob } from './financeJob';
+import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
+
+export { setAccessTokenCookie, clearAccessTokenCookie };
 
 export type UserRole = 'HR' | 'EMPLOYEE' | 'FINANCE' | 'MANAGER' | 'ADMIN';
 
@@ -56,6 +59,7 @@ export async function verifyLoginOtp(email: string, otp: string) {
     otp,
   });
   localStorage.setItem('accessToken', res.data.accessToken);
+  setAccessTokenCookie(res.data.accessToken);
 
   return res.data;
 }
@@ -76,6 +80,7 @@ export async function requestMagicLink(email: string) {
 export async function verifyMagicLink(token: string) {
   const res = await api.post('/e/auth/magic-link/verify', { token });
   localStorage.setItem('accessToken', res.data.accessToken);
+  setAccessTokenCookie(res.data.accessToken);
 
   return res.data;
 }
@@ -112,6 +117,7 @@ export async function logout() {
     const res = await api.post('/e/auth/logout');
     if (res.data.success) {
       localStorage.clear();
+      clearAccessTokenCookie();
       return res;
     }
   } catch (err) {
@@ -130,6 +136,7 @@ export async function adminLogin(email: string, password: string) {
     password,
   });
   localStorage.setItem('accessToken', res.data.accessToken);
+  setAccessTokenCookie(res.data.accessToken);
   return res.data;
 }
 
