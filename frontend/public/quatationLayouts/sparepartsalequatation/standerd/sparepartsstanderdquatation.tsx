@@ -11,6 +11,7 @@ export interface QuotationLineItem {
   specialPrice: number;
   amount: number;
   vat: number;
+  vatPercent?: number;
   productImage?: string;
   productName?: string;
   discount?: number;
@@ -55,6 +56,8 @@ export interface SparePartsStandardQuotationProps {
   totals?: {
     subTotal: number;
     vatTotal: number;
+    vatPercent?: number;
+    vatName?: string;
     total: number;
     payment: number;
     balanceDue: number;
@@ -537,7 +540,11 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
               borderBottom: '1px solid #f1f5f9',
             }}
           >
-            <span style={{ color: mutedText, fontWeight: '400' }}>VAT Amount</span>
+            <span style={{ color: mutedText, fontWeight: '400' }}>
+              {totals.vatPercent
+                ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                : totals.vatName || 'VAT Amount'}
+            </span>
             <span style={{ fontWeight: '400' }}>QAR {fmt(totals.vatTotal)}</span>
           </div>
           <div

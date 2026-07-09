@@ -487,6 +487,8 @@ export interface Branch {
   taxPercentage: number;
   taxName: string;
   country: string;
+  address?: string;
+  tax_registration_number?: string;
 }
 
 export async function fetchBranches(): Promise<Branch[]> {

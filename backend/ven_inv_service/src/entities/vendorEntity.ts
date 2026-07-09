@@ -55,6 +55,9 @@ export class Vendor {
   @Column({ type: 'varchar', length: 10, default: 'QAR' })
   currency!: string;
 
+  @Column({ name: 'vat_number', type: 'varchar', length: 50, nullable: true })
+  vatNumber?: string | null;
+
   @Column({ name: 'country_code', type: 'varchar', length: 2, nullable: true })
   countryCode?: string;
 

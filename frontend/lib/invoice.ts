@@ -143,6 +143,11 @@ export interface Invoice {
   warrantyEmailSent?: boolean;
   warrantyExpiryEmailSent?: boolean;
   notes?: string;
+  // Tax / VAT fields (populated from branch tax config at invoice creation)
+  taxName?: string; // e.g. "VAT"
+  taxPercent?: number; // e.g. 5
+  taxAmount?: number; // computed: subTotal * taxPercent / 100
+  taxRegistrationNumber?: string;
   createdAt: string;
   employeeName: string;
   branchName: string;
@@ -365,6 +370,10 @@ export interface CreateInvoicePayload {
   securityDepositReference?: string;
   securityDepositDate?: string;
   securityDepositBank?: string;
+
+  // Per-transaction customer location override (snapshotted to invoice)
+  customerCountry?: string;
+  customerStateProvince?: string;
 }
 
 /**

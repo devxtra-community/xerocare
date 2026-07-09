@@ -7,6 +7,15 @@ export interface CreatePurchaseDto {
   shippingCost: number;
   groundfieldCost: number;
   createdBy?: string;
+  // Tax fields (optional — resolved from branch/vendor at creation if not provided)
+  taxPercent?: number;
+  taxName?: string;
+  purchaseCategory?: 'PRODUCT' | 'SPARE_PART' | 'SERVICE' | 'OTHER';
+  importInvoiceNo?: string;
+  customsEntryNo?: string;
+  customsDuty?: number;
+  goodsOrService?: 'GOODS' | 'SERVICE';
+  vatClaimable?: boolean;
 }
 
 export interface AddPaymentDto {

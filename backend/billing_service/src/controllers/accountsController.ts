@@ -13,12 +13,14 @@ import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { Invoice } from '../entities/invoiceEntity';
-import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { AppError } from '../errors/appError';
 import { calculateDepreciation, generateDepreciationSchedule } from '../utils/depreciation';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
+import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
+import { VatRemittance } from '../entities/vatRemittanceEntity';
+import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
 
 // ─── INTERNAL SERVICE HELPER ──────────────────────────────────────────────────
 
@@ -56,13 +58,13 @@ async function internalFetchJSON<T>(
 }
 import { postCashbookEntry } from '../services/cashbookService';
 import { logger } from '../config/logger';
+import { nowInBusinessTz, todayInBusinessTz } from '../utils/businessDate';
 
 // ─── PERIOD HELPER ─────────────────────────────────────────────────────────────
 
 function getPeriodRange(period?: string): { fromDate: string; toDate: string } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
+  // Use business timezone so early-morning UTC moments land on the correct local month/year.
+  const { year: y, month0: m } = nowInBusinessTz();
   switch (period) {
     case 'this_month': {
       const from = new Date(y, m, 1).toISOString().slice(0, 10);
@@ -166,6 +168,22 @@ export const getCashbookEntries = async (req: Request, res: Response, next: Next
 
 export const createCashbookEntry = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // P2-1: Hard-reject manual entries that reference non-existent same-service records.
+    if (req.body.linkedInvoiceId) {
+      const exists = await Source.getRepository(Invoice).findOne({
+        where: { id: req.body.linkedInvoiceId },
+        select: ['id'],
+      });
+      if (!exists) throw new AppError(`Invoice ${req.body.linkedInvoiceId} not found`, 400);
+    }
+    if (req.body.linkedExpenseId) {
+      const exists = await Source.getRepository(ExpenseEntry).findOne({
+        where: { id: req.body.linkedExpenseId },
+        select: ['id'],
+      });
+      if (!exists) throw new AppError(`Expense ${req.body.linkedExpenseId} not found`, 400);
+    }
+
     // Generate reference before transaction to avoid holding lock during count
     if (!req.body.referenceNo) {
       const count = await Source.getRepository(CashbookEntry).count();
@@ -196,6 +214,73 @@ export const createCashbookEntry = async (req: Request, res: Response, next: Nex
   }
 };
 
+// P2-2: Reverse a MANUAL cashbook entry — creates an offsetting entry and marks the original.
+export const reverseCashbookEntry = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const repo = Source.getRepository(CashbookEntry);
+    const original = await repo.findOne({ where: { id } });
+    if (!original) throw new AppError('Cashbook entry not found', 404);
+    if (original.sourceType) {
+      throw new AppError(
+        'Only MANUAL cashbook entries can be reversed. Correct the source record (invoice / expense) to reverse AUTO entries.',
+        400,
+      );
+    }
+    if (original.isReversed) throw new AppError('Entry has already been reversed', 400);
+
+    const branchId = original.branchId;
+    const userId = req.user?.userId ?? 'SYSTEM';
+
+    // Build the reversing entry — opposite type, same amount, same account
+    const reversalRefCount = await repo.count();
+    const reversalRef = `REV-${original.referenceNo}-${String(reversalRefCount + 1).padStart(4, '0')}`;
+    const reversalType: 'RECEIPT' | 'PAYMENT' =
+      original.entryType === 'RECEIPT' ? 'PAYMENT' : 'RECEIPT';
+
+    const reversal = await postCashbookEntry({
+      referenceNo: reversalRef,
+      date: todayInBusinessTz(),
+      entryType: reversalType,
+      amount: Number(original.amount),
+      category: 'REVERSAL',
+      branchId,
+      createdBy: userId,
+      paymentMode: original.paymentMode,
+      accountId: original.accountId,
+      description: `Reversal of ${original.referenceNo}`,
+      notes: `Auto-generated reversal for entry ${original.referenceNo}`,
+    });
+
+    // Mark the original as reversed
+    await repo.update(id, { isReversed: true, reversedById: reversal.id });
+
+    res.status(201).json({ success: true, data: reversal });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// P2-1: Admin — list cashbook entries where linked_po_id was found orphaned by the nightly cron.
+export const getOrphanedCashbookEntries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (req.user?.role !== 'ADMIN') throw new AppError('Admin access required', 403);
+    const repo = Source.getRepository(CashbookEntry);
+    const orphans = await repo.find({
+      where: { isPoOrphaned: true },
+      order: { createdAt: 'DESC' },
+      take: 200,
+    });
+    res.json({ success: true, data: orphans, count: orphans.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── DAY BOOK ─────────────────────────────────────────────────────────────────
 
 function toYmd(d: Date | string): string {
@@ -218,7 +303,7 @@ export const getDayBook = async (req: Request, res: Response, next: NextFunction
   try {
     const repo = Source.getRepository(CashbookEntry);
     const { fromDate, toDate, accountId } = req.query;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInBusinessTz();
     const from = (fromDate as string) || today;
     const to = (toDate as string) || from;
 
@@ -376,6 +461,8 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Expense not found', 404);
     if (entry.status === 'PAID') throw new AppError('Expense is already paid', 400);
+    if (entry.status !== 'APPROVED')
+      throw new AppError('Expense must be APPROVED before payment', 400);
 
     const { paidFrom, paymentMode, paymentDate, referenceNo } = req.body as {
       paidFrom?: string;
@@ -404,6 +491,8 @@ export const approveExpenseEntry = async (req: Request, res: Response, next: Nex
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Expense not found', 404);
+    if (entry.status === 'PAID') throw new AppError('Cannot approve a paid expense', 400);
+    if (entry.status === 'APPROVED') throw new AppError('Expense is already approved', 400);
     entry.status = 'APPROVED';
     entry.approvedBy = req.user?.userId;
     const saved = await repo.save(entry);
@@ -417,6 +506,10 @@ export const deleteExpenseEntry = async (req: Request, res: Response, next: Next
   try {
     const repo = Source.getRepository(ExpenseEntry);
     const id = req.params.id as string;
+    const entry = await repo.findOne({ where: { id } });
+    if (!entry) throw new AppError('Expense not found', 404);
+    if (entry.status === 'PAID')
+      throw new AppError('Cannot delete a paid expense — reverse the payment first', 400);
     await repo.delete(id);
     res.json({ success: true });
   } catch (err) {
@@ -542,9 +635,9 @@ export const deleteDepreciationModelRule = async (
 export const getAssetRegister = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(AssetDepreciationRegister);
-    const { branchId, brandId, status } = req.query;
+    const { brandId, status } = req.query;
     const qb = repo.createQueryBuilder('a');
-    if (branchId) qb.andWhere('a.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'a', req.branchFilter ?? []);
     if (brandId) qb.andWhere('a.brandId = :brandId', { brandId });
     if (status) qb.andWhere('a.status = :status', { status });
     qb.orderBy('a.purchaseDate', 'DESC');
@@ -751,60 +844,75 @@ export const getDepreciationJournals = async (req: Request, res: Response, next:
 
 export const postDepreciationJournal = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const journalRepo = Source.getRepository(DepreciationJournalEntry);
-    const expenseRepo = Source.getRepository(ExpenseEntry);
-    const assetRepo = Source.getRepository(AssetDepreciationRegister);
-
     const { periodYear, periodMonth, branchId } = req.body as {
       periodYear: number;
       periodMonth: number;
       branchId: string;
     };
 
-    const existing = await journalRepo.findOne({ where: { periodYear, periodMonth, branchId } });
-    if (existing?.status === 'POSTED') {
-      throw new AppError('Depreciation already posted for this period', 400);
-    }
+    let saved!: DepreciationJournalEntry;
+    await Source.transaction(async (em) => {
+      const journalRepo = em.getRepository(DepreciationJournalEntry);
+      const expenseRepo = em.getRepository(ExpenseEntry);
+      const assetRepo = em.getRepository(AssetDepreciationRegister);
 
-    const assets = await assetRepo.find({ where: { branchId, status: 'ACTIVE' } });
-    let totalAmount = 0;
-    for (const a of assets) {
-      const result = calculateDepreciation({
-        purchasePrice: Number(a.purchasePrice),
-        salvageValue: Number(a.salvageValue),
-        usefulLifeMonths: a.usefulLifeMonths,
-        annualDepreciationPct: Number(a.annualDepreciationPct),
-        method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(a.purchaseDate),
-      });
-      totalAmount += result.monthlyDep;
-    }
+      // Pessimistic lock prevents concurrent double-posts for the same period.
+      const existing = await journalRepo
+        .createQueryBuilder('j')
+        .where(
+          'j.periodYear = :periodYear AND j.periodMonth = :periodMonth AND j.branchId = :branchId',
+          {
+            periodYear,
+            periodMonth,
+            branchId,
+          },
+        )
+        .setLock('pessimistic_write')
+        .getOne();
+      if (existing?.status === 'POSTED') {
+        throw new AppError('Depreciation already posted for this period', 400);
+      }
 
-    const expCount = await expenseRepo.count();
-    const expense = expenseRepo.create({
-      expenseNo: `EXP-DEP-${periodYear}-${String(periodMonth).padStart(2, '0')}-${String(expCount + 1).padStart(4, '0')}`,
-      date: new Date(`${periodYear}-${String(periodMonth).padStart(2, '0')}-28`),
-      category: 'DEPRECIATION',
-      description: `Depreciation for ${periodYear}-${String(periodMonth).padStart(2, '0')}`,
-      branchId,
-      amount: totalAmount,
-      vatAmount: 0,
-      netAmount: totalAmount,
-      currency: 'AED',
-      status: 'PAID',
-      createdBy: req.user?.userId ?? (req.body.createdBy as string),
-    }) as unknown as ExpenseEntry;
-    const savedExpense = await expenseRepo.save(expense);
+      const assets = await assetRepo.find({ where: { branchId, status: 'ACTIVE' } });
+      let totalAmount = 0;
+      for (const a of assets) {
+        const result = calculateDepreciation({
+          purchasePrice: Number(a.purchasePrice),
+          salvageValue: Number(a.salvageValue),
+          usefulLifeMonths: a.usefulLifeMonths,
+          annualDepreciationPct: Number(a.annualDepreciationPct),
+          method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
+          purchaseDate: new Date(a.purchaseDate),
+        });
+        totalAmount += result.monthlyDep;
+      }
 
-    const journal: DepreciationJournalEntry =
-      existing ??
-      (journalRepo.create({ periodYear, periodMonth, branchId }) as DepreciationJournalEntry);
-    journal.totalAmount = totalAmount;
-    journal.status = 'POSTED';
-    journal.postedBy = req.user?.userId;
-    journal.postedAt = new Date();
-    journal.expenseEntryId = savedExpense.id;
-    const saved = await journalRepo.save(journal);
+      const expCount = await expenseRepo.count();
+      const expense = expenseRepo.create({
+        expenseNo: `EXP-DEP-${periodYear}-${String(periodMonth).padStart(2, '0')}-${String(expCount + 1).padStart(4, '0')}`,
+        date: new Date(`${periodYear}-${String(periodMonth).padStart(2, '0')}-28`),
+        category: 'DEPRECIATION',
+        description: `Depreciation for ${periodYear}-${String(periodMonth).padStart(2, '0')}`,
+        branchId,
+        amount: totalAmount,
+        vatAmount: 0,
+        netAmount: totalAmount,
+        currency: 'AED',
+        status: 'PAID',
+        createdBy: req.user?.userId ?? (req.body.createdBy as string),
+      }) as unknown as ExpenseEntry;
+      const savedExpense = await expenseRepo.save(expense);
+
+      const journal: DepreciationJournalEntry =
+        existing ??
+        (journalRepo.create({ periodYear, periodMonth, branchId }) as DepreciationJournalEntry);
+      journal.totalAmount = totalAmount;
+      journal.status = 'POSTED';
+      journal.postedBy = req.user?.userId;
+      journal.postedAt = new Date();
+      journal.expenseEntryId = savedExpense.id;
+      saved = await journalRepo.save(journal);
+    });
 
     res.json({ success: true, data: saved });
   } catch (err) {
@@ -1202,11 +1310,11 @@ export const getEquitySummary = async (req: Request, res: Response, next: NextFu
 export const getEquityStatement = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(EquityEntry);
-    const { branchId, year } = req.query;
+    const { year } = req.query;
     const targetYear = year ? String(year) : String(new Date().getFullYear());
     const prevYear = String(Number(targetYear) - 1);
     const qb = repo.createQueryBuilder('e');
-    if (branchId) qb.andWhere('e.branchId = :branchId', { branchId });
+    applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     qb.orderBy('e.date', 'ASC');
     const all = await qb.getMany();
 
@@ -1280,152 +1388,65 @@ export const getEquityStatement = async (req: Request, res: Response, next: Next
 export const getBalanceSheet = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchF = req.branchFilter ?? [];
-    const cbRepo3 = Source.getRepository(CashBankAccount);
-    const cbQb3 = cbRepo3.createQueryBuilder('a').where('a.isActive = :active', { active: true });
-    applyBranchQB(cbQb3 as never, 'a', branchF);
-    const cashAccts = await cbQb3.getMany();
-    const cashTotal = cashAccts
-      .filter((a) => a.type === 'CASH')
-      .reduce((s, a) => s + Number(a.currentBalance), 0);
-    const bankTotal = cashAccts
-      .filter((a) => a.type === 'BANK')
-      .reduce((s, a) => s + Number(a.currentBalance), 0);
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
-    const assetRepo2 = Source.getRepository(AssetDepreciationRegister);
-    const assetQb2 = assetRepo2.createQueryBuilder('a').where('a.status = :s', { s: 'ACTIVE' });
-    applyBranchQB(assetQb2 as never, 'a', branchF);
-    const assets = await assetQb2.getMany();
-    let fixedGross = 0,
-      fixedNBV = 0,
-      accumDep = 0;
-    for (const a of assets) {
-      const dep = calculateDepreciation({
-        purchasePrice: Number(a.purchasePrice),
-        salvageValue: Number(a.salvageValue),
-        usefulLifeMonths: a.usefulLifeMonths,
-        annualDepreciationPct: Number(a.annualDepreciationPct),
-        method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(a.purchaseDate),
-      });
-      fixedGross += Number(a.purchasePrice);
-      fixedNBV += dep.nbv;
-      accumDep += dep.accumulated;
+    // Per-branch base currency; fall back to AED for multi-branch / admin views
+    let baseCurrency = 'AED';
+    if (branchF.length === 1) {
+      const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+      const info = await getBranchCurrencyInfo(branchF[0]);
+      baseCurrency = info?.currencyCode ?? 'AED';
     }
 
-    const rcvRepo = Source.getRepository(ManualReceivable);
-    const rcvQb = rcvRepo.createQueryBuilder('r').where('r.status != :s', { s: 'PAID' });
-    applyBranchQB(rcvQb as never, 'r', branchF);
-    const receivables = await rcvQb.getMany();
-    const manualReceivablesTotal = receivables.reduce((s, r) => s + Number(r.outstanding ?? 0), 0);
-
-    // Invoice AR: INVOICED (unpaid/partially paid) invoices minus payments received
-    const invArRepo = Source.getRepository(Invoice);
-    const invArQb = invArRepo
-      .createQueryBuilder('i')
-      .where('i.status = :invStatus', { invStatus: 'INVOICED' })
-      .andWhere('i.totalAmount > 0');
-    applyBranchQB(invArQb as never, 'i', branchF);
-    const arInvoices = await invArQb.getMany();
-    let invoiceAR = 0;
-    if (arInvoices.length > 0) {
-      const invIds = arInvoices.map((i) => i.id);
-      const ptRepo = Source.getRepository(PaymentTransaction);
-      const paymentSums = await ptRepo
-        .createQueryBuilder('pt')
-        .select('pt.invoiceId', 'invoiceId')
-        .addSelect('SUM(pt.amount)', 'totalPaid')
-        .where('pt.invoiceId IN (:...invIds)', { invIds })
-        .groupBy('pt.invoiceId')
-        .getRawMany();
-      const paidMap: Record<string, number> = {};
-      for (const p of paymentSums) {
-        paidMap[p.invoiceId] = Number(p.totalPaid);
-      }
-      invoiceAR = arInvoices.reduce(
-        (s, inv) => s + Math.max(0, Number(inv.totalAmount) - (paidMap[inv.id] ?? 0)),
-        0,
-      );
-    }
-    const receivablesTotal = manualReceivablesTotal + invoiceAR;
-    const totalAssets = cashTotal + bankTotal + fixedNBV + receivablesTotal;
-
-    const payRepo2 = Source.getRepository(ManualPayable);
-    const payQb2 = payRepo2.createQueryBuilder('p').where('p.status != :s', { s: 'PAID' });
-    applyBranchQB(payQb2 as never, 'p', branchF);
-    const payables = await payQb2.getMany();
-    const payablesTotal = payables.reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
-
-    const expRepo = Source.getRepository(ExpenseEntry);
-    const expQb = expRepo.createQueryBuilder('e').where('e.status = :s', { s: 'PENDING' });
-    applyBranchQB(expQb as never, 'e', branchF);
-    const pendingExp = await expQb.getMany();
-    const accruedExpenses = pendingExp.reduce((s, e) => s + Number(e.netAmount), 0);
-
-    // VAT Payable: tax from PAID/PARTIAL (INVOICED with payments) invoices — collected but not yet remitted
-    const vatInvRepo = Source.getRepository(Invoice);
-    const vatQb = vatInvRepo
-      .createQueryBuilder('i')
-      .where('i.status IN (:...vatStatuses)', { vatStatuses: ['PAID', 'INVOICED'] })
-      .andWhere('i.taxAmount > 0');
-    applyBranchQB(vatQb as never, 'i', branchF);
-    const vatInvoices = await vatQb.getMany();
-    const vatPayable = vatInvoices.reduce((s, i) => s + Number(i.taxAmount ?? 0), 0);
-
-    const totalLiabilities = payablesTotal + accruedExpenses + vatPayable;
-
-    const eqRepo2 = Source.getRepository(EquityEntry);
-    const eqQb2 = eqRepo2.createQueryBuilder('e');
-    applyBranchQB(eqQb2 as never, 'e', branchF);
-    const eqEntries = await eqQb2.getMany();
-    const positive2 = [
-      'SHARE_CAPITAL',
-      'RETAINED_EARNINGS',
-      'RESERVES',
-      'OWNER_CONTRIBUTION',
-      'PROFIT_TRANSFER',
-    ];
-    let netEquity = 0;
-    for (const e of eqEntries) {
-      if (positive2.includes(e.type)) netEquity += Number(e.amount);
-      else netEquity -= Number(e.amount);
-    }
-
-    const totalLiabilitiesAndEquity = totalLiabilities + netEquity;
-    const difference = Math.abs(totalAssets - totalLiabilitiesAndEquity);
-    const balanced = difference < 0.01;
+    const bs = await computeBalanceSheet(
+      Source,
+      branchF,
+      todayInBusinessTz(),
+      baseCurrency,
+      INV_URL,
+    );
 
     res.json({
       success: true,
       data: {
         assets: {
-          cash: cashTotal,
-          bank: bankTotal,
-          cashAndBank: cashTotal + bankTotal,
-          fixedAssetsGross: fixedGross,
-          accumulatedDepreciation: accumDep,
-          fixedAssetsNet: fixedNBV,
-          receivables: receivablesTotal,
-          manualReceivables: manualReceivablesTotal,
-          invoiceAR,
-          total: totalAssets,
+          cash: +bs.cashInHand.toFixed(2),
+          bank: +bs.cashAtBank.toFixed(2),
+          cashAndBank: +(bs.cashInHand + bs.cashAtBank).toFixed(2),
+          fixedAssetsGross: +bs.equipmentGrossCost.toFixed(2),
+          accumulatedDepreciation: +bs.accumulatedDepreciation.toFixed(2),
+          fixedAssetsNet: +bs.equipmentNBV.toFixed(2),
+          invoiceAR: +bs.invoiceAR.toFixed(2),
+          manualAR: +bs.manualAR.toFixed(2),
+          accountsReceivable: +bs.accountsReceivable.toFixed(2),
+          securityDepositsReceivable: +bs.securityDepositsReceivable.toFixed(2),
+          sparePartsInventory: +bs.sparePartsInventory.toFixed(2),
+          inventoryUnavailable: bs.inventoryUnavailable,
+          total: +bs.totalAssets.toFixed(2),
         },
         liabilities: {
-          payables: payablesTotal,
-          accruedExpenses,
-          vatPayable,
-          total: totalLiabilities,
+          accountsPayable: +bs.accountsPayable.toFixed(2),
+          accruedExpenses: +bs.accruedExpenses.toFixed(2),
+          vatPayable: +bs.vatPayable.toFixed(2),
+          securityDepositsReceived: +bs.securityDepositsReceived.toFixed(2),
+          total: +bs.totalLiabilities.toFixed(2),
         },
-        equity: { netEquity, total: netEquity },
-        totalLiabilitiesAndEquity,
-        difference,
-        balanced,
-        // flat fields for backward compat
-        totalAssets,
-        totalLiabilities,
-        totalEquity: netEquity,
-        cashAndBank: cashTotal + bankTotal,
-        receivables: receivablesTotal,
-        payables: payablesTotal,
+        equity: {
+          ownerCapital: +bs.ownerCapital.toFixed(2),
+          retainedEarnings: +bs.retainedEarnings.toFixed(2),
+          reserves: +bs.reserves.toFixed(2),
+          dividends: +bs.dividends.toFixed(2),
+          total: +bs.totalEquity.toFixed(2),
+        },
+        totalAssets: +bs.totalAssets.toFixed(2),
+        totalLiabilities: +bs.totalLiabilities.toFixed(2),
+        totalEquity: +bs.totalEquity.toFixed(2),
+        totalLiabilitiesAndEquity: +bs.totalLiabilitiesAndEquity.toFixed(2),
+        difference: +bs.difference.toFixed(2),
+        isBalanced: bs.isBalanced,
+        currency: baseCurrency,
+        currencyWarnings: bs.currencyWarnings,
+        dataWarnings: bs.dataWarnings,
       },
     });
   } catch (err) {
@@ -1668,6 +1689,7 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
   try {
     const { fromDate, toDate, period } = req.query;
     const branchF = req.branchFilter ?? [];
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
     let dateFrom: string, dateTo: string;
     if (fromDate && toDate) {
@@ -1679,90 +1701,58 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       dateTo = range.toDate;
     }
 
-    const invoiceRepo = Source.getRepository(Invoice);
-    const invQb = invoiceRepo
-      .createQueryBuilder('i')
-      .where('CAST(i.createdAt AS DATE) >= :from', { from: dateFrom })
-      .andWhere('CAST(i.createdAt AS DATE) <= :to', { to: dateTo })
-      .andWhere('i.status NOT IN (:...excl)', {
-        excl: ['DRAFT', 'CANCELLED', 'TEMPLATE', 'ASSIGNED', 'RETAKEN', 'SUPERSEDED'],
-      })
-      // Only count real revenue invoices — exclude quotations (not yet revenue)
-      // and opening balance entries (accounting entries, not sales)
-      .andWhere('i.type NOT IN (:...excTypes)', { excTypes: ['QUOTATION', 'OPENING'] });
-    applyBranchQB(invQb as never, 'i', branchF);
-    const invoices = await invQb.getMany();
-
-    const revenueByType: Record<string, number> = {};
-    let totalRevenue = 0,
-      totalTax = 0;
-    const monthlyRevMap: Record<string, number> = {};
-    for (const inv of invoices) {
-      const taxAmt = Number(inv.taxAmount ?? 0);
-      const amt = Number(inv.totalAmount) - taxAmt; // accrual: net revenue excludes VAT
-
-      // For SERVICE invoices, split by billType so AMC/FSMA/SMA show separately
-      let revenueKey: string = inv.saleType;
-      if (inv.saleType === 'SERVICE' && inv.billType && inv.billType !== 'SERVICE') {
-        revenueKey = `SERVICE_${inv.billType}`; // e.g. SERVICE_AMC, SERVICE_FSMA, SERVICE_SMA
-      }
-
-      revenueByType[revenueKey] = (revenueByType[revenueKey] ?? 0) + amt;
-      totalRevenue += amt;
-      totalTax += taxAmt;
-      const monthKey = String(inv.createdAt).slice(0, 7);
-      monthlyRevMap[monthKey] = (monthlyRevMap[monthKey] ?? 0) + amt;
+    let baseCurrency = 'AED';
+    if (branchF.length === 1) {
+      const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+      const info = await getBranchCurrencyInfo(branchF[0]);
+      baseCurrency = info?.currencyCode ?? 'AED';
     }
 
-    const expRepo = Source.getRepository(ExpenseEntry);
-    const expQb = expRepo
-      .createQueryBuilder('e')
-      .where('e.date >= :from', { from: dateFrom })
-      .andWhere('e.date <= :to', { to: dateTo })
-      .andWhere('e.status IN (:...statuses)', { statuses: ['APPROVED', 'PAID'] });
-    applyBranchQB(expQb as never, 'e', branchF);
-    const expenses = await expQb.getMany();
+    const pl = await computeProfitAndLoss(Source, branchF, dateFrom, dateTo, baseCurrency, INV_URL);
 
-    const expByCategory: Record<string, number> = {};
-    let totalExpenses = 0;
-    const monthlyExpMap: Record<string, number> = {};
-    for (const exp of expenses) {
-      const amt = Number(exp.netAmount); // use net amount (excl. VAT) for operating expenses
-      expByCategory[exp.category] = (expByCategory[exp.category] ?? 0) + amt;
-      totalExpenses += amt;
-      const monthKey = String(exp.date).slice(0, 7);
-      monthlyExpMap[monthKey] = (monthlyExpMap[monthKey] ?? 0) + amt;
-    }
+    const revenueByType: Record<string, number> = {
+      RENT: pl.rentalRevenue,
+      LEASE: pl.leaseRevenue,
+      SALE: pl.salesRevenue,
+      SERVICE: pl.serviceRevenue,
+      AMC_SMA: pl.amcSmaRevenue,
+      USAGE: pl.usageRevenue,
+      SPAREPART_SALE: pl.sparePartSalesRevenue,
+    };
+    const expByCategory: Record<string, number> = {
+      SPARE_PARTS: pl.costOfParts,
+      LABOUR: pl.labourCost,
+      DEPRECIATION: pl.depreciationExpense,
+      VENDOR_PURCHASE: pl.vendorPurchases,
+      SHIPPING_HANDLING: pl.shippingHandling,
+      SALARY: pl.salaryExpense,
+      TRAVEL: pl.travelExpense,
+      RENT: pl.rentExpense,
+      UTILITIES: pl.utilitiesExpense,
+      MARKETING: pl.marketingExpense,
+      MAINTENANCE: pl.maintenanceExpense,
+      INSURANCE: pl.insuranceExpense,
+      OTHER: pl.otherExpenses,
+    };
 
-    const allMonths = new Set([...Object.keys(monthlyRevMap), ...Object.keys(monthlyExpMap)]);
-    const monthly = Array.from(allMonths)
-      .sort()
-      .map((month) => ({
-        month,
-        revenue: monthlyRevMap[month] ?? 0,
-        expenses: monthlyExpMap[month] ?? 0,
-        net: (monthlyRevMap[month] ?? 0) - (monthlyExpMap[month] ?? 0),
-      }));
-
-    const netProfit = totalRevenue - totalExpenses;
-    const margin = totalRevenue > 0 ? +((netProfit / totalRevenue) * 100).toFixed(2) : 0;
+    const margin = pl.totalRevenue > 0 ? +((pl.netProfit / pl.totalRevenue) * 100).toFixed(2) : 0;
 
     res.json({
       success: true,
       data: {
         fromDate: dateFrom,
         toDate: dateTo,
-        totalRevenue,
-        totalExpenses,
-        netProfit,
+        totalRevenue: +pl.totalRevenue.toFixed(2),
+        totalExpenses: +pl.totalExpenses.toFixed(2),
+        netProfit: +pl.netProfit.toFixed(2),
+        grossProfit: +pl.grossProfit.toFixed(2),
         margin,
-        totalTax,
-        totalIncome: totalRevenue,
+        totalIncome: +pl.totalRevenue.toFixed(2),
         revenueByType,
         expByCategory,
-        monthly,
-        invoiceCount: invoices.length,
-        expenseCount: expenses.length,
+        currency: baseCurrency,
+        currencyWarnings: pl.currencyWarnings,
+        dataWarnings: pl.dataWarnings,
       },
     });
   } catch (err) {
@@ -2051,6 +2041,8 @@ export const getConsolidatedPL = async (req: Request, res: Response, next: NextF
   try {
     const { period, fromDate: fd, toDate: td } = req.query;
     const bFilter = req.branchFilter ?? [];
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
     let dateFrom: string, dateTo: string;
     if (fd && td) {
       dateFrom = fd as string;
@@ -2061,63 +2053,25 @@ export const getConsolidatedPL = async (req: Request, res: Response, next: NextF
       dateTo = r.toDate;
     }
 
-    const invoiceRepo = Source.getRepository(Invoice);
-    const invQb = invoiceRepo
-      .createQueryBuilder('i')
-      .where('CAST(i.createdAt AS DATE) >= :from', { from: dateFrom })
-      .andWhere('CAST(i.createdAt AS DATE) <= :to', { to: dateTo })
-      .andWhere('i.status NOT IN (:...excl)', { excl: ['DRAFT', 'CANCELLED'] });
-    applyBranchQB(invQb as never, 'i', bFilter);
-    const invoices = await invQb.getMany();
+    // Consolidated always reports in AED
+    const pl = await computeProfitAndLoss(Source, bFilter, dateFrom, dateTo, 'AED', INV_URL);
 
-    const expRepo = Source.getRepository(ExpenseEntry);
-    const expQb = expRepo
-      .createQueryBuilder('e')
-      .where('e.date >= :from', { from: dateFrom })
-      .andWhere('e.date <= :to', { to: dateTo })
-      .andWhere('e.status IN (:...statuses)', { statuses: ['APPROVED', 'PAID'] });
-    applyBranchQB(expQb as never, 'e', bFilter);
-    const expEntries = await expQb.getMany();
-
-    const monthRevMap: Record<string, number> = {};
-    const monthExpMap: Record<string, number> = {};
-    let totalIncome = 0,
-      totalExpenses = 0;
-    for (const inv of invoices) {
-      const key = String(inv.createdAt).slice(0, 7);
-      const netAmt = Number(inv.totalAmount) - Number(inv.taxAmount ?? 0);
-      monthRevMap[key] = (monthRevMap[key] ?? 0) + netAmt;
-      totalIncome += netAmt;
-    }
-    for (const exp of expEntries) {
-      const key = String(exp.date).slice(0, 7);
-      monthExpMap[key] = (monthExpMap[key] ?? 0) + Number(exp.amount);
-      totalExpenses += Number(exp.amount);
-    }
-
-    const allMonths = new Set([...Object.keys(monthRevMap), ...Object.keys(monthExpMap)]);
-    const monthly = Array.from(allMonths)
-      .sort()
-      .map((month) => ({
-        month,
-        revenue: monthRevMap[month] ?? 0,
-        expenses: monthExpMap[month] ?? 0,
-        net: (monthRevMap[month] ?? 0) - (monthExpMap[month] ?? 0),
-      }));
-
-    const netProfit = totalIncome - totalExpenses;
-    const margin = totalIncome > 0 ? +((netProfit / totalIncome) * 100).toFixed(2) : 0;
+    const margin = pl.totalRevenue > 0 ? +((pl.netProfit / pl.totalRevenue) * 100).toFixed(2) : 0;
 
     res.json({
       success: true,
       data: {
         fromDate: dateFrom,
         toDate: dateTo,
-        totalIncome,
-        totalExpenses,
-        netProfit,
+        totalIncome: +pl.totalRevenue.toFixed(2),
+        totalRevenue: +pl.totalRevenue.toFixed(2),
+        totalExpenses: +pl.totalExpenses.toFixed(2),
+        netProfit: +pl.netProfit.toFixed(2),
+        grossProfit: +pl.grossProfit.toFixed(2),
         margin,
-        monthly,
+        currency: 'AED',
+        currencyWarnings: pl.currencyWarnings,
+        dataWarnings: pl.dataWarnings,
       },
     });
   } catch (err) {
@@ -2132,72 +2086,39 @@ export const getConsolidatedBalanceSheet = async (
 ) => {
   try {
     const bFilter = req.branchFilter ?? [];
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
-    const cbRepo = Source.getRepository(CashBankAccount);
-    const cbQb = cbRepo.createQueryBuilder('a').where('a.isActive = :active', { active: true });
-    applyBranchQB(cbQb as never, 'a', bFilter);
-    const cashAccts = await cbQb.getMany();
-    const cashAndBank = cashAccts.reduce((s, a) => s + Number(a.currentBalance), 0);
-
-    const assetRepo = Source.getRepository(AssetDepreciationRegister);
-    const aQb = assetRepo.createQueryBuilder('a').where('a.status = :s', { s: 'ACTIVE' });
-    applyBranchQB(aQb as never, 'a', bFilter);
-    const depAssets = await aQb.getMany();
-    let fixedNBV = 0;
-    for (const a of depAssets) {
-      const dep = calculateDepreciation({
-        purchasePrice: Number(a.purchasePrice),
-        salvageValue: Number(a.salvageValue),
-        usefulLifeMonths: a.usefulLifeMonths,
-        annualDepreciationPct: Number(a.annualDepreciationPct),
-        method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(a.purchaseDate),
-      });
-      fixedNBV += dep.nbv;
-    }
-
-    const rcvRepo = Source.getRepository(ManualReceivable);
-    const rcvQb = rcvRepo.createQueryBuilder('r').where('r.status != :s', { s: 'PAID' });
-    applyBranchQB(rcvQb as never, 'r', bFilter);
-    const receivables = await rcvQb.getMany();
-    const receivablesTotal = receivables.reduce((s, r) => s + Number(r.outstanding ?? 0), 0);
-
-    const payRepo = Source.getRepository(ManualPayable);
-    const payQb = payRepo.createQueryBuilder('p').where('p.status != :s', { s: 'PAID' });
-    applyBranchQB(payQb as never, 'p', bFilter);
-    const payables = await payQb.getMany();
-    const payablesTotal = payables.reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
-
-    const eqRepo = Source.getRepository(EquityEntry);
-    const eqQb = eqRepo.createQueryBuilder('e');
-    applyBranchQB(eqQb as never, 'e', bFilter);
-    const eqEntries = await eqQb.getMany();
-    const positive = [
-      'SHARE_CAPITAL',
-      'RETAINED_EARNINGS',
-      'RESERVES',
-      'OWNER_CONTRIBUTION',
-      'PROFIT_TRANSFER',
-    ];
-    let totalEquity = 0;
-    for (const e of eqEntries) {
-      if (positive.includes(e.type)) totalEquity += Number(e.amount);
-      else totalEquity -= Number(e.amount);
-    }
-
-    const totalAssets = cashAndBank + fixedNBV + receivablesTotal;
-    const totalLiabilities = payablesTotal;
+    // Consolidated always reports in AED
+    const bs = await computeBalanceSheet(Source, bFilter, todayInBusinessTz(), 'AED', INV_URL);
 
     res.json({
       success: true,
       data: {
-        totalAssets,
-        totalLiabilities,
-        totalEquity,
-        cashAndBank,
-        receivables: receivablesTotal,
-        payables: payablesTotal,
-        fixedAssets: fixedNBV,
+        assets: {
+          cashAndBank: +(bs.cashInHand + bs.cashAtBank).toFixed(2),
+          accountsReceivable: +bs.accountsReceivable.toFixed(2),
+          sparePartsInventory: +bs.sparePartsInventory.toFixed(2),
+          fixedAssets: +bs.equipmentNBV.toFixed(2),
+          total: +bs.totalAssets.toFixed(2),
+        },
+        liabilities: {
+          payables: +bs.accountsPayable.toFixed(2),
+          accruedExpenses: +bs.accruedExpenses.toFixed(2),
+          vatPayable: +bs.vatPayable.toFixed(2),
+          total: +bs.totalLiabilities.toFixed(2),
+        },
+        equity: {
+          ownerCapital: +bs.ownerCapital.toFixed(2),
+          retainedEarnings: +bs.retainedEarnings.toFixed(2),
+          total: +bs.totalEquity.toFixed(2),
+        },
+        totalAssets: +bs.totalAssets.toFixed(2),
+        totalLiabilities: +bs.totalLiabilities.toFixed(2),
+        totalEquity: +bs.totalEquity.toFixed(2),
+        isBalanced: bs.isBalanced,
+        currency: 'AED',
+        currencyWarnings: bs.currencyWarnings,
+        dataWarnings: bs.dataWarnings,
       },
     });
   } catch (err) {
@@ -2293,7 +2214,7 @@ export const depositToCashBank = async (req: Request, res: Response, next: NextF
       await entryRepo.save(
         entryRepo.create({
           referenceNo: ref,
-          date: date || new Date().toISOString().slice(0, 10),
+          date: date || todayInBusinessTz(),
           accountId: id,
           entryType: 'RECEIPT',
           amount: Number(amount),
@@ -2318,7 +2239,7 @@ export const depositToCashBank = async (req: Request, res: Response, next: NextF
           await entryRepo.save(
             entryRepo.create({
               referenceNo: genRef('PAY'),
-              date: date || new Date().toISOString().slice(0, 10),
+              date: date || todayInBusinessTz(),
               accountId: linkedId,
               entryType: 'PAYMENT',
               amount: Number(amount),
@@ -2377,7 +2298,7 @@ export const withdrawFromCashBank = async (req: Request, res: Response, next: Ne
       await entryRepo.save(
         entryRepo.create({
           referenceNo: ref,
-          date: date || new Date().toISOString().slice(0, 10),
+          date: date || todayInBusinessTz(),
           accountId: id,
           entryType: 'PAYMENT',
           amount: Number(amount),
@@ -2400,7 +2321,7 @@ export const withdrawFromCashBank = async (req: Request, res: Response, next: Ne
           await entryRepo.save(
             entryRepo.create({
               referenceNo: genRef('REC'),
-              date: date || new Date().toISOString().slice(0, 10),
+              date: date || todayInBusinessTz(),
               accountId: linkedId,
               entryType: 'RECEIPT',
               amount: Number(amount),
@@ -2461,7 +2382,7 @@ export const transferBetweenAccounts = async (req: Request, res: Response, next:
       }
 
       const ref = referenceNo || genRef('TRF');
-      const transferDate = date || new Date().toISOString().slice(0, 10);
+      const transferDate = date || todayInBusinessTz();
       const desc = description || `Transfer to ${toAcc.name}`;
 
       await entryRepo.save(
@@ -2522,6 +2443,9 @@ export const getCashBankTransactions = async (req: Request, res: Response, next:
 
     const account = await accountRepo.findOne({ where: { id } });
     if (!account) throw new AppError('Account not found', 404);
+    const bf = req.branchFilter ?? [];
+    if (bf.length > 0 && !bf.includes(account.branchId))
+      throw new AppError('Account not found', 404);
 
     // Get ALL entries sorted by date ASC to compute running balance
     const allQb = entryRepo
@@ -2574,11 +2498,14 @@ export const reconcileAccount = async (req: Request, res: Response, next: NextFu
 
     const account = await Source.getRepository(CashBankAccount).findOne({ where: { id } });
     if (!account) throw new AppError('Account not found', 404);
+    const bf = req.branchFilter ?? [];
+    if (bf.length > 0 && !bf.includes(account.branchId))
+      throw new AppError('Account not found', 404);
 
     const bookBalance = Number(account.currentBalance);
     const stmtBal = Number(statementBalance);
-    const difference = Math.abs(bookBalance - stmtBal);
-    const isBalanced = difference < 0.01;
+    const difference = bookBalance - stmtBal; // signed: positive = book > statement
+    const isBalanced = Math.abs(difference) < 0.01;
 
     const repo = Source.getRepository(AccountReconciliation);
     const rec = repo.create({
@@ -2616,30 +2543,6 @@ export const getReconciliations = async (req: Request, res: Response, next: Next
 
 // ─── CHART OF ACCOUNTS ────────────────────────────────────────────────────────
 
-async function safeInternalFetch(url: string): Promise<number> {
-  try {
-    const { sign } = await import('jsonwebtoken');
-    const token = sign(
-      { userId: 'billing_service', role: 'ADMIN' },
-      process.env.ACCESS_SECRET as string,
-      { expiresIn: '1m' },
-    );
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
-    });
-    clearTimeout(timer);
-    const json = await res.json();
-    return typeof json?.total === 'number' ? json.total : 0;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[CoA] internal call failed ${url}:`, msg);
-    return 0;
-  }
-}
-
 function makeAccountBalance(
   code: string,
   name: string,
@@ -2658,347 +2561,95 @@ function makeAccountBalance(
 export const getChartOfAccounts = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const branchF = req.branchFilter ?? [];
-    const today = new Date().toISOString().slice(0, 10);
-
-    // period for income/expenses — validate YYYY-MM-DD format to prevent SQL injection
+    const today = todayInBusinessTz();
     const dateRe = /^\d{4}-\d{2}-\d{2}$/;
     const rawFrom = req.query.periodFrom as string | undefined;
     const rawTo = req.query.periodTo as string | undefined;
     const periodFrom =
-      rawFrom && dateRe.test(rawFrom) ? rawFrom : `${new Date().getFullYear()}-01-01`;
+      rawFrom && dateRe.test(rawFrom) ? rawFrom : `${nowInBusinessTz().year}-01-01`;
     const periodTo = rawTo && dateRe.test(rawTo) ? rawTo : today;
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
-    const db = Source;
-
-    // Build branch param for raw SQL — UUIDs only, prevent injection
-    const uuidRe = /^[0-9a-f-]{36}$/i;
-    const safeBranches = branchF.filter((b) => uuidRe.test(b));
-    const branchParam = safeBranches.length > 0 ? safeBranches : null;
-
-    function branchSqlCamel(alias: string, col = '"branchId"'): string {
-      if (!branchParam) return '';
-      if (branchParam.length === 1) return `AND ${alias}.${col} = '${branchParam[0]}'`;
-      return `AND ${alias}.${col} IN (${branchParam.map((b) => `'${b}'`).join(',')})`;
+    let currency = 'AED';
+    if (branchF.length === 1) {
+      const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+      const info = await getBranchCurrencyInfo(branchF[0]);
+      currency = info?.currencyCode ?? 'AED';
     }
 
-    // Safe query helper — returns empty array on error so one bad query never crashes the endpoint
-    async function safeQ<T = Record<string, string>>(sql: string): Promise<T[]> {
-      try {
-        return await db.query<T[]>(sql);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[CoA] query failed: ${msg}\nSQL: ${sql.slice(0, 200)}`);
-        return [];
-      }
-    }
+    const [pl, bs] = await Promise.all([
+      computeProfitAndLoss(Source, branchF, periodFrom, periodTo, currency, INV_URL),
+      computeBalanceSheet(Source, branchF, today, currency, INV_URL),
+    ]);
 
-    // Convenience: run a single-row balance query and return the numeric value
-    async function safeQNum(sql: string): Promise<number> {
-      const rows = await safeQ<{ balance: string }>(sql);
-      return Number(rows[0]?.balance ?? 0);
-    }
-
-    const INVENTORY_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
-
-    // Run all queries in parallel — Promise.allSettled so individual failures don't abort the rest
-    const [
+    const {
       cashInHand,
       cashAtBank,
-      invoiceAR,
-      manualAR,
+      accountsReceivable,
       securityDepositsReceivable,
+      prepaidExpenses,
+      sparePartsInventory,
+      inventoryUnavailable,
       equipmentGrossCost,
-      equipDepRowsResult,
+      accumulatedDepreciation,
+      equipmentNBV,
       accountsPayable,
       accruedExpenses,
       vatPayable,
-      equityRowsResult,
-      allTimeRevenue,
-      allTimeExpenses,
+      securityDepositsReceived,
+      deferredRevenue,
+      salaryPayable,
+      ownerCapital,
+      retainedEarnings,
+      reserves,
+      withdrawals,
+      dividends,
+      totalAssets,
+      totalLiabilities,
+      totalEquity,
+      totalLiabilitiesAndEquity,
+      isBalanced,
+      difference,
+      currencyWarnings: bsCurrencyWarnings,
+      dataWarnings: bsDataWarnings,
+    } = bs;
+
+    const {
       rentalRevenue,
       leaseRevenue,
       salesRevenue,
       serviceRevenue,
       amcSmaRevenue,
       usageRevenue,
-      expByCategoryRowsResult,
+      sparePartSalesRevenue,
+      costOfParts,
+      labourCost,
       depreciationExpense,
-      sparePartsValue,
-    ] = await Promise.all([
-      // 1001 Cash in Hand
-      safeQNum(`
-        SELECT COALESCE(SUM("currentBalance"), 0)::numeric AS balance
-        FROM cash_bank_accounts
-        WHERE type = 'CASH' AND "isActive" = true ${branchSqlCamel('cash_bank_accounts', '"branchId"')}
-      `),
-      // 1002 Cash at Bank
-      safeQNum(`
-        SELECT COALESCE(SUM("currentBalance"), 0)::numeric AS balance
-        FROM cash_bank_accounts
-        WHERE type = 'BANK' AND "isActive" = true ${branchSqlCamel('cash_bank_accounts', '"branchId"')}
-      `),
-      // 1003 Invoice AR
-      safeQNum(`
-        SELECT COALESCE(
-          SUM(i."totalAmount" - COALESCE(pt.paid, 0)), 0
-        )::numeric AS balance
-        FROM invoices i
-        LEFT JOIN (
-          SELECT "invoice_id", SUM(amount) AS paid
-          FROM payment_transactions
-          GROUP BY "invoice_id"
-        ) pt ON pt."invoice_id" = i.id
-        WHERE i.status = 'INVOICED'
-          AND i."totalAmount" > 0
-          AND i."deletedAt" IS NULL
-          ${branchSqlCamel('i', '"branchId"')}
-      `),
-      // 1003 Manual AR (non-security-deposit, without linked invoice)
-      safeQNum(`
-        SELECT COALESCE(SUM(outstanding), 0)::numeric AS balance
-        FROM manual_receivables
-        WHERE status IN ('PENDING', 'PARTIAL', 'OVERDUE')
-          AND type != 'SECURITY_DEPOSIT'
-          AND "linkedInvoiceId" IS NULL
-          ${branchSqlCamel('manual_receivables', '"branchId"')}
-      `),
-      // 1004 Security Deposits Receivable
-      safeQNum(`
-        SELECT COALESCE(SUM(outstanding), 0)::numeric AS balance
-        FROM manual_receivables
-        WHERE type = 'SECURITY_DEPOSIT'
-          AND status NOT IN ('PAID', 'WRITTEN_OFF')
-          ${branchSqlCamel('manual_receivables', '"branchId"')}
-      `),
-      // 1007 Equipment Gross Cost
-      safeQNum(`
-        SELECT COALESCE(SUM("purchasePrice"), 0)::numeric AS balance
-        FROM asset_depreciation_register
-        WHERE status != 'DISPOSED'
-          ${branchSqlCamel('asset_depreciation_register', '"branchId"')}
-      `),
-      // 1008 Accumulated Depreciation (computed from asset register rows)
-      safeQ<{
-        purchase_price: string;
-        salvage_value: string;
-        useful_life_months: string;
-        annual_depreciation_pct: string;
-        method: string;
-        purchase_date: string;
-      }>(`
-        SELECT "purchasePrice" AS purchase_price,
-               "salvageValue" AS salvage_value,
-               "usefulLifeMonths" AS useful_life_months,
-               "annualDepreciationPct" AS annual_depreciation_pct,
-               method,
-               "purchaseDate" AS purchase_date
-        FROM asset_depreciation_register
-        WHERE status = 'ACTIVE'
-          ${branchSqlCamel('asset_depreciation_register', '"branchId"')}
-      `),
-      // 2001 Accounts Payable (manual payables)
-      safeQNum(`
-        SELECT COALESCE(SUM(outstanding), 0)::numeric AS balance
-        FROM manual_payables
-        WHERE status IN ('PENDING', 'PARTIAL')
-          ${branchSqlCamel('manual_payables', '"branchId"')}
-      `),
-      // 2002 Accrued Expenses
-      safeQNum(`
-        SELECT COALESCE(SUM("netAmount"), 0)::numeric AS balance
-        FROM expense_entries
-        WHERE status = 'PENDING'
-          ${branchSqlCamel('expense_entries', '"branchId"')}
-      `),
-      // 2003 VAT Payable (current month)
-      safeQNum(`
-        SELECT COALESCE(SUM(tax_amount), 0)::numeric AS balance
-        FROM invoices
-        WHERE status IN ('PAID', 'INVOICED')
-          AND tax_amount > 0
-          AND DATE_TRUNC('month', "createdAt") = DATE_TRUNC('month', CURRENT_DATE)
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // Equity entries
-      safeQ<{ type: string; amount: string }>(`
-        SELECT type, COALESCE(SUM(amount), 0)::numeric AS amount
-        FROM equity_entries
-        WHERE 1=1 ${branchSqlCamel('equity_entries', '"branchId"')}
-        GROUP BY type
-      `),
-      // All-time revenue (for retained earnings)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // All-time expenses (for retained earnings)
-      safeQNum(`
-        SELECT COALESCE(SUM("netAmount"), 0)::numeric AS balance
-        FROM expense_entries
-        WHERE status IN ('APPROVED', 'PAID')
-          ${branchSqlCamel('expense_entries', '"branchId"')}
-      `),
-      // 4001 Rental Revenue (period)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE "saleType" = 'RENT'
-          AND status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // 4002 Lease Revenue (period)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE "saleType" = 'LEASE'
-          AND status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // 4003 Sales Revenue (period)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE "saleType" IN ('SALE', 'PRODUCT_SALE', 'SPAREPART_SALE')
-          AND status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // 4004 Service Revenue (CHARGEABLE, not AMC/FSMA/SMA) (period)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE "saleType" = 'SERVICE'
-          AND ("billType" IS NULL OR "billType" NOT IN ('AMC', 'FSMA', 'SMA'))
-          AND status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // 4006 AMC/FSMA/SMA Revenue (period)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE "billType" IN ('AMC', 'FSMA', 'SMA')
-          AND status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // 4005 Usage Revenue (invoices linked to usage records)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0)::numeric AS balance
-        FROM invoices
-        WHERE "usageRecordId" IS NOT NULL
-          AND status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
-          AND "deletedAt" IS NULL
-          ${branchSqlCamel('invoices', '"branchId"')}
-      `),
-      // Expenses by category (period) — covers 5001-5012
-      safeQ<{ category: string; balance: string }>(`
-        SELECT category, COALESCE(SUM("netAmount"), 0)::numeric AS balance
-        FROM expense_entries
-        WHERE status IN ('APPROVED', 'PAID')
-          AND date BETWEEN '${periodFrom}' AND '${periodTo}'
-          ${branchSqlCamel('expense_entries', '"branchId"')}
-        GROUP BY category
-      `),
-      // 5003 Depreciation (posted journals for period)
-      safeQNum(`
-        SELECT COALESCE(SUM("totalAmount"), 0)::numeric AS balance
-        FROM depreciation_journal_entries
-        WHERE status = 'POSTED'
-          AND (
-            "periodYear" * 100 + "periodMonth"
-            BETWEEN
-              EXTRACT(YEAR FROM DATE '${periodFrom}')::int * 100 + EXTRACT(MONTH FROM DATE '${periodFrom}')::int
-            AND
-              EXTRACT(YEAR FROM DATE '${periodTo}')::int * 100 + EXTRACT(MONTH FROM DATE '${periodTo}')::int
-          )
-          ${branchSqlCamel('depreciation_journal_entries', '"branchId"')}
-      `),
-      // 1006 Spare parts inventory value (internal call)
-      safeInternalFetch(
-        `${INVENTORY_URL}/spare-parts/inventory-value${branchParam ? `?branchIds=${branchParam.join(',')}` : ''}`,
-      ),
-    ]);
+      vendorPurchases,
+      shippingHandling,
+      salaryExpense,
+      travelExpense,
+      rentExpense,
+      utilitiesExpense,
+      marketingExpense,
+      maintenanceExpense,
+      insuranceExpense,
+      otherExpenses,
+      totalExpenses,
+      grossProfit,
+      netProfit,
+      currencyWarnings: plCurrencyWarnings,
+      dataWarnings: plDataWarnings,
+    } = pl;
 
-    // ── Combine AR totals ──
-    const accountsReceivable = invoiceAR + manualAR;
-    const prepaidExpenses = 0; // manual_assets table not yet created
-
-    // Compute accumulated depreciation from individual asset register rows
-    let accumulatedDepreciation = 0;
-    for (const row of equipDepRowsResult) {
-      const dep = calculateDepreciation({
-        purchasePrice: Number(row.purchase_price),
-        salvageValue: Number(row.salvage_value),
-        usefulLifeMonths: Number(row.useful_life_months),
-        annualDepreciationPct: Number(row.annual_depreciation_pct),
-        method: row.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(row.purchase_date),
-      });
-      accumulatedDepreciation += dep.accumulated;
-    }
-    accumulatedDepreciation = +accumulatedDepreciation.toFixed(2);
-
-    // ── Liabilities ──
-    const securityDepositsReceived = 0; // no manual_liabilities table yet
-    const deferredRevenue = 0;
-    const salaryPayable = 0; // covered in accrued via manual_payables type=SALARY_PAYABLE
-
-    // ── Equity ──
-    const eqByType: Record<string, number> = {};
-    for (const row of equityRowsResult) {
-      eqByType[row.type] = Number(row.amount);
-    }
-    const ownerCapital = (eqByType['SHARE_CAPITAL'] ?? 0) + (eqByType['OWNER_CONTRIBUTION'] ?? 0);
-    const reserves = eqByType['RESERVES'] ?? 0;
-    const withdrawals = 0;
-    const dividends = eqByType['DIVIDEND'] ?? 0;
-    const retainedEarnings = allTimeRevenue - allTimeExpenses;
-
-    // ── Income (period) ──
-    const otherIncome = 0;
-
-    // ── Expenses by category (period) ──
-    const expMap: Record<string, number> = {};
-    for (const row of expByCategoryRowsResult) {
-      expMap[row.category] = Number(row.balance);
-    }
-    const costOfParts = expMap['SPARE_PARTS'] ?? 0;
-    const labourCost = expMap['LABOUR'] ?? 0;
-    const vendorPurchases = expMap['VENDOR_PURCHASE'] ?? 0;
-    const salaryExpense = expMap['SALARY'] ?? 0;
-    const travelExpense = expMap['TRAVEL'] ?? 0;
-    const rentExpense = expMap['RENT'] ?? 0;
-    const utilitiesExpense = expMap['UTILITIES'] ?? 0;
-    const marketingExpense = expMap['MARKETING'] ?? 0;
-    const maintenanceExpense = expMap['MAINTENANCE'] ?? 0;
-    const insuranceExpense = expMap['INSURANCE'] ?? 0;
-    const otherExpenses = expMap['OTHER'] ?? 0;
-
-    // ── Totals ──
-    const equipmentNBV = equipmentGrossCost - accumulatedDepreciation;
     const totalCurrentAssets =
       cashInHand +
       cashAtBank +
       accountsReceivable +
       securityDepositsReceivable +
       prepaidExpenses +
-      sparePartsValue;
+      sparePartsInventory;
     const totalNonCurrentAssets = equipmentNBV;
-    const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
-
     const totalCurrentLiabilities =
       accountsPayable +
       accruedExpenses +
@@ -3006,11 +2657,6 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       securityDepositsReceived +
       deferredRevenue +
       salaryPayable;
-    const totalNonCurrentLiabilities = 0;
-    const totalLiabilities = totalCurrentLiabilities + totalNonCurrentLiabilities;
-
-    const totalEquity = ownerCapital + retainedEarnings + reserves - withdrawals - dividends;
-
     const totalIncome =
       rentalRevenue +
       leaseRevenue +
@@ -3018,30 +2664,19 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       serviceRevenue +
       amcSmaRevenue +
       usageRevenue +
-      otherIncome;
+      sparePartSalesRevenue;
 
-    const totalExpenses =
-      costOfParts +
-      labourCost +
-      depreciationExpense +
-      vendorPurchases +
-      salaryExpense +
-      travelExpense +
-      rentExpense +
-      utilitiesExpense +
-      marketingExpense +
-      maintenanceExpense +
-      insuranceExpense +
-      otherExpenses;
-
-    const grossProfit = totalIncome - costOfParts - labourCost;
-    const netProfit = grossProfit - (totalExpenses - costOfParts - labourCost);
-
-    const totalLiabilitiesPlusEquity = totalLiabilities + totalEquity;
-    const difference = Math.abs(totalAssets - totalLiabilitiesPlusEquity);
-    const isBalanced = difference < 0.01;
-
-    const currency = 'AED';
+    const allWarnings = [
+      ...bsCurrencyWarnings,
+      ...bsDataWarnings,
+      ...plCurrencyWarnings,
+      ...plDataWarnings,
+    ];
+    if (inventoryUnavailable) {
+      allWarnings.push(
+        'Spare parts inventory value unavailable — Inventory service did not respond',
+      );
+    }
 
     res.json({
       success: true,
@@ -3051,6 +2686,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
         periodTo,
         branchIds: branchF,
         currency,
+        warnings: allWarnings,
 
         assets: {
           currentAssets: {
@@ -3077,7 +2713,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             sparePartsInventory: makeAccountBalance(
               '1006',
               'Spare Parts Inventory',
-              sparePartsValue,
+              sparePartsInventory,
               currency,
             ),
             totalCurrentAssets: +totalCurrentAssets.toFixed(2),
@@ -3131,9 +2767,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             salaryPayable: makeAccountBalance('2006', 'Salary Payable', salaryPayable, currency),
             totalCurrentLiabilities: +totalCurrentLiabilities.toFixed(2),
           },
-          nonCurrentLiabilities: {
-            totalNonCurrentLiabilities,
-          },
+          nonCurrentLiabilities: { totalNonCurrentLiabilities: 0 },
           totalLiabilities: +totalLiabilities.toFixed(2),
         },
 
@@ -3158,7 +2792,12 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
           serviceRevenue: makeAccountBalance('4004', 'Service Revenue', serviceRevenue, currency),
           usageRevenue: makeAccountBalance('4005', 'Usage / Copy Revenue', usageRevenue, currency),
           amcSmaRevenue: makeAccountBalance('4006', 'AMC / SMA Revenue', amcSmaRevenue, currency),
-          otherIncome: makeAccountBalance('4007', 'Other Income', otherIncome, currency),
+          sparePartSales: makeAccountBalance(
+            '4007',
+            'Spare Part Sales',
+            sparePartSalesRevenue,
+            currency,
+          ),
           totalIncome: +totalIncome.toFixed(2),
         },
 
@@ -3177,34 +2816,40 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             vendorPurchases,
             currency,
           ),
-          salaryExpense: makeAccountBalance('5005', 'Salary Expense', salaryExpense, currency),
-          travelExpense: makeAccountBalance('5006', 'Travel Expense', travelExpense, currency),
-          rentExpense: makeAccountBalance('5007', 'Rent Expense', rentExpense, currency),
+          shippingHandling: makeAccountBalance(
+            '5005',
+            'Shipping & Handling',
+            shippingHandling,
+            currency,
+          ),
+          salaryExpense: makeAccountBalance('5006', 'Salary Expense', salaryExpense, currency),
+          travelExpense: makeAccountBalance('5007', 'Travel Expense', travelExpense, currency),
+          rentExpense: makeAccountBalance('5008', 'Rent Expense', rentExpense, currency),
           utilitiesExpense: makeAccountBalance(
-            '5008',
+            '5009',
             'Utilities Expense',
             utilitiesExpense,
             currency,
           ),
           marketingExpense: makeAccountBalance(
-            '5009',
+            '5010',
             'Marketing Expense',
             marketingExpense,
             currency,
           ),
           maintenanceExpense: makeAccountBalance(
-            '5010',
+            '5011',
             'Maintenance Expense',
             maintenanceExpense,
             currency,
           ),
           insuranceExpense: makeAccountBalance(
-            '5011',
+            '5012',
             'Insurance Expense',
             insuranceExpense,
             currency,
           ),
-          otherExpenses: makeAccountBalance('5012', 'Other Expenses', otherExpenses, currency),
+          otherExpenses: makeAccountBalance('5013', 'Other Expenses', otherExpenses, currency),
           totalExpenses: +totalExpenses.toFixed(2),
         },
 
@@ -3213,13 +2858,232 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
           netProfit: +netProfit.toFixed(2),
           accountingEquation: {
             totalAssets: +totalAssets.toFixed(2),
-            totalLiabilitiesPlusEquity: +totalLiabilitiesPlusEquity.toFixed(2),
+            totalLiabilitiesPlusEquity: +totalLiabilitiesAndEquity.toFixed(2),
             isBalanced,
             difference: +difference.toFixed(2),
           },
         },
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── VAT REMITTANCES ──────────────────────────────────────────────────────────
+
+export const getVatRemittances = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchF = req.branchFilter ?? [];
+    const repo = Source.getRepository(VatRemittance);
+    const qb = repo.createQueryBuilder('v').orderBy('v.remittedDate', 'DESC');
+    if (branchF.length > 0) {
+      if (branchF.length === 1) qb.where('v.branchId = :bid', { bid: branchF[0] });
+      else qb.where('v.branchId IN (:...bids)', { bids: branchF });
+    }
+    const data = await qb.getMany();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createVatRemittance = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchId = req.user?.branchId;
+    if (!branchId) throw new AppError('Branch ID required', 400);
+    const { periodFrom, periodTo, amountRemitted, remittedDate, referenceNo, notes } = req.body;
+    if (!periodFrom || !periodTo || !amountRemitted || !remittedDate) {
+      throw new AppError('periodFrom, periodTo, amountRemitted, remittedDate are required', 400);
+    }
+    const repo = Source.getRepository(VatRemittance);
+    const entry = repo.create({
+      branchId,
+      periodFrom: new Date(periodFrom),
+      periodTo: new Date(periodTo),
+      amountRemitted: Number(amountRemitted),
+      remittedDate: new Date(remittedDate),
+      referenceNo,
+      notes,
+      createdBy: req.user!.userId,
+    });
+    const saved = await repo.save(entry);
+    res.status(201).json({ success: true, data: saved });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteVatRemittance = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    const branchF = req.branchFilter ?? [];
+    const repo = Source.getRepository(VatRemittance);
+    const entry = await repo.findOne({ where: { id } });
+    if (!entry) throw new AppError('VAT remittance not found', 404);
+    if (branchF.length > 0 && !branchF.includes(entry.branchId)) {
+      throw new AppError('Not authorized for this branch', 403);
+    }
+    await repo.remove(entry);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── OUTPUT TAX REPORT ────────────────────────────────────────────────────────
+
+const OUTPUT_TAX_STATUSES = ['INVOICED', 'PAID', 'ACTIVE_CONTRACT'];
+
+export const getOutputTax = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      dateFrom,
+      dateTo,
+      country,
+      stateProvince,
+      page = '1',
+      limit = '50',
+    } = req.query as Record<string, string>;
+    const branchFilter: string[] = req.branchFilter ?? [];
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+
+    const qb = Source.getRepository(Invoice)
+      .createQueryBuilder('i')
+      .where('i.status IN (:...statuses)', { statuses: OUTPUT_TAX_STATUSES })
+      .andWhere('i.isTemplate = false')
+      .andWhere('i.isOpeningEntry = false')
+      .andWhere('i.deletedAt IS NULL');
+
+    if (branchFilter.length === 1) {
+      qb.andWhere('i.branchId = :bf', { bf: branchFilter[0] });
+    } else if (branchFilter.length > 1) {
+      qb.andWhere('i.branchId IN (:...bf)', { bf: branchFilter });
+    }
+
+    if (dateFrom) qb.andWhere('i.createdAt >= :dateFrom', { dateFrom });
+    if (dateTo) {
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      qb.andWhere('i.createdAt <= :dateTo', { dateTo: end });
+    }
+    if (country) qb.andWhere('i.customerCountry = :country', { country });
+    if (stateProvince) qb.andWhere('i.customerStateProvince = :stateProvince', { stateProvince });
+
+    const total = await qb.getCount();
+    const invoices = await qb
+      .orderBy('i.createdAt', 'DESC')
+      .skip((pageNum - 1) * limitNum)
+      .take(limitNum)
+      .getMany();
+
+    const rows = invoices.map((inv) => ({
+      invoiceNumber: inv.invoiceNumber,
+      invoiceDate: inv.effectiveFrom ?? inv.createdAt,
+      branchId: inv.branchId,
+      customerId: inv.customerId,
+      customerName: inv.customerName,
+      customerVatNumber: inv.customerVatNumber,
+      customerCountry: inv.customerCountry,
+      customerStateProvince: inv.customerStateProvince,
+      taxableAmount: Number(inv.totalAmount ?? 0),
+      taxPercent: inv.taxPercent,
+      taxName: inv.taxName,
+      outputVat: Number(inv.taxAmount ?? 0),
+      totalInvoice: Number(inv.totalAmount ?? 0) + Number(inv.taxAmount ?? 0),
+      currencyCode: inv.currencyCode,
+      status: inv.status,
+    }));
+
+    const totalTaxableAmount = rows.reduce((s, r) => s + r.taxableAmount, 0);
+    const totalOutputVat = rows.reduce((s, r) => s + r.outputVat, 0);
+
+    res.json({
+      success: true,
+      data: {
+        rows,
+        totals: { totalTaxableAmount, totalOutputVat, count: total },
+        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── COUNTRY TAX RULES ────────────────────────────────────────────────────────
+
+export const getCountryTaxRules = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rules = await Source.getRepository(CountryTaxRule).find({ order: { country: 'ASC' } });
+    res.json({ success: true, data: rules });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const upsertCountryTaxRule = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { country, taxName, defaultTaxPercent, isActive } = req.body;
+    if (!country || !taxName) {
+      return next(new AppError('country and taxName are required', 400));
+    }
+    const repo = Source.getRepository(CountryTaxRule);
+    let rule = await repo.findOne({ where: { country: country.toUpperCase() } });
+    if (rule) {
+      rule.taxName = taxName;
+      rule.defaultTaxPercent = defaultTaxPercent ?? rule.defaultTaxPercent;
+      rule.isActive = isActive !== undefined ? isActive : rule.isActive;
+    } else {
+      rule = repo.create({
+        country: country.toUpperCase(),
+        taxName,
+        defaultTaxPercent: defaultTaxPercent ?? null,
+        isActive: isActive !== false,
+      });
+    }
+    await repo.save(rule);
+    res.json({ success: true, data: rule });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteCountryTaxRule = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params as { id: string };
+    const repo = Source.getRepository(CountryTaxRule);
+    const rule = await repo.findOne({ where: { id } });
+    if (!rule) return next(new AppError('Country tax rule not found', 404));
+    await repo.remove(rule);
+    res.json({ success: true, message: 'Country tax rule deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── TAX DOCUMENT EMAIL ───────────────────────────────────────────────────────
+
+export const sendTaxDocumentEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { recipient, subject, body, attachments, branchId } = req.body;
+    if (!recipient) return next(new AppError('recipient is required', 400));
+    const bf = req.branchFilter ?? [];
+    if (bf.length > 0 && branchId && !bf.includes(branchId as string)) {
+      return next(new AppError('Not authorized to send documents for this branch', 403));
+    }
+
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+    await NotificationPublisher.publishEmailRequest({
+      recipient,
+      subject: subject ?? 'Tax Document',
+      body: body ?? '',
+      attachments,
+    });
+
+    res.json({ success: true, message: 'Tax document email queued' });
   } catch (err) {
     next(err);
   }

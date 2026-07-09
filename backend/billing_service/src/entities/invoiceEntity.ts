@@ -257,6 +257,19 @@ export class Invoice {
   @Column({ name: 'tax_registration_number', type: 'varchar', length: 50, nullable: true })
   taxRegistrationNumber?: string;
 
+  // --- Customer Snapshot (copied from CRM at invoice creation for tax reporting) ---
+  @Column({ name: 'customer_name', type: 'varchar', length: 255, nullable: true })
+  customerName?: string | null;
+
+  @Column({ name: 'customer_vat_number', type: 'varchar', length: 50, nullable: true })
+  customerVatNumber?: string | null;
+
+  @Column({ name: 'customer_country', type: 'varchar', length: 2, nullable: true })
+  customerCountry?: string | null;
+
+  @Column({ name: 'customer_state_province', type: 'varchar', length: 100, nullable: true })
+  customerStateProvince?: string | null;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   grossAmount?: number;
 

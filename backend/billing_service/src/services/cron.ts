@@ -673,6 +673,97 @@ export async function rentLeaseDueReminderJob() {
   }
 }
 
+// P2-1: Nightly reconciliation — scan cashbook_entries with linked_po_id, batch-check against
+// Inventory service, and flag any orphaned entries so admins can see them.
+export async function orphanedPoReconciliationJob() {
+  logger.info('[CRON] Running PO orphan reconciliation for cashbook entries...');
+  try {
+    const rows = await Source.query<{ id: string; linked_po_id: string }[]>(`
+      SELECT id, "linkedPoId" AS linked_po_id
+      FROM cashbook_entries
+      WHERE "linkedPoId" IS NOT NULL
+    `);
+
+    if (rows.length === 0) {
+      logger.info('[CRON] PO orphan reconciliation: no linked_po_id entries found.');
+      return;
+    }
+
+    const poIds = rows.map((r) => r.linked_po_id);
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
+    const { sign } = await import('jsonwebtoken');
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+
+    // Batch call — send all IDs at once to avoid N+1 HTTP calls.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    let existingIds: string[] = [];
+    try {
+      const res = await fetch(`${INV_URL}/purchases/internal/batch-exists`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-internal-service': 'billing',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: poIds }),
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = (await res.json()) as { existingIds: string[] };
+        existingIds = data.existingIds ?? [];
+      } else {
+        logger.warn(
+          '[CRON] PO orphan reconciliation: Inventory service returned non-OK response — skipping this run.',
+        );
+        return;
+      }
+    } catch (err) {
+      clearTimeout(timer);
+      logger.warn(
+        '[CRON] PO orphan reconciliation: Inventory service unreachable — skipping this run.',
+        err,
+      );
+      return;
+    }
+
+    const existingSet = new Set(existingIds);
+    const orphaned = rows.filter((r) => !existingSet.has(r.linked_po_id));
+    const cleared = rows.filter((r) => existingSet.has(r.linked_po_id));
+
+    // Bulk-flag orphaned entries
+    if (orphaned.length > 0) {
+      const orphanedIds = orphaned.map((r) => `'${r.id}'`).join(',');
+      await Source.query(
+        `UPDATE cashbook_entries SET "isPoOrphaned" = TRUE WHERE id IN (${orphanedIds})`,
+      );
+      logger.warn(
+        `[CRON] PO orphan reconciliation: flagged ${orphaned.length} orphaned cashbook entr(ies). IDs: ${orphaned.map((r) => r.id).join(', ')}`,
+      );
+    }
+
+    // Clear the flag for entries whose PO was restored (edge case)
+    if (cleared.length > 0) {
+      const clearedIds = cleared.map((r) => `'${r.id}'`).join(',');
+      await Source.query(
+        `UPDATE cashbook_entries SET "isPoOrphaned" = FALSE WHERE id IN (${clearedIds}) AND "isPoOrphaned" IS DISTINCT FROM FALSE`,
+      );
+    }
+
+    logger.info(
+      `[CRON] PO orphan reconciliation complete. Checked ${rows.length} entries: ${orphaned.length} orphaned, ${cleared.length} OK.`,
+    );
+  } catch (err) {
+    logger.error('[CRON] PO orphan reconciliation job failed:', err);
+  }
+}
+
 export function startReminderCronJobs() {
   logger.info('[CRON] Initializing payment and due reminder cron jobs using node-cron...');
 
@@ -684,5 +775,10 @@ export function startReminderCronJobs() {
   // 2. Rent & Lease Due Reminder (Daily): Run at 9:00 AM daily
   cron.schedule('0 9 * * *', () => {
     rentLeaseDueReminderJob();
+  });
+
+  // 3. PO Orphan Reconciliation (Nightly): Run at 2:00 AM daily
+  cron.schedule('0 2 * * *', () => {
+    orphanedPoReconciliationJob();
   });
 }

@@ -73,11 +73,16 @@ export interface CashbookEntry {
   category: string;
   description?: string;
   linkedInvoiceId?: string;
+  linkedPoId?: string;
+  linkedExpenseId?: string;
   paymentMode?: string;
   chequeNo?: string;
   notes?: string;
   sourceType?: string;
   sourceId?: string;
+  isReversed?: boolean;
+  reversedById?: string;
+  isPoOrphaned?: boolean | null;
   createdBy: string;
   branchId: string;
   createdAt: string;
@@ -400,6 +405,21 @@ export async function createCashbookEntry(data: Partial<CashbookEntry>): Promise
   return res.data?.data;
 }
 
+export async function reverseCashbookEntry(id: string): Promise<CashbookEntry> {
+  const res = await api.post(`${BASE}/cashbook/${id}/reverse`);
+  return res.data?.data;
+}
+
+export async function fetchOrphanedCashbookEntries(): Promise<{
+  data: CashbookEntry[];
+  count: number;
+}> {
+  const res = await api.get<{ success: boolean; data: CashbookEntry[]; count: number }>(
+    `${BASE}/admin/orphaned-cashbook`,
+  );
+  return { data: res.data?.data ?? [], count: res.data?.count ?? 0 };
+}
+
 // ─── Day Book ──────────────────────────────────────────────────────────────────
 
 export async function fetchDayBook(params?: {
@@ -710,6 +730,8 @@ export interface BalanceSheet {
     receivables: number;
     manualReceivables?: number;
     invoiceAR?: number;
+    sparePartsInventory?: number;
+    inventoryUnavailable?: boolean;
     total: number;
   };
   liabilities: { payables: number; accruedExpenses: number; vatPayable?: number; total: number };
@@ -724,6 +746,8 @@ export interface BalanceSheet {
   cashAndBank: number;
   receivables: number;
   payables: number;
+  dataWarnings?: string[];
+  currencyWarnings?: string[];
 }
 
 export interface ProfitLoss {
@@ -740,6 +764,8 @@ export interface ProfitLoss {
   revenueByType: Record<string, number>;
   expByCategory: Record<string, number>;
   monthly: { month: string; revenue: number; income?: number; expenses: number; net: number }[];
+  dataWarnings?: string[];
+  currencyWarnings?: string[];
 }
 
 export const fetchEquityEntries = (params?: Record<string, string>) =>
@@ -1161,3 +1187,265 @@ export const cancelCheque = (id: string, body?: { notes?: string }) =>
   api
     .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/cancel`, body ?? {})
     .then((r) => r.data.data);
+
+// ─── TAX REPORT ──────────────────────────────────────────────────────────────
+
+export interface TaxReportFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  branchIds?: string;
+  branchId?: string;
+  country?: string;
+  stateProvince?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface TaxReportTotals {
+  count: number;
+  [key: string]: number;
+}
+
+export interface TaxReportPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface OutputTaxRow {
+  invoiceNumber: string;
+  invoiceDate: string;
+  branchId: string;
+  customerId?: string;
+  customerName?: string;
+  customerVatNumber?: string;
+  customerCountry?: string;
+  customerStateProvince?: string;
+  taxableAmount: number;
+  taxPercent?: number;
+  taxName?: string;
+  outputVat: number;
+  totalInvoice: number;
+  currencyCode?: string;
+  status: string;
+}
+
+export interface InputTaxLocalRow {
+  id: string;
+  invoiceDate: string;
+  branch: string;
+  branchId: string;
+  vendorName: string;
+  vendorVatNumber?: string;
+  vendorCountry?: string;
+  purchaseCategory?: string;
+  taxableAmount?: number;
+  taxPercent?: number;
+  taxName?: string;
+  inputVatAmount?: number;
+  totalAmount: number;
+  currencyCode?: string;
+  taxStatus: string;
+  vatClaimable: boolean;
+}
+
+export interface InputTaxInternationalRow {
+  id: string;
+  importInvoiceNo?: string;
+  invoiceDate: string;
+  branch: string;
+  branchId: string;
+  supplierName: string;
+  supplierCountry?: string;
+  supplierVatNumber?: string;
+  importCountry?: string;
+  goodsOrService?: string;
+  taxableAmount?: number;
+  importVatReverseCharge?: number;
+  taxPercent?: number;
+  customsEntryNo?: string;
+  customsDuty?: number;
+  currencyCode?: string;
+  exchangeRate?: number;
+  vatClaimable: boolean;
+  taxStatus: string;
+}
+
+export interface CountryTaxRule {
+  id: string;
+  country: string;
+  taxName: string;
+  defaultTaxPercent?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaxReportResponse<T> {
+  rows: T[];
+  totals: TaxReportTotals;
+  pagination: TaxReportPagination;
+}
+
+export const getOutputTax = (filters: TaxReportFilters = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: TaxReportResponse<OutputTaxRow>;
+    }>(`${BASE}/tax/output`, { params: filters })
+    .then((r) => r.data.data);
+
+export const getInputTaxLocal = (filters: TaxReportFilters = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: TaxReportResponse<InputTaxLocalRow>;
+    }>('/i/purchases/tax-report/local', { params: filters })
+    .then((r) => r.data.data);
+
+export const getInputTaxInternational = (filters: TaxReportFilters = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: TaxReportResponse<InputTaxInternationalRow>;
+    }>('/i/purchases/tax-report/international', { params: filters })
+    .then((r) => r.data.data);
+
+export const sendTaxDocumentEmail = (payload: {
+  recipient: string;
+  subject: string;
+  body: string;
+  attachments: { filename: string; content: string; encoding: string }[];
+}) => api.post(`${BASE}/tax/send-email`, payload).then((r) => r.data);
+
+export const fetchCountryTaxRules = () =>
+  api
+    .get<{ success: boolean; data: CountryTaxRule[] }>(`${BASE}/tax-rules`)
+    .then((r) => r.data.data ?? []);
+
+export const upsertCountryTaxRule = (body: {
+  country: string;
+  taxName: string;
+  defaultTaxPercent?: number;
+  isActive?: boolean;
+}) =>
+  api
+    .post<{ success: boolean; data: CountryTaxRule }>(`${BASE}/tax-rules`, body)
+    .then((r) => r.data.data);
+
+export const deleteCountryTaxRule = (id: string) =>
+  api.delete(`${BASE}/tax-rules/${id}`).then((r) => r.data);
+
+// ─── Guarantee Cheques ────────────────────────────────────────────────────────
+
+export type GuaranteeStatus = 'RECEIVED' | 'RETURNED';
+export type GuaranteePurpose = 'PERFORMANCE_SECURITY' | 'OTHER';
+
+export interface GuaranteeCheque {
+  id: string;
+  customerId: string;
+  customerName: string;
+  contractInvoiceId?: string | null;
+  contractReference?: string | null;
+  chequeNumber: string;
+  amount: number;
+  currencyCode: string;
+  bankName: string;
+  receivedDate: string;
+  purpose: GuaranteePurpose;
+  status: GuaranteeStatus;
+  returnedDate?: string | null;
+  branchId: string;
+  createdBy: string;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuaranteeStats {
+  heldCount: number;
+  heldAmount: number;
+  returnedCount: number;
+  returnedAmount: number;
+  pendingReturnCount: number;
+}
+
+export interface CustomerContract {
+  id: string;
+  invoiceNumber: string;
+  saleType: string;
+  status: string;
+  totalAmount: string;
+  createdAt: string;
+}
+
+export interface GuaranteeFilters {
+  status?: string;
+  purpose?: string;
+  branchIds?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  customerId?: string;
+  search?: string;
+}
+
+export interface CreateGuaranteeChequePayload {
+  customerId: string;
+  customerName: string;
+  contractInvoiceId?: string | null;
+  contractReference?: string | null;
+  chequeNumber: string;
+  amount: number;
+  currencyCode: string;
+  bankName: string;
+  receivedDate: string;
+  purpose: GuaranteePurpose;
+  notes?: string;
+}
+
+export const fetchGuaranteeCheques = (filters: GuaranteeFilters = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: GuaranteeCheque[];
+    }>(`${BASE}/guarantee-cheques`, { params: filters })
+    .then((r) => r.data.data ?? []);
+
+export const fetchGuaranteeStats = (filters: Pick<GuaranteeFilters, 'branchIds'> = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: GuaranteeStats;
+    }>(`${BASE}/guarantee-cheques/stats`, { params: filters })
+    .then((r) => r.data.data);
+
+export const fetchCustomerContracts = (customerId: string) =>
+  api
+    .get<{
+      success: boolean;
+      data: CustomerContract[];
+    }>(`${BASE}/guarantee-cheques/customer-contracts/${customerId}`)
+    .then((r) => r.data.data ?? []);
+
+export const createGuaranteeCheque = (payload: CreateGuaranteeChequePayload) =>
+  api
+    .post<{ success: boolean; data: GuaranteeCheque }>(`${BASE}/guarantee-cheques`, payload)
+    .then((r) => r.data.data);
+
+export const updateGuaranteeCheque = (id: string, payload: Partial<CreateGuaranteeChequePayload>) =>
+  api
+    .put<{ success: boolean; data: GuaranteeCheque }>(`${BASE}/guarantee-cheques/${id}`, payload)
+    .then((r) => r.data.data);
+
+export const returnGuaranteeCheque = (id: string, returnedDate: string) =>
+  api
+    .post<{
+      success: boolean;
+      data: GuaranteeCheque;
+    }>(`${BASE}/guarantee-cheques/${id}/return`, { returnedDate })
+    .then((r) => r.data.data);
+
+export const deleteGuaranteeCheque = (id: string) =>
+  api.delete(`${BASE}/guarantee-cheques/${id}`).then((r) => r.data);

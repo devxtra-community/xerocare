@@ -99,6 +99,7 @@ type VendorFormData = {
   currency: string;
   countryCode?: string;
   countryName?: string;
+  vatNumber?: string;
   bankAccounts: BankAccount[];
 };
 
@@ -439,6 +440,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         currency: data.currency,
         countryCode: data.countryCode || undefined,
         countryName: data.countryName || undefined,
+        vatNumber: data.vatNumber || undefined,
         bankAccounts: data.bankAccounts || [],
       };
 
@@ -749,6 +751,7 @@ function VendorFormModal({
     currency: 'QAR',
     countryCode: undefined,
     countryName: undefined,
+    vatNumber: undefined,
     bankAccounts: [],
   });
 
@@ -767,6 +770,7 @@ function VendorFormModal({
           currency: initialData.currency || 'QAR',
           countryCode: initialData.countryCode,
           countryName: initialData.countryName,
+          vatNumber: (initialData as { vatNumber?: string }).vatNumber,
           bankAccounts: initialData.bankAccounts || [],
         });
       } else {
@@ -780,6 +784,7 @@ function VendorFormModal({
           currency: 'QAR',
           countryCode: undefined,
           countryName: undefined,
+          vatNumber: undefined,
           bankAccounts: [],
         });
       }
@@ -947,6 +952,20 @@ function VendorFormModal({
                   </Command>
                 </PopoverContent>
               </Popover>
+            </div>
+
+            {/* VAT Number */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                VAT Number
+              </label>
+              <input
+                type="text"
+                placeholder="Tax registration / VAT No."
+                value={form.vatNumber ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, vatNumber: e.target.value || undefined }))}
+                className="w-full h-11 rounded-xl bg-card shadow-sm border-0 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
             </div>
 
             {/* Phone with dial-code prefix */}

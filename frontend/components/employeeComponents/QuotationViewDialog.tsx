@@ -574,6 +574,14 @@ export function QuotationViewDialog({
     isLeaseStandard ||
     isLeasePremium;
 
+  // ── Resolve VAT/tax rate ──────────────────────────────────────────────────
+  // Priority: snapshotted taxPercent on the quotation record (set at creation time)
+  //           → live product metadata tax_rate (fallback for legacy records)
+  const resolvedTaxPercent =
+    quotation.taxPercent != null
+      ? Number(quotation.taxPercent)
+      : Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+
   // ── Data mapping for Standard / Premium templates ─────────────────────────
   const templateLineItems = enrichedItems.map((item, idx) => {
     const unitP = item.unitPrice || 0;
@@ -654,7 +662,9 @@ export function QuotationViewDialog({
       qty: qty,
       unitPrice: unitP,
       specialPrice: discountedPrice,
-      vat: ((discountedPrice * Number(item.metadata?.tax_rate || 0)) / 100) * qty,
+      // Use resolved tax percent (snapshotted at creation time, not live product rate)
+      vat: ((discountedPrice * resolvedTaxPercent) / 100) * qty,
+      vatPercent: resolvedTaxPercent,
       amount: subAmt,
       productImage: item.metadata?.imageUrl || item.metadata?.image_url || item.metadata?.image,
       discount: disc,
@@ -675,7 +685,12 @@ export function QuotationViewDialog({
     Number(quotation.discountAmount || 0),
   );
 
-  const finalVatTotal = templateLineItems.reduce((acc, it) => acc + (it.vat || 0), 0);
+  // Use the authoritative snapshotted taxAmount when available, otherwise sum from line items
+  const computedVatFromItems = templateLineItems.reduce((acc, it) => acc + (it.vat || 0), 0);
+  const finalVatTotal =
+    quotation.taxAmount != null && Number(quotation.taxAmount) > 0
+      ? Number(quotation.taxAmount)
+      : computedVatFromItems;
   const netAmount = totalBeforeDiscount - finalDiscountTotal;
   const isVatAlreadyIncluded =
     quotation.totalAmount &&
@@ -690,6 +705,8 @@ export function QuotationViewDialog({
       : totalBeforeDiscount,
     discountTotal: finalDiscountTotal,
     vatTotal: finalVatTotal,
+    vatPercent: resolvedTaxPercent,
+    vatName: quotation.taxName || 'VAT',
     total: finalTotalAmount,
     payment: finalTotalAmount,
     balanceDue: finalTotalAmount,
@@ -833,14 +850,19 @@ export function QuotationViewDialog({
       (quotation.monthlyRent || 0) * (1 - (quotation.discountPercent || 0) / 100),
   };
 
-  const rentTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  // Rent totals — use snapshotted taxPercent first, fall back to product metadata
+  const rentTaxRate = resolvedTaxPercent;
   const rentSubTotal = Number(quotation.monthlyRent || 0);
-  const rentTaxAmount = (rentSubTotal * rentTaxRate) / 100;
+  const rentTaxAmount =
+    quotation.taxAmount != null && Number(quotation.taxAmount) > 0
+      ? Number(quotation.taxAmount)
+      : (rentSubTotal * rentTaxRate) / 100;
   const rentTotalAmount = rentSubTotal + rentTaxAmount;
 
   const isFsmLease = quotation.leaseType === 'FSM';
 
-  const leaseTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  // Lease totals — same snapshotted approach
+  const leaseTaxRate = resolvedTaxPercent;
   const getLeaseSubTotal = () => {
     return Number(
       quotation.totalLeaseAmount ||
@@ -854,7 +876,10 @@ export function QuotationViewDialog({
     );
   };
   const leaseSubTotal = getLeaseSubTotal();
-  const leaseTaxAmount = (leaseSubTotal * leaseTaxRate) / 100;
+  const leaseTaxAmount =
+    quotation.taxAmount != null && Number(quotation.taxAmount) > 0
+      ? Number(quotation.taxAmount)
+      : (leaseSubTotal * leaseTaxRate) / 100;
   const leaseTotalAmount = leaseSubTotal + leaseTaxAmount;
 
   const leaseTemplateLineItems = (quotation.items || [])

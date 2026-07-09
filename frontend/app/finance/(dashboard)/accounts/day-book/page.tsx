@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { fetchDayBook } from '@/lib/finance/accountsApi';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight, RotateCcw } from 'lucide-react';
+import { fetchDayBook, reverseCashbookEntry } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 type Period = 'today' | 'this_week' | 'this_month' | 'custom';
 
@@ -56,6 +57,8 @@ export default function DayBookPage() {
   const [period, setPeriod] = useState<Period>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [reversingId, setReversingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { from, to } = useMemo(
     () => getDateRange(period, customFrom, customTo),
@@ -73,6 +76,20 @@ export default function DayBookPage() {
     queryFn: () => fetchDayBook({ fromDate: from, toDate: to }),
     staleTime: 60_000,
     enabled: !!(from && to),
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: (id: string) => reverseCashbookEntry(id),
+    onMutate: (id) => setReversingId(id),
+    onSuccess: () => {
+      toast.success('Entry reversed successfully. A new offsetting entry has been created.');
+      queryClient.invalidateQueries({ queryKey: ['daybook'] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : 'Reversal failed';
+      toast.error(msg);
+    },
+    onSettled: () => setReversingId(null),
   });
 
   const totals = dayBook?.totals ?? {
@@ -249,12 +266,16 @@ export default function DayBookPage() {
                           <th className="px-4 py-2 font-semibold">Description</th>
                           <th className="px-4 py-2 font-semibold">Mode</th>
                           <th className="px-4 py-2 font-semibold text-right">Receipt</th>
-                          <th className="px-6 py-2 font-semibold text-right">Payment</th>
+                          <th className="px-4 py-2 font-semibold text-right">Payment</th>
+                          <th className="px-6 py-2 font-semibold text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {day.entries.map((e) => (
-                          <tr key={e.id} className="border-b border-border/60 hover:bg-slate-50/60">
+                          <tr
+                            key={e.id}
+                            className={`border-b border-border/60 hover:bg-slate-50/60 ${e.isReversed ? 'opacity-50' : ''}`}
+                          >
                             <td className="px-6 py-2.5 font-medium text-slate-700">
                               <span className="inline-flex items-center gap-1.5">
                                 {e.entryType === 'RECEIPT' ? (
@@ -263,6 +284,16 @@ export default function DayBookPage() {
                                   <ArrowUpRight className="h-3.5 w-3.5 text-red-600" />
                                 )}
                                 {e.referenceNo}
+                                {e.isReversed && (
+                                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                    Reversed
+                                  </span>
+                                )}
+                                {e.category === 'REVERSAL' && (
+                                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                                    Reversal
+                                  </span>
+                                )}
                               </span>
                             </td>
                             <td className="px-4 py-2.5 text-slate-600">{e.category}</td>
@@ -271,8 +302,29 @@ export default function DayBookPage() {
                             <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">
                               {e.entryType === 'RECEIPT' ? formatCurrency(Number(e.amount)) : ''}
                             </td>
-                            <td className="px-6 py-2.5 text-right tabular-nums text-red-600">
+                            <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
                               {e.entryType === 'PAYMENT' ? formatCurrency(Number(e.amount)) : ''}
+                            </td>
+                            <td className="px-6 py-2.5 text-right">
+                              {!e.sourceType && !e.isReversed && e.category !== 'REVERSAL' && (
+                                <button
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        `Reverse entry ${e.referenceNo}? This will create an offsetting entry and cannot be undone.`,
+                                      )
+                                    ) {
+                                      reverseMutation.mutate(e.id);
+                                    }
+                                  }}
+                                  disabled={reversingId === e.id}
+                                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 hover:text-amber-900 disabled:opacity-50"
+                                  title="Reverse this manual entry"
+                                >
+                                  <RotateCcw className="h-3 w-3" />
+                                  {reversingId === e.id ? 'Reversing…' : 'Reverse'}
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}

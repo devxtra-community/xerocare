@@ -415,6 +415,14 @@ export function InvoiceViewDialog({
 
   const useTemplate = true; // Use the new layouts for everything where possible
 
+  // ── Resolve VAT/tax rate ──────────────────────────────────────────────────
+  // Priority: snapshotted taxPercent on the invoice (set at creation from branch tax config)
+  //           → live product metadata tax_rate (fallback for legacy records)
+  const resolvedTaxPercent =
+    invoice.taxPercent != null
+      ? Number(invoice.taxPercent)
+      : Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+
   // ── Data mapping for Standard / Premium templates ─────────────────────────
   const templateLineItems = enrichedItems.map((item, idx) => {
     const unitP = item.unitPrice || 0;
@@ -470,7 +478,9 @@ export function InvoiceViewDialog({
       qty: qty,
       unitPrice: unitP,
       specialPrice: discountedPrice,
-      vat: ((discountedPrice * Number(item.metadata?.tax_rate || 0)) / 100) * qty,
+      // Use resolved tax percent (snapshotted at creation time, not live product rate)
+      vat: ((discountedPrice * resolvedTaxPercent) / 100) * qty,
+      vatPercent: resolvedTaxPercent,
       amount: subAmt,
       productImage: item.metadata?.imageUrl || item.metadata?.image_url || item.metadata?.image,
       discount: disc,
@@ -493,7 +503,12 @@ export function InvoiceViewDialog({
   );
   const finalDiscountTotal = Math.max(totalDiscountFromItems, Number(invoice.discountAmount || 0));
 
-  const finalVatTotal = templateLineItems.reduce((acc, it) => acc + (it.vat || 0), 0);
+  // Use the authoritative snapshotted taxAmount when available, otherwise sum from line items
+  const computedVatFromItems = templateLineItems.reduce((acc, it) => acc + (it.vat || 0), 0);
+  const finalVatTotal =
+    invoice.taxAmount != null && Number(invoice.taxAmount) > 0
+      ? Number(invoice.taxAmount)
+      : computedVatFromItems;
   const netAmount = totalBeforeDiscount - finalDiscountTotal;
   const isVatAlreadyIncluded =
     invoice.totalAmount &&
@@ -508,6 +523,8 @@ export function InvoiceViewDialog({
       : totalBeforeDiscount,
     discountTotal: finalDiscountTotal,
     vatTotal: finalVatTotal,
+    vatPercent: resolvedTaxPercent,
+    vatName: invoice.taxName || 'VAT',
     total: finalTotalAmount,
     payment: finalTotalAmount,
     balanceDue: finalTotalAmount,
@@ -588,11 +605,15 @@ export function InvoiceViewDialog({
     discountedMonthlyRent: (invoice.monthlyRent || 0) * (1 - (invoice.discountPercent || 0) / 100),
   };
 
-  const rentTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  // Rent totals — use snapshotted taxPercent first, fall back to product metadata
+  const rentTaxRate = resolvedTaxPercent;
   const rentSubTotal =
     Number(invoice.monthlyRent || 0) ||
     (invoice.items || []).reduce((acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0), 0);
-  const rentTaxAmount = (rentSubTotal * rentTaxRate) / 100;
+  const rentTaxAmount =
+    invoice.taxAmount != null && Number(invoice.taxAmount) > 0
+      ? Number(invoice.taxAmount)
+      : (rentSubTotal * rentTaxRate) / 100;
   const rentTotalAmount = rentSubTotal + rentTaxAmount;
 
   const isFsmLease = invoice.leaseType === 'FSM';
@@ -655,9 +676,13 @@ export function InvoiceViewDialog({
       : Number(invoice.totalAmount || 0),
   };
 
-  const leaseTaxRate = Number(enrichedItems[0]?.metadata?.tax_rate || 0);
+  // Lease totals — use snapshotted taxPercent first, fall back to product metadata
+  const leaseTaxRate = resolvedTaxPercent;
   const leaseSubTotal = Number(leaseAgreementDetails.totalLeaseValue || 0);
-  const leaseTaxAmount = (leaseSubTotal * leaseTaxRate) / 100;
+  const leaseTaxAmount =
+    invoice.taxAmount != null && Number(invoice.taxAmount) > 0
+      ? Number(invoice.taxAmount)
+      : (leaseSubTotal * leaseTaxRate) / 100;
   const leaseTotalAmount = leaseSubTotal + leaseTaxAmount;
 
   return (

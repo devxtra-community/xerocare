@@ -21,6 +21,8 @@ import { Loader2, User, Mail, Save, MapPin } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 
 import { Customer, CreateCustomerData } from '@/lib/customer';
+import { getCountryDataList } from 'countries-list';
+import { State } from 'country-state-city';
 
 interface CustomerFormDialogProps {
   open: boolean;
@@ -58,6 +60,9 @@ export default function CustomerFormDialog({
     phone: '',
     address: '',
     status: 'ACTIVE',
+    stateProvince: '',
+    bankName: '',
+    bankAccountNumber: '',
   });
 
   useEffect(() => {
@@ -69,6 +74,11 @@ export default function CustomerFormDialog({
         phone: customer.phone,
         address: customer.address || '',
         status: customer.isActive ? 'ACTIVE' : 'INACTIVE',
+        vatNumber: customer.vatNumber ?? undefined,
+        country: customer.country ?? undefined,
+        stateProvince: customer.stateProvince ?? undefined,
+        bankName: customer.bankName ?? '',
+        bankAccountNumber: customer.bankAccountNumber ?? '',
       });
 
       if (customer.phone) {
@@ -98,6 +108,9 @@ export default function CustomerFormDialog({
         phone: '',
         address: '',
         status: 'ACTIVE',
+        stateProvince: '',
+        bankName: '',
+        bankAccountNumber: '',
       });
       setCountryCode('+974');
       setRawPhone('');
@@ -243,6 +256,116 @@ export default function CustomerFormDialog({
                   className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 pl-11"
                 />
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  VAT Number
+                </Label>
+                <Input
+                  name="vatNumber"
+                  value={formData.vatNumber ?? ''}
+                  onChange={handleChange}
+                  placeholder="Tax registration / VAT No."
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Country
+                </Label>
+                <Select
+                  value={formData.country ?? ''}
+                  onValueChange={(val) => {
+                    handleSelectChange('country', val);
+                    handleSelectChange('stateProvince', '');
+                  }}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                    {getCountryDataList().map((c) => (
+                      <SelectItem key={c.iso2} value={c.iso2}>
+                        {c.name} ({c.iso2})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {formData.country &&
+              (() => {
+                const states = State.getStatesOfCountry(formData.country);
+                const label =
+                  formData.country === 'AE'
+                    ? 'Emirate'
+                    : ['US', 'IN', 'AU', 'MX', 'BR'].includes(formData.country)
+                      ? 'State'
+                      : formData.country === 'CA'
+                        ? 'Province'
+                        : 'City / District';
+                return (
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                      {label}
+                    </Label>
+                    {states.length > 0 ? (
+                      <Select
+                        value={formData.stateProvince ?? ''}
+                        onValueChange={(val) => handleSelectChange('stateProvince', val)}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                          <SelectValue placeholder={`Select ${label}`} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                          {states.map((s) => (
+                            <SelectItem key={s.isoCode} value={s.name}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        name="stateProvince"
+                        value={formData.stateProvince ?? ''}
+                        onChange={handleChange}
+                        placeholder={`Enter ${label}`}
+                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                      />
+                    )}
+                  </div>
+                );
+              })()}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Bank Name
+                </Label>
+                <Input
+                  name="bankName"
+                  value={formData.bankName ?? ''}
+                  onChange={handleChange}
+                  placeholder="e.g. Qatar National Bank"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Bank Account Number
+                </Label>
+                <Input
+                  name="bankAccountNumber"
+                  value={formData.bankAccountNumber ?? ''}
+                  onChange={handleChange}
+                  placeholder="Optional"
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
               </div>
             </div>
 

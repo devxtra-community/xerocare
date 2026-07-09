@@ -18,6 +18,7 @@ export interface StandardQuotationLineItem {
   unitPrice: number;
   specialPrice: number;
   vat: number;
+  vatPercent?: number;
   amount: number;
   /** Optional product image URL */
   productImage?: string;
@@ -61,6 +62,8 @@ export interface ProductStandardQuotationProps {
     subTotal: number;
     discountTotal?: number;
     vatTotal: number;
+    vatPercent?: number;
+    vatName?: string;
     total: number;
     payment: number;
     balanceDue: number;
@@ -697,7 +700,14 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
               bold: false,
               color: GOLD,
             },
-            { label: 'VAT AMOUNT', value: fmt(totals.vatTotal), num: totals.vatTotal, bold: false },
+            {
+              label: totals.vatPercent
+                ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                : totals.vatName || 'VAT AMOUNT',
+              value: fmt(totals.vatTotal),
+              num: totals.vatTotal,
+              bold: false,
+            },
             {
               label: 'GRAND TOTAL (INCLUDING VAT)',
               value: fmt(totals.total),

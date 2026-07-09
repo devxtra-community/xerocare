@@ -8,6 +8,8 @@ import {
   deleteCashBankAccount,
   getCashbookEntries,
   createCashbookEntry,
+  reverseCashbookEntry,
+  getOrphanedCashbookEntries,
   getDayBook,
   getExpenseEntries,
   createExpenseEntry,
@@ -65,8 +67,17 @@ import {
   reconcileAccount,
   getReconciliations,
   getChartOfAccounts,
+  getOutputTax,
+  getCountryTaxRules,
+  upsertCountryTaxRule,
+  deleteCountryTaxRule,
+  sendTaxDocumentEmail,
+  getVatRemittances,
+  createVatRemittance,
+  deleteVatRemittance,
 } from '../controllers/accountsController';
 import chequesRouter from './chequesRoutes';
+import guaranteeChequesRouter from './guaranteeChequesRoutes';
 
 const router = Router();
 
@@ -85,6 +96,9 @@ router.use((req, res, next) => {
 // Cheques sub-router (inherits auth + parseBranchFilter above)
 router.use('/cheques', chequesRouter);
 
+// Guarantee Cheques sub-router — separate from real cheques, no cashbook impact
+router.use('/guarantee-cheques', guaranteeChequesRouter);
+
 // Cash & Bank Accounts
 router.get('/cash-bank/summary', getCashBankSummary);
 router.post('/cash-bank/transfer', transferBetweenAccounts);
@@ -102,6 +116,7 @@ router.delete('/cash-bank/:id', deleteCashBankAccount);
 // Cashbook Entries
 router.get('/cashbook', getCashbookEntries);
 router.post('/cashbook', createCashbookEntry);
+router.post('/cashbook/:id/reverse', reverseCashbookEntry);
 
 // Day Book (per-day cash receipts/payments summary)
 router.get('/daybook', getDayBook);
@@ -169,7 +184,20 @@ router.get('/balance-sheet', getBalanceSheet);
 // Profit & Loss
 router.get('/profit-loss', getProfitLoss);
 
+// VAT Remittances
+router.get('/vat-remittances', getVatRemittances);
+router.post('/vat-remittances', createVatRemittance);
+router.delete('/vat-remittances/:id', deleteVatRemittance);
+
+// Tax Report
+router.get('/tax/output', getOutputTax);
+router.post('/tax/send-email', sendTaxDocumentEmail);
+router.get('/tax-rules', getCountryTaxRules);
+router.post('/tax-rules', upsertCountryTaxRule);
+router.delete('/tax-rules/:id', deleteCountryTaxRule);
+
 // Admin consolidated routes (ADMIN role only — branch security enforced in parseBranchFilter)
+router.get('/admin/orphaned-cashbook', getOrphanedCashbookEntries);
 router.get('/admin/exchange-rates', getExchangeRates);
 router.post('/admin/exchange-rates', setExchangeRate);
 router.get('/admin/consolidated-kpis', getConsolidatedKPIs);

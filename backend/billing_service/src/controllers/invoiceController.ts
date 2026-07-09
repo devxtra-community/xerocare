@@ -122,6 +122,8 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
 
       layoutId: req.body.layoutId,
       notes: req.body.notes,
+      customerCountry: req.body.customerCountry,
+      customerStateProvince: req.body.customerStateProvince,
     });
 
     return res.status(201).json({

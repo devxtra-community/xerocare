@@ -61,4 +61,7 @@ router.post('/spare-parts/:id/mark-damaged', controller.markSparePartDamaged);
 router.get('/tickets/:id/report', controller.generateReportPDF);
 router.get('/machine/:productId/history', controller.getMachineHistory);
 
+// Internal endpoint for Billing service — returns COGS and labour aggregates
+router.get('/internal/cogs-report', controller.getCogsReport);
+
 export default router;

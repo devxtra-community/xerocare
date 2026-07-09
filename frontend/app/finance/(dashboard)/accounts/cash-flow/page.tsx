@@ -137,28 +137,38 @@ export default function CashFlowPage() {
     staleTime: 60_000,
   });
 
+  // Fetch all entries up to period end — we split pre-period vs in-period in useMemo
   const {
-    data: cashbook = [],
+    data: allCashbook = [],
     isLoading: loadingCashbook,
     isError,
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['cf-cashbook', from, to],
-    queryFn: () => fetchCashbookEntries({ fromDate: from, toDate: to }),
+    queryKey: ['cf-cashbook-all', to],
+    queryFn: () => fetchCashbookEntries({ toDate: to }),
     staleTime: 60_000,
-    enabled: !!(from && to),
+    enabled: !!to,
   });
 
   const isLoading = loadingAccounts || loadingCashbook;
 
+  // Split into pre-period (for opening balance computation) and in-period entries
+  const { cashbook, prePeriodNet } = useMemo(() => {
+    const inPeriod = allCashbook.filter((e) => e.date >= from && e.date <= to);
+    let prePeriodNetVal = 0;
+    for (const e of allCashbook) {
+      if (e.date < from) {
+        prePeriodNetVal += e.entryType === 'RECEIPT' ? Number(e.amount) : -Number(e.amount);
+      }
+    }
+    return { cashbook: inPeriod, prePeriodNet: prePeriodNetVal };
+  }, [allCashbook, from, to]);
+
+  // Opening = fixed anchor + all cashbook entries BEFORE the period start
   const openingBalance = useMemo(
-    () => accounts.reduce((s, a) => s + Number(a.openingBalance), 0),
-    [accounts],
-  );
-  const closingBalance = useMemo(
-    () => accounts.reduce((s, a) => s + Number(a.currentBalance), 0),
-    [accounts],
+    () => accounts.reduce((s, a) => s + Number(a.openingBalance), 0) + prePeriodNet,
+    [accounts, prePeriodNet],
   );
 
   const { opReceipts, opPayments, invReceipts, invPayments, finReceipts, finPayments } =
@@ -196,6 +206,7 @@ export default function CashFlowPage() {
   const netInvesting = invReceipts - invPayments;
   const netFinancing = finReceipts - finPayments;
   const netChange = netOperating + netInvesting + netFinancing;
+  const closingBalance = openingBalance + netChange;
 
   const exportExcel = () => {
     const rows: (string | number)[][] = [

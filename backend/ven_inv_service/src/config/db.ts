@@ -803,6 +803,48 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         } catch (stockTransferErr) {
           logger.error('Failed to create stock_transfers schema:', stockTransferErr);
         }
+
+        // ─── Tax Report: vendor vat_number ────────────────────────────────────
+        await Source.query(`
+          ALTER TABLE vendors
+            ADD COLUMN IF NOT EXISTS vat_number VARCHAR(50) NULL;
+        `);
+        logger.info('Guaranteed vendors.vat_number column exists.');
+
+        // ─── Tax Report: purchase tax & snapshot columns ──────────────────────
+        await Source.query(`
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'purchases_purchasecategory_enum') THEN
+              CREATE TYPE purchases_purchasecategory_enum AS ENUM ('PRODUCT','SPARE_PART','SERVICE','OTHER');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'purchases_goodsorservice_enum') THEN
+              CREATE TYPE purchases_goodsorservice_enum AS ENUM ('GOODS','SERVICE');
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'purchases_taxstatus_enum') THEN
+              CREATE TYPE purchases_taxstatus_enum AS ENUM ('PENDING','RECORDED','FILED');
+            END IF;
+          END $$;
+
+          ALTER TABLE purchases
+            ADD COLUMN IF NOT EXISTS vendor_vat_number VARCHAR(50) NULL,
+            ADD COLUMN IF NOT EXISTS vendor_country VARCHAR(2) NULL,
+            ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3) NULL,
+            ADD COLUMN IF NOT EXISTS exchange_rate DECIMAL(12,6) NULL,
+            ADD COLUMN IF NOT EXISTS purchase_category purchases_purchasecategory_enum NULL,
+            ADD COLUMN IF NOT EXISTS taxable_amount DECIMAL(12,2) NULL,
+            ADD COLUMN IF NOT EXISTS tax_percent DECIMAL(5,2) NULL,
+            ADD COLUMN IF NOT EXISTS tax_name VARCHAR(50) NULL,
+            ADD COLUMN IF NOT EXISTS input_vat_amount DECIMAL(12,2) NULL,
+            ADD COLUMN IF NOT EXISTS reverse_charge_vat_amount DECIMAL(12,2) NULL,
+            ADD COLUMN IF NOT EXISTS import_invoice_no VARCHAR(100) NULL,
+            ADD COLUMN IF NOT EXISTS customs_entry_no VARCHAR(100) NULL,
+            ADD COLUMN IF NOT EXISTS customs_duty DECIMAL(12,2) NULL,
+            ADD COLUMN IF NOT EXISTS goods_or_service purchases_goodsorservice_enum NULL,
+            ADD COLUMN IF NOT EXISTS vat_claimable BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS tax_status purchases_taxstatus_enum NOT NULL DEFAULT 'PENDING';
+        `);
+        logger.info('Guaranteed purchases tax report columns exist.');
       }
       return Source;
     } catch (error: unknown) {

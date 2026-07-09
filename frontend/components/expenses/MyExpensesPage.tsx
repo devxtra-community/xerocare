@@ -29,6 +29,7 @@ import {
   type CreateExpenseRequestPayload,
 } from '@/lib/employeeExpenses';
 import { formatCurrency } from '@/lib/format';
+import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -529,35 +530,6 @@ function SubmitConfirmDialog({
   );
 }
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
-
-function SummaryCard({
-  title,
-  count,
-  total,
-  currency,
-  color,
-  icon,
-}: {
-  title: string;
-  count: number;
-  total: number;
-  currency: string;
-  color: string;
-  icon: React.ReactNode;
-}) {
-  return (
-    <div className={`rounded-xl border p-4 space-y-2 ${color}`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide opacity-70">{title}</span>
-        {icon}
-      </div>
-      <div className="text-2xl font-black">{count}</div>
-      <div className="text-xs font-medium opacity-80">{formatCurrency(total, currency)}</div>
-    </div>
-  );
-}
-
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function MyExpensesPage({ currency = 'AED' }: { currency?: string }) {
@@ -672,45 +644,30 @@ export default function MyExpensesPage({ currency = 'AED' }: { currency?: string
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <SummaryCard
+        <StatCard
           title="Draft"
-          count={summary.pending.count}
-          total={summary.pending.total}
-          currency={currency}
-          color="bg-gray-50 border-gray-200 text-gray-700"
-          icon={<Clock className="h-4 w-4 opacity-50" />}
+          value={summary.pending.count.toString()}
+          subtitle={formatCurrency(summary.pending.total, currency)}
         />
-        <SummaryCard
+        <StatCard
           title="Submitted"
-          count={summary.submitted.count}
-          total={summary.submitted.total}
-          currency={currency}
-          color="bg-blue-50 border-blue-200 text-blue-700"
-          icon={<Send className="h-4 w-4 opacity-50" />}
+          value={summary.submitted.count.toString()}
+          subtitle={formatCurrency(summary.submitted.total, currency)}
         />
-        <SummaryCard
+        <StatCard
           title="Approved"
-          count={summary.approved.count}
-          total={summary.approved.total}
-          currency={currency}
-          color="bg-emerald-50 border-emerald-200 text-emerald-700"
-          icon={<CheckCircle2 className="h-4 w-4 opacity-50" />}
+          value={summary.approved.count.toString()}
+          subtitle={formatCurrency(summary.approved.total, currency)}
         />
-        <SummaryCard
+        <StatCard
           title="Rejected"
-          count={summary.rejected.count}
-          total={summary.rejected.total}
-          currency={currency}
-          color="bg-red-50 border-red-200 text-red-700"
-          icon={<XCircle className="h-4 w-4 opacity-50" />}
+          value={summary.rejected.count.toString()}
+          subtitle={formatCurrency(summary.rejected.total, currency)}
         />
-        <SummaryCard
+        <StatCard
           title="Paid"
-          count={summary.paid.count}
-          total={summary.paid.total}
-          currency={currency}
-          color="bg-purple-50 border-purple-200 text-purple-700"
-          icon={<Banknote className="h-4 w-4 opacity-50" />}
+          value={summary.paid.count.toString()}
+          subtitle={formatCurrency(summary.paid.total, currency)}
         />
       </div>
 

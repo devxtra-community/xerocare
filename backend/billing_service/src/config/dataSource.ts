@@ -37,6 +37,9 @@ import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity';
 import { Cheque } from '../entities/chequeEntity';
 import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
+import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
+import { GuaranteeCheque } from '../entities/guaranteeChequeEntity';
+import { VatRemittance } from '../entities/vatRemittanceEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -78,6 +81,9 @@ export const Source = new DataSource({
     EmployeeExpenseRequest,
     Cheque,
     ChequeStatusHistory,
+    CountryTaxRule,
+    GuaranteeCheque,
+    VatRemittance,
   ],
   poolSize: 1,
   extra: {
@@ -281,6 +287,13 @@ async function runPreMigrations() {
       await client.query(`
         ALTER TABLE payment_transactions
         ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3);
+      `);
+
+      // --- Customer snapshot location columns ---
+      await client.query(`
+        ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS customer_country VARCHAR(100) NULL,
+        ADD COLUMN IF NOT EXISTS customer_state_province VARCHAR(100) NULL;
       `);
 
       // --- Quotation validity + service estimate columns ---
@@ -618,6 +631,22 @@ async function runPreMigrations() {
         "updatedAt" TIMESTAMP DEFAULT NOW()
       );
     `);
+    // vat_remittances: tracks VAT payments made to the tax authority
+    // VAT Payable = cumulative output VAT collected − SUM(amount_remitted)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vat_remittances (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "branchId" UUID NOT NULL,
+        "periodFrom" DATE NOT NULL,
+        "periodTo" DATE NOT NULL,
+        "amountRemitted" DECIMAL(14,2) NOT NULL,
+        "remittedDate" DATE NOT NULL,
+        "referenceNo" VARCHAR(100),
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+    `);
     logger.info('Finance accounts module tables created/verified.');
 
     // ─── Employee Expense Requests ─────────────────────────────────────────────
@@ -736,6 +765,81 @@ async function runPreMigrations() {
       );
     `);
     logger.info('Cheque management tables created.');
+
+    // ─── Tax Report: customer snapshot columns on invoices ─────────────────────
+    await client.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS customer_vat_number VARCHAR(50) NULL,
+        ADD COLUMN IF NOT EXISTS customer_country VARCHAR(2) NULL;
+    `);
+
+    // ─── Country Tax Rules table ───────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS country_tax_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        country VARCHAR(2) NOT NULL UNIQUE,
+        tax_name VARCHAR(50) NOT NULL,
+        default_tax_percent DECIMAL(5,2) NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    logger.info('Country tax rules table and invoice customer snapshot columns applied.');
+
+    // ─── customer_state_province column on invoices ────────────────────────────
+    await client.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS customer_state_province VARCHAR(100) NULL;
+    `);
+
+    // ─── Guarantee Cheques table ───────────────────────────────────────────────
+    // IMPORTANT: guarantee_cheques are collateral/security instruments, NOT cash-flow.
+    // They are never deposited and have NO cashbook_entries counterpart.
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'guarantee_cheques_status_enum') THEN
+          CREATE TYPE guarantee_cheques_status_enum AS ENUM ('RECEIVED', 'RETURNED');
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'guarantee_cheques_purpose_enum') THEN
+          CREATE TYPE guarantee_cheques_purpose_enum AS ENUM ('PERFORMANCE_SECURITY', 'OTHER');
+        END IF;
+      END $$;
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS guarantee_cheques (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id UUID NOT NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        contract_invoice_id UUID NULL,
+        contract_reference VARCHAR(255) NULL,
+        cheque_number VARCHAR(100) NOT NULL,
+        amount DECIMAL(12, 2) NOT NULL,
+        currency_code VARCHAR(3) NOT NULL DEFAULT 'AED',
+        bank_name VARCHAR(150) NOT NULL,
+        received_date DATE NOT NULL,
+        purpose guarantee_cheques_purpose_enum NOT NULL DEFAULT 'PERFORMANCE_SECURITY',
+        status guarantee_cheques_status_enum NOT NULL DEFAULT 'RECEIVED',
+        returned_date DATE NULL,
+        branch_id UUID NOT NULL,
+        created_by UUID NOT NULL,
+        notes TEXT NULL,
+        deleted_at TIMESTAMP NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    logger.info('Guarantee cheques table ensured.');
+
+    // ─── Cashbook: reversal tracking + PO orphan flag ─────────────────────────
+    await client.query(`
+      ALTER TABLE cashbook_entries
+        ADD COLUMN IF NOT EXISTS "isReversed" BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "reversedById" UUID DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS "isPoOrphaned" BOOLEAN DEFAULT NULL;
+    `);
+    logger.info('Cashbook reversal + PO-orphan columns ensured.');
 
     logger.info('Pre-migration enum values and tables added successfully');
 

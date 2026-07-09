@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Scale, RefreshCw } from 'lucide-react';
+import { Download, Scale, RefreshCw, AlertTriangle } from 'lucide-react';
 import { fetchBalanceSheet } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
@@ -66,6 +66,7 @@ export default function BalanceSheetPage() {
   const equity = bs?.equity;
   const isBalanced = bs?.balanced ?? false;
   const difference = bs?.difference ?? 0;
+  const dataWarnings = bs?.dataWarnings ?? [];
 
   const exportCSV = () => {
     if (!bs) return;
@@ -131,7 +132,16 @@ export default function BalanceSheetPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          <Button onClick={exportCSV} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+          <Button
+            onClick={exportCSV}
+            disabled={dataWarnings.length > 0}
+            title={
+              dataWarnings.length > 0
+                ? 'Export disabled: some figures may be incomplete due to service warnings'
+                : undefined
+            }
+            className="bg-blue-600 hover:bg-blue-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
         </div>
@@ -147,6 +157,23 @@ export default function BalanceSheetPage() {
         </div>
       ) : (
         <>
+          {dataWarnings.length > 0 && (
+            <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Data incomplete — some figures below may be understated. Export is disabled until
+                resolved.
+              </div>
+              <ul className="pl-6 list-disc space-y-0.5">
+                {dataWarnings.map((w, i) => (
+                  <li key={i} className="text-xs text-amber-700">
+                    {w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div
             className={`flex items-center gap-2 rounded-xl p-3 border ${isBalanced ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}
           >

@@ -14,6 +14,7 @@ import {
 } from '@/lib/employeeExpenses';
 import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -59,39 +60,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 function getCategoryLabel(value: string) {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value.replace(/_/g, ' ');
-}
-
-// ─── Summary Cards ────────────────────────────────────────────────────────────
-
-function SummaryCards({ summary }: { summary: ExpenseRequestSummary }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-yellow-700">
-          Pending Review
-        </p>
-        <p className="text-2xl font-black text-yellow-800">{summary.submitted.count}</p>
-        <p className="text-xs text-yellow-700">{formatCurrency(summary.submitted.total_amount)}</p>
-      </div>
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-          Approved This Month
-        </p>
-        <p className="text-2xl font-black text-emerald-800">{summary.approved.count}</p>
-        <p className="text-xs text-emerald-700">{formatCurrency(summary.approved.total_amount)}</p>
-      </div>
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Rejected</p>
-        <p className="text-2xl font-black text-red-800">{summary.rejected.count}</p>
-        <p className="text-xs text-red-700">{formatCurrency(summary.rejected.total_amount)}</p>
-      </div>
-      <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">Total Paid</p>
-        <p className="text-2xl font-black text-purple-800">{summary.paid.count}</p>
-        <p className="text-xs text-purple-700">{formatCurrency(summary.paid.total_amount)}</p>
-      </div>
-    </div>
-  );
 }
 
 // ─── View & Approve Modal ─────────────────────────────────────────────────────
@@ -507,7 +475,30 @@ export default function EmployeeRequestsTab() {
 
   return (
     <div className="space-y-6">
-      {summary && <SummaryCards summary={summary} />}
+      {summary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard
+            title="Pending Review"
+            value={summary.submitted.count.toString()}
+            subtitle={formatCurrency(summary.submitted.total_amount)}
+          />
+          <StatCard
+            title="Approved This Month"
+            value={summary.approved.count.toString()}
+            subtitle={formatCurrency(summary.approved.total_amount)}
+          />
+          <StatCard
+            title="Rejected"
+            value={summary.rejected.count.toString()}
+            subtitle={formatCurrency(summary.rejected.total_amount)}
+          />
+          <StatCard
+            title="Total Paid"
+            value={summary.paid.count.toString()}
+            subtitle={formatCurrency(summary.paid.total_amount)}
+          />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">

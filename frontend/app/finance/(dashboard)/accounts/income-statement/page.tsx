@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw, AlertTriangle } from 'lucide-react';
 import { fetchProfitLoss } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
@@ -115,6 +115,7 @@ export default function IncomeStatementPage() {
   const totalTax = pl?.totalTax ?? 0;
   const grossProfit = totalRevenue - totalExpenses;
   const margin = pl?.margin ?? 0;
+  const dataWarnings = pl?.dataWarnings ?? [];
 
   const exportExcel = () => {
     if (!pl) return;
@@ -190,8 +191,13 @@ export default function IncomeStatementPage() {
           </Button>
           <Button
             onClick={exportExcel}
-            disabled={!pl}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            disabled={!pl || dataWarnings.length > 0}
+            title={
+              dataWarnings.length > 0
+                ? 'Export disabled: some figures may be incomplete due to service warnings'
+                : undefined
+            }
+            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" /> Export Excel
           </Button>
@@ -210,6 +216,23 @@ export default function IncomeStatementPage() {
         </div>
       ) : (
         <>
+          {dataWarnings.length > 0 && (
+            <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Data incomplete — some expense figures may be understated. Export is disabled until
+                resolved.
+              </div>
+              <ul className="pl-6 list-disc space-y-0.5">
+                {dataWarnings.map((w, i) => (
+                  <li key={i} className="text-xs text-amber-700">
+                    {w}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
             <StatCard
               title="Total Revenue"

@@ -5,11 +5,9 @@ import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { ExpenseEntry } from '../entities/expenseEntryEntity';
 import { ManualReceivable } from '../entities/manualReceivableEntity';
 import { ManualPayable } from '../entities/manualPayableEntity';
-import { AssetDepreciationRegister } from '../entities/assetDepreciationRegisterEntity';
-import { EquityEntry } from '../entities/equityEntryEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
-import { calculateDepreciation } from '../utils/depreciation';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
+import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
 
 // Admin-only guard
 function requireAdmin(req: Request) {
@@ -53,13 +51,16 @@ export const setExchangeRate = async (req: Request, res: Response, next: NextFun
   }
 };
 
-// Converts amount from one currency to AED using stored rates (default: 1 QAR = 0.99 AED)
+// Converts amount from one currency to AED using stored rates (returns null when rate is missing).
 async function convertToAED(amount: number, fromCurrency: string): Promise<number> {
   if (fromCurrency === 'AED' || !fromCurrency) return amount;
   const repo = Source.getRepository(ExchangeRate);
   const rate = await repo.findOne({ where: { fromCurrency, toCurrency: 'AED' } });
-  const r = rate ? Number(rate.rate) : 0.99;
-  return amount * r;
+  if (!rate) {
+    console.warn(`[Admin] No exchange rate found for ${fromCurrency}→AED — excluding from totals`);
+    return 0;
+  }
+  return amount * Number(rate.rate);
 }
 
 // ─── CONSOLIDATED KPIs ────────────────────────────────────────────────────────
@@ -118,7 +119,6 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
     const expQb = expRepo.createQueryBuilder('e').where('e.date >= :monthStart', { monthStart });
     applyBranchQB(expQb as never, 'e', bf);
     const expenses = await expQb.getMany();
-    const totalExpenses = expenses.reduce((s, e) => s + Number(e.netAmount ?? 0), 0);
 
     // Aggregate per branch
     const branchMap: Record<
@@ -135,17 +135,26 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
     for (const r of receivables) {
       if (!branchMap[r.branchId])
         branchMap[r.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      branchMap[r.branchId].receivable += Number(r.amount) - Number(r.amountPaid ?? 0);
+      branchMap[r.branchId].receivable += await convertToAED(
+        Number(r.amount) - Number(r.amountPaid ?? 0),
+        r.currency ?? 'AED',
+      );
     }
     for (const p of payables) {
       if (!branchMap[p.branchId])
         branchMap[p.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      branchMap[p.branchId].payable += Number(p.amount) - Number(p.amountPaid ?? 0);
+      branchMap[p.branchId].payable += await convertToAED(
+        Number(p.amount) - Number(p.amountPaid ?? 0),
+        p.currency ?? 'AED',
+      );
     }
     for (const e of expenses) {
       if (!branchMap[e.branchId])
         branchMap[e.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      branchMap[e.branchId].expenses += Number(e.netAmount ?? 0);
+      branchMap[e.branchId].expenses += await convertToAED(
+        Number(e.netAmount ?? 0),
+        e.currency ?? 'AED',
+      );
     }
 
     const perBranch = Object.entries(branchMap).map(([branchId, v]) => ({
@@ -161,7 +170,7 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
         totalBank,
         totalReceivable,
         totalPayable,
-        netProfit: -totalExpenses, // simplified; real P&L needs revenue
+        netProfit: null, // use /consolidated-pl for full P&L including revenue
         overdueReceivables,
         perBranch,
       },
@@ -238,22 +247,31 @@ export const getBranchPerformanceTable = async (
 
     for (const e of expenses) {
       ensureBranch(e.branchId);
-      branchData[e.branchId].expenses += Number(e.netAmount ?? 0);
+      branchData[e.branchId].expenses += await convertToAED(
+        Number(e.netAmount ?? 0),
+        e.currency ?? 'AED',
+      );
     }
     for (const r of receivables) {
       ensureBranch(r.branchId);
       const outstanding = Number(r.amount) - Number(r.amountPaid ?? 0);
-      branchData[r.branchId].receivables += outstanding;
+      branchData[r.branchId].receivables += await convertToAED(outstanding, r.currency ?? 'AED');
       const diffDays = Math.floor((today.getTime() - new Date(r.dueDate).getTime()) / 86400000);
       if (diffDays > 90) branchData[r.branchId].overdueCount++;
     }
     for (const p of payables) {
       ensureBranch(p.branchId);
-      branchData[p.branchId].payables += Number(p.amount) - Number(p.amountPaid ?? 0);
+      branchData[p.branchId].payables += await convertToAED(
+        Number(p.amount) - Number(p.amountPaid ?? 0),
+        p.currency ?? 'AED',
+      );
     }
     for (const a of accounts) {
       ensureBranch(a.branchId);
-      branchData[a.branchId].cash += Number(a.currentBalance);
+      branchData[a.branchId].cash += await convertToAED(
+        Number(a.currentBalance),
+        a.currency ?? 'AED',
+      );
     }
 
     const rows = Object.entries(branchData).map(([branchId, d]) => {
@@ -294,8 +312,8 @@ export const getBranchComparison = async (req: Request, res: Response, next: Nex
     for (const e of expenses) {
       const month = String(e.date).slice(0, 7);
       if (!monthBranchMap[month]) monthBranchMap[month] = {};
-      monthBranchMap[month][e.branchId] =
-        (monthBranchMap[month][e.branchId] ?? 0) + Number(e.netAmount ?? 0);
+      const aedAmount = await convertToAED(Number(e.netAmount ?? 0), e.currency ?? 'AED');
+      monthBranchMap[month][e.branchId] = (monthBranchMap[month][e.branchId] ?? 0) + aedAmount;
       branches.add(e.branchId);
     }
 
@@ -310,8 +328,11 @@ export const getBranchComparison = async (req: Request, res: Response, next: Nex
     const receivables = await rcvQb.getMany();
     const receivablesByBranch: Record<string, number> = {};
     for (const r of receivables) {
-      receivablesByBranch[r.branchId] =
-        (receivablesByBranch[r.branchId] ?? 0) + (Number(r.amount) - Number(r.amountPaid ?? 0));
+      const outstanding = await convertToAED(
+        Number(r.amount) - Number(r.amountPaid ?? 0),
+        r.currency ?? 'AED',
+      );
+      receivablesByBranch[r.branchId] = (receivablesByBranch[r.branchId] ?? 0) + outstanding;
     }
     const receivableChart = Object.entries(receivablesByBranch).map(([branchId, value]) => ({
       branchId,
@@ -325,7 +346,9 @@ export const getBranchComparison = async (req: Request, res: Response, next: Nex
     const accounts = await cbQb.getMany();
     const cashByBranch: Record<string, number> = {};
     for (const a of accounts) {
-      cashByBranch[a.branchId] = (cashByBranch[a.branchId] ?? 0) + Number(a.currentBalance);
+      cashByBranch[a.branchId] =
+        (cashByBranch[a.branchId] ?? 0) +
+        (await convertToAED(Number(a.currentBalance), a.currency ?? 'AED'));
     }
     const cashChart = Object.entries(cashByBranch)
       .map(([branchId, value]) => ({ branchId, value }))
@@ -354,35 +377,38 @@ export const getConsolidatedPL = async (req: Request, res: Response, next: NextF
     const { from, to } = req.query;
     const fromDate = (from as string) || `${new Date().getFullYear()}-01-01`;
     const toDate = (to as string) || new Date().toISOString().slice(0, 10);
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
-    const expRepo = Source.getRepository(ExpenseEntry);
-    const qb = expRepo
-      .createQueryBuilder('e')
-      .where('e.date >= :fromDate AND e.date <= :toDate', { fromDate, toDate });
-    applyBranchQB(qb as never, 'e', bf);
-    const expenses = await qb.getMany();
-
-    const catMap: Record<string, number> = {};
-    const branchMap: Record<string, number> = {};
-    let totalExpenses = 0;
-
-    for (const e of expenses) {
-      catMap[e.category] = (catMap[e.category] ?? 0) + Number(e.netAmount ?? 0);
-      branchMap[e.branchId] = (branchMap[e.branchId] ?? 0) + Number(e.netAmount ?? 0);
-      totalExpenses += Number(e.netAmount ?? 0);
-    }
-
-    const byCategory = Object.entries(catMap).map(([category, amount]) => ({ category, amount }));
-    const byBranch = Object.entries(branchMap).map(([branchId, amount]) => ({ branchId, amount }));
+    const pl = await computeProfitAndLoss(Source, bf, fromDate, toDate, 'AED', INV_URL);
 
     res.json({
       success: true,
       data: {
         period: { from: fromDate, to: toDate },
-        totalExpenses,
-        byCategory,
-        byBranch,
-        grossProfit: -totalExpenses, // Will be updated once revenue API exists
+        totalRevenue: +pl.totalRevenue.toFixed(2),
+        totalExpenses: +pl.totalExpenses.toFixed(2),
+        grossProfit: +pl.grossProfit.toFixed(2),
+        netProfit: +pl.netProfit.toFixed(2),
+        revenueBreakdown: {
+          rentalRevenue: +pl.rentalRevenue.toFixed(2),
+          leaseRevenue: +pl.leaseRevenue.toFixed(2),
+          salesRevenue: +pl.salesRevenue.toFixed(2),
+          serviceRevenue: +pl.serviceRevenue.toFixed(2),
+          amcSmaRevenue: +pl.amcSmaRevenue.toFixed(2),
+          usageRevenue: +pl.usageRevenue.toFixed(2),
+          sparePartSalesRevenue: +pl.sparePartSalesRevenue.toFixed(2),
+        },
+        expenseBreakdown: {
+          costOfParts: +pl.costOfParts.toFixed(2),
+          labourCost: +pl.labourCost.toFixed(2),
+          depreciationExpense: +pl.depreciationExpense.toFixed(2),
+          vendorPurchases: +pl.vendorPurchases.toFixed(2),
+          salaryExpense: +pl.salaryExpense.toFixed(2),
+          otherExpenses: +pl.otherExpenses.toFixed(2),
+        },
+        currency: 'AED',
+        dataWarnings: pl.dataWarnings,
+        currencyWarnings: pl.currencyWarnings,
       },
     });
   } catch (err) {
@@ -400,95 +426,45 @@ export const getConsolidatedBalanceSheet = async (
   try {
     requireAdmin(req);
     const bf = req.branchFilter ?? [];
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
-    // Cash
-    const cbRepo = Source.getRepository(CashBankAccount);
-    const cbQb = cbRepo.createQueryBuilder('a').where('a.isActive = :active', { active: true });
-    applyBranchQB(cbQb as never, 'a', bf);
-    const accounts = await cbQb.getMany();
-    const cashTotal = accounts.reduce((s, a) => s + Number(a.currentBalance), 0);
-
-    // Fixed Assets NBV
-    const assetRepo = Source.getRepository(AssetDepreciationRegister);
-    const assetQb = assetRepo.createQueryBuilder('a').where('a.status = :s', { s: 'ACTIVE' });
-    applyBranchQB(assetQb as never, 'a', bf);
-    const assets = await assetQb.getMany();
-    let fixedNBV = 0;
-    for (const a of assets) {
-      const dep = calculateDepreciation({
-        purchasePrice: Number(a.purchasePrice),
-        salvageValue: Number(a.salvageValue),
-        usefulLifeMonths: a.usefulLifeMonths,
-        annualDepreciationPct: Number(a.annualDepreciationPct),
-        method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(a.purchaseDate),
-      });
-      fixedNBV += dep.nbv;
-    }
-
-    // Receivables
-    const rcvRepo = Source.getRepository(ManualReceivable);
-    const rcvQb = rcvRepo.createQueryBuilder('r').where('r.status != :s', { s: 'PAID' });
-    applyBranchQB(rcvQb as never, 'r', bf);
-    const receivables = await rcvQb.getMany();
-    const rcvTotal = receivables.reduce(
-      (s, r) => s + (Number(r.amount) - Number(r.amountPaid ?? 0)),
-      0,
+    const bs = await computeBalanceSheet(
+      Source,
+      bf,
+      new Date().toISOString().slice(0, 10),
+      'AED',
+      INV_URL,
     );
-
-    // Payables
-    const payRepo = Source.getRepository(ManualPayable);
-    const payQb = payRepo.createQueryBuilder('p').where('p.status != :s', { s: 'PAID' });
-    applyBranchQB(payQb as never, 'p', bf);
-    const payables = await payQb.getMany();
-    const payTotal = payables.reduce(
-      (s, p) => s + (Number(p.amount) - Number(p.amountPaid ?? 0)),
-      0,
-    );
-
-    // Equity
-    const eqRepo = Source.getRepository(EquityEntry);
-    const eqQb = eqRepo.createQueryBuilder('e');
-    applyBranchQB(eqQb as never, 'e', bf);
-    const eqEntries = await eqQb.getMany();
-    const positive = [
-      'SHARE_CAPITAL',
-      'RETAINED_EARNINGS',
-      'RESERVES',
-      'OWNER_CONTRIBUTION',
-      'PROFIT_TRANSFER',
-    ];
-    let netEquity = 0;
-    for (const e of eqEntries) {
-      netEquity += positive.includes(e.type) ? Number(e.amount) : -Number(e.amount);
-    }
-
-    const totalAssets = cashTotal + fixedNBV + rcvTotal;
-    const totalLiabilities = payTotal;
-    const totalLiabEquity = totalLiabilities + netEquity;
-    const difference = Math.abs(totalAssets - totalLiabEquity);
-
-    // Per-branch breakdown
-    const branchAssets: Record<string, number> = {};
-    for (const a of accounts) {
-      branchAssets[a.branchId] = (branchAssets[a.branchId] ?? 0) + Number(a.currentBalance);
-    }
 
     res.json({
       success: true,
       data: {
         assets: {
-          cash: cashTotal,
-          fixedAssets: fixedNBV,
-          receivables: rcvTotal,
-          total: totalAssets,
+          cash: +(bs.cashInHand + bs.cashAtBank).toFixed(2),
+          fixedAssets: +bs.equipmentNBV.toFixed(2),
+          receivables: +bs.accountsReceivable.toFixed(2),
+          sparePartsInventory: +bs.sparePartsInventory.toFixed(2),
+          total: +bs.totalAssets.toFixed(2),
         },
-        liabilities: { payables: payTotal, total: totalLiabilities },
-        equity: { netEquity, total: netEquity },
-        totalLiabilitiesAndEquity: totalLiabEquity,
-        difference,
-        balanced: difference < 1,
-        perBranch: Object.entries(branchAssets).map(([branchId, cash]) => ({ branchId, cash })),
+        liabilities: {
+          payables: +bs.accountsPayable.toFixed(2),
+          accruedExpenses: +bs.accruedExpenses.toFixed(2),
+          vatPayable: +bs.vatPayable.toFixed(2),
+          total: +bs.totalLiabilities.toFixed(2),
+        },
+        equity: {
+          ownerCapital: +bs.ownerCapital.toFixed(2),
+          retainedEarnings: +bs.retainedEarnings.toFixed(2),
+          reserves: +bs.reserves.toFixed(2),
+          dividends: +bs.dividends.toFixed(2),
+          total: +bs.totalEquity.toFixed(2),
+        },
+        totalLiabilitiesAndEquity: +bs.totalLiabilitiesAndEquity.toFixed(2),
+        difference: +bs.difference.toFixed(2),
+        balanced: bs.isBalanced,
+        currency: 'AED',
+        dataWarnings: bs.dataWarnings,
+        currencyWarnings: bs.currencyWarnings,
       },
     });
   } catch (err) {

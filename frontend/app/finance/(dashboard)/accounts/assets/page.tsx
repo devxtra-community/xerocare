@@ -216,6 +216,23 @@ function AddAssetModal({
   const currentUser = getUserFromToken();
   const todayStr = new Date().toISOString().slice(0, 10);
 
+  // Fetch branch name from API using branchId in JWT
+  const { data: branchData } = useQuery<{ name: string; id: string } | null>({
+    queryKey: ['branch-detail', currentUser?.branchId],
+    queryFn: () =>
+      currentUser?.branchId
+        ? api.get(`/i/branch/${currentUser.branchId}`).then((r) => r.data?.data ?? null)
+        : Promise.resolve(null),
+    enabled: !!currentUser?.branchId,
+    staleTime: 600_000,
+  });
+
+  const branchDisplayName = branchData?.name
+    ? branchData.name
+    : currentUser?.branchId
+      ? `Branch ${currentUser.branchId.slice(0, 8)}…`
+      : 'Your Branch';
+
   // Asset type selection (only for new assets)
   const [assetType, setAssetType] = useState<'PRINTER_PRODUCT' | 'MANUAL_ASSET'>(
     asset?.assetType === 'MANUAL_ASSET' ? 'MANUAL_ASSET' : 'PRINTER_PRODUCT',
@@ -246,27 +263,39 @@ function AddAssetModal({
     [allModels, selectedBrandId],
   );
 
-  // Fetch AVAILABLE products for selected model
-  const { data: availableProducts = [] } = useQuery<
+  // Fetch AVAILABLE + RETURNED products for selected model (returned units also need depreciation)
+  const { data: availableProductsRaw = [] } = useQuery<
     {
       id: string;
       serial_no: string;
       brand: string;
       product_status: string;
+      purchase_price?: number | string;
       model_id: string;
       model?: { model_name: string; brand_id: string };
     }[]
   >({
-    queryKey: ['products-available', selectedModelId],
-    queryFn: () =>
-      api
-        .get('/i/products', {
-          params: { modelId: selectedModelId, status: 'AVAILABLE', limit: 100 },
-        })
-        .then((r) => r.data?.data ?? r.data ?? []),
+    queryKey: ['products-for-asset', selectedModelId],
+    queryFn: async () => {
+      const [avail, returned] = await Promise.all([
+        api
+          .get('/i/products', {
+            params: { modelId: selectedModelId, status: 'AVAILABLE', limit: 100 },
+          })
+          .then((r) => r.data?.data ?? r.data ?? []),
+        api
+          .get('/i/products', {
+            params: { modelId: selectedModelId, status: 'RETURNED', limit: 100 },
+          })
+          .then((r) => r.data?.data ?? r.data ?? []),
+      ]);
+      return [...avail, ...returned];
+    },
     enabled: !!selectedModelId,
     staleTime: 60_000,
   });
+
+  const availableProducts = availableProductsRaw;
 
   // Form state
   const [form, setForm] = useState({
@@ -290,7 +319,7 @@ function AddAssetModal({
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  // When a product is selected — auto-fill brand/model and look up dep rule
+  // When a product is selected — auto-fill brand/model, purchase price, and look up dep rule
   const onProductSelect = (productId: string) => {
     const product = availableProducts.find((p) => p.id === productId);
     if (!product) return;
@@ -302,6 +331,12 @@ function AddAssetModal({
     const brandRule = brandRules.find((r) => r.brandId === brandId);
     const rule = modelRule ?? brandRule;
 
+    // Auto-fill purchase price from product if available
+    const autoPurchasePrice =
+      product.purchase_price != null && Number(product.purchase_price) > 0
+        ? Number(product.purchase_price).toString()
+        : '';
+
     setForm((f) => ({
       ...f,
       productId,
@@ -309,6 +344,7 @@ function AddAssetModal({
       modelId,
       assetCategory: 'PRINTER_EQUIPMENT',
       assetName: '',
+      purchasePrice: autoPurchasePrice || f.purchasePrice,
       ...(rule
         ? {
             annualDepreciationPct: rule.annualDepreciationPct.toString(),
@@ -405,11 +441,7 @@ function AddAssetModal({
           {/* Branch info (read-only from JWT) */}
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
             <span className="text-sm text-blue-600">Branch:</span>
-            <span className="text-sm font-medium text-blue-800">
-              {currentUser?.branchId
-                ? `Branch ${currentUser.branchId.slice(0, 8)}…`
-                : 'Your Branch'}
-            </span>
+            <span className="text-sm font-medium text-blue-800">{branchDisplayName}</span>
             <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
           </div>
 
@@ -541,7 +573,7 @@ function AddAssetModal({
                   </label>
                   {availableProducts.length === 0 ? (
                     <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700">
-                      No available products for this model in your branch.
+                      No available or returned products for this model in your branch.
                     </div>
                   ) : (
                     <Select value={form.productId} onValueChange={onProductSelect}>
@@ -552,7 +584,15 @@ function AddAssetModal({
                         {availableProducts.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
                             <span className="font-mono">{p.serial_no}</span>
-                            <span className="text-xs text-gray-400 ml-2">({p.product_status})</span>
+                            <span
+                              className={`text-xs ml-2 ${
+                                p.product_status === 'RETURNED'
+                                  ? 'text-orange-500'
+                                  : 'text-gray-400'
+                              }`}
+                            >
+                              ({p.product_status})
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>

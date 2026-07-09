@@ -8,6 +8,11 @@ export interface Customer {
   address?: string;
   branch_id?: string;
   location?: string;
+  vatNumber?: string | null;
+  country?: string | null;
+  stateProvince?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
 
   isActive: boolean;
   createdAt: string;
@@ -66,6 +71,11 @@ export interface CreateCustomerData {
   source?: string;
   totalPurchase?: number;
   status?: 'ACTIVE' | 'INACTIVE';
+  vatNumber?: string;
+  country?: string;
+  stateProvince?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
 }
 
 /**

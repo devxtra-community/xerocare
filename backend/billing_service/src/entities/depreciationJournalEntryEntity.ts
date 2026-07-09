@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Unique } from 'typeorm';
 
 @Entity('depreciation_journal_entries')
+@Unique(['periodYear', 'periodMonth', 'branchId'])
 export class DepreciationJournalEntry {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

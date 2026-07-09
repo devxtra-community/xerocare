@@ -63,6 +63,17 @@ export class CashbookEntry {
   @Column({ type: 'uuid', nullable: true })
   sourceId?: string;
 
+  // Reversal tracking — manual entries only
+  @Column({ type: 'boolean', default: false })
+  isReversed!: boolean;
+
+  @Column({ type: 'uuid', nullable: true })
+  reversedById?: string;
+
+  // Cross-service orphan flag — set by nightly reconciliation cron for linked_po_id entries
+  @Column({ type: 'boolean', nullable: true, default: null })
+  isPoOrphaned?: boolean | null;
+
   @Column()
   createdBy!: string;
 

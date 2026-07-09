@@ -29,6 +29,21 @@ export class Customer {
   @Column({ type: 'text', nullable: true })
   address!: string | null;
 
+  @Column({ name: 'vat_number', type: 'varchar', length: 50, nullable: true })
+  vatNumber?: string | null;
+
+  @Column({ name: 'country', type: 'varchar', length: 2, nullable: true })
+  country?: string | null;
+
+  @Column({ name: 'state_province', type: 'varchar', length: 100, nullable: true })
+  stateProvince?: string | null;
+
+  @Column({ name: 'bank_name', type: 'varchar', length: 100, nullable: true })
+  bankName?: string | null;
+
+  @Column({ name: 'bank_account_number', type: 'varchar', length: 50, nullable: true })
+  bankAccountNumber?: string | null;
+
   @Column({ default: true })
   isActive!: boolean;
 

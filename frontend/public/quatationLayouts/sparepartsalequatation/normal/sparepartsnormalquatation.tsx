@@ -12,6 +12,7 @@ export interface QuotationLineItem {
   specialPrice: number;
   amount: number;
   vat: number;
+  vatPercent?: number;
   productImage?: string;
   productName?: string;
   discount?: number;
@@ -52,6 +53,8 @@ export interface SparePartsNormalQuotationProps {
   totals?: {
     subTotal: number;
     vatTotal: number;
+    vatPercent?: number;
+    vatName?: string;
     total: number;
     payment: number;
     balanceDue: number;
@@ -314,7 +317,9 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               <th style={thStyle('center')}>Qty</th>
               <th style={thStyle('center')}>Unit Price</th>
               <th style={thStyle('center')}>Discount</th>
-              <th style={thStyle('center')}>VAT</th>
+              <th style={thStyle('center')}>
+                {lineItems[0]?.vatPercent ? `VAT (${lineItems[0].vatPercent}%)` : 'VAT'}
+              </th>
               <th style={{ ...thStyle('right') }}>Amount</th>
             </tr>
           </thead>
@@ -454,7 +459,13 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                   },
                 ]
               : []),
-            { label: 'VAT Amount', value: totals.vatTotal, num: totals.vatTotal },
+            {
+              label: totals.vatPercent
+                ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                : totals.vatName || 'VAT Amount',
+              value: totals.vatTotal,
+              num: totals.vatTotal,
+            },
             {
               label: 'Grand Total (Including VAT)',
               value: totals.total,

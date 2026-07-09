@@ -9,6 +9,7 @@ import {
   fetchBranchComparison,
   fetchConsolidatedPL,
 } from '@/lib/finance/accountsApi';
+import { AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart } from '@/components/accounts/charts';
@@ -52,8 +53,11 @@ function AccountsOverviewContent() {
     queryFn: () =>
       fetchConsolidatedPL(params) as Promise<{
         monthly: { month: string; income: number; expenses: number }[];
+        dataWarnings?: string[];
       }>,
   });
+
+  const dataWarnings: string[] = pl?.dataWarnings ?? [];
 
   return (
     <div className="bg-gray-50 min-h-full p-6 space-y-6">
@@ -65,6 +69,23 @@ function AccountsOverviewContent() {
       </div>
 
       <BranchFilterBar showPeriod />
+
+      {dataWarnings.length > 0 && (
+        <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
+          <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Consolidated figures are incomplete — one or more services were unavailable. Figures
+            shown may be understated.
+          </div>
+          <ul className="pl-6 list-disc space-y-0.5">
+            {dataWarnings.map((w, i) => (
+              <li key={i} className="text-xs text-amber-700">
+                {w}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* KPI Cards */}
       {kpiLoading ? (
@@ -231,6 +252,7 @@ function AccountsOverviewContent() {
           { label: 'Balance Sheet', href: '/admin/accounts/cash-bank' },
           { label: 'Receivables', href: '/admin/accounts/receivable' },
           { label: 'Reports Hub', href: '/admin/accounts/reports' },
+          { label: 'Data Integrity', href: '/admin/accounts/data-integrity' },
         ].map((l) => (
           <Link
             key={l.label}

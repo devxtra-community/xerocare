@@ -18,6 +18,7 @@ export interface PremiumQuotationLineItem {
   unitPrice: number;
   specialPrice: number;
   vat: number;
+  vatPercent?: number;
   amount: number;
   /** Optional product image URL */
   productImage?: string;
@@ -53,6 +54,8 @@ export interface ProductPremiumQuotationProps {
     subTotal: number;
     discountTotal?: number;
     vatTotal: number;
+    vatPercent?: number;
+    vatName?: string;
     total: number;
     payment: number;
     balanceDue: number;
@@ -725,7 +728,11 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
               >
                 <span>Subtotal (Before VAT):</span>
                 <span>Discount:</span>
-                <span>VAT Amount:</span>
+                <span>
+                  {totals.vatPercent
+                    ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%):`
+                    : `${totals.vatName || 'VAT Amount'}:`}
+                </span>
               </div>
               <div
                 style={{

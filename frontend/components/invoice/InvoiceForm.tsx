@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createInvoice, CreateInvoicePayload } from '@/lib/invoice';
 import { CustomerSelect, SelectableCustomer } from './CustomerSelect';
@@ -14,6 +14,15 @@ import { Trash2, Receipt, Users, Package, Save, ArrowLeft, Scan } from 'lucide-r
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { getCountryDataList } from 'countries-list';
+import { State } from 'country-state-city';
 import {
   Table,
   TableBody,
@@ -45,9 +54,24 @@ export default function InvoiceForm() {
   const [customerId, setCustomerId] = useState<string>(preselectedCustomerId || '');
 
   const [customer, setCustomer] = useState<SelectableCustomer | undefined>();
+  const [txnCountry, setTxnCountry] = useState<string>('');
+  const [txnStateProvince, setTxnStateProvince] = useState<string>('');
   const [items, setItems] = useState<InvoiceItemRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanQuery, setScanQuery] = useState('');
+
+  const txnStates = useMemo(
+    () => (txnCountry ? State.getStatesOfCountry(txnCountry) : []),
+    [txnCountry],
+  );
+  const subdivisionLabel =
+    txnCountry === 'AE'
+      ? 'Emirate'
+      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(txnCountry)
+        ? 'State'
+        : txnCountry === 'CA'
+          ? 'Province'
+          : 'City / District';
 
   const selectedQuantities = React.useMemo(() => {
     const map: Record<string, number> = {};
@@ -222,6 +246,8 @@ export default function InvoiceForm() {
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
         })),
+        customerCountry: txnCountry || undefined,
+        customerStateProvince: txnStateProvince || undefined,
       };
 
       await createInvoice(payload);
@@ -293,6 +319,8 @@ export default function InvoiceForm() {
                 onChange={(id, cust) => {
                   setCustomerId(id);
                   setCustomer(cust);
+                  setTxnCountry((cust?.country as string) ?? '');
+                  setTxnStateProvince((cust?.stateProvince as string) ?? '');
                 }}
               />
               {customer && (
@@ -302,6 +330,64 @@ export default function InvoiceForm() {
                   <div className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-tight">
                     VIP Status: Active
                   </div>
+                </div>
+              )}
+              {customer && (
+                <div className="mt-4 space-y-3 pt-3 border-t border-slate-100">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Transaction Location
+                  </p>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase">
+                      Country
+                    </label>
+                    <Select
+                      value={txnCountry}
+                      onValueChange={(val) => {
+                        setTxnCountry(val);
+                        setTxnStateProvince('');
+                      }}
+                    >
+                      <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm">
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                        {getCountryDataList().map((c) => (
+                          <SelectItem key={c.iso2} value={c.iso2}>
+                            {c.name} ({c.iso2})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {txnCountry && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase">
+                        {subdivisionLabel}
+                      </label>
+                      {txnStates.length > 0 ? (
+                        <Select value={txnStateProvince} onValueChange={setTxnStateProvince}>
+                          <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm">
+                            <SelectValue placeholder={`Select ${subdivisionLabel}`} />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                            {txnStates.map((s) => (
+                              <SelectItem key={s.isoCode} value={s.name}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={txnStateProvince}
+                          onChange={(e) => setTxnStateProvince(e.target.value)}
+                          placeholder={`Enter ${subdivisionLabel}`}
+                          className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

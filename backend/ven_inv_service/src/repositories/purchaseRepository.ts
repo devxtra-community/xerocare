@@ -86,6 +86,51 @@ export class PurchaseRepository {
       purchase.totalAmount = totalAmount;
       purchase.createdBy = data.createdBy;
 
+      // Copy purchase_origin from lot (was always in entity but never populated — bug fix)
+      purchase.purchaseOrigin = lot.purchaseOrigin;
+
+      // Vendor snapshot
+      purchase.vendorVatNumber = lot.vendor?.vatNumber ?? null;
+      purchase.vendorCountry = lot.vendor?.countryCode ?? null;
+
+      // Currency inherited from lot
+      purchase.currencyCode = lot.currencyCode ?? null;
+      purchase.exchangeRate = lot.exchangeRateSnapshot ? Number(lot.exchangeRateSnapshot) : null;
+
+      // taxableAmount: all cost components except documentationFee (non-taxable admin charge)
+      purchase.taxableAmount =
+        purchaseAmount +
+        Number(data.labourCost) +
+        Number(data.handlingFee) +
+        Number(data.transportationCost) +
+        Number(data.shippingCost) +
+        Number(data.groundfieldCost);
+
+      // Tax rate and name (caller may supply from branch config or country_tax_rules)
+      purchase.taxPercent = data.taxPercent != null ? Number(data.taxPercent) : null;
+      purchase.taxName = data.taxName ?? null;
+
+      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
+        if (purchase.purchaseOrigin === 'DOMESTIC') {
+          purchase.inputVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.reverseChargeVatAmount = null;
+        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
+          purchase.reverseChargeVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.inputVatAmount = null;
+        }
+      }
+
+      // Optional fields
+      purchase.purchaseCategory = data.purchaseCategory ?? null;
+      purchase.importInvoiceNo = data.importInvoiceNo ?? null;
+      purchase.customsEntryNo = data.customsEntryNo ?? null;
+      purchase.customsDuty = data.customsDuty != null ? Number(data.customsDuty) : null;
+      purchase.goodsOrService = data.goodsOrService ?? null;
+      purchase.vatClaimable = data.vatClaimable !== false; // default true
+      purchase.taxStatus = 'PENDING';
+
       return await manager.save(Purchase, purchase);
     });
   }

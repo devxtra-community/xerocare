@@ -24,6 +24,7 @@ import purchaseRouter from './routes/purchaseRoutes';
 import { httpLogger } from './middlewares/httpLogger';
 import serviceRouter from './routes/serviceRoutes';
 import stockTransferRouter from './routes/stockTransferRoutes';
+import taxReportRouter from './routes/taxReportRoutes';
 
 /**
  * This is the main engine for the Vendor & Inventory Service.
@@ -65,6 +66,7 @@ app.use('/spareparts', sparePartRouter);
 app.use('/brands', brandRouter);
 app.use('/lots', lotRouter);
 app.use('/rfq', rfqRouter);
+app.use('/purchases/tax-report', taxReportRouter);
 app.use('/purchases', purchaseRouter);
 app.use('/service', serviceRouter);
 app.use('/stock-transfers', stockTransferRouter);

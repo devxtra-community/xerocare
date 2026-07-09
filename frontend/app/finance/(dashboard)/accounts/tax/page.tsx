@@ -2,26 +2,20 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Info } from 'lucide-react';
+import { Download, RefreshCw, FileText } from 'lucide-react';
 import {
-  fetchARInvoices,
-  fetchPurchases,
-  fetchBranches,
-  getDateRangeForPeriod,
-  type InvoiceSummary,
-  type PurchaseOrder,
-  type Branch,
-} from '@/lib/finance/accounts';
+  getOutputTax,
+  getInputTaxLocal,
+  getInputTaxInternational,
+  type TaxReportFilters,
+  type OutputTaxRow,
+  type InputTaxLocalRow,
+  type InputTaxInternationalRow,
+} from '@/lib/finance/accountsApi';
+import { fetchBranches, type Branch } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
-import StatCard from '@/components/StatCard';
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import * as XLSX from 'xlsx';
 import {
   Table,
   TableBody,
@@ -30,196 +24,724 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import * as XLSX from 'xlsx';
+import TaxDocumentDialog from '@/components/finance/TaxDocumentDialog';
 
-type Period = 'month' | 'quarter' | 'year' | 'custom';
+type Tab = 'output' | 'local' | 'international';
 
-type TaxRow = {
-  ref: string;
-  party: string;
-  date?: string;
-  taxableAmount: number;
-  vatRate: string;
-  vatAmount: number;
-  currency: string;
+const TAB_LABELS: Record<Tab, string> = {
+  output: 'Output Tax',
+  local: 'Input Tax – Local',
+  international: 'Input Tax – International',
 };
 
-function TaxTable({
-  title,
-  rows,
-  type,
-}: {
-  title: string;
-  rows: TaxRow[];
-  type: 'output' | 'input';
-}) {
-  const headerCls = type === 'output' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700';
-  const amtCls = type === 'output' ? 'text-emerald-600' : 'text-red-600';
+const TAX_STATUS_COLORS: Record<string, string> = {
+  PENDING: 'bg-yellow-100 text-yellow-700',
+  RECORDED: 'bg-blue-100 text-blue-700',
+  FILED: 'bg-green-100 text-green-700',
+};
+
+function StatusBadge({ status }: { status: string }) {
   return (
-    <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-      <div className={`px-4 py-3 border-b border-border ${headerCls}`}>
-        <h3 className="font-bold text-sm">{title}</h3>
-      </div>
-      <Table>
-        <TableHeader className="bg-muted/40">
-          <TableRow>
-            <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              Reference
-            </TableHead>
-            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              {type === 'output' ? 'Customer' : 'Vendor'}
-            </TableHead>
-            <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              Date
-            </TableHead>
-            <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              Taxable Amount
-            </TableHead>
-            <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              VAT %
-            </TableHead>
-            <TableHead className="text-right pr-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-              VAT Amount
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                No records in this period
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((r, i) => (
-              <TableRow key={i} className="hover:bg-blue-50/50 transition-colors">
-                <TableCell className="pl-4 font-mono text-xs">{r.ref}</TableCell>
-                <TableCell className="font-medium text-slate-800">{r.party}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{r.date}</TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(r.taxableAmount, r.currency)}
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">{r.vatRate}%</TableCell>
-                <TableCell className={`text-right font-bold pr-4 ${amtCls}`}>
-                  {formatCurrency(r.vatAmount, r.currency)}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-      {rows.length > 0 && (
-        <div className="border-t bg-muted/30 px-4 py-3 flex justify-end rounded-b-xl">
-          <span className={`text-sm font-black ${amtCls}`}>
-            Total: {formatCurrency(rows.reduce((s, r) => s + r.vatAmount, 0))}
-          </span>
-        </div>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TAX_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-slate-800">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+function FilterBar({
+  filters,
+  onChange,
+  isAdmin,
+  branches,
+}: {
+  filters: TaxReportFilters;
+  onChange: (f: Partial<TaxReportFilters>) => void;
+  isAdmin: boolean;
+  branches: { id: string; name: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="date"
+        value={filters.dateFrom ?? ''}
+        onChange={(e) => onChange({ dateFrom: e.target.value || undefined })}
+        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+        placeholder="From"
+      />
+      <span className="text-muted-foreground text-sm">to</span>
+      <input
+        type="date"
+        value={filters.dateTo ?? ''}
+        onChange={(e) => onChange({ dateTo: e.target.value || undefined })}
+        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+      />
+      {isAdmin && (
+        <select
+          value={filters.branchIds ?? ''}
+          onChange={(e) => onChange({ branchIds: e.target.value || undefined })}
+          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+        >
+          <option value="">All Branches</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <input
+        type="text"
+        value={filters.country ?? ''}
+        onChange={(e) =>
+          onChange({ country: e.target.value || undefined, stateProvince: undefined })
+        }
+        placeholder="Country (ISO)"
+        maxLength={2}
+        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-32 uppercase"
+      />
+      {filters.country && (
+        <input
+          type="text"
+          value={filters.stateProvince ?? ''}
+          onChange={(e) => onChange({ stateProvince: e.target.value || undefined })}
+          placeholder="State / Emirate"
+          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-36"
+        />
       )}
     </div>
   );
 }
 
-export default function TaxReportPage() {
-  const [period, setPeriod] = useState<Period>('month');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
-  const [branchFilter, setBranchFilter] = useState('ALL');
-
-  const { from, to } = useMemo(
-    () => getDateRangeForPeriod(period, customFrom, customTo),
-    [period, customFrom, customTo],
+function Pagination({
+  page,
+  pages,
+  total,
+  onChange,
+}: {
+  page: number;
+  pages: number;
+  total: number;
+  onChange: (p: number) => void;
+}) {
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+      <span>{total} records</span>
+      <div className="flex items-center gap-1">
+        <button
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+        >
+          ‹
+        </button>
+        <span className="px-3">
+          {page} / {pages}
+        </span>
+        <button
+          disabled={page >= pages}
+          onClick={() => onChange(page + 1)}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-50"
+        >
+          ›
+        </button>
+      </div>
+    </div>
   );
+}
 
-  const { data: branches = [] } = useQuery<Branch[]>({
+function OutputTaxTab({
+  filters,
+  onGenerate,
+}: {
+  filters: TaxReportFilters;
+  branches: Branch[];
+  onGenerate: (type: 'output', row: OutputTaxRow) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const query = useQuery({
+    queryKey: ['tax-output', filters, page],
+    queryFn: () => getOutputTax({ ...filters, page, limit: 50 }),
+    placeholderData: (prev) => prev,
+  });
+
+  const { rows = [], totals, pagination } = query.data ?? {};
+
+  const exportExcel = () => {
+    if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(
+      rows.map((r) => ({
+        'Invoice No': r.invoiceNumber,
+        Date: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
+        'Customer Name': r.customerName ?? '',
+        'Customer VAT No': r.customerVatNumber ?? '',
+        Country: r.customerCountry ?? '',
+        'State / Emirate': r.customerStateProvince ?? '',
+        'Taxable Amount': r.taxableAmount,
+        'Tax %': r.taxPercent ?? '',
+        'Tax Name': r.taxName ?? '',
+        'Output VAT': r.outputVat,
+        'Total Invoice': r.totalInvoice,
+        Currency: r.currencyCode ?? '',
+        Status: r.status,
+      })),
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Output Tax');
+    XLSX.writeFile(wb, `Output_Tax_${filters.dateFrom ?? ''}_${filters.dateTo ?? ''}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <SummaryCard
+          label="Total Taxable Amount"
+          value={formatCurrency(totals?.totalTaxableAmount ?? 0)}
+          sub={`${totals?.count ?? 0} invoices`}
+        />
+        <SummaryCard label="Total Output VAT" value={formatCurrency(totals?.totalOutputVat ?? 0)} />
+        <div className="flex items-center justify-end col-span-2 sm:col-span-1">
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        {query.isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+          </div>
+        ) : query.isError ? (
+          <p className="text-center py-12 text-red-500">Failed to load — try refreshing</p>
+        ) : (
+          <>
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest">
+                    Invoice No
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Customer
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    VAT No
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Country
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    State / Emirate
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Taxable Amt
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Tax %
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Output VAT
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Total
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Currency
+                  </TableHead>
+                  <TableHead className="pr-4 text-[10px] font-bold uppercase tracking-widest">
+                    Status
+                  </TableHead>
+                  <TableHead className="pr-4 text-[10px] font-bold uppercase tracking-widest"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
+                      No output tax records in this period
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((r: OutputTaxRow, i) => (
+                    <TableRow key={i} className="hover:bg-blue-50/40">
+                      <TableCell className="pl-4 font-mono text-xs">{r.invoiceNumber}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '—'}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">{r.customerName ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">
+                        {r.customerVatNumber ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.customerCountry ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.customerStateProvince ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {formatCurrency(r.taxableAmount, r.currencyCode)}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {r.taxPercent != null ? `${r.taxPercent}%` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-emerald-700">
+                        {formatCurrency(r.outputVat, r.currencyCode)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-bold">
+                        {formatCurrency(r.totalInvoice, r.currencyCode)}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.currencyCode ?? '—'}</TableCell>
+                      <TableCell className="pr-4">{r.status}</TableCell>
+                      <TableCell className="pr-4">
+                        <button
+                          onClick={() => onGenerate('output', r)}
+                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          <FileText size={12} /> Generate
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            {pagination && (
+              <Pagination
+                page={pagination.page}
+                pages={pagination.pages}
+                total={pagination.total}
+                onChange={setPage}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InputTaxLocalTab({
+  filters,
+  onGenerate,
+}: {
+  filters: TaxReportFilters;
+  branches: Branch[];
+  onGenerate: (type: 'local', row: InputTaxLocalRow) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const query = useQuery({
+    queryKey: ['tax-input-local', filters, page],
+    queryFn: () => getInputTaxLocal({ ...filters, page, limit: 50 }),
+    placeholderData: (prev) => prev,
+  });
+
+  const { rows = [], totals, pagination } = query.data ?? {};
+
+  const exportExcel = () => {
+    if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(
+      rows.map((r) => ({
+        Date: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
+        Branch: r.branch,
+        Vendor: r.vendorName,
+        'Vendor VAT No': r.vendorVatNumber ?? '',
+        Country: r.vendorCountry ?? '',
+        Category: r.purchaseCategory ?? '',
+        'Taxable Amount': r.taxableAmount ?? '',
+        'Tax %': r.taxPercent ?? '',
+        'Tax Name': r.taxName ?? '',
+        'Input VAT': r.inputVatAmount ?? '',
+        'Total Amount': r.totalAmount,
+        Currency: r.currencyCode ?? '',
+        'VAT Claimable': r.vatClaimable ? 'Yes' : 'No',
+        'Tax Status': r.taxStatus,
+      })),
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Input Tax Local');
+    XLSX.writeFile(wb, `Input_Tax_Local_${filters.dateFrom ?? ''}_${filters.dateTo ?? ''}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <SummaryCard
+          label="Total Taxable Amount"
+          value={formatCurrency(totals?.totalTaxableAmount ?? 0)}
+          sub={`${totals?.count ?? 0} purchases`}
+        />
+        <SummaryCard label="Total Input VAT" value={formatCurrency(totals?.totalInputVat ?? 0)} />
+        <div className="flex items-center justify-end col-span-2 sm:col-span-1">
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        {query.isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+          </div>
+        ) : query.isError ? (
+          <p className="text-center py-12 text-red-500">Failed to load — try refreshing</p>
+        ) : (
+          <>
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Vendor
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    VAT No
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Country
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Category
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Taxable Amt
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Tax %
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Input VAT
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Claimable
+                  </TableHead>
+                  <TableHead className="pr-4 text-[10px] font-bold uppercase tracking-widest">
+                    Status
+                  </TableHead>
+                  <TableHead className="pr-4 text-[10px] font-bold uppercase tracking-widest"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                      No local input tax records in this period
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((r: InputTaxLocalRow, i) => (
+                    <TableRow key={i} className="hover:bg-blue-50/40">
+                      <TableCell className="pl-4 text-xs text-muted-foreground">
+                        {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '—'}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">{r.vendorName}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {r.vendorVatNumber ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.vendorCountry ?? '—'}</TableCell>
+                      <TableCell className="text-xs">{r.purchaseCategory ?? '—'}</TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.taxableAmount != null
+                          ? formatCurrency(r.taxableAmount, r.currencyCode)
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {r.taxPercent != null ? `${r.taxPercent}%` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-red-600">
+                        {r.inputVatAmount != null
+                          ? formatCurrency(r.inputVatAmount, r.currencyCode)
+                          : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`text-xs font-medium ${r.vatClaimable ? 'text-green-700' : 'text-gray-400'}`}
+                        >
+                          {r.vatClaimable ? 'Yes' : 'No'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <StatusBadge status={r.taxStatus} />
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <button
+                          onClick={() => onGenerate('local', r)}
+                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          <FileText size={12} /> Generate
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            {pagination && (
+              <Pagination
+                page={pagination.page}
+                pages={pagination.pages}
+                total={pagination.total}
+                onChange={setPage}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InputTaxInternationalTab({
+  filters,
+  onGenerate,
+}: {
+  filters: TaxReportFilters;
+  branches: Branch[];
+  onGenerate: (type: 'international', row: InputTaxInternationalRow) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const query = useQuery({
+    queryKey: ['tax-input-intl', filters, page],
+    queryFn: () => getInputTaxInternational({ ...filters, page, limit: 50 }),
+    placeholderData: (prev) => prev,
+  });
+
+  const { rows = [], totals, pagination } = query.data ?? {};
+
+  const exportExcel = () => {
+    if (!rows.length) return;
+    const ws = XLSX.utils.json_to_sheet(
+      rows.map((r) => ({
+        'Import Invoice No': r.importInvoiceNo ?? '',
+        Date: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
+        Branch: r.branch,
+        Supplier: r.supplierName,
+        'Supplier Country': r.supplierCountry ?? '',
+        'Supplier VAT No': r.supplierVatNumber ?? '',
+        'Goods/Service': r.goodsOrService ?? '',
+        'Taxable Amount': r.taxableAmount ?? '',
+        'Reverse Charge VAT': r.importVatReverseCharge ?? '',
+        'Tax %': r.taxPercent ?? '',
+        'Customs Entry No': r.customsEntryNo ?? '',
+        'Customs Duty': r.customsDuty ?? '',
+        Currency: r.currencyCode ?? '',
+        'Exchange Rate': r.exchangeRate ?? '',
+        'VAT Claimable': r.vatClaimable ? 'Yes' : 'No',
+        'Tax Status': r.taxStatus,
+      })),
+    );
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Input Tax International');
+    XLSX.writeFile(wb, `Input_Tax_Intl_${filters.dateFrom ?? ''}_${filters.dateTo ?? ''}.xlsx`);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <SummaryCard
+          label="Total Taxable Amount"
+          value={formatCurrency(totals?.totalTaxableAmount ?? 0)}
+          sub={`${totals?.count ?? 0} purchases`}
+        />
+        <SummaryCard
+          label="Total Reverse Charge VAT"
+          value={formatCurrency(totals?.totalReverseChargeVat ?? 0)}
+        />
+        <div className="flex items-center justify-end col-span-2 sm:col-span-1">
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+        {query.isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+          </div>
+        ) : query.isError ? (
+          <p className="text-center py-12 text-red-500">Failed to load — try refreshing</p>
+        ) : (
+          <>
+            <Table>
+              <TableHeader className="bg-muted/40">
+                <TableRow>
+                  <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest">
+                    Import Inv No
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Supplier
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Country
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Type
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Taxable Amt
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Rev. Charge VAT
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Customs Duty
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Currency
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Claimable
+                  </TableHead>
+                  <TableHead className="pr-4 text-[10px] font-bold uppercase tracking-widest">
+                    Status
+                  </TableHead>
+                  <TableHead className="pr-4 text-[10px] font-bold uppercase tracking-widest"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
+                      No international input tax records in this period
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rows.map((r: InputTaxInternationalRow, i) => (
+                    <TableRow key={i} className="hover:bg-blue-50/40">
+                      <TableCell className="pl-4 font-mono text-xs">
+                        {r.importInvoiceNo ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '—'}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">{r.supplierName}</TableCell>
+                      <TableCell className="text-xs">{r.supplierCountry ?? '—'}</TableCell>
+                      <TableCell className="text-xs">{r.goodsOrService ?? '—'}</TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.taxableAmount != null
+                          ? formatCurrency(r.taxableAmount, r.currencyCode)
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold text-orange-600">
+                        {r.importVatReverseCharge != null
+                          ? formatCurrency(r.importVatReverseCharge, r.currencyCode)
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.customsDuty != null
+                          ? formatCurrency(r.customsDuty, r.currencyCode)
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-xs">{r.currencyCode ?? '—'}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`text-xs font-medium ${r.vatClaimable ? 'text-green-700' : 'text-gray-400'}`}
+                        >
+                          {r.vatClaimable ? 'Yes' : 'No'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <StatusBadge status={r.taxStatus} />
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <button
+                          onClick={() => onGenerate('international', r)}
+                          className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          <FileText size={12} /> Generate
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            {pagination && (
+              <Pagination
+                page={pagination.page}
+                pages={pagination.pages}
+                total={pagination.total}
+                onChange={setPage}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type DialogState =
+  | { type: 'output'; row: OutputTaxRow }
+  | { type: 'local'; row: InputTaxLocalRow }
+  | { type: 'international'; row: InputTaxInternationalRow }
+  | null;
+
+export default function TaxReportPage() {
+  const user = getUserFromToken();
+  const isAdmin = user?.role === 'ADMIN';
+
+  const [activeTab, setActiveTab] = useState<Tab>('output');
+  const [filters, setFilters] = useState<TaxReportFilters>({});
+  const [docDialog, setDocDialog] = useState<DialogState>(null);
+
+  const { data: branches = [] } = useQuery({
     queryKey: ['branches'],
     queryFn: fetchBranches,
     staleTime: 600_000,
   });
-  const {
-    data: invoices = [],
-    isLoading: invLoading,
-    isError: invError,
-    refetch: refetchInv,
-  } = useQuery<InvoiceSummary[]>({
-    queryKey: ['tax-ar-invoices', from, to],
-    queryFn: () => fetchARInvoices({ fromDate: from, toDate: to }),
-    staleTime: 60_000,
-  });
-  const {
-    data: purchases = [],
-    isLoading: poLoading,
-    isError: poError,
-    refetch: refetchPo,
-  } = useQuery<PurchaseOrder[]>({
-    queryKey: ['tax-purchases', from, to],
-    queryFn: () => fetchPurchases({ fromDate: from, toDate: to }),
-    staleTime: 60_000,
-  });
-  const isError = invError || poError;
-  const refetchAll = () => {
-    refetchInv();
-    refetchPo();
+
+  const mergedFilters = useMemo((): TaxReportFilters => {
+    if (!isAdmin && user?.branchId) {
+      return { ...filters, branchId: user.branchId, branchIds: undefined };
+    }
+    return filters;
+  }, [filters, isAdmin, user?.branchId]);
+
+  const handleFilterChange = (delta: Partial<TaxReportFilters>) => {
+    setFilters((f) => ({ ...f, ...delta }));
   };
 
-  const filteredInvoices = useMemo(
-    () => (branchFilter === 'ALL' ? invoices : invoices.filter((i) => i.branchId === branchFilter)),
-    [invoices, branchFilter],
-  );
-  const filteredPurchases = useMemo(
-    () =>
-      branchFilter === 'ALL' ? purchases : purchases.filter((p) => p.branchId === branchFilter),
-    [purchases, branchFilter],
-  );
+  const activeBranch = useMemo(() => {
+    if (!user?.branchId) return branches[0];
+    return branches.find((b) => b.id === user.branchId) ?? branches[0];
+  }, [branches, user?.branchId]);
 
-  const outputTaxRows: TaxRow[] = filteredInvoices
-    .filter((i) => (i.taxAmount ?? 0) > 0)
-    .map((i) => ({
-      ref: i.invoiceNumber,
-      party: i.customerName,
-      date: i.createdAt?.slice(0, 10),
-      taxableAmount: i.totalAmount - (i.taxAmount ?? 0),
-      vatRate:
-        i.totalAmount > 0
-          ? (((i.taxAmount ?? 0) / (i.totalAmount - (i.taxAmount ?? 0))) * 100).toFixed(1)
-          : '5.0',
-      vatAmount: i.taxAmount ?? 0,
-      currency: i.currency,
-    }));
-
-  const inputTaxRows: TaxRow[] = filteredPurchases.map((p) => ({
-    ref: (p.id?.slice(0, 8) ?? '') + '...',
-    party: p.vendorName,
-    date: p.createdAt?.slice(0, 10),
-    taxableAmount: p.totalCost,
-    vatRate: '5.0',
-    vatAmount: p.totalCost * 0.05,
-    currency: p.currency ?? 'AED',
-  }));
-
-  const totalOutputTax = outputTaxRows.reduce((s, r) => s + r.vatAmount, 0);
-  const totalInputTax = inputTaxRows.reduce((s, r) => s + r.vatAmount, 0);
-  const netVatPayable = totalOutputTax - totalInputTax;
-
-  const exportExcel = () => {
-    const rows = [
-      ...outputTaxRows.map((r) => ({ ...r, 'Tax Type': 'Output (Customer)' })),
-      ...inputTaxRows.map((r) => ({ ...r, 'Tax Type': 'Input (Vendor)' })),
-    ];
-    const ws = XLSX.utils.json_to_sheet(
-      rows.map((r) => ({
-        Reference: r.ref,
-        Party: r.party,
-        Date: r.date,
-        'Taxable Amount': r.taxableAmount,
-        'VAT Rate %': r.vatRate,
-        'VAT Amount': r.vatAmount,
-        Currency: r.currency,
-        'Tax Type': r['Tax Type'],
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'VAT Report');
-    XLSX.writeFile(wb, `VAT_Report_${from}_${to}.xlsx`);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+    currency: activeBranch?.currency,
   };
 
   return (
@@ -227,115 +749,72 @@ export default function TaxReportPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Tax Report (VAT)</h3>
-          <p className="text-muted-foreground">Gulf VAT compliance — Output vs Input tax</p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <SelectTrigger className="w-44 bg-card border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="quarter">This Quarter</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-              <SelectItem value="custom">Custom</SelectItem>
-            </SelectContent>
-          </Select>
-          {period === 'custom' && (
-            <>
-              <input
-                type="date"
-                className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-              />
-              <span className="text-sm text-muted-foreground">to</span>
-              <input
-                type="date"
-                className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-              />
-            </>
-          )}
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-44 bg-card border-border">
-              <SelectValue placeholder="All Branches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Branches</SelectItem>
-              {branches.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name} ({b.currency})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={exportExcel}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
-          >
-            <Download className="h-4 w-4" /> Export Excel
-          </Button>
+          <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Tax Report</h3>
+          <p className="text-muted-foreground text-sm">
+            VAT compliance — Output vs Input tax by period
+          </p>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-        <StatCard
-          title="Output Tax (Collected)"
-          value={formatCurrency(totalOutputTax)}
-          subtitle={`From ${outputTaxRows.length} invoices`}
-        />
-        <StatCard
-          title="Input Tax (Paid)"
-          value={formatCurrency(totalInputTax)}
-          subtitle={`From ${inputTaxRows.length} purchase orders`}
-        />
-        <StatCard
-          title="Net VAT Payable"
-          value={formatCurrency(netVatPayable)}
-          subtitle="Output − Input"
+      {/* Filter bar */}
+      <div className="rounded-xl border bg-white p-4 shadow-sm">
+        <FilterBar
+          filters={filters}
+          onChange={handleFilterChange}
+          isAdmin={isAdmin}
+          branches={branches}
         />
       </div>
 
-      {/* Info note */}
-      <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
-        <p className="text-sm text-blue-700">
-          UAE VAT rate is 5%. Qatar currently has 0% VAT for most supplies. Input tax on vendor
-          purchases is estimated at 5% — verify with actual vendor invoices for accurate filing.
-        </p>
-      </div>
-
-      {invLoading || poLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : isError ? (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center space-y-3">
-          <p className="text-red-700 font-medium">Failed to load tax data. Please retry.</p>
+      {/* Tabs */}
+      <div className="flex gap-1 border-b">
+        {(Object.entries(TAB_LABELS) as [Tab, string][]).map(([tab, label]) => (
           <button
-            onClick={refetchAll}
-            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:text-slate-700'
+            }`}
           >
-            Retry
+            {label}
           </button>
-        </div>
-      ) : (
-        <>
-          <TaxTable
-            title="Output Tax — Collected from Customers"
-            rows={outputTaxRows}
-            type="output"
-          />
-          <TaxTable
-            title="Input Tax — Paid to Vendors (Estimated)"
-            rows={inputTaxRows}
-            type="input"
-          />
-        </>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'output' && (
+        <OutputTaxTab
+          filters={mergedFilters}
+          branches={branches}
+          onGenerate={(type, row) => setDocDialog({ type, row })}
+        />
+      )}
+      {activeTab === 'local' && (
+        <InputTaxLocalTab
+          filters={mergedFilters}
+          branches={branches}
+          onGenerate={(type, row) => setDocDialog({ type, row })}
+        />
+      )}
+      {activeTab === 'international' && (
+        <InputTaxInternationalTab
+          filters={mergedFilters}
+          branches={branches}
+          onGenerate={(type, row) => setDocDialog({ type, row })}
+        />
+      )}
+
+      {docDialog && (
+        <TaxDocumentDialog
+          open
+          onOpenChange={(o) => {
+            if (!o) setDocDialog(null);
+          }}
+          data={docDialog}
+          branch={branchInfo}
+        />
       )}
     </div>
   );

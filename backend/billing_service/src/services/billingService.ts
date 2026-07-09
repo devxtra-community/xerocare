@@ -37,6 +37,7 @@ import {
   emitSparePartReduce,
 } from '../events/publisher/inventoryEventPublisher';
 import { BillType } from '../entities/enums/billType';
+import { getBranchCurrencyInfo } from './billingHelpers';
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
   excessRate: number | undefined,
@@ -496,6 +497,8 @@ export class BillingService {
 
     layoutId?: string;
     notes?: string;
+    customerCountry?: string;
+    customerStateProvince?: string;
   }) {
     // 1. Validation Logic
     if (
@@ -704,6 +707,38 @@ export class BillingService {
       invoice.totalAmount =
         calculatedTotal === 0 ? Number(payload.advanceAmount || 0) : calculatedTotal;
     }
+
+    // ─── Snapshot: branch currency/tax + customer info ────────────────────────
+    try {
+      const branchInfo = await getBranchCurrencyInfo(payload.branchId);
+      if (branchInfo) {
+        invoice.currencyCode = branchInfo.currencyCode;
+        if (branchInfo.hasTax && branchInfo.taxPercent) {
+          invoice.taxName = branchInfo.taxName;
+          invoice.taxPercent = branchInfo.taxPercent;
+          invoice.taxAmount = Number(invoice.totalAmount) * (branchInfo.taxPercent / 100);
+          invoice.taxRegistrationNumber = branchInfo.taxRegistrationNumber;
+        }
+      }
+    } catch (err) {
+      logger.warn('Could not fetch branch info for tax snapshot on invoice creation', err);
+    }
+
+    if (payload.customerId) {
+      try {
+        const customer = await this.getCustomerDetails(payload.customerId);
+        if (customer) {
+          invoice.customerName = customer.name ?? null;
+          invoice.customerVatNumber = customer.vatNumber ?? null;
+          invoice.customerCountry = payload.customerCountry ?? customer.country ?? null;
+          invoice.customerStateProvince =
+            payload.customerStateProvince ?? customer.stateProvince ?? null;
+        }
+      } catch (err) {
+        logger.warn('Could not fetch customer info for snapshot on invoice creation', err);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     await this.invoiceRepo.save(invoice);
 
@@ -4412,8 +4447,9 @@ export class BillingService {
     // Best-effort: a posting failure must never break payment recording.
     if (invoice.branchId) {
       try {
+        const { toBusinessDate } = await import('../utils/businessDate');
         await postCashbookEntry({
-          date: transaction.transactionDate,
+          date: toBusinessDate(transaction.transactionDate),
           entryType: 'RECEIPT',
           amount: Number(transaction.amount),
           category: 'Customer Payment',
