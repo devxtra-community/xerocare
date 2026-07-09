@@ -15,6 +15,7 @@ import {
   Bell,
   ArrowLeft,
   Award,
+  Receipt,
 } from 'lucide-react';
 
 import {
@@ -52,6 +53,12 @@ const menuItems = [
     title: 'My Achievements',
     icon: Award,
     href: '/employee/achievements',
+    modules: ['*'], // Always accessible
+  },
+  {
+    title: 'My Expenses',
+    icon: Receipt,
+    href: '/employee/expenses',
     modules: ['*'], // Always accessible
   },
   {

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/authMiddleware';
-import { parseBranchFilter } from '../middlewares/branchFilterMiddleware';
+import { parseBranchFilter, requireWriteAccess } from '../middlewares/branchFilterMiddleware';
 import {
   getCashBankAccounts,
   createCashBankAccount,
@@ -64,13 +64,26 @@ import {
   getCashBankTransactions,
   reconcileAccount,
   getReconciliations,
+  getChartOfAccounts,
 } from '../controllers/accountsController';
+import chequesRouter from './chequesRoutes';
 
 const router = Router();
 
 // All routes require auth + branch filter enforcement
 router.use(authMiddleware);
 router.use(parseBranchFilter);
+
+// MANAGER is read-only — block all mutating methods
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return requireWriteAccess(req, res, next);
+  }
+  next();
+});
+
+// Cheques sub-router (inherits auth + parseBranchFilter above)
+router.use('/cheques', chequesRouter);
 
 // Cash & Bank Accounts
 router.get('/cash-bank/summary', getCashBankSummary);
@@ -146,6 +159,9 @@ router.get('/equity', getEquityEntries);
 router.post('/equity', createEquityEntry);
 router.patch('/equity/:id', updateEquityEntry);
 router.delete('/equity/:id', deleteEquityEntry);
+
+// Chart of Accounts
+router.get('/chart-of-accounts', getChartOfAccounts);
 
 // Balance Sheet
 router.get('/balance-sheet', getBalanceSheet);

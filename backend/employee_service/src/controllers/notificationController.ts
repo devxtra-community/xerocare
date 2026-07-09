@@ -65,4 +65,35 @@ export class NotificationController {
       return res.status(500).json({ message: 'Internal server error' });
     }
   }
+
+  // Internal endpoint — called by billing_service with x-internal-service header
+  static async createInternal(req: Request, res: Response) {
+    try {
+      const internalHeader = req.headers['x-internal-service'];
+      if (!internalHeader) {
+        return res.status(403).json({ message: 'Forbidden' });
+      }
+
+      const { employee_id, title, message, type, data } = req.body;
+      if (!employee_id || !title || !message) {
+        return res.status(400).json({ message: 'employee_id, title, message are required' });
+      }
+
+      const notificationRepo = Source.getRepository(Notification);
+      const notification = notificationRepo.create({
+        employee_id,
+        title,
+        message,
+        type: type || 'INFO',
+        data: data || null,
+        is_read: false,
+      });
+      await notificationRepo.save(notification);
+
+      return res.status(201).json({ success: true, data: notification });
+    } catch (error) {
+      logger.error('Error creating internal notification:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }
 }

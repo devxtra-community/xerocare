@@ -73,7 +73,10 @@ const SALE_TYPE_LABELS: Record<string, string> = {
   SALE: 'Sales Revenue (Direct sales)',
   PRODUCT_SALE: 'Product Sales',
   SPAREPART_SALE: 'Spare Parts Sales',
-  SERVICE: 'Service Revenue (Tickets)',
+  SERVICE: 'Service Revenue (Chargeable)',
+  SERVICE_AMC: 'AMC Revenue',
+  SERVICE_FSMA: 'FSMA Revenue',
+  SERVICE_SMA: 'SMA Revenue',
   USAGE: 'Usage / Copy Revenue',
   AMC: 'AMC / SMA Revenue',
 };

@@ -36,6 +36,9 @@ import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { EmployeeTarget } from '../entities/employeeTargetEntity';
 import { EmployeeTargetAchievement } from '../entities/employeeTargetAchievementEntity';
+import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity';
+import { Cheque } from '../entities/chequeEntity';
+import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -76,6 +79,9 @@ export const Source = new DataSource({
     AccountReconciliation,
     EmployeeTarget,
     EmployeeTargetAchievement,
+    EmployeeExpenseRequest,
+    Cheque,
+    ChequeStatusHistory,
   ],
   poolSize: 1,
   extra: {
@@ -618,6 +624,44 @@ async function runPreMigrations() {
     `);
     logger.info('Finance accounts module tables created/verified.');
 
+    // ─── Employee Expense Requests ─────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS employee_expense_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "requestNo" VARCHAR UNIQUE NOT NULL,
+        "employeeId" UUID NOT NULL,
+        "employeeName" VARCHAR NOT NULL,
+        "employeeRole" VARCHAR NOT NULL,
+        "branchId" UUID NOT NULL,
+        "branchName" VARCHAR NOT NULL,
+        date DATE NOT NULL,
+        category VARCHAR NOT NULL,
+        "subCategory" VARCHAR,
+        description TEXT NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'AED',
+        "receiptUrl" VARCHAR,
+        status VARCHAR NOT NULL DEFAULT 'PENDING',
+        "submittedAt" TIMESTAMP,
+        "reviewedBy" UUID,
+        "reviewedByName" VARCHAR,
+        "reviewedAt" TIMESTAMP,
+        "rejectionReason" TEXT,
+        "paidAt" TIMESTAMP,
+        "paidFromAccount" UUID,
+        "paymentReference" VARCHAR,
+        "expenseEntryId" UUID,
+        notes TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_expense_req_employee ON employee_expense_requests("employeeId");
+      CREATE INDEX IF NOT EXISTS idx_expense_req_branch ON employee_expense_requests("branchId");
+      CREATE INDEX IF NOT EXISTS idx_expense_req_status ON employee_expense_requests(status);
+      CREATE INDEX IF NOT EXISTS idx_expense_req_date ON employee_expense_requests(date);
+    `);
+    logger.info('Employee expense requests table created/verified.');
     // ─── Cash & Bank extended columns + reconciliation table ─────────────────
     await client.query(`
       ALTER TABLE cash_bank_accounts
@@ -652,7 +696,50 @@ async function runPreMigrations() {
       );
     `);
     logger.info('Cash & Bank extended schema applied.');
-    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─── Asset Depreciation Register — extended columns ───────────────────────
+    await client.query(`
+      ALTER TABLE asset_depreciation_register
+        ALTER COLUMN "productId" DROP NOT NULL,
+        ADD COLUMN IF NOT EXISTS "assetType" VARCHAR DEFAULT 'PRINTER_PRODUCT',
+        ADD COLUMN IF NOT EXISTS "assetCategory" VARCHAR DEFAULT 'PRINTER_EQUIPMENT',
+        ADD COLUMN IF NOT EXISTS "assetName" VARCHAR NULL;
+    `);
+    logger.info('Asset depreciation register extended columns applied.');
+
+    // ─── Cheque Management Tables ──────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cheques (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        cheque_no VARCHAR NOT NULL,
+        bank_name VARCHAR,
+        party_name VARCHAR NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        due_date DATE NOT NULL,
+        issue_date DATE,
+        type VARCHAR NOT NULL DEFAULT 'RECEIVED',
+        status VARCHAR NOT NULL DEFAULT 'PENDING',
+        description TEXT,
+        branch_id UUID NOT NULL,
+        account_id UUID REFERENCES cash_bank_accounts(id),
+        cashbook_entry_id UUID REFERENCES cashbook_entries(id),
+        created_by VARCHAR NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cheque_status_history (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        cheque_id UUID NOT NULL REFERENCES cheques(id) ON DELETE CASCADE,
+        from_status VARCHAR,
+        to_status VARCHAR NOT NULL,
+        notes TEXT,
+        changed_by VARCHAR NOT NULL,
+        changed_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    logger.info('Cheque management tables created.');
 
     // ─── Payment ledger proof-of-payment attachment ────────────────────────────
     await client.query(`

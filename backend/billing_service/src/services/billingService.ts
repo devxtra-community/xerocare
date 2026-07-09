@@ -545,6 +545,11 @@ export class BillingService {
         const invItem = new InvoiceItem();
         invItem.itemType =
           item.itemType === 'SPAREPART' ? ItemType.SPARE_PART : item.itemType || ItemType.PRODUCT;
+        // Normalize 'SPAREPART' (frontend alias) to the DB enum value 'SPARE_PART'
+        const rawItemType = item.itemType;
+        invItem.itemType = (
+          rawItemType === 'SPAREPART' ? ItemType.SPARE_PART : rawItemType || ItemType.PRODUCT
+        ) as ItemType;
         invItem.description = item.description;
         invItem.quantity = item.quantity;
         invItem.unitPrice = item.unitPrice;
@@ -3146,12 +3151,13 @@ export class BillingService {
         calculatedTotal += itemTotal;
 
         const invItem = new InvoiceItem();
-        invItem.itemType = item.itemType as ItemType;
+        const rawType = item.itemType as string;
+        invItem.itemType = (rawType === 'SPAREPART' ? ItemType.SPARE_PART : rawType) as ItemType;
         invItem.description = item.description;
         invItem.quantity = quantity;
         invItem.unitPrice = item.unitPrice;
         invItem.discountAmount = discount;
-        if (item.itemType === 'PRODUCT') {
+        if (rawType === 'PRODUCT') {
           invItem.productId = item.productId;
           invItem.serialNumber = item.serialNumber;
           invItem.modelId = item.modelId;

@@ -31,6 +31,7 @@ app.use(httpLogger);
 import creditNoteRouter from './routes/creditNoteRoutes';
 import accountsRouter from './routes/accountsRoutes';
 import adminAccountsRouter from './routes/adminAccountsRoutes';
+import expenseRequestRouter from './routes/expenseRequestRoutes';
 import targetRouter from './routes/targetRoutes';
 
 /**
@@ -45,8 +46,10 @@ app.use('/usage', usageRouter);
 app.use('/payments', paymentRouter);
 app.use('/opening-balance', openingBalanceRouter);
 app.use('/credit-notes', creditNoteRouter);
-app.use('/accounts', accountsRouter);
+// expense request routes mount BEFORE /accounts to avoid parseBranchFilter blocking non-finance roles
+app.use('/expenses/requests', expenseRequestRouter);
 app.use('/accounts/admin', adminAccountsRouter);
+app.use('/accounts', accountsRouter);
 app.use('/targets', targetRouter);
 
 /**

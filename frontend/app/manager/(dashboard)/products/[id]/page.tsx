@@ -57,6 +57,36 @@ interface Product extends Omit<BaseProduct, 'model'> {
   };
 }
 
+function parseFeaturesFromDescription(description?: string): ProductFeature[] {
+  if (!description) return [];
+
+  const textToParse = description.replace(
+    /([A-Z][a-zA-Z0-9-]{1,30}(\s+[a-zA-Z0-9.-]{1,30})*):/g,
+    '\n$1:',
+  );
+  const processedLines = textToParse.split(/\r?\n/);
+  const features: ProductFeature[] = [];
+
+  for (const line of processedLines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex > 0 && colonIndex < 40) {
+      const subHeading = trimmed
+        .substring(0, colonIndex)
+        .replace(/^(?:⚙️|[\s•*-])+/, '')
+        .trim();
+      const desc = trimmed.substring(colonIndex + 1).trim();
+      if (subHeading && desc && desc.length > 2) {
+        features.push({ subHeading, description: desc });
+      }
+    }
+  }
+
+  return features;
+}
+
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -115,6 +145,11 @@ export default function ProductDetailPage() {
       </div>
     );
   }
+
+  const displayFeatures =
+    product.features && product.features.length > 0
+      ? product.features
+      : parseFeaturesFromDescription(product.description);
 
   const mfdDate = product.MFD
     ? new Date(product.MFD).toLocaleDateString('en-US', {
@@ -346,13 +381,13 @@ export default function ProductDetailPage() {
           )}
 
           {/* Key Features */}
-          {product.features && product.features.length > 0 && (
+          {displayFeatures && displayFeatures.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
               <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-2 mb-4">
                 <List size={16} className="text-emerald-500" /> Key Features
               </h4>
               <div className="bg-emerald-50/20 p-5 rounded-xl border border-emerald-100/50 space-y-4">
-                {product.features.map((f: ProductFeature, i: number) => (
+                {displayFeatures.map((f: ProductFeature, i: number) => (
                   <div key={i} className="group">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

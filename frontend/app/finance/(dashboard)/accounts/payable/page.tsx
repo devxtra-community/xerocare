@@ -23,12 +23,8 @@ import {
   type ManualPayable,
 } from '@/lib/finance/accountsApi';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
-import {
-  fetchPurchases,
-  agingBucket,
-  fetchBranches,
-  type PurchaseOrder,
-} from '@/lib/finance/accounts';
+import { fetchPurchases, agingBucket, type PurchaseOrder } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -72,15 +68,14 @@ const today = new Date().toISOString().slice(0, 10);
 function AddPayableModal({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   accounts: _,
-  branches,
   onClose,
   onSaved,
 }: {
   accounts: { id: string; name: string }[];
-  branches: { id: string; name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const currentUser = getUserFromToken();
   const [form, setForm] = useState({
     type: 'VENDOR_INVOICE',
     payableTo: '',
@@ -89,7 +84,6 @@ function AddPayableModal({
     currency: 'AED',
     issueDate: today,
     dueDate: today,
-    branchId: branches[0]?.id ?? '',
     notes: '',
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -114,6 +108,15 @@ function AddPayableModal({
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
+            <span className="text-sm text-blue-600">Branch:</span>
+            <span className="text-sm font-medium text-blue-800">
+              {currentUser?.branchId
+                ? `Branch ${currentUser.branchId.slice(0, 8)}…`
+                : 'Your Branch'}
+            </span>
+            <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
+          </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Type</label>
             <Select value={form.type} onValueChange={(v) => set('type', v)}>
@@ -188,21 +191,6 @@ function AddPayableModal({
                 className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
               />
             </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Branch</label>
-            <Select value={form.branchId} onValueChange={(v) => set('branchId', v)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
         <div className="flex gap-3 px-6 pb-5">
@@ -369,12 +357,6 @@ export default function AccountsPayablePage() {
     queryKey: ['cash-bank-accounts'],
     queryFn: () => fetchCashBankAccounts(),
     staleTime: 60_000,
-  });
-
-  const { data: branches = [] } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => fetchBranches(),
-    staleTime: 300_000,
   });
 
   const { data: payCharts } = useQuery({
@@ -722,7 +704,6 @@ export default function AccountsPayablePage() {
       {showAdd && (
         <AddPayableModal
           accounts={accounts}
-          branches={branches}
           onClose={() => setShowAdd(false)}
           onSaved={() => setShowAdd(false)}
         />

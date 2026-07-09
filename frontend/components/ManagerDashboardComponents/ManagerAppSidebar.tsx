@@ -27,6 +27,7 @@ import {
   Eye,
   Bell,
   ArrowRightLeft,
+  Receipt,
 } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
@@ -216,7 +217,11 @@ const menuItems = [
       },
     ],
   },
-
+  {
+    title: 'My Expenses',
+    icon: Receipt,
+    href: '/manager/expenses',
+  },
   {
     title: 'Finance',
     icon: Wallet,

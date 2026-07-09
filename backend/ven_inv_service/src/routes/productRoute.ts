@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   addproduct,
   bulkCreateProducts,
@@ -11,6 +11,7 @@ import {
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 import { uploadProductImage } from '../middlewares/uploadProductImage';
+import { Source } from '../config/db';
 
 /**
  * This file handles the Catalog of items we sell and use.
@@ -77,6 +78,32 @@ productRoute.put(
 productRoute.delete('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), deleteproduct);
 
 // --- 2. Advanced Management ---
+
+// Internal batch fetch — used by billing_service to enrich asset register with product details
+productRoute.post(
+  '/batch',
+  authMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { productIds } = req.body;
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+      const products = await Source.query(
+        `SELECT p.id, p.serial_no, p.product_status, p.purchase_price, p.brand,
+                m.model_name, b.name AS brand_name
+         FROM products p
+         LEFT JOIN model m ON m.id = p.model_id
+         LEFT JOIN brands b ON b.id = m.brand_id
+         WHERE p.id = ANY($1::uuid[])`,
+        [productIds],
+      );
+      return res.json({ success: true, data: products });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * Add many products at once:

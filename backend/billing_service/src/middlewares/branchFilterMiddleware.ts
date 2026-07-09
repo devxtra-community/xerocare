@@ -17,6 +17,8 @@ export function parseBranchFilter(req: Request, res: Response, next: NextFunctio
     // Locked to their own branch — never override
     req.branchFilter = jwtBranchId ? [jwtBranchId] : [];
     req.isMultiBranch = false;
+    // MANAGER is read-only; FINANCE can write
+    req.canWrite = role === 'FINANCE';
   } else if (role === 'ADMIN') {
     // Admin can request specific branches or all
     const requested = req.query.branchIds as string | undefined;
@@ -32,10 +34,25 @@ export function parseBranchFilter(req: Request, res: Response, next: NextFunctio
       req.branchFilter = []; // empty = all branches
     }
     req.isMultiBranch = req.branchFilter.length !== 1;
+    req.canWrite = true; // ADMIN has full write access
   } else {
     return next(new AppError('Access denied', 403));
   }
 
+  next();
+}
+
+// Blocks MANAGER (read-only) from any mutating request.
+// Apply to write routes: POST, PUT, PATCH, DELETE.
+export function requireWriteAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.canWrite) {
+    return res.status(403).json({
+      success: false,
+      message:
+        'Branch Managers have read-only access to accounts. Contact your Finance Manager to make changes.',
+      role: req.user?.role,
+    });
+  }
   next();
 }
 

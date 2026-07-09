@@ -24,7 +24,7 @@ import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { getProductById } from '@/lib/product';
-import { getAllSpareParts } from '@/lib/spare-part';
+import { getAllSpareParts, getSparePartById } from '@/lib/spare-part';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
 import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
@@ -106,7 +106,30 @@ export function InvoiceDetailsDialog({
         if (currentInvoice.items) {
           const spareParts = await getAllSpareParts().catch(() => []);
           for (const item of currentInvoice.items) {
-            if (item.productId) {
+            const isSparePart =
+              (item.itemType as string) === 'SPARE_PART' ||
+              item.itemType === 'SPAREPART' ||
+              currentInvoice.saleType === 'SPAREPART_SALE';
+            // For spare parts, sparePartId is the canonical ID; productId may also hold it
+            const spareId =
+              (item as unknown as { sparePartId?: string }).sparePartId || item.productId;
+
+            if (isSparePart && spareId) {
+              // Try local spare parts list first (fast), then fetch by ID
+              const local = spareParts.find((s) => s.id === spareId);
+              if (local) {
+                details[spareId] = local;
+                if (item.productId) details[item.productId] = local;
+              } else {
+                try {
+                  const sp = await getSparePartById(spareId);
+                  details[spareId] = sp;
+                  if (item.productId) details[item.productId] = sp;
+                } catch (e) {
+                  console.error(e);
+                }
+              }
+            } else if (item.productId) {
               try {
                 const p = await getProductById(item.productId);
                 details[item.productId] = p;

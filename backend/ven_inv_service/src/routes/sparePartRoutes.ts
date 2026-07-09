@@ -7,11 +7,15 @@ import {
   deleteSparePart,
   getSparePartById,
   getSparePartStock,
+  getInventoryValue,
 } from '../controllers/sparePartController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 
 const router = Router();
+
+// Internal endpoint — no auth required (called service-to-service)
+router.get('/inventory-value', getInventoryValue);
 
 router.post('/bulk', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), bulkUploadSpareParts);
 router.post('/add', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), addSparePart);

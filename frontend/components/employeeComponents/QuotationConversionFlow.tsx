@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { getAvailableProductsByModel, Product } from '@/lib/product';
+import { getSparePartById, SparePart } from '@/lib/spare-part';
 import {
   Invoice,
   convertToTransaction,
@@ -35,6 +36,7 @@ interface SerialUpdate {
   description: string;
   productId: string;
   modelId?: string;
+  isSparePart?: boolean;
 }
 
 export function QuotationConversionFlow({
@@ -46,41 +48,66 @@ export function QuotationConversionFlow({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Step 1: Serial number assignment per item
+  // Backend stores spare part items as 'SPARE_PART'; frontend type alias is 'SPAREPART'
   const allocatableItems = React.useMemo(
     () =>
       (quotation.items || []).filter(
-        (item) => item.itemType === 'PRODUCT' || item.itemType === 'SPAREPART',
+        (item) =>
+          item.itemType === 'PRODUCT' ||
+          item.itemType === 'SPAREPART' ||
+          (item.itemType as string) === 'SPARE_PART',
       ),
     [quotation.items],
   );
+
   const [serialUpdates, setSerialUpdates] = useState<SerialUpdate[]>(
-    allocatableItems.map((item) => ({
-      itemId: item.id || '',
-      description: item.description,
-      productId: item.productId || '',
-      modelId: item.modelId,
-    })),
+    allocatableItems.map((item) => {
+      const isSparePart =
+        item.itemType === 'SPAREPART' || (item.itemType as string) === 'SPARE_PART';
+      // For spare parts, the allocation ID is sparePartId; productId is for physical serial units
+      const spId = (item as unknown as { sparePartId?: string }).sparePartId;
+      return {
+        itemId: item.id || '',
+        description: item.description,
+        productId: isSparePart ? spId || item.productId || '' : item.productId || '',
+        modelId: item.modelId,
+        isSparePart,
+      };
+    }),
   );
 
   const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
+  const [sparePartDetails, setSparePartDetails] = useState<Record<string, SparePart>>({});
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   useEffect(() => {
     const fetchAvailable = async () => {
       setIsLoadingProducts(true);
       const productMap: Record<string, Product[]> = {};
+      const spareMap: Record<string, SparePart> = {};
       try {
         for (const item of allocatableItems) {
-          if (item.modelId) {
+          const isSp = item.itemType === 'SPAREPART' || (item.itemType as string) === 'SPARE_PART';
+          if (isSp) {
+            // Fetch spare part details for display — ID comes from sparePartId or productId
+            const spId =
+              (item as unknown as { sparePartId?: string }).sparePartId || item.productId;
+            if (spId && !spareMap[spId]) {
+              const sp = await getSparePartById(spId).catch(() => null);
+              if (sp) spareMap[spId] = sp;
+            }
+          } else if (item.modelId) {
             const products = await getAvailableProductsByModel(item.modelId);
             productMap[item.modelId] = products;
           }
         }
         setAvailableProducts(productMap);
+        setSparePartDetails(spareMap);
 
-        // Auto-clear productId if it is not in the list of currently available products
+        // Auto-clear productId only for non-spare-part items that are no longer available
         setSerialUpdates((prev) =>
           prev.map((update) => {
+            if (update.isSparePart) return update; // spare parts are pre-confirmed, don't clear
             const modelProds = update.modelId ? productMap[update.modelId] || [] : [];
             const isAvailable = modelProds.some((p) => p.id === update.productId);
             return {
@@ -285,7 +312,33 @@ export function QuotationConversionFlow({
                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">
                       {update.description}
                     </Label>
-                    {isLoadingProducts ? (
+                    {update.isSparePart ? (
+                      // Spare parts are pre-assigned from the quotation — show confirmation
+                      isLoadingProducts ? (
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Loader2 size={12} className="animate-spin" />
+                          <span className="text-[10px] font-bold">Loading spare part...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                          <PackageCheck size={16} className="text-emerald-500 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">
+                              {sparePartDetails[update.productId]?.part_name || update.description}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                              SKU: {sparePartDetails[update.productId]?.sku || update.productId}
+                              {sparePartDetails[update.productId]?.lot?.lotNumber
+                                ? ` • Lot: ${sparePartDetails[update.productId].lot!.lotNumber}`
+                                : sparePartDetails[update.productId]?.lot?.lot_number
+                                  ? ` • Lot: ${sparePartDetails[update.productId].lot!.lot_number}`
+                                  : ''}
+                            </p>
+                          </div>
+                          <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                        </div>
+                      )
+                    ) : isLoadingProducts ? (
                       <div className="flex items-center gap-2 text-slate-400">
                         <Loader2 size={12} className="animate-spin" />
                         <span className="text-[10px] font-bold">Loading available units...</span>
@@ -467,10 +520,14 @@ export function QuotationConversionFlow({
                     {serialUpdates
                       .filter((u) => u.productId)
                       .map((update, idx) => {
-                        const product = update.modelId
-                          ? availableProducts[update.modelId]?.find(
-                              (p) => p.id === update.productId,
-                            )
+                        const product =
+                          !update.isSparePart && update.modelId
+                            ? availableProducts[update.modelId]?.find(
+                                (p) => p.id === update.productId,
+                              )
+                            : undefined;
+                        const sparePart = update.isSparePart
+                          ? sparePartDetails[update.productId]
                           : undefined;
                         return (
                           <div
@@ -479,17 +536,23 @@ export function QuotationConversionFlow({
                           >
                             <span
                               className="text-xs font-bold text-slate-700 line-clamp-1"
-                              title={product ? product.name : update.description}
+                              title={sparePart?.part_name || product?.name || update.description}
                             >
-                              {product ? product.name : update.description}
+                              {sparePart?.part_name || product?.name || update.description}
                             </span>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                S/N: {product ? product.serial_no : 'Unknown'}
-                              </span>
-                              {product?.brand && (
+                              {update.isSparePart ? (
+                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                  SKU: {sparePart?.sku || update.productId}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                  S/N: {product ? product.serial_no : 'Unknown'}
+                                </span>
+                              )}
+                              {(sparePart?.brand || product?.brand) && (
                                 <span className="text-[10px] font-bold text-slate-400 uppercase">
-                                  {product.brand}
+                                  {sparePart?.brand || product?.brand}
                                 </span>
                               )}
                             </div>

@@ -56,6 +56,7 @@ export interface SparePartsNormalQuotationProps {
     payment: number;
     balanceDue: number;
     paid: boolean;
+    discountTotal?: number;
   };
 }
 
@@ -106,6 +107,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
     payment: 0.0,
     balanceDue: 0.0,
     paid: false,
+    discountTotal: 0.0,
   },
 }) => {
   const companyInfo = {
@@ -405,6 +407,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                 <td style={tdStyleHelper()}>{item.qty}</td>
                 <td style={tdStyleHelper()}>{fmt(item.unitPrice)}</td>
                 <td style={tdStyleHelper()}>{fmt(Number(item.discount || 0))}</td>
+                <td style={tdStyleHelper()}>{item.discount ? fmt(item.discount) : '0.00'}</td>
                 <td style={tdStyleHelper()}>{fmt(item.vat)}</td>
                 <td style={{ ...tdStyleHelper('right'), fontWeight: '300' }}>{fmt(item.amount)}</td>
               </tr>
@@ -442,6 +445,16 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         <div style={{ width: '250px' }}>
           {[
             { label: 'Subtotal (Before VAT)', value: totals.subTotal, num: totals.subTotal },
+            ...(totals.discountTotal
+              ? [
+                  {
+                    label: 'Discount',
+                    value: -totals.discountTotal,
+                    num: totals.discountTotal,
+                    isDiscount: true,
+                  },
+                ]
+              : []),
             { label: 'VAT Amount', value: totals.vatTotal, num: totals.vatTotal },
             {
               label: 'Grand Total (Including VAT)',
@@ -450,14 +463,14 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               prefix: 'QAR ',
               isBold: true,
             },
-          ].map((row, i) => (
+          ].map((row, i, arr) => (
             <div
               key={i}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 padding: '8px 0',
-                borderBottom: i === 2 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
+                borderBottom: i === arr.length - 1 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
               }}
             >
               <div
@@ -467,7 +480,11 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                   style={{
                     fontSize: '12px',
                     textTransform: 'uppercase',
-                    color: row.isBold ? ACCENT : '#000',
+                    color: (row as { isBold?: boolean }).isBold
+                      ? ACCENT
+                      : (row as { isDiscount?: boolean }).isDiscount
+                        ? '#16a34a'
+                        : '#000',
                     fontWeight: '300',
                   }}
                 >
@@ -476,25 +493,32 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                 <span
                   style={{
                     fontSize: '14px',
-                    color: row.isBold ? ACCENT : '#000',
+                    color: (row as { isBold?: boolean }).isBold
+                      ? ACCENT
+                      : (row as { isDiscount?: boolean }).isDiscount
+                        ? '#16a34a'
+                        : '#000',
                     fontWeight: '300',
                   }}
                 >
-                  {row.prefix || ''}
-                  {fmt(row.value)}
+                  {(row as { isDiscount?: boolean }).isDiscount
+                    ? `- ${fmt(row.num)}`
+                    : `${row.prefix || ''}${fmt(row.value)}`}
                 </span>
               </div>
-              <div
-                style={{
-                  fontSize: '9px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                  marginTop: '1px',
-                }}
-              >
-                {numberToWords(row.num)}
-              </div>
+              {!(row as { isDiscount?: boolean }).isDiscount && (
+                <div
+                  style={{
+                    fontSize: '9px',
+                    color: '#111827',
+                    fontStyle: 'italic',
+                    textAlign: 'right',
+                    marginTop: '1px',
+                  }}
+                >
+                  {numberToWords(row.num)}
+                </div>
+              )}
             </div>
           ))}
         </div>

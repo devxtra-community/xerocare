@@ -586,6 +586,9 @@ importers:
       countries-list:
         specifier: ^3.3.0
         version: 3.3.0
+      country-list:
+        specifier: ^2.4.1
+        version: 2.4.1
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -4456,6 +4459,12 @@ packages:
     resolution:
       {
         integrity: sha512-XRUjS+dcZuNh/fg3+mka3bXgcg4TbQZ1gaK5IJqO6qulerBANl1bmrd20P2dgmPkBpP+5FnejiSF1gd7bgAg+g==,
+      }
+
+  country-list@2.4.1:
+    resolution:
+      {
+        integrity: sha512-KhVV/UfUV3dSNpsWIqHTQxLpYDKPKz1UwkRjadt+YbX2PRhyCEihEoS5XgB7J7AMXpkicvl+tRHvkNI5wbji/g==,
       }
 
   crc-32@1.2.2:
@@ -12033,6 +12042,8 @@ snapshots:
       typescript: 5.9.3
 
   countries-list@3.3.0: {}
+
+  country-list@2.4.1: {}
 
   crc-32@1.2.2: {}
 

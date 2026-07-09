@@ -29,6 +29,7 @@ import {
 import { getBranches, Branch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { getUserFromToken } from '@/lib/auth';
+import axios from 'axios';
 
 /**
  * Comprehensive Warehouse management dashboard component.
@@ -91,7 +92,10 @@ export default function ManagerWarehouseTable() {
       setEditingWarehouse(null);
     } catch (error) {
       console.error('Save failed:', error);
-      toast.error('Failed to save warehouse');
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.message || 'Failed to save warehouse'
+        : 'Failed to save warehouse';
+      toast.error(message);
     }
   };
 
@@ -295,6 +299,30 @@ function WarehouseFormModal({
     }
   }, [initialData, branches]);
 
+  const handleSubmit = () => {
+    if (!form.warehouseName?.trim()) {
+      toast.error('Warehouse name is required');
+      return;
+    }
+    if (!form.warehouseCode?.trim()) {
+      toast.error('Warehouse code is required');
+      return;
+    }
+    if (!form.location?.trim()) {
+      toast.error('Location / City is required');
+      return;
+    }
+    if (!form.address?.trim()) {
+      toast.error('Full address is required');
+      return;
+    }
+    if (!form.capacity?.trim()) {
+      toast.error('Capacity is required');
+      return;
+    }
+    onConfirm(form);
+  };
+
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-xl">
@@ -308,7 +336,7 @@ function WarehouseFormModal({
           <div className="grid grid-cols-2 gap-x-8 gap-y-6">
             <div className="col-span-2 space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Warehouse Name
+                Warehouse Name *
               </label>
               <Input
                 placeholder="Enter warehouse name"
@@ -320,7 +348,7 @@ function WarehouseFormModal({
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Warehouse Code
+                Warehouse Code *
               </label>
               <Input
                 placeholder="e.g., WH-001"
@@ -341,7 +369,7 @@ function WarehouseFormModal({
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Location / City
+                Location / City *
               </label>
               <Input
                 placeholder="Enter city"
@@ -353,7 +381,7 @@ function WarehouseFormModal({
 
             <div className="col-span-2 space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Full Address
+                Full Address *
               </label>
               <Input
                 placeholder="Enter complete address"
@@ -365,7 +393,7 @@ function WarehouseFormModal({
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Capacity
+                Capacity *
               </label>
               <Input
                 placeholder="e.g., 30000 sqft"
@@ -404,7 +432,7 @@ function WarehouseFormModal({
             >
               Cancel
             </button>
-            <Button className="h-12 px-10" onClick={() => onConfirm(form)}>
+            <Button className="h-12 px-10" onClick={handleSubmit}>
               {initialData ? 'Update' : 'Confirm'}
             </Button>
           </div>

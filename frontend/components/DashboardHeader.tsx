@@ -1,6 +1,7 @@
 'use client';
 
 import { Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor } from 'lucide-react';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -44,6 +45,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
     email: '',
     initial: '',
     role: '',
+    profile_image_url: '',
   });
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -76,7 +78,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
       try {
         const res = await getProfile();
         if (res.success && res.data) {
-          const { first_name, last_name, name, email, role } = res.data;
+          const { first_name, last_name, name, email, role, profile_image_url } = res.data;
 
           const formattedRole = role
             ? role === 'HR' || role === 'IT'
@@ -94,6 +96,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
             email: email || '',
             initial: fullName.charAt(0).toUpperCase(),
             role: formattedRole,
+            profile_image_url: profile_image_url || '',
           });
         }
       } catch (error) {
@@ -262,10 +265,20 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                 suppressHydrationWarning
               >
                 <div
-                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0"
+                  className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-white/20 flex items-center justify-center text-xs sm:text-sm font-medium shrink-0 overflow-hidden relative"
                   suppressHydrationWarning
                 >
-                  {user.initial}
+                  {user.profile_image_url ? (
+                    <Image
+                      src={user.profile_image_url}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
+                  ) : (
+                    user.initial
+                  )}
                 </div>
                 <div
                   className="hidden sm:flex flex-col min-w-0 items-start"
@@ -289,8 +302,18 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
               className="w-64 p-2 bg-white border-slate-200 shadow-xl rounded-2xl"
             >
               <div className="flex items-center gap-3 p-3 mb-1 bg-slate-50 rounded-xl">
-                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm">
-                  {user.initial}
+                <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-sm overflow-hidden relative">
+                  {user.profile_image_url ? (
+                    <Image
+                      src={user.profile_image_url}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={true}
+                    />
+                  ) : (
+                    user.initial
+                  )}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5 max-w-full">

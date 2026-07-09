@@ -29,6 +29,7 @@ import {
   Landmark,
   Bell,
   ArrowLeft,
+  Banknote,
 } from 'lucide-react';
 
 import {
@@ -91,6 +92,7 @@ export default function FinanceSidebar() {
     { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
     { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
     { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
+    { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
     { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
     { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
   ];

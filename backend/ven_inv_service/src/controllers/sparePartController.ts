@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { SparePartService } from '../services/sparePartService';
 import { logger } from '../config/logger';
+import { Source } from '../config/db';
 
 const service = new SparePartService();
 
@@ -170,6 +171,36 @@ export const deleteSparePart = async (req: Request, res: Response) => {
         ? 400
         : 500;
     res.status(status).json({ success: false, message });
+  }
+};
+
+/**
+ * Returns total inventory value (quantity × purchase_price) for spare parts.
+ * Internal endpoint — used by billing_service chart-of-accounts.
+ */
+export const getInventoryValue = async (req: Request, res: Response) => {
+  try {
+    const branchIds = req.query.branchIds as string | undefined;
+    const ids = branchIds ? branchIds.split(',').filter(Boolean) : [];
+
+    let branchClause = '';
+    if (ids.length === 1) {
+      branchClause = `AND branch_id = '${ids[0]}'`;
+    } else if (ids.length > 1) {
+      branchClause = `AND branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
+    }
+
+    const rows = await Source.query<{ total: string }[]>(`
+      SELECT COALESCE(SUM(quantity * purchase_price), 0)::numeric AS total
+      FROM spare_parts
+      WHERE 1=1 ${branchClause}
+    `);
+
+    const total = Number(rows[0]?.total ?? 0);
+    res.json({ total });
+  } catch (error) {
+    logger.error('Error in getInventoryValue:', error);
+    res.status(500).json({ total: 0 });
   }
 };
 

@@ -153,7 +153,10 @@ export interface DepreciationModelRule {
 
 export interface AssetDepreciationRegister {
   id: string;
-  productId: string;
+  productId?: string;
+  assetType: 'PRINTER_PRODUCT' | 'MANUAL_ASSET';
+  assetCategory: string;
+  assetName?: string;
   brandId: string;
   modelId: string;
   branchId: string;
@@ -169,11 +172,17 @@ export interface AssetDepreciationRegister {
   disposalValue?: number;
   notes?: string;
   createdAt: string;
-  // computed
+  // computed depreciation fields
   monthlyDep: number;
   accumulated: number;
   nbv: number;
   monthsElapsed: number;
+  // enriched product details (only for PRINTER_PRODUCT assets)
+  serial_no?: string | null;
+  product_status?: string | null;
+  brand_name?: string | null;
+  model_name?: string | null;
+  product_purchase_price?: number | null;
 }
 
 export interface DepreciationScheduleRow {
@@ -838,6 +847,115 @@ export function calcDepreciation(asset: {
   return { monthlyDep, accumulated, nbv, monthsElapsed: activeMonths };
 }
 
+// ─── CHART OF ACCOUNTS ───────────────────────────────────────────────────────
+
+export interface AccountBalance {
+  code: string;
+  name: string;
+  balance: number;
+  currency: string;
+  lastUpdated: string;
+}
+
+export interface ChartOfAccountsResponse {
+  asOfDate: string;
+  periodFrom: string;
+  periodTo: string;
+  branchIds: string[];
+  currency: string;
+  assets: {
+    currentAssets: {
+      cashInHand: AccountBalance;
+      cashAtBank: AccountBalance;
+      accountsReceivable: AccountBalance;
+      securityDepositsReceivable: AccountBalance;
+      prepaidExpenses: AccountBalance;
+      sparePartsInventory: AccountBalance;
+      totalCurrentAssets: number;
+    };
+    nonCurrentAssets: {
+      equipmentGrossCost: AccountBalance;
+      accumulatedDepreciation: AccountBalance;
+      equipmentNBV: number;
+      totalNonCurrentAssets: number;
+    };
+    totalAssets: number;
+  };
+  liabilities: {
+    currentLiabilities: {
+      accountsPayable: AccountBalance;
+      accruedExpenses: AccountBalance;
+      vatPayable: AccountBalance;
+      securityDepositsReceived: AccountBalance;
+      deferredRevenue: AccountBalance;
+      salaryPayable: AccountBalance;
+      totalCurrentLiabilities: number;
+    };
+    nonCurrentLiabilities: { totalNonCurrentLiabilities: number };
+    totalLiabilities: number;
+  };
+  equity: {
+    ownerCapital: AccountBalance;
+    retainedEarnings: AccountBalance;
+    reserves: AccountBalance;
+    lessWithdrawals: AccountBalance;
+    lessDividends: AccountBalance;
+    totalEquity: number;
+  };
+  income: {
+    rentalRevenue: AccountBalance;
+    leaseRevenue: AccountBalance;
+    salesRevenue: AccountBalance;
+    serviceRevenue: AccountBalance;
+    usageRevenue: AccountBalance;
+    amcSmaRevenue: AccountBalance;
+    otherIncome: AccountBalance;
+    totalIncome: number;
+  };
+  expenses: {
+    costOfParts: AccountBalance;
+    labourCost: AccountBalance;
+    depreciation: AccountBalance;
+    vendorPurchases: AccountBalance;
+    salaryExpense: AccountBalance;
+    travelExpense: AccountBalance;
+    rentExpense: AccountBalance;
+    utilitiesExpense: AccountBalance;
+    marketingExpense: AccountBalance;
+    maintenanceExpense: AccountBalance;
+    insuranceExpense: AccountBalance;
+    otherExpenses: AccountBalance;
+    totalExpenses: number;
+  };
+  summary: {
+    grossProfit: number;
+    netProfit: number;
+    accountingEquation: {
+      totalAssets: number;
+      totalLiabilitiesPlusEquity: number;
+      isBalanced: boolean;
+      difference: number;
+    };
+  };
+}
+
+export interface ChartOfAccountsParams {
+  branchIds?: string[];
+  periodFrom?: string;
+  periodTo?: string;
+}
+
+export const getChartOfAccounts = (params: ChartOfAccountsParams = {}) =>
+  api
+    .get<{ success: boolean; data: ChartOfAccountsResponse }>(`${BASE}/chart-of-accounts`, {
+      params: {
+        branchIds: params.branchIds?.join(','),
+        periodFrom: params.periodFrom,
+        periodTo: params.periodTo,
+      },
+    })
+    .then((r) => r.data.data);
+
 // ─── ADMIN CONSOLIDATED API ───────────────────────────────────────────────────
 
 const ADMIN_BASE = '/b/accounts/admin';
@@ -925,4 +1043,121 @@ export const fetchConsolidatedBalanceSheet = (params?: Record<string, string>) =
       success: boolean;
       data: unknown;
     }>(`${ADMIN_BASE}/consolidated-balance-sheet`, { params })
+    .then((r) => r.data.data);
+
+// ─────────────────────────────────────────────
+// CHEQUES
+// ─────────────────────────────────────────────
+
+export interface Cheque {
+  id: string;
+  chequeNo: string;
+  bankName?: string;
+  partyName: string;
+  amount: number;
+  dueDate: string;
+  issueDate?: string;
+  type: 'RECEIVED' | 'ISSUED';
+  status: 'PENDING' | 'DEPOSITED' | 'CLEARED' | 'BOUNCED' | 'CANCELLED' | 'ISSUED';
+  description?: string;
+  branchId: string;
+  accountId?: string;
+  cashbookEntryId?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChequeWithHistory extends Cheque {
+  history: {
+    id: string;
+    fromStatus?: string;
+    toStatus: string;
+    notes?: string;
+    changedBy: string;
+    changedAt: string;
+  }[];
+}
+
+const CHEQUE_BASE = `${BASE}/cheques`;
+
+export const fetchCheques = (params?: { status?: string; type?: string; search?: string }) =>
+  api.get<{ success: boolean; data: Cheque[] }>(CHEQUE_BASE, { params }).then((r) => r.data.data);
+
+export const fetchChequeSummary = () =>
+  api
+    .get<{ success: boolean; data: Record<string, number> }>(`${CHEQUE_BASE}/summary`)
+    .then((r) => r.data.data);
+
+export const fetchChequeNotifications = () =>
+  api
+    .get<{ success: boolean; data: Cheque[]; count: number }>(`${CHEQUE_BASE}/notifications`)
+    .then((r) => r.data);
+
+export const fetchChequeById = (id: string) =>
+  api
+    .get<{ success: boolean; data: ChequeWithHistory }>(`${CHEQUE_BASE}/${id}`)
+    .then((r) => r.data.data);
+
+export const createCheque = (body: {
+  chequeNo: string;
+  bankName?: string;
+  partyName: string;
+  amount: number;
+  dueDate: string;
+  issueDate?: string;
+  type: 'RECEIVED' | 'ISSUED';
+  description?: string;
+  accountId?: string;
+}) => api.post<{ success: boolean; data: Cheque }>(CHEQUE_BASE, body).then((r) => r.data.data);
+
+export const updateCheque = (
+  id: string,
+  body: Partial<
+    Pick<
+      Cheque,
+      | 'chequeNo'
+      | 'bankName'
+      | 'partyName'
+      | 'amount'
+      | 'dueDate'
+      | 'issueDate'
+      | 'description'
+      | 'accountId'
+    >
+  >,
+) =>
+  api
+    .patch<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}`, body)
+    .then((r) => r.data.data);
+
+export const depositCheque = (
+  id: string,
+  body: { accountId: string; depositDate?: string; notes?: string },
+) =>
+  api
+    .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/deposit`, body)
+    .then((r) => r.data.data);
+
+export const issueCheque = (
+  id: string,
+  body: { accountId: string; issueDate?: string; notes?: string },
+) =>
+  api
+    .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/issue`, body)
+    .then((r) => r.data.data);
+
+export const clearCheque = (id: string, body?: { notes?: string }) =>
+  api
+    .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/clear`, body ?? {})
+    .then((r) => r.data.data);
+
+export const bounceCheque = (id: string, body?: { notes?: string }) =>
+  api
+    .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/bounce`, body ?? {})
+    .then((r) => r.data.data);
+
+export const cancelCheque = (id: string, body?: { notes?: string }) =>
+  api
+    .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/cancel`, body ?? {})
     .then((r) => r.data.data);
