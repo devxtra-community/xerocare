@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm, useFieldArray, Control, Resolver } from 'react-hook-form';
+import { useForm, useFieldArray, Control, Resolver, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -171,7 +171,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
       .catch(() => setCurrencyCode('AED'));
   }, []);
 
-  const watchLotNumber = form.watch('lotNumber');
+  const watchLotNumber = useWatch({ control: form.control, name: 'lotNumber' });
 
   // Real-time lot number validation
   useEffect(() => {
@@ -286,7 +286,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   };
 
   // Calculate totals for display
-  const watchedItems = form.watch('items');
+  const watchedItems = useWatch({ control: form.control, name: 'items' });
   const calculateItemsTotal = () => {
     return (
       watchedItems?.reduce((sum, item) => sum + (item.quantity || 0) * (item.unitPrice || 0), 0) ??
@@ -728,7 +728,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           control={formControl}
                                           name={`items.${index}.modelId`}
                                           render={({ field: modelField }) => {
-                                            const itemBrand = form.watch(`items.${index}.brand`);
+                                            const itemBrand = watchedItems?.[index]?.brand;
                                             return (
                                               <FormItem>
                                                 <FormControl>
@@ -782,14 +782,12 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                             }}
                                             className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
                                           >
-                                            {form.watch(`items.${index}.isRequestingNewPart`) !==
-                                            false
+                                            {watchedItems?.[index]?.isRequestingNewPart !== false
                                               ? '+ Existing Spare Part?'
                                               : '+ New Spare Part?'}
                                           </button>
                                         </div>
-                                        {form.watch(`items.${index}.isRequestingNewPart`) !==
-                                        false ? (
+                                        {watchedItems?.[index]?.isRequestingNewPart !== false ? (
                                           <FormField
                                             control={formControl}
                                             name={`items.${index}.partName`}
@@ -811,7 +809,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                             control={formControl}
                                             name={`items.${index}.sparePartId`}
                                             render={({ field: sparePartField }) => {
-                                              const itemBrand = form.watch(`items.${index}.brand`);
+                                              const itemBrand = watchedItems?.[index]?.brand;
                                               return (
                                                 <FormItem>
                                                   <FormControl>
@@ -963,7 +961,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                           control={formControl}
                                           name={`items.${index}.modelIds`}
                                           render={({ field: modelIdsField }) => {
-                                            const itemBrand = form.watch(`items.${index}.brand`);
+                                            const itemBrand = watchedItems?.[index]?.brand;
                                             return (
                                               <MultiSelect
                                                 values={modelIdsField.value || []}
