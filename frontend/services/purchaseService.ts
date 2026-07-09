@@ -12,6 +12,7 @@ export interface Payment {
   referenceNumber?: string;
   paymentDate: string;
   description?: string;
+  attachmentUrl?: string;
 }
 
 export interface PurchaseCost {
@@ -147,7 +148,24 @@ export const purchaseService = {
   /**
    * Add a new payment (e.g., bank transfer, cash) against a purchase.
    */
-  addPayment: async (purchaseId: string, data: AddPaymentDto): Promise<Payment> => {
+  addPayment: async (
+    purchaseId: string,
+    data: AddPaymentDto,
+    attachment?: File | null,
+  ): Promise<Payment> => {
+    if (attachment) {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          formData.append(key, String(value));
+        }
+      });
+      formData.append('receipt', attachment);
+      const response = await api.post(`/i/purchases/${purchaseId}/payments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data.data;
+    }
     const response = await api.post(`/i/purchases/${purchaseId}/payments`, data);
     return response.data.data;
   },

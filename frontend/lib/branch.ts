@@ -87,6 +87,12 @@ export async function getAllBranches(): Promise<Branch[]> {
   return res.data.data;
 }
 
+/** Current manager's own branch (MANAGER role only). */
+export async function getMyBranch(): Promise<Branch> {
+  const res = await api.get<{ success: boolean; data: Branch }>('/i/branch/my-branch');
+  return res.data.data;
+}
+
 export async function updateBranch(id: string, data: UpdateBranchPayload) {
   const res = await api.put(`/i/branch/${id}`, data);
   return res.data;

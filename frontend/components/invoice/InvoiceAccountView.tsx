@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Plus, Receipt, AlertCircle } from 'lucide-react';
+import { Loader2, Plus, Receipt, AlertCircle, Paperclip, FileText } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 
@@ -40,6 +40,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchSummary = React.useCallback(async () => {
@@ -82,12 +83,14 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
         paymentDate,
         referenceNumber,
         remarks,
+        receiptFile,
       });
       toast.success('Payment recorded successfully');
       setShowForm(false);
       setAmountPaid('');
       setReferenceNumber('');
       setRemarks('');
+      setReceiptFile(null);
       fetchSummary();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -213,6 +216,21 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                     rows={2}
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500">
+                    Payment Proof (Optional) — screenshot or PDF receipt
+                  </label>
+                  <Input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                  />
+                  {receiptFile && (
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <Paperclip size={12} /> {receiptFile.name}
+                    </p>
+                  )}
+                </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                     Cancel
@@ -234,12 +252,13 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                     <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Mode</th>
                     <th className="px-4 py-3">Ref/Remarks</th>
+                    <th className="px-4 py-3">Proof</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {summary.payments.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-slate-400">
+                      <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
                         <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         No payments recorded yet
                       </td>
@@ -262,6 +281,20 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                           <p className="text-xs font-semibold">{p.referenceNumber || '-'}</p>
                           {p.remarks && (
                             <p className="text-[10px] text-slate-500 mt-0.5">{p.remarks}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {p.receiptUrl ? (
+                            <a
+                              href={p.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                            >
+                              <FileText size={12} /> View
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-300">-</span>
                           )}
                         </td>
                       </tr>

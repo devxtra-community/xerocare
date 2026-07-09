@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   ChevronDown,
   ChevronUp,
+  Download,
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -60,6 +61,32 @@ export function BulkProductDialog({
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+  // Same-batch units (e.g. 10x the same product from one lot) usually share
+  // everything except serial number & date of manufacture. Fill a value once
+  // here and push it to every row instead of retyping it 10 times.
+  const [bulkFill, setBulkFill] = useState<{
+    warehouse_id: string;
+    vendor_id: string;
+    sale_price: string;
+    wholesale_price: string;
+    tax_rate: string;
+    print_colour: BulkProductRow['print_colour'];
+    hs_code: string;
+    max_discount_amount: string;
+    MFD: string;
+    product_status: BulkProductRow['product_status'];
+  }>({
+    warehouse_id: '',
+    vendor_id: '',
+    sale_price: '',
+    wholesale_price: '',
+    tax_rate: '',
+    print_colour: 'BOTH',
+    hs_code: '',
+    max_discount_amount: '',
+    MFD: '',
+    product_status: 'AVAILABLE',
+  });
 
   const loadDependencies = async () => {
     const [vResult, wResult, lResult, mResult, bResult] = await Promise.allSettled([
@@ -110,7 +137,9 @@ export function BulkProductDialog({
     purchase_price: 0,
     sale_price: 0,
     tax_rate: 0,
-    print_colour: 'BLACK_WHITE',
+    // Colour-only or B&W-only machines are rare these days; default to a
+    // dual-capable machine and let the user narrow it down per row.
+    print_colour: 'BOTH',
     max_discount_amount: 0,
     wholesale_price: 0,
     lot_id: '',
@@ -171,11 +200,20 @@ export function BulkProductDialog({
                   sale_price: Number(item.sellingPrice) || 0,
                   name: item.customProductName || model?.model_name || '',
                   description: model?.description || '',
+                  hs_code: item.hsCode || '',
                 });
               }
             });
 
             setRows(newRows);
+            // Seed Bulk Fill with the lot's shared values so it isn't blank —
+            // vendor/warehouse/HS code are the same for every unit in a lot.
+            setBulkFill((prev) => ({
+              ...prev,
+              warehouse_id: lot.warehouseId || lot.warehouse_id || '',
+              vendor_id: vendorId,
+              hs_code: newRows[0]?.hs_code || '',
+            }));
           }
         } else {
           setRows([]);
@@ -195,6 +233,34 @@ export function BulkProductDialog({
     const excelEpoch = new Date(1899, 11, 30);
     const date = new Date(excelEpoch.getTime() + serial * 86400000);
     return date.toISOString().split('T')[0];
+  };
+
+  /** Downloads a sample sheet with headers matching parseExcelData's column names. */
+  const handleDownloadSample = () => {
+    const sampleRows = [
+      {
+        'Model No': 'Look up the Model ID from the Models page',
+        'Serial No': 'SN-0001',
+        'Product Name': 'Kyocera Taskalfa 2321',
+        Brand: 'Kyocera',
+        Warehouse: 'Look up the Warehouse ID from the Warehouses page',
+        Vendor: 'Look up the Vendor ID from the Vendors page',
+        Status: 'AVAILABLE',
+        'Date of Manufacture': '2026-01-15',
+        'Purchase Price': 305.6,
+        'Wholesale Price': 600,
+        'Sale Price': 700,
+        'Max Discount': 100,
+        'Tax Rate': 0,
+        'Print Colour': 'BOTH',
+        Lot: '',
+        'HS Code': '8443.31',
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    XLSX.writeFile(wb, 'product-bulk-upload-sample.xlsx');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -260,6 +326,11 @@ export function BulkProductDialog({
     const newRows = [...rows];
     newRows[index] = { ...newRows[index], [field]: value };
     setRows(newRows);
+  };
+
+  /** Pushes one Bulk Fill field's current value onto every row, live as the user types/selects. */
+  const applyBulkField = <K extends keyof BulkProductRow>(field: K, value: BulkProductRow[K]) => {
+    setRows((prev) => prev.map((r) => ({ ...r, [field]: value })));
   };
 
   /**
@@ -433,11 +504,185 @@ export function BulkProductDialog({
                 Upload Excel
               </label>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadSample}
+              className="gap-2"
+            >
+              <Download size={18} />
+              Download Sample
+            </Button>
           </div>
           <div className="text-sm text-muted-foreground">
             {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}
           </div>
         </div>
+
+        {rows.length > 1 && (
+          <div className="p-4 bg-blue-50/60 border-b">
+            <p className="text-xs font-bold text-blue-900 mb-3">
+              Bulk Fill — type here and it fills all {rows.length} rows below live (Serial Number &
+              Date of Manufacture stay per-unit).
+            </p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <BulkFillField label="Warehouse">
+                <SearchableSelect
+                  value={bulkFill.warehouse_id}
+                  onValueChange={(v) => {
+                    setBulkFill((p) => ({ ...p, warehouse_id: v }));
+                    applyBulkField('warehouse_id', v);
+                  }}
+                  options={warehouses.map((w) => ({
+                    value: w.id || '',
+                    label: w.warehouseName || '',
+                  }))}
+                  placeholder="Warehouse"
+                  emptyText="No warehouses"
+                  className="w-36"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Vendor">
+                <SearchableSelect
+                  value={bulkFill.vendor_id}
+                  onValueChange={(v) => {
+                    setBulkFill((p) => ({ ...p, vendor_id: v }));
+                    applyBulkField('vendor_id', v);
+                  }}
+                  options={vendors.map((v) => ({ value: String(v.id || ''), label: v.name || '' }))}
+                  placeholder="Vendor"
+                  emptyText="No vendors"
+                  className="w-36"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Sale Price">
+                <Input
+                  type="number"
+                  className="w-24 h-9"
+                  value={bulkFill.sale_price}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, sale_price: raw }));
+                    applyBulkField('sale_price', Number(raw) || 0);
+                  }}
+                  placeholder="0"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Wholesale Price">
+                <Input
+                  type="number"
+                  className="w-24 h-9"
+                  value={bulkFill.wholesale_price}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, wholesale_price: raw }));
+                    applyBulkField('wholesale_price', Number(raw) || 0);
+                  }}
+                  placeholder="0"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Tax Rate (%)">
+                <Input
+                  type="number"
+                  className="w-20 h-9"
+                  value={bulkFill.tax_rate}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, tax_rate: raw }));
+                    applyBulkField('tax_rate', Number(raw) || 0);
+                  }}
+                  placeholder="0"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Print Colour">
+                <Select
+                  value={bulkFill.print_colour}
+                  onValueChange={(v) => {
+                    const colour = v as BulkProductRow['print_colour'];
+                    setBulkFill((p) => ({ ...p, print_colour: colour }));
+                    applyBulkField('print_colour', colour);
+                  }}
+                >
+                  <SelectTrigger className="w-28 h-9">
+                    <SelectValue placeholder="Colour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BLACK_WHITE">B&W</SelectItem>
+                    <SelectItem value="COLOUR">Colour</SelectItem>
+                    <SelectItem value="BOTH">Both</SelectItem>
+                  </SelectContent>
+                </Select>
+              </BulkFillField>
+
+              <BulkFillField label="HS Code">
+                <Input
+                  className="w-28 h-9"
+                  value={bulkFill.hs_code}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, hs_code: raw }));
+                    applyBulkField('hs_code', raw);
+                  }}
+                  placeholder="HS Code"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Max Discount">
+                <Input
+                  type="number"
+                  className="w-24 h-9"
+                  value={bulkFill.max_discount_amount}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, max_discount_amount: raw }));
+                    applyBulkField('max_discount_amount', Number(raw) || 0);
+                  }}
+                  placeholder="0"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Date of Manufacture">
+                <Input
+                  type="date"
+                  className="w-36 h-9"
+                  value={bulkFill.MFD}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, MFD: raw }));
+                    applyBulkField('MFD', raw);
+                  }}
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Product Status">
+                <Select
+                  value={bulkFill.product_status}
+                  onValueChange={(v) => {
+                    const status = v as BulkProductRow['product_status'];
+                    setBulkFill((p) => ({ ...p, product_status: status }));
+                    applyBulkField('product_status', status);
+                  }}
+                >
+                  <SelectTrigger className="w-32 h-9">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AVAILABLE">Available</SelectItem>
+                    <SelectItem value="RENTED">Rented</SelectItem>
+                    <SelectItem value="LEASE">Lease</SelectItem>
+                    <SelectItem value="SOLD">Sold</SelectItem>
+                    <SelectItem value="DAMAGED">Damaged</SelectItem>
+                  </SelectContent>
+                </Select>
+              </BulkFillField>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {rows.length > 0 ? (
@@ -579,6 +824,7 @@ export function BulkProductDialog({
                                       'description',
                                       modelObj?.description || row.description || '',
                                     );
+                                    updateRow(i, 'hs_code', item.hsCode || row.hs_code || '');
                                     updateRow(
                                       i,
                                       'vendor_id',
@@ -1145,6 +1391,15 @@ export function BulkProductDialog({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function BulkFillField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[10px] font-bold text-blue-700 mb-1">{label}</label>
+      {children}
     </div>
   );
 }

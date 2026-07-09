@@ -8,6 +8,7 @@ export interface PaymentLedger {
   paymentDate: string;
   referenceNumber?: string;
   remarks?: string;
+  receiptUrl?: string;
   recordedBy: string;
   createdAt: string;
 }
@@ -30,8 +31,21 @@ export const recordPayment = async (data: {
   paymentDate: string;
   referenceNumber?: string;
   remarks?: string;
+  receiptFile?: File | null;
 }): Promise<PaymentLedger> => {
-  const response = await api.post('/b/payments/record', data);
+  // `invoiceId` must be appended before `receipt` — multer-s3 reads req.body fields
+  // as they stream in, and the file's storage key is keyed off invoiceId.
+  const form = new FormData();
+  form.append('invoiceId', data.invoiceId);
+  form.append('amountPaid', String(data.amountPaid));
+  form.append('paymentMode', data.paymentMode);
+  form.append('paymentDate', data.paymentDate);
+  if (data.referenceNumber) form.append('referenceNumber', data.referenceNumber);
+  if (data.remarks) form.append('remarks', data.remarks);
+  if (data.receiptFile) form.append('receipt', data.receiptFile);
+
+  // Let the browser set Content-Type (incl. multipart boundary) — do not set it manually.
+  const response = await api.post('/b/payments/record', form);
   return response.data.data;
 };
 

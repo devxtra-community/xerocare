@@ -76,9 +76,12 @@ export class PurchaseController {
       const branchId = req.user?.branchId;
       if (!branchId) throw new AppError('Branch ID is required', 400);
 
+      const receiptFile = req.file as unknown as { location?: string } | undefined;
+
       const paymentData = {
         ...req.body,
         createdBy: req.user?.userId,
+        attachmentUrl: receiptFile?.location,
       };
 
       const payment = await purchaseService.addPayment(id, paymentData, branchId);

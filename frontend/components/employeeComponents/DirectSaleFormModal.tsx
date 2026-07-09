@@ -50,6 +50,25 @@ interface SaleItem {
   maxDiscount?: number;
 }
 
+const DEFAULT_WARRANTY_KEY = 'xerocare_direct_sale_default_warranty';
+
+interface DefaultWarranty {
+  warrantyType: 'none' | 'duration' | 'copies' | 'both';
+  warrantyDurationValue: string;
+  warrantyDurationUnit: 'months' | 'years';
+  warrantyCopyLimit: string;
+}
+
+function loadDefaultWarranty(): DefaultWarranty | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(DEFAULT_WARRANTY_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFormModalProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -61,11 +80,21 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [paymentReference, setPaymentReference] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Warranty states (for product sales)
-  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('none');
-  const [warrantyDurationValue, setWarrantyDurationValue] = useState('');
-  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('months');
-  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('');
+  // Warranty states (for product sales) — seeded from the last-used defaults,
+  // saved to localStorage after a successful sale below.
+  const defaultWarranty = loadDefaultWarranty();
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>(
+    defaultWarranty?.warrantyType || 'none',
+  );
+  const [warrantyDurationValue, setWarrantyDurationValue] = useState(
+    defaultWarranty?.warrantyDurationValue || '',
+  );
+  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>(
+    defaultWarranty?.warrantyDurationUnit || 'months',
+  );
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState(
+    defaultWarranty?.warrantyCopyLimit || '',
+  );
 
   const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
   const [sparePartStocks, setSparePartStocks] = useState<
@@ -373,6 +402,19 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       const createdInvoice = res.data.data || res.data;
       setSuccessInvoice(createdInvoice);
 
+      // Remember this warranty config as the default for the next direct sale.
+      if (items.some((it) => it.itemType === 'PRODUCT') && typeof window !== 'undefined') {
+        window.localStorage.setItem(
+          DEFAULT_WARRANTY_KEY,
+          JSON.stringify({
+            warrantyType,
+            warrantyDurationValue,
+            warrantyDurationUnit,
+            warrantyCopyLimit,
+          }),
+        );
+      }
+
       // Pre-fill customer notifications info
       const cust = customers.find((c) => c.id === customerId);
       if (cust) {
@@ -411,15 +453,35 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     }
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1] || '');
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
   const handleSendEmail = async () => {
     if (!successInvoice) return;
     if (!notifyEmail) return toast.error('Please enter a recipient email.');
     setNotifyingEmail(true);
     try {
+      const pdfRes = await api.get(`/b/invoices/${successInvoice.id}/download-premium`, {
+        responseType: 'blob',
+      });
+      const base64Data = await blobToBase64(new Blob([pdfRes.data]));
+
       await api.post(`/b/invoices/${successInvoice.id}/notify/email`, {
         recipient: notifyEmail,
         subject: `Your Invoice ${successInvoice.invoiceNumber || ''} from Xerocare`,
         body: `Dear Customer, please find your invoice ${successInvoice.invoiceNumber || ''} details below.\nGrand Total: QAR ${successInvoice.totalAmount || 0}`,
+        attachments: [
+          {
+            filename: `Invoice-${successInvoice.invoiceNumber || successInvoice.id}.pdf`,
+            content: base64Data,
+            encoding: 'base64',
+          },
+        ],
       });
       toast.success('Email notification sent successfully!');
     } catch {

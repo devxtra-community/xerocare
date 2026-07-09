@@ -106,7 +106,7 @@ export const getLeaveApplicationById = async (req: Request, res: Response, next:
     const leaveApplication = await service.getLeaveApplicationById(id);
 
     const isOwner = leaveApplication.employee_id === req.user?.userId;
-    const isHROrAdmin = [EmployeeRole.HR, EmployeeRole.ADMIN].includes(
+    const isHROrAdmin = [EmployeeRole.HR, EmployeeRole.ADMIN, EmployeeRole.MANAGER].includes(
       req.user?.role as EmployeeRole,
     );
     const isSameBranch = leaveApplication.branch_id === req.user?.branchId;

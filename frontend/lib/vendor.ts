@@ -7,7 +7,7 @@ export interface BankAccount {
   routingNumber?: string;
   swiftCode?: string;
   iban?: string;
-  ifscCode?: string;
+  address?: string;
   isPrimary?: boolean;
 }
 
@@ -37,6 +37,8 @@ export interface Vendor {
   countryCode?: string;
   countryName?: string;
   bankAccounts?: BankAccount[];
+  branchId?: string | null;
+  branch?: { id: string; name: string } | null;
 }
 
 export async function createVendor(data: Partial<Vendor>) {

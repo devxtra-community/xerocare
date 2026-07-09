@@ -20,6 +20,7 @@ import {
   Plus,
   Pencil,
   Eye,
+  Paperclip,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -81,16 +82,20 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
   const router = useRouter();
 
   useEffect(() => {
-    // Initialize receivedItems from lot data
+    // Initialize receivedItems from lot data.
+    // For a lot that hasn't been touched yet (still PENDING), default the
+    // received qty to the full expected qty so the whole shipment is marked
+    // by default and the user only needs to move units into "damaged".
     const initial: Record<string, { received: number; damaged: number }> = {};
+    const notYetStarted = currentLot.status === LotStatus.PENDING;
     (currentLot.items || []).forEach((item) => {
       initial[item.id] = {
-        received: item.receivedQuantity || 0,
+        received: notYetStarted ? item.expectedQuantity : item.receivedQuantity || 0,
         damaged: item.damagedQuantity || 0,
       };
     });
     setReceivedItems(initial);
-  }, [currentLot.items]);
+  }, [currentLot.items, currentLot.status]);
 
   const fetchPurchase = React.useCallback(async () => {
     try {
@@ -143,17 +148,18 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
         damaged_quantity: qtys.damaged,
       }));
 
-      // Validation
+      // Validation: every expected unit must be accounted for as either
+      // received or damaged before the lot can be saved/confirmed.
       for (const item of items) {
         const original = (currentLot.items || []).find((i) => i.id === item.item_id);
         if (
           original &&
-          item.received_quantity + item.damaged_quantity > original.expectedQuantity
+          item.received_quantity + item.damaged_quantity !== original.expectedQuantity
         ) {
           toast.error(
             `Error in item: ${original.itemType === LotItemType.MODEL ? original.model?.model_name || original.customProductName || 'Unnamed Product' : original.sparePart?.part_name || original.customSparePartName || 'Unnamed Spare'}`,
             {
-              description: `Total (Received + Damaged) cannot exceed Expected (${original.expectedQuantity})`,
+              description: `Total (Received + Damaged) must equal Expected (${original.expectedQuantity})`,
             },
           );
           setIsSaving(false);
@@ -245,6 +251,24 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
     }
   };
 
+  // With `responseType: 'blob'`, axios also returns error bodies as a Blob,
+  // so `err.response.data.message` is always undefined and the toast falls
+  // back to the generic "Request failed with status code 404". Parse the
+  // blob back into JSON to surface the real backend error message.
+  const extractBlobErrorMessage = async (err: unknown): Promise<string> => {
+    const axiosErr = err as { response?: { data?: unknown }; message?: string };
+    const data = axiosErr.response?.data;
+    if (data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await data.text());
+        return parsed.message || axiosErr.message || 'Unknown error';
+      } catch {
+        return axiosErr.message || 'Unknown error';
+      }
+    }
+    return (data as { message?: string })?.message || axiosErr.message || 'Unknown error';
+  };
+
   const handlePrintProductBarcodes = async () => {
     try {
       const response = await api.get(`/i/inventory/products/barcode-pdf?lotId=${currentLot.id}`, {
@@ -254,9 +278,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
       window.open(fileUrl);
     } catch (err: unknown) {
       toast.error('Failed to generate product barcodes', {
-        description:
-          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          (err as Error).message,
+        description: await extractBlobErrorMessage(err),
       });
     }
   };
@@ -273,9 +295,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
       window.open(fileUrl);
     } catch (err: unknown) {
       toast.error('Failed to generate spare part barcodes', {
-        description:
-          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          (err as Error).message,
+        description: await extractBlobErrorMessage(err),
       });
     }
   };
@@ -328,7 +348,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <User size={14} className="text-slate-400" />
-                      {lot.vendor?.name}
+                      {lot.vendor?.name ?? (lot.transferOrigin ? 'Internal Transfer' : '—')}
                     </div>
                   </div>
                 </div>
@@ -906,9 +926,22 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                                     {format(new Date(p.paymentDate), 'MMM d, yyyy')}
                                   </span>
                                 </div>
-                                <span className="font-bold text-green-600">
-                                  +{formatCurrency(Number(p.amount))}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  {p.attachmentUrl && (
+                                    <a
+                                      href={p.attachmentUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-slate-400 hover:text-primary transition-colors"
+                                      title="View receipt"
+                                    >
+                                      <Paperclip size={12} />
+                                    </a>
+                                  )}
+                                  <span className="font-bold text-green-600">
+                                    +{formatCurrency(Number(p.amount))}
+                                  </span>
+                                </div>
                               </div>
                             ))}
                           </div>

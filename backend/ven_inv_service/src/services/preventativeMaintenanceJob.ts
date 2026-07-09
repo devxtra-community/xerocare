@@ -13,20 +13,34 @@ import { In } from 'typeorm';
 
 const INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
+
+interface RentAllocation {
+  productId: string;
+  serialNumber: string;
+  contractId: string;
+  branchId: string;
+  customerId: string;
+}
+
+// product_allocations & invoices live in billing_service's own database,
+// so they're fetched over HTTP rather than queried directly from here.
+async function fetchActiveRentAllocations(): Promise<RentAllocation[]> {
+  const resp = await fetch(`${BILLING_SERVICE_URL}/invoices/allocations/active-rent`, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!resp.ok) {
+    throw new Error(`billing_service returned ${resp.status} for active-rent allocations`);
+  }
+  const body = (await resp.json()) as { success: boolean; data: RentAllocation[] };
+  return body.data;
+}
+
 export async function runPreventativeMaintenanceJob() {
   logger.info('[CRON-PM] Running daily Preventative Maintenance Service Ticket Generation Job...');
 
   try {
-    // Find all allocated rent machines from product_allocations & invoices
-    const rentAllocations = await Source.query(`
-      SELECT pa."productId", pa."serialNumber", pa."contractId", i."branchId", i."customerId"
-      FROM product_allocations pa
-      JOIN invoices i ON pa."contractId" = i.id
-      WHERE i.type = 'PROFORMA'
-        AND i."billType" = 'RENT'
-        AND i."contractStatus" = 'ACTIVE'
-        AND pa.status = 'ALLOCATED'
-    `);
+    const rentAllocations = await fetchActiveRentAllocations();
 
     logger.info(`[CRON-PM] Found ${rentAllocations.length} active rent allocation(s) to check.`);
 

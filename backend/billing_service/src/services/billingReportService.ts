@@ -3,6 +3,7 @@ import { UsageRepository } from '../repositories/usageRepository';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { CreditNote } from '../entities/creditNoteEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { Source } from '../config/dataSource';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
@@ -1032,10 +1033,16 @@ export class BillingReportService {
     const quotation = await this.invoiceRepo.findById(quotationId);
     if (!quotation) throw new AppError('Quotation not found', 404);
 
-    const [customer, employee] = await Promise.all([
+    const [customer, employee, paymentTransactions] = await Promise.all([
       this.getCustomerDetails(quotation.customerId),
       this.getEmployeeDetails(quotation.createdBy),
+      Source.getRepository(PaymentTransaction).find({ where: { invoiceId: quotationId } }),
     ]);
+
+    const transactionsPaid = paymentTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    // Fall back to the advance recorded at booking time if no ledger payments exist yet.
+    const amountPaid =
+      transactionsPaid > 0 ? transactionsPaid : Number(quotation.advanceAmount || 0);
 
     // Enrich items with product/spare part details
     const enrichedItems = await Promise.all(
@@ -1287,8 +1294,16 @@ export class BillingReportService {
     doc.font('Helvetica').fontSize(9);
 
     // --- Table Content ---
+    const descWidth = 270;
+    // Fixed row height with clipped text (via `ellipsis`) so long names/descriptions
+    // can never spill past the row border into the totals block below.
+    const itemHeight = 60;
+
     for (const item of enrichedItems) {
-      const itemHeight = 60;
+      if (currentY + itemHeight > 720) {
+        doc.addPage();
+        currentY = 50;
+      }
 
       // Row Border
       doc
@@ -1316,17 +1331,23 @@ export class BillingReportService {
           ? item.description
           : item.metadata?.description || 'Standard specification as per brand guidelines.';
 
-      doc.fillColor('#475569').text(mpn, mpnX + 5, currentY + 5, { width: 50 });
+      doc
+        .fillColor('#475569')
+        .text(mpn, mpnX + 5, currentY + 5, { width: 50, height: itemHeight - 10, ellipsis: true });
 
       doc
         .fillColor('#1e293b')
         .font('Helvetica-Bold')
-        .text(productName, descX, currentY + 5);
+        .text(productName, descX, currentY + 5, { width: descWidth, height: 14, ellipsis: true });
       doc
         .fillColor('#64748b')
         .font('Helvetica')
         .fontSize(8)
-        .text(description, descX, currentY + 18, { width: 270 });
+        .text(description, descX, currentY + 18, {
+          width: descWidth,
+          height: itemHeight - 25,
+          ellipsis: true,
+        });
 
       doc
         .fillColor('#1e293b')
@@ -1354,11 +1375,6 @@ export class BillingReportService {
         );
 
       currentY += itemHeight;
-
-      if (currentY > 700) {
-        doc.addPage();
-        currentY = 50;
-      }
     }
 
     // --- Subtotal / Grand Total ---
@@ -1406,13 +1422,14 @@ export class BillingReportService {
       : Number(quotation.totalAmount || netAmount);
     const grandTotal = baseTotal + totalVat;
 
-    doc.moveDown(1);
     const totalsX = 350;
     const totalsWidth = 210;
     const labelWidth = 110;
     const valueWidth = 90;
     const valueX = totalsX + 120;
-    let totalY = doc.y;
+    // Anchor to the row tracker, not doc.y — the last item row's fixed-position
+    // .text() calls leave doc.y pointing mid-table, not below the table.
+    let totalY = currentY + 10;
 
     // Subtotal Row
     doc.font('Helvetica').fontSize(9).fillColor('#64748b');
@@ -1472,6 +1489,60 @@ export class BillingReportService {
       );
 
     totalY += 45;
+
+    // Amount Paid / Balance Due — reflects advances or payments already recorded
+    // against this quotation (e.g. paid at time of purchase).
+    if (amountPaid > 0) {
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+      doc.text('Amount Paid', totalsX, totalY, { width: labelWidth });
+      doc
+        .fillColor('#16a34a')
+        .text(
+          `- QAR ${amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          valueX,
+          totalY,
+          { width: valueWidth, align: 'right' },
+        );
+      totalY += 16;
+
+      const balanceDue = Math.max(0, grandTotal - amountPaid);
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b');
+      doc.text('Balance Due', totalsX, totalY, { width: labelWidth });
+      doc.text(
+        `QAR ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        valueX,
+        totalY,
+        { width: valueWidth, align: 'right' },
+      );
+      totalY += 20;
+    }
+
+    // Warranty summary — shown whenever a warranty config was set on the sale
+    // (product/spare-part sale or lease), regardless of whether an advance was paid.
+    if (quotation.warrantyType && quotation.warrantyType !== 'none') {
+      const warrantyParts: string[] = [];
+      if (quotation.warrantyType === 'duration' || quotation.warrantyType === 'both') {
+        warrantyParts.push(
+          `${quotation.warrantyDurationValue || 0} ${quotation.warrantyDurationUnit || ''}`,
+        );
+      }
+      if (quotation.warrantyType === 'copies' || quotation.warrantyType === 'both') {
+        warrantyParts.push(`${Number(quotation.warrantyCopyLimit || 0).toLocaleString()} copies`);
+      }
+      const warrantyText =
+        quotation.warrantyType === 'both'
+          ? `Warranty: ${warrantyParts.join(' + ')} (whichever comes first)`
+          : `Warranty: ${warrantyParts.join(' + ')}`;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor('#b91c1c')
+        .text(warrantyText, totalsX, totalY, {
+          width: totalsWidth,
+        });
+      totalY += 20;
+    }
+
     doc.y = totalY;
 
     doc.moveDown(2);
@@ -1563,10 +1634,15 @@ export class BillingReportService {
     const invoice = await this.invoiceRepo.findById(invoiceId);
     if (!invoice) throw new AppError('Invoice not found', 404);
 
-    const [customer, employee] = await Promise.all([
+    const [customer, employee, paymentTransactions] = await Promise.all([
       this.getCustomerDetails(invoice.customerId),
       this.getEmployeeDetails(invoice.createdBy),
+      Source.getRepository(PaymentTransaction).find({ where: { invoiceId } }),
     ]);
+
+    const transactionsPaid = paymentTransactions.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    // Fall back to the advance recorded at booking time if no ledger payments exist yet.
+    const amountPaid = transactionsPaid > 0 ? transactionsPaid : Number(invoice.advanceAmount || 0);
 
     // Enrich items with product/spare part details
     const enrichedItems = await Promise.all(
@@ -1788,8 +1864,17 @@ export class BillingReportService {
 
     currentY += 30;
 
+    const descWidth = 270;
+    // Fixed row height with clipped text (via `ellipsis`) so long names/descriptions
+    // can never spill past the row border into the totals block below.
+    const itemHeight = 48;
+
     for (const item of enrichedItems) {
-      const itemHeight = 40;
+      if (currentY + itemHeight > 720) {
+        doc.addPage();
+        currentY = 50;
+      }
+
       doc
         .rect(40, currentY - 5, 520, itemHeight)
         .strokeColor('#fee2e2')
@@ -1817,17 +1902,21 @@ export class BillingReportService {
         .fillColor('#475569')
         .font('Helvetica')
         .fontSize(8)
-        .text(mpn, mpnX + 5, currentY + 5, { width: 50 });
+        .text(mpn, mpnX + 5, currentY + 5, { width: 50, height: itemHeight - 10, ellipsis: true });
       doc
         .fillColor('#1e293b')
         .font('Helvetica-Bold')
         .fontSize(9)
-        .text(productName, descX, currentY + 5);
+        .text(productName, descX, currentY + 5, { width: descWidth, height: 12, ellipsis: true });
       doc
         .fillColor('#64748b')
         .font('Helvetica')
         .fontSize(7)
-        .text(description, descX, currentY + 18, { width: 270 });
+        .text(description, descX, currentY + 18, {
+          width: descWidth,
+          height: itemHeight - 23,
+          ellipsis: true,
+        });
 
       doc
         .fillColor('#1e293b')
@@ -1855,10 +1944,6 @@ export class BillingReportService {
         );
 
       currentY += itemHeight;
-      if (currentY > 700) {
-        doc.addPage();
-        currentY = 50;
-      }
     }
 
     // --- Totals ---
@@ -1910,7 +1995,9 @@ export class BillingReportService {
     const labelWidth = 110;
     const valueWidth = 90;
     const valueX = totalsX_ + 120;
-    let totalY = doc.y + 10;
+    // Anchor to the row tracker, not doc.y — the last item row's fixed-position
+    // .text() calls leave doc.y pointing mid-table, not below the table.
+    let totalY = currentY + 10;
 
     // Subtotal Row
     doc.font('Helvetica').fontSize(9).fillColor('#64748b');
@@ -1970,6 +2057,60 @@ export class BillingReportService {
       );
 
     totalY += 45;
+
+    // Amount Paid / Balance Due — reflects advances or payments already recorded
+    // against this invoice (e.g. paid at time of purchase).
+    if (amountPaid > 0) {
+      doc.font('Helvetica').fontSize(9).fillColor('#64748b');
+      doc.text('Amount Paid', totalsX_, totalY, { width: labelWidth });
+      doc
+        .fillColor('#16a34a')
+        .text(
+          `- QAR ${amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          valueX,
+          totalY,
+          { width: valueWidth, align: 'right' },
+        );
+      totalY += 16;
+
+      const balanceDue = Math.max(0, grandTotal - amountPaid);
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b');
+      doc.text('Balance Due', totalsX_, totalY, { width: labelWidth });
+      doc.text(
+        `QAR ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        valueX,
+        totalY,
+        { width: valueWidth, align: 'right' },
+      );
+      totalY += 20;
+    }
+
+    // Warranty summary — shown whenever a warranty config was set on the sale
+    // (product/spare-part sale or lease), regardless of whether an advance was paid.
+    if (invoice.warrantyType && invoice.warrantyType !== 'none') {
+      const warrantyParts: string[] = [];
+      if (invoice.warrantyType === 'duration' || invoice.warrantyType === 'both') {
+        warrantyParts.push(
+          `${invoice.warrantyDurationValue || 0} ${invoice.warrantyDurationUnit || ''}`,
+        );
+      }
+      if (invoice.warrantyType === 'copies' || invoice.warrantyType === 'both') {
+        warrantyParts.push(`${Number(invoice.warrantyCopyLimit || 0).toLocaleString()} copies`);
+      }
+      const warrantyText =
+        invoice.warrantyType === 'both'
+          ? `Warranty: ${warrantyParts.join(' + ')} (whichever comes first)`
+          : `Warranty: ${warrantyParts.join(' + ')}`;
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor('#b91c1c')
+        .text(warrantyText, totalsX_, totalY, {
+          width: totalsWidth_,
+        });
+      totalY += 20;
+    }
+
     doc.y = totalY;
 
     // --- Footer Brands ---

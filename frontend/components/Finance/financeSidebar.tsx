@@ -29,6 +29,7 @@ import {
   Landmark,
   Bell,
   ShieldCheck,
+  ArrowLeft,
 } from 'lucide-react';
 
 import {
@@ -43,7 +44,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-import { logout } from '@/lib/auth';
+import { logout, getUserFromToken } from '@/lib/auth';
 import { toast } from 'sonner';
 import { useRouter, usePathname } from 'next/navigation';
 
@@ -56,10 +57,15 @@ export default function FinanceSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [accountsOpen, setAccountsOpen] = React.useState(pathname.startsWith('/finance/accounts'));
+  const [isManager, setIsManager] = React.useState(false);
 
   React.useEffect(() => {
     if (pathname.startsWith('/finance/accounts')) setAccountsOpen(true);
   }, [pathname]);
+
+  React.useEffect(() => {
+    setIsManager(getUserFromToken()?.role === 'MANAGER');
+  }, []);
 
   type FinanceMenuItem = {
     title: string;
@@ -217,6 +223,21 @@ export default function FinanceSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">
+        {isManager && (
+          <SidebarMenu className="space-y-1 px-2 pt-2">
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                className="py-2.5 rounded-md hover:bg-card/10 text-sidebar-accent-foreground"
+              >
+                <a href="/manager/dashboard" className="flex items-center gap-3 px-3">
+                  <ArrowLeft className="h-4 w-4" />
+                  <span className="font-medium">Back to Manager</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
         {financeMenu.map((section) => (
           <SidebarGroup key={section.group}>
             <SidebarGroupContent>

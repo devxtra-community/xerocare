@@ -58,6 +58,7 @@ export class PurchasePaymentRepository {
       payment.referenceNumber = data.referenceNumber;
       payment.paymentDate = data.paymentDate || new Date();
       payment.createdBy = data.createdBy;
+      payment.attachmentUrl = data.attachmentUrl;
 
       return await manager.save(PurchasePayment, payment);
     });

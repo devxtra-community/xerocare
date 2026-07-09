@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { purchaseService, CreatePurchaseDTO, Purchase } from '@/services/purchaseService';
 import { lotService, Lot } from '@/lib/lot';
+import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { formatCurrency } from '@/lib/format';
@@ -46,6 +47,7 @@ export default function AddPurchaseDialog({
   const [loading, setLoading] = useState(false);
   const [lots, setLots] = useState<Lot[]>([]);
   const [loadingLots, setLoadingLots] = useState(false);
+  const [currencyCode, setCurrencyCode] = useState('AED');
 
   const [formData, setFormData] = useState<CreatePurchaseDTO>({
     lotId: '',
@@ -73,6 +75,9 @@ export default function AddPurchaseDialog({
   useEffect(() => {
     if (open) {
       fetchLots();
+      getMyBranch()
+        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
+        .catch(() => setCurrencyCode('AED'));
       if (editMode && purchaseData) {
         setFormData({
           lotId: purchaseData.lotId,
@@ -200,7 +205,7 @@ export default function AddPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="documentationFee"
@@ -227,7 +232,7 @@ export default function AddPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="labourCost"
@@ -254,7 +259,7 @@ export default function AddPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="handlingFee"
@@ -281,7 +286,7 @@ export default function AddPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="transportationCost"
@@ -308,7 +313,7 @@ export default function AddPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="shippingCost"
@@ -335,7 +340,7 @@ export default function AddPurchaseDialog({
                 </Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-                    QAR
+                    {currencyCode}
                   </span>
                   <Input
                     id="groundfieldCost"

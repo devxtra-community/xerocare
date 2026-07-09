@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { purchaseService, AddPaymentDto } from '@/services/purchaseService';
+import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
-import { CreditCard, Calendar, FileText, Hash } from 'lucide-react';
+import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
 
 interface AddPaymentModalProps {
   open: boolean;
@@ -36,6 +37,9 @@ export default function AddPaymentModal({
 }: AddPaymentModalProps) {
   const remainingAmount = Math.max(0, totalAmount - paidAmount);
   const [loading, setLoading] = useState(false);
+  const [currencyCode, setCurrencyCode] = useState('AED');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<AddPaymentDto>({
     amount: 0,
     paymentMethod: 'Bank Transfer',
@@ -43,6 +47,32 @@ export default function AddPaymentModal({
     referenceNumber: '',
     paymentDate: new Date().toISOString().split('T')[0],
   });
+
+  useEffect(() => {
+    if (open) {
+      getMyBranch()
+        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
+        .catch(() => setCurrencyCode('AED'));
+    } else {
+      setAttachment(null);
+    }
+  }, [open]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isAllowed = file.type.startsWith('image/') || file.type === 'application/pdf';
+    if (!isAllowed) {
+      toast.error('Only images or PDF receipts are allowed');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File must be under 10MB');
+      return;
+    }
+    setAttachment(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +91,7 @@ export default function AddPaymentModal({
     }
 
     try {
-      await purchaseService.addPayment(purchaseId, formData);
+      await purchaseService.addPayment(purchaseId, formData, attachment);
       toast.success('Payment recorded successfully');
       onSuccess();
       onOpenChange(false);
@@ -98,7 +128,7 @@ export default function AddPaymentModal({
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                QAR
+                {currencyCode}
               </span>
               <Input
                 id="amount"
@@ -180,6 +210,43 @@ export default function AddPaymentModal({
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Paperclip size={12} /> Receipt / Screenshot
+            </Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {attachment ? (
+              <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
+                <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachment(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                  title="Remove attachment"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
+              >
+                Attach receipt image or PDF (optional)
+              </button>
+            )}
           </div>
 
           <div className="pt-4 flex gap-3">

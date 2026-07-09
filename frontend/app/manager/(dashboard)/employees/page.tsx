@@ -5,11 +5,30 @@ import EmployeeStats from '@/components/ManagerDashboardComponents/employeeCompo
 import EmployeeTable from '@/components/ManagerDashboardComponents/employeeComponents/EmployeeTable';
 import TeamDistributionChart from '@/components/ManagerDashboardComponents/employeeComponents/TeamDistributionChart';
 import AttendanceTrendChart from '@/components/ManagerDashboardComponents/employeeComponents/AttendanceTrendChart';
-import { getHRStats, HRStats } from '@/lib/employee';
+import EmployeeFormDialog from '@/components/AdminDahboardComponents/hrComponents/EmployeeFormDialog';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
+import { getHRStats, createEmployee, HRStats } from '@/lib/employee';
 
 export default function EmployeesPage() {
   const [stats, setStats] = useState<HRStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [tableKey, setTableKey] = useState(0);
+
+  const handleAddSubmit = async (formData: FormData) => {
+    try {
+      await createEmployee(formData);
+      toast.success('Employee created successfully');
+      setTableKey((k) => k + 1);
+      return true;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create employee');
+      return false;
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -70,6 +89,13 @@ export default function EmployeesPage() {
             Monitor attendance, department distribution, and visa statuses
           </p>
         </div>
+        <Button
+          className="h-10 rounded-xl bg-primary hover:bg-primary/90 text-white"
+          onClick={() => setIsAddOpen(true)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Employee
+        </Button>
       </div>
 
       {/* STATS CARDS */}
@@ -88,8 +114,15 @@ export default function EmployeesPage() {
             Employee Directory
           </h3>
         </div>
-        <EmployeeTable />
+        <EmployeeTable key={tableKey} />
       </div>
+
+      <EmployeeFormDialog
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        initialData={null}
+        onSubmit={handleAddSubmit}
+      />
     </div>
   );
 }

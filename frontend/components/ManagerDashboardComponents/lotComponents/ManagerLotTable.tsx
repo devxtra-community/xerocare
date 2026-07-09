@@ -113,7 +113,8 @@ export default function ManagerLotTable() {
             {
               id: 'vendor',
               header: 'VENDOR',
-              cell: (lot: Lot) => lot.vendor?.name,
+              cell: (lot: Lot) =>
+                lot.vendor?.name ?? (lot.transferOrigin ? 'Internal Transfer' : '—'),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {
@@ -131,6 +132,7 @@ export default function ManagerLotTable() {
             {
               id: 'total',
               header: 'TOTAL AMOUNT',
+              // Transfer lots carry the (converted) purchase value of the moved stock
               cell: (lot: Lot) => formatCurrency(Number(lot.totalAmount)),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },

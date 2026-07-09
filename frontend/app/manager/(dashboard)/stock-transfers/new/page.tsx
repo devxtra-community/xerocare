@@ -1,38 +1,34 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, Plus, Trash2, Search, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
-import { getAllBranches, Branch } from '@/lib/branch';
+import { getAllBranches, getMyBranch, Branch } from '@/lib/branch';
 import { getWarehouses, Warehouse } from '@/lib/warehouse';
 import {
   createStockTransfer,
   submitTransfer,
+  dispatchTransfer,
+  getTransferBranchInventory,
   TransferType,
   CreateTransferPayload,
+  BranchInventory,
 } from '@/lib/stockTransfer';
-import api from '@/lib/api';
 import { toast } from 'sonner';
 
 interface LineItem {
   item_type: 'SPARE_PART' | 'PRODUCT';
   spare_part_id?: string;
+  model_id?: string;
   product_id?: string;
   requested_qty: number;
-  unit_cost: number;
   label: string;
-  availableQty?: number;
+  availableQty: number;
 }
 
 const STEPS = ['Transfer Type', 'Source', 'Destination', 'Items & Submit'];
@@ -43,140 +39,93 @@ export default function ManagerNewTransferPage() {
   const [saving, setSaving] = useState(false);
 
   const [transferType, setTransferType] = useState<TransferType>('INTRA_BRANCH');
+  const [myBranch, setMyBranch] = useState<Branch | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [sourceBranchId, setSourceBranchId] = useState('');
   const [sourceWarehouseId, setSourceWarehouseId] = useState('');
   const [destBranchId, setDestBranchId] = useState('');
   const [destWarehouseId, setDestWarehouseId] = useState('');
+
+  const [inventory, setInventory] = useState<BranchInventory | null>(null);
+  const [loadingInventory, setLoadingInventory] = useState(false);
   const [items, setItems] = useState<LineItem[]>([]);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<
-    {
-      id: string;
-      label: string;
-      type: 'SPARE_PART' | 'PRODUCT';
-      cost: number;
-      available?: number;
-    }[]
-  >([]);
-  const [searching, setSearching] = useState(false);
-  const [submitAfter, setSubmitAfter] = useState(false);
+
+  const isInter = transferType === 'INTER_BRANCH';
 
   useEffect(() => {
     getAllBranches().then(setBranches);
+    getMyBranch()
+      .then(setMyBranch)
+      .catch(() => toast.error('Could not load your branch'));
     getWarehouses().then((res) => {
       const arr = Array.isArray(res) ? res : (res.data ?? []);
       setWarehouses(arr);
     });
   }, []);
 
-  const sourceWarehouses = warehouses.filter((w) => w.branchId === sourceBranchId || !w.branchId);
-  const destWarehouses = warehouses.filter((w) => {
-    if (transferType === 'INTRA_BRANCH') return w.branchId === sourceBranchId || !w.branchId;
-    return w.branchId === destBranchId || !w.branchId;
-  });
-  const destBranches =
-    transferType === 'INTRA_BRANCH'
-      ? branches.filter((b) => b.id === sourceBranchId)
-      : branches.filter((b) => b.id !== sourceBranchId);
+  // Managers operate from their own branch: INTRA moves stock within it,
+  // INTER requests stock from another branch INTO it. Branch ids are derived, not selected.
+  useEffect(() => {
+    if (!myBranch) return;
+    if (transferType === 'INTRA_BRANCH') {
+      setSourceBranchId(myBranch.id);
+      setDestBranchId(myBranch.id);
+    } else {
+      setDestBranchId(myBranch.id);
+      setSourceBranchId((prev) => (prev === myBranch.id ? '' : prev));
+    }
+  }, [myBranch, transferType]);
+
+  const sourceWarehouses = warehouses.filter((w) => w.branchId === sourceBranchId);
+  const destWarehouses = warehouses.filter((w) => w.branchId === destBranchId);
+
+  const loadInventory = useCallback(async () => {
+    if (!sourceBranchId || (!isInter && !sourceWarehouseId)) return;
+    setLoadingInventory(true);
+    try {
+      const inv = await getTransferBranchInventory(
+        sourceBranchId,
+        isInter ? undefined : sourceWarehouseId,
+      );
+      setInventory(inv);
+    } catch {
+      toast.error('Failed to load source inventory');
+    } finally {
+      setLoadingInventory(false);
+    }
+  }, [sourceBranchId, sourceWarehouseId, isInter]);
+
+  useEffect(() => {
+    if (step === 3) loadInventory();
+  }, [step, loadInventory]);
+
+  const addLine = (line: LineItem) => {
+    const key = line.product_id ?? line.model_id ?? line.spare_part_id;
+    if (items.some((i) => (i.product_id ?? i.model_id ?? i.spare_part_id) === key)) {
+      toast.info('Item already added');
+      return;
+    }
+    setItems((prev) => [...prev, line]);
+  };
 
   const canNext = () => {
     if (step === 0) return true;
-    if (step === 1) return !!sourceBranchId && !!sourceWarehouseId;
+    if (step === 1) return isInter ? !!sourceBranchId : !!sourceBranchId && !!sourceWarehouseId;
     if (step === 2) return !!destBranchId && !!destWarehouseId;
     if (step === 3) return items.length > 0 && !!reason;
     return false;
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim() || !sourceWarehouseId) return;
-    setSearching(true);
-    try {
-      const [spRes, prodRes] = await Promise.allSettled([
-        api.get(`/i/spare-parts?search=${encodeURIComponent(searchQuery)}`),
-        api.get(`/i/products?search=${encodeURIComponent(searchQuery)}`),
-      ]);
-
-      const results: typeof searchResults = [];
-
-      if (spRes.status === 'fulfilled') {
-        const parts = spRes.value.data?.data ?? spRes.value.data ?? [];
-        for (const p of parts.slice(0, 5)) {
-          let available = 0;
-          try {
-            const stockRes = await api.get(`/i/spare-parts/${p.id}/stock`);
-            const inv = (stockRes.data?.data ?? []).find(
-              (i: { warehouse_id: string; quantity: number }) =>
-                i.warehouse_id === sourceWarehouseId,
-            );
-            available = inv?.quantity ?? 0;
-          } catch {
-            /* ignore */
-          }
-          results.push({
-            id: p.id,
-            label: `${p.item_name} (${p.item_code})`,
-            type: 'SPARE_PART',
-            cost: p.unit_price ?? 0,
-            available,
-          });
-        }
-      }
-
-      if (prodRes.status === 'fulfilled') {
-        const prods = prodRes.value.data?.data ?? prodRes.value.data ?? [];
-        for (const p of prods
-          .filter((x: { warehouse_id: string }) => x.warehouse_id === sourceWarehouseId)
-          .slice(0, 5)) {
-          results.push({
-            id: p.id,
-            label: `${p.name} — SN: ${p.serial_no}`,
-            type: 'PRODUCT',
-            cost: p.purchase_price ?? 0,
-            available: 1,
-          });
-        }
-      }
-
-      setSearchResults(results);
-    } catch {
-      toast.error('Search failed');
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const addItem = (r: (typeof searchResults)[0]) => {
-    if (items.find((i) => (i.spare_part_id ?? i.product_id) === r.id)) {
-      toast.info('Item already added');
-      return;
-    }
-    setItems((prev) => [
-      ...prev,
-      {
-        item_type: r.type,
-        spare_part_id: r.type === 'SPARE_PART' ? r.id : undefined,
-        product_id: r.type === 'PRODUCT' ? r.id : undefined,
-        requested_qty: 1,
-        unit_cost: r.cost,
-        label: r.label,
-        availableQty: r.available,
-      },
-    ]);
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const handleSave = async () => {
+  const handleSave = async (action: 'draft' | 'go') => {
     setSaving(true);
     try {
       const payload: CreateTransferPayload = {
         transfer_type: transferType,
         source_branch_id: sourceBranchId,
-        source_warehouse_id: sourceWarehouseId,
+        source_warehouse_id: isInter ? undefined : sourceWarehouseId,
         destination_branch_id: destBranchId,
         destination_warehouse_id: destWarehouseId,
         reason,
@@ -184,25 +133,24 @@ export default function ManagerNewTransferPage() {
         items: items.map((i) => ({
           item_type: i.item_type,
           spare_part_id: i.spare_part_id,
+          model_id: i.model_id,
           product_id: i.product_id,
           requested_qty: i.requested_qty,
-          unit_cost: i.unit_cost,
         })),
       };
-
       const transfer = await createStockTransfer(payload);
 
-      if (submitAfter) {
-        await submitTransfer(transfer.id);
-        toast.success(
-          transferType === 'INTRA_BRANCH'
-            ? 'Transfer created and approved — ready to dispatch'
-            : 'Transfer submitted — another manager must approve before dispatch',
-        );
+      if (action === 'go') {
+        if (isInter) {
+          await submitTransfer(transfer.id);
+          toast.success('Request sent — the giving branch manager must approve it');
+        } else {
+          await dispatchTransfer(transfer.id);
+          toast.success('Transfer dispatched — receive it via the created lot');
+        }
       } else {
         toast.success('Transfer saved as draft');
       }
-
       router.push(`/manager/stock-transfers/${transfer.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create transfer';
@@ -244,7 +192,7 @@ export default function ManagerNewTransferPage() {
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 space-y-5">
-          {/* Step 1 */}
+          {/* Step 1: Type */}
           {step === 0 && (
             <div className="space-y-4">
               <h2 className="font-semibold text-slate-700">Select Transfer Type</h2>
@@ -252,7 +200,10 @@ export default function ManagerNewTransferPage() {
                 {(['INTRA_BRANCH', 'INTER_BRANCH'] as TransferType[]).map((type) => (
                   <button
                     key={type}
-                    onClick={() => setTransferType(type)}
+                    onClick={() => {
+                      setTransferType(type);
+                      setItems([]);
+                    }}
                     className={`p-4 rounded-xl border-2 text-left transition-all ${
                       transferType === type
                         ? 'border-primary bg-blue-50'
@@ -264,176 +215,191 @@ export default function ManagerNewTransferPage() {
                     </div>
                     <div className="text-xs text-slate-500 mt-1">
                       {type === 'INTRA_BRANCH'
-                        ? 'Move stock between warehouses within same branch'
-                        : 'Move stock from one branch to another branch'}
+                        ? 'Move stock between your warehouses'
+                        : 'Request stock from another branch'}
                     </div>
                   </button>
                 ))}
               </div>
-              {transferType === 'INTER_BRANCH' && (
-                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
-                  <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  Inter-branch transfers require approval from a different manager or Admin — you
-                  cannot approve your own request.
+              {isInter && (
+                <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                  The giving branch manager reviews, can adjust quantities, assigns machines and
+                  approves before anything moves.
                 </div>
               )}
             </div>
           )}
 
-          {/* Step 2 */}
+          {/* Step 2: Source */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="font-semibold text-slate-700">Source Location</h2>
+              <h2 className="font-semibold text-slate-700">
+                {isInter ? 'Request From Branch' : 'Source Warehouse'}
+              </h2>
               <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium">Source Branch</Label>
-                  <Select
-                    value={sourceBranchId}
-                    onValueChange={(v) => {
-                      setSourceBranchId(v);
-                      setSourceWarehouseId('');
-                    }}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select branch..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches
-                        .filter((b) => b.status === 'ACTIVE')
-                        .map((b) => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Source Warehouse</Label>
-                  <Select
-                    value={sourceWarehouseId}
-                    onValueChange={setSourceWarehouseId}
-                    disabled={!sourceBranchId}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select warehouse..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sourceWarehouses
-                        .filter((w) => w.status === 'ACTIVE')
-                        .map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.warehouseName}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {isInter ? (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium">Branch to request from</Label>
+                      <div className="mt-1">
+                        <SearchableSelect
+                          value={sourceBranchId}
+                          onValueChange={(v) => {
+                            setSourceBranchId(v);
+                            setSourceWarehouseId('');
+                            setItems([]);
+                          }}
+                          placeholder="Select branch..."
+                          emptyText="No branches found."
+                          options={branches
+                            .filter((b) => b.status === 'ACTIVE' && b.id !== myBranch?.id)
+                            .map((b) => ({ value: b.id, label: b.name }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                      You will pick items from that branch&apos;s live inventory in the last step.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                      Intra-branch transfer within{' '}
+                      <span className="font-semibold">{myBranch?.name ?? 'your branch'}</span> —
+                      pick the warehouse to move stock from.
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Source Warehouse</Label>
+                      <div className="mt-1">
+                        <SearchableSelect
+                          value={sourceWarehouseId}
+                          onValueChange={(v) => {
+                            setSourceWarehouseId(v);
+                            setItems([]);
+                          }}
+                          disabled={!sourceBranchId}
+                          placeholder="Select warehouse..."
+                          emptyText="No warehouses found."
+                          options={sourceWarehouses
+                            .filter((w) => w.status === 'ACTIVE')
+                            .map((w) => ({ value: w.id, label: w.warehouseName }))}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          {/* Step 3 */}
+          {/* Step 3: Destination */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="font-semibold text-slate-700">Destination Location</h2>
-              {transferType === 'INTRA_BRANCH' && (
-                <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
-                  Intra-branch: destination branch locked to source branch
-                </div>
-              )}
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium">Destination Branch</Label>
-                  <Select
-                    value={destBranchId}
-                    onValueChange={(v) => {
-                      setDestBranchId(v);
-                      setDestWarehouseId('');
-                    }}
-                    disabled={transferType === 'INTRA_BRANCH' && !!sourceBranchId}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select branch..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {destBranches
-                        .filter((b) => b.status === 'ACTIVE')
-                        .map((b) => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Destination Warehouse</Label>
-                  <Select
+              <h2 className="font-semibold text-slate-700">Destination Warehouse</h2>
+              <div className="text-xs text-slate-500 bg-blue-50 rounded-lg px-3 py-2">
+                {isInter ? 'Receiving into' : 'Moving stock within'}{' '}
+                <span className="font-semibold">{myBranch?.name ?? 'your branch'}</span> — pick the
+                warehouse that will receive the items.
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Destination Warehouse</Label>
+                <div className="mt-1">
+                  <SearchableSelect
                     value={destWarehouseId}
                     onValueChange={setDestWarehouseId}
                     disabled={!destBranchId}
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select warehouse..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {destWarehouses
-                        .filter((w) => w.status === 'ACTIVE' && w.id !== sourceWarehouseId)
-                        .map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.warehouseName}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Select warehouse..."
+                    emptyText="No warehouses found."
+                    options={destWarehouses
+                      .filter((w) => w.status === 'ACTIVE' && w.id !== sourceWarehouseId)
+                      .map((w) => ({ value: w.id, label: w.warehouseName }))}
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 4 */}
+          {/* Step 4: Items */}
           {step === 3 && (
             <div className="space-y-5">
               <h2 className="font-semibold text-slate-700">Items & Details</h2>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Add Items</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Search by name, code, or serial number..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="flex-1 text-sm"
-                  />
-                  <Button variant="outline" size="sm" onClick={handleSearch} disabled={searching}>
-                    <Search className="h-4 w-4" />
-                  </Button>
-                </div>
-                {searchResults.length > 0 && (
-                  <div className="border border-slate-200 rounded-lg overflow-hidden">
-                    {searchResults.map((r) => (
-                      <button
-                        key={r.id}
-                        onClick={() => addItem(r)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 text-sm hover:bg-blue-50 border-b border-slate-100 last:border-0 text-left"
-                      >
-                        <div>
-                          <span className="font-medium">{r.label}</span>
-                          <Badge
-                            className={`ml-2 text-xs border-0 ${r.type === 'PRODUCT' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}
-                          >
-                            {r.type === 'PRODUCT' ? 'Machine' : 'Spare Part'}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <span>Avail: {r.available ?? '?'}</span>
-                          <Plus className="h-3.5 w-3.5 text-primary" />
-                        </div>
-                      </button>
-                    ))}
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-sm font-medium">
+                    {isInter ? 'Add machine (by model)' : 'Add machine (by serial)'}
+                  </Label>
+                  <div className="mt-1">
+                    <SearchableSelect
+                      value=""
+                      loading={loadingInventory}
+                      onValueChange={(v) => {
+                        if (isInter) {
+                          const m = inventory?.models.find((x) => x.model_id === v);
+                          if (m)
+                            addLine({
+                              item_type: 'PRODUCT',
+                              model_id: m.model_id,
+                              requested_qty: 1,
+                              label: `${m.brand ? `${m.brand} ` : ''}${m.model_name}`,
+                              availableQty: m.available,
+                            });
+                        } else {
+                          const p = inventory?.products.find((x) => x.id === v);
+                          if (p)
+                            addLine({
+                              item_type: 'PRODUCT',
+                              product_id: p.id,
+                              requested_qty: 1,
+                              label: `${p.model_name} — SN: ${p.serial_no}`,
+                              availableQty: 1,
+                            });
+                        }
+                      }}
+                      placeholder="Select machine..."
+                      emptyText="No machines available."
+                      options={
+                        isInter
+                          ? (inventory?.models ?? []).map((m) => ({
+                              value: m.model_id,
+                              label: `${m.brand ? `${m.brand} ` : ''}${m.model_name}`,
+                              description: `${m.available} available`,
+                            }))
+                          : (inventory?.products ?? []).map((p) => ({
+                              value: p.id,
+                              label: `${p.model_name} — ${p.serial_no}`,
+                            }))
+                      }
+                    />
                   </div>
-                )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Add spare part</Label>
+                  <div className="mt-1">
+                    <SearchableSelect
+                      value=""
+                      loading={loadingInventory}
+                      onValueChange={(v) => {
+                        const sp = inventory?.spare_parts.find((x) => x.spare_part_id === v);
+                        if (sp)
+                          addLine({
+                            item_type: 'SPARE_PART',
+                            spare_part_id: sp.spare_part_id,
+                            requested_qty: 1,
+                            label: `${sp.part_name} (${sp.item_code})`,
+                            availableQty: sp.available,
+                          });
+                      }}
+                      placeholder="Select spare part..."
+                      emptyText="No spare parts in stock."
+                      options={(inventory?.spare_parts ?? []).map((sp) => ({
+                        value: sp.spare_part_id,
+                        label: `${sp.brand ? `${sp.brand} ` : ''}${sp.part_name}`,
+                        description: `${sp.available} in stock`,
+                      }))}
+                    />
+                  </div>
+                </div>
               </div>
 
               {items.length > 0 && (
@@ -446,12 +412,17 @@ export default function ManagerNewTransferPage() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-slate-800 truncate">
                           {item.label}
+                          <Badge
+                            className={`ml-2 text-xs border-0 ${item.item_type === 'PRODUCT' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}
+                          >
+                            {item.item_type === 'PRODUCT' ? 'Machine' : 'Spare Part'}
+                          </Badge>
                         </div>
                         <div className="text-xs text-slate-400 mt-0.5">
-                          Available: {item.availableQty ?? '?'}
+                          Available: {item.availableQty}
                         </div>
                       </div>
-                      {item.item_type === 'SPARE_PART' && (
+                      {!(item.item_type === 'PRODUCT' && !isInter) && (
                         <div className="flex items-center gap-1.5">
                           <Label className="text-xs text-slate-500 shrink-0">Qty</Label>
                           <Input
@@ -460,7 +431,10 @@ export default function ManagerNewTransferPage() {
                             max={item.availableQty}
                             value={item.requested_qty}
                             onChange={(e) => {
-                              const qty = Math.max(1, parseInt(e.target.value) || 1);
+                              const qty = Math.min(
+                                item.availableQty,
+                                Math.max(1, parseInt(e.target.value) || 1),
+                              );
                               setItems((prev) =>
                                 prev.map((it, i) =>
                                   i === idx ? { ...it, requested_qty: qty } : it,
@@ -508,6 +482,7 @@ export default function ManagerNewTransferPage() {
           )}
         </div>
 
+        {/* Nav */}
         <div className="flex justify-between">
           <Button
             variant="outline"
@@ -519,39 +494,21 @@ export default function ManagerNewTransferPage() {
           </Button>
 
           {step < STEPS.length - 1 ? (
-            <Button
-              onClick={() => {
-                if (step === 2 && transferType === 'INTRA_BRANCH') setDestBranchId(sourceBranchId);
-                setStep((s) => s + 1);
-              }}
-              disabled={!canNext()}
-            >
-              Next <ArrowRight className="h-4 w-4 ml-1.5" />
+            <Button onClick={() => setStep((s) => s + 1)} disabled={!canNext()}>
+              Next
+              <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           ) : (
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setSubmitAfter(false);
-                  handleSave();
-                }}
+                onClick={() => handleSave('draft')}
                 disabled={!canNext() || saving}
               >
                 Save as Draft
               </Button>
-              <Button
-                onClick={() => {
-                  setSubmitAfter(true);
-                  handleSave();
-                }}
-                disabled={!canNext() || saving}
-              >
-                {saving
-                  ? 'Saving...'
-                  : transferType === 'INTRA_BRANCH'
-                    ? 'Submit & Approve'
-                    : 'Submit for Approval'}
+              <Button onClick={() => handleSave('go')} disabled={!canNext() || saving}>
+                {saving ? 'Saving...' : isInter ? 'Submit Request' : 'Create & Dispatch'}
               </Button>
             </div>
           )}

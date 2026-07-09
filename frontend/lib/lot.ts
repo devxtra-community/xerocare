@@ -43,6 +43,7 @@ export interface LotItem {
   customProductName?: string;
   customSparePartName?: string;
   mpn?: string;
+  hsCode?: string;
   compatibleModels?: string;
   modelIds?: string[];
   sellingPrice?: number;
@@ -51,8 +52,12 @@ export interface LotItem {
 export interface Lot {
   id: string;
   lotNumber: string;
-  vendorId: string;
-  vendor: Vendor;
+  // Absent on internal stock-transfer lots
+  vendorId?: string;
+  vendor?: Vendor;
+  /** True for lots auto-created by a stock transfer — no vendor, no amounts. */
+  transferOrigin?: boolean;
+  transferId?: string;
   purchaseDate: string;
   totalAmount: number;
   status: LotStatus;
@@ -78,6 +83,7 @@ export interface CreateLotItemData {
   unitPrice: number;
   sellingPrice?: number;
   mpn?: string;
+  hsCode?: string;
   compatibleModels?: string;
 }
 

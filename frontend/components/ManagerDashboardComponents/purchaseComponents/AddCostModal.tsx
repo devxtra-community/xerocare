@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { purchaseService, AddCostDto } from '@/services/purchaseService';
+import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { Calendar, FileText, Banknote } from 'lucide-react';
 
@@ -30,12 +31,21 @@ export default function AddCostModal({
   onSuccess,
 }: AddCostModalProps) {
   const [loading, setLoading] = useState(false);
+  const [currencyCode, setCurrencyCode] = useState('AED');
   const [formData, setFormData] = useState<AddCostDto>({
     amount: 0,
     costType: 'Other',
     description: '',
     costDate: new Date().toISOString().split('T')[0],
   });
+
+  useEffect(() => {
+    if (open) {
+      getMyBranch()
+        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
+        .catch(() => setCurrencyCode('AED'));
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,7 +94,7 @@ export default function AddCostModal({
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                QAR
+                {currencyCode}
               </span>
               <Input
                 id="amount"

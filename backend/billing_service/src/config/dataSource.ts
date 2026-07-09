@@ -34,6 +34,8 @@ import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
+import { EmployeeTarget } from '../entities/employeeTargetEntity';
+import { EmployeeTargetAchievement } from '../entities/employeeTargetAchievementEntity';
 import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity';
 import { Cheque } from '../entities/chequeEntity';
 import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
@@ -78,6 +80,8 @@ export const Source = new DataSource({
     EquityEntry,
     ExchangeRate,
     AccountReconciliation,
+    EmployeeTarget,
+    EmployeeTargetAchievement,
     EmployeeExpenseRequest,
     Cheque,
     ChequeStatusHistory,

@@ -18,13 +18,11 @@ export enum TransferType {
 
 export enum TransferStatus {
   DRAFT = 'DRAFT',
-  PENDING_APPROVAL = 'PENDING_APPROVAL',
-  APPROVED = 'APPROVED',
-  IN_TRANSIT = 'IN_TRANSIT',
-  RECEIVED = 'RECEIVED',
-  PARTIALLY_RECEIVED = 'PARTIALLY_RECEIVED',
-  COMPLETED = 'COMPLETED',
+  SENT = 'SENT', // INTER only: request sent to the giving branch
+  APPROVED = 'APPROVED', // INTER only: giver approved; lot created at requesting branch
   REJECTED = 'REJECTED',
+  IN_TRANSIT = 'IN_TRANSIT', // dispatched; receiving happens via the linked lot
+  COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
 
@@ -57,12 +55,13 @@ export class StockTransfer {
   @JoinColumn({ name: 'source_branch_id' })
   source_branch!: Branch;
 
-  @Column({ name: 'source_warehouse_id', type: 'uuid' })
-  source_warehouse_id!: string;
+  // Nullable: INTER_BRANCH requests target a branch; the source warehouse is resolved at approval.
+  @Column({ name: 'source_warehouse_id', type: 'uuid', nullable: true })
+  source_warehouse_id?: string;
 
-  @ManyToOne(() => Warehouse)
+  @ManyToOne(() => Warehouse, { nullable: true })
   @JoinColumn({ name: 'source_warehouse_id' })
-  source_warehouse!: Warehouse;
+  source_warehouse?: Warehouse;
 
   @Column({ name: 'destination_branch_id', type: 'uuid' })
   destination_branch_id!: string;
@@ -93,6 +92,10 @@ export class StockTransfer {
   @Column({ name: 'rejection_reason', type: 'text', nullable: true })
   rejection_reason?: string;
 
+  // Lot auto-created for receiving (INTRA: at dispatch, INTER: at approval). No amounts on it.
+  @Column({ name: 'lot_id', type: 'uuid', nullable: true })
+  lot_id?: string;
+
   @Column({ name: 'dispatched_at', type: 'timestamp', nullable: true })
   dispatched_at?: Date;
 
@@ -104,4 +107,13 @@ export class StockTransfer {
 
   @OneToMany(() => StockTransferItem, (item) => item.transfer, { cascade: true, eager: false })
   items!: StockTransferItem[];
+
+  // Not a column — lot summary attached by the service for detail responses.
+  lot?: {
+    id: string;
+    lotNumber: string;
+    status: string;
+    currencyCode?: string;
+    exchangeRateSnapshot?: number;
+  };
 }

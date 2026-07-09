@@ -38,6 +38,7 @@ import {
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import { formatCurrency } from '@/lib/format';
+import { getAllBranches, type Branch } from '@/lib/branch';
 import {
   Select,
   SelectContent,
@@ -68,7 +69,7 @@ type BankAccount = {
   routingNumber?: string;
   swiftCode?: string;
   iban?: string;
-  ifscCode?: string;
+  address?: string;
   isPrimary?: boolean;
 };
 
@@ -87,6 +88,8 @@ type Vendor = {
   countryCode?: string;
   countryName?: string;
   bankAccounts?: BankAccount[];
+  branchId?: string | null;
+  branchName?: string;
 };
 
 type VendorFormData = {
@@ -101,6 +104,7 @@ type VendorFormData = {
   countryName?: string;
   vatNumber?: string;
   bankAccounts: BankAccount[];
+  branchId?: string;
 };
 
 const COUNTRY_TO_CURRENCY_MAP: Record<string, string> = {
@@ -137,6 +141,19 @@ const COUNTRY_TO_CURRENCY_MAP: Record<string, string> = {
 };
 
 const ALL_COUNTRIES: { code: string; name: string }[] = countryList.getData();
+
+/** Longest dial code the phone starts with, e.g. "+1-268" before "+1". */
+const findDialCode = (phone: string) =>
+  Object.values(COUNTRY_DIAL_CODES)
+    .filter((d) => phone.startsWith(d))
+    .sort((a, b) => b.length - a.length)[0];
+
+/** The national number without its dial-code prefix (kept in the form state). */
+const stripDialCode = (phone?: string) => {
+  const p = (phone || '').trim();
+  const dial = findDialCode(p);
+  return dial ? p.slice(dial.length).trim() : p;
+};
 
 const COUNTRY_DIAL_CODES: Record<string, string> = {
   AF: '+93',
@@ -343,6 +360,9 @@ export { type Vendor }; // Export so parent can use it
  */
 export default function VendorTable({ basePath = '/admin' }: { basePath?: string }) {
   const router = useRouter();
+  // Admins see (and manage) vendors across branches; managers are scoped to
+  // their own branch by the backend and never pick a branch themselves.
+  const isAdmin = basePath === '/admin';
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
     'All',
@@ -380,6 +400,8 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         countryCode: v.countryCode as string | undefined,
         countryName: v.countryName as string | undefined,
         bankAccounts: (v.bankAccounts as BankAccount[]) || [],
+        branchId: (v.branchId as string | null) ?? null,
+        branchName: (v.branch as { name?: string } | null)?.name || '',
       }));
 
       setVendors(mappedVendors);
@@ -442,6 +464,8 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         countryName: data.countryName || undefined,
         vatNumber: data.vatNumber || undefined,
         bankAccounts: data.bankAccounts || [],
+        // Only admins send a branch; the backend pins managers to their own.
+        ...(isAdmin ? { branchId: data.branchId || null } : {}),
       };
 
       if (editingVendor) {
@@ -559,6 +583,25 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
             cell: (v: Vendor) => `VND-${v.id.substring(0, 4)}`,
             className: 'font-semibold text-[11px] text-primary uppercase',
           },
+          ...(isAdmin
+            ? [
+                {
+                  id: 'branch',
+                  header: 'BRANCH',
+                  className: 'font-semibold text-[11px] text-primary uppercase',
+                  cell: (v: Vendor) =>
+                    v.branchName ? (
+                      <span className="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-700">
+                        {v.branchName}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold uppercase text-gray-400">
+                        Unassigned
+                      </span>
+                    ),
+                },
+              ]
+            : []),
           {
             id: 'type',
             header: 'TYPE',
@@ -691,6 +734,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onConfirm={handleSave}
+        isAdmin={isAdmin}
       />
 
       <DeleteConfirmDialog
@@ -721,7 +765,7 @@ const BLANK_BANK: BankAccount = {
   routingNumber: '',
   swiftCode: '',
   iban: '',
-  ifscCode: '',
+  address: '',
   isPrimary: false,
 };
 
@@ -730,16 +774,27 @@ function VendorFormModal({
   open,
   onClose,
   onConfirm,
+  isAdmin = false,
 }: {
   initialData: Vendor | null;
   open: boolean;
   onClose: () => void;
   onConfirm: (data: VendorFormData) => Promise<void>;
+  isAdmin?: boolean;
 }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [countryOpen, setCountryOpen] = React.useState(false);
   const [addingBank, setAddingBank] = React.useState(false);
   const [bankDraft, setBankDraft] = React.useState<BankAccount>({ ...BLANK_BANK });
+  const [branches, setBranches] = React.useState<Branch[]>([]);
+
+  React.useEffect(() => {
+    if (open && isAdmin) {
+      getAllBranches()
+        .then(setBranches)
+        .catch(() => setBranches([]));
+    }
+  }, [open, isAdmin]);
 
   const [form, setForm] = useState<VendorFormData>({
     name: '',
@@ -753,6 +808,7 @@ function VendorFormModal({
     countryName: undefined,
     vatNumber: undefined,
     bankAccounts: [],
+    branchId: undefined,
   });
 
   React.useEffect(() => {
@@ -764,7 +820,7 @@ function VendorFormModal({
           name: initialData.name,
           type: initialData.type,
           contactPerson: initialData.contactPerson,
-          phone: initialData.phone,
+          phone: stripDialCode(initialData.phone),
           email: initialData.email,
           status: initialData.status,
           currency: initialData.currency || 'QAR',
@@ -772,6 +828,7 @@ function VendorFormModal({
           countryName: initialData.countryName,
           vatNumber: (initialData as { vatNumber?: string }).vatNumber,
           bankAccounts: initialData.bankAccounts || [],
+          branchId: initialData.branchId || undefined,
         });
       } else {
         setForm({
@@ -786,6 +843,7 @@ function VendorFormModal({
           countryName: undefined,
           vatNumber: undefined,
           bankAccounts: [],
+          branchId: undefined,
         });
       }
     }
@@ -793,23 +851,15 @@ function VendorFormModal({
 
   const handleCountrySelect = (code: string, name: string) => {
     const suggestedCurrency = COUNTRY_TO_CURRENCY_MAP[code];
-    const dialCode = COUNTRY_DIAL_CODES[code];
-    setForm((f) => {
-      const currentPhone = f.phone.trim();
-      const existingDialCode = Object.values(COUNTRY_DIAL_CODES).find((d) =>
-        currentPhone.startsWith(d),
-      );
-      const phoneBase = existingDialCode
-        ? currentPhone.slice(existingDialCode.length).trim()
-        : currentPhone;
-      return {
-        ...f,
-        countryCode: code,
-        countryName: name,
-        currency: suggestedCurrency || f.currency,
-        phone: dialCode ? `${dialCode}${phoneBase ? ' ' + phoneBase : ''}` : f.phone,
-      };
-    });
+    setForm((f) => ({
+      ...f,
+      countryCode: code,
+      countryName: name,
+      currency: suggestedCurrency || f.currency,
+      // The dial code lives in the prefix box, not in the input — keep only
+      // the national number here (dial code is prepended on save).
+      phone: stripDialCode(f.phone),
+    }));
     setCountryOpen(false);
   };
 
@@ -1008,6 +1058,33 @@ function VendorFormModal({
               />
             </div>
 
+            {/* Branch (admin only — managers' vendors are pinned to their own branch) */}
+            {isAdmin && (
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Branch
+                </label>
+                <Select
+                  value={form.branchId ?? 'UNASSIGNED'}
+                  onValueChange={(v) =>
+                    setForm({ ...form, branchId: v === 'UNASSIGNED' ? undefined : v })
+                  }
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
+                    <SelectValue placeholder="Select branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNASSIGNED">Unassigned (admin only)</SelectItem>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="col-span-2 space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Status
@@ -1067,19 +1144,22 @@ function VendorFormModal({
                         )}
                       </div>
                       <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
-                        {acc.accountType && (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
-                            {acc.accountType}
-                          </span>
-                        )}
-                      </div>
-                      {(acc.swiftCode || acc.iban || acc.ifscCode) && (
+                      <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                      {(acc.swiftCode || acc.iban || acc.address) && (
+                        <div className="flex items-center gap-2">
+                          <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                          {acc.accountType && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                              {acc.accountType}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {(acc.swiftCode || acc.iban || acc.address) && (
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
                           {acc.iban && ` • IBAN: ${acc.iban}`}
-                          {acc.ifscCode && ` • IFSC: ${acc.ifscCode}`}
+                          {acc.address && ` • ${acc.address}`}
                         </p>
                       )}
                     </div>
@@ -1195,14 +1275,12 @@ function VendorFormModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
-                      IFSC Code
-                    </label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">Address</label>
                     <Input
-                      placeholder="IFSC (India only)"
-                      value={bankDraft.ifscCode || ''}
-                      onChange={(e) => setBankDraft((d) => ({ ...d, ifscCode: e.target.value }))}
-                      className="h-9 text-sm font-mono rounded-lg bg-card border-none shadow-sm"
+                      placeholder="Bank address"
+                      value={bankDraft.address || ''}
+                      onChange={(e) => setBankDraft((d) => ({ ...d, address: e.target.value }))}
+                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
                     />
                   </div>
                   <div className="col-span-2">
@@ -1291,9 +1369,17 @@ function VendorFormModal({
                   finalBankAccounts = [...existingAccounts, { ...bankDraft }];
                 }
 
+                // Recombine dial code + national number for storage.
+                const dial = form.countryCode ? COUNTRY_DIAL_CODES[form.countryCode] : undefined;
+                const phoneBase = form.phone.trim();
+                const fullPhone =
+                  dial && phoneBase && !phoneBase.startsWith('+')
+                    ? `${dial} ${phoneBase}`
+                    : phoneBase;
+
                 setIsSubmitting(true);
                 try {
-                  await onConfirm({ ...form, bankAccounts: finalBankAccounts });
+                  await onConfirm({ ...form, phone: fullPhone, bankAccounts: finalBankAccounts });
                 } finally {
                   setIsSubmitting(false);
                 }

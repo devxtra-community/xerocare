@@ -49,6 +49,8 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
     resolver: zodResolver(formSchema),
   });
 
+  const brandIdValue = watch('brand_id');
+
   const onSubmit = async (data: FormData) => {
     try {
       setLoading(true);
@@ -87,7 +89,7 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
               </label>
               <SearchableSelect
                 options={brandOptions}
-                value={watch('brand_id')}
+                value={brandIdValue}
                 onValueChange={(val) => setValue('brand_id', val)}
                 placeholder="Select a brand"
                 emptyText="No brands found"

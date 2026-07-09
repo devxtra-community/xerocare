@@ -9,7 +9,12 @@ export class VendorController {
    */
   createVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const vendor = await this.vendorService.createVendor(req.body);
+      // Managers always create vendors in their own branch; admins may pick
+      // a branch in the request body (or leave it empty for a global vendor).
+      const isAdmin = req.user?.role === 'ADMIN';
+      const ownerBranchId = isAdmin ? (req.body.branchId ?? null) : req.user?.branchId;
+
+      const vendor = await this.vendorService.createVendor(req.body, ownerBranchId);
 
       return res.status(201).json({
         success: true,
@@ -72,6 +77,11 @@ export class VendorController {
    */
   updateVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Only admins may move a vendor to another branch.
+      if (req.user?.role !== 'ADMIN') {
+        delete req.body.branchId;
+      }
+
       const vendor = await this.vendorService.updateVendor(req.params.id as string, req.body);
 
       return res.json({

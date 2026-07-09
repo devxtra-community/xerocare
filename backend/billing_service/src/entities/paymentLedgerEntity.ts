@@ -42,6 +42,9 @@ export class PaymentLedger {
   @Column({ type: 'text', nullable: true })
   remarks?: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  receiptUrl?: string; // Proof of payment (screenshot/PDF) uploaded to R2
+
   @Column()
   recordedBy!: string; // employeeId
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { purchaseController } from '../controllers/purchaseController';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { uploadReceiptFile } from '../middlewares/uploadReceiptFile';
 
 const router = Router();
 
@@ -10,7 +11,7 @@ router.get('/', purchaseController.getAllPurchases);
 router.get('/spend-by-origin', purchaseController.getSpendByOrigin);
 router.get('/lot/:lotId', purchaseController.getPurchaseByLotId);
 router.get('/:id', purchaseController.getPurchaseById);
-router.post('/:id/payments', purchaseController.addPayment);
+router.post('/:id/payments', uploadReceiptFile.single('receipt'), purchaseController.addPayment);
 router.post('/:id/costs', purchaseController.addCost);
 router.patch('/:id', purchaseController.updatePurchase);
 

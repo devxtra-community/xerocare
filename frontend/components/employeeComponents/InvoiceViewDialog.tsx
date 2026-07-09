@@ -900,6 +900,99 @@ export function InvoiceViewDialog({
                       }}
                     />
                   )}
+
+                  {/* --- Warranty Details Section (Lease and Product/Spare Part Sale) --- */}
+                  {(isLease || isSale) &&
+                    invoice.warrantyType &&
+                    invoice.warrantyType !== 'none' && (
+                      <div className="flex flex-col mt-8 pl-12 pr-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="border border-red-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(185,28,28,0.1)]">
+                          <div className="flex items-center justify-between border-b border-red-50 pb-3 mb-6">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 bg-emerald-50 rounded-xl flex items-center justify-center">
+                                <span className="text-emerald-600">🛡️</span>
+                              </div>
+                              <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
+                                Warranty Details
+                              </h3>
+                            </div>
+                            <div className="bg-emerald-100 px-3 py-1 rounded-full">
+                              <p className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">
+                                Guaranteed Coverage
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-8">
+                            <div>
+                              <p className="text-[10px] font-normal text-slate-400 uppercase tracking-widest mb-1">
+                                Identification
+                              </p>
+                              <div className="space-y-3">
+                                <div className="flex justify-between border-b border-slate-50 pb-2">
+                                  <span className="text-[12px] text-slate-500 font-normal">
+                                    Warranty Type
+                                  </span>
+                                  <span className="text-[12px] font-normal text-slate-900 uppercase italic">
+                                    {invoice.warrantyType === 'duration'
+                                      ? 'By Duration'
+                                      : invoice.warrantyType === 'copies'
+                                        ? 'By Count of Copies'
+                                        : 'By Duration & Count of Copies'}
+                                  </span>
+                                </div>
+
+                                {(invoice.warrantyType === 'duration' ||
+                                  invoice.warrantyType === 'both') && (
+                                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                                    <span className="text-[12px] text-slate-500 font-normal">
+                                      Coverage Period
+                                    </span>
+                                    <span className="text-[12px] font-normal text-slate-900 uppercase">
+                                      {invoice.warrantyDurationValue} {invoice.warrantyDurationUnit}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {(invoice.warrantyType === 'copies' ||
+                                  invoice.warrantyType === 'both') && (
+                                  <div className="flex justify-between border-b border-slate-50 pb-2">
+                                    <span className="text-[12px] text-slate-500 font-normal">
+                                      Maximum Copy Limit
+                                    </span>
+                                    <span className="text-[12px] font-normal text-slate-900">
+                                      {Number(invoice.warrantyCopyLimit || 0).toLocaleString()}{' '}
+                                      COPIES
+                                    </span>
+                                  </div>
+                                )}
+
+                                {invoice.warrantyType === 'both' && (
+                                  <p className="text-[10px] text-slate-400 font-normal italic pt-1">
+                                    Whichever comes first — warranty ends as soon as either the
+                                    coverage period or the copy limit above is reached.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="bg-amber-50/50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-center">
+                              <p className="text-[10px] font-normal text-amber-700 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                Terms & Limitations
+                              </p>
+                              <p className="text-[11px] text-amber-900 leading-relaxed font-normal">
+                                Technical support and replacement parts are provided free of charge
+                                during the warranty period specified above. After the warranty
+                                period expires, or once the applicable usage limit is reached, all
+                                technical support services, spare parts, repairs, and related
+                                charges will be billable at the prevailing rates.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                 </div>
               ) : (
                 <>

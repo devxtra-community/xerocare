@@ -32,6 +32,7 @@ import creditNoteRouter from './routes/creditNoteRoutes';
 import accountsRouter from './routes/accountsRoutes';
 import adminAccountsRouter from './routes/adminAccountsRoutes';
 import expenseRequestRouter from './routes/expenseRequestRoutes';
+import targetRouter from './routes/targetRoutes';
 
 /**
  * Routing: Directing users to the right department.
@@ -49,6 +50,7 @@ app.use('/credit-notes', creditNoteRouter);
 app.use('/expenses/requests', expenseRequestRouter);
 app.use('/accounts/admin', adminAccountsRouter);
 app.use('/accounts', accountsRouter);
+app.use('/targets', targetRouter);
 
 /**
  * Safety Net: Handling mistakes.
@@ -85,9 +87,11 @@ const startServer = async () => {
     await getRabbitChannel();
 
     // Start Contract Expiry Scheduler
-    const { startContractExpiryScheduler, startReminderCronJobs } = await import('./services/cron');
+    const { startContractExpiryScheduler, startReminderCronJobs, startTargetFinalizationCron } =
+      await import('./services/cron');
     startContractExpiryScheduler();
     startReminderCronJobs();
+    startTargetFinalizationCron();
 
     // Start Exchange Rate Cron (daily at midnight)
     const { startExchangeRateCron } = await import('./services/exchangeRateCron');

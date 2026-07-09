@@ -43,6 +43,9 @@ export class PurchasePayment {
   @Column({ name: 'reference_number', type: 'varchar', length: 100, nullable: true })
   referenceNumber?: string;
 
+  @Column({ name: 'attachment_url', type: 'varchar', length: 500, nullable: true })
+  attachmentUrl?: string;
+
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy?: string;
 

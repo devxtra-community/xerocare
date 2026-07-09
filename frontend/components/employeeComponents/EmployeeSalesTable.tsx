@@ -542,7 +542,10 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
         <InvoiceAccountView
           invoiceId={selectedInvoice.id}
           open={accountViewOpen}
-          onClose={() => setAccountViewOpen(false)}
+          onClose={() => {
+            setAccountViewOpen(false);
+            fetchInvoices();
+          }}
         />
       )}
 

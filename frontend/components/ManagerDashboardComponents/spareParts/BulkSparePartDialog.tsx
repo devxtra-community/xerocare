@@ -12,6 +12,7 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Download,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -173,7 +174,7 @@ export default function BulkSparePartDialog({
         setExpandedRows({});
       }
     }
-  }, [open]);
+  }, [open, initialLotId]);
 
   useEffect(() => {
     if (open && initialLotId && lots.length > 0) {
@@ -301,6 +302,33 @@ export default function BulkSparePartDialog({
       setRows(parsedRows);
       toast.success(`Parsed ${parsedRows.length} rows`);
     }
+  };
+
+  /** Downloads a sample sheet with headers matching parseExcelData's column names. */
+  const handleDownloadSample = () => {
+    const sampleRows = [
+      {
+        'Item Name': 'Toner Cartridge TK-1150',
+        SKU: 'SKU-0001',
+        MPN: 'TK-1150',
+        Brand: 'Kyocera',
+        Description: 'High quality replacement toner',
+        'Compatible Model': 'Universal',
+        Quantity: 10,
+        'Purchase Price': 45,
+        'Wholesale Price': 65,
+        'Selling Price': 80,
+        'Max Discount': 5,
+        Vendor: 'Look up the Vendor ID from the Vendors page',
+        Warehouse: 'Look up the Warehouse ID from the Warehouses page',
+        Yield: '3,000 pages @ 5% coverage',
+        Lot: '',
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Spare Parts');
+    XLSX.writeFile(wb, 'spare-part-bulk-upload-sample.xlsx');
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -441,6 +469,15 @@ export default function BulkSparePartDialog({
                 Upload Excel
               </label>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadSample}
+              className="gap-2"
+            >
+              <Download size={18} />
+              Download Sample
+            </Button>
           </div>
           <div className="text-sm text-muted-foreground">
             {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}

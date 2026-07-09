@@ -54,6 +54,7 @@ export class LotRepository {
         lotItem.sellingPrice = itemData.sellingPrice || itemData.unitPrice;
         lotItem.totalPrice = itemData.quantity * itemData.unitPrice;
         lotItem.mpn = itemData.mpn;
+        lotItem.hsCode = itemData.hsCode;
         lotItem.compatibleModels = itemData.compatibleModels;
         lotItem.modelIds = itemData.modelIds;
 
@@ -198,6 +199,8 @@ export class LotRepository {
       const finalLot = await manager.save(Lot, savedLot);
 
       // Auto-create a purchase record with zero costs so pricing can be filled in later
+      // (vendor lots only — transfer lots are created elsewhere and never reach this path)
+      if (!finalLot.vendorId) throw new AppError('Vendor is required for purchase lots', 400);
       const purchase = new Purchase();
       purchase.lotId = finalLot.id;
       purchase.vendorId = finalLot.vendorId;
@@ -228,6 +231,15 @@ export class LotRepository {
     transactionManager?: EntityManager,
   ): Promise<void> {
     const runInTransaction = async (manager: EntityManager) => {
+      // Transfer lots move existing stock automatically on receive — nothing is created from them.
+      const lotHeader = await manager.findOne(Lot, { where: { id: lotId } });
+      if (lotHeader?.transferOrigin) {
+        throw new AppError(
+          'This is an internal transfer lot — items are moved automatically when the lot is received.',
+          400,
+        );
+      }
+
       let lotItem: LotItem | null;
 
       if (itemType === LotItemType.MODEL) {
@@ -490,6 +502,13 @@ export class LotRepository {
 
       lot.status = LotStatus.RECEIVED;
       const savedLot = await manager.save(Lot, lot);
+
+      // Transfer lots complete their stock transfer in the same transaction:
+      // machines change warehouse, spare-part stock lands at the destination.
+      if (lot.transferOrigin && lot.transferId) {
+        const { StockTransferService } = await import('../services/stockTransferService');
+        await new StockTransferService().completeFromLot(lot.id, manager);
+      }
 
       // Return with full relations to ensure UI consistency
       return (await manager.findOne(Lot, {

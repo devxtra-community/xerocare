@@ -22,7 +22,9 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
-import { Filter } from 'lucide-react';
+import { Filter, Sparkles } from 'lucide-react';
+import { listTargetsByEmployee } from '@/lib/targets';
+import { formatCurrency } from '@/lib/format';
 
 interface AddPayrollDialogProps {
   open: boolean;
@@ -53,6 +55,35 @@ export default function AddPayrollDialog({
   });
   const [departmentFilter, setDepartmentFilter] = useState('All');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [incentiveBanner, setIncentiveBanner] = useState<{
+    month: string;
+    amount: number;
+    currencyCode: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!selectedEmployeeId) {
+      setIncentiveBanner(null);
+      return;
+    }
+    listTargetsByEmployee(selectedEmployeeId)
+      .then((rows) => {
+        const finalized = rows
+          .filter((r) => r.achievement.isFinalized)
+          .sort((a, b) => (a.target.targetMonth < b.target.targetMonth ? 1 : -1));
+        const latest = finalized[0];
+        setIncentiveBanner(
+          latest
+            ? {
+                month: latest.target.targetMonth,
+                amount: Number(latest.achievement.incentiveAmount),
+                currencyCode: latest.target.currencyCode,
+              }
+            : null,
+        );
+      })
+      .catch(() => setIncentiveBanner(null));
+  }, [selectedEmployeeId]);
 
   useEffect(() => {
     if (selectedEmployeeId) {
@@ -136,6 +167,7 @@ export default function AddPayrollDialog({
 
   const resetForm = () => {
     setSelectedEmployeeId('');
+    setIncentiveBanner(null);
     setFormData({
       salaryAmount: '',
       status: 'PENDING',
@@ -206,6 +238,19 @@ export default function AddPayrollDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {incentiveBanner && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2.5 text-sm text-emerald-800 dark:text-emerald-300">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span>
+                Incentive for {incentiveBanner.month}:{' '}
+                <strong>
+                  {formatCurrency(incentiveBanner.amount, incentiveBanner.currencyCode)}
+                </strong>{' '}
+                — include in payroll
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">

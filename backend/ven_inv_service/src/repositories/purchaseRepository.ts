@@ -71,7 +71,8 @@ export class PurchaseRepository {
         Number(data.shippingCost) +
         Number(data.groundfieldCost);
 
-      // 6. Insert purchase record
+      // 6. Insert purchase record (vendor lots only — transfer lots carry no purchase)
+      if (!lot.vendorId) throw new AppError('Vendor is required for purchase lots', 400);
       const purchase = new Purchase();
       purchase.lotId = lot.id;
       purchase.vendorId = lot.vendorId;

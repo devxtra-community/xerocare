@@ -14,7 +14,7 @@ interface BankAccountDTO {
   routingNumber?: string;
   swiftCode?: string;
   iban?: string;
-  ifscCode?: string;
+  address?: string;
   isPrimary?: boolean;
 }
 
@@ -57,7 +57,7 @@ export class VendorService {
     }
   }
 
-  async createVendor(data: CreateVendorDTO): Promise<Vendor> {
+  async createVendor(data: CreateVendorDTO, branchId?: string | null): Promise<Vendor> {
     this.validateBankAccounts(data.bankAccounts);
 
     if (!data.name || !data.name.trim()) {
@@ -67,7 +67,9 @@ export class VendorService {
       throw new AppError('Vendor email is required', 400);
     }
 
-    const existingByEmail = await this.vendorRepo.findByEmail(data.email.trim());
+    // Vendors are branch-scoped: name/email only need to be unique within
+    // the owning branch, so different branches can register the same vendor.
+    const existingByEmail = await this.vendorRepo.findByEmail(data.email.trim(), branchId);
     if (existingByEmail) {
       const msg =
         existingByEmail.status === VendorStatus.DELETED
@@ -76,7 +78,7 @@ export class VendorService {
       throw new AppError(msg, 409);
     }
 
-    const existingByName = await this.vendorRepo.findByName(data.name.trim());
+    const existingByName = await this.vendorRepo.findByName(data.name.trim(), branchId);
     if (existingByName) {
       const msg =
         existingByName.status === VendorStatus.DELETED
@@ -85,12 +87,13 @@ export class VendorService {
       throw new AppError(msg, 409);
     }
 
-    const vendor = this.vendorRepo.create(data);
+    const vendor = this.vendorRepo.create({ ...data, branchId: branchId ?? null });
 
     const savedVendor = await this.vendorRepo.save(vendor);
     logger.info('Vendor created successfully', {
       vendorId: savedVendor.id,
       name: savedVendor.name,
+      branchId: savedVendor.branchId,
     });
     return savedVendor;
   }
@@ -126,8 +129,11 @@ export class VendorService {
       throw new AppError('Vendor email cannot be empty', 400);
     }
 
+    const vendor = await this.getVendorById(id);
+
+    // Uniqueness checks stay inside the vendor's own branch.
     if (data.email) {
-      const existingByEmail = await this.vendorRepo.findByEmail(data.email.trim());
+      const existingByEmail = await this.vendorRepo.findByEmail(data.email.trim(), vendor.branchId);
       if (existingByEmail && existingByEmail.id !== id) {
         const msg =
           existingByEmail.status === VendorStatus.DELETED
@@ -138,7 +144,7 @@ export class VendorService {
     }
 
     if (data.name) {
-      const existingByName = await this.vendorRepo.findByName(data.name.trim());
+      const existingByName = await this.vendorRepo.findByName(data.name.trim(), vendor.branchId);
       if (existingByName && existingByName.id !== id) {
         const msg =
           existingByName.status === VendorStatus.DELETED
@@ -147,8 +153,6 @@ export class VendorService {
         throw new AppError(msg, 409);
       }
     }
-
-    const vendor = await this.getVendorById(id);
 
     Object.keys(data).forEach((key) => {
       const val = (data as unknown as Record<string, unknown>)[key];
@@ -191,6 +195,12 @@ export class VendorService {
     branchId?: string,
   ) {
     const vendor = await this.getVendorById(vendorId, branchId);
+
+    // Purchasing is restricted to the vendor's own branch (admins pass no
+    // branchId and skip this guard).
+    if (branchId && vendor.branchId !== branchId) {
+      throw new AppError('This vendor belongs to another branch', 403);
+    }
 
     // Check if the user exists in the employee manager table
     let manager = await this.employeeManagerRepo.findActiveManager(userId);

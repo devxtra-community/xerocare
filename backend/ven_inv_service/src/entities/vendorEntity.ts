@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Branch } from './branchEntity';
 
 export enum VendorStatus {
   ACTIVE = 'ACTIVE',
@@ -17,11 +20,22 @@ export class Vendor {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ unique: true })
+  // Unique per branch (enforced by composite indexes created in db bootstrap),
+  // not globally — two branches may register the same real-world vendor.
+  @Column()
   name!: string;
 
-  @Column({ unique: true })
+  @Column()
   email!: string;
+
+  // Owning branch. NULL = legacy/global vendor, visible only to ADMIN
+  // until assigned to a branch.
+  @Column({ name: 'branch_id', type: 'uuid', nullable: true })
+  branchId?: string | null;
+
+  @ManyToOne(() => Branch, { nullable: true })
+  @JoinColumn({ name: 'branch_id' })
+  branch?: Branch;
 
   @Column({ nullable: true })
   phone?: string;
@@ -72,7 +86,7 @@ export class Vendor {
     routingNumber?: string;
     swiftCode?: string;
     iban?: string;
-    ifscCode?: string;
+    address?: string;
     isPrimary?: boolean;
   }[];
 

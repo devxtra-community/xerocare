@@ -30,3 +30,25 @@ export const uploadMeterImage = multer({
     // I will use public-read for now for simplicity of MVP unless restricted.
   }),
 });
+
+export const uploadPaymentReceipt = multer({
+  storage: multerS3({
+    s3: r2,
+    bucket: process.env.R2_BUCKET!,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (req: Request, file, cb) => {
+      const invoiceId = req.body?.invoiceId || 'unknown';
+      const fileName = `payment-receipts/${invoiceId}/${Date.now()}-${file.originalname}`;
+      cb(null, fileName);
+    },
+    acl: 'public-read',
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    if (!allowed) {
+      return cb(new Error('Only image or PDF receipts are allowed'));
+    }
+    cb(null, true);
+  },
+});
