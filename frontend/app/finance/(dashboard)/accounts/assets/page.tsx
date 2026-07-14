@@ -62,6 +62,7 @@ import { getUserFromToken } from '@/lib/auth';
 import { ASSET_CATEGORIES, CATEGORY_GROUPS } from '@/lib/assetCategories';
 import { DepreciationPreview } from '@/components/accounts/DepreciationPreview';
 
+import { getActiveCurrency } from '@/lib/currency';
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   FULLY_DEPRECIATED: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -825,7 +826,7 @@ function AddAssetModal({
                       usefulLifeMonths={parseInt(form.usefulLifeMonths) || 60}
                       annualDepreciationPct={parseFloat(form.annualDepreciationPct) || 20}
                       method={form.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE'}
-                      currency="AED"
+                      currency={getActiveCurrency()}
                     />
                   )}
                 </div>

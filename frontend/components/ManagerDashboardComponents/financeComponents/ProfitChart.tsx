@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getFinanceReport } from '@/lib/invoice';
 import { formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ProfitChartProps {
   selectedYear?: number | 'all';
 }
@@ -100,7 +101,10 @@ export default function ProfitChart({ selectedYear }: ProfitChartProps) {
                 tickFormatter={(val) => `${formatCompactNumber(val)}`}
               />
               <Tooltip
-                formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`, 'Net Profit']}
+                formatter={(val: number) => [
+                  `${getActiveCurrency()} ${formatCompactNumber(val)}`,
+                  'Net Profit',
+                ]}
                 contentStyle={{
                   borderRadius: '12px',
                   border: 'none',

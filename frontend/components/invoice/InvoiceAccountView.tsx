@@ -23,6 +23,7 @@ import { Loader2, Plus, Receipt, AlertCircle, Paperclip, FileText } from 'lucide
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface InvoiceAccountViewProps {
   invoiceId: string;
   onClose: () => void;
@@ -162,7 +163,9 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                 <h4 className="font-bold text-slate-700">Record New Payment</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">Amount Paid (QAR)</label>
+                    <label className="text-xs font-bold text-slate-500">
+                      Amount Paid ({getActiveCurrency()})
+                    </label>
                     <Input
                       type="number"
                       step="0.01"

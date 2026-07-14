@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { formatCurrency } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AddPurchaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,7 +48,7 @@ export default function AddPurchaseDialog({
   const [loading, setLoading] = useState(false);
   const [lots, setLots] = useState<Lot[]>([]);
   const [loadingLots, setLoadingLots] = useState(false);
-  const [currencyCode, setCurrencyCode] = useState('AED');
+  const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
 
   const [formData, setFormData] = useState<CreatePurchaseDTO>({
     lotId: '',
@@ -76,8 +77,8 @@ export default function AddPurchaseDialog({
     if (open) {
       fetchLots();
       getMyBranch()
-        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
-        .catch(() => setCurrencyCode('AED'));
+        .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+        .catch(() => setCurrencyCode(getActiveCurrency()));
       if (editMode && purchaseData) {
         setFormData({
           lotId: purchaseData.lotId,

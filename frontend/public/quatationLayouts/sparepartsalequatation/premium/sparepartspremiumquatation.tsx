@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface QuotationLineItem {
   brand: string;
   modelNo?: string;
@@ -615,7 +616,9 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
                 SUBTOTAL (BEFORE VAT)
               </span>
-              <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
+              <span style={{ fontWeight: '400' }}>
+                {getActiveCurrency()} {fmt(totals.subTotal)}
+              </span>
             </div>
             <div
               style={{
@@ -627,7 +630,9 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               }}
             >
               <span style={{ fontWeight: '400', fontSize: '11px' }}>DISCOUNT</span>
-              <span style={{ fontWeight: '400' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
+              <span style={{ fontWeight: '400' }}>
+                - {getActiveCurrency()} {fmt(totals.discountTotal || 0)}
+              </span>
             </div>
             <div
               style={{
@@ -640,7 +645,9 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
                 VAT AMOUNT
               </span>
-              <span style={{ fontWeight: '400' }}>QAR {fmt(totals.vatTotal)}</span>
+              <span style={{ fontWeight: '400' }}>
+                {getActiveCurrency()} {fmt(totals.vatTotal)}
+              </span>
             </div>
 
             <div
@@ -659,7 +666,9 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               <span style={{ fontWeight: '900', fontSize: '14px' }}>
                 GRAND TOTAL (INCLUDING VAT)
               </span>
-              <span style={{ fontWeight: '900', fontSize: '20px' }}>QAR {fmt(totals.total)}</span>
+              <span style={{ fontWeight: '900', fontSize: '20px' }}>
+                {getActiveCurrency()} {fmt(totals.total)}
+              </span>
             </div>
 
             <div style={{ marginTop: '15px', textAlign: 'right' }}>

@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/table';
 import * as XLSX from 'xlsx';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface GLEntry {
   date: string;
   account: string;
@@ -179,7 +180,7 @@ export default function GeneralLedgerPage() {
         source: 'Purchase Order',
         debit: p.totalCost,
         credit: 0,
-        currency: p.currency ?? 'AED',
+        currency: p.currency ?? getActiveCurrency(),
       });
       rows.push({
         date: p.createdAt?.slice(0, 10) ?? '',
@@ -188,7 +189,7 @@ export default function GeneralLedgerPage() {
         source: 'Purchase Order',
         debit: 0,
         credit: p.totalCost,
-        currency: p.currency ?? 'AED',
+        currency: p.currency ?? getActiveCurrency(),
       });
       if ((p.shipping ?? 0) + (p.handling ?? 0) > 0)
         rows.push({
@@ -198,7 +199,7 @@ export default function GeneralLedgerPage() {
           source: 'Purchase Order',
           debit: (p.shipping ?? 0) + (p.handling ?? 0),
           credit: 0,
-          currency: p.currency ?? 'AED',
+          currency: p.currency ?? getActiveCurrency(),
         });
     });
     payroll.forEach((p) => {
@@ -210,7 +211,7 @@ export default function GeneralLedgerPage() {
         source: 'Payroll',
         debit: p.netSalary,
         credit: 0,
-        currency: 'AED',
+        currency: getActiveCurrency(),
       });
       rows.push({
         date: dateStr,
@@ -219,7 +220,7 @@ export default function GeneralLedgerPage() {
         source: 'Payroll',
         debit: 0,
         credit: p.netSalary,
-        currency: 'AED',
+        currency: getActiveCurrency(),
       });
     });
     return rows.sort((a, b) => a.date.localeCompare(b.date));

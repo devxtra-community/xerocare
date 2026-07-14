@@ -32,6 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface InvoiceItemRow {
   id: string; // temp id for UI key
   description: string;
@@ -517,7 +518,7 @@ export default function InvoiceForm() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end font-bold text-slate-600">
-                              <span className="text-[10px] mr-1">QAR</span>
+                              <span className="text-[10px] mr-1">{getActiveCurrency()}</span>
                               <Input
                                 type="number"
                                 value={item.unitPrice}

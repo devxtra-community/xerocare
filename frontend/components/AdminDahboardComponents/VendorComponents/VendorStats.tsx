@@ -1,6 +1,7 @@
 import StatCard from '@/components/StatCard';
 import { formatCurrency, formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface VendorStatsProps {
   totalVendors: number;
   activeVendors: number;
@@ -22,7 +23,7 @@ export default function VendorStats({
   const formatValue = (val: number, isCurrency = false) => {
     if (val >= 1000) {
       const kValue = (val / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-      return isCurrency ? `QAR ${kValue}` : kValue;
+      return isCurrency ? `${getActiveCurrency()} ${kValue}` : kValue;
     }
     return isCurrency ? formatCurrency(val) : formatCompactNumber(val);
   };

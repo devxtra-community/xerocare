@@ -134,6 +134,10 @@ export class SparePart {
   @Column({ type: 'int', default: 0 })
   damaged_quantity!: number;
 
+  /** 'TONER' | 'SPARE_PART' — drives contract coverage (SMA/AMC charge toner). */
+  @Column({ name: 'part_category', type: 'varchar', length: 30, nullable: true })
+  part_category?: string;
+
   @Column({ nullable: true })
   image_url?: string;
 

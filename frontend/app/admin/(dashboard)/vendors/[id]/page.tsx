@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { Globe, Landmark } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { id } = React.use(params);
@@ -84,7 +85,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
     );
   }
 
-  const currency = vendor.currency || 'QAR';
+  const currency = vendor.currency || getActiveCurrency();
   const bankAccounts = vendor.bankAccounts || [];
 
   return (

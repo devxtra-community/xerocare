@@ -1,6 +1,7 @@
 import React from 'react';
 import { numberToWords } from '@/lib/numberToWords';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface QuotationLineItem {
   brand: string;
   modelNo?: string;
@@ -471,7 +472,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               label: 'Grand Total (Including VAT)',
               value: totals.total,
               num: totals.total,
-              prefix: 'QAR ',
+              prefix: `${getActiveCurrency()} `,
               isBold: true,
             },
           ].map((row, i, arr) => (

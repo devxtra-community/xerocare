@@ -63,6 +63,7 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { QuotationViewDialog } from '../../employeeComponents/QuotationViewDialog';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -1305,7 +1306,7 @@ function QuotationTemplateFormModal({
         let disc = Math.max(0, Number(val));
         const maxAllowed = (item.maxDiscount || 0) * item.quantity;
         if (maxAllowed > 0 && disc > maxAllowed) {
-          toast.warning(`Maximum discount allowed is QAR ${maxAllowed}`);
+          toast.warning(`Maximum discount allowed is ${getActiveCurrency()} ${maxAllowed}`);
           disc = maxAllowed;
         }
         const totalBase = item.basePrice * item.quantity;
@@ -1811,7 +1812,7 @@ function QuotationTemplateFormModal({
 
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase text-slate-500">
-                    Monthly Base Rent (QAR)
+                    Monthly Base Rent ({getActiveCurrency()})
                   </label>
                   <Input
                     type="number"
@@ -1888,7 +1889,7 @@ function QuotationTemplateFormModal({
 
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-slate-500">
-                      Total Valuation (QAR)
+                      Total Valuation ({getActiveCurrency()})
                     </label>
                     <Input
                       type="number"
@@ -1907,7 +1908,7 @@ function QuotationTemplateFormModal({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-3 rounded-lg border">
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-slate-500">
-                        Monthly EMI (QAR)
+                        Monthly EMI ({getActiveCurrency()})
                       </label>
                       <Input
                         type="number"
@@ -1965,7 +1966,7 @@ function QuotationTemplateFormModal({
 
                     <div className="space-y-1">
                       <label className="text-[10px] font-black uppercase text-slate-500">
-                        Monthly Base Rent (QAR)
+                        Monthly Base Rent ({getActiveCurrency()})
                       </label>
                       <Input
                         type="number"
@@ -2003,7 +2004,9 @@ function QuotationTemplateFormModal({
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700">Amount (QAR)</label>
+                    <label className="text-[10px] font-bold text-slate-700">
+                      Amount ({getActiveCurrency()})
+                    </label>
                     <Input
                       type="number"
                       value={securityDepositAmount}
@@ -2072,7 +2075,9 @@ function QuotationTemplateFormModal({
                         <TableHead className="font-bold text-right w-24">QTY</TableHead>
                         {activeCategory === 'SALE' && (
                           <>
-                            <TableHead className="font-bold text-right w-28">PRICE (QAR)</TableHead>
+                            <TableHead className="font-bold text-right w-28">
+                              PRICE ({getActiveCurrency()})
+                            </TableHead>
                             <TableHead className="font-bold text-right w-28">DISCOUNT</TableHead>
                             <TableHead className="font-bold text-right w-28">TOTAL</TableHead>
                           </>
@@ -2240,7 +2245,7 @@ function QuotationTemplateFormModal({
                                       <>
                                         <div className="space-y-1">
                                           <label className="text-[9px] font-bold text-slate-500">
-                                            BW Excess Rate (QAR)
+                                            BW Excess Rate ({getActiveCurrency()})
                                           </label>
                                           <Input
                                             type="number"
@@ -2255,7 +2260,7 @@ function QuotationTemplateFormModal({
                                         </div>
                                         <div className="space-y-1">
                                           <label className="text-[9px] font-bold text-slate-500">
-                                            Color Excess Rate (QAR)
+                                            Color Excess Rate ({getActiveCurrency()})
                                           </label>
                                           <Input
                                             type="number"
@@ -2274,7 +2279,7 @@ function QuotationTemplateFormModal({
                                     {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
                                       <div className="space-y-1">
                                         <label className="text-[9px] font-bold text-slate-500">
-                                          Combined Excess Rate (QAR)
+                                          Combined Excess Rate ({getActiveCurrency()})
                                         </label>
                                         <Input
                                           type="number"

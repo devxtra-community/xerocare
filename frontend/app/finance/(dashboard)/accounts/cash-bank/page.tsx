@@ -51,6 +51,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const today = new Date().toISOString().slice(0, 10);
@@ -91,11 +92,17 @@ const TXN_COLOR: Record<string, string> = {
   PAYMENT: 'text-red-600',
 };
 
-function fmtMoney(amount: number, currency = 'AED') {
+function fmtMoney(amount: number, currency = getActiveCurrency()) {
   return `${currency} ${Number(amount).toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function BalanceText({ amount, currency = 'AED' }: { amount: number; currency?: string }) {
+function BalanceText({
+  amount,
+  currency = getActiveCurrency(),
+}: {
+  amount: number;
+  currency?: string;
+}) {
   const cls = amount < 0 ? 'text-red-600' : amount === 0 ? 'text-slate-400' : 'text-slate-900';
   return <span className={`font-semibold tabular-nums ${cls}`}>{fmtMoney(amount, currency)}</span>;
 }
@@ -132,7 +139,7 @@ function AccountModal({
   const [form, setForm] = useState<AccountFormData>({
     name: account?.name ?? '',
     type: account?.type ?? defaultType ?? 'CASH',
-    currency: account?.currency ?? 'AED',
+    currency: account?.currency ?? getActiveCurrency(),
     openingBalance: account?.openingBalance?.toString() ?? '0',
     openingDate: account?.openingDate?.slice(0, 10) ?? today,
     notes: account?.notes ?? '',

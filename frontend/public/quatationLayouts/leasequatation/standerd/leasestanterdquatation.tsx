@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ─── Shared Types (same as LeaseNormalQuotation) ──────────────────────────────
 
 export interface SlabRange {
@@ -875,7 +876,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                                         color: NAVY,
                                       }}
                                     >
-                                      QAR {Number(s.rate || 0).toFixed(3)}
+                                      {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                     </td>
                                   </tr>
                                 ))}
@@ -954,7 +955,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                                         color: '#b91c1c',
                                       }}
                                     >
-                                      QAR {Number(s.rate || 0).toFixed(3)}
+                                      {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                     </td>
                                   </tr>
                                 ))}
@@ -1033,7 +1034,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                                         color: '#6d28d9',
                                       }}
                                     >
-                                      QAR {Number(s.rate || 0).toFixed(3)}
+                                      {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                     </td>
                                   </tr>
                                 ))}
@@ -1095,7 +1096,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                     </td>
                     <td style={{ ...td('center') }}>{leaseDetails.rentPeriod || 'MONTHLY'}</td>
                     <td style={{ ...td('center') }}>
-                      QAR {fmt(leaseDetails.advance || leaseDetails.deposit || 0)}
+                      {getActiveCurrency()} {fmt(leaseDetails.advance || leaseDetails.deposit || 0)}
                     </td>
                     <td style={{ ...td('center'), fontWeight: '600' }}>{leaseDetails.duration}</td>
                     <td style={{ ...td('center') }}>
@@ -1108,7 +1109,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                       )}
                     </td>
                     <td style={{ ...td('right'), fontWeight: '800', color: NAVY }}>
-                      QAR {fmt(leaseDetails.monthlyEmi)}
+                      {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
                     </td>
                   </tr>
                 </tbody>
@@ -1160,11 +1161,14 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                 { label: 'Tenure / Duration', value: leaseDetails.duration },
                 {
                   label: 'Advance / Deposit',
-                  value: `QAR ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
+                  value: `${getActiveCurrency()} ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
                 },
                 { label: 'Contract Start Date', value: leaseDetails.startDate },
                 { label: 'Contract End Date', value: leaseDetails.endDate },
-                { label: 'Monthly EMI Amount', value: `QAR ${fmt(leaseDetails.monthlyEmi)}` },
+                {
+                  label: 'Monthly EMI Amount',
+                  value: `${getActiveCurrency()} ${fmt(leaseDetails.monthlyEmi)}`,
+                },
               ].map((r, i) => (
                 <div
                   key={i}
@@ -1276,7 +1280,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
             </div>
             <div style={{ fontSize: '10px', color: '#666', lineHeight: '1.6' }}>
               Payment is due within 15 days. Standard lease terms apply. All amounts are in Qatari
-              Riyal (QAR). Cheque should be in favor of:{' '}
+              Riyal ({getActiveCurrency()}). Cheque should be in favor of:{' '}
               <span style={{ fontWeight: '700', color: NAVY }}>{companyInfo.name}</span>
             </div>
           </div>
@@ -1340,7 +1344,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                 Grand Total (Including VAT)
               </span>
               <span style={{ fontSize: '14px', fontWeight: '900', color: NAVY }}>
-                QAR {fmt(totals.total)}
+                {getActiveCurrency()} {fmt(totals.total)}
               </span>
             </div>
 
@@ -1367,7 +1371,7 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
                 {isFSM ? 'Monthly Lease' : 'Monthly EMI'}
               </span>
               <span style={{ fontSize: '18px', fontWeight: '900', color: GOLD }}>
-                QAR {fmt(leaseDetails.monthlyEmi)}
+                {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
               </span>
             </div>
           </div>

@@ -200,8 +200,14 @@ export default function ManagerProduct() {
                 </div>
               ),
           },
-          { id: 'name', header: 'PRODUCT', accessorKey: 'name' as keyof Product },
           { id: 'brand', header: 'BRAND', accessorKey: 'brand' as keyof Product },
+          {
+            id: 'model',
+            header: 'MODEL NO',
+            cell: (p: Product) => (
+              <span title={p.name}>{p.model?.model_no || p.model_no || '-'}</span>
+            ),
+          },
           {
             id: 'lot',
             header: 'LOT ID',

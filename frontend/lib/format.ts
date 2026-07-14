@@ -1,9 +1,13 @@
+import { getActiveCurrency } from './currency';
+
 /**
  * Gulf ERP standard: "AED 1,000.00"
  * Always currency code + single space + comma-separated amount with 2 decimal places.
  * Never compact notation for monetary amounts.
+ * When no currencyCode is passed, the logged-in user's branch currency is used.
  */
-export function formatCurrency(amount: number | string, currencyCode: string = 'AED'): string {
+export function formatCurrency(amount: number | string, currencyCode?: string): string {
+  currencyCode = currencyCode || getActiveCurrency();
   const value = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (typeof value !== 'number' || isNaN(value)) return `${currencyCode} 0.00`;
 

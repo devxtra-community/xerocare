@@ -1,6 +1,7 @@
 import React from 'react';
 import { numberToWords } from '@/lib/numberToWords';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface Consumable {
   partName: string;
   description: string;
@@ -603,7 +604,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             {
               label: 'Grand Total (Including VAT)',
               value: totals.total,
-              prefix: 'QAR ',
+              prefix: `${getActiveCurrency()} `,
               isBold: true,
             },
           ].map((row, i) => (
@@ -720,7 +721,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                         </th>
                         <th style={{ ...thStyle('center', '#333'), fontWeight: '300' }}>Yield</th>
                         <th style={{ ...thStyle('right', '#333'), fontWeight: '300' }}>
-                          Price (QAR)
+                          Price ({getActiveCurrency()})
                         </th>
                       </tr>
                     </thead>

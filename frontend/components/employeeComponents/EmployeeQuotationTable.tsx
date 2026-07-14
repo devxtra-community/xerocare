@@ -72,6 +72,7 @@ import RentFormModal from './RentFormModal';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 import { getAccountSummary } from '@/lib/payment';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
@@ -1876,7 +1877,7 @@ function QuotationFormModal({
           </div>
           <div className="relative w-32">
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-300 pointer-events-none">
-              QAR
+              {getActiveCurrency()}
             </span>
             <Input
               placeholder="0.00"
@@ -1901,7 +1902,7 @@ function QuotationFormModal({
               To
             </div>
             <div className="col-span-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">
-              Rate per Page (QAR)
+              Rate per Page ({getActiveCurrency()})
             </div>
             <div className="col-span-1" />
           </div>
@@ -1936,7 +1937,7 @@ function QuotationFormModal({
                 </div>
                 <div className="col-span-5 relative">
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 pointer-events-none group-hover:text-blue-300">
-                    QAR
+                    {getActiveCurrency()}
                   </span>
                   <Input
                     placeholder="0.00"
@@ -2082,7 +2083,7 @@ function QuotationFormModal({
         let d = Number(value);
         const maxLimit = item.maxDiscount || 0;
         if (d > maxLimit) {
-          toast.warning(`Maximum discount allowed is QAR ${maxLimit}`);
+          toast.warning(`Maximum discount allowed is ${getActiveCurrency()} ${maxLimit}`);
           d = maxLimit;
         }
         if (d > item.basePrice) {
@@ -3014,7 +3015,7 @@ function QuotationFormModal({
 
                                 <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
-                                    Rate (QAR)
+                                    Rate ({getActiveCurrency()})
                                   </label>
                                   <Input
                                     type="number"
@@ -3089,7 +3090,7 @@ function QuotationFormModal({
                                           Yield
                                         </div>
                                         <div className="md:col-span-2 text-[9px] font-black text-slate-400 uppercase text-right">
-                                          Price (QAR)
+                                          Price ({getActiveCurrency()})
                                         </div>
                                       </div>
 
@@ -3537,7 +3538,7 @@ function QuotationFormModal({
                         </div>
                         <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                            Advance / Caution Deposit (QAR)
+                            Advance / Caution Deposit ({getActiveCurrency()})
                           </label>
                           <Input
                             type="number"
@@ -3930,7 +3931,7 @@ function QuotationFormModal({
                     </div>
                     <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Total Lease Amount (QAR)
+                        Total Lease Amount ({getActiveCurrency()})
                       </label>
                       <Input
                         type="number"
@@ -3950,7 +3951,7 @@ function QuotationFormModal({
                     {leaseType === 'EMI' && (
                       <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
                         <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
-                          <span>Monthly EMI (QAR)</span>
+                          <span>Monthly EMI ({getActiveCurrency()})</span>
                           <span className="text-[9px] lowercase">(auto)</span>
                         </label>
                         <Input
@@ -3987,7 +3988,7 @@ function QuotationFormModal({
                         )}
                         <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                            Advance / Caution Deposit (QAR)
+                            Advance / Caution Deposit ({getActiveCurrency()})
                           </label>
                           <Input
                             type="number"

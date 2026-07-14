@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface QuotationLineItem {
   brand: string;
   modelNo?: string;
@@ -518,7 +519,9 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
             }}
           >
             <span style={{ color: mutedText, fontWeight: '400' }}>Subtotal (Before VAT)</span>
-            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
+            <span style={{ fontWeight: '400' }}>
+              {getActiveCurrency()} {fmt(totals.subTotal)}
+            </span>
           </div>
           <div
             style={{
@@ -530,7 +533,9 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
             }}
           >
             <span style={{ fontWeight: '400' }}>Discount</span>
-            <span style={{ fontWeight: '400' }}>- QAR {fmt(totals.discountTotal || 0)}</span>
+            <span style={{ fontWeight: '400' }}>
+              - {getActiveCurrency()} {fmt(totals.discountTotal || 0)}
+            </span>
           </div>
           <div
             style={{
@@ -545,7 +550,9 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
                 ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
                 : totals.vatName || 'VAT Amount'}
             </span>
-            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.vatTotal)}</span>
+            <span style={{ fontWeight: '400' }}>
+              {getActiveCurrency()} {fmt(totals.vatTotal)}
+            </span>
           </div>
           <div
             style={{
@@ -559,7 +566,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
               Grand Total (Including VAT)
             </span>
             <span style={{ fontSize: '24px', fontWeight: '900', color: purpleColor }}>
-              QAR {fmt(totals.total)}
+              {getActiveCurrency()} {fmt(totals.total)}
             </span>
           </div>
           <div

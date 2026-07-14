@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Mail, Phone, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /** Converts CN-2026-00001 → RTN-INV-0001 */
@@ -515,13 +516,13 @@ export default function ReturnInvoiceLayout({
                 <div>
                   <div style={labelStyle}>Original Sale Amount</div>
                   <div style={{ ...valueStyle, fontWeight: '600' }}>
-                    QAR {fmt(creditNote.productAmount)}
+                    {getActiveCurrency()} {fmt(creditNote.productAmount)}
                   </div>
                 </div>
                 <div>
                   <div style={labelStyle}>Credit Issued</div>
                   <div style={{ ...valueStyle, fontWeight: '600' }}>
-                    − QAR {fmt(creditNote.productAmount)}
+                    − {getActiveCurrency()} {fmt(creditNote.productAmount)}
                   </div>
                 </div>
                 {returnedProductDesc && (
@@ -610,14 +611,14 @@ export default function ReturnInvoiceLayout({
                   <div>
                     <div style={labelStyle}>New Product Price</div>
                     <div style={{ ...valueStyle, fontWeight: '600' }}>
-                      QAR {fmt(creditNote.replacementAmount || 0)}
+                      {getActiveCurrency()} {fmt(creditNote.replacementAmount || 0)}
                     </div>
                   </div>
                   {(creditNote.replacementDiscount || 0) > 0 && (
                     <div>
                       <div style={labelStyle}>Exchange Discount</div>
                       <div style={{ ...valueStyle, fontWeight: '600' }}>
-                        − QAR {fmt(creditNote.replacementDiscount)}
+                        − {getActiveCurrency()} {fmt(creditNote.replacementDiscount)}
                       </div>
                     </div>
                   )}
@@ -715,7 +716,7 @@ export default function ReturnInvoiceLayout({
                       borderBottom: '1px solid #eee',
                     }}
                   >
-                    Amount (QAR)
+                    Amount ({getActiveCurrency()})
                   </th>
                 </tr>
               </thead>
@@ -805,7 +806,7 @@ export default function ReturnInvoiceLayout({
                     Returned Credit
                   </span>
                   <span style={{ fontSize: '14px', fontWeight: '300' }}>
-                    − QAR {fmt(creditNote.productAmount)}
+                    − {getActiveCurrency()} {fmt(creditNote.productAmount)}
                   </span>
                 </div>
                 {isReplacement && (
@@ -823,7 +824,7 @@ export default function ReturnInvoiceLayout({
                       New Product Price
                     </span>
                     <span style={{ fontSize: '14px', fontWeight: '300' }}>
-                      QAR {fmt(creditNote.replacementAmount || 0)}
+                      {getActiveCurrency()} {fmt(creditNote.replacementAmount || 0)}
                     </span>
                   </div>
                 )}
@@ -845,7 +846,8 @@ export default function ReturnInvoiceLayout({
                       : 'Total Credit Issued'}
                   </span>
                   <span style={{ fontSize: '15px', color: ACCENT, fontWeight: '300' }}>
-                    QAR {fmt(isReplacement ? Math.abs(netVariation) : creditNote.productAmount)}
+                    {getActiveCurrency()}{' '}
+                    {fmt(isReplacement ? Math.abs(netVariation) : creditNote.productAmount)}
                   </span>
                 </div>
               </div>

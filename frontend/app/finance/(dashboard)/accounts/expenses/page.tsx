@@ -54,6 +54,7 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 const EXPENSE_CATEGORIES = [
   'SALARY',
   'TRAVEL',
@@ -114,7 +115,7 @@ function ExpenseModal({
     subCategory: expense?.subCategory ?? '',
     description: expense?.description ?? '',
     amount: expense?.amount?.toString() ?? '',
-    currency: expense?.currency ?? 'AED',
+    currency: expense?.currency ?? getActiveCurrency(),
     vatIncluded: false,
     vatAmount: expense?.vatAmount?.toString() ?? '0',
     netAmount: expense?.netAmount?.toString() ?? '',

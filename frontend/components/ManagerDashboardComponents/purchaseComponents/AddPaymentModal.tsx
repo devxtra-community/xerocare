@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AddPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,7 +38,7 @@ export default function AddPaymentModal({
 }: AddPaymentModalProps) {
   const remainingAmount = Math.max(0, totalAmount - paidAmount);
   const [loading, setLoading] = useState(false);
-  const [currencyCode, setCurrencyCode] = useState('AED');
+  const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
   const [attachment, setAttachment] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<AddPaymentDto>({
@@ -51,8 +52,8 @@ export default function AddPaymentModal({
   useEffect(() => {
     if (open) {
       getMyBranch()
-        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
-        .catch(() => setCurrencyCode('AED'));
+        .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+        .catch(() => setCurrencyCode(getActiveCurrency()));
     } else {
       setAttachment(null);
     }

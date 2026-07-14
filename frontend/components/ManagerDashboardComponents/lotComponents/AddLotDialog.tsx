@@ -41,6 +41,7 @@ import { AddModelDialog } from '../productComponents/AddModelDialog';
 import { AddBrandDialog } from '../BrandComponents/AddBrandDialog';
 import { Label } from '@/components/ui/label';
 
+import { getActiveCurrency } from '@/lib/currency';
 // --- Schema Definition ---
 const lotItemSchema = z
   .object({
@@ -111,7 +112,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   const [isValidatingLot, setIsValidatingLot] = useState(false);
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [brandDialogOpen, setBrandDialogOpen] = useState(false);
-  const [currencyCode, setCurrencyCode] = useState('AED');
+  const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
 
   const form = useForm<CreateLotFormValues>({
     resolver: zodResolver(createLotSchema) as Resolver<CreateLotFormValues>,
@@ -167,8 +168,8 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
   useEffect(() => {
     fetchData();
     getMyBranch()
-      .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
-      .catch(() => setCurrencyCode('AED'));
+      .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+      .catch(() => setCurrencyCode(getActiveCurrency()));
   }, []);
 
   const watchLotNumber = useWatch({ control: form.control, name: 'lotNumber' });

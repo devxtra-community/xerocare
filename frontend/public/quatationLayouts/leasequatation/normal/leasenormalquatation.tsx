@@ -1,6 +1,7 @@
 import React from 'react';
 import { numberToWords } from '@/lib/numberToWords';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface SlabRange {
   from: number;
   to: number;
@@ -704,7 +705,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                                       color: '#0f172a',
                                     }}
                                   >
-                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                    {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                   </td>
                                 </tr>
                               ))}
@@ -775,7 +776,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                                       color: '#b91c1c',
                                     }}
                                   >
-                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                    {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                   </td>
                                 </tr>
                               ))}
@@ -846,7 +847,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                                       color: '#6d28d9',
                                     }}
                                   >
-                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                    {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                   </td>
                                 </tr>
                               ))}
@@ -898,7 +899,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                 <td style={tdStyle('center')}>{leaseDetails.rentType || 'FIXED LIMIT'}</td>
                 <td style={tdStyle('center')}>{leaseDetails.rentPeriod || 'MONTHLY'}</td>
                 <td style={tdStyle('center')}>
-                  QAR {fmt(leaseDetails.advance || leaseDetails.deposit || 0)}
+                  {getActiveCurrency()} {fmt(leaseDetails.advance || leaseDetails.deposit || 0)}
                 </td>
                 <td style={tdStyle('center')}>{leaseDetails.duration}</td>
                 <td style={tdStyle('center')}>
@@ -911,7 +912,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   )}
                 </td>
                 <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
-                  QAR {fmt(leaseDetails.monthlyEmi)}
+                  {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
                 </td>
               </tr>
             </tbody>
@@ -932,11 +933,14 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               { label: 'Tenure / Duration', value: leaseDetails.duration },
               {
                 label: 'Advance / Deposit',
-                value: `QAR ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
+                value: `${getActiveCurrency()} ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
               },
               { label: 'Contract Start Date', value: leaseDetails.startDate },
               { label: 'Contract End Date', value: leaseDetails.endDate },
-              { label: 'Monthly EMI Amount', value: `QAR ${fmt(leaseDetails.monthlyEmi)}` },
+              {
+                label: 'Monthly EMI Amount',
+                value: `${getActiveCurrency()} ${fmt(leaseDetails.monthlyEmi)}`,
+              },
             ].map((item, id) => (
               <div
                 key={id}
@@ -1128,7 +1132,9 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                 }}
               >
                 <span>Grand Total (Including VAT)</span>
-                <span>QAR {fmt(totals.total)}</span>
+                <span>
+                  {getActiveCurrency()} {fmt(totals.total)}
+                </span>
               </div>
               <div
                 style={{
@@ -1149,7 +1155,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               {isFSM ? 'Monthly Lease Amount' : 'Monthly EMI Amount'}
             </div>
             <div style={{ fontSize: '22px', fontWeight: '300', color: '#111' }}>
-              QAR {fmt(leaseDetails.monthlyEmi)}
+              {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
             </div>
             <div
               style={{

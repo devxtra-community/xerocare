@@ -35,6 +35,14 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         );
         await Source.initialize();
         logger.info('Database connected successfully.');
+
+        // Fresh database (no customers table yet): create the schema from entities.
+        const customersTable = await Source.query(`SELECT to_regclass('public.customers') AS tbl;`);
+        if (!customersTable[0].tbl) {
+          logger.info('Fresh database — creating schema from entities via synchronize...');
+          await Source.synchronize();
+          logger.info('Schema created from entities.');
+        }
       }
       return Source;
     } catch (error: unknown) {

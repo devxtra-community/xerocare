@@ -15,6 +15,7 @@ import {
 import { getFinanceReport } from '@/lib/invoice';
 import { formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface RevenueVsExpenseChartProps {
   selectedYear?: number | 'all';
 }
@@ -128,7 +129,7 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
                 tickFormatter={(val) => `${formatCompactNumber(val)}`}
               />
               <Tooltip
-                formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`]}
+                formatter={(val: number) => [`${getActiveCurrency()} ${formatCompactNumber(val)}`]}
                 contentStyle={{
                   borderRadius: '12px',
                   border: 'none',

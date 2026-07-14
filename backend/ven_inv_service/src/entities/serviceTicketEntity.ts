@@ -173,6 +173,9 @@ export class ServiceTicket {
   @Column({ type: 'int', nullable: true, name: 'meter_reading_at_service' })
   meterReadingAtService?: number | null; // Total meter count at time of service visit
 
+  @Column({ type: 'int', nullable: true, name: 'meter_reading_at_creation' })
+  meterReadingAtCreation?: number | null; // Meter reading reported by the customer when the ticket was raised
+
   @Column({ type: 'varchar', length: 500, nullable: true, name: 'report_url' })
   reportUrl?: string | null;
 

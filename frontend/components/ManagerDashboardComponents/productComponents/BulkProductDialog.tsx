@@ -14,6 +14,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -61,6 +62,10 @@ export function BulkProductDialog({
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+  // Rows targeted by Bulk Fill. Empty set = no selection = fill every row
+  // (the original behavior). With a selection, Bulk Fill touches only those
+  // rows — lets the user fill 5 units of model A, re-select, fill model B.
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   // Same-batch units (e.g. 10x the same product from one lot) usually share
   // everything except serial number & date of manufacture. Fill a value once
   // here and push it to every row instead of retyping it 10 times.
@@ -153,6 +158,7 @@ export function BulkProductDialog({
     if (open) {
       setFile(null);
       setExpandedRows({});
+      setSelectedRows(new Set());
       const prepareInitialData = async () => {
         const { loadedModels, loadedVendors } = await loadDependencies();
 
@@ -309,6 +315,23 @@ export function BulkProductDialog({
       });
       return updatedExpanded;
     });
+    setSelectedRows((prev) => {
+      const next = new Set<number>();
+      prev.forEach((idx) => {
+        if (idx === index) return;
+        next.add(idx > index ? idx - 1 : idx);
+      });
+      return next;
+    });
+  };
+
+  const toggleRowSelected = (index: number) => {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   };
 
   const toggleRowExpanded = (index: number) => {
@@ -328,9 +351,16 @@ export function BulkProductDialog({
     setRows(newRows);
   };
 
-  /** Pushes one Bulk Fill field's current value onto every row, live as the user types/selects. */
+  /**
+   * Pushes one Bulk Fill field's current value onto the selected rows, live as
+   * the user types/selects. No selection = every row.
+   */
   const applyBulkField = <K extends keyof BulkProductRow>(field: K, value: BulkProductRow[K]) => {
-    setRows((prev) => prev.map((r) => ({ ...r, [field]: value })));
+    setRows((prev) =>
+      prev.map((r, idx) =>
+        selectedRows.size === 0 || selectedRows.has(idx) ? { ...r, [field]: value } : r,
+      ),
+    );
   };
 
   /**
@@ -521,10 +551,35 @@ export function BulkProductDialog({
 
         {rows.length > 1 && (
           <div className="p-4 bg-blue-50/60 border-b">
-            <p className="text-xs font-bold text-blue-900 mb-3">
-              Bulk Fill — type here and it fills all {rows.length} rows below live (Serial Number &
-              Date of Manufacture stay per-unit).
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <p className="text-xs font-bold text-blue-900">
+                {selectedRows.size > 0
+                  ? `Bulk Fill — type here and it fills the ${selectedRows.size} selected row${selectedRows.size > 1 ? 's' : ''} below live.`
+                  : `Bulk Fill — type here and it fills all ${rows.length} rows below live (tick rows below to target only some).`}{' '}
+                Serial Number stays per-unit.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] text-blue-700"
+                  onClick={() => setSelectedRows(new Set(rows.map((_, idx) => idx)))}
+                >
+                  Select all
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] text-blue-700"
+                  disabled={selectedRows.size === 0}
+                  onClick={() => setSelectedRows(new Set())}
+                >
+                  Clear selection
+                </Button>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-3 items-end">
               <BulkFillField label="Warehouse">
                 <SearchableSelect
@@ -560,6 +615,7 @@ export function BulkProductDialog({
               <BulkFillField label="Sale Price">
                 <Input
                   type="number"
+                  step="0.01"
                   className="w-24 h-9"
                   value={bulkFill.sale_price}
                   onChange={(e) => {
@@ -574,6 +630,7 @@ export function BulkProductDialog({
               <BulkFillField label="Wholesale Price">
                 <Input
                   type="number"
+                  step="0.01"
                   className="w-24 h-9"
                   value={bulkFill.wholesale_price}
                   onChange={(e) => {
@@ -588,6 +645,7 @@ export function BulkProductDialog({
               <BulkFillField label="Tax Rate (%)">
                 <Input
                   type="number"
+                  step="0.01"
                   className="w-20 h-9"
                   value={bulkFill.tax_rate}
                   onChange={(e) => {
@@ -635,6 +693,7 @@ export function BulkProductDialog({
               <BulkFillField label="Max Discount">
                 <Input
                   type="number"
+                  step="0.01"
                   className="w-24 h-9"
                   value={bulkFill.max_discount_amount}
                   onChange={(e) => {
@@ -710,7 +769,11 @@ export function BulkProductDialog({
               return (
                 <div
                   key={i}
-                  className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md"
+                  className={`border rounded-xl overflow-hidden shadow-sm bg-card transition-all duration-200 hover:shadow-md ${
+                    selectedRows.has(i)
+                      ? 'border-blue-400 ring-1 ring-blue-300'
+                      : 'border-slate-200'
+                  }`}
                 >
                   {/* Header / Summary */}
                   <div
@@ -718,6 +781,14 @@ export function BulkProductDialog({
                     className="p-4 bg-slate-50 border-b flex justify-between items-center cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-3">
+                      <span onClick={(e) => e.stopPropagation()} className="flex items-center">
+                        <Checkbox
+                          checked={selectedRows.has(i)}
+                          onCheckedChange={() => toggleRowSelected(i)}
+                          title="Target this row with Bulk Fill"
+                          className="shrink-0"
+                        />
+                      </span>
                       {isValid ? (
                         <span
                           className="h-2.5 w-2.5 rounded-full bg-green-500 shrink-0"
@@ -983,6 +1054,7 @@ export function BulkProductDialog({
                             <Field label="Purchase Price">
                               <Input
                                 type="number"
+                                step="0.01"
                                 value={row.purchase_price ?? ''}
                                 onChange={(e) =>
                                   updateRow(i, 'purchase_price', Number(e.target.value))
@@ -993,6 +1065,7 @@ export function BulkProductDialog({
                             <Field label="Sale Price *">
                               <Input
                                 type="number"
+                                step="0.01"
                                 value={row.sale_price ?? ''}
                                 onChange={(e) => updateRow(i, 'sale_price', Number(e.target.value))}
                                 placeholder="0"
@@ -1004,6 +1077,7 @@ export function BulkProductDialog({
                             <Field label="Wholesale Price">
                               <Input
                                 type="number"
+                                step="0.01"
                                 value={row.wholesale_price ?? ''}
                                 onChange={(e) =>
                                   updateRow(i, 'wholesale_price', Number(e.target.value))
@@ -1014,6 +1088,7 @@ export function BulkProductDialog({
                             <Field label="Tax Rate (%) *">
                               <Input
                                 type="number"
+                                step="0.01"
                                 value={row.tax_rate ?? ''}
                                 onChange={(e) => updateRow(i, 'tax_rate', Number(e.target.value))}
                                 placeholder="0"
@@ -1067,6 +1142,7 @@ export function BulkProductDialog({
                             <Field label="Max Discount">
                               <Input
                                 type="number"
+                                step="0.01"
                                 value={row.max_discount_amount ?? ''}
                                 onChange={(e) =>
                                   updateRow(i, 'max_discount_amount', Number(e.target.value))

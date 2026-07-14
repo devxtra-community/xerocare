@@ -27,6 +27,7 @@ import { modelService } from '@/services/modelService';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface BulkSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -746,6 +747,7 @@ export default function BulkSparePartDialog({
                               <Input
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={row.purchase_price ?? 0}
                                 onChange={(e) =>
                                   updateRow(i, 'purchase_price', Number(e.target.value))
@@ -757,6 +759,7 @@ export default function BulkSparePartDialog({
                               <Input
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={row.base_price ?? 0}
                                 onChange={(e) => updateRow(i, 'base_price', Number(e.target.value))}
                                 placeholder="0"
@@ -769,6 +772,7 @@ export default function BulkSparePartDialog({
                               <Input
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={row.wholesale_price ?? 0}
                                 onChange={(e) =>
                                   updateRow(i, 'wholesale_price', Number(e.target.value))
@@ -776,10 +780,11 @@ export default function BulkSparePartDialog({
                                 placeholder="0"
                               />
                             </Field>
-                            <Field label="Max Discount (QAR)">
+                            <Field label={`Max Discount (${getActiveCurrency()})`}>
                               <Input
                                 type="number"
                                 min={0}
+                                step="0.01"
                                 value={row.maxDiscountableAmount ?? 0}
                                 onChange={(e) =>
                                   updateRow(i, 'maxDiscountableAmount', Number(e.target.value))

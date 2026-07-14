@@ -6,6 +6,7 @@ import { ArrowUpRight, TrendingUp } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCurrency } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 const cashFlowData = [
   { month: 'Jan', inflow: 42000, outflow: 31000 },
   { month: 'Feb', inflow: 38000, outflow: 29000 },
@@ -68,7 +69,7 @@ export default function CashFlowMiniChart() {
                 <ChartTooltipContent
                   valueFormatter={(value) => {
                     const val = Number(value);
-                    return `QAR ${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
+                    return `${getActiveCurrency()} ${val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toLocaleString()}`;
                   }}
                 />
               }

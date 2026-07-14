@@ -21,6 +21,7 @@ import {
 import { useState, useEffect } from 'react';
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 
+import { getActiveCurrency } from '@/lib/currency';
 /**
  * Table component displaying a summary of recent sales transactions.
  * Fetches and lists invoices with details like invoice number, customer, sale type, amount, employee, status, and date.
@@ -89,9 +90,9 @@ export default function SalesSummaryTable({ selectedYear }: { selectedYear: numb
   }
   const formatToK = (value: number) => {
     if (value >= 1000) {
-      return `QAR ${(value / 1000).toFixed(1)}k`;
+      return `${getActiveCurrency()} ${(value / 1000).toFixed(1)}k`;
     }
-    return `QAR ${value.toLocaleString()}`;
+    return `${getActiveCurrency()} ${value.toLocaleString()}`;
   };
 
   return (

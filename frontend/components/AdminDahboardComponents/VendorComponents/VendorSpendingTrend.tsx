@@ -12,6 +12,7 @@ import {
 import { VendorRequest } from '@/lib/vendor';
 import { format, parseISO, startOfYear, eachMonthOfInterval, endOfYear } from 'date-fns';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface VendorSpendingTrendProps {
   requests: VendorRequest[];
 }
@@ -94,7 +95,10 @@ export default function VendorSpendingTrend({ requests }: VendorSpendingTrendPro
                 fontSize: '10px',
               }}
               cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }}
-              formatter={(value: number) => [`QAR ${value.toLocaleString()}`, 'Spend']}
+              formatter={(value: number) => [
+                `${getActiveCurrency()} ${value.toLocaleString()}`,
+                'Spend',
+              ]}
             />
             <Area
               type="monotone"

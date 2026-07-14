@@ -16,6 +16,7 @@ import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 // Month names for display
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -110,7 +111,7 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
               axisLine={false}
               tickLine={false}
               tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
-              tickFormatter={(value) => `${formatCompactNumber(value)} QAR`}
+              tickFormatter={(value) => `${formatCompactNumber(value)} ${getActiveCurrency()}`}
             />
 
             <Tooltip
@@ -118,7 +119,7 @@ export default function RevenueBreakdownChart({ selectedYear }: RevenueBreakdown
                 <ChartTooltipContent
                   valueFormatter={(value) => {
                     const val = Number(value);
-                    return `QAR ${formatCompactNumber(val)}`;
+                    return `${getActiveCurrency()} ${formatCompactNumber(val)}`;
                   }}
                 />
               }

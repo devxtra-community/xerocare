@@ -19,6 +19,7 @@ import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCurrency } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface SalesChartDataItem {
   name: string;
   salesCount: number;
@@ -68,7 +69,9 @@ const ChartContainer = ({
             axisLine={false}
             tickLine={false}
             tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
-            tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+            tickFormatter={(val) =>
+              `${getActiveCurrency()} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
+            }
           />
           <Tooltip
             content={<ChartTooltipContent valueFormatter={(val) => formatCurrency(Number(val))} />}
@@ -129,7 +132,9 @@ const ForexChartContainer = ({
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
-              tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+              tickFormatter={(val) =>
+                `${getActiveCurrency()} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
+              }
               domain={['auto', 'auto']}
             />
             <Tooltip

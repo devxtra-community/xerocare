@@ -1,6 +1,22 @@
 import api from './api';
 import { ServiceContract } from './serviceContract';
 
+/**
+ * Warranty status computed server-side (single source of truth).
+ * Attached to product allocations in customer history and to machine context.
+ */
+export interface WarrantyInfo {
+  isUnderWarranty: boolean;
+  warrantyType?: string;
+  warrantyEndDate?: string | null;
+  copyLimit?: number | null;
+  copiesUsed?: number;
+  copiesRemaining?: number | null;
+  expiredBy?: 'TIME' | 'COPIES' | 'BOTH' | null;
+  /** RENT machines: always fully covered. */
+  fullCoverage?: boolean;
+}
+
 export interface ServiceTicketItem {
   id?: string;
   itemSource: 'SPARE_PART' | 'CUSTOM';
@@ -52,6 +68,7 @@ export interface ServiceTicket {
   problemFound?: string | null;
   rootCause?: string | null;
   meterReadingAtService?: number;
+  meterReadingAtCreation?: number;
   branchName?: string;
   branchId?: string;
 }
@@ -408,18 +425,30 @@ export const markSparePartDamaged = async (id: string, quantity: number): Promis
 
 export const getMachineContext = async (
   serialNumber: string,
+  meterReading?: number,
 ): Promise<{
   serviceContext: string;
   contractReferenceId: string | null;
   productId: string | null;
   coverage: {
     labour: boolean;
-    consumables: boolean;
+    spareParts: boolean;
+    toner: boolean;
     travel: boolean;
   };
   contract: ServiceContract | null;
+  warrantyInfo: WarrantyInfo | null;
+  contractUsage: {
+    copiesUsed: number;
+    copyLimit: number;
+    copiesRemaining: number;
+    limitExceeded: boolean;
+    overagePerCopyRate: number;
+  } | null;
 }> => {
-  const response = await api.get(`/i/service/machines/${serialNumber}/context`);
+  const params: Record<string, number> = {};
+  if (meterReading !== undefined && meterReading > 0) params.meterReading = meterReading;
+  const response = await api.get(`/i/service/machines/${serialNumber}/context`, { params });
   return response.data.data;
 };
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { salesService } from '@/services/salesService';
 
+import { getActiveCurrency } from '@/lib/currency';
 const COLORS = ['#2563eb', '#3b82f6', '#93c5fd'];
 
 export default function RevenuePieChart({ selectedYear }: { selectedYear: number | 'all' }) {
@@ -61,7 +62,7 @@ export default function RevenuePieChart({ selectedYear }: { selectedYear: number
                     <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-50">
                       <p className="text-xs font-bold text-gray-700">{item.name}</p>
                       <p className="text-xs text-primary font-medium">
-                        QAR {(item.value ?? 0).toLocaleString()}
+                        {getActiveCurrency()} {(item.value ?? 0).toLocaleString()}
                       </p>
                     </div>
                   );

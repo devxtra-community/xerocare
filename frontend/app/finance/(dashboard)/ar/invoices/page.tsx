@@ -26,6 +26,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 import { arCustomers, arInvoices, arPayments } from '@/lib/finance/ar';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function SalesInvoiceListPage() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -244,7 +245,7 @@ function StatsCard({
           <h3
             className={`text-2xl font-black ${isRisk && value > 0 ? 'text-destructive' : 'text-foreground'}`}
           >
-            {!isCount && 'AED '}
+            {!isCount && `${getActiveCurrency()} `}
             {value.toLocaleString()}
           </h3>
         </div>

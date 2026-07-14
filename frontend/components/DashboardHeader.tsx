@@ -23,6 +23,7 @@ import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { SessionsDialog } from './SessionsDialog';
 import { SalaryDetailsDialog } from './SalaryDetailsDialog';
 import { HelpGuideDialog } from './HelpGuideDialog';
+import { initBranchCurrency } from '@/lib/currency';
 
 export interface Notification {
   id: string;
@@ -105,6 +106,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
     };
     fetchProfile();
     fetchNotifications();
+    initBranchCurrency();
 
     // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchNotifications, 30000);

@@ -1,6 +1,7 @@
 import React from 'react';
 import { numberToWords } from '@/lib/numberToWords';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface Consumable {
   partName: string;
   description: string;
@@ -973,7 +974,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                           fontWeight: '400',
                         }}
                       >
-                        Price (QAR)
+                        Price ({getActiveCurrency()})
                       </th>
                     </tr>
                   </thead>

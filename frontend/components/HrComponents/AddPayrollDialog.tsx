@@ -26,6 +26,7 @@ import { Filter, Sparkles } from 'lucide-react';
 import { listTargetsByEmployee } from '@/lib/targets';
 import { formatCurrency } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AddPayrollDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -91,7 +92,7 @@ export default function AddPayrollDialog({
       if (emp) {
         setFormData((prev) => ({
           ...prev,
-          salaryAmount: emp.salaryPerMonth.replace('QAR ', '').replace(/,/g, ''),
+          salaryAmount: emp.salaryPerMonth.replace(/^[A-Z]{3}\s*/, '').replace(/,/g, ''),
           department: emp.department,
           role: emp.role,
           branchName: emp.branchName,
@@ -291,7 +292,7 @@ export default function AddPayrollDialog({
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Salary Amount (QAR)
+              Salary Amount ({getActiveCurrency()})
             </label>
             <Input
               name="salaryAmount"

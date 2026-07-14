@@ -13,6 +13,7 @@ import { getGlobalSalesOverview } from '@/lib/invoice';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface SalesDataPoint {
   month: string;
   SALE: number;
@@ -160,7 +161,9 @@ export default function SalesChart({ selectedYear = new Date().getFullYear() }: 
                     labelFormatter={(label) =>
                       `${label} ${selectedYear === 'all' ? '' : selectedYear}`
                     }
-                    valueFormatter={(v) => `QAR ${formatCompactNumber(Number(v))}`}
+                    valueFormatter={(v) =>
+                      `${getActiveCurrency()} ${formatCompactNumber(Number(v))}`
+                    }
                   />
                 }
               />

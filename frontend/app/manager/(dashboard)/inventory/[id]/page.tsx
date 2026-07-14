@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import Image from 'next/image';
+import { formatCurrency } from '@/lib/format';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -113,17 +114,17 @@ export default function ProductDetailPage() {
           />
           <StatCard
             title="Purchase Cost"
-            value={`QAR ${product.purchaseCost.toLocaleString()}`}
+            value={formatCurrency(product.purchaseCost)}
             subtitle="Last Purchase Price"
           />
           <StatCard
             title="Selling Price"
-            value={`QAR ${product.sellingPrice.toLocaleString()}`}
+            value={formatCurrency(product.sellingPrice)}
             subtitle={`Margin: ${product.margin}`}
           />
           <StatCard
             title="Total Value"
-            value={`QAR ${(product.quantity * product.purchaseCost).toLocaleString()}`}
+            value={formatCurrency(product.quantity * product.purchaseCost)}
             subtitle="Current Inventory Value"
           />
         </div>

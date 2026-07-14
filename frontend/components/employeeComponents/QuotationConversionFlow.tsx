@@ -25,6 +25,7 @@ import {
 import { recordPayment } from '@/lib/payment';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface QuotationConversionFlowProps {
   quotation: Invoice;
   onClose: () => void;
@@ -213,11 +214,11 @@ export function QuotationConversionFlow({
       const hasAdvance = advanceAmount && Number(advanceAmount) > 0;
       const hasCaution = cautionAmount && Number(cautionAmount) > 0;
       if (hasAdvance && hasCaution) {
-        successMsg += ` Advance QAR ${Number(advanceAmount).toFixed(2)} and Caution QAR ${Number(cautionAmount).toFixed(2)} recorded.`;
+        successMsg += ` Advance ${getActiveCurrency()} ${Number(advanceAmount).toFixed(2)} and Caution ${getActiveCurrency()} ${Number(cautionAmount).toFixed(2)} recorded.`;
       } else if (hasAdvance) {
-        successMsg += ` Advance QAR ${Number(advanceAmount).toFixed(2)} recorded.`;
+        successMsg += ` Advance ${getActiveCurrency()} ${Number(advanceAmount).toFixed(2)} recorded.`;
       } else if (hasCaution) {
-        successMsg += ` Caution QAR ${Number(cautionAmount).toFixed(2)} recorded.`;
+        successMsg += ` Caution ${getActiveCurrency()} ${Number(cautionAmount).toFixed(2)} recorded.`;
       }
 
       toast.success('Conversion complete!', {
@@ -376,8 +377,8 @@ export function QuotationConversionFlow({
                               ),
                               searchText: `${p.serial_no} ${p.brand} ${p.name} ${p.product_status}`,
                               description: p.model?.model_name
-                                ? `Model: ${p.model.model_name} • QAR ${Number(p.sale_price || 0).toLocaleString()}`
-                                : `QAR ${Number(p.sale_price || 0).toLocaleString()}`,
+                                ? `Model: ${p.model.model_name} • ${getActiveCurrency()} ${Number(p.sale_price || 0).toLocaleString()}`
+                                : `${getActiveCurrency()} ${Number(p.sale_price || 0).toLocaleString()}`,
                             };
                           })}
                       />
@@ -406,7 +407,7 @@ export function QuotationConversionFlow({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                      Amount (QAR)
+                      Amount ({getActiveCurrency()})
                     </Label>
                     <Input
                       type="number"
@@ -502,7 +503,7 @@ export function QuotationConversionFlow({
                     Advance / Caution Deposit
                   </span>
                   <span className="text-emerald-600 font-black">
-                    QAR {Number(advanceAmount || 0).toFixed(2)}
+                    {getActiveCurrency()} {Number(advanceAmount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">

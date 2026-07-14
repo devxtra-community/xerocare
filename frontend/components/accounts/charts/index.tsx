@@ -20,10 +20,11 @@ import {
   Rectangle,
 } from 'recharts';
 
+import { getActiveCurrency } from '@/lib/currency';
 const fmt = (v: number) =>
   new Intl.NumberFormat('en-AE', {
     style: 'currency',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     maximumFractionDigits: 0,
   }).format(v);
 

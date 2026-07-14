@@ -44,6 +44,14 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         await Source.initialize();
         logger.info('Database connected successfully.');
 
+        // Fresh database (no admin table yet): create the schema from entities.
+        const adminTable = await Source.query(`SELECT to_regclass('public.admin') AS tbl;`);
+        if (!adminTable[0].tbl) {
+          logger.info('Fresh database — creating schema from entities via synchronize...');
+          await Source.synchronize();
+          logger.info('Schema created from entities.');
+        }
+
         // Run SQL migration to add job values to employee job enums if they don't exist
         try {
           await Source.query(`

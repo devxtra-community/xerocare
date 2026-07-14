@@ -29,6 +29,7 @@ import {
   DialogOverlay,
 } from '@/components/ui/dialog';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ApiError {
   response?: {
     data?: {
@@ -436,21 +437,21 @@ export default function OpeningBalancePage() {
                       {agg.branchName}
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-slate-900 dark:text-slate-100">
-                      QAR{' '}
+                      {getActiveCurrency()}{' '}
                       {agg.totalMigrated.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-amber-600 dark:text-amber-500">
-                      QAR{' '}
+                      {getActiveCurrency()}{' '}
                       {agg.totalRemaining.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-emerald-600 dark:text-emerald-500">
-                      QAR{' '}
+                      {getActiveCurrency()}{' '}
                       {agg.totalPaid.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -642,7 +643,7 @@ export default function OpeningBalancePage() {
               {/* Original Total Amount */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Original Total Amount (QAR)
+                  Original Total Amount ({getActiveCurrency()})
                 </label>
                 <Input
                   required
@@ -659,7 +660,7 @@ export default function OpeningBalancePage() {
               {/* Already Paid Amount */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Already Paid Pre-Go-Live (QAR)
+                  Already Paid Pre-Go-Live ({getActiveCurrency()})
                 </label>
                 <Input
                   type="number"
@@ -683,7 +684,7 @@ export default function OpeningBalancePage() {
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Monthly Billing Amount (QAR)
+                      Monthly Billing Amount ({getActiveCurrency()})
                     </label>
                     <Input
                       type="number"
@@ -897,7 +898,7 @@ export default function OpeningBalancePage() {
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                        Monthly Billing Amount (QAR)
+                        Monthly Billing Amount ({getActiveCurrency()})
                       </label>
                       <Input
                         type="number"

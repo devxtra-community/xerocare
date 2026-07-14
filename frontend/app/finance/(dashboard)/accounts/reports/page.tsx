@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
+import { getActiveCurrency } from '@/lib/currency';
 type Period = 'month' | 'quarter' | 'year' | 'custom';
 
 const COLOR_MAP: Record<string, string> = {
@@ -135,7 +136,7 @@ export default function ReportsHubPage() {
         Model: p.modelName,
         Brand: p.brandName,
         'Purchase Date': p.createdAt?.slice(0, 10),
-        'Cost (AED)': 15000,
+        [`Cost (${getActiveCurrency()})`]: 15000,
         'Useful Life (mo)': 60,
         'Months Elapsed': months,
         'Monthly Dep': dep.monthly.toFixed(2),
@@ -172,7 +173,7 @@ export default function ReportsHubPage() {
       'Taxable Amount': p.totalCost,
       'VAT %': '5',
       'VAT Amount': p.totalCost * 0.05,
-      Currency: p.currency ?? 'AED',
+      Currency: p.currency ?? getActiveCurrency(),
       Type: 'Input',
     }));
     const ws = XLSX.utils.json_to_sheet([...outputRows, ...inputRows]);

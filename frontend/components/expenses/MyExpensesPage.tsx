@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 const today = new Date().toISOString().slice(0, 10);
 
 const CATEGORIES = [
@@ -116,7 +117,7 @@ function ExpenseFormModal({
     sub_category: expense?.subCategory ?? '',
     description: expense?.description ?? '',
     amount: expense?.amount ?? ('' as unknown as number),
-    currency: expense?.currency ?? currency ?? 'AED',
+    currency: expense?.currency ?? currency ?? getActiveCurrency(),
     receipt_url: expense?.receiptUrl ?? '',
     notes: expense?.notes ?? '',
   });
@@ -532,7 +533,7 @@ function SubmitConfirmDialog({
 
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
-export default function MyExpensesPage({ currency = 'AED' }: { currency?: string }) {
+export default function MyExpensesPage({ currency }: { currency?: string }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');

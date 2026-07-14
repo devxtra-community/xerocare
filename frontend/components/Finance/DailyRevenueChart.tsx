@@ -24,6 +24,7 @@ import { CalendarDays, Loader2 } from 'lucide-react';
 import { getBranchSalesOverview } from '@/lib/invoice';
 import { formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface DailyData {
   day: string;
   rent: number;
@@ -169,7 +170,7 @@ export default function DailyRevenueChart({
               axisLine={false}
               tickLine={false}
               tick={{ fill: 'var(--chart-slate-dark)', fontSize: 12 }}
-              tickFormatter={(value) => `${formatCompactNumber(value)} QAR`}
+              tickFormatter={(value) => `${formatCompactNumber(value)} ${getActiveCurrency()}`}
             />
 
             <Tooltip
@@ -180,7 +181,7 @@ export default function DailyRevenueChart({
                   }
                   valueFormatter={(value) => {
                     const val = Number(value);
-                    return `QAR ${formatCompactNumber(val)}`;
+                    return `${getActiveCurrency()} ${formatCompactNumber(val)}`;
                   }}
                 />
               }

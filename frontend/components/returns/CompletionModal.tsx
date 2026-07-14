@@ -16,6 +16,7 @@ import { getProductById, getAllProducts, Product, ProductStatus } from '@/lib/pr
 import { CreditNoteRecord } from '@/lib/invoice';
 import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface CompletionData {
   replacementSerialNumber: string;
   replacementProductId?: string;
@@ -184,7 +185,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                     <div className="flex items-center justify-between">
                       <span className="font-medium">SN: {p.serial_no}</span>
                       <span className="text-muted-foreground font-normal">
-                        QAR {p.sale_price?.toLocaleString()}
+                        {getActiveCurrency()} {p.sale_price?.toLocaleString()}
                       </span>
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate">
@@ -220,7 +221,9 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                   ✓ Selected: {selectedProduct.name}{' '}
                   {selectedProduct.model?.model_name ? `(${selectedProduct.model.model_name})` : ''}
                 </p>
-                <p>Sale Price: QAR {selectedProduct.sale_price?.toLocaleString()}</p>
+                <p>
+                  Sale Price: {getActiveCurrency()} {selectedProduct.sale_price?.toLocaleString()}
+                </p>
               </div>
             )}
           </div>
@@ -245,16 +248,22 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                 </h4>
                 <div className="flex justify-between text-xs text-blue-700">
                   <span>New Product Price:</span>
-                  <span className="font-semibold">QAR {newValue.toLocaleString()}</span>
+                  <span className="font-semibold">
+                    {getActiveCurrency()} {newValue.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs text-blue-700">
                   <span>Returned Credit:</span>
-                  <span className="font-semibold">- QAR {originalValue.toLocaleString()}</span>
+                  <span className="font-semibold">
+                    - {getActiveCurrency()} {originalValue.toLocaleString()}
+                  </span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-xs text-green-600">
                     <span>Extra Discount:</span>
-                    <span className="font-semibold">- QAR {discount.toLocaleString()}</span>
+                    <span className="font-semibold">
+                      - {getActiveCurrency()} {discount.toLocaleString()}
+                    </span>
                   </div>
                 )}
                 <div className="pt-2 border-t border-blue-200 flex justify-between font-bold text-sm">
@@ -262,7 +271,7 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                     {variation >= 0 ? 'Payable Gap:' : 'Refundable Balance:'}
                   </span>
                   <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
-                    QAR {Math.abs(variation).toLocaleString()}
+                    {getActiveCurrency()} {Math.abs(variation).toLocaleString()}
                   </span>
                 </div>
               </div>

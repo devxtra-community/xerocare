@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ActivateContractModalProps {
   invoice: Invoice;
   onClose: () => void;
@@ -421,7 +422,9 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-slate-500">Amount (QAR)</Label>
+                        <Label className="text-xs text-slate-500">
+                          Amount ({getActiveCurrency()})
+                        </Label>
                         <Input
                           type="number"
                           min="0"

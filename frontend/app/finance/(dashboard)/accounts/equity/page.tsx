@@ -36,6 +36,7 @@ import {
   WaterfallChart,
 } from '@/components/accounts/charts';
 
+import { getActiveCurrency } from '@/lib/currency';
 const EQUITY_TYPES: EquityType[] = [
   'SHARE_CAPITAL',
   'RETAINED_EARNINGS',
@@ -75,7 +76,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
     type: (entry?.type ?? 'SHARE_CAPITAL') as EquityType,
     description: entry?.description ?? '',
     amount: entry?.amount ? String(entry.amount) : '',
-    currency: entry?.currency ?? 'AED',
+    currency: entry?.currency ?? getActiveCurrency(),
     referenceNo: entry?.referenceNo ?? '',
     linkedCashAccountId: entry?.linkedCashAccountId ?? '',
     notes: entry?.notes ?? '',

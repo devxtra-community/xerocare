@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 const today = new Date().toISOString().slice(0, 10);
 
 const PURPOSE_LABELS: Record<string, string> = {
@@ -80,7 +81,7 @@ function GuaranteeModal({
   const [contractReference, setContractReference] = useState(cheque?.contractReference ?? '');
   const [chequeNumber, setChequeNumber] = useState(cheque?.chequeNumber ?? '');
   const [amount, setAmount] = useState(cheque?.amount?.toString() ?? '');
-  const [currencyCode, setCurrencyCode] = useState(cheque?.currencyCode ?? 'AED');
+  const [currencyCode, setCurrencyCode] = useState(cheque?.currencyCode ?? getActiveCurrency());
   const [bankName, setBankName] = useState(cheque?.bankName ?? '');
   const [receivedDate, setReceivedDate] = useState(cheque?.receivedDate?.slice(0, 10) ?? today);
   const [purpose, setPurpose] = useState<GuaranteePurpose>(

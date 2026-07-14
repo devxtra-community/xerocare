@@ -20,6 +20,7 @@ import { Product } from '@/lib/product';
 import { SparePart } from '@/lib/spare-part';
 import { Invoice } from '@/lib/invoice';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface Customer {
   id: string;
   name: string;
@@ -314,7 +315,9 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     const item = items[idx];
     const maxAllowed = item.maxDiscount || 0;
     if (val > maxAllowed) {
-      toast.warning(`Maximum discount allowed for ${item.description} is QAR ${maxAllowed}`);
+      toast.warning(
+        `Maximum discount allowed for ${item.description} is ${getActiveCurrency()} ${maxAllowed}`,
+      );
       updateItem(idx, 'discount', maxAllowed);
     } else {
       updateItem(idx, 'discount', val);
@@ -354,7 +357,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       }
       if (item.discount > (item.maxDiscount || 0)) {
         return toast.error(
-          `Discount for ${item.description} cannot exceed max discount QAR ${item.maxDiscount || 0}`,
+          `Discount for ${item.description} cannot exceed max discount ${getActiveCurrency()} ${item.maxDiscount || 0}`,
         );
       }
       if (item.itemType === 'SPARE_PART' && item.sparePartId) {
@@ -474,7 +477,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       await api.post(`/b/invoices/${successInvoice.id}/notify/email`, {
         recipient: notifyEmail,
         subject: `Your Invoice ${successInvoice.invoiceNumber || ''} from Xerocare`,
-        body: `Dear Customer, please find your invoice ${successInvoice.invoiceNumber || ''} details below.\nGrand Total: QAR ${successInvoice.totalAmount || 0}`,
+        body: `Dear Customer, please find your invoice ${successInvoice.invoiceNumber || ''} details below.\nGrand Total: ${getActiveCurrency()} ${successInvoice.totalAmount || 0}`,
         attachments: [
           {
             filename: `Invoice-${successInvoice.invoiceNumber || successInvoice.id}.pdf`,
@@ -498,7 +501,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     try {
       await api.post(`/b/invoices/${successInvoice.id}/notify/whatsapp`, {
         recipient: notifyPhone,
-        body: `Dear Customer, here is your invoice ${successInvoice.invoiceNumber || ''} from Xerocare. Grand Total: QAR ${successInvoice.totalAmount || 0}`,
+        body: `Dear Customer, here is your invoice ${successInvoice.invoiceNumber || ''} from Xerocare. Grand Total: ${getActiveCurrency()} ${successInvoice.totalAmount || 0}`,
       });
       toast.success('WhatsApp notification sent successfully!');
     } catch {
@@ -541,7 +544,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               <div>
                 <span className="font-semibold text-slate-500">Grand Total:</span>
                 <p className="font-bold text-green-600">
-                  QAR{' '}
+                  {getActiveCurrency()}{' '}
                   {(successInvoice.totalAmount || grandTotal).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -868,7 +871,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                             />
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-700">
-                            QAR{' '}
+                            {getActiveCurrency()}{' '}
                             {itemTotal.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
@@ -901,7 +904,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Amount Paid (QAR)
+                  Amount Paid ({getActiveCurrency()})
                 </label>
                 <input
                   type="number"
@@ -944,7 +947,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               <div className="flex justify-between items-center text-sm text-slate-600">
                 <span>Total (Without Tax):</span>
                 <span className="font-medium">
-                  QAR{' '}
+                  {getActiveCurrency()}{' '}
                   {subtotal.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -954,7 +957,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               <div className="flex justify-between items-center text-sm text-slate-600">
                 <span>Tax Amount:</span>
                 <span className="font-medium">
-                  QAR{' '}
+                  {getActiveCurrency()}{' '}
                   {taxTotal.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -964,7 +967,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               <div className="flex justify-between items-center text-base font-bold text-slate-800">
                 <span>Grand Total (With Tax):</span>
                 <span>
-                  QAR{' '}
+                  {getActiveCurrency()}{' '}
                   {grandTotal.toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
@@ -976,7 +979,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 <span
                   className={`font-bold ${grandTotal - paymentAmount <= 0 ? 'text-green-600' : 'text-orange-600'}`}
                 >
-                  QAR{' '}
+                  {getActiveCurrency()}{' '}
                   {Math.max(0, grandTotal - paymentAmount).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,

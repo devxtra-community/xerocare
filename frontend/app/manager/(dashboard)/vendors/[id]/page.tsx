@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { Globe, Landmark } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function VendorProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -69,7 +70,7 @@ export default function VendorProfilePage() {
     );
   }
 
-  const currency = vendor.currency || 'QAR';
+  const currency = vendor.currency || getActiveCurrency();
   const bankAccounts = vendor.bankAccounts || [];
 
   return (

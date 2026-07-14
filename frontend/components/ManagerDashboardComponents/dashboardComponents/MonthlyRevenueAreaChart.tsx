@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { salesService } from '@/services/salesService';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ChartDataItem {
   date: string;
   sale: number;
@@ -114,7 +115,7 @@ export default function MonthlyRevenueAreaChart() {
                               className="text-[12px] font-medium"
                               style={{ color: entry.stroke }}
                             >
-                              QAR {entry.value.toLocaleString()}
+                              {getActiveCurrency()} {entry.value.toLocaleString()}
                             </span>
                           </div>
                         ),

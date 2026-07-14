@@ -40,6 +40,7 @@ import { InventoryReservation } from '../entities/inventoryReservationEntity';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
 import { ServiceContract } from '../entities/serviceContractEntity';
+import { ContractMeterReading } from '../entities/contractMeterReadingEntity';
 import { StockTransfer } from '../entities/stockTransferEntity';
 import { StockTransferItem } from '../entities/stockTransferItemEntity';
 
@@ -84,6 +85,7 @@ export const Source = new DataSource({
     ServicePartUsageLog,
     ServiceTicketActivity,
     ServiceContract,
+    ContractMeterReading,
     StockTransfer,
     StockTransferItem,
   ],
@@ -108,6 +110,17 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         logger.info(`Attempting database connection (Attempt ${attempt})...`);
         await Source.initialize();
         logger.info('Database connected successfully.');
+
+        // Fresh database (no branches table yet): create the schema from entities
+        // first, otherwise the ALTER TABLE statements below fail and the service
+        // never starts.
+        const branchesTable = await Source.query(`SELECT to_regclass('public.branches') AS tbl;`);
+        if (!branchesTable[0].tbl) {
+          logger.info('Fresh database — creating schema from entities via synchronize...');
+          await Source.synchronize();
+          logger.info('Schema created from entities.');
+        }
+
         // Ensure processed_invoice_items table exists
         await Source.query(`
           CREATE TABLE IF NOT EXISTS processed_invoice_items (
@@ -772,6 +785,80 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             );
           `);
           logger.info('Guaranteed service_contracts table and enum exist.');
+
+          // Type-specific billing fields (AMC monthly fee, SMA copy limit/overage,
+          // FSMA per-click rates + baseline meters).
+          await Source.query(`
+            ALTER TABLE service_contracts
+            ADD COLUMN IF NOT EXISTS "monthlyCharge" NUMERIC(12,2) NULL,
+            ADD COLUMN IF NOT EXISTS "copyLimit" INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS "overagePerCopyRate" NUMERIC(12,4) NULL,
+            ADD COLUMN IF NOT EXISTS "startMeterReading" INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS "fsmaBillingMode" VARCHAR(20) NULL,
+            ADD COLUMN IF NOT EXISTS "ratePerClickBW" NUMERIC(12,4) NULL,
+            ADD COLUMN IF NOT EXISTS "ratePerClickColor" NUMERIC(12,4) NULL,
+            ADD COLUMN IF NOT EXISTS "ratePerClickCombined" NUMERIC(12,4) NULL,
+            ADD COLUMN IF NOT EXISTS "startMeterBW" INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS "startMeterColor" INTEGER NULL,
+            ADD COLUMN IF NOT EXISTS notes TEXT NULL;
+          `);
+
+          // Coverage moved from {labour,consumables,travel} to
+          // {labour,spareParts,toner,travel}, fixed per contract type.
+          await Source.query(`
+            UPDATE service_contracts SET "coverageRules" = CASE "contractType"
+              WHEN 'AMC'  THEN '{"labour":true,"spareParts":false,"toner":false,"travel":true}'::jsonb
+              WHEN 'SMA'  THEN '{"labour":true,"spareParts":true,"toner":false,"travel":true}'::jsonb
+              ELSE             '{"labour":true,"spareParts":true,"toner":true,"travel":true}'::jsonb
+            END
+            WHERE "coverageRules" IS NULL OR NOT ("coverageRules" ? 'toner');
+          `);
+
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS contract_meter_readings (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              "contractId" UUID NOT NULL REFERENCES service_contracts(id) ON DELETE CASCADE,
+              "readingDate" TIMESTAMP NOT NULL DEFAULT NOW(),
+              "totalReading" INTEGER NULL,
+              "bwReading" INTEGER NULL,
+              "colorReading" INTEGER NULL,
+              "clicksTotal" INTEGER NOT NULL DEFAULT 0,
+              "clicksBW" INTEGER NOT NULL DEFAULT 0,
+              "clicksColor" INTEGER NOT NULL DEFAULT 0,
+              "amountCharged" NUMERIC(12,2) NOT NULL DEFAULT 0,
+              "chargeBreakdown" JSONB NULL,
+              notes TEXT NULL,
+              "recordedBy" UUID NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_contract_meter_readings_contract
+              ON contract_meter_readings ("contractId");
+          `);
+          logger.info('Guaranteed contract_meter_readings table exists.');
+
+          // Toner vs spare part classification (SMA/AMC charge toner).
+          await Source.query(`
+            ALTER TABLE spare_parts ADD COLUMN IF NOT EXISTS part_category VARCHAR(30) NULL;
+          `);
+          await Source.query(`
+            UPDATE spare_parts SET part_category = 'TONER'
+            WHERE part_category IS NULL
+              AND (part_name ~* 'toner|cartridge|developer' OR description ~* 'toner|cartridge|developer');
+          `);
+          await Source.query(`
+            UPDATE spare_parts SET part_category = 'SPARE_PART' WHERE part_category IS NULL;
+          `);
+          logger.info('Guaranteed spare_parts.part_category exists and is backfilled.');
+
+          // External machines (bought elsewhere) have no model/warehouse/vendor
+          await Source.query(`
+            ALTER TABLE products
+            ALTER COLUMN model_id DROP NOT NULL,
+            ALTER COLUMN warehouse_id DROP NOT NULL,
+            ALTER COLUMN vendor_id DROP NOT NULL,
+            ALTER COLUMN "MFD" DROP NOT NULL;
+          `);
+          logger.info('Guaranteed products external-machine columns are nullable.');
         } catch (contractSchemaErr) {
           logger.error('Failed to create service_contracts schema:', contractSchemaErr);
         }
@@ -929,6 +1016,13 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ADD COLUMN IF NOT EXISTS tax_status purchases_taxstatus_enum NOT NULL DEFAULT 'PENDING';
         `);
         logger.info('Guaranteed purchases tax report columns exist.');
+
+        // ─── Warranty: meter reading captured when a ticket is raised ─────────
+        await Source.query(`
+          ALTER TABLE service_tickets
+            ADD COLUMN IF NOT EXISTS meter_reading_at_creation INT NULL;
+        `);
+        logger.info('Guaranteed service_tickets.meter_reading_at_creation column exists.');
       }
       return Source;
     } catch (error: unknown) {

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { getHRStats } from '@/lib/employee';
 
+import { getActiveCurrency } from '@/lib/currency';
 const COLORS = ['#003F7D', '#0284C7', '#0891b2', '#7dd3fc', '#94a3b8', '#CBD5E1'];
 
 export default function SalaryDistributionChart({
@@ -48,7 +49,9 @@ export default function SalaryDistributionChart({
     <div className="rounded-2xl bg-white h-[320px] w-full shadow-sm border border-blue-50 flex flex-col p-4">
       <div className="pb-2">
         <h4 className="text-sm font-semibold text-gray-800">Salary Payroll Distribution</h4>
-        <p className="text-[10px] text-gray-500">Total: QAR {(total / 1000).toFixed(1)}k</p>
+        <p className="text-[10px] text-gray-500">
+          Total: {getActiveCurrency()} {(total / 1000).toFixed(1)}k
+        </p>
       </div>
       <div className="flex-1 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -77,7 +80,8 @@ export default function SalaryDistributionChart({
                     <div className="bg-white p-3 rounded-xl shadow-lg border border-gray-50">
                       <p className="text-xs font-bold text-gray-700">{item.name}</p>
                       <p className="text-xs text-primary font-medium">
-                        QAR {((item.value as number) / 1000).toFixed(1)}k ({percentage}%)
+                        {getActiveCurrency()} {((item.value as number) / 1000).toFixed(1)}k (
+                        {percentage}%)
                       </p>
                     </div>
                   );

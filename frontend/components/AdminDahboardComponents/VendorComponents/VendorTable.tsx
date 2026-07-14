@@ -58,6 +58,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { Send } from 'lucide-react';
 import RequestProductDialog from '@/components/ManagerDashboardComponents/VendorComponents/RequestProductDialog';
+import { getActiveCurrency } from '@/lib/currency';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const countryList = require('country-list');
 
@@ -396,7 +397,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         purchaseValue: (v.purchaseValue as number) || 0,
         outstandingAmount: (v.outstandingAmount as number) || 0,
         status: v.status === 'ACTIVE' ? 'Active' : 'On Hold',
-        currency: (v.currency as string) || 'QAR',
+        currency: (v.currency as string) || getActiveCurrency(),
         countryCode: v.countryCode as string | undefined,
         countryName: v.countryName as string | undefined,
         bankAccounts: (v.bankAccounts as BankAccount[]) || [],
@@ -803,7 +804,7 @@ function VendorFormModal({
     phone: '',
     email: '',
     status: 'Active',
-    currency: 'QAR',
+    currency: getActiveCurrency(),
     countryCode: undefined,
     countryName: undefined,
     vatNumber: undefined,
@@ -823,7 +824,7 @@ function VendorFormModal({
           phone: stripDialCode(initialData.phone),
           email: initialData.email,
           status: initialData.status,
-          currency: initialData.currency || 'QAR',
+          currency: initialData.currency || getActiveCurrency(),
           countryCode: initialData.countryCode,
           countryName: initialData.countryName,
           vatNumber: (initialData as { vatNumber?: string }).vatNumber,
@@ -838,7 +839,7 @@ function VendorFormModal({
           phone: '',
           email: '',
           status: 'Active',
-          currency: 'QAR',
+          currency: getActiveCurrency(),
           countryCode: undefined,
           countryName: undefined,
           vatNumber: undefined,

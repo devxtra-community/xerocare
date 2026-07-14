@@ -47,6 +47,7 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -75,7 +76,7 @@ function AddReceivableModal({
     customerName: '',
     description: '',
     amount: '',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     issueDate: today,
     dueDate: today,
     notes: '',

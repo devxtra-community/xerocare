@@ -12,6 +12,7 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+import { getActiveCurrency } from '@/lib/currency';
 // Period defaults: current month
 function currentMonthFrom() {
   const d = new Date();
@@ -131,7 +132,7 @@ export default function ChartOfAccountsPage() {
     });
   };
 
-  const currency = data?.currency ?? 'AED';
+  const currency = data?.currency ?? getActiveCurrency();
 
   if (isLoading)
     return (

@@ -53,6 +53,7 @@ import {
   MachineHistoryResponse,
   ServiceTicketItem,
   ConsumableYieldHistory,
+  WarrantyInfo,
 } from '@/lib/serviceTicket';
 import { ServiceContract } from '@/lib/serviceContract';
 
@@ -88,6 +89,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AuthUser {
   userId: string;
   role: string;
@@ -112,6 +114,7 @@ interface HistoryAllocation {
   currentBwA3?: number;
   currentColorA4?: number;
   currentColorA3?: number;
+  warrantyInfo?: WarrantyInfo;
 }
 
 interface HistoryInvoice {
@@ -149,6 +152,7 @@ interface MachineAllocation {
   purchaseDate?: string;
   contractType?: string;
   meterReading?: number;
+  warrantyInfo?: WarrantyInfo;
 }
 
 function ActiveTimer({ startTime }: { startTime: string }) {
@@ -318,23 +322,41 @@ export default function ServiceDashboardPage() {
   >('rented');
   const [selectedMachine, setSelectedMachine] = useState<MachineAllocation | null>(null);
   const [machineContextLoading, setMachineContextLoading] = useState(false);
+  const [meterReadingInput, setMeterReadingInput] = useState('');
   const [machineContextData, setMachineContextData] = useState<{
     serviceContext: string;
     contractReferenceId: string | null;
     productId: string | null;
     coverage: {
       labour: boolean;
-      consumables: boolean;
+      spareParts: boolean;
+      toner: boolean;
       travel: boolean;
     };
     contract: ServiceContract | null;
+    warrantyInfo?: WarrantyInfo | null;
+    contractUsage?: {
+      copiesUsed: number;
+      copyLimit: number;
+      copiesRemaining: number;
+      limitExceeded: boolean;
+      overagePerCopyRate: number;
+    } | null;
   } | null>(null);
 
   useEffect(() => {
-    if (selectedMachine?.serialNumber) {
-      setMachineContextLoading(true);
+    if (!selectedMachine?.serialNumber) {
+      setMachineContextData(null);
+      return;
+    }
+    // Debounced so typing a meter reading re-evaluates coverage live
+    // without firing a request per keystroke.
+    const serial = selectedMachine.serialNumber;
+    const reading = meterReadingInput !== '' ? Number(meterReadingInput) : undefined;
+    setMachineContextLoading(true);
+    const timer = setTimeout(() => {
       import('@/lib/serviceTicket').then(({ getMachineContext }) => {
-        getMachineContext(selectedMachine.serialNumber)
+        getMachineContext(serial, reading)
           .then((res) => {
             setMachineContextData(res);
             setNewTicket((prev) => ({
@@ -351,9 +373,13 @@ export default function ServiceDashboardPage() {
             setMachineContextLoading(false);
           });
       });
-    } else {
-      setMachineContextData(null);
-    }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [selectedMachine?.serialNumber, meterReadingInput]);
+
+  // A fresh machine selection invalidates any previously typed reading.
+  useEffect(() => {
+    setMeterReadingInput('');
   }, [selectedMachine?.serialNumber]);
 
   const [isOtherMachine, setIsOtherMachine] = useState(false);
@@ -513,6 +539,20 @@ export default function ServiceDashboardPage() {
         toast.error('Scheduled Visit Date is required for On-Site service.');
         return;
       }
+      // Copy-limited warranties need the customer's meter reading to decide
+      // whether the warranty is still valid.
+      if (
+        !isOtherMachine &&
+        selectedMachine &&
+        (selectedMachine.type === 'SALE' || selectedMachine.type === 'LEASE') &&
+        machineContextData?.warrantyInfo?.copyLimit != null &&
+        meterReadingInput === ''
+      ) {
+        toast.error(
+          'Please ask the customer for the current meter reading — this machine has a copy-limited warranty.',
+        );
+        return;
+      }
 
       try {
         setSubmitting(true);
@@ -537,6 +577,8 @@ export default function ServiceDashboardPage() {
           scheduledVisitDate:
             newTicket.jobType === 'ONSITE' ? newTicket.scheduledVisitDate : undefined,
           issueDescription: newTicket.issueDescription.trim(),
+          meterReadingAtCreation:
+            !isOtherMachine && meterReadingInput !== '' ? Number(meterReadingInput) : undefined,
         };
 
         await createServiceTicket(payload);
@@ -801,7 +843,7 @@ export default function ServiceDashboardPage() {
 
     if (Number(diagnosisForm.discountAmount || 0) > totalMaxDiscount) {
       toast.error(
-        `Discount of QAR ${diagnosisForm.discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
+        `Discount of ${getActiveCurrency()} ${diagnosisForm.discountAmount} exceeds the maximum allowed discount of ${getActiveCurrency()} ${totalMaxDiscount} for the selected parts.`,
       );
       return;
     }
@@ -1389,6 +1431,7 @@ export default function ServiceDashboardPage() {
     setModalIntelData(null);
     setCreationPath('existing');
     setActiveMachineTab('rented');
+    setMeterReadingInput('');
   };
 
   const getRentedMachines = (): MachineAllocation[] => {
@@ -1441,6 +1484,39 @@ export default function ServiceDashboardPage() {
     return list;
   };
 
+  /**
+   * Derives display fields from the server-computed warrantyInfo
+   * (single source of truth — no client-side warranty math).
+   */
+  const warrantyDisplayFields = (w?: WarrantyInfo) => {
+    if (!w) {
+      return {
+        isUnderWarranty: false,
+        remainingTime: 'N/A',
+        remainingCopies: 'N/A',
+        expiredFirst: '',
+        effectiveTo: undefined as string | undefined,
+      };
+    }
+    let remainingTime = 'N/A';
+    if (w.warrantyEndDate) {
+      const currentDate = new Date();
+      const diffMs = new Date(w.warrantyEndDate).getTime() - currentDate.getTime();
+      const diffMonths = Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 30));
+      remainingTime = diffMonths > 0 ? `${diffMonths} months left` : 'Expired';
+    }
+    return {
+      isUnderWarranty: w.isUnderWarranty,
+      remainingTime,
+      remainingCopies:
+        w.copiesRemaining != null ? `${w.copiesRemaining.toLocaleString()} copies left` : 'N/A',
+      expiredFirst: w.expiredBy || '',
+      effectiveTo: w.warrantyEndDate
+        ? new Date(w.warrantyEndDate).toISOString().split('T')[0]
+        : undefined,
+    };
+  };
+
   const getLeasedMachines = (): MachineAllocation[] => {
     if (!modalIntelData?.billingHistory?.LEASE) return [];
     const list: MachineAllocation[] = [];
@@ -1450,33 +1526,7 @@ export default function ServiceDashboardPage() {
       if (allocations.length > 0) {
         allocations.forEach((alloc) => {
           const matchedModel = models.find((m) => m.id === alloc.modelId);
-          const start = new Date(inv.effectiveFrom || '');
-          const tenureMonths = inv.leaseTenureMonths || 0;
-          const expiryDate = new Date(start.setMonth(start.getMonth() + tenureMonths));
-          const currentDate = new Date();
-          const isTimeValid = currentDate <= expiryDate;
-
-          const currentCopies =
-            (alloc.currentBwA4 || 0) +
-            (alloc.currentBwA3 || 0) +
-            (alloc.currentColorA4 || 0) +
-            (alloc.currentColorA3 || 0);
-          const maxCopies = inv.maxCopyLimit || 0;
-          const isCopyValid = maxCopies > 0 ? currentCopies < maxCopies : true;
-          const isUnderWarranty = isTimeValid && isCopyValid;
-
-          let expiredFirst = '';
-          if (!isUnderWarranty) {
-            if (!isTimeValid && !isCopyValid) expiredFirst = 'BOTH';
-            else if (!isTimeValid) expiredFirst = 'TIME';
-            else expiredFirst = 'COPIES';
-          }
-
-          const diffTime = expiryDate.getTime() - currentDate.getTime();
-          const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30));
-          const remainingTimeStr = diffMonths > 0 ? `${diffMonths} months left` : 'Expired';
-          const remainingCopies = maxCopies - currentCopies;
-
+          const w = warrantyDisplayFields(alloc.warrantyInfo);
           list.push({
             id: alloc.productId || alloc.id,
             modelName: matchedModel
@@ -1485,14 +1535,12 @@ export default function ServiceDashboardPage() {
                 'Leased Printer',
             serialNumber: alloc.serialNumber || 'N/A',
             effectiveFrom: inv.effectiveFrom,
-            effectiveTo: expiryDate.toISOString().split('T')[0],
-            isUnderWarranty,
-            remainingTime: remainingTimeStr,
-            remainingCopies:
-              remainingCopies > 0
-                ? `${remainingCopies.toLocaleString()} copies left`
-                : '0 copies left',
-            expiredFirst,
+            effectiveTo: w.effectiveTo,
+            isUnderWarranty: w.isUnderWarranty,
+            remainingTime: w.remainingTime,
+            remainingCopies: w.remainingCopies,
+            expiredFirst: w.expiredFirst,
+            warrantyInfo: alloc.warrantyInfo,
             contractReferenceId: inv.id,
             invoiceNumber: inv.invoiceNumber,
             type: 'LEASE',
@@ -1547,6 +1595,7 @@ export default function ServiceDashboardPage() {
       if (allocations.length > 0) {
         allocations.forEach((alloc) => {
           const matchedModel = models.find((m) => m.id === alloc.modelId);
+          const w = warrantyDisplayFields(alloc.warrantyInfo);
           list.push({
             id: alloc.productId || alloc.id,
             modelName: matchedModel
@@ -1557,6 +1606,12 @@ export default function ServiceDashboardPage() {
             purchaseDate: inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A',
             invoiceNumber: inv.invoiceNumber,
             contractReferenceId: inv.id,
+            isUnderWarranty: w.isUnderWarranty,
+            remainingTime: w.remainingTime,
+            remainingCopies: w.remainingCopies,
+            expiredFirst: w.expiredFirst,
+            effectiveTo: w.effectiveTo,
+            warrantyInfo: alloc.warrantyInfo,
             type: 'SALE',
           });
         });
@@ -2468,9 +2523,9 @@ export default function ServiceDashboardPage() {
                                       No rented machines found.
                                     </p>
                                   ) : (
-                                    getRentedMachines().map((machine) => (
+                                    getRentedMachines().map((machine, index) => (
                                       <div
-                                        key={machine.id + '-' + machine.serialNumber}
+                                        key={machine.id + '-' + machine.serialNumber + '-' + index}
                                         onClick={() => {
                                           setSelectedMachine(machine);
                                           setNewTicket((prev) => ({
@@ -2538,9 +2593,9 @@ export default function ServiceDashboardPage() {
                                       No leased machines found.
                                     </p>
                                   ) : (
-                                    getLeasedMachines().map((machine) => (
+                                    getLeasedMachines().map((machine, index) => (
                                       <div
-                                        key={machine.id + '-' + machine.serialNumber}
+                                        key={machine.id + '-' + machine.serialNumber + '-' + index}
                                         onClick={() => {
                                           setSelectedMachine(machine);
                                           setNewTicket((prev) => ({
@@ -2629,9 +2684,9 @@ export default function ServiceDashboardPage() {
                                       No purchased machines found.
                                     </p>
                                   ) : (
-                                    getPurchasedMachines().map((machine) => (
+                                    getPurchasedMachines().map((machine, index) => (
                                       <div
-                                        key={machine.id + '-' + machine.serialNumber}
+                                        key={machine.id + '-' + machine.serialNumber + '-' + index}
                                         onClick={() => {
                                           setSelectedMachine(machine);
                                           setNewTicket((prev) => ({
@@ -2642,7 +2697,9 @@ export default function ServiceDashboardPage() {
                                             productModel: machine.modelName,
                                             productName: machine.modelName,
                                             serialNumber: machine.serialNumber,
-                                            serviceContext: 'CHARGEABLE',
+                                            serviceContext: machine.isUnderWarranty
+                                              ? 'WARRANTY'
+                                              : 'CHARGEABLE',
                                             jobType: 'ONSITE',
                                           }));
                                         }}
@@ -2656,8 +2713,16 @@ export default function ServiceDashboardPage() {
                                           <span className="font-bold text-slate-800">
                                             {machine.modelName}
                                           </span>
-                                          <span className="text-[10px] text-slate-400 font-medium">
-                                            Outright Sale
+                                          <span
+                                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                              machine.isUnderWarranty
+                                                ? 'bg-emerald-100 text-emerald-800'
+                                                : 'bg-red-100 text-red-800'
+                                            }`}
+                                          >
+                                            {machine.isUnderWarranty
+                                              ? 'Under Warranty'
+                                              : 'Warranty Expired'}
                                           </span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
@@ -2673,6 +2738,31 @@ export default function ServiceDashboardPage() {
                                               {machine.purchaseDate}
                                             </span>
                                           </div>
+                                          {machine.isUnderWarranty ? (
+                                            <>
+                                              <div>
+                                                Remaining Time:{' '}
+                                                <span className="text-emerald-700 font-bold">
+                                                  {machine.remainingTime}
+                                                </span>
+                                              </div>
+                                              <div>
+                                                Remaining Copies:{' '}
+                                                <span className="text-emerald-700 font-bold">
+                                                  {machine.remainingCopies}
+                                                </span>
+                                              </div>
+                                            </>
+                                          ) : (
+                                            machine.expiredFirst && (
+                                              <div className="col-span-2">
+                                                Expired First:{' '}
+                                                <span className="text-red-700 font-bold">
+                                                  {machine.expiredFirst}
+                                                </span>
+                                              </div>
+                                            )
+                                          )}
                                         </div>
                                       </div>
                                     ))
@@ -2687,9 +2777,9 @@ export default function ServiceDashboardPage() {
                                       No contracts found.
                                     </p>
                                   ) : (
-                                    getContractMachines().map((machine) => (
+                                    getContractMachines().map((machine, index) => (
                                       <div
-                                        key={machine.id + '-' + machine.serialNumber}
+                                        key={machine.id + '-' + machine.serialNumber + '-' + index}
                                         onClick={() => {
                                           setSelectedMachine(machine);
                                           setNewTicket((prev) => ({
@@ -2745,9 +2835,9 @@ export default function ServiceDashboardPage() {
                                       No external machines found.
                                     </p>
                                   ) : (
-                                    getExternalMachines().map((machine) => (
+                                    getExternalMachines().map((machine, index) => (
                                       <div
-                                        key={machine.id + '-' + machine.serialNumber}
+                                        key={machine.id + '-' + machine.serialNumber + '-' + index}
                                         onClick={() => {
                                           setSelectedMachine(machine);
                                           setNewTicket((prev) => ({
@@ -3009,10 +3099,58 @@ export default function ServiceDashboardPage() {
                                     ? new Date(
                                         machineContextData.contract.endDate,
                                       ).toLocaleDateString()
-                                    : selectedMachine.effectiveTo || 'None'}
+                                    : machineContextData?.warrantyInfo?.warrantyEndDate
+                                      ? new Date(
+                                          machineContextData.warrantyInfo.warrantyEndDate,
+                                        ).toLocaleDateString()
+                                      : selectedMachine.effectiveTo || 'None'}
                                 </span>
                               </div>
                             </div>
+
+                            {/* METER READING — copies can expire a warranty before time does */}
+                            {(selectedMachine.type === 'SALE' ||
+                              selectedMachine.type === 'LEASE') && (
+                              <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
+                                <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
+                                  Current Meter Reading (Total Copies)
+                                  {machineContextData?.warrantyInfo?.copyLimit != null && ' *'}
+                                </label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="Ask the customer for the machine's current meter reading..."
+                                  value={meterReadingInput}
+                                  onChange={(e) => setMeterReadingInput(e.target.value)}
+                                  className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
+                                />
+                                {machineContextData?.warrantyInfo && (
+                                  <p
+                                    className={`text-[11px] font-semibold ${
+                                      machineContextData.warrantyInfo.isUnderWarranty
+                                        ? 'text-emerald-700'
+                                        : 'text-red-700'
+                                    }`}
+                                  >
+                                    {machineContextData.warrantyInfo.isUnderWarranty
+                                      ? `Under warranty${
+                                          machineContextData.warrantyInfo.copiesRemaining != null
+                                            ? ` — ${machineContextData.warrantyInfo.copiesRemaining.toLocaleString()} copies remaining`
+                                            : ''
+                                        }${
+                                          machineContextData.warrantyInfo.warrantyEndDate
+                                            ? ` (until ${new Date(machineContextData.warrantyInfo.warrantyEndDate).toLocaleDateString()})`
+                                            : ''
+                                        }`
+                                      : `Warranty expired${
+                                          machineContextData.warrantyInfo.expiredBy
+                                            ? ` — limit hit: ${machineContextData.warrantyInfo.expiredBy}`
+                                            : ''
+                                        }. Service will be chargeable.`}
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
                             {machineContextData?.contract && (
                               <div className="p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl space-y-1">
@@ -3021,7 +3159,7 @@ export default function ServiceDashboardPage() {
                                     Active {machineContextData.contract.contractType} Agreement
                                   </span>
                                   <span className="font-bold text-blue-700 text-[10px]">
-                                    Valued: QAR{' '}
+                                    Valued: {getActiveCurrency()}{' '}
                                     {Number(machineContextData.contract.contractValue).toFixed(2)}
                                   </span>
                                 </div>
@@ -3042,56 +3180,52 @@ export default function ServiceDashboardPage() {
                               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
                                 Coverage Checklist
                               </span>
-                              <div className="grid grid-cols-3 gap-2">
-                                <div className="flex items-center gap-1.5 text-xs">
-                                  {machineContextData?.coverage?.labour ? (
-                                    <span className="text-emerald-500 font-bold">✓</span>
-                                  ) : (
-                                    <span className="text-rose-500 font-bold">✗</span>
-                                  )}
-                                  <span
-                                    className={
-                                      machineContextData?.coverage?.labour
-                                        ? 'text-slate-700 font-medium'
-                                        : 'text-slate-400 line-through'
-                                    }
-                                  >
-                                    Labour Cost
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs">
-                                  {machineContextData?.coverage?.consumables ? (
-                                    <span className="text-emerald-500 font-bold">✓</span>
-                                  ) : (
-                                    <span className="text-rose-500 font-bold">✗</span>
-                                  )}
-                                  <span
-                                    className={
-                                      machineContextData?.coverage?.consumables
-                                        ? 'text-slate-700 font-medium'
-                                        : 'text-slate-400 line-through'
-                                    }
-                                  >
-                                    Consumables
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs">
-                                  {machineContextData?.coverage?.travel ? (
-                                    <span className="text-emerald-500 font-bold">✓</span>
-                                  ) : (
-                                    <span className="text-rose-500 font-bold">✗</span>
-                                  )}
-                                  <span
-                                    className={
-                                      machineContextData?.coverage?.travel
-                                        ? 'text-slate-700 font-medium'
-                                        : 'text-slate-400 line-through'
-                                    }
-                                  >
-                                    Travel & Transport
-                                  </span>
-                                </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(
+                                  [
+                                    { key: 'labour', label: 'Labour Cost' },
+                                    { key: 'spareParts', label: 'Spare Parts' },
+                                    { key: 'toner', label: 'Toner / Consumables' },
+                                    { key: 'travel', label: 'Travel & Transport' },
+                                  ] as const
+                                ).map(({ key, label }) => {
+                                  const covered = !!machineContextData?.coverage?.[key];
+                                  return (
+                                    <div key={key} className="flex items-center gap-1.5 text-xs">
+                                      {covered ? (
+                                        <span className="text-emerald-500 font-bold">✓</span>
+                                      ) : (
+                                        <span className="text-rose-500 font-bold">✗</span>
+                                      )}
+                                      <span
+                                        className={
+                                          covered
+                                            ? 'text-slate-700 font-medium'
+                                            : 'text-slate-400 line-through'
+                                        }
+                                      >
+                                        {label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
+                              {machineContextData?.contractUsage && (
+                                <p
+                                  className={`text-[11px] font-semibold ${
+                                    machineContextData.contractUsage.limitExceeded
+                                      ? 'text-rose-600'
+                                      : 'text-slate-500'
+                                  }`}
+                                >
+                                  Contract copies:{' '}
+                                  {machineContextData.contractUsage.copiesUsed.toLocaleString()} /{' '}
+                                  {machineContextData.contractUsage.copyLimit.toLocaleString()} used
+                                  {machineContextData.contractUsage.limitExceeded
+                                    ? ` — limit exceeded, overage billed at ${machineContextData.contractUsage.overagePerCopyRate}/copy`
+                                    : ` (${machineContextData.contractUsage.copiesRemaining.toLocaleString()} remaining)`}
+                                </p>
+                              )}
                             </div>
                           </div>
                         )}
@@ -3298,7 +3432,15 @@ export default function ServiceDashboardPage() {
                             'Lease Under Warranty: Service & coverage remains active within terms.';
                         } else if (ctx === 'LEASE_EXPIRED') {
                           bannerClass = 'bg-red-50 border-red-200 text-red-800';
-                          bannerText = `Lease Warranty EXPIRED (Limit hit: ${selectedMachine.expiredFirst}). Repairs will be CHARGEABLE.`;
+                          bannerText = `Lease Warranty EXPIRED (Limit hit: ${
+                            machineContextData?.warrantyInfo?.expiredBy ||
+                            selectedMachine.expiredFirst ||
+                            'TIME/COPIES'
+                          }). Repairs will be CHARGEABLE.`;
+                        } else if (ctx === 'WARRANTY') {
+                          bannerClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
+                          bannerText =
+                            'Purchased Machine Under Warranty: Repair service & spare parts are fully covered.';
                         } else if (ctx === 'CHARGEABLE') {
                           bannerClass = 'bg-orange-50 border-orange-200 text-orange-800';
                           bannerText =
@@ -3828,7 +3970,7 @@ export default function ServiceDashboardPage() {
                 ) && (
                   <div>
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Labor Cost / Service Charge (QAR)
+                      Labor Cost / Service Charge ({getActiveCurrency()})
                     </label>
                     <Input
                       type="number"
@@ -3892,7 +4034,7 @@ export default function ServiceDashboardPage() {
                               options={spareParts.map((sp) => ({
                                 value: sp.id,
                                 label: `${sp.part_name} (${sp.sku})`,
-                                description: `Base Price: QAR ${sp.base_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                                description: `Base Price: ${getActiveCurrency()} ${sp.base_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
                               }))}
                               value={item.sparePartId}
                               onValueChange={(val) => updateDiagnosisItem(idx, 'sparePartId', val)}
@@ -4017,7 +4159,7 @@ export default function ServiceDashboardPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Visit Charge (QAR)
+                          Visit Charge ({getActiveCurrency()})
                         </label>
                         <Input
                           type="number"
@@ -4055,7 +4197,7 @@ export default function ServiceDashboardPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Discount (QAR)
+                          Discount ({getActiveCurrency()})
                         </label>
                         <Input
                           type="number"
@@ -4076,7 +4218,7 @@ export default function ServiceDashboardPage() {
                           Grand Service Estimate Total
                         </label>
                         <div className="h-9 px-3 flex items-center justify-between bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl text-xs font-bold">
-                          <span>QAR</span>
+                          <span>{getActiveCurrency()}</span>
                           <span>
                             {(() => {
                               const partsTotal = diagnosisForm.items.reduce(
@@ -4738,7 +4880,7 @@ export default function ServiceDashboardPage() {
                                     {item.quantity}
                                   </TableCell>
                                   <TableCell className="py-1 px-2 text-xs text-slate-600 text-right">
-                                    QAR{' '}
+                                    {getActiveCurrency()}{' '}
                                     {item.unitPrice.toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
                                     })}
@@ -4749,7 +4891,7 @@ export default function ServiceDashboardPage() {
                                         FOC
                                       </span>
                                     ) : (
-                                      `QAR ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                      `${getActiveCurrency()} ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                     )}
                                   </TableCell>
                                 </TableRow>
@@ -5025,7 +5167,7 @@ export default function ServiceDashboardPage() {
                               <div>
                                 <span className="text-slate-400 block font-bold">Total Amount</span>
                                 <span className="font-semibold text-slate-900">
-                                  QAR {Number(rev.totalAmount || 0).toFixed(2)}
+                                  {getActiveCurrency()} {Number(rev.totalAmount || 0).toFixed(2)}
                                 </span>
                               </div>
                               <div>
@@ -5033,13 +5175,15 @@ export default function ServiceDashboardPage() {
                                   Discount Applied
                                 </span>
                                 <span className="font-semibold text-slate-900">
-                                  QAR {Number(rev.discountApplied || 0).toFixed(2)}
+                                  {getActiveCurrency()}{' '}
+                                  {Number(rev.discountApplied || 0).toFixed(2)}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-slate-400 block font-bold">Visit Charge</span>
                                 <span className="font-semibold text-slate-900">
-                                  QAR {Number(rev.visitChargeAmount || 0).toFixed(2)}
+                                  {getActiveCurrency()}{' '}
+                                  {Number(rev.visitChargeAmount || 0).toFixed(2)}
                                 </span>
                               </div>
                               <div>
@@ -5108,12 +5252,13 @@ export default function ServiceDashboardPage() {
                                                 {item.quantity}
                                               </td>
                                               <td className="px-3 py-1 text-right">
-                                                QAR {Number(item.unitPrice || 0).toFixed(2)}
+                                                {getActiveCurrency()}{' '}
+                                                {Number(item.unitPrice || 0).toFixed(2)}
                                               </td>
                                               <td className="px-3 py-1 text-right font-bold text-slate-700">
                                                 {item.isFree
                                                   ? 'FOC'
-                                                  : `QAR ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
+                                                  : `${getActiveCurrency()} ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
                                               </td>
                                             </tr>
                                           ))
@@ -5134,12 +5279,13 @@ export default function ServiceDashboardPage() {
                                                 {item.quantity}
                                               </td>
                                               <td className="px-3 py-1 text-right">
-                                                QAR {Number(item.unitPrice || 0).toFixed(2)}
+                                                {getActiveCurrency()}{' '}
+                                                {Number(item.unitPrice || 0).toFixed(2)}
                                               </td>
                                               <td className="px-3 py-1 text-right font-bold text-slate-700">
                                                 {item.isFree
                                                   ? 'FOC'
-                                                  : `QAR ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
+                                                  : `${getActiveCurrency()} ${(Number(item.unitPrice || 0) * Number(item.quantity || 1)).toFixed(2)}`}
                                               </td>
                                             </tr>
                                           ))}
@@ -5322,20 +5468,20 @@ export default function ServiceDashboardPage() {
                           <p>
                             Labor Cost:{' '}
                             <span className="font-semibold text-slate-800">
-                              QAR {Number(est.labourCost || 0).toFixed(2)}
+                              {getActiveCurrency()} {Number(est.labourCost || 0).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Parts/Items Cost:{' '}
                             <span className="font-semibold text-slate-800">
-                              QAR{' '}
+                              {getActiveCurrency()}{' '}
                               {Number(est.partsCost ?? est.totalCost - est.labourCost).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Total Cost:{' '}
                             <span className="font-bold text-slate-900 text-sm">
-                              QAR {Number(est.totalCost || 0).toFixed(2)}
+                              {getActiveCurrency()} {Number(est.totalCost || 0).toFixed(2)}
                             </span>
                           </p>
                         </div>
@@ -5355,7 +5501,8 @@ export default function ServiceDashboardPage() {
                                   {item.partName} x {item.quantity}
                                 </span>
                                 <span className="font-mono">
-                                  QAR {(item.unitPrice * item.quantity).toFixed(2)}
+                                  {getActiveCurrency()}{' '}
+                                  {(item.unitPrice * item.quantity).toFixed(2)}
                                 </span>
                               </div>
                             ))}
@@ -5457,20 +5604,20 @@ export default function ServiceDashboardPage() {
                           <p>
                             Additional Labor:{' '}
                             <span className="font-semibold text-slate-800">
-                              QAR {Number(rev.labourCost || 0).toFixed(2)}
+                              {getActiveCurrency()} {Number(rev.labourCost || 0).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Additional Parts:{' '}
                             <span className="font-semibold text-slate-800">
-                              QAR{' '}
+                              {getActiveCurrency()}{' '}
                               {Number(rev.partsCost ?? rev.totalCost - rev.labourCost).toFixed(2)}
                             </span>
                           </p>
                           <p>
                             Additional Total:{' '}
                             <span className="font-bold text-slate-900">
-                              QAR {Number(rev.totalCost || 0).toFixed(2)}
+                              {getActiveCurrency()} {Number(rev.totalCost || 0).toFixed(2)}
                             </span>
                           </p>
                         </div>
@@ -5486,7 +5633,8 @@ export default function ServiceDashboardPage() {
                                   {item.partName} x {item.quantity}
                                 </span>
                                 <span className="font-mono">
-                                  QAR {(item.unitPrice * item.quantity).toFixed(2)}
+                                  {getActiveCurrency()}{' '}
+                                  {(item.unitPrice * item.quantity).toFixed(2)}
                                 </span>
                               </div>
                             ))}
@@ -5546,7 +5694,7 @@ export default function ServiceDashboardPage() {
                     <form onSubmit={handleCreateRevision} className="space-y-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Additional Labor Cost (QAR)
+                          Additional Labor Cost ({getActiveCurrency()})
                         </label>
                         <Input
                           type="number"
@@ -5583,7 +5731,7 @@ export default function ServiceDashboardPage() {
                               options={spareParts.map((sp) => ({
                                 value: sp.id,
                                 label: `${sp.part_name} (${sp.sku})`,
-                                description: `Price: QAR ${sp.base_price.toFixed(2)}`,
+                                description: `Price: ${getActiveCurrency()} ${sp.base_price.toFixed(2)}`,
                               }))}
                               value={item.sparePartId}
                               onValueChange={(val) => updateRevisionItem(idx, 'sparePartId', val)}
@@ -5638,7 +5786,7 @@ export default function ServiceDashboardPage() {
                     <form onSubmit={handleCreateEstimate} className="space-y-4">
                       <div>
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Labor / Service Charge (QAR)
+                          Labor / Service Charge ({getActiveCurrency()})
                         </label>
                         <Input
                           type="number"
@@ -5675,7 +5823,7 @@ export default function ServiceDashboardPage() {
                               options={spareParts.map((sp) => ({
                                 value: sp.id,
                                 label: `${sp.part_name} (${sp.sku})`,
-                                description: `Price: QAR ${sp.base_price.toFixed(2)}`,
+                                description: `Price: ${getActiveCurrency()} ${sp.base_price.toFixed(2)}`,
                               }))}
                               value={item.sparePartId}
                               onValueChange={(val) => updateEstimateItem(idx, 'sparePartId', val)}
@@ -5782,7 +5930,8 @@ export default function ServiceDashboardPage() {
                         Total Spare Parts Cost
                       </span>
                       <span className="text-xl font-black text-slate-800 font-mono">
-                        QAR {(machineCostData?.totalSparePartsCost || 0).toFixed(2)}
+                        {getActiveCurrency()}{' '}
+                        {(machineCostData?.totalSparePartsCost || 0).toFixed(2)}
                       </span>
                     </div>
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
@@ -5790,7 +5939,7 @@ export default function ServiceDashboardPage() {
                         Total Labor Cost
                       </span>
                       <span className="text-xl font-black text-slate-800 font-mono">
-                        QAR {(machineCostData?.totalLabourCost || 0).toFixed(2)}
+                        {getActiveCurrency()} {(machineCostData?.totalLabourCost || 0).toFixed(2)}
                       </span>
                     </div>
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center bg-blue-50/50 border-blue-100">
@@ -5798,7 +5947,7 @@ export default function ServiceDashboardPage() {
                         Total Lifetime Cost
                       </span>
                       <span className="text-xl font-black text-blue-900 font-mono">
-                        QAR {(machineCostData?.totalLifetimeCost || 0).toFixed(2)}
+                        {getActiveCurrency()} {(machineCostData?.totalLifetimeCost || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -5873,7 +6022,7 @@ export default function ServiceDashboardPage() {
                                 <p className="text-xs text-slate-600">
                                   Total Cost:{' '}
                                   <span className="font-bold text-slate-800">
-                                    QAR {log.cost.toFixed(2)}
+                                    {getActiveCurrency()} {log.cost.toFixed(2)}
                                   </span>
                                 </p>
                               </div>
@@ -5908,7 +6057,7 @@ export default function ServiceDashboardPage() {
                                     Qty
                                   </TableHead>
                                   <TableHead className="text-[10px] py-2 h-8 font-bold text-right">
-                                    Cost (QAR)
+                                    Cost ({getActiveCurrency()})
                                   </TableHead>
                                   <TableHead className="text-[10px] py-2 h-8 font-bold text-center">
                                     Replaced At

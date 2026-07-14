@@ -22,6 +22,7 @@ import { brandService } from '@/services/brandService';
 import { Brand } from '@/lib/brand';
 import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AddSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -397,7 +398,7 @@ export default function AddSparePartDialog({
                       return {
                         value: item.id,
                         label: `${sku} - ${name}`,
-                        description: `Available: ${available} / ${item.receivedQuantity} | Price: QAR ${item.unitPrice}`,
+                        description: `Available: ${available} / ${item.receivedQuantity} | Price: ${getActiveCurrency()} ${item.unitPrice}`,
                       };
                     });
                   })()}
@@ -570,6 +571,7 @@ export default function AddSparePartDialog({
                 required
                 type="number"
                 min="0"
+                step="0.01"
                 value={formData.purchase_price}
                 onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
               />
@@ -580,6 +582,7 @@ export default function AddSparePartDialog({
                 required
                 type="number"
                 min="0"
+                step="0.01"
                 value={formData.wholesale_price}
                 onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
               />
@@ -590,15 +593,17 @@ export default function AddSparePartDialog({
                 required
                 type="number"
                 min="0"
+                step="0.01"
                 value={formData.base_price}
                 onChange={(e) => setFormData({ ...formData, base_price: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Max Discount Allowed (QAR)</Label>
+              <Label>Max Discount Allowed ({getActiveCurrency()})</Label>
               <Input
                 type="number"
                 min="0"
+                step="0.01"
                 value={formData.maxDiscountableAmount}
                 onChange={(e) =>
                   setFormData({ ...formData, maxDiscountableAmount: e.target.value })

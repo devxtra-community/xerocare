@@ -5,6 +5,7 @@ import StatCard from '@/components/StatCard';
 import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface EmployeeSalesStatsProps {
   invoices?: Invoice[];
   selectedYear?: number | 'all';
@@ -109,7 +110,7 @@ export default function EmployeeSalesStats({
       title: 'Total Sales Amount',
       value: loading
         ? '...'
-        : `QAR ${
+        : `${getActiveCurrency()} ${
             stats.totalAmount >= 1000
               ? (stats.totalAmount / 1000).toFixed(1) + ' k'
               : stats.totalAmount.toLocaleString()

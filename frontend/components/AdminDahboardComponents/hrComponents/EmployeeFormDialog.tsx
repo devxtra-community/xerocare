@@ -21,6 +21,7 @@ import { getEmployeeJobOptions, EmployeeJob } from '@/lib/employeeJob';
 import { getFinanceJobOptions, FinanceJob } from '@/lib/financeJob';
 import { getUserFromToken } from '@/lib/auth';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface EmployeeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -368,7 +369,7 @@ export default function EmployeeFormDialog({
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Salary (AED)
+                Salary ({getActiveCurrency()})
               </label>
               <Input
                 name="salary"

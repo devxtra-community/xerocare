@@ -32,6 +32,7 @@ import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import { QuotationViewDialog } from '../employeeComponents/QuotationViewDialog';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -167,7 +168,7 @@ export default function FinanceQuotationTable({
             notifiedIds.current.add(q.id);
             if ('Notification' in window && Notification.permission === 'granted') {
               new Notification('📋 New Quotation for Review', {
-                body: `${q.invoiceNumber} from ${q.employeeName || 'an employee'} — QAR ${Number(q.totalAmount || 0).toLocaleString()}`,
+                body: `${q.invoiceNumber} from ${q.employeeName || 'an employee'} — ${getActiveCurrency()} ${Number(q.totalAmount || 0).toLocaleString()}`,
                 icon: '/favicon.ico',
               });
             }

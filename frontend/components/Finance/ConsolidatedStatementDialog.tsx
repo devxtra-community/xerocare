@@ -24,6 +24,7 @@ import { formatCurrency } from '@/lib/format';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ConsolidatedStatementDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -100,7 +101,7 @@ export default function ConsolidatedStatementDialog({
         range = slab.to === 9999999 ? `${slab.from}+` : `${slab.from}-${slab.to}`;
       }
     }
-    return `QAR ${rate} (${range})`;
+    return `${getActiveCurrency()} ${rate} (${range})`;
   };
 
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
@@ -184,7 +185,9 @@ export default function ConsolidatedStatementDialog({
                                       <span className="text-slate-600">
                                         {s.from} - {s.to}
                                       </span>
-                                      <span className="font-semibold">QAR {s.rate}</span>
+                                      <span className="font-semibold">
+                                        {getActiveCurrency()} {s.rate}
+                                      </span>
                                     </div>
                                   ))}
                                   {rule.bwExcessRate && (
@@ -195,7 +198,9 @@ export default function ConsolidatedStatementDialog({
                                           ...rule.bwSlabRanges.map((s) => Number(s.to) || 0),
                                         )}
                                       </span>
-                                      <span className="font-semibold">QAR {rule.bwExcessRate}</span>
+                                      <span className="font-semibold">
+                                        {getActiveCurrency()} {rule.bwExcessRate}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
@@ -213,7 +218,9 @@ export default function ConsolidatedStatementDialog({
                                       <span className="text-slate-600">
                                         {s.from} - {s.to}
                                       </span>
-                                      <span className="font-semibold">QAR {s.rate}</span>
+                                      <span className="font-semibold">
+                                        {getActiveCurrency()} {s.rate}
+                                      </span>
                                     </div>
                                   ))}
                                   {rule.colorExcessRate && (
@@ -225,7 +232,7 @@ export default function ConsolidatedStatementDialog({
                                         )}
                                       </span>
                                       <span className="font-semibold">
-                                        QAR {rule.colorExcessRate}
+                                        {getActiveCurrency()} {rule.colorExcessRate}
                                       </span>
                                     </div>
                                   )}
@@ -244,7 +251,9 @@ export default function ConsolidatedStatementDialog({
                                       <span className="text-slate-600">
                                         {s.from} - {s.to}
                                       </span>
-                                      <span className="font-semibold">QAR {s.rate}</span>
+                                      <span className="font-semibold">
+                                        {getActiveCurrency()} {s.rate}
+                                      </span>
                                     </div>
                                   ))}
                                   {rule.combinedExcessRate && (
@@ -256,7 +265,7 @@ export default function ConsolidatedStatementDialog({
                                         )}
                                       </span>
                                       <span className="font-semibold">
-                                        QAR {rule.combinedExcessRate}
+                                        {getActiveCurrency()} {rule.combinedExcessRate}
                                       </span>
                                     </div>
                                   )}
@@ -275,7 +284,7 @@ export default function ConsolidatedStatementDialog({
                                     <div>
                                       B/W Rate:{' '}
                                       <strong className="text-slate-900">
-                                        QAR {rule.bwExcessRate}
+                                        {getActiveCurrency()} {rule.bwExcessRate}
                                       </strong>
                                     </div>
                                   )}
@@ -283,7 +292,7 @@ export default function ConsolidatedStatementDialog({
                                     <div>
                                       Color Rate:{' '}
                                       <strong className="text-slate-900">
-                                        QAR {rule.colorExcessRate}
+                                        {getActiveCurrency()} {rule.colorExcessRate}
                                       </strong>
                                     </div>
                                   )}
@@ -291,7 +300,7 @@ export default function ConsolidatedStatementDialog({
                                     <div>
                                       Combined Rate:{' '}
                                       <strong className="text-slate-900">
-                                        QAR {rule.combinedExcessRate}
+                                        {getActiveCurrency()} {rule.combinedExcessRate}
                                       </strong>
                                     </div>
                                   )}

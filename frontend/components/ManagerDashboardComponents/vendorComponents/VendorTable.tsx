@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+import { getActiveCurrency } from '@/lib/currency';
 type Vendor = {
   id: string;
   name: string;
@@ -374,7 +375,7 @@ function VendorFormModal({
     phone: '',
     email: '',
     status: 'Active',
-    currency: 'QAR',
+    currency: getActiveCurrency(),
     countryCode: undefined,
     countryName: undefined,
   });
@@ -389,7 +390,7 @@ function VendorFormModal({
           phone: initialData.phone,
           email: initialData.email,
           status: initialData.status,
-          currency: initialData.currency || 'QAR',
+          currency: initialData.currency || getActiveCurrency(),
           countryCode: initialData.countryCode,
           countryName: initialData.countryName,
         });
@@ -401,7 +402,7 @@ function VendorFormModal({
           phone: '',
           email: '',
           status: 'Active',
-          currency: 'QAR',
+          currency: getActiveCurrency(),
           countryCode: undefined,
           countryName: undefined,
         });
