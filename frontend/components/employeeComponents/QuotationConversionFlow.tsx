@@ -23,9 +23,9 @@ import {
   activateContractInvoice,
 } from '@/lib/invoice';
 import { recordPayment } from '@/lib/payment';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 
-import { getActiveCurrency } from '@/lib/currency';
 interface QuotationConversionFlowProps {
   quotation: Invoice;
   onClose: () => void;
@@ -45,6 +45,7 @@ export function QuotationConversionFlow({
   onClose,
   onSuccess,
 }: QuotationConversionFlowProps) {
+  const currency = useBranchCurrency();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -135,6 +136,9 @@ export function QuotationConversionFlow({
     'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD'
   >('CASH');
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDueDate, setChequeDueDate] = useState('');
   const paymentDate = new Date().toISOString().split('T')[0];
   const [remarks, setRemarks] = useState('');
 
@@ -200,10 +204,13 @@ export function QuotationConversionFlow({
           amountPaid: Number(advanceAmount),
           paymentMode,
           paymentDate,
-          referenceNumber: referenceNumber || undefined,
+          referenceNumber: paymentMode === 'CHEQUE' ? undefined : referenceNumber || undefined,
           remarks:
             remarks ||
             `Advance payment collected at conversion — Invoice ${quotation.invoiceNumber}`,
+          chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
+          chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
+          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
         });
       }
 
@@ -214,11 +221,17 @@ export function QuotationConversionFlow({
       const hasAdvance = advanceAmount && Number(advanceAmount) > 0;
       const hasCaution = cautionAmount && Number(cautionAmount) > 0;
       if (hasAdvance && hasCaution) {
-        successMsg += ` Advance ${getActiveCurrency()} ${Number(advanceAmount).toFixed(2)} and Caution ${getActiveCurrency()} ${Number(cautionAmount).toFixed(2)} recorded.`;
+        successMsg +=
+          paymentMode === 'CHEQUE'
+            ? ` Cheque (PENDING) ${currency} ${Number(advanceAmount).toFixed(2)} and Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`
+            : ` Advance ${currency} ${Number(advanceAmount).toFixed(2)} and Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`;
       } else if (hasAdvance) {
-        successMsg += ` Advance ${getActiveCurrency()} ${Number(advanceAmount).toFixed(2)} recorded.`;
+        successMsg +=
+          paymentMode === 'CHEQUE'
+            ? ` Cheque recorded (PENDING) — go to Accounts → Cheques to deposit when cleared.`
+            : ` Advance ${currency} ${Number(advanceAmount).toFixed(2)} recorded.`;
       } else if (hasCaution) {
-        successMsg += ` Caution ${getActiveCurrency()} ${Number(cautionAmount).toFixed(2)} recorded.`;
+        successMsg += ` Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`;
       }
 
       toast.success('Conversion complete!', {
@@ -377,8 +390,8 @@ export function QuotationConversionFlow({
                               ),
                               searchText: `${p.serial_no} ${p.brand} ${p.name} ${p.product_status}`,
                               description: p.model?.model_name
-                                ? `Model: ${p.model.model_name} • ${getActiveCurrency()} ${Number(p.sale_price || 0).toLocaleString()}`
-                                : `${getActiveCurrency()} ${Number(p.sale_price || 0).toLocaleString()}`,
+                                ? `Model: ${p.model.model_name} • ${currency} ${Number(p.sale_price || 0).toLocaleString()}`
+                                : `${currency} ${Number(p.sale_price || 0).toLocaleString()}`,
                             };
                           })}
                       />
@@ -407,7 +420,7 @@ export function QuotationConversionFlow({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                      Amount ({getActiveCurrency()})
+                      Amount ({currency})
                     </Label>
                     <Input
                       type="number"
@@ -450,18 +463,57 @@ export function QuotationConversionFlow({
                       </div>
                       <div>
                         <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                          Reference #
+                          {paymentMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference #'}
                         </Label>
                         <Input
-                          value={referenceNumber}
-                          onChange={(e) => setReferenceNumber(e.target.value)}
-                          placeholder="Ref/Cheque No"
+                          value={paymentMode === 'CHEQUE' ? chequeNumber : referenceNumber}
+                          onChange={(e) =>
+                            paymentMode === 'CHEQUE'
+                              ? setChequeNumber(e.target.value)
+                              : setReferenceNumber(e.target.value)
+                          }
+                          placeholder={paymentMode === 'CHEQUE' ? 'e.g., CHQ-001234' : 'Ref No'}
+                          required={paymentMode === 'CHEQUE'}
                           className="h-10 border-slate-200 font-bold text-xs"
                         />
                       </div>
                     </>
                   )}
                 </div>
+                {/* Cheque-specific fields */}
+                {advanceAmount && Number(advanceAmount) > 0 && paymentMode === 'CHEQUE' && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-amber-700">
+                      Cheque Details — PENDING until deposited in Accounts → Cheques
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Customer&apos;s Bank *
+                        </Label>
+                        <Input
+                          value={chequeBankName}
+                          onChange={(e) => setChequeBankName(e.target.value)}
+                          placeholder="e.g., Emirates NBD"
+                          required
+                          className="h-10 border-slate-200 font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Due Date *
+                        </Label>
+                        <Input
+                          type="date"
+                          value={chequeDueDate}
+                          onChange={(e) => setChequeDueDate(e.target.value)}
+                          required
+                          className="h-10 border-slate-200 font-bold text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Remarks Section */}
@@ -503,7 +555,7 @@ export function QuotationConversionFlow({
                     Advance / Caution Deposit
                   </span>
                   <span className="text-emerald-600 font-black">
-                    {getActiveCurrency()} {Number(advanceAmount || 0).toFixed(2)}
+                    {currency} {Number(advanceAmount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">

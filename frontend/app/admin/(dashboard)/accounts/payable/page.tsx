@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Search, Download } from 'lucide-react';
 import { fetchManualPayables, fetchPayableCharts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -20,6 +21,7 @@ const AGING_COLORS: Record<string, string> = {
 };
 
 function PayableContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const [search, setSearch] = useState('');
@@ -93,10 +95,10 @@ function PayableContent() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
+          value={formatCurrency(totalOutstanding, currency)}
           subtitle="All branches"
         />
-        <StatCard title="Overdue" value={formatCurrency(overdue)} subtitle="Past due" />
+        <StatCard title="Overdue" value={formatCurrency(overdue, currency)} subtitle="Past due" />
         <StatCard title="Total Entries" value={payables.length.toString()} subtitle="Records" />
         <StatCard title="Shown" value={filtered.length.toString()} subtitle="Filtered" />
       </div>
@@ -104,7 +106,7 @@ function PayableContent() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">By Type</h3>
-          <DonutChart data={charts?.byType ?? []} height={220} />
+          <DonutChart data={charts?.byType ?? []} height={220} currency={currency} />
         </div>
         <div className="md:col-span-2 bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Payments</h3>
@@ -113,13 +115,19 @@ function PayableContent() {
             xKey="month"
             bars={[{ key: 'amount', color: '#ef4444', label: 'Payments' }]}
             height={220}
+            currency={currency}
           />
         </div>
       </div>
 
       <div className="bg-white rounded-xl border p-4">
         <h3 className="text-sm font-semibold text-gray-600 mb-3">Top Payees by Outstanding</h3>
-        <HorizontalBarChart data={charts?.topVendors ?? []} height={200} color="#f59e0b" />
+        <HorizontalBarChart
+          data={charts?.topVendors ?? []}
+          height={200}
+          color="#f59e0b"
+          currency={currency}
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -171,8 +179,10 @@ function PayableContent() {
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {p.type?.replace(/_/g, ' ')}
                       </td>
-                      <td className="px-4 py-3">{formatCurrency(p.amount)}</td>
-                      <td className="px-4 py-3 font-semibold">{formatCurrency(p.outstanding)}</td>
+                      <td className="px-4 py-3">{formatCurrency(p.amount, currency)}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatCurrency(p.outstanding, currency)}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-medium ${AGING_COLORS[p.aging ?? 'Current'] ?? 'bg-gray-100 text-gray-700'}`}

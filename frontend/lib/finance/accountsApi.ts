@@ -204,6 +204,7 @@ export interface DepreciationJournalEntry {
   periodYear: number;
   periodMonth: number;
   totalAmount: number;
+  assetCount?: number;
   branchId: string;
   status: 'PENDING' | 'POSTED';
   postedBy?: string;
@@ -474,7 +475,15 @@ export async function approveExpenseEntry(id: string): Promise<ExpenseEntry> {
 
 export async function payExpenseEntry(
   id: string,
-  data: { paidFrom?: string; paymentMode?: string; paymentDate?: string; referenceNo?: string },
+  data: {
+    paidFrom?: string;
+    paymentMode?: string;
+    paymentDate?: string;
+    referenceNo?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDueDate?: string;
+  },
 ): Promise<ExpenseEntry> {
   const res = await api.patch(`${BASE}/expenses/${id}/pay`, data);
   return res.data?.data;
@@ -727,15 +736,28 @@ export interface BalanceSheet {
     fixedAssetsGross: number;
     accumulatedDepreciation: number;
     fixedAssetsNet: number;
-    receivables: number;
-    manualReceivables?: number;
+    accountsReceivable: number;
+    manualAR?: number;
     invoiceAR?: number;
+    securityDepositsReceivable?: number;
     sparePartsInventory?: number;
     inventoryUnavailable?: boolean;
     total: number;
   };
-  liabilities: { payables: number; accruedExpenses: number; vatPayable?: number; total: number };
-  equity: { netEquity: number; total: number };
+  liabilities: {
+    accountsPayable: number;
+    accruedExpenses: number;
+    vatPayable?: number;
+    securityDepositsReceived?: number;
+    total: number;
+  };
+  equity: {
+    ownerCapital: number;
+    retainedEarnings: number;
+    reserves: number;
+    dividends: number;
+    total: number;
+  };
   totalLiabilitiesAndEquity: number;
   difference: number;
   balanced: boolean;
@@ -897,6 +919,7 @@ export interface ChartOfAccountsResponse {
       securityDepositsReceivable: AccountBalance;
       prepaidExpenses: AccountBalance;
       sparePartsInventory: AccountBalance;
+      productInventory: AccountBalance;
       totalCurrentAssets: number;
     };
     nonCurrentAssets: {
@@ -935,7 +958,7 @@ export interface ChartOfAccountsResponse {
     serviceRevenue: AccountBalance;
     usageRevenue: AccountBalance;
     amcSmaRevenue: AccountBalance;
-    otherIncome: AccountBalance;
+    sparePartSales: AccountBalance;
     totalIncome: number;
   };
   expenses: {
@@ -1089,6 +1112,10 @@ export interface Cheque {
   branchId: string;
   accountId?: string;
   cashbookEntryId?: string;
+  sourceType?: string;
+  sourceReferenceId?: string;
+  sourceLabel?: string;
+  invoiceNo?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -1107,12 +1134,22 @@ export interface ChequeWithHistory extends Cheque {
 
 const CHEQUE_BASE = `${BASE}/cheques`;
 
-export const fetchCheques = (params?: { status?: string; type?: string; search?: string }) =>
+export const fetchCheques = (params?: {
+  status?: string;
+  type?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  branchIds?: string;
+}) =>
   api.get<{ success: boolean; data: Cheque[] }>(CHEQUE_BASE, { params }).then((r) => r.data.data);
 
-export const fetchChequeSummary = () =>
+export const fetchChequeSummary = (params?: { branchIds?: string }) =>
   api
-    .get<{ success: boolean; data: Record<string, number> }>(`${CHEQUE_BASE}/summary`)
+    .get<{
+      success: boolean;
+      data: Record<string, Record<string, { count: number; total: number }>>;
+    }>(`${CHEQUE_BASE}/summary`, { params })
     .then((r) => r.data.data);
 
 export const fetchChequeNotifications = () =>
@@ -1135,6 +1172,10 @@ export const createCheque = (body: {
   type: 'RECEIVED' | 'ISSUED';
   description?: string;
   accountId?: string;
+  sourceType?: string;
+  sourceReferenceId?: string;
+  sourceLabel?: string;
+  invoiceNo?: string;
 }) => api.post<{ success: boolean; data: Cheque }>(CHEQUE_BASE, body).then((r) => r.data.data);
 
 export const updateCheque = (
@@ -1197,6 +1238,7 @@ export interface TaxReportFilters {
   branchId?: string;
   country?: string;
   stateProvince?: string;
+  city?: string;
   status?: string;
   page?: number;
   limit?: number;
@@ -1223,6 +1265,7 @@ export interface OutputTaxRow {
   customerVatNumber?: string;
   customerCountry?: string;
   customerStateProvince?: string;
+  customerCity?: string;
   taxableAmount: number;
   taxPercent?: number;
   taxName?: string;
@@ -1240,6 +1283,8 @@ export interface InputTaxLocalRow {
   vendorName: string;
   vendorVatNumber?: string;
   vendorCountry?: string;
+  vendorStateProvince?: string;
+  vendorCity?: string;
   purchaseCategory?: string;
   taxableAmount?: number;
   taxPercent?: number;
@@ -1259,6 +1304,8 @@ export interface InputTaxInternationalRow {
   branchId: string;
   supplierName: string;
   supplierCountry?: string;
+  supplierStateProvince?: string;
+  supplierCity?: string;
   supplierVatNumber?: string;
   importCountry?: string;
   goodsOrService?: string;
@@ -1289,11 +1336,29 @@ export interface TaxReportResponse<T> {
   pagination: TaxReportPagination;
 }
 
+export interface CountryBreakdownState {
+  state: string;
+  count: number;
+  outputVat: number;
+}
+
+export interface CountryBreakdownRow {
+  country: string;
+  count: number;
+  taxableAmount: number;
+  outputVat: number;
+  states: CountryBreakdownState[];
+}
+
+export interface OutputTaxResponse extends TaxReportResponse<OutputTaxRow> {
+  countryBreakdown: CountryBreakdownRow[];
+}
+
 export const getOutputTax = (filters: TaxReportFilters = {}) =>
   api
     .get<{
       success: boolean;
-      data: TaxReportResponse<OutputTaxRow>;
+      data: OutputTaxResponse;
     }>(`${BASE}/tax/output`, { params: filters })
     .then((r) => r.data.data);
 
@@ -1340,7 +1405,7 @@ export const deleteCountryTaxRule = (id: string) =>
 
 // ─── Guarantee Cheques ────────────────────────────────────────────────────────
 
-export type GuaranteeStatus = 'RECEIVED' | 'RETURNED';
+export type GuaranteeStatus = 'RECEIVED' | 'RETURNED' | 'DEPOSITED';
 export type GuaranteePurpose = 'PERFORMANCE_SECURITY' | 'OTHER';
 
 export interface GuaranteeCheque {
@@ -1357,6 +1422,8 @@ export interface GuaranteeCheque {
   purpose: GuaranteePurpose;
   status: GuaranteeStatus;
   returnedDate?: string | null;
+  depositedDate?: string | null;
+  depositedToAccountId?: string | null;
   branchId: string;
   createdBy: string;
   notes?: string | null;
@@ -1369,6 +1436,8 @@ export interface GuaranteeStats {
   heldAmount: number;
   returnedCount: number;
   returnedAmount: number;
+  depositedCount: number;
+  depositedAmount: number;
   pendingReturnCount: number;
 }
 
@@ -1445,6 +1514,17 @@ export const returnGuaranteeCheque = (id: string, returnedDate: string) =>
       success: boolean;
       data: GuaranteeCheque;
     }>(`${BASE}/guarantee-cheques/${id}/return`, { returnedDate })
+    .then((r) => r.data.data);
+
+export const depositGuaranteeCheque = (
+  id: string,
+  payload: { depositDate: string; bankAccountId: string; notes?: string },
+) =>
+  api
+    .post<{
+      success: boolean;
+      data: GuaranteeCheque;
+    }>(`${BASE}/guarantee-cheques/${id}/deposit`, payload)
     .then((r) => r.data.data);
 
 export const deleteGuaranteeCheque = (id: string) =>

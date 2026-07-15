@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import StatCard from '@/components/StatCard';
 import { getBranchFinanceStats } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface FinanceStatsProps {
   selectedYear?: number | 'all';
@@ -15,6 +16,7 @@ interface FinanceStatsProps {
  * Provides a high-level financial overview.
  */
 export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
+  const currency = useBranchCurrency();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -51,22 +53,22 @@ export default function FinanceStats({ selectedYear }: FinanceStatsProps) {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
       <StatCard
         title="Total Revenue"
-        value={loading ? '...' : formatCurrency(stats.totalRevenue)}
+        value={loading ? '...' : formatCurrency(stats.totalRevenue, currency)}
         subtitle={selectedYear === 'all' ? 'All Time' : `${selectedYear} Total`}
       />
       <StatCard
         title="Total Expenses"
-        value={loading ? '...' : formatCurrency(stats.totalExpenses)}
+        value={loading ? '...' : formatCurrency(stats.totalExpenses, currency)}
         subtitle="Purchase Cost + Payroll"
       />
       <StatCard
         title="Payroll Expense"
-        value={loading ? '...' : formatCurrency(stats.totalSalaries)}
+        value={loading ? '...' : formatCurrency(stats.totalSalaries, currency)}
         subtitle="Employee Salaries"
       />
       <StatCard
         title="Net Profit"
-        value={loading ? '...' : formatCurrency(stats.netProfit)}
+        value={loading ? '...' : formatCurrency(stats.netProfit, currency)}
         subtitle={`Net Margin: ${stats.totalRevenue > 0 ? ((stats.netProfit / stats.totalRevenue) * 100).toFixed(1) : 0}%`}
       />
     </div>

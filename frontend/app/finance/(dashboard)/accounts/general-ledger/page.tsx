@@ -15,6 +15,7 @@ import {
   type PayrollRecord,
 } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,6 @@ import {
 } from '@/components/ui/table';
 import * as XLSX from 'xlsx';
 
-import { getActiveCurrency } from '@/lib/currency';
 interface GLEntry {
   date: string;
   account: string;
@@ -54,6 +54,7 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 export default function GeneralLedgerPage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [accountFilter, setAccountFilter] = useState('ALL');
   const [fromDate, setFromDate] = useState(() => {
@@ -176,30 +177,30 @@ export default function GeneralLedgerPage() {
       rows.push({
         date: p.createdAt?.slice(0, 10) ?? '',
         account: '5004 Vendor Purchase Cost',
-        description: `Purchase from ${p.vendorName}`,
+        description: `Purchase from ${p.vendor?.name ?? ''}`,
         source: 'Purchase Order',
-        debit: p.totalCost,
+        debit: p.totalAmount ?? 0,
         credit: 0,
-        currency: p.currency ?? getActiveCurrency(),
+        currency: p.currencyCode ?? currency,
       });
       rows.push({
         date: p.createdAt?.slice(0, 10) ?? '',
         account: '2001 Accounts Payable',
-        description: `Purchase from ${p.vendorName}`,
+        description: `Purchase from ${p.vendor?.name ?? ''}`,
         source: 'Purchase Order',
         debit: 0,
-        credit: p.totalCost,
-        currency: p.currency ?? getActiveCurrency(),
+        credit: p.totalAmount ?? 0,
+        currency: p.currencyCode ?? currency,
       });
-      if ((p.shipping ?? 0) + (p.handling ?? 0) > 0)
+      if ((p.shippingCost ?? 0) + (p.handlingFee ?? 0) > 0)
         rows.push({
           date: p.createdAt?.slice(0, 10) ?? '',
           account: '5005 Shipping & Handling',
-          description: `Freight on PO from ${p.vendorName}`,
+          description: `Freight on PO from ${p.vendor?.name ?? ''}`,
           source: 'Purchase Order',
-          debit: (p.shipping ?? 0) + (p.handling ?? 0),
+          debit: (p.shippingCost ?? 0) + (p.handlingFee ?? 0),
           credit: 0,
-          currency: p.currency ?? getActiveCurrency(),
+          currency: p.currencyCode ?? currency,
         });
     });
     payroll.forEach((p) => {
@@ -211,7 +212,7 @@ export default function GeneralLedgerPage() {
         source: 'Payroll',
         debit: p.netSalary,
         credit: 0,
-        currency: getActiveCurrency(),
+        currency,
       });
       rows.push({
         date: dateStr,
@@ -220,11 +221,11 @@ export default function GeneralLedgerPage() {
         source: 'Payroll',
         debit: 0,
         credit: p.netSalary,
-        currency: getActiveCurrency(),
+        currency,
       });
     });
     return rows.sort((a, b) => a.date.localeCompare(b.date));
-  }, [invoices, payments, purchases, payroll]);
+  }, [invoices, payments, purchases, payroll, currency]);
 
   const filtered = useMemo(
     () =>
@@ -300,10 +301,14 @@ export default function GeneralLedgerPage() {
           value={filtered.length.toString()}
           subtitle="In selected period"
         />
-        <StatCard title="Total Debits" value={formatCurrency(totalDebit)} subtitle="Debit side" />
+        <StatCard
+          title="Total Debits"
+          value={formatCurrency(totalDebit, currency)}
+          subtitle="Debit side"
+        />
         <StatCard
           title="Total Credits"
-          value={formatCurrency(totalCredit)}
+          value={formatCurrency(totalCredit, currency)}
           subtitle="Credit side"
         />
       </div>
@@ -438,7 +443,7 @@ export default function GeneralLedgerPage() {
                     <TableCell
                       className={`text-right font-bold text-sm pr-4 ${e.runningBalance < 0 ? 'text-red-600' : 'text-slate-800'}`}
                     >
-                      {formatCurrency(Math.abs(e.runningBalance))}
+                      {formatCurrency(Math.abs(e.runningBalance), currency)}
                       {e.runningBalance < 0 ? ' Cr' : ' Dr'}
                     </TableCell>
                   </TableRow>
@@ -452,13 +457,13 @@ export default function GeneralLedgerPage() {
                 Totals
               </span>
               <span className="text-sm font-black text-blue-600 w-28 text-right">
-                {formatCurrency(totalDebit)}
+                {formatCurrency(totalDebit, currency)}
               </span>
               <span className="text-sm font-black text-emerald-600 w-28 text-right">
-                {formatCurrency(totalCredit)}
+                {formatCurrency(totalCredit, currency)}
               </span>
               <span className="text-sm font-black text-slate-800 w-32 text-right pr-4">
-                {formatCurrency(Math.abs(totalDebit - totalCredit))}
+                {formatCurrency(Math.abs(totalDebit - totalCredit), currency)}
               </span>
             </div>
           )}

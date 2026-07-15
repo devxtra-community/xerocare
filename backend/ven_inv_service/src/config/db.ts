@@ -556,6 +556,8 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             revision_type VARCHAR(50) NOT NULL,
             items_snapshot JSONB NOT NULL,
             total_amount DECIMAL(10,2) NOT NULL,
+            "labourCost" DECIMAL(10,2) DEFAULT 0,
+            "totalCost" DECIMAL(10,2) DEFAULT 0,
             discount_applied DECIMAL(10,2) DEFAULT 0,
             visit_charge_amount DECIMAL(10,2) DEFAULT 0,
             technician_note_to_finance TEXT,
@@ -565,7 +567,9 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             finance_decision_note TEXT DEFAULT NULL,
             finance_decision_at TIMESTAMP DEFAULT NULL,
             valid_until TIMESTAMP DEFAULT NULL,
-            submitted_at TIMESTAMP NOT NULL DEFAULT NOW()
+            submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
           );
         `);
         logger.info('Guaranteed service_estimate_revisions table exists.');
@@ -997,9 +1001,15 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             END IF;
           END $$;
 
+          ALTER TABLE vendors
+            ADD COLUMN IF NOT EXISTS state_province VARCHAR(100) NULL,
+            ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL;
+
           ALTER TABLE purchases
             ADD COLUMN IF NOT EXISTS vendor_vat_number VARCHAR(50) NULL,
             ADD COLUMN IF NOT EXISTS vendor_country VARCHAR(2) NULL,
+            ADD COLUMN IF NOT EXISTS vendor_state_province VARCHAR(100) NULL,
+            ADD COLUMN IF NOT EXISTS vendor_city VARCHAR(100) NULL,
             ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3) NULL,
             ADD COLUMN IF NOT EXISTS exchange_rate DECIMAL(12,6) NULL,
             ADD COLUMN IF NOT EXISTS purchase_category purchases_purchasecategory_enum NULL,

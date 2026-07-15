@@ -5,8 +5,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Bell } from 'lucide-react';
 import { fetchChequeNotifications, Cheque } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 export default function ChequeNotificationBell() {
+  const currency = useBranchCurrency();
   const { data } = useQuery({
     queryKey: ['cheque-notifications'],
     queryFn: fetchChequeNotifications,
@@ -55,7 +57,7 @@ export default function ChequeNotificationBell() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(c.amount)}
+                          {formatCurrency(c.amount, currency)}
                         </p>
                         <p className="text-xs text-red-500 font-medium">
                           Due {String(c.dueDate).slice(0, 10)}

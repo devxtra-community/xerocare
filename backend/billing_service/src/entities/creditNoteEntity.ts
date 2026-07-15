@@ -45,24 +45,52 @@ export class CreditNote {
   @Index()
   branchId!: string;
 
-  @Column({ type: 'uuid' })
+  // ── Item category: PRODUCT (serialized unit) or SPARE_PART (quantity-based) ──
+  @Column({ name: 'item_category', type: 'varchar', length: 20, default: 'PRODUCT' })
+  itemCategory!: 'PRODUCT' | 'SPARE_PART';
+
+  // ── Product fields (itemCategory = PRODUCT) ──
+  @Column({ type: 'uuid', nullable: true })
   @Index()
-  productId!: string;
+  productId?: string;
 
-  @Column()
-  productName!: string;
+  @Column({ nullable: true })
+  productName?: string;
 
-  @Column()
-  modelName!: string;
+  @Column({ nullable: true })
+  modelName?: string;
 
-  @Column()
-  brand!: string;
+  @Column({ nullable: true })
+  brand?: string;
 
   @Column({ type: 'varchar', nullable: true })
   serialNumber?: string;
 
+  // ── Spare part fields (itemCategory = SPARE_PART) ──
+  @Column({ type: 'uuid', nullable: true })
+  @Index()
+  sparePartId?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  sku?: string;
+
+  // Number of units being returned (spare parts); always 1 for products
+  @Column({ type: 'int', nullable: true })
+  quantity?: number;
+
+  // ── Financial ──
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   productAmount!: number;
+
+  // Tax snapshot copied from invoice at creation (B.2)
+  @Column({ name: 'tax_name', type: 'varchar', length: 50, nullable: true })
+  taxName?: string;
+
+  @Column({ name: 'tax_percent', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  taxPercent?: number;
+
+  @Column({ name: 'tax_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxAmount?: number;
 
   @Column({
     type: 'enum',
@@ -94,9 +122,14 @@ export class CreditNote {
   })
   damageReason?: DamageReason;
 
+  // How the refund was settled (B.1 fix — now persisted)
+  @Column({ type: 'varchar', nullable: true })
+  paymentMode?: string;
+
   @Column({ type: 'text', nullable: true })
   rejectionReason?: string;
 
+  // ── Replacement / Exchange fields (PRODUCT) ──
   @Column({ type: 'uuid', nullable: true })
   replacementProductId?: string;
 
@@ -111,6 +144,19 @@ export class CreditNote {
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   replacementDiscount: number = 0;
+
+  // ── Replacement / Exchange fields (SPARE_PART) ──
+  @Column({ type: 'uuid', nullable: true })
+  replacementSparePartId?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  replacementSparePartName?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  replacementSparePartSku?: string;
+
+  @Column({ type: 'int', nullable: true })
+  replacementQuantity?: number;
 
   @CreateDateColumn()
   createdAt!: Date;

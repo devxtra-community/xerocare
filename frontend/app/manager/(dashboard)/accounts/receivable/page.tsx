@@ -6,6 +6,7 @@ import { Eye, Search, Download } from 'lucide-react';
 import { fetchManualReceivables, fetchReceivableCharts } from '@/lib/finance/accountsApi';
 import { fetchARInvoices, agingBucket } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, SimpleLineChart, HorizontalBarChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
@@ -26,6 +27,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function ManagerReceivablePage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
 
   const { data: manual = [] } = useQuery({
@@ -122,10 +124,10 @@ export default function ManagerReceivablePage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
+          value={formatCurrency(totalOutstanding, currency)}
           subtitle="All receivables"
         />
-        <StatCard title="Overdue" value={formatCurrency(overdue)} subtitle="Past due" />
+        <StatCard title="Overdue" value={formatCurrency(overdue, currency)} subtitle="Past due" />
         <StatCard title="Total Entries" value={all.length.toString()} subtitle="Records" />
         <StatCard title="Shown" value={filtered.length.toString()} subtitle="Filtered" />
       </div>
@@ -141,17 +143,23 @@ export default function ManagerReceivablePage() {
               { key: 'collected', color: '#10b981', label: 'Collected' },
             ]}
             height={220}
+            currency={currency}
           />
         </div>
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">By Type</h3>
-          <DonutChart data={charts?.byType ?? []} height={220} />
+          <DonutChart data={charts?.byType ?? []} height={220} currency={currency} />
         </div>
       </div>
 
       <div className="bg-white rounded-xl border p-4">
         <h3 className="text-sm font-semibold text-gray-600 mb-3">Top Customers</h3>
-        <HorizontalBarChart data={charts?.topCustomers ?? []} height={200} color="#8b5cf6" />
+        <HorizontalBarChart
+          data={charts?.topCustomers ?? []}
+          height={200}
+          color="#8b5cf6"
+          currency={currency}
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -201,9 +209,13 @@ export default function ManagerReceivablePage() {
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {r.type?.replace(/_/g, ' ')}
                     </td>
-                    <td className="px-4 py-3">{formatCurrency(r.amount)}</td>
-                    <td className="px-4 py-3 text-emerald-600">{formatCurrency(r.amountPaid)}</td>
-                    <td className="px-4 py-3 font-semibold">{formatCurrency(r.outstanding)}</td>
+                    <td className="px-4 py-3">{formatCurrency(r.amount, currency)}</td>
+                    <td className="px-4 py-3 text-emerald-600">
+                      {formatCurrency(r.amountPaid, currency)}
+                    </td>
+                    <td className="px-4 py-3 font-semibold">
+                      {formatCurrency(r.outstanding, currency)}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${AGING_COLORS[r.aging ?? 'Current'] ?? 'bg-gray-100 text-gray-700'}`}

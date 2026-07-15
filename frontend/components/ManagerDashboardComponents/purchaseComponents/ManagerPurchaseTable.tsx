@@ -15,6 +15,7 @@ import {
 import { purchaseService, Purchase } from '@/services/purchaseService';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
 import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 import AddPurchaseDialog from './AddPurchaseDialog';
@@ -29,6 +30,7 @@ import PurchaseStats from './PurchaseStats';
  * Transitions to dedicated Details Page for full financial tracking.
  */
 export default function ManagerPurchaseTable() {
+  const currency = useBranchCurrency();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [search, setSearch] = useState('');
   const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
@@ -118,7 +120,9 @@ export default function ManagerPurchaseTable() {
           <p className="text-[11px] font-black uppercase tracking-widest text-green-700">
             Domestic Spend
           </p>
-          <p className="mt-1 text-2xl font-black text-green-800">{formatCurrency(domesticSpend)}</p>
+          <p className="mt-1 text-2xl font-black text-green-800">
+            {formatCurrency(domesticSpend, currency)}
+          </p>
           <p className="mt-1 text-xs font-medium text-green-600/80">
             Vendor country matches branch country
           </p>
@@ -128,7 +132,7 @@ export default function ManagerPurchaseTable() {
             International Spend
           </p>
           <p className="mt-1 text-2xl font-black text-blue-800">
-            {formatCurrency(internationalSpend)}
+            {formatCurrency(internationalSpend, currency)}
           </p>
           <p className="mt-1 text-xs font-medium text-blue-600/80">Cross-border vendor purchases</p>
         </div>
@@ -214,13 +218,13 @@ export default function ManagerPurchaseTable() {
                     {p.lot?.lotNumber || p.lotId.slice(0, 8)}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">
-                    {formatCurrency(p.totalAmount)}
+                    {formatCurrency(p.totalAmount, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">
-                    {formatCurrency(p.paidAmount)}
+                    {formatCurrency(p.paidAmount, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-bold text-primary whitespace-nowrap">
-                    {formatCurrency(p.remainingAmount)}
+                    {formatCurrency(p.remainingAmount, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-3">
                     <span

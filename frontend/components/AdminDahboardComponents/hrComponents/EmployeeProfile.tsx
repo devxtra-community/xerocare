@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface EmployeeProfileProps {
   id: string;
@@ -30,6 +31,7 @@ interface EmployeeProfileProps {
  * Provides a comprehensive portfolio view for HR management.
  */
 export default function EmployeeProfile({ id }: EmployeeProfileProps) {
+  const currency = useBranchCurrency();
   const router = useRouter();
   const [emp, setEmp] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -214,7 +216,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
               <DetailRow
                 icon={<CircleDollarSign />}
                 label="Monthly Remuneration"
-                value={formatCurrency(emp.salary || 0)}
+                value={formatCurrency(emp.salary || 0, currency)}
               />
               <DetailRow
                 icon={<Calendar />}

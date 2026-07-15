@@ -20,6 +20,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 import { CreditNoteRecord } from '@/lib/invoice';
+import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface Props {
   open: boolean;
@@ -29,6 +31,7 @@ interface Props {
 }
 
 export default function FinanceApprovalModal({ open, onClose, onConfirm, record }: Props) {
+  const currency = useBranchCurrency();
   const [financeNote, setFinanceNote] = useState('');
   const [damageReason, setDamageReason] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
@@ -52,7 +55,7 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
               {record?.productName} - {record?.modelName}
             </p>
             <p className="font-bold text-blue-900 mt-1">
-              Amount: ₹{record?.productAmount?.toLocaleString()}
+              Amount: {formatCurrency(record?.productAmount ?? 0, currency)}
             </p>
           </div>
 

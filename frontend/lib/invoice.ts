@@ -25,6 +25,9 @@ export interface InvoiceItem {
   serialNumber?: string;
   sn?: string;
   productId?: string;
+  sparePartId?: string;
+  sku?: string;
+  totalAmount?: number;
   modelId?: string; // Added for finance flow
   initialBwCount?: number;
   initialBwA3Count?: number;
@@ -76,25 +79,42 @@ export interface CreditNoteRecord {
   customerId: string;
   customerName: string;
   branchId: string;
-  productId: string;
-  productName: string;
-  modelName: string;
-  brand: string;
+  // Item category
+  itemCategory?: 'PRODUCT' | 'SPARE_PART';
+  // Product fields
+  productId?: string;
+  productName?: string;
+  modelName?: string;
+  brand?: string;
   serialNumber?: string;
+  // Spare part fields
+  sparePartId?: string;
+  sku?: string;
+  quantity?: number;
+  // Financial
   productAmount: number;
+  taxName?: string;
+  taxPercent?: number;
+  taxAmount?: number;
   type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
   status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'PRODUCT_REPLACED';
   sellerEmployeeId: string;
   notes?: string;
   financeNote?: string;
   damageReason?: string;
-  rejectionReason?: string;
   paymentMode?: string;
+  rejectionReason?: string;
+  // Product replacement/exchange fields
   replacementProductId?: string;
   replacementProductName?: string;
   replacementSerialNumber?: string;
   replacementAmount?: number;
   replacementDiscount?: number;
+  // Spare part replacement/exchange fields
+  replacementSparePartId?: string;
+  replacementSparePartName?: string;
+  replacementSparePartSku?: string;
+  replacementQuantity?: number;
   createdAt?: string;
   updatedAt?: string;
   invoice?: Invoice;
@@ -232,10 +252,23 @@ export interface Invoice {
 
 export interface CreateCreditNotePayload {
   invoiceId: string;
-  productId: string;
+  invoiceNumber: string;
+  customerId: string;
+  customerName: string;
+  branchId?: string;
+  itemCategory: 'PRODUCT' | 'SPARE_PART';
+  productId?: string;
+  productName?: string;
+  modelName?: string;
+  brand?: string;
+  serialNumber?: string;
+  sparePartId?: string;
+  sku?: string;
+  quantity?: number;
   productAmount: number;
   type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
   notes?: string;
+  sellerEmployeeId?: string;
 }
 
 export type UpdateCreditNotePayload = Partial<CreateCreditNotePayload>;
@@ -374,6 +407,7 @@ export interface CreateInvoicePayload {
   // Per-transaction customer location override (snapshotted to invoice)
   customerCountry?: string;
   customerStateProvince?: string;
+  customerCity?: string;
 }
 
 /**

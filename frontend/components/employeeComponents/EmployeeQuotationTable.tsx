@@ -23,6 +23,7 @@ import {
   Scan,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import {
@@ -72,7 +73,6 @@ import RentFormModal from './RentFormModal';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 import { getAccountSummary } from '@/lib/payment';
 
-import { getActiveCurrency } from '@/lib/currency';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type QuotationType = 'RENT' | 'LEASE' | 'PRODUCT_SALE' | 'SPAREPART_SALE';
@@ -244,6 +244,7 @@ const getRemainingDays = (expiryDate?: string | Date) => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeQuotationTable() {
+  const currency = useBranchCurrency();
   const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -954,14 +955,14 @@ export default function EmployeeQuotationTable() {
                       {q.customerName || 'Walk-in'}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
-                      {formatCurrency(q.totalAmount)}
+                      {formatCurrency(q.totalAmount, currency)}
                     </TableCell>
                     <TableCell>
                       <TypeBadge type={q.saleType} />
                     </TableCell>
                     <TableCell className="font-bold text-red-600">
                       {balances[q.id] !== undefined ? (
-                        formatCurrency(balances[q.id])
+                        formatCurrency(balances[q.id], currency)
                       ) : (
                         <Loader2 className="h-3 w-3 animate-spin text-muted-foreground inline" />
                       )}
@@ -1272,6 +1273,7 @@ function QuotationFormModal({
   allModels: Model[];
   initialData?: Invoice | null;
 }) {
+  const currency = useBranchCurrency();
   const [step, setStep] = useState<1 | 2>(1);
   const [activeCategory, setActiveCategory] = useState<'SALE' | 'RENT' | 'LEASE' | null>(null);
   const [quotationType, setQuotationType] = useState<QuotationType>(
@@ -1877,7 +1879,7 @@ function QuotationFormModal({
           </div>
           <div className="relative w-32">
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-300 pointer-events-none">
-              {getActiveCurrency()}
+              {currency}
             </span>
             <Input
               placeholder="0.00"
@@ -1902,7 +1904,7 @@ function QuotationFormModal({
               To
             </div>
             <div className="col-span-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right pr-2">
-              Rate per Page ({getActiveCurrency()})
+              Rate per Page ({currency})
             </div>
             <div className="col-span-1" />
           </div>
@@ -1937,7 +1939,7 @@ function QuotationFormModal({
                 </div>
                 <div className="col-span-5 relative">
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 pointer-events-none group-hover:text-blue-300">
-                    {getActiveCurrency()}
+                    {currency}
                   </span>
                   <Input
                     placeholder="0.00"
@@ -2083,7 +2085,7 @@ function QuotationFormModal({
         let d = Number(value);
         const maxLimit = item.maxDiscount || 0;
         if (d > maxLimit) {
-          toast.warning(`Maximum discount allowed is ${getActiveCurrency()} ${maxLimit}`);
+          toast.warning(`Maximum discount allowed is ${currency} ${maxLimit}`);
           d = maxLimit;
         }
         if (d > item.basePrice) {
@@ -2962,7 +2964,7 @@ function QuotationFormModal({
                                     Net
                                   </p>
                                   <p className="font-extrabold text-foreground">
-                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                    {formatCurrency(item.quantity * item.unitPrice, currency)}
                                   </p>
                                 </div>
                               </div>
@@ -3015,7 +3017,7 @@ function QuotationFormModal({
 
                                 <div className="md:col-span-2 space-y-1">
                                   <label className="text-[9px] font-bold text-slate-400 uppercase text-right block">
-                                    Rate ({getActiveCurrency()})
+                                    Rate ({currency})
                                   </label>
                                   <Input
                                     type="number"
@@ -3043,7 +3045,7 @@ function QuotationFormModal({
                                     Net
                                   </p>
                                   <p className="font-extrabold text-foreground">
-                                    {formatCurrency(item.quantity * item.unitPrice)}
+                                    {formatCurrency(item.quantity * item.unitPrice, currency)}
                                   </p>
                                 </div>
                               </>
@@ -3090,7 +3092,7 @@ function QuotationFormModal({
                                           Yield
                                         </div>
                                         <div className="md:col-span-2 text-[9px] font-black text-slate-400 uppercase text-right">
-                                          Price ({getActiveCurrency()})
+                                          Price ({currency})
                                         </div>
                                       </div>
 
@@ -3190,7 +3192,7 @@ function QuotationFormModal({
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-slate-400 uppercase">Grand Total</p>
                       <p className="text-2xl font-black text-primary">
-                        {formatCurrency(saleTotal)}
+                        {formatCurrency(saleTotal, currency)}
                       </p>
                     </div>
                   )}
@@ -3538,7 +3540,7 @@ function QuotationFormModal({
                         </div>
                         <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                            Advance / Caution Deposit ({getActiveCurrency()})
+                            Advance / Caution Deposit ({currency})
                           </label>
                           <Input
                             type="number"
@@ -3931,7 +3933,7 @@ function QuotationFormModal({
                     </div>
                     <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                        Total Lease Amount ({getActiveCurrency()})
+                        Total Lease Amount ({currency})
                       </label>
                       <Input
                         type="number"
@@ -3951,7 +3953,7 @@ function QuotationFormModal({
                     {leaseType === 'EMI' && (
                       <div className="bg-card p-4 rounded-xl border border-purple-100 shadow-sm space-y-2">
                         <label className="text-[11px] font-bold text-purple-600 uppercase flex items-center justify-between">
-                          <span>Monthly EMI ({getActiveCurrency()})</span>
+                          <span>Monthly EMI ({currency})</span>
                           <span className="text-[9px] lowercase">(auto)</span>
                         </label>
                         <Input
@@ -3988,7 +3990,7 @@ function QuotationFormModal({
                         )}
                         <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                            Advance / Caution Deposit ({getActiveCurrency()})
+                            Advance / Caution Deposit ({currency})
                           </label>
                           <Input
                             type="number"

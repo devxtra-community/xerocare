@@ -5,6 +5,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, CartesianGrid } f
 import { ArrowUpRight, TrendingUp } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import { getActiveCurrency } from '@/lib/currency';
 const cashFlowData = [
@@ -20,6 +21,7 @@ const cashFlowData = [
  * Shows net cash position and percentage growth.
  */
 export default function CashFlowMiniChart() {
+  const currency = useBranchCurrency();
   // Calculate net for the latest month (May)
   const latest = cashFlowData[cashFlowData.length - 1];
   const netPosition = latest.inflow - latest.outflow;
@@ -31,7 +33,9 @@ export default function CashFlowMiniChart() {
         <div>
           <h3 className="text-sm font-medium text-muted-foreground">Net Cash Position</h3>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-xl font-bold text-foreground">{formatCurrency(netPosition)}</span>
+            <span className="text-xl font-bold text-foreground">
+              {formatCurrency(netPosition, currency)}
+            </span>
             <span className="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
               <ArrowUpRight className="w-3 h-3 mr-0.5" /> +12%
             </span>

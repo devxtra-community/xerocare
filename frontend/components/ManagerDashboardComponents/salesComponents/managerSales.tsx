@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { salesService } from '@/services/salesService';
 import { YearSelector } from '@/components/ui/YearSelector';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 /**
  * Manager Sales Dashboard Page.
@@ -14,6 +15,7 @@ import { formatCurrency } from '@/lib/format';
  * Integrates `SalesSummaryTable`, `MonthlySalesBarChart`, and `MostSoldProductChart` for detailed analytics.
  */
 export default function ManagerSalesPage() {
+  const currency = useBranchCurrency();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [totalSales, setTotalSales] = useState(0);
   const [saleAmount, setSaleAmount] = useState(0);
@@ -103,7 +105,7 @@ export default function ManagerSalesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : formatCurrency(totalSales)}
+            value={loading ? '...' : formatCurrency(totalSales, currency)}
             subtitle={`${selectedYear === 'all' ? 'Lifetime Revenue' : `Revenue in ${selectedYear}`}`}
           />
           <StatCard
@@ -113,12 +115,12 @@ export default function ManagerSalesPage() {
           />
           <StatCard
             title="Product Sales"
-            value={loading ? '...' : formatCurrency(saleAmount)}
+            value={loading ? '...' : formatCurrency(saleAmount, currency)}
             subtitle="Products & spare parts"
           />
           <StatCard
             title="Rent + Lease"
-            value={loading ? '...' : formatCurrency(rentAmount + leaseAmount)}
+            value={loading ? '...' : formatCurrency(rentAmount + leaseAmount, currency)}
             subtitle="Rental & lease income"
           />
         </div>

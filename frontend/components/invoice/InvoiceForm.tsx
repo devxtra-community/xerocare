@@ -8,6 +8,7 @@ import { ProductSelect, SelectableItem } from './ProductSelect';
 import { Product } from '@/lib/product';
 import { SparePart } from '@/lib/spare-part';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Trash2, Receipt, Users, Package, Save, ArrowLeft, Scan } from 'lucide-react';
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { getCountryDataList } from 'countries-list';
-import { State } from 'country-state-city';
+import { State, City } from 'country-state-city';
 import {
   Table,
   TableBody,
@@ -32,7 +33,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { getActiveCurrency } from '@/lib/currency';
 interface InvoiceItemRow {
   id: string; // temp id for UI key
   description: string;
@@ -48,6 +48,7 @@ interface InvoiceItemRow {
  * Allows selecting a customer, adding multiple products/spare parts, and calculating totals.
  */
 export default function InvoiceForm() {
+  const currency = useBranchCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedCustomerId = searchParams.get('customerId');
@@ -57,6 +58,7 @@ export default function InvoiceForm() {
   const [customer, setCustomer] = useState<SelectableCustomer | undefined>();
   const [txnCountry, setTxnCountry] = useState<string>('');
   const [txnStateProvince, setTxnStateProvince] = useState<string>('');
+  const [txnCity, setTxnCity] = useState<string>('');
   const [items, setItems] = useState<InvoiceItemRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [scanQuery, setScanQuery] = useState('');
@@ -72,7 +74,16 @@ export default function InvoiceForm() {
         ? 'State'
         : txnCountry === 'CA'
           ? 'Province'
-          : 'City / District';
+          : 'Region / Province';
+  const txnSelectedState = useMemo(
+    () => txnStates.find((s) => s.name === txnStateProvince),
+    [txnStates, txnStateProvince],
+  );
+  const txnCities = useMemo(() => {
+    if (!txnCountry) return [];
+    if (txnSelectedState) return City.getCitiesOfState(txnCountry, txnSelectedState.isoCode);
+    return City.getCitiesOfCountry(txnCountry) ?? [];
+  }, [txnCountry, txnSelectedState]);
 
   const selectedQuantities = React.useMemo(() => {
     const map: Record<string, number> = {};
@@ -249,6 +260,7 @@ export default function InvoiceForm() {
         })),
         customerCountry: txnCountry || undefined,
         customerStateProvince: txnStateProvince || undefined,
+        customerCity: txnCity || undefined,
       };
 
       await createInvoice(payload);
@@ -322,6 +334,7 @@ export default function InvoiceForm() {
                   setCustomer(cust);
                   setTxnCountry((cust?.country as string) ?? '');
                   setTxnStateProvince((cust?.stateProvince as string) ?? '');
+                  setTxnCity((cust?.city as string) ?? '');
                 }}
               />
               {customer && (
@@ -347,6 +360,7 @@ export default function InvoiceForm() {
                       onValueChange={(val) => {
                         setTxnCountry(val);
                         setTxnStateProvince('');
+                        setTxnCity('');
                       }}
                     >
                       <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm">
@@ -367,7 +381,13 @@ export default function InvoiceForm() {
                         {subdivisionLabel}
                       </label>
                       {txnStates.length > 0 ? (
-                        <Select value={txnStateProvince} onValueChange={setTxnStateProvince}>
+                        <Select
+                          value={txnStateProvince}
+                          onValueChange={(val) => {
+                            setTxnStateProvince(val);
+                            setTxnCity('');
+                          }}
+                        >
                           <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm">
                             <SelectValue placeholder={`Select ${subdivisionLabel}`} />
                           </SelectTrigger>
@@ -382,8 +402,39 @@ export default function InvoiceForm() {
                       ) : (
                         <Input
                           value={txnStateProvince}
-                          onChange={(e) => setTxnStateProvince(e.target.value)}
+                          onChange={(e) => {
+                            setTxnStateProvince(e.target.value);
+                            setTxnCity('');
+                          }}
                           placeholder={`Enter ${subdivisionLabel}`}
+                          className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm"
+                        />
+                      )}
+                    </div>
+                  )}
+                  {txnCountry && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase">
+                        City
+                      </label>
+                      {txnCities.length > 0 ? (
+                        <Select value={txnCity} onValueChange={setTxnCity}>
+                          <SelectTrigger className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm">
+                            <SelectValue placeholder="Select city" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                            {txnCities.map((c) => (
+                              <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={txnCity}
+                          onChange={(e) => setTxnCity(e.target.value)}
+                          placeholder="Enter city"
                           className="h-10 rounded-xl bg-muted/50 border-none shadow-sm text-sm"
                         />
                       )}
@@ -518,7 +569,7 @@ export default function InvoiceForm() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end font-bold text-slate-600">
-                              <span className="text-[10px] mr-1">{getActiveCurrency()}</span>
+                              <span className="text-[10px] mr-1">{currency}</span>
                               <Input
                                 type="number"
                                 value={item.unitPrice}
@@ -528,7 +579,7 @@ export default function InvoiceForm() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right pr-6 font-black text-foreground">
-                            {formatCurrency(item.quantity * item.unitPrice)}
+                            {formatCurrency(item.quantity * item.unitPrice, currency)}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -561,7 +612,7 @@ export default function InvoiceForm() {
                     </div>
                     <div className="text-right">
                       <div className="text-4xl font-black text-foreground tracking-tighter flex items-center gap-2">
-                        {formatCurrency(calculateTotal())}
+                        {formatCurrency(calculateTotal(), currency)}
                       </div>
                     </div>
                   </div>

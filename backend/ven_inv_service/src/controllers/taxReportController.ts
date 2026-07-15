@@ -48,6 +48,8 @@ export async function getInputTaxLocal(req: Request, res: Response, next: NextFu
       dateTo,
       status,
       country,
+      stateProvince,
+      city,
       page = '1',
       limit = '50',
     } = req.query as Record<string, string>;
@@ -57,6 +59,7 @@ export async function getInputTaxLocal(req: Request, res: Response, next: NextFu
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.vendor', 'vendor')
       .leftJoinAndSelect('p.branch', 'branch')
+      .leftJoinAndSelect('p.lot', 'lot')
       .where('p.purchaseOrigin = :origin', { origin: 'DOMESTIC' });
 
     applyBranch(qb, 'p', branchFilter);
@@ -69,6 +72,8 @@ export async function getInputTaxLocal(req: Request, res: Response, next: NextFu
     }
     if (status) qb.andWhere('p.taxStatus = :status', { status });
     if (country) qb.andWhere('p.vendorCountry = :country', { country });
+    if (stateProvince) qb.andWhere('p.vendorStateProvince = :stateProvince', { stateProvince });
+    if (city) qb.andWhere('p.vendorCity = :city', { city });
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
@@ -80,27 +85,59 @@ export async function getInputTaxLocal(req: Request, res: Response, next: NextFu
       .take(limitNum)
       .getMany();
 
-    const rows = purchases.map((p) => ({
-      id: p.id,
-      invoiceDate: p.createdAt,
-      branch: p.branch?.name ?? p.branchId,
-      branchId: p.branchId,
-      vendorName: p.vendor?.name ?? p.vendorId,
-      vendorVatNumber: p.vendorVatNumber,
-      vendorCountry: p.vendorCountry,
-      purchaseCategory: p.purchaseCategory,
-      taxableAmount: p.taxableAmount,
-      taxPercent: p.taxPercent,
-      taxName: p.taxName,
-      inputVatAmount: p.inputVatAmount,
-      totalAmount: p.totalAmount,
-      currencyCode: p.currencyCode ?? p.branch?.currency_code,
-      taxStatus: p.taxStatus,
-      vatClaimable: p.vatClaimable,
-    }));
+    const rows = purchases.map((p) => {
+      const taxableAmount =
+        p.taxableAmount != null
+          ? Number(p.taxableAmount)
+          : Number(p.purchaseAmount ?? 0) +
+            Number(p.labourCost ?? 0) +
+            Number(p.handlingFee ?? 0) +
+            Number(p.transportationCost ?? 0) +
+            Number(p.shippingCost ?? 0) +
+            Number(p.groundfieldCost ?? 0);
+      const taxPercent =
+        p.taxPercent != null
+          ? Number(p.taxPercent)
+          : p.branch?.tax_percent != null
+            ? Number(p.branch.tax_percent)
+            : 5;
+      const inputVatAmount =
+        p.inputVatAmount != null ? Number(p.inputVatAmount) : taxableAmount * (taxPercent / 100);
+      const totalAmount =
+        p.totalAmount != null
+          ? Number(p.totalAmount)
+          : Number(p.purchaseAmount ?? 0) +
+            Number(p.documentationFee ?? 0) +
+            Number(p.labourCost ?? 0) +
+            Number(p.handlingFee ?? 0) +
+            Number(p.transportationCost ?? 0) +
+            Number(p.shippingCost ?? 0) +
+            Number(p.groundfieldCost ?? 0);
 
-    const totalTaxableAmount = purchases.reduce((s, p) => s + Number(p.taxableAmount ?? 0), 0);
-    const totalInputVat = purchases.reduce((s, p) => s + Number(p.inputVatAmount ?? 0), 0);
+      return {
+        id: p.id,
+        invoiceDate: p.createdAt,
+        branch: p.branch?.name ?? p.branchId,
+        branchId: p.branchId,
+        vendorName: p.vendor?.name ?? p.vendorId,
+        vendorVatNumber: p.vendorVatNumber ?? p.vendor?.vatNumber ?? '—',
+        vendorCountry: p.vendorCountry ?? p.vendor?.countryCode ?? '—',
+        vendorStateProvince: p.vendorStateProvince ?? p.vendor?.stateProvince ?? null,
+        vendorCity: p.vendorCity ?? p.vendor?.city ?? null,
+        purchaseCategory: p.purchaseCategory ?? '—',
+        taxableAmount,
+        taxPercent,
+        taxName: p.taxName ?? p.branch?.tax_name ?? 'VAT',
+        inputVatAmount,
+        totalAmount,
+        currencyCode: p.currencyCode ?? p.lot?.currencyCode ?? p.branch?.currency_code ?? 'AED',
+        taxStatus: p.taxStatus,
+        vatClaimable: p.vatClaimable,
+      };
+    });
+
+    const totalTaxableAmount = rows.reduce((s, r) => s + Number(r.taxableAmount), 0);
+    const totalInputVat = rows.reduce((s, r) => s + Number(r.inputVatAmount), 0);
 
     res.json({
       success: true,
@@ -128,6 +165,8 @@ export async function getInputTaxInternational(req: Request, res: Response, next
       dateTo,
       status,
       country,
+      stateProvince: stateProvinceIntl,
+      city: cityIntl,
       page = '1',
       limit = '50',
     } = req.query as Record<string, string>;
@@ -137,6 +176,7 @@ export async function getInputTaxInternational(req: Request, res: Response, next
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.vendor', 'vendor')
       .leftJoinAndSelect('p.branch', 'branch')
+      .leftJoinAndSelect('p.lot', 'lot')
       .where('p.purchaseOrigin = :origin', { origin: 'INTERNATIONAL' });
 
     applyBranch(qb, 'p', branchFilter);
@@ -149,6 +189,9 @@ export async function getInputTaxInternational(req: Request, res: Response, next
     }
     if (status) qb.andWhere('p.taxStatus = :status', { status });
     if (country) qb.andWhere('p.vendorCountry = :country', { country });
+    if (stateProvinceIntl)
+      qb.andWhere('p.vendorStateProvince = :stateProvinceIntl', { stateProvinceIntl });
+    if (cityIntl) qb.andWhere('p.vendorCity = :cityIntl', { cityIntl });
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
@@ -160,33 +203,54 @@ export async function getInputTaxInternational(req: Request, res: Response, next
       .take(limitNum)
       .getMany();
 
-    const rows = purchases.map((p) => ({
-      id: p.id,
-      importInvoiceNo: p.importInvoiceNo,
-      invoiceDate: p.createdAt,
-      branch: p.branch?.name ?? p.branchId,
-      branchId: p.branchId,
-      supplierName: p.vendor?.name ?? p.vendorId,
-      supplierCountry: p.vendorCountry,
-      supplierVatNumber: p.vendorVatNumber,
-      importCountry: p.branch?.country_code ?? null,
-      goodsOrService: p.goodsOrService,
-      taxableAmount: p.taxableAmount,
-      importVatReverseCharge: p.reverseChargeVatAmount,
-      taxPercent: p.taxPercent,
-      customsEntryNo: p.customsEntryNo,
-      customsDuty: p.customsDuty,
-      currencyCode: p.currencyCode ?? p.branch?.currency_code,
-      exchangeRate: p.exchangeRate,
-      vatClaimable: p.vatClaimable,
-      taxStatus: p.taxStatus,
-    }));
+    const rows = purchases.map((p) => {
+      const taxableAmount =
+        p.taxableAmount != null
+          ? Number(p.taxableAmount)
+          : Number(p.purchaseAmount ?? 0) +
+            Number(p.labourCost ?? 0) +
+            Number(p.handlingFee ?? 0) +
+            Number(p.transportationCost ?? 0) +
+            Number(p.shippingCost ?? 0) +
+            Number(p.groundfieldCost ?? 0);
+      const taxPercent =
+        p.taxPercent != null
+          ? Number(p.taxPercent)
+          : p.branch?.tax_percent != null
+            ? Number(p.branch.tax_percent)
+            : 5;
+      const importVatReverseCharge =
+        p.reverseChargeVatAmount != null
+          ? Number(p.reverseChargeVatAmount)
+          : taxableAmount * (taxPercent / 100);
+      return {
+        id: p.id,
+        importInvoiceNo: p.importInvoiceNo ?? p.lot?.lotNumber ?? '—',
+        invoiceDate: p.createdAt,
+        branch: p.branch?.name ?? p.branchId,
+        branchId: p.branchId,
+        supplierName: p.vendor?.name ?? p.vendorId,
+        supplierCountry: p.vendorCountry ?? p.vendor?.countryCode ?? '—',
+        supplierStateProvince: p.vendorStateProvince ?? p.vendor?.stateProvince ?? null,
+        supplierCity: p.vendorCity ?? p.vendor?.city ?? null,
+        supplierVatNumber: p.vendorVatNumber ?? p.vendor?.vatNumber ?? '—',
+        importCountry: p.branch?.country_code ?? null,
+        goodsOrService:
+          p.goodsOrService ?? (p.purchaseCategory === 'SERVICE' ? 'SERVICE' : 'GOODS'),
+        taxableAmount,
+        importVatReverseCharge,
+        taxPercent,
+        customsEntryNo: p.customsEntryNo ?? '—',
+        customsDuty: p.customsDuty != null ? Number(p.customsDuty) : 0,
+        currencyCode: p.currencyCode ?? p.lot?.currencyCode ?? p.branch?.currency_code ?? 'AED',
+        exchangeRate: p.exchangeRate ?? p.lot?.exchangeRateSnapshot ?? 1,
+        vatClaimable: p.vatClaimable,
+        taxStatus: p.taxStatus,
+      };
+    });
 
-    const totalTaxableAmount = purchases.reduce((s, p) => s + Number(p.taxableAmount ?? 0), 0);
-    const totalReverseChargeVat = purchases.reduce(
-      (s, p) => s + Number(p.reverseChargeVatAmount ?? 0),
-      0,
-    );
+    const totalTaxableAmount = rows.reduce((s, r) => s + Number(r.taxableAmount), 0);
+    const totalReverseChargeVat = rows.reduce((s, r) => s + Number(r.importVatReverseCharge), 0);
 
     res.json({
       success: true,

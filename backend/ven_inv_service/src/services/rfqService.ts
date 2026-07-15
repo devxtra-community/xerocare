@@ -1132,6 +1132,8 @@ export class RfqService {
 
       await manager.save(lotItemsToSave);
 
+      const vendor = await manager.findOne(Vendor, { where: { id: lot.vendorId } });
+
       // Create Purchase record for financial tracking
       const purchase = manager.create(Purchase, {
         lotId: lot.id,
@@ -1148,8 +1150,40 @@ export class RfqService {
         createdBy: userId,
         // Snapshot on the financial record powers the spend dashboard directly.
         purchaseOrigin: rfq.purchase_origin,
+
+        // Vendor snapshot
+        vendorVatNumber: vendor?.vatNumber ?? null,
+        vendorCountry: vendor?.countryCode ?? null,
+        vendorStateProvince: vendor?.stateProvince ?? null,
+        vendorCity: vendor?.city ?? null,
+
+        // Currency inherited from lot
+        currencyCode: lot.currencyCode ?? null,
+        exchangeRate: lot.exchangeRateSnapshot ? Number(lot.exchangeRateSnapshot) : null,
+
+        // Tax rate and name from branch
+        taxPercent: branch?.tax_percent != null ? Number(branch.tax_percent) : null,
+        taxName: branch?.tax_name ?? null,
+
+        // Taxable amount (initially purchaseAmount since labour, shipping, etc. are 0)
+        taxableAmount: lot.totalAmount,
       });
-      await manager.save(purchase);
+
+      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
+        if (purchase.purchaseOrigin === 'DOMESTIC') {
+          purchase.inputVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.reverseChargeVatAmount = null;
+        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
+          purchase.reverseChargeVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.inputVatAmount = null;
+        }
+      }
+      purchase.vatClaimable = true;
+      purchase.taxStatus = 'PENDING';
+
+      await manager.save(Purchase, purchase);
 
       rfq.status = RfqStatus.CLOSED;
       await manager.save(rfq);

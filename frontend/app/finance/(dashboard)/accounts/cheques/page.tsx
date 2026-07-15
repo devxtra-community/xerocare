@@ -1,16 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
-  Filter,
   CheckCircle,
   XCircle,
   AlertTriangle,
   Clock,
   RefreshCw,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -26,9 +29,9 @@ import {
   Cheque,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
-import { getUserFromToken } from '@/lib/auth';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
-// ─── Status config ────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
   DEPOSITED: 'bg-blue-100 text-blue-700',
@@ -47,15 +50,19 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
   CANCELLED: <XCircle className="h-3.5 w-3.5" />,
 };
 
-// ─── Add Cheque Modal ─────────────────────────────────────────────────────────
-interface AddChequeModalProps {
-  onClose: () => void;
-  cashAccounts: { id: string; name: string; bankName?: string; currentBalance: number }[];
-}
+type ActionType = 'deposit' | 'issue' | 'clear' | 'bounce' | 'cancel';
 
-function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
+// ─── Add Cheque Modal ─────────────────────────────────────────────────────────
+function AddChequeModal({
+  defaultType,
+  cashAccounts,
+  onClose,
+}: {
+  defaultType: 'RECEIVED' | 'ISSUED';
+  cashAccounts: { id: string; name: string; bankName?: string }[];
+  onClose: () => void;
+}) {
   const qc = useQueryClient();
-  const currentUser = getUserFromToken();
   const [form, setForm] = useState({
     chequeNo: '',
     bankName: '',
@@ -63,7 +70,7 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
     amount: '',
     dueDate: '',
     issueDate: '',
-    type: 'RECEIVED' as 'RECEIVED' | 'ISSUED',
+    type: defaultType,
     description: '',
     accountId: '',
   });
@@ -71,33 +78,21 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
   const mut = useMutation({
     mutationFn: () =>
       createCheque({
-        chequeNo: form.chequeNo,
-        bankName: form.bankName || undefined,
-        partyName: form.partyName,
+        ...form,
         amount: Number(form.amount),
-        dueDate: form.dueDate,
         issueDate: form.issueDate || undefined,
-        type: form.type,
         description: form.description || undefined,
         accountId: form.accountId || undefined,
+        bankName: form.bankName || undefined,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cheques'] });
       qc.invalidateQueries({ queryKey: ['cheque-summary'] });
-      toast.success('Cheque added successfully');
+      toast.success('Cheque added');
       onClose();
     },
     onError: (e: Error) => toast.error(e.message || 'Failed to add cheque'),
   });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.chequeNo.trim()) return toast.error('Cheque number is required');
-    if (!form.partyName.trim()) return toast.error('Party name is required');
-    if (!form.amount || Number(form.amount) <= 0) return toast.error('Amount must be > 0');
-    if (!form.dueDate) return toast.error('Due date is required');
-    mut.mutate();
-  };
 
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -110,19 +105,17 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
             ×
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Branch info banner */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-            <span className="text-sm text-blue-600">Branch:</span>
-            <span className="text-sm font-medium text-blue-800">
-              {currentUser?.branchId
-                ? `Branch ${currentUser.branchId.slice(0, 8)}…`
-                : 'Your Branch'}
-            </span>
-            <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
-          </div>
-
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!form.chequeNo.trim()) return toast.error('Cheque number required');
+            if (!form.partyName.trim()) return toast.error('Party name required');
+            if (!form.amount || Number(form.amount) <= 0) return toast.error('Amount must be > 0');
+            if (!form.dueDate) return toast.error('Due date required');
+            mut.mutate();
+          }}
+          className="p-6 space-y-4"
+        >
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Type *</label>
@@ -145,7 +138,6 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
               />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Party Name *</label>
@@ -166,7 +158,6 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
               />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Amount *</label>
@@ -190,7 +181,6 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
               />
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Issue Date</label>
@@ -211,13 +201,13 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
                 <option value="">None</option>
                 {cashAccounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} {a.bankName ? `(${a.bankName})` : ''}
+                    {a.name}
+                    {a.bankName ? ` (${a.bankName})` : ''}
                   </option>
                 ))}
               </select>
             </div>
           </div>
-
           <div>
             <label className="text-xs font-medium text-gray-600">Description</label>
             <textarea
@@ -228,7 +218,6 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
-
           <div className="flex gap-2 pt-2">
             <button
               type="button"
@@ -252,16 +241,18 @@ function AddChequeModal({ onClose, cashAccounts }: AddChequeModalProps) {
 }
 
 // ─── Action Modal ─────────────────────────────────────────────────────────────
-type ActionType = 'deposit' | 'issue' | 'clear' | 'bounce' | 'cancel';
-
-interface ChequeActionModalProps {
+function ChequeActionModal({
+  cheque,
+  action,
+  cashAccounts,
+  onClose,
+}: {
   cheque: Cheque;
   action: ActionType;
   cashAccounts: { id: string; name: string; bankName?: string }[];
   onClose: () => void;
-}
-
-function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActionModalProps) {
+}) {
+  const currency = useBranchCurrency();
   const qc = useQueryClient();
   const [accountId, setAccountId] = useState(cheque.accountId ?? '');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -282,7 +273,7 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
       qc.invalidateQueries({ queryKey: ['cheques'] });
       qc.invalidateQueries({ queryKey: ['cheque-summary'] });
       qc.invalidateQueries({ queryKey: ['cheque-notifications'] });
-      toast.success(`Cheque ${action}ed successfully`);
+      toast.success(`Cheque ${action === 'clear' ? 'cleared' : action + 'ed'} successfully`);
       onClose();
     },
     onError: (e: Error) => toast.error(e.message || `Failed to ${action} cheque`),
@@ -291,32 +282,26 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
   const needsAccount = action === 'deposit' || action === 'issue';
   const needsDate = action === 'deposit' || action === 'issue';
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (needsAccount && !accountId) return toast.error('Please select a bank account');
-    mut.mutate();
-  };
-
-  const actionLabels: Record<ActionType, { label: string; color: string; desc: string }> = {
+  const cfg: Record<ActionType, { label: string; color: string; desc: string }> = {
     deposit: {
-      label: 'Deposit Cheque',
+      label: 'Deposit to Bank',
       color: 'bg-blue-600 hover:bg-blue-700',
-      desc: 'Mark this cheque as deposited and credit the account.',
+      desc: 'Mark cheque as deposited. Cash at Bank increases only when you mark it Cleared.',
     },
     issue: {
-      label: 'Issue Cheque',
+      label: 'Issue to Vendor',
       color: 'bg-purple-600 hover:bg-purple-700',
-      desc: 'Mark this cheque as issued as payment and debit the account.',
+      desc: 'Mark cheque as issued. Cash at Bank decreases only when you mark it Cleared.',
     },
     clear: {
       label: 'Mark Cleared',
       color: 'bg-emerald-600 hover:bg-emerald-700',
-      desc: 'Confirm the cheque has cleared the bank.',
+      desc: 'Bank confirms funds cleared. This moves the Cash at Bank balance.',
     },
     bounce: {
       label: 'Mark Bounced',
       color: 'bg-red-600 hover:bg-red-700',
-      desc: 'Mark as bounced. The cashbook entry will be reversed.',
+      desc: 'Cheque bounced. No balance reversal needed (money never moved).',
     },
     cancel: {
       label: 'Cancel Cheque',
@@ -325,26 +310,32 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
     },
   };
 
-  const cfg = actionLabels[action];
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">{cfg.label}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{cfg[action].label}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
             ×
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (needsAccount && !accountId) return toast.error('Please select a bank account');
+            mut.mutate();
+          }}
+          className="p-6 space-y-4"
+        >
           <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-            <p className="text-gray-500">{cfg.desc}</p>
+            <p className="text-gray-500">{cfg[action].desc}</p>
             <p className="font-medium text-gray-800">
-              {cheque.partyName} — #{cheque.chequeNo} — {formatCurrency(cheque.amount)}
+              {cheque.partyName} — #{cheque.chequeNo} — {formatCurrency(cheque.amount, currency)}
             </p>
+            {cheque.sourceLabel && (
+              <p className="text-xs text-gray-400">Source: {cheque.sourceLabel}</p>
+            )}
           </div>
-
           {needsAccount && (
             <div>
               <label className="text-xs font-medium text-gray-600">Bank Account *</label>
@@ -356,13 +347,13 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
                 <option value="">Select account…</option>
                 {cashAccounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name} {a.bankName ? `(${a.bankName})` : ''}
+                    {a.name}
+                    {a.bankName ? ` (${a.bankName})` : ''}
                   </option>
                 ))}
               </select>
             </div>
           )}
-
           {needsDate && (
             <div>
               <label className="text-xs font-medium text-gray-600">Transaction Date</label>
@@ -374,7 +365,6 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
               />
             </div>
           )}
-
           <div>
             <label className="text-xs font-medium text-gray-600">Notes</label>
             <textarea
@@ -385,7 +375,6 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
-
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -397,9 +386,9 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
             <button
               type="submit"
               disabled={mut.isPending}
-              className={`flex-1 text-white rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg.color}`}
+              className={`flex-1 text-white rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg[action].color}`}
             >
-              {mut.isPending ? 'Processing…' : cfg.label}
+              {mut.isPending ? 'Processing…' : cfg[action].label}
             </button>
           </div>
         </form>
@@ -409,12 +398,13 @@ function ChequeActionModal({ cheque, action, cashAccounts, onClose }: ChequeActi
 }
 
 // ─── Action Buttons ───────────────────────────────────────────────────────────
-interface ChequeActionButtonsProps {
+function ActionButtons({
+  cheque,
+  onAction,
+}: {
   cheque: Cheque;
-  onAction: (cheque: Cheque, action: ActionType) => void;
-}
-
-function ChequeActionButtons({ cheque, onAction }: ChequeActionButtonsProps) {
+  onAction: (c: Cheque, a: ActionType) => void;
+}) {
   const actions: { action: ActionType; label: string; className: string; show: boolean }[] = [
     {
       action: 'deposit',
@@ -447,10 +437,8 @@ function ChequeActionButtons({ cheque, onAction }: ChequeActionButtonsProps) {
       show: cheque.status === 'PENDING',
     },
   ];
-
   const visible = actions.filter((a) => a.show);
   if (visible.length === 0) return <span className="text-xs text-gray-400">—</span>;
-
   return (
     <div className="flex gap-1 flex-wrap">
       {visible.map(({ action, label, className }) => (
@@ -466,39 +454,195 @@ function ChequeActionButtons({ cheque, onAction }: ChequeActionButtonsProps) {
   );
 }
 
-// ─── Summary Card ─────────────────────────────────────────────────────────────
-function SummaryCard({ label, count, color }: { label: string; count: number; color: string }) {
+// ─── Stats Cards ──────────────────────────────────────────────────────────────
+function StatsRow({
+  summary,
+  type,
+  currency,
+}: {
+  summary: Record<string, { count: number; total: number }>;
+  type: 'RECEIVED' | 'ISSUED';
+  currency: string;
+}) {
+  const pending = summary['PENDING'] ?? { count: 0, total: 0 };
+  const deposited = summary['DEPOSITED'] ?? summary['ISSUED'] ?? { count: 0, total: 0 };
+  const cleared = summary['CLEARED'] ?? { count: 0, total: 0 };
+  const bounced = summary['BOUNCED'] ?? { count: 0, total: 0 };
+  const cancelled = summary['CANCELLED'] ?? { count: 0, total: 0 };
+  const total = [pending, deposited, cleared, bounced, cancelled].reduce(
+    (acc, s) => ({ count: acc.count + s.count, total: acc.total + s.total }),
+    { count: 0, total: 0 },
+  );
+
+  const cards = [
+    {
+      label: 'Total',
+      count: total.count,
+      amount: total.total,
+      color: 'text-gray-800',
+      bg: 'bg-gray-50 border-gray-200',
+    },
+    {
+      label: type === 'RECEIVED' ? 'Pending' : 'Pending',
+      count: pending.count,
+      amount: pending.total,
+      color: 'text-yellow-700',
+      bg: 'bg-yellow-50 border-yellow-200',
+    },
+    {
+      label: type === 'RECEIVED' ? 'Deposited' : 'Issued',
+      count: deposited.count,
+      amount: deposited.total,
+      color: 'text-blue-700',
+      bg: 'bg-blue-50 border-blue-200',
+    },
+    {
+      label: 'Cleared',
+      count: cleared.count,
+      amount: cleared.total,
+      color: 'text-emerald-700',
+      bg: 'bg-emerald-50 border-emerald-200',
+    },
+    {
+      label: 'Bounced',
+      count: bounced.count,
+      amount: bounced.total,
+      color: 'text-red-700',
+      bg: 'bg-red-50 border-red-200',
+    },
+  ];
+
   return (
-    <div className="bg-white rounded-xl border p-4 flex flex-col gap-1">
-      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
-      <span className={`text-2xl font-bold ${color}`}>{count}</span>
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      {cards.map((c) => (
+        <div key={c.label} className={`rounded-xl border p-3 ${c.bg}`}>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{c.label}</p>
+          <p className={`text-xl font-bold mt-0.5 ${c.color}`}>{c.count}</p>
+          <p className={`text-xs font-semibold mt-0.5 ${c.color}`}>
+            {formatCurrency(c.amount, currency)}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Cheque Table ─────────────────────────────────────────────────────────────
+function ChequeTable({
+  cheques,
+  loading,
+  currency,
+  onAction,
+  emptyLabel,
+}: {
+  cheques: Cheque[];
+  loading: boolean;
+  currency: string;
+  onAction: (c: Cheque, a: ActionType) => void;
+  emptyLabel: string;
+}) {
+  const isOverdue = (c: Cheque) =>
+    new Date(c.dueDate) < new Date() && ['PENDING', 'ISSUED'].includes(c.status);
+
+  if (loading) return <div className="p-10 text-center text-gray-400">Loading…</div>;
+  if (cheques.length === 0)
+    return <div className="p-10 text-center text-gray-400">{emptyLabel}</div>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
+          <tr>
+            {['Cheque #', 'Party / Bank', 'Amount', 'Due Date', 'Source', 'Status', 'Actions'].map(
+              (h) => (
+                <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                  {h}
+                </th>
+              ),
+            )}
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {cheques.map((c) => (
+            <tr
+              key={c.id}
+              className={`transition-colors ${isOverdue(c) ? 'bg-red-50/40' : 'hover:bg-gray-50'}`}
+            >
+              <td className="px-4 py-3 font-mono text-gray-700 text-xs">{c.chequeNo}</td>
+              <td className="px-4 py-3">
+                <p className="font-medium text-gray-800 max-w-[140px] truncate">{c.partyName}</p>
+                <p className="text-xs text-gray-400">{c.bankName ?? '—'}</p>
+              </td>
+              <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                {formatCurrency(c.amount, currency)}
+              </td>
+              <td
+                className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+              >
+                {String(c.dueDate).slice(0, 10)}
+                {isOverdue(c) && <span className="ml-1 text-red-500">⚠</span>}
+              </td>
+              <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px]">
+                {c.sourceLabel ? (
+                  <span
+                    className="inline-block px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-medium text-slate-600 max-w-[150px] truncate"
+                    title={c.sourceLabel}
+                  >
+                    {c.sourceLabel}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </td>
+              <td className="px-4 py-3">
+                <span
+                  className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
+                >
+                  {STATUS_ICON[c.status]}
+                  {c.status}
+                </span>
+              </td>
+              <td className="px-4 py-3">
+                <ActionButtons cheque={c} onAction={onAction} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ChequesPage() {
+  const currency = useBranchCurrency();
+  const [activeTab, setActiveTab] = useState<'received' | 'issued'>('received');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [actionState, setActionState] = useState<{ cheque: Cheque; action: ActionType } | null>(
     null,
   );
 
-  const params: Record<string, string> = {};
-  if (statusFilter !== 'ALL') params.status = statusFilter;
-  if (typeFilter !== 'ALL') params.type = typeFilter;
-  if (search.trim()) params.search = search.trim();
+  const params = useMemo(() => {
+    const p: Record<string, string> = { type: activeTab === 'received' ? 'RECEIVED' : 'ISSUED' };
+    if (statusFilter !== 'ALL') p.status = statusFilter;
+    if (search.trim()) p.search = search.trim();
+    if (dateFrom) p.dateFrom = dateFrom;
+    if (dateTo) p.dateTo = dateTo;
+    return p;
+  }, [activeTab, statusFilter, search, dateFrom, dateTo]);
 
   const { data: cheques = [], isLoading } = useQuery({
-    queryKey: ['cheques', statusFilter, typeFilter, search],
+    queryKey: ['cheques', params],
     queryFn: () => fetchCheques(params),
   });
 
-  const { data: summary = {} } = useQuery({
+  const { data: summary = { RECEIVED: {}, ISSUED: {} } } = useQuery({
     queryKey: ['cheque-summary'],
-    queryFn: fetchChequeSummary,
+    queryFn: () => fetchChequeSummary(),
   });
 
   const { data: cashAccounts = [] } = useQuery({
@@ -508,40 +652,93 @@ export default function ChequesPage() {
 
   const bankAccounts = cashAccounts
     .filter((a) => a.type === 'BANK')
-    .map((a) => ({
-      id: a.id,
-      name: a.name,
-      bankName: a.bankName,
-      currentBalance: a.currentBalance,
-    }));
+    .map((a) => ({ id: a.id, name: a.name, bankName: a.bankName }));
 
   const openAction = (cheque: Cheque, action: ActionType) => setActionState({ cheque, action });
+
+  const tabSummary =
+    activeTab === 'received'
+      ? ((summary as Record<string, Record<string, { count: number; total: number }>>)[
+          'RECEIVED'
+        ] ?? {})
+      : ((summary as Record<string, Record<string, { count: number; total: number }>>)['ISSUED'] ??
+        {});
+
+  const statusOptions =
+    activeTab === 'received'
+      ? ['PENDING', 'DEPOSITED', 'CLEARED', 'BOUNCED', 'CANCELLED']
+      : ['PENDING', 'ISSUED', 'CLEARED', 'BOUNCED', 'CANCELLED'];
 
   return (
     <div className="bg-blue-50/30 min-h-full p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cheque Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track received and issued cheques</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            {activeTab === 'received' ? (
+              <>
+                <ArrowDownCircle className="h-6 w-6 text-emerald-600" /> Cheques from Customers
+              </>
+            ) : (
+              <>
+                <ArrowUpCircle className="h-6 w-6 text-blue-600" /> Cheques to Vendors
+              </>
+            )}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {activeTab === 'received'
+              ? 'Cheques received from customers — deposited to bank, cleared when bank confirms'
+              : 'Cheques issued to vendors — Cash at Bank moves only when bank clears payment'}
+          </p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 shadow-sm"
         >
           <Plus className="h-4 w-4" /> Add Cheque
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-        <SummaryCard label="Pending" count={summary['PENDING'] ?? 0} color="text-yellow-600" />
-        <SummaryCard label="Deposited" count={summary['DEPOSITED'] ?? 0} color="text-blue-600" />
-        <SummaryCard label="Issued" count={summary['ISSUED'] ?? 0} color="text-purple-600" />
-        <SummaryCard label="Cleared" count={summary['CLEARED'] ?? 0} color="text-emerald-600" />
-        <SummaryCard label="Bounced" count={summary['BOUNCED'] ?? 0} color="text-red-600" />
-        <SummaryCard label="Cancelled" count={summary['CANCELLED'] ?? 0} color="text-gray-500" />
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        {(
+          [
+            {
+              key: 'received',
+              label: 'Received (Customers)',
+              icon: <TrendingUp className="h-4 w-4" />,
+            },
+            {
+              key: 'issued',
+              label: 'Issued (Vendors)',
+              icon: <TrendingDown className="h-4 w-4" />,
+            },
+          ] as const
+        ).map(({ key, label, icon }) => (
+          <button
+            key={key}
+            onClick={() => {
+              setActiveTab(key);
+              setStatusFilter('ALL');
+            }}
+            className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === key
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {icon}
+            {label}
+          </button>
+        ))}
       </div>
+
+      {/* Stats */}
+      <StatsRow
+        summary={tabSummary}
+        type={activeTab === 'received' ? 'RECEIVED' : 'ISSUED'}
+        currency={currency}
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-xl border p-4">
@@ -551,119 +748,58 @@ export default function ChequesPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search cheque#, party, bank…"
+              placeholder="Search cheque #, party, bank, source…"
               className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Status</option>
-              {['PENDING', 'DEPOSITED', 'ISSUED', 'CLEARED', 'BOUNCED', 'CANCELLED'].map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Types</option>
-              <option value="RECEIVED">Received</option>
-              <option value="ISSUED">Issued</option>
-            </select>
-          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="ALL">All Status</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="Due date from"
+          />
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="Due date to"
+          />
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        {isLoading ? (
-          <div className="p-10 text-center text-gray-400">Loading cheques…</div>
-        ) : cheques.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">
-            <p className="text-lg">No cheques found</p>
-            <p className="text-sm mt-1">Add your first cheque using the button above.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
-                <tr>
-                  {[
-                    'Type',
-                    'Cheque #',
-                    'Party',
-                    'Bank',
-                    'Amount',
-                    'Due Date',
-                    'Status',
-                    'Actions',
-                  ].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {cheques.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          c.type === 'RECEIVED'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {c.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-gray-700">{c.chequeNo}</td>
-                    <td className="px-4 py-3 font-medium text-gray-800 max-w-32 truncate">
-                      {c.partyName}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{c.bankName ?? '—'}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-900">
-                      {formatCurrency(c.amount)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-xs ${
-                        new Date(c.dueDate) < new Date() && c.status === 'PENDING'
-                          ? 'text-red-600 font-semibold'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      {String(c.dueDate).slice(0, 10)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
-                      >
-                        {STATUS_ICON[c.status]}
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <ChequeActionButtons cheque={c} onAction={openAction} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <ChequeTable
+          cheques={cheques}
+          loading={isLoading}
+          currency={currency}
+          onAction={openAction}
+          emptyLabel={`No ${activeTab === 'received' ? 'received' : 'issued'} cheques found`}
+        />
       </div>
 
       {/* Modals */}
-      {showAdd && <AddChequeModal cashAccounts={bankAccounts} onClose={() => setShowAdd(false)} />}
+      {showAdd && (
+        <AddChequeModal
+          defaultType={activeTab === 'received' ? 'RECEIVED' : 'ISSUED'}
+          cashAccounts={bankAccounts}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
       {actionState && (
         <ChequeActionModal
           cheque={actionState.cheque}

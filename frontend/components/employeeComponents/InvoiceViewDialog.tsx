@@ -22,6 +22,7 @@ import { getUserFromToken } from '@/lib/auth';
 import AuditTimeline from '../invoice/AuditTimeline';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface InternalConsumable {
   name?: string;
@@ -91,6 +92,7 @@ export function InvoiceViewDialog({
   approveLabel = 'Approve',
   showDistribution = false,
 }: InvoiceViewDialogProps) {
+  const currency = useBranchCurrency();
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [isRejecting, setIsRejecting] = useState(false);
@@ -1493,7 +1495,7 @@ export function InvoiceViewDialog({
                                   {cn.productName}
                                 </p>
                                 <p className="text-[11px] font-black text-rose-600 mt-1">
-                                  {formatCurrency(cn.productAmount)}
+                                  {formatCurrency(cn.productAmount, currency)}
                                 </p>
                               </div>
 
@@ -1512,7 +1514,7 @@ export function InvoiceViewDialog({
                                   {cn.replacementProductName || 'New Product'}
                                 </p>
                                 <p className="text-[11px] font-black text-emerald-600 mt-1">
-                                  {formatCurrency(cn.replacementAmount || 0)}
+                                  {formatCurrency(cn.replacementAmount || 0, currency)}
                                 </p>
                               </div>
                             </div>
@@ -1521,13 +1523,13 @@ export function InvoiceViewDialog({
                               <div className="flex justify-between text-xs">
                                 <span className="text-slate-500 font-medium">New Price</span>
                                 <span className="font-bold text-slate-700">
-                                  {formatCurrency(cn.replacementAmount || 0)}
+                                  {formatCurrency(cn.replacementAmount || 0, currency)}
                                 </span>
                               </div>
                               <div className="flex justify-between text-xs">
                                 <span className="text-slate-500 font-medium">Returned Credit</span>
                                 <span className="font-bold text-rose-600">
-                                  − {formatCurrency(cn.productAmount)}
+                                  − {formatCurrency(cn.productAmount, currency)}
                                 </span>
                               </div>
                               {cn.replacementDiscount > 0 && (
@@ -1536,7 +1538,7 @@ export function InvoiceViewDialog({
                                     Exchange Discount
                                   </span>
                                   <span className="font-bold text-rose-500">
-                                    − {formatCurrency(cn.replacementDiscount)}
+                                    − {formatCurrency(cn.replacementDiscount, currency)}
                                   </span>
                                 </div>
                               )}
@@ -1548,7 +1550,7 @@ export function InvoiceViewDialog({
                                   className={`text-sm font-black ${variation >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}
                                 >
                                   {variation >= 0 ? '+' : ''}
-                                  {formatCurrency(variation)}
+                                  {formatCurrency(variation, currency)}
                                 </span>
                               </div>
                             </div>

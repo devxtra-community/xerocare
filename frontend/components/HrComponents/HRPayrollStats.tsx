@@ -2,6 +2,7 @@ import StatCard from '@/components/StatCard';
 import { PayrollRecord } from './HRPayrollTable';
 import { Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 /**
  * Component displaying key payroll statistics.
@@ -15,6 +16,7 @@ export default function HRPayrollStats({
   data: PayrollRecord[];
   loading: boolean;
 }) {
+  const currency = useBranchCurrency();
   // Calculate real stats from the payroll data
   const employeeCount = data.length;
 
@@ -25,7 +27,7 @@ export default function HRPayrollStats({
     return sum + value;
   }, 0);
 
-  const payrollPerMonth = formatCurrency(totalPayrollValue);
+  const payrollPerMonth = formatCurrency(totalPayrollValue, currency);
 
   const uniqueDepartments = new Set(data.map((item) => item.department)).size;
 

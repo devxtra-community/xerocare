@@ -10,6 +10,7 @@ import {
   fetchEquityCharts,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -27,6 +28,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function EquityContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
 
@@ -85,10 +87,10 @@ function EquityContent() {
 
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
         <p className="text-sm font-medium opacity-80 mb-1">Net Equity (Consolidated)</p>
-        <p className="text-4xl font-bold">{formatCurrency(summary?.netEquity ?? 0)}</p>
+        <p className="text-4xl font-bold">{formatCurrency(summary?.netEquity ?? 0, currency)}</p>
         <div className="flex gap-6 mt-4 text-sm">
           <span>
-            Total Assets: <strong>{formatCurrency(summary?.totalAssets ?? 0)}</strong>
+            Total Assets: <strong>{formatCurrency(summary?.totalAssets ?? 0, currency)}</strong>
           </span>
         </div>
       </div>
@@ -96,17 +98,17 @@ function EquityContent() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Share Capital"
-          value={formatCurrency(summary?.shareCapital ?? 0)}
+          value={formatCurrency(summary?.shareCapital ?? 0, currency)}
           subtitle="Paid-in"
         />
         <StatCard
           title="Retained Earnings"
-          value={formatCurrency(summary?.retainedEarnings ?? 0)}
+          value={formatCurrency(summary?.retainedEarnings ?? 0, currency)}
           subtitle="Accumulated"
         />
         <StatCard
           title="Owner Contribution"
-          value={formatCurrency(summary?.ownerContribution ?? 0)}
+          value={formatCurrency(summary?.ownerContribution ?? 0, currency)}
           subtitle="Capital input"
         />
         <StatCard title="Total Entries" value={entries.length.toString()} subtitle="Records" />
@@ -115,7 +117,7 @@ function EquityContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Equity Composition</h3>
-          <DonutChart data={charts?.composition ?? []} height={240} />
+          <DonutChart data={charts?.composition ?? []} height={240} currency={currency} />
         </div>
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Equity Growth Trend</h3>
@@ -124,6 +126,7 @@ function EquityContent() {
             xKey="month"
             lines={[{ key: 'equity', color: '#6366f1', label: 'Equity' }]}
             height={240}
+            currency={currency}
           />
         </div>
       </div>
@@ -165,7 +168,9 @@ function EquityContent() {
                     <td className="px-4 py-3 max-w-[200px] truncate text-gray-600">
                       {e.description}
                     </td>
-                    <td className="px-4 py-3 font-semibold">{formatCurrency(e.amount)}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {formatCurrency(e.amount, currency)}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{e.currency}</td>
                   </tr>
                 ))

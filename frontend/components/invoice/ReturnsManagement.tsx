@@ -21,9 +21,11 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 
 export default function ReturnsManagement() {
+  const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -160,7 +162,7 @@ export default function ReturnsManagement() {
                         {new Date(inv.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-2 text-xs font-bold text-gray-700">
-                        {formatCurrency(inv.totalAmount)}
+                        {formatCurrency(inv.totalAmount, currency)}
                       </td>
                       <td className="py-3 px-2 text-xs">
                         <span
@@ -217,7 +219,7 @@ export default function ReturnsManagement() {
                 <SelectContent>
                   {selectedInvoice?.items?.map((item) => (
                     <SelectItem key={item.id} value={item.id || ''}>
-                      {item.description} ({formatCurrency(item.unitPrice || 0)})
+                      {item.description} ({formatCurrency(item.unitPrice || 0, currency)})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -237,7 +239,7 @@ export default function ReturnsManagement() {
                   max={selectedItem.unitPrice || 0}
                 />
                 <p className="text-[10px] text-muted-foreground">
-                  Max possible: {formatCurrency(selectedItem.unitPrice || 0)}
+                  Max possible: {formatCurrency(selectedItem.unitPrice || 0, currency)}
                 </p>
               </div>
             )}

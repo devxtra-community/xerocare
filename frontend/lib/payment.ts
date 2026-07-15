@@ -32,6 +32,10 @@ export const recordPayment = async (data: {
   referenceNumber?: string;
   remarks?: string;
   receiptFile?: File | null;
+  // Required when paymentMode === 'CHEQUE'
+  chequeNumber?: string;
+  chequeBankName?: string;
+  chequeDueDate?: string;
 }): Promise<PaymentLedger> => {
   // `invoiceId` must be appended before `receipt` — multer-s3 reads req.body fields
   // as they stream in, and the file's storage key is keyed off invoiceId.
@@ -43,6 +47,9 @@ export const recordPayment = async (data: {
   if (data.referenceNumber) form.append('referenceNumber', data.referenceNumber);
   if (data.remarks) form.append('remarks', data.remarks);
   if (data.receiptFile) form.append('receipt', data.receiptFile);
+  if (data.chequeNumber) form.append('chequeNumber', data.chequeNumber);
+  if (data.chequeBankName) form.append('chequeBankName', data.chequeBankName);
+  if (data.chequeDueDate) form.append('chequeDueDate', data.chequeDueDate);
 
   // Let the browser set Content-Type (incl. multipart boundary) — do not set it manually.
   const response = await api.post('/b/payments/record', form);

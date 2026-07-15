@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -14,14 +14,17 @@ import {
   CheckCircle2,
   AlertTriangle,
   ChevronDown,
+  Landmark,
 } from 'lucide-react';
 import {
   fetchGuaranteeCheques,
   fetchGuaranteeStats,
   fetchCustomerContracts,
+  fetchCashBankAccounts,
   createGuaranteeCheque,
   updateGuaranteeCheque,
   returnGuaranteeCheque,
+  depositGuaranteeCheque,
   deleteGuaranteeCheque,
   type GuaranteeCheque,
   type GuaranteePurpose,
@@ -29,6 +32,7 @@ import {
 } from '@/lib/finance/accountsApi';
 import { getCustomers, type Customer } from '@/lib/customer';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +53,6 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 
-import { getActiveCurrency } from '@/lib/currency';
 const today = new Date().toISOString().slice(0, 10);
 
 const PURPOSE_LABELS: Record<string, string> = {
@@ -60,6 +63,7 @@ const PURPOSE_LABELS: Record<string, string> = {
 const STATUS_BADGE: Record<string, string> = {
   RECEIVED: 'bg-blue-100 text-blue-700 border-blue-200',
   RETURNED: 'bg-gray-100 text-gray-600 border-gray-200',
+  DEPOSITED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 };
 
 // ─── Add/Edit Modal ───────────────────────────────────────────────────────────
@@ -74,6 +78,7 @@ function GuaranteeModal({
   onSaved: () => void;
 }) {
   const isEdit = !!cheque?.id;
+  const branchCurrency = useBranchCurrency();
 
   const [customerId, setCustomerId] = useState(cheque?.customerId ?? '');
   const [customerName, setCustomerName] = useState(cheque?.customerName ?? '');
@@ -81,7 +86,10 @@ function GuaranteeModal({
   const [contractReference, setContractReference] = useState(cheque?.contractReference ?? '');
   const [chequeNumber, setChequeNumber] = useState(cheque?.chequeNumber ?? '');
   const [amount, setAmount] = useState(cheque?.amount?.toString() ?? '');
-  const [currencyCode, setCurrencyCode] = useState(cheque?.currencyCode ?? getActiveCurrency());
+  const [currencyCode, setCurrencyCode] = useState(cheque?.currencyCode ?? branchCurrency);
+  useEffect(() => {
+    if (!isEdit) setCurrencyCode(branchCurrency);
+  }, [branchCurrency, isEdit]);
   const [bankName, setBankName] = useState(cheque?.bankName ?? '');
   const [receivedDate, setReceivedDate] = useState(cheque?.receivedDate?.slice(0, 10) ?? today);
   const [purpose, setPurpose] = useState<GuaranteePurpose>(
@@ -418,9 +426,133 @@ function ReturnDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: (
   );
 }
 
+// ─── Deposit Dialog ───────────────────────────────────────────────────────────
+
+function DepositDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: () => void }) {
+  const [depositDate, setDepositDate] = useState(today);
+  const [bankAccountId, setBankAccountId] = useState('');
+  const [notes, setNotes] = useState('');
+  const qc = useQueryClient();
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['cash-bank-accounts'],
+    queryFn: () => fetchCashBankAccounts(),
+    staleTime: 60_000,
+  });
+  const bankAccounts = accounts.filter((a) => a.type === 'BANK' && a.isActive !== false);
+
+  const depositMut = useMutation({
+    mutationFn: () =>
+      depositGuaranteeCheque(cheque.id, { depositDate, bankAccountId, notes: notes || undefined }),
+    onSuccess: () => {
+      toast.success('Guarantee cheque deposited to bank');
+      qc.invalidateQueries({ queryKey: ['guarantee-cheques'] });
+      qc.invalidateQueries({ queryKey: ['guarantee-stats'] });
+      qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
+      qc.invalidateQueries({ queryKey: ['cashbook'] });
+      onClose();
+    },
+    onError: (err: Error) => toast.error(err.message || 'Failed to deposit cheque'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+              <Landmark className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800">Deposit to Bank</h3>
+              <p className="text-xs text-muted-foreground">
+                {cheque.chequeNumber} · {cheque.customerName}
+              </p>
+            </div>
+          </div>
+          <div className="bg-muted/40 rounded-xl p-3 text-sm space-y-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Cheque Amount</span>
+              <span className="font-bold">
+                {formatCurrency(Number(cheque.amount), cheque.currencyCode)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Customer Bank</span>
+              <span className="font-medium">{cheque.bankName}</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">
+              Deposit to Account *
+            </label>
+            <Select value={bankAccountId} onValueChange={setBankAccountId}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select bank account…" />
+              </SelectTrigger>
+              <SelectContent>
+                {bankAccounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                    {a.bankName ? ` · ${a.bankName}` : ''}
+                    {a.accountNumber ? ` · ${a.accountNumber}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Deposit Date *</label>
+            <input
+              type="date"
+              value={depositDate}
+              max={today}
+              onChange={(e) => setDepositDate(e.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background resize-none"
+              placeholder="Any additional notes…"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            This will mark the cheque as <strong>DEPOSITED</strong> and add{' '}
+            <strong>{formatCurrency(Number(cheque.amount), cheque.currencyCode)}</strong> as a
+            receipt to the selected bank account.
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 pb-6">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={depositMut.isPending}
+            className="flex-1"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => depositMut.mutate()}
+            disabled={!depositDate || !bankAccountId || depositMut.isPending}
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {depositMut.isPending ? 'Processing…' : 'Confirm Deposit'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function GuaranteeChequesPage() {
+  const currency = useBranchCurrency();
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -433,6 +565,7 @@ export default function GuaranteeChequesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<GuaranteeCheque | null>(null);
   const [returning, setReturning] = useState<GuaranteeCheque | null>(null);
+  const [depositing, setDepositing] = useState<GuaranteeCheque | null>(null);
 
   const filters = useMemo(
     (): GuaranteeFilters => ({
@@ -474,7 +607,7 @@ export default function GuaranteeChequesPage() {
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Guarantee Cheques</h3>
           <p className="text-muted-foreground text-sm">
-            Security &amp; performance cheques held as collateral — never deposited
+            Security &amp; performance cheques — received, deposited, or returned
           </p>
         </div>
         <Button
@@ -493,19 +626,19 @@ export default function GuaranteeChequesPage() {
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard
-            title="Total Held"
+            title="Currently Held"
             value={stats.heldCount.toString()}
-            subtitle={formatCurrency(stats.heldAmount)}
+            subtitle={formatCurrency(stats.heldAmount, currency)}
           />
           <StatCard
-            title="Amount Held"
-            value={formatCurrency(stats.heldAmount)}
-            subtitle={`${stats.heldCount} cheque${stats.heldCount !== 1 ? 's' : ''}`}
+            title="Deposited to Bank"
+            value={stats.depositedCount.toString()}
+            subtitle={formatCurrency(stats.depositedAmount, currency)}
           />
           <StatCard
             title="Returned"
             value={stats.returnedCount.toString()}
-            subtitle={formatCurrency(stats.returnedAmount)}
+            subtitle={formatCurrency(stats.returnedAmount, currency)}
           />
           <StatCard
             title="Pending Return"
@@ -548,6 +681,7 @@ export default function GuaranteeChequesPage() {
               <SelectContent>
                 <SelectItem value="ALL">All Status</SelectItem>
                 <SelectItem value="RECEIVED">Received</SelectItem>
+                <SelectItem value="DEPOSITED">Deposited</SelectItem>
                 <SelectItem value="RETURNED">Returned</SelectItem>
               </SelectContent>
             </Select>
@@ -679,10 +813,12 @@ export default function GuaranteeChequesPage() {
                     </TableCell>
                     <TableCell>
                       <span
-                        className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[c.status]}`}
+                        className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[c.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}
                       >
                         {c.status === 'RETURNED' ? (
                           <CheckCircle2 className="h-3 w-3" />
+                        ) : c.status === 'DEPOSITED' ? (
+                          <Landmark className="h-3 w-3" />
                         ) : (
                           <ShieldCheck className="h-3 w-3" />
                         )}
@@ -692,13 +828,22 @@ export default function GuaranteeChequesPage() {
                     <TableCell className="pr-4">
                       <div className="flex items-center gap-1">
                         {c.status === 'RECEIVED' && (
-                          <button
-                            onClick={() => setReturning(c)}
-                            className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
-                            title="Mark as Returned"
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => setDepositing(c)}
+                              className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                              title="Deposit to Bank"
+                            >
+                              <Landmark className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setReturning(c)}
+                              className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                              title="Mark as Returned"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                         <button
                           onClick={() => {
@@ -745,6 +890,7 @@ export default function GuaranteeChequesPage() {
       )}
 
       {returning && <ReturnDialog cheque={returning} onClose={() => setReturning(null)} />}
+      {depositing && <DepositDialog cheque={depositing} onClose={() => setDepositing(null)} />}
     </div>
   );
 }

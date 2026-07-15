@@ -20,9 +20,13 @@ import {
   XCircle,
   Send,
   X,
+  Wrench,
+  Hash,
+  Percent,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import { CreditNoteRecord } from '@/lib/invoice';
 
@@ -91,6 +95,7 @@ function InfoRow({
 }
 
 export default function CreditNoteViewModal({ record, open, onClose }: Props) {
+  const currency = useBranchCurrency();
   if (!record) return null;
 
   const status = STATUS_CONFIG[record.status] ?? {
@@ -169,22 +174,86 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
 
         {/* ── Body ── */}
         <div className="p-6 space-y-5 overflow-y-auto" style={{ maxHeight: '65vh' }}>
-          {/* Product Info */}
+          {/* Item Info */}
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-              <Package className="h-3 w-3" /> Product Details
+              {record.itemCategory === 'SPARE_PART' ? (
+                <>
+                  <Wrench className="h-3 w-3" /> Spare Part Details
+                </>
+              ) : (
+                <>
+                  <Package className="h-3 w-3" /> Product Details
+                </>
+              )}
             </p>
+            {/* Category badge */}
+            <div className="mb-2">
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                  record.itemCategory === 'SPARE_PART'
+                    ? 'bg-orange-50 text-orange-700 border-orange-200'
+                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                }`}
+              >
+                {record.itemCategory === 'SPARE_PART' ? (
+                  <>
+                    <Wrench className="h-3 w-3" /> Spare Part
+                  </>
+                ) : (
+                  <>
+                    <Package className="h-3 w-3" /> Product
+                  </>
+                )}
+              </span>
+            </div>
             <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
-              <InfoRow icon={Package} label="Product" value={record.productName} />
-              <InfoRow icon={Tag} label="Model" value={record.modelName} />
-              <InfoRow icon={Building2} label="Brand" value={record.brand} />
-              <InfoRow icon={Building2} label="Serial No" value={record.serialNumber} mono />
+              <InfoRow
+                icon={Package}
+                label={record.itemCategory === 'SPARE_PART' ? 'Part Name' : 'Product'}
+                value={record.productName}
+              />
+              {record.itemCategory === 'SPARE_PART' ? (
+                <>
+                  <InfoRow icon={Building2} label="SKU" value={record.sku} mono />
+                  <InfoRow
+                    icon={Hash}
+                    label="Return Qty"
+                    value={record.quantity != null ? String(record.quantity) : undefined}
+                  />
+                </>
+              ) : (
+                <>
+                  <InfoRow icon={Tag} label="Model" value={record.modelName} />
+                  <InfoRow icon={Building2} label="Brand" value={record.brand} />
+                  <InfoRow icon={Building2} label="Serial No" value={record.serialNumber} mono />
+                </>
+              )}
               <InfoRow
                 icon={DollarSign}
                 label="Amount"
-                value={formatCurrency(record.productAmount)}
+                value={formatCurrency(record.productAmount, currency)}
                 accent
               />
+              {/* Tax breakdown */}
+              {record.taxName && (
+                <>
+                  <InfoRow
+                    icon={Percent}
+                    label={`Tax (${record.taxName})`}
+                    value={record.taxPercent != null ? `${record.taxPercent}%` : undefined}
+                  />
+                  <InfoRow
+                    icon={DollarSign}
+                    label="Tax Amount"
+                    value={
+                      record.taxAmount != null
+                        ? formatCurrency(record.taxAmount, currency)
+                        : undefined
+                    }
+                  />
+                </>
+              )}
             </div>
           </div>
 
@@ -283,7 +352,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
 
           {/* Replacement/Exchange Details */}
           {(record.status === 'PRODUCT_REPLACED' || record.status === 'COMPLETED') &&
-            record.replacementSerialNumber && (
+            (record.replacementSerialNumber || record.replacementSparePartId) && (
               <div className="space-y-4 pt-4 border-t border-dashed">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
                   <RefreshCw className="h-3 w-3 text-blue-500" />{' '}
@@ -293,15 +362,30 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                 <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 space-y-3">
                   <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
                     <div className="bg-white p-1.5 rounded-lg border border-blue-100">
-                      <Package className="h-4 w-4 text-blue-600" />
+                      {record.itemCategory === 'SPARE_PART' ? (
+                        <Wrench className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <Package className="h-4 w-4 text-blue-600" />
+                      )}
                     </div>
                     <div>
                       <p className="text-[10px] uppercase font-bold text-blue-400">
-                        New Unit Assigned
+                        {record.itemCategory === 'SPARE_PART'
+                          ? 'Replacement Spare Part'
+                          : 'New Unit Assigned'}
                       </p>
-                      <p className="text-xs font-bold text-blue-900">
-                        Serial No: {record.replacementSerialNumber}
-                      </p>
+                      {record.itemCategory === 'SPARE_PART' ? (
+                        <p className="text-xs font-bold text-blue-900">
+                          {record.replacementSparePartName} ({record.replacementSparePartSku})
+                          {record.replacementQuantity != null
+                            ? ` × ${record.replacementQuantity}`
+                            : ''}
+                        </p>
+                      ) : (
+                        <p className="text-xs font-bold text-blue-900">
+                          Serial No: {record.replacementSerialNumber}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -309,20 +393,20 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                     <div className="space-y-1">
                       <p className="text-blue-500 font-medium">New Item Price</p>
                       <p className="font-bold text-blue-900">
-                        {formatCurrency(record.replacementAmount || 0)}
+                        {formatCurrency(record.replacementAmount || 0, currency)}
                       </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-blue-500 font-medium">Returned Credit</p>
                       <p className="font-bold text-blue-900">
-                        - {formatCurrency(record.productAmount)}
+                        - {formatCurrency(record.productAmount, currency)}
                       </p>
                     </div>
                     {record.replacementDiscount !== undefined && record.replacementDiscount > 0 && (
                       <div className="space-y-1">
                         <p className="text-emerald-600 font-medium">Extra Discount</p>
                         <p className="font-bold text-emerald-700">
-                          - {formatCurrency(record.replacementDiscount || 0)}
+                          - {formatCurrency(record.replacementDiscount || 0, currency)}
                         </p>
                       </div>
                     )}
@@ -342,6 +426,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                               record.productAmount -
                               (record.replacementDiscount || 0),
                           ),
+                          currency,
                         )}
                       </p>
                     </div>

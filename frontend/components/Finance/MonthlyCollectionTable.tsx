@@ -24,6 +24,7 @@ import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import { getActiveCurrency } from '@/lib/currency';
 /**
@@ -37,6 +38,7 @@ export default function MonthlyCollectionTable({
   mode?: 'RENT' | 'LEASE';
   onSuccess?: () => void;
 }) {
+  const currency = useBranchCurrency();
   const [alerts, setAlerts] = useState<CollectionAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContract, setSelectedContract] = useState<CollectionAlert | null>(null);
@@ -219,7 +221,7 @@ export default function MonthlyCollectionTable({
         const amount = isLease
           ? alertItem.monthlyLeaseAmount || alertItem.monthlyEmiAmount || alertItem.monthlyRent || 0
           : alertItem.totalAmount || alertItem.monthlyRent || 0;
-        return <span className="font-bold">{formatCurrency(amount)}</span>;
+        return <span className="font-bold">{formatCurrency(amount, currency)}</span>;
       },
     },
     {

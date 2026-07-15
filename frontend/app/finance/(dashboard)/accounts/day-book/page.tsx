@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Download, RefreshCw, ArrowDownLeft, ArrowUpRight, RotateCcw } from 'lucide-react';
 import { fetchDayBook, reverseCashbookEntry } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,6 +55,7 @@ function fmtDate(d: string): string {
 }
 
 export default function DayBookPage() {
+  const currency = useBranchCurrency();
   const [period, setPeriod] = useState<Period>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -205,17 +207,17 @@ export default function DayBookPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             <StatCard
               title="Total Earnings"
-              value={formatCurrency(totals.totalReceipts)}
+              value={formatCurrency(totals.totalReceipts, currency)}
               subtitle="Cash received"
             />
             <StatCard
               title="Total Expenses"
-              value={formatCurrency(totals.totalPayments)}
+              value={formatCurrency(totals.totalPayments, currency)}
               subtitle="Cash paid out"
             />
             <StatCard
               title="Net Cash"
-              value={formatCurrency(totals.net)}
+              value={formatCurrency(totals.net, currency)}
               subtitle={totals.net >= 0 ? 'Surplus' : 'Deficit'}
             />
             <StatCard
@@ -245,15 +247,15 @@ export default function DayBookPage() {
                     </div>
                     <div className="flex items-center gap-6 text-sm">
                       <span className="text-emerald-600 font-semibold">
-                        + {formatCurrency(day.totalReceipts)}
+                        + {formatCurrency(day.totalReceipts, currency)}
                       </span>
                       <span className="text-red-600 font-semibold">
-                        − {formatCurrency(day.totalPayments)}
+                        − {formatCurrency(day.totalPayments, currency)}
                       </span>
                       <span
                         className={`font-bold ${day.net >= 0 ? 'text-slate-800' : 'text-red-600'}`}
                       >
-                        Net {formatCurrency(day.net)}
+                        Net {formatCurrency(day.net, currency)}
                       </span>
                     </div>
                   </div>
@@ -300,10 +302,14 @@ export default function DayBookPage() {
                             <td className="px-4 py-2.5 text-slate-600">{e.description ?? '—'}</td>
                             <td className="px-4 py-2.5 text-slate-600">{e.paymentMode ?? '—'}</td>
                             <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">
-                              {e.entryType === 'RECEIPT' ? formatCurrency(Number(e.amount)) : ''}
+                              {e.entryType === 'RECEIPT'
+                                ? formatCurrency(Number(e.amount), currency)
+                                : ''}
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
-                              {e.entryType === 'PAYMENT' ? formatCurrency(Number(e.amount)) : ''}
+                              {e.entryType === 'PAYMENT'
+                                ? formatCurrency(Number(e.amount), currency)
+                                : ''}
                             </td>
                             <td className="px-6 py-2.5 text-right">
                               {!e.sourceType && !e.isReversed && e.category !== 'REVERSAL' && (

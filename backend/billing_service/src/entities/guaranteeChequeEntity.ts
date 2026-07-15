@@ -9,6 +9,7 @@ import {
 export enum GuaranteeChequeStatus {
   RECEIVED = 'RECEIVED',
   RETURNED = 'RETURNED',
+  DEPOSITED = 'DEPOSITED',
 }
 
 export enum GuaranteeChequePurpose {
@@ -16,10 +17,8 @@ export enum GuaranteeChequePurpose {
   OTHER = 'OTHER',
 }
 
-// IMPORTANT: Guarantee cheques are collateral held from customers, NOT real cash-flow instruments.
-// They are NEVER deposited, NEVER affect the cashbook, and have NO cashbook entry at any point.
-// Do NOT wire this entity into CashbookEntry or CashBankAccount — it would be incorrect.
-// The only lifecycle transition is RECEIVED → RETURNED (physical return to customer).
+// Guarantee cheque lifecycle: RECEIVED → DEPOSITED (cheque cleared to bank) or RECEIVED → RETURNED (cheque returned to customer)
+// Depositing creates a RECEIPT cashbook entry on the chosen bank account.
 @Entity('guarantee_cheques')
 export class GuaranteeCheque {
   @PrimaryGeneratedColumn('uuid')
@@ -70,6 +69,12 @@ export class GuaranteeCheque {
 
   @Column({ name: 'returned_date', type: 'date', nullable: true })
   returnedDate?: Date | null;
+
+  @Column({ name: 'deposited_date', type: 'date', nullable: true })
+  depositedDate?: Date | null;
+
+  @Column({ name: 'deposited_to_account_id', type: 'uuid', nullable: true })
+  depositedToAccountId?: string | null;
 
   @Column({ name: 'branch_id', type: 'uuid' })
   branchId!: string;

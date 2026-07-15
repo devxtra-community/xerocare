@@ -26,9 +26,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Barcode from 'react-barcode';
 import { getSparePartById, getSparePartStock, SparePart, SparePartStock } from '@/lib/spare-part';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 
 export default function SparePartDetailPage() {
+  const currency = useBranchCurrency();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -219,7 +221,7 @@ export default function SparePartDetailPage() {
                     Selling Price
                   </p>
                   <p className="text-3xl font-extrabold text-blue-800">
-                    {formatCurrency(part.base_price)}
+                    {formatCurrency(part.base_price, currency)}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -228,7 +230,7 @@ export default function SparePartDetailPage() {
                       Wholesale
                     </p>
                     <p className="text-sm font-semibold text-slate-700">
-                      {formatCurrency(part.wholesale_price ?? 0)}
+                      {formatCurrency(part.wholesale_price ?? 0, currency)}
                     </p>
                   </div>
                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -244,7 +246,7 @@ export default function SparePartDetailPage() {
                       Purchase Price
                     </p>
                     <p className="text-sm font-semibold text-slate-700">
-                      {formatCurrency(part.purchase_price ?? 0)}
+                      {formatCurrency(part.purchase_price ?? 0, currency)}
                     </p>
                   </div>
                 )}
@@ -254,7 +256,10 @@ export default function SparePartDetailPage() {
                       Max Discount
                     </p>
                     <p className="text-sm font-semibold text-amber-700">
-                      {formatCurrency(part.maxDiscountableAmount ?? part.max_discount_amount ?? 0)}
+                      {formatCurrency(
+                        part.maxDiscountableAmount ?? part.max_discount_amount ?? 0,
+                        currency,
+                      )}
                     </p>
                   </div>
                 )}
@@ -326,12 +331,12 @@ export default function SparePartDetailPage() {
                   <SpecRow
                     icon={<DollarSign size={16} />}
                     label="Selling Price"
-                    value={formatCurrency(part.base_price)}
+                    value={formatCurrency(part.base_price, currency)}
                   />
                   <SpecRow
                     icon={<TrendingUp size={16} />}
                     label="Wholesale Price"
-                    value={formatCurrency(part.wholesale_price ?? 0)}
+                    value={formatCurrency(part.wholesale_price ?? 0, currency)}
                   />
                 </div>
               </div>

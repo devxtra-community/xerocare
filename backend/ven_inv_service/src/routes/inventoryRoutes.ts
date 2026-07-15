@@ -5,7 +5,10 @@ import {
   getWarehouseInventory,
   getInventoryStats,
 } from '../controllers/inventoryController';
-import { processInventoryReturn } from '../controllers/inventoryReturnController';
+import {
+  processInventoryReturn,
+  allocateSparePart,
+} from '../controllers/inventoryReturnController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 import {
@@ -36,6 +39,11 @@ inventoryRouter.post(
   '/returns/process',
   roleMiddleware(['ADMIN', 'MANAGER', 'SALES']),
   processInventoryReturn,
+);
+inventoryRouter.post(
+  '/spare-parts/:id/allocate',
+  roleMiddleware(['ADMIN', 'MANAGER']),
+  allocateSparePart,
 );
 
 export default inventoryRouter;

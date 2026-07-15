@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { SparePartInventoryItem } from '@/services/sparePartService';
 import Barcode from 'react-barcode';
 
@@ -39,6 +40,7 @@ export default function SparePartDetailDialog({
   onClose,
   onEdit,
 }: SparePartDetailDialogProps) {
+  const currency = useBranchCurrency();
   const [copiedLot, setCopiedLot] = useState(false);
 
   const handleCopyLot = () => {
@@ -133,7 +135,7 @@ export default function SparePartDetailDialog({
             <StatItem
               icon={<DollarSign size={18} />}
               label="Selling Price"
-              value={formatCurrency(part.price || 0)}
+              value={formatCurrency(part.price || 0, currency)}
               subValue="Retail"
               iconBgClass="bg-green-50"
               iconColorClass="text-green-600"
@@ -141,7 +143,7 @@ export default function SparePartDetailDialog({
             <StatItem
               icon={<TrendingUp size={18} />}
               label="Wholesale Price"
-              value={formatCurrency(part.wholesale_price || 0)}
+              value={formatCurrency(part.wholesale_price || 0, currency)}
               subValue="Bulk"
               iconBgClass="bg-indigo-50"
               iconColorClass="text-indigo-600"

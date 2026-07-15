@@ -30,9 +30,11 @@ import {
   Invoice,
 } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 
 export default function FinanceServiceEstimatesPage() {
+  const currency = useBranchCurrency();
   const [estimates, setEstimates] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -217,7 +219,7 @@ export default function FinanceServiceEstimatesPage() {
                       {e.employeeName || '—'}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground text-xs">
-                      {formatCurrency(e.totalAmount)}
+                      {formatCurrency(e.totalAmount, currency)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {new Date(e.createdAt).toLocaleDateString()}
@@ -330,10 +332,10 @@ export default function FinanceServiceEstimatesPage() {
                           </TableCell>
                           <TableCell className="text-right">{item.quantity || 0}</TableCell>
                           <TableCell className="text-right">
-                            {formatCurrency(item.unitPrice || 0)}
+                            {formatCurrency(item.unitPrice || 0, currency)}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency((item.unitPrice || 0) * (item.quantity || 0))}
+                            {formatCurrency((item.unitPrice || 0) * (item.quantity || 0), currency)}
                           </TableCell>
                         </TableRow>
                       ))
@@ -352,7 +354,7 @@ export default function FinanceServiceEstimatesPage() {
                 <div className="text-right space-y-1">
                   <span className="text-xs text-muted-foreground block">Grand Total:</span>
                   <span className="text-lg font-bold text-primary">
-                    {formatCurrency(detailTarget.totalAmount)}
+                    {formatCurrency(detailTarget.totalAmount, currency)}
                   </span>
                 </div>
               </div>

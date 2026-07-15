@@ -46,6 +46,7 @@ import { Card } from '@/components/ui/card';
 import { Lot, LotItemType, lotService, LotStatus } from '@/lib/lot';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { purchaseService, Purchase } from '@/services/purchaseService';
 import { Input } from '@/components/ui/input';
 import AddPaymentModal from '../purchaseComponents/AddPaymentModal';
@@ -66,6 +67,7 @@ interface LotDetailsDialogProps {
  * Displays associated purchase record if available.
  */
 export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetailsDialogProps) {
+  const currency = useBranchCurrency();
   const [purchaseRecord, setPurchaseRecord] = useState<Purchase | null>(null);
   const [loadingPurchase, setLoadingPurchase] = useState(true);
   const [isReceiving, setIsReceiving] = useState(false);
@@ -576,7 +578,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                 Lot Value
               </p>
               <p className="text-lg font-bold leading-none text-primary">
-                {formatCurrency(itemsTotal)}
+                {formatCurrency(itemsTotal, currency)}
               </p>
             </div>
           </div>
@@ -718,10 +720,10 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                           </TableCell>
                         )}
                         <TableCell className="text-right text-slate-600">
-                          {formatCurrency(Number(item.unitPrice))}
+                          {formatCurrency(Number(item.unitPrice), currency)}
                         </TableCell>
                         <TableCell className="text-right font-bold text-slate-900">
-                          {formatCurrency(Number(item.totalPrice))}
+                          {formatCurrency(Number(item.totalPrice), currency)}
                         </TableCell>
                       </TableRow>
                     );
@@ -822,7 +824,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                 <span>
                   Items Total:{' '}
                   <span className="font-bold text-primary text-base">
-                    {formatCurrency(itemsTotal)}
+                    {formatCurrency(itemsTotal, currency)}
                   </span>
                 </span>
               </div>
@@ -876,7 +878,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-slate-500 font-medium">Inventory Cost</span>
                         <span className="font-bold text-slate-900">
-                          {formatCurrency(purchaseRecord.purchaseAmount)}
+                          {formatCurrency(purchaseRecord.purchaseAmount, currency)}
                         </span>
                       </div>
 
@@ -908,7 +910,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                               <span
                                 className={`font-bold ${Number(item.value) > 0 ? 'text-slate-700' : 'text-slate-300'}`}
                               >
-                                {formatCurrency(Number(item.value))}
+                                {formatCurrency(Number(item.value), currency)}
                               </span>
                             </div>
                           ))}
@@ -920,7 +922,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                         <div className="flex justify-between text-sm">
                           <span className="text-slate-500 font-medium">Total Lot Cost</span>
                           <span className="font-bold text-slate-900">
-                            {formatCurrency(purchaseRecord.totalAmount)}
+                            {formatCurrency(purchaseRecord.totalAmount, currency)}
                           </span>
                         </div>
 
@@ -933,7 +935,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                               <div className="flex justify-between text-sm">
                                 <span className="text-green-600 font-medium">Paid Amount</span>
                                 <span className="font-bold text-green-700">
-                                  {formatCurrency(paidAmount)}
+                                  {formatCurrency(paidAmount, currency)}
                                 </span>
                               </div>
                               <div className="flex justify-between text-sm p-2 bg-slate-50 rounded-lg border border-slate-100">
@@ -941,7 +943,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                                 <span
                                   className={`font-black ${remainingAmount > 0 ? 'text-amber-600' : 'text-green-600'}`}
                                 >
-                                  {formatCurrency(remainingAmount)}
+                                  {formatCurrency(remainingAmount, currency)}
                                 </span>
                               </div>
                             </>
@@ -981,7 +983,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                                     </a>
                                   )}
                                   <span className="font-bold text-green-600">
-                                    +{formatCurrency(Number(p.amount))}
+                                    +{formatCurrency(Number(p.amount), currency)}
                                   </span>
                                 </div>
                               </div>
@@ -1009,7 +1011,7 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                                   </span>
                                 </div>
                                 <span className="font-bold text-slate-700">
-                                  {formatCurrency(Number(c.amount))}
+                                  {formatCurrency(Number(c.amount), currency)}
                                 </span>
                               </div>
                             ))}

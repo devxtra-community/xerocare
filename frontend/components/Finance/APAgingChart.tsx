@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Clock, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 const apAgingData = [
   { bucket: 'Current', amount: 38000, color: 'bg-indigo-600', percentage: 63 },
@@ -18,6 +19,7 @@ const apAgingData = [
  * categorizes payables by overdue duration (Current, 1-30, 31-60, 61-90, 90+ days).
  */
 export default function APDueAgingChart() {
+  const currency = useBranchCurrency();
   const totalAP = apAgingData.reduce((acc, curr) => acc + curr.amount, 0);
 
   return (
@@ -37,7 +39,7 @@ export default function APDueAgingChart() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-black text-foreground tracking-tight">
-              {formatCurrency(totalAP)}
+              {formatCurrency(totalAP, currency)}
             </p>
           </div>
         </div>
@@ -61,7 +63,7 @@ export default function APDueAgingChart() {
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-bold text-foreground tabular-nums">
-                    {formatCurrency(item.amount)}
+                    {formatCurrency(item.amount, currency)}
                   </span>
                   <span className="text-xs text-slate-400 ml-2">({item.percentage}%)</span>
                 </div>

@@ -15,8 +15,10 @@ import CategoryPieChart from '@/components/AdminDahboardComponents/dashboardComp
 import DashboardPage from '@/components/DashboardPage';
 import { YearSelector } from '@/components/ui/YearSelector';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 export default function Dashboard() {
+  const currency = useBranchCurrency();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [stats, setStats] = useState({
     earnings: '0.00',
@@ -63,7 +65,7 @@ export default function Dashboard() {
         });
 
         setStats({
-          earnings: `${formatCurrency(salesTotals?.totalSales || 0)}`,
+          earnings: `${formatCurrency(salesTotals?.totalSales || 0, currency)}`,
           branchCount: (branchesRes?.data?.length || 0).toString(),
           warehouseCount: (warehousesRes?.data?.length || 0).toString(),
           employeeCount: (employeeRes?.data?.employees?.length || 0).toString(),
@@ -73,7 +75,7 @@ export default function Dashboard() {
       }
     };
     fetchStats();
-  }, [selectedYear]);
+  }, [selectedYear, currency]);
 
   return (
     <DashboardPage>

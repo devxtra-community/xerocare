@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, RefreshCw, AlertTriangle } from 'lucide-react';
 import { fetchProfitLoss } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +19,35 @@ import * as XLSX from 'xlsx';
 
 type Period = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'last_year' | 'custom';
 
+// ─── Revenue source labels ─────────────────────────────────────────────────────
+const REVENUE_LABELS: Record<string, string> = {
+  RENT: 'Rental Revenue',
+  LEASE: 'Lease Revenue',
+  SALE: 'Sales Revenue (Direct & Product)',
+  SERVICE: 'Service Revenue (Chargeable)',
+  AMC_SMA: 'AMC / SMA / FSMA Revenue',
+  SPAREPART_SALE: 'Spare Parts Sales Revenue',
+  USAGE: 'Usage / Copy Revenue (Overage)',
+};
+
+// ─── Expense category labels ──────────────────────────────────────────────────
+const EXPENSE_LABELS: Record<string, string> = {
+  SPARE_PARTS: 'Cost of Spare Parts (COGS)',
+  LABOUR: 'Service Labour Cost',
+  DEPRECIATION: 'Depreciation Expense',
+  VENDOR_PURCHASE: 'Vendor / Inventory Purchases',
+  SHIPPING_HANDLING: 'Shipping & Handling',
+  SALARY: 'Salary Expense',
+  TRAVEL: 'Travel & Transportation',
+  RENT: 'Rent Expense',
+  UTILITIES: 'Utilities & Bills',
+  MARKETING: 'Marketing & Advertising',
+  MAINTENANCE: 'Maintenance & Repairs',
+  INSURANCE: 'Insurance',
+  OTHER: 'Other Expenses',
+};
+
+// ─── Row components ───────────────────────────────────────────────────────────
 function PLRow({
   label,
   value,
@@ -31,6 +61,7 @@ function PLRow({
   bold?: boolean;
   highlight?: 'green' | 'red' | 'blue';
 }) {
+  const currency = useBranchCurrency();
   const color =
     highlight === 'green'
       ? 'text-emerald-700'
@@ -40,23 +71,27 @@ function PLRow({
           ? 'text-blue-700'
           : 'text-slate-800';
   return (
-    <div className={`flex items-center justify-between py-2 ${bold ? 'font-bold' : 'font-normal'}`}>
+    <div
+      className={`flex items-center justify-between py-1.5 ${bold ? 'font-bold' : 'font-normal'}`}
+    >
       <span
-        className={`text-sm ${bold ? 'text-slate-800' : 'text-muted-foreground'} ${indent > 0 ? 'pl-5' : ''}`}
+        className={`text-sm ${bold ? 'text-slate-800' : 'text-slate-600'} ${indent > 0 ? 'pl-5' : ''}`}
       >
         {label}
       </span>
       <span
         className={`text-sm font-semibold tabular-nums ${bold ? color : value < 0 ? 'text-red-600' : 'text-slate-700'}`}
       >
-        {value < 0 ? `(${formatCurrency(Math.abs(value))})` : formatCurrency(value)}
+        {value < 0
+          ? `(${formatCurrency(Math.abs(value), currency)})`
+          : formatCurrency(value, currency)}
       </span>
     </div>
   );
 }
 
 function Divider({ thick }: { thick?: boolean }) {
-  return <hr className={`my-1 ${thick ? 'border-2 border-slate-300' : 'border-border'}`} />;
+  return <hr className={`my-1 ${thick ? 'border-2 border-slate-300' : 'border-slate-100'}`} />;
 }
 
 function SectionHeader({ label }: { label: string }) {
@@ -67,21 +102,9 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-const SALE_TYPE_LABELS: Record<string, string> = {
-  RENT: 'Rental Revenue (RENT contracts)',
-  LEASE: 'Lease Revenue (LEASE contracts)',
-  SALE: 'Sales Revenue (Direct sales)',
-  PRODUCT_SALE: 'Product Sales',
-  SPAREPART_SALE: 'Spare Parts Sales',
-  SERVICE: 'Service Revenue (Chargeable)',
-  SERVICE_AMC: 'AMC Revenue',
-  SERVICE_FSMA: 'FSMA Revenue',
-  SERVICE_SMA: 'SMA Revenue',
-  USAGE: 'Usage / Copy Revenue',
-  AMC: 'AMC / SMA Revenue',
-};
-
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function IncomeStatementPage() {
+  const currency = useBranchCurrency();
   const [period, setPeriod] = useState<Period>('this_month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -103,10 +126,14 @@ export default function IncomeStatementPage() {
   } = useQuery({
     queryKey: ['profit-loss', period, customFrom, customTo],
     queryFn: () => fetchProfitLoss(queryParams),
-    staleTime: 60_000,
+    // Always fetch fresh data so revenue/expense figures are never stale
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
     enabled: period !== 'custom' || (!!customFrom && !!customTo),
   });
 
+  // All revenue types — show all, hide those with value 0
   const revenueByType = pl?.revenueByType ?? {};
   const expByCategory = pl?.expByCategory ?? {};
   const totalRevenue = pl?.totalRevenue ?? 0;
@@ -117,23 +144,30 @@ export default function IncomeStatementPage() {
   const margin = pl?.margin ?? 0;
   const dataWarnings = pl?.dataWarnings ?? [];
 
+  // Revenue lines (non-zero only for display)
+  const revenueLines = Object.entries(revenueByType).filter(([, v]) => v !== 0);
+  // Expense lines (non-zero only)
+  const expenseLines = Object.entries(expByCategory).filter(([, v]) => v !== 0);
+
+  const dateLabel = pl ? `${pl.fromDate} to ${pl.toDate}` : '…';
+
   const exportExcel = () => {
     if (!pl) return;
     const rows: (string | number)[][] = [
       ['INCOME STATEMENT / PROFIT & LOSS', '', `${pl.fromDate} to ${pl.toDate}`],
       [],
       ['REVENUE'],
-      ...Object.entries(revenueByType).map(([type, amt]) => [SALE_TYPE_LABELS[type] ?? type, amt]),
+      ...revenueLines.map(([type, amt]) => [REVENUE_LABELS[type] ?? type, amt]),
       ['TOTAL REVENUE', totalRevenue],
       [],
       ['EXPENSES BY CATEGORY'],
-      ...Object.entries(expByCategory).map(([cat, amt]) => [cat, amt]),
+      ...expenseLines.map(([cat, amt]) => [EXPENSE_LABELS[cat] ?? cat, amt]),
       ['TOTAL EXPENSES', totalExpenses],
       [],
       ['GROSS PROFIT', grossProfit],
-      ['Tax', totalTax],
+      ['Tax Collected (from invoices)', totalTax],
       ['NET PROFIT', netProfit],
-      ['MARGIN %', `${margin.toFixed(2)}%`],
+      ['NET MARGIN %', `${margin.toFixed(2)}%`],
     ];
     const ws = XLSX.utils.aoa_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -141,14 +175,13 @@ export default function IncomeStatementPage() {
     XLSX.writeFile(wb, `Income_Statement_${pl.fromDate}_${pl.toDate}.xlsx`);
   };
 
-  const dateLabel = pl ? `${pl.fromDate} to ${pl.toDate}` : '…';
-
   return (
     <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* ── Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Income Statement</h3>
-          <p className="text-muted-foreground">Profit & Loss — {dateLabel}</p>
+          <p className="text-muted-foreground">Profit &amp; Loss — {dateLabel}</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
@@ -192,11 +225,6 @@ export default function IncomeStatementPage() {
           <Button
             onClick={exportExcel}
             disabled={!pl || dataWarnings.length > 0}
-            title={
-              dataWarnings.length > 0
-                ? 'Export disabled: some figures may be incomplete due to service warnings'
-                : undefined
-            }
             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="h-4 w-4" /> Export Excel
@@ -211,17 +239,17 @@ export default function IncomeStatementPage() {
       ) : isError ? (
         <div className="rounded-xl bg-red-50 border border-red-200 p-6 text-center">
           <p className="text-red-700 font-medium">
-            Failed to load profit & loss data. Please refresh.
+            Failed to load profit &amp; loss data. Please refresh.
           </p>
         </div>
       ) : (
         <>
+          {/* ── Warnings ── */}
           {dataWarnings.length > 0 && (
             <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
               <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                Data incomplete — some expense figures may be understated. Export is disabled until
-                resolved.
+                Data incomplete — some figures may be understated.
               </div>
               <ul className="pl-6 list-disc space-y-0.5">
                 {dataWarnings.map((w, i) => (
@@ -233,65 +261,71 @@ export default function IncomeStatementPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+          {/* ── KPI Cards ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard
               title="Total Revenue"
-              value={formatCurrency(totalRevenue)}
+              value={formatCurrency(totalRevenue, currency)}
               subtitle={`${pl?.invoiceCount ?? 0} invoices in period`}
             />
             <StatCard
               title="Total Expenses"
-              value={formatCurrency(totalExpenses)}
+              value={formatCurrency(totalExpenses, currency)}
               subtitle={`${pl?.expenseCount ?? 0} expense entries`}
             />
             <StatCard
               title="Net Profit"
-              value={formatCurrency(netProfit)}
+              value={formatCurrency(netProfit, currency)}
               subtitle={`${margin.toFixed(1)}% margin`}
             />
           </div>
 
+          {/* ── P&L Statement ── */}
           <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100">
             <div className="px-6 py-4 border-b border-border bg-muted/20">
               <h3 className="font-bold text-primary text-base">
-                Profit & Loss Statement — {dateLabel}
+                Profit &amp; Loss Statement — {dateLabel}
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {pl?.invoiceCount ?? 0} invoices · {pl?.expenseCount ?? 0} expense entries
               </p>
             </div>
+
             <div className="px-6 py-4 space-y-0.5 max-w-2xl">
+              {/* ── REVENUE ── */}
               <SectionHeader label="REVENUE" />
-              {Object.entries(revenueByType).length === 0 ? (
+              {revenueLines.length === 0 ? (
                 <PLRow label="No revenue in this period" value={0} indent={1} />
               ) : (
-                Object.entries(revenueByType).map(([type, amt]) => (
-                  <PLRow key={type} label={SALE_TYPE_LABELS[type] ?? type} value={amt} indent={1} />
+                revenueLines.map(([type, amt]) => (
+                  <PLRow key={type} label={REVENUE_LABELS[type] ?? type} value={amt} indent={1} />
                 ))
               )}
               <Divider />
               <PLRow label="TOTAL REVENUE" value={totalRevenue} bold highlight="blue" />
               <Divider thick />
 
+              {/* ── OPERATING EXPENSES ── */}
               <SectionHeader label="OPERATING EXPENSES" />
-              {Object.entries(expByCategory).length === 0 ? (
+              {expenseLines.length === 0 ? (
                 <PLRow label="No expenses in this period" value={0} indent={1} />
               ) : (
-                Object.entries(expByCategory).map(([cat, amt]) => (
-                  <PLRow key={cat} label={cat} value={amt} indent={1} />
+                expenseLines.map(([cat, amt]) => (
+                  <PLRow key={cat} label={EXPENSE_LABELS[cat] ?? cat} value={amt} indent={1} />
                 ))
               )}
               <Divider />
               <PLRow label="TOTAL EXPENSES" value={totalExpenses} bold highlight="red" />
               <Divider thick />
 
+              {/* ── SUMMARY ── */}
               <PLRow
                 label="GROSS PROFIT"
                 value={grossProfit}
                 bold
                 highlight={grossProfit >= 0 ? 'green' : 'red'}
               />
-              <PLRow label="Tax (from invoices)" value={totalTax} indent={1} />
+              <PLRow label="Tax Collected (from invoices)" value={totalTax} indent={1} />
               <Divider thick />
               <PLRow
                 label="NET PROFIT"
@@ -313,6 +347,7 @@ export default function IncomeStatementPage() {
             </div>
           </div>
 
+          {/* ── Monthly Breakdown ── */}
           {(pl?.monthly?.length ?? 0) > 0 && (
             <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden">
               <div className="px-6 py-4 border-b border-border">
@@ -334,15 +369,17 @@ export default function IncomeStatementPage() {
                       <tr key={row.month} className="hover:bg-muted/10">
                         <td className="px-5 py-3 font-medium text-slate-700">{row.month}</td>
                         <td className="px-5 py-3 text-emerald-600">
-                          {formatCurrency(row.revenue)}
+                          {formatCurrency(row.revenue, currency)}
                         </td>
-                        <td className="px-5 py-3 text-red-600">{formatCurrency(row.expenses)}</td>
+                        <td className="px-5 py-3 text-red-600">
+                          {formatCurrency(row.expenses, currency)}
+                        </td>
                         <td
                           className={`px-5 py-3 font-semibold ${row.net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
                         >
                           {row.net < 0
-                            ? `(${formatCurrency(Math.abs(row.net))})`
-                            : formatCurrency(row.net)}
+                            ? `(${formatCurrency(Math.abs(row.net), currency)})`
+                            : formatCurrency(row.net, currency)}
                         </td>
                       </tr>
                     ))}

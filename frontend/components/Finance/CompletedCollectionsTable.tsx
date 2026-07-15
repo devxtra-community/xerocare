@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import UsageHistoryDialog from './UsageHistoryDialog';
 import ConsolidatedStatementDialog from './ConsolidatedStatementDialog';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 /**
  * Table displaying completed rental and lease collections.
@@ -35,6 +36,7 @@ export default function CompletedCollectionsTable({
   mode?: 'RENT' | 'LEASE';
   onSuccess?: () => void;
 }) {
+  const currency = useBranchCurrency();
   const [collections, setCollections] = useState<CompletedCollection[]>([]);
   const [loading, setLoading] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -156,7 +158,7 @@ export default function CompletedCollectionsTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium text-green-600">
-                    {formatCurrency(collection.totalCollected || 0)}
+                    {formatCurrency(collection.totalCollected || 0, currency)}
                   </TableCell>
                   <TableCell>
                     <Button

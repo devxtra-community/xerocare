@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
@@ -26,6 +26,7 @@ import { SimpleLineChart, DonutChart, HorizontalBarChart } from '@/components/ac
 import { fetchARInvoices, agingBucket, type InvoiceSummary } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +48,6 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
-import { getActiveCurrency } from '@/lib/currency';
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -71,16 +71,20 @@ function AddReceivableModal({
   onSaved: () => void;
 }) {
   const currentUser = getUserFromToken();
+  const branchCurrency = useBranchCurrency();
   const [form, setForm] = useState({
     type: 'CUSTOMER_INVOICE',
     customerName: '',
     description: '',
     amount: '',
-    currency: getActiveCurrency(),
+    currency: branchCurrency,
     issueDate: today,
     dueDate: today,
     notes: '',
   });
+  useEffect(() => {
+    setForm((f) => ({ ...f, currency: branchCurrency }));
+  }, [branchCurrency]);
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const qc = useQueryClient();
   const mut = useMutation({
@@ -323,6 +327,7 @@ function PaymentModal({
 }
 
 export default function AccountsReceivablePage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [agingFilter, setAgingFilter] = useState('ALL');
@@ -475,14 +480,14 @@ export default function AccountsReceivablePage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           title="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
+          value={formatCurrency(totalOutstanding, currency)}
           subtitle="All receivables"
         />
         {AGING_BUCKETS.map((b) => (
           <StatCard
             key={b}
             title={b}
-            value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0)}
+            value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0, currency)}
             subtitle={b === '90+ days' ? 'Critical' : ''}
           />
         ))}
@@ -527,7 +532,7 @@ export default function AccountsReceivablePage() {
                     axisLine={false}
                   />
                   <Tooltip
-                    formatter={(v: number) => formatCurrency(v)}
+                    formatter={(v: number) => formatCurrency(v, currency)}
                     contentStyle={{
                       borderRadius: '10px',
                       fontSize: '12px',
@@ -551,11 +556,12 @@ export default function AccountsReceivablePage() {
                     { key: 'collected', color: '#10b981', label: 'Collected' },
                   ]}
                   height={220}
+                  currency={currency}
                 />
               </div>
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">By Type</h4>
-                <DonutChart data={rcvCharts?.byType ?? []} height={220} />
+                <DonutChart data={rcvCharts?.byType ?? []} height={220} currency={currency} />
               </div>
             </div>
             <div>
@@ -566,6 +572,7 @@ export default function AccountsReceivablePage() {
                 data={rcvCharts?.topCustomers ?? []}
                 height={240}
                 color="#8b5cf6"
+                currency={currency}
               />
             </div>
           </div>

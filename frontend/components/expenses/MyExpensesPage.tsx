@@ -29,6 +29,7 @@ import {
   type CreateExpenseRequestPayload,
 } from '@/lib/employeeExpenses';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -533,7 +534,9 @@ function SubmitConfirmDialog({
 
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
-export default function MyExpensesPage({ currency }: { currency?: string }) {
+export default function MyExpensesPage({ currency: currencyProp }: { currency?: string }) {
+  const branchCurrency = useBranchCurrency();
+  const currency = currencyProp ?? branchCurrency;
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');

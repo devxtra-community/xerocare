@@ -4,6 +4,7 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { getBranchSalesTotals } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 // Finance components (self-contained visuals)
 import RevenueBreakdownChart from '@/components/Finance/RevenueBreakdownChart';
@@ -71,6 +72,7 @@ export default function FinanceDashboard() {
 }
 
 function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
+  const currency = useBranchCurrency();
   const [loading, setLoading] = React.useState(true);
   const [data, setData] = React.useState({
     totalSales: 0,
@@ -110,10 +112,10 @@ function KPIStats({ selectedYear }: { selectedYear: number | 'all' }) {
   };
 
   const stats = [
-    { label: 'Total Income', value: formatCurrency(data.totalSales) },
-    { label: 'From Rent', value: formatCurrency(getAmountByType('RENT')) },
-    { label: 'From Sale', value: formatCurrency(getAmountByType('SALE')) },
-    { label: 'From Lease', value: formatCurrency(getAmountByType('LEASE')) },
+    { label: 'Total Income', value: formatCurrency(data.totalSales, currency) },
+    { label: 'From Rent', value: formatCurrency(getAmountByType('RENT'), currency) },
+    { label: 'From Sale', value: formatCurrency(getAmountByType('SALE'), currency) },
+    { label: 'From Lease', value: formatCurrency(getAmountByType('LEASE'), currency) },
   ];
 
   if (loading) {

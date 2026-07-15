@@ -117,7 +117,10 @@ export class BillingReportService {
 
       const exchanges = await qb.getMany();
       exchanges.forEach((cn) => {
-        const adjustment = Number(cn.replacementAmount || 0) - Number(cn.productAmount || 0);
+        const adjustment =
+          Number(cn.replacementAmount || 0) -
+          Number(cn.productAmount || 0) -
+          Number(cn.replacementDiscount || 0);
         if (adjustment !== 0) {
           sales.totalSales += adjustment;
           const saleType = cn.invoice?.saleType || 'PRODUCT_SALE';
@@ -220,7 +223,10 @@ export class BillingReportService {
 
       const exchanges = await qb.getMany();
       exchanges.forEach((cn) => {
-        const adjustment = Number(cn.replacementAmount || 0) - Number(cn.productAmount || 0);
+        const adjustment =
+          Number(cn.replacementAmount || 0) -
+          Number(cn.productAmount || 0) -
+          Number(cn.replacementDiscount || 0);
         if (adjustment !== 0) {
           sales.totalSales += adjustment;
           const saleType = cn.invoice?.saleType || 'PRODUCT_SALE';

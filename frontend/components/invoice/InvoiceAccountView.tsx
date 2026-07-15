@@ -21,9 +21,9 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Plus, Receipt, AlertCircle, Paperclip, FileText } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 
-import { getActiveCurrency } from '@/lib/currency';
 interface InvoiceAccountViewProps {
   invoiceId: string;
   onClose: () => void;
@@ -31,6 +31,7 @@ interface InvoiceAccountViewProps {
 }
 
 export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountViewProps) {
+  const currency = useBranchCurrency();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,6 +43,9 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
   const [referenceNumber, setReferenceNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDueDate, setChequeDueDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchSummary = React.useCallback(async () => {
@@ -85,13 +89,23 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
         referenceNumber,
         remarks,
         receiptFile,
+        chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
+        chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
+        chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
       });
-      toast.success('Payment recorded successfully');
+      toast.success(
+        paymentMode === 'CHEQUE'
+          ? 'Cheque recorded (PENDING). Go to Accounts → Cheques to deposit when cleared.'
+          : 'Payment recorded successfully',
+      );
       setShowForm(false);
       setAmountPaid('');
       setReferenceNumber('');
       setRemarks('');
       setReceiptFile(null);
+      setChequeNumber('');
+      setChequeBankName('');
+      setChequeDueDate('');
       fetchSummary();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -126,20 +140,20 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-slate-500 uppercase">Total Amount</p>
                 <p className="text-xl font-bold text-slate-800">
-                  {formatCurrency(summary.totalAmount)}
+                  {formatCurrency(summary.totalAmount, currency)}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">Invoice: {summary.invoiceNumber}</p>
               </div>
               <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-green-600 uppercase">Total Paid</p>
                 <p className="text-xl font-bold text-green-700">
-                  {formatCurrency(summary.totalPaid)}
+                  {formatCurrency(summary.totalPaid, currency)}
                 </p>
               </div>
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-orange-600 uppercase">Pending Balance</p>
                 <p className="text-xl font-bold text-orange-700">
-                  {formatCurrency(summary.pendingBalance)}
+                  {formatCurrency(summary.pendingBalance, currency)}
                 </p>
               </div>
             </div>
@@ -164,7 +178,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500">
-                      Amount Paid ({getActiveCurrency()})
+                      Amount Paid ({currency})
                     </label>
                     <Input
                       type="number"
@@ -201,15 +215,51 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500">
-                      Reference Number (Optional)
+                      {paymentMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference Number (Optional)'}
                     </label>
                     <Input
-                      placeholder="e.g., TXN-123456"
-                      value={referenceNumber}
-                      onChange={(e) => setReferenceNumber(e.target.value)}
+                      placeholder={
+                        paymentMode === 'CHEQUE' ? 'e.g., CHQ-001234' : 'e.g., TXN-123456'
+                      }
+                      required={paymentMode === 'CHEQUE'}
+                      value={paymentMode === 'CHEQUE' ? chequeNumber : referenceNumber}
+                      onChange={(e) =>
+                        paymentMode === 'CHEQUE'
+                          ? setChequeNumber(e.target.value)
+                          : setReferenceNumber(e.target.value)
+                      }
                     />
                   </div>
                 </div>
+                {/* Cheque-specific fields */}
+                {paymentMode === 'CHEQUE' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="col-span-full text-xs font-bold text-amber-700">
+                      Cheque details — this will create a PENDING cheque record. Cash at Bank
+                      increases only when you deposit the cheque in Accounts → Cheques.
+                    </p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500">
+                        Customer&apos;s Bank Name *
+                      </label>
+                      <Input
+                        placeholder="e.g., Emirates NBD"
+                        required
+                        value={chequeBankName}
+                        onChange={(e) => setChequeBankName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500">Cheque Due Date *</label>
+                      <Input
+                        type="date"
+                        required
+                        value={chequeDueDate}
+                        onChange={(e) => setChequeDueDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-500">Remarks (Optional)</label>
                   <Textarea
@@ -273,7 +323,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                           {new Date(p.paymentDate).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 font-bold text-green-600">
-                          {formatCurrency(p.amountPaid)}
+                          {formatCurrency(p.amountPaid, currency)}
                         </td>
                         <td className="px-4 py-3">
                           <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">

@@ -36,6 +36,9 @@ export interface Vendor {
   currency?: string;
   countryCode?: string;
   countryName?: string;
+  stateProvince?: string;
+  city?: string;
+  vatNumber?: string;
   bankAccounts?: BankAccount[];
   branchId?: string | null;
   branch?: { id: string; name: string } | null;

@@ -5,9 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { fetchOrphanedCashbookEntries, CashbookEntry } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Button } from '@/components/ui/button';
 
 export default function DataIntegrityPage() {
+  const currency = useBranchCurrency();
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['admin-orphaned-cashbook'],
     queryFn: fetchOrphanedCashbookEntries,
@@ -97,7 +99,7 @@ export default function DataIntegrityPage() {
                     </td>
                     <td className="px-4 py-3 text-slate-600">{e.category}</td>
                     <td className="px-4 py-3 font-semibold text-slate-800">
-                      {formatCurrency(Number(e.amount))}
+                      {formatCurrency(Number(e.amount), currency)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-amber-700">
                       {e.linkedPoId ?? '—'}

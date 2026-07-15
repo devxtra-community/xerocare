@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Eye, Search, Download } from 'lucide-react';
 import { fetchExpenseEntries, fetchExpenseCharts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, StackedBarChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
@@ -17,6 +18,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function ManagerExpensesPage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('ALL');
 
@@ -84,7 +86,11 @@ export default function ManagerExpensesPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total Amount" value={formatCurrency(total)} subtitle="Filtered" />
+        <StatCard
+          title="Total Amount"
+          value={formatCurrency(total, currency)}
+          subtitle="Filtered"
+        />
         <StatCard title="Pending" value={pending.toString()} subtitle="Awaiting approval" />
         <StatCard title="Entries" value={filtered.length.toString()} subtitle="Shown" />
         <StatCard
@@ -97,7 +103,7 @@ export default function ManagerExpensesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Category Breakdown</h3>
-          <DonutChart data={charts?.categoryDonut ?? []} height={220} />
+          <DonutChart data={charts?.categoryDonut ?? []} height={220} currency={currency} />
         </div>
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Trend</h3>
@@ -106,6 +112,7 @@ export default function ManagerExpensesPage() {
             xKey="month"
             keys={charts?.categories ?? []}
             height={220}
+            currency={currency}
           />
         </div>
       </div>
@@ -164,7 +171,9 @@ export default function ManagerExpensesPage() {
                       <td className="px-4 py-3 max-w-[200px] truncate" title={e.description}>
                         {e.description}
                       </td>
-                      <td className="px-4 py-3 font-semibold">{formatCurrency(e.amount)}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatCurrency(e.amount, currency)}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[e.status] ?? 'bg-gray-100 text-gray-700'}`}

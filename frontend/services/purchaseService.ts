@@ -56,6 +56,10 @@ export interface AddPaymentDto {
   description?: string;
   referenceNumber?: string;
   paymentDate?: string;
+  // Required when paymentMethod === 'Cheque'
+  chequeNumber?: string;
+  chequeBankName?: string;
+  chequeDueDate?: string;
 }
 
 export interface AddCostDto {

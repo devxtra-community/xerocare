@@ -20,13 +20,14 @@ import {
   Rectangle,
 } from 'recharts';
 
-import { getActiveCurrency } from '@/lib/currency';
-const fmt = (v: number) =>
-  new Intl.NumberFormat('en-AE', {
-    style: 'currency',
-    currency: getActiveCurrency(),
-    maximumFractionDigits: 0,
-  }).format(v);
+function makeFmt(currency: string) {
+  return (v: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(v);
+}
 
 const COLORS = [
   '#3b82f6',
@@ -60,9 +61,11 @@ interface DonutProps {
   data: DonutData[];
   height?: number;
   colors?: string[];
+  currency?: string;
 }
 
-export function DonutChart({ data, height = 300, colors = COLORS }: DonutProps) {
+export function DonutChart({ data, height = 300, colors = COLORS, currency = 'AED' }: DonutProps) {
+  const fmt = makeFmt(currency);
   if (!data?.length)
     return (
       <div style={{ height }}>
@@ -100,7 +103,7 @@ interface SimpleBarProps {
   xKey: string;
   bars: { key: string; color?: string; label?: string }[];
   height?: number;
-  currency?: boolean;
+  currency?: boolean | string;
 }
 
 export function SimpleBarChart({
@@ -110,6 +113,9 @@ export function SimpleBarChart({
   height = 300,
   currency = true,
 }: SimpleBarProps) {
+  const currencyCode = typeof currency === 'string' ? currency : 'AED';
+  const showCurrency = currency !== false;
+  const fmt = makeFmt(currencyCode);
   if (!data?.length)
     return (
       <div style={{ height }}>
@@ -123,9 +129,9 @@ export function SimpleBarChart({
         <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
         <YAxis
           tick={{ fontSize: 11 }}
-          tickFormatter={currency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined}
+          tickFormatter={showCurrency ? (v) => `${(v / 1000).toFixed(0)}k` : undefined}
         />
-        <Tooltip formatter={(v: number) => (currency ? fmt(v) : v)} />
+        <Tooltip formatter={(v: number) => (showCurrency ? fmt(v) : v)} />
         {bars.length > 1 && <Legend iconSize={8} />}
         {bars.map((b, i) => (
           <Bar
@@ -148,9 +154,16 @@ interface HBarProps {
   data: { name: string; value: number }[];
   height?: number;
   color?: string;
+  currency?: string;
 }
 
-export function HorizontalBarChart({ data, height = 300, color = '#3b82f6' }: HBarProps) {
+export function HorizontalBarChart({
+  data,
+  height = 300,
+  color = '#3b82f6',
+  currency = 'AED',
+}: HBarProps) {
+  const fmt = makeFmt(currency);
   if (!data?.length)
     return (
       <div style={{ height }}>
@@ -181,9 +194,11 @@ interface LineProps {
   xKey: string;
   lines: { key: string; color?: string; label?: string }[];
   height?: number;
+  currency?: string;
 }
 
-export function SimpleLineChart({ data, xKey, lines, height = 300 }: LineProps) {
+export function SimpleLineChart({ data, xKey, lines, height = 300, currency = 'AED' }: LineProps) {
+  const fmt = makeFmt(currency);
   if (!data?.length)
     return (
       <div style={{ height }}>
@@ -221,9 +236,17 @@ interface StackedBarProps {
   xKey: string;
   keys: string[];
   height?: number;
+  currency?: string;
 }
 
-export function StackedBarChart({ data, xKey, keys, height = 300 }: StackedBarProps) {
+export function StackedBarChart({
+  data,
+  xKey,
+  keys,
+  height = 300,
+  currency = 'AED',
+}: StackedBarProps) {
+  const fmt = makeFmt(currency);
   if (!data?.length)
     return (
       <div style={{ height }}>
@@ -258,9 +281,11 @@ interface WaterfallRow {
 interface WaterfallProps {
   data: WaterfallRow[];
   height?: number;
+  currency?: string;
 }
 
-export function WaterfallChart({ data, height = 300 }: WaterfallProps) {
+export function WaterfallChart({ data, height = 300, currency = 'AED' }: WaterfallProps) {
+  const fmt = makeFmt(currency);
   if (!data?.length)
     return (
       <div style={{ height }}>
@@ -333,9 +358,11 @@ interface AreaProps {
   xKey: string;
   areas: { key: string; color?: string; label?: string }[];
   height?: number;
+  currency?: string;
 }
 
-export function AreaChart({ data, xKey, areas, height = 300 }: AreaProps) {
+export function AreaChart({ data, xKey, areas, height = 300, currency = 'AED' }: AreaProps) {
+  const fmt = makeFmt(currency);
   if (!data?.length)
     return (
       <div style={{ height }}>

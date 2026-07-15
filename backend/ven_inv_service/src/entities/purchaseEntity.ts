@@ -85,6 +85,12 @@ export class Purchase {
   @Column({ name: 'vendor_country', type: 'varchar', length: 2, nullable: true })
   vendorCountry?: string | null;
 
+  @Column({ name: 'vendor_state_province', type: 'varchar', length: 100, nullable: true })
+  vendorStateProvince?: string | null;
+
+  @Column({ name: 'vendor_city', type: 'varchar', length: 100, nullable: true })
+  vendorCity?: string | null;
+
   // ─── Currency (inherited from lot at creation) ────────────────────────────
   @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
   currencyCode?: string | null;

@@ -23,6 +23,7 @@ export interface Customer {
   vatNumber?: string | null;
   country?: string | null;
   stateProvince?: string | null;
+  city?: string | null;
   bankName?: string | null;
   bankAccountNumber?: string | null;
   bankAccounts?: CustomerBankAccount[] | null;
@@ -87,6 +88,7 @@ export interface CreateCustomerData {
   vatNumber?: string;
   country?: string;
   stateProvince?: string;
+  city?: string;
   bankName?: string;
   bankAccountNumber?: string;
   bankAccounts?: CustomerBankAccount[];

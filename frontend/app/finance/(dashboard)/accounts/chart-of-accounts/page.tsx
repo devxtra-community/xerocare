@@ -9,19 +9,16 @@ import {
   type ChartOfAccountsResponse,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { getActiveCurrency } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-import { getActiveCurrency } from '@/lib/currency';
-// Period defaults: current month
-function currentMonthFrom() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+// Period defaults: year-to-date (matches backend default)
+function currentYearFrom() {
+  return `${new Date().getFullYear()}-01-01`;
 }
-function currentMonthTo() {
-  const d = new Date();
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return last.toISOString().slice(0, 10);
+function currentYearTo() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function Bal({ ab, negative }: { ab: AccountBalance; negative?: boolean }) {
@@ -110,8 +107,8 @@ function LoadingSkeleton() {
 }
 
 export default function ChartOfAccountsPage() {
-  const [periodFrom, setPeriodFrom] = useState(currentMonthFrom());
-  const [periodTo, setPeriodTo] = useState(currentMonthTo());
+  const [periodFrom, setPeriodFrom] = useState(currentYearFrom());
+  const [periodTo, setPeriodTo] = useState(currentYearTo());
   const [openSections, setOpenSections] = useState(
     new Set(['assets', 'liabilities', 'equity', 'income', 'expenses']),
   );
@@ -247,6 +244,7 @@ export default function ChartOfAccountsPage() {
             <Row ab={assets.currentAssets.securityDepositsReceivable} />
             <Row ab={assets.currentAssets.prepaidExpenses} />
             <Row ab={assets.currentAssets.sparePartsInventory} />
+            <Row ab={assets.currentAssets.productInventory} />
             <SubTotal
               label="Total Current Assets"
               value={assets.currentAssets.totalCurrentAssets}
@@ -348,7 +346,7 @@ export default function ChartOfAccountsPage() {
             <Row ab={income.serviceRevenue} />
             <Row ab={income.usageRevenue} />
             <Row ab={income.amcSmaRevenue} />
-            <Row ab={income.otherIncome} />
+            <Row ab={income.sparePartSales} />
             <SubTotal label="TOTAL INCOME" value={income.totalIncome} currency={currency} />
           </div>
         )}

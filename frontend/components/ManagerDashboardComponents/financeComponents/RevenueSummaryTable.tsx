@@ -21,6 +21,7 @@ import {
 
 import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Search, Loader2 } from 'lucide-react';
 import Pagination from '@/components/Pagination';
 
@@ -34,6 +35,7 @@ interface RevenueSummaryTableProps {
  * Includes search and filtering by date, month, and revenue type.
  */
 export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTableProps) {
+  const currency = useBranchCurrency();
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FinanceReportItem[]>([]);
@@ -221,7 +223,7 @@ export default function RevenueSummaryTable({ selectedYear }: RevenueSummaryTabl
                     {row.count}
                   </TableCell>
                   <TableCell className="text-xs font-bold text-foreground">
-                    {formatCurrency(row.income)}
+                    {formatCurrency(row.income, currency)}
                   </TableCell>
                 </TableRow>
               ))

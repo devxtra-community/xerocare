@@ -499,6 +499,7 @@ export class BillingService {
     notes?: string;
     customerCountry?: string;
     customerStateProvince?: string;
+    customerCity?: string;
   }) {
     // 1. Validation Logic
     if (
@@ -739,6 +740,7 @@ export class BillingService {
           invoice.customerCountry = payload.customerCountry ?? customer.country ?? null;
           invoice.customerStateProvince =
             payload.customerStateProvince ?? customer.stateProvince ?? null;
+          invoice.customerCity = payload.customerCity ?? customer.city ?? null;
         }
       } catch (err) {
         logger.warn('Could not fetch customer info for snapshot on invoice creation', err);

@@ -1,20 +1,63 @@
 import { Request, Response, NextFunction } from 'express';
 import { Source } from '../config/dataSource';
-import { Like } from 'typeorm';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { CreditNoteStatus } from '../entities/enums/creditNoteStatus';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
-import { ReturnCredit } from '../entities/returnCreditEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
+import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 
 export class CreditNoteController {
   private repository = Source.getRepository(CreditNote);
+  private returnCreditRepo = new ReturnCreditRepository();
+
+  // ── Shared helper: call inventory service with admin JWT ──────────────────
+  private async callInventoryService(path: string, body: object): Promise<void> {
+    try {
+      const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '5m' },
+      );
+      const response = await fetch(`${inventoryServiceUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        logger.error(`Inventory service call failed: ${path}`, errData);
+        // Non-fatal: the credit note flow continues even if inventory update fails
+      }
+    } catch (err) {
+      logger.error(`Failed to reach inventory service at ${path}`, err);
+    }
+  }
+
+  // ── B.10: Atomic credit note number via PostgreSQL per-year sequence ──────
+  private async generateCreditNoteNo(): Promise<string> {
+    const year = new Date().getFullYear();
+    // Seed start from current count so existing data is never overwritten
+    const count = await this.repository
+      .createQueryBuilder('cn')
+      .where('cn.creditNoteNo LIKE :pat', { pat: `CN-${year}-%` })
+      .getCount();
+    await Source.query(
+      `CREATE SEQUENCE IF NOT EXISTS cn_seq_${year} START WITH ${count + 1} INCREMENT BY 1`,
+    );
+    const result = await Source.query(`SELECT nextval('cn_seq_${year}') AS n`);
+    const sequence = String(result[0].n).padStart(5, '0');
+    return `CN-${year}-${sequence}`;
+  }
 
   /**
    * Create a new Credit Note in DRAFT status.
+   * Supports both PRODUCT and SPARE_PART item categories.
+   * Auto-copies tax fields from the originating invoice (B.2).
    */
   create = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -24,28 +67,50 @@ export class CreditNoteController {
         customerId,
         customerName,
         branchId,
+        itemCategory = 'PRODUCT',
+        // PRODUCT fields
         productId,
         productName,
         modelName,
         brand,
         serialNumber,
+        // SPARE_PART fields
+        sparePartId,
+        sku,
+        quantity,
+        // Shared
         productAmount,
         type,
         notes,
         sellerEmployeeId,
       } = req.body;
 
-      if (!invoiceId || !invoiceNumber || !customerId || !customerName || !productId || !type) {
+      if (!invoiceId || !invoiceNumber || !customerId || !customerName || !type) {
         throw new AppError('Missing required fields', 400);
       }
+      if (itemCategory === 'PRODUCT' && !productId) {
+        throw new AppError('productId is required for PRODUCT returns', 400);
+      }
+      if (itemCategory === 'SPARE_PART' && !sparePartId) {
+        throw new AppError('sparePartId is required for SPARE_PART returns', 400);
+      }
 
-      // Generate Credit Note Number: CN-YYYY-XXXXX
-      const year = new Date().getFullYear();
-      const count = await this.repository.count({
-        where: { creditNoteNo: Like(`CN-${year}-%`) },
-      });
-      const sequence = (count + 1).toString().padStart(5, '0');
-      const creditNoteNo = `CN-${year}-${sequence}`;
+      // Copy tax rate from originating invoice (B.2)
+      let taxName: string | undefined;
+      let taxPercent: number | undefined;
+      let taxAmount: number | undefined;
+      try {
+        const invoice = await Source.getRepository(Invoice).findOne({ where: { id: invoiceId } });
+        if (invoice?.taxPercent) {
+          taxName = invoice.taxName ?? undefined;
+          taxPercent = Number(invoice.taxPercent);
+          taxAmount = (Number(productAmount) * taxPercent) / 100;
+        }
+      } catch (err) {
+        logger.warn('Could not fetch invoice tax for credit note', err);
+      }
+
+      const creditNoteNo = await this.generateCreditNoteNo();
 
       const creditNote = this.repository.create({
         creditNoteNo,
@@ -54,12 +119,22 @@ export class CreditNoteController {
         customerId,
         customerName,
         branchId: branchId || req.user?.branchId,
-        productId,
-        productName,
-        modelName,
-        brand,
-        serialNumber,
+        itemCategory,
+        // PRODUCT
+        productId: itemCategory === 'PRODUCT' ? productId : undefined,
+        productName: productName || undefined,
+        modelName: modelName || undefined,
+        brand: brand || undefined,
+        serialNumber: serialNumber || undefined,
+        // SPARE_PART
+        sparePartId: itemCategory === 'SPARE_PART' ? sparePartId : undefined,
+        sku: sku || undefined,
+        quantity: itemCategory === 'SPARE_PART' ? quantity || 1 : undefined,
+        // Financial
         productAmount,
+        taxName,
+        taxPercent,
+        taxAmount,
         type,
         notes,
         sellerEmployeeId: sellerEmployeeId || req.user?.userId,
@@ -88,10 +163,8 @@ export class CreditNoteController {
       let query = this.repository.createQueryBuilder('cn');
 
       if (role === 'FINANCE') {
-        // Finance sees everything sent to them
         query = query.where('cn.status != :draft', { draft: CreditNoteStatus.DRAFT });
       } else {
-        // Sales Employee/Manager sees their own or branch ones
         if (role === 'EMPLOYEE') {
           query = query.where('cn.sellerEmployeeId = :userId', { userId });
         } else if (role === 'MANAGER') {
@@ -101,10 +174,7 @@ export class CreditNoteController {
 
       const list = await query.orderBy('cn.createdAt', 'DESC').getMany();
 
-      return res.status(200).json({
-        success: true,
-        data: list,
-      });
+      return res.status(200).json({ success: true, data: list });
     } catch (error) {
       next(error);
     }
@@ -151,17 +221,14 @@ export class CreditNoteController {
 
       await this.repository.remove(creditNote);
 
-      return res.status(200).json({
-        success: true,
-        message: 'Credit Note deleted successfully',
-      });
+      return res.status(200).json({ success: true, message: 'Credit Note deleted successfully' });
     } catch (error) {
       next(error);
     }
   };
 
   /**
-   * Send Credit Note to Finance.
+   * Send Credit Note to Finance for review.
    */
   sendToFinance = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -187,12 +254,14 @@ export class CreditNoteController {
   };
 
   /**
-   * Finance Approval Flow.
+   * Finance Approval.
+   * For DIRECT_REFUND: immediately completes — creates ReturnCredit, updates inventory, closes invoice.
+   * For REPLACEMENT / CREDIT_EXCHANGE: moves to APPROVED; inventory updated when Sales calls complete().
    */
   approve = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { financeNote, damageReason } = req.body;
+      const { financeNote, damageReason, paymentMode } = req.body; // B.1: paymentMode now persisted
 
       if (!financeNote || !damageReason) {
         throw new AppError('Finance note and damage reason are required', 400);
@@ -206,6 +275,7 @@ export class CreditNoteController {
 
       creditNote.financeNote = financeNote;
       creditNote.damageReason = damageReason;
+      creditNote.paymentMode = paymentMode || undefined; // B.1
 
       const inventoryStatus: 'DAMAGED' | 'RETURNED' =
         damageReason === 'Damaged Product' ? 'DAMAGED' : 'RETURNED';
@@ -213,31 +283,42 @@ export class CreditNoteController {
       if (creditNote.type === 'DIRECT_REFUND') {
         creditNote.status = CreditNoteStatus.COMPLETED;
 
-        // Mark unit as Damaged or Returned
-        await emitProductStatusUpdate({
-          productId: creditNote.productId,
-          billType: inventoryStatus,
-          invoiceId: creditNote.invoiceId,
-          approvedBy: req.user?.userId || 'FINANCE',
-          approvedAt: new Date(),
-        });
+        if (creditNote.itemCategory === 'PRODUCT') {
+          // Mark product unit as DAMAGED or RETURNED via RabbitMQ (B.7: branchId now passed)
+          await emitProductStatusUpdate({
+            productId: creditNote.productId!,
+            billType: inventoryStatus,
+            invoiceId: creditNote.invoiceId,
+            approvedBy: req.user?.userId || 'FINANCE',
+            approvedAt: new Date(),
+            branchId: creditNote.branchId,
+          });
+        } else {
+          // SPARE_PART: increment quantity via inventory REST (all returns → available stock)
+          await this.callInventoryService('/inventory/returns/process', {
+            itemType: 'SPARE_PART',
+            itemId: creditNote.sparePartId,
+            quantity: creditNote.quantity || 1,
+          });
+        }
 
-        // Deduct from sales by creating a ReturnCredit entry
-        const returnCreditRepo = Source.getRepository(ReturnCredit);
-        await returnCreditRepo.save({
+        // Create ReturnCredit via repository (B.8: use single consistent path)
+        await this.returnCreditRepo.createReturnCredit({
           invoiceId: creditNote.invoiceId,
           branchId: creditNote.branchId,
           amount: creditNote.productAmount,
           createdBy: req.user?.userId || 'FINANCE',
           note: `Refund for Credit Note ${creditNote.creditNoteNo}. Finance Note: ${financeNote}`,
-          returnedItemId: creditNote.productId,
-          returnedItemType: 'PRODUCT',
+          returnedItemId:
+            creditNote.itemCategory === 'PRODUCT' ? creditNote.productId : creditNote.sparePartId,
+          returnedItemType: creditNote.itemCategory as 'PRODUCT' | 'SPARE_PART',
         });
 
-        // Update Invoice status to REFUNDED
+        // Close originating invoice
         const invoiceRepo = Source.getRepository(Invoice);
         await invoiceRepo.update(creditNote.invoiceId, { status: InvoiceStatus.REFUNDED });
       } else {
+        // REPLACEMENT or CREDIT_EXCHANGE: Finance approval only — inventory updated later in complete()
         creditNote.status = CreditNoteStatus.APPROVED;
       }
 
@@ -254,23 +335,20 @@ export class CreditNoteController {
   };
 
   /**
-   * Finance Reject Flow.
+   * Finance Reject.
    */
   reject = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
       const { rejectionReason } = req.body;
 
-      if (!rejectionReason) {
-        throw new AppError('Rejection reason is required', 400);
-      }
+      if (!rejectionReason) throw new AppError('Rejection reason is required', 400);
 
       const creditNote = await this.repository.findOne({ where: { id: id as string } });
       if (!creditNote) throw new AppError('Credit Note not found', 404);
 
       creditNote.status = CreditNoteStatus.REJECTED;
       creditNote.rejectionReason = rejectionReason;
-
       await this.repository.save(creditNote);
 
       return res.status(200).json({
@@ -284,59 +362,101 @@ export class CreditNoteController {
   };
 
   /**
-   * Complete Replacement/Exchange by Sales.
+   * Complete Replacement / Exchange by Sales.
+   * For PRODUCT: RabbitMQ events update product status in inventory.
+   * For SPARE_PART: REST calls update available quantity in inventory.
    */
   complete = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const {
-        replacementProductId,
-        replacementProductName,
-        replacementSerialNumber,
-        replacementAmount,
-        replacementDiscount = 0,
-      } = req.body;
 
       const creditNote = await this.repository.findOne({ where: { id: id as string } });
       if (!creditNote) throw new AppError('Credit Note not found', 404);
       if (creditNote.status !== CreditNoteStatus.APPROVED) {
         throw new AppError('Credit Note must be approved by Finance first', 400);
       }
-      if (creditNote.type === 'REPLACEMENT' || creditNote.type === 'CREDIT_EXCHANGE') {
-        creditNote.status = CreditNoteStatus.PRODUCT_REPLACED;
-      } else {
-        creditNote.status = CreditNoteStatus.COMPLETED;
+      if (creditNote.type !== 'REPLACEMENT' && creditNote.type !== 'CREDIT_EXCHANGE') {
+        throw new AppError(
+          'complete() is only valid for REPLACEMENT and CREDIT_EXCHANGE types',
+          400,
+        );
       }
-      creditNote.replacementProductId = replacementProductId;
-      creditNote.replacementProductName = replacementProductName;
-      creditNote.replacementSerialNumber = replacementSerialNumber;
-      creditNote.replacementAmount = replacementAmount;
-      creditNote.replacementDiscount = replacementDiscount;
 
-      logger.info(
-        `Completing Return: ${creditNote.creditNoteNo}, New Status: ${creditNote.status}`,
-      );
-      await this.repository.save(creditNote);
-      logger.info(`Credit Note ${creditNote.creditNoteNo} saved successfully.`);
+      creditNote.status = CreditNoteStatus.PRODUCT_REPLACED;
 
-      // 1. Mark OLD unit as Damaged or Returned
       const inventoryStatus: 'DAMAGED' | 'RETURNED' =
         creditNote.damageReason === 'Damaged Product' ? 'DAMAGED' : 'RETURNED';
-      await emitProductStatusUpdate({
-        productId: creditNote.productId,
-        billType: inventoryStatus,
-        invoiceId: creditNote.invoiceId,
-        approvedBy: req.user?.userId || 'SALES',
-        approvedAt: new Date(),
-      });
 
-      await emitProductStatusUpdate({
-        productId: replacementProductId,
-        billType: 'SALE', // Defaulting to SALE for now, ideally fetch from Invoice
-        invoiceId: creditNote.invoiceId,
-        approvedBy: req.user?.userId || 'SALES',
-        approvedAt: new Date(),
-      });
+      if (creditNote.itemCategory === 'PRODUCT') {
+        const {
+          replacementProductId,
+          replacementProductName,
+          replacementSerialNumber,
+          replacementAmount,
+          replacementDiscount = 0,
+        } = req.body;
+
+        creditNote.replacementProductId = replacementProductId;
+        creditNote.replacementProductName = replacementProductName;
+        creditNote.replacementSerialNumber = replacementSerialNumber;
+        creditNote.replacementAmount = replacementAmount;
+        creditNote.replacementDiscount = replacementDiscount;
+
+        // Mark OLD product as DAMAGED or RETURNED (B.7: branchId passed)
+        await emitProductStatusUpdate({
+          productId: creditNote.productId!,
+          billType: inventoryStatus,
+          invoiceId: creditNote.invoiceId,
+          approvedBy: req.user?.userId || 'SALES',
+          approvedAt: new Date(),
+          branchId: creditNote.branchId,
+        });
+
+        // Mark NEW product as SALE — 'SALE' is correct here; the replacement is a sale allocation
+        await emitProductStatusUpdate({
+          productId: replacementProductId,
+          billType: 'SALE',
+          invoiceId: creditNote.invoiceId,
+          approvedBy: req.user?.userId || 'SALES',
+          approvedAt: new Date(),
+          branchId: creditNote.branchId,
+        });
+      } else {
+        // SPARE_PART
+        const {
+          replacementSparePartId,
+          replacementSparePartName,
+          replacementSparePartSku,
+          replacementQuantity,
+          replacementAmount,
+          replacementDiscount = 0,
+        } = req.body;
+
+        creditNote.replacementSparePartId = replacementSparePartId;
+        creditNote.replacementSparePartName = replacementSparePartName;
+        creditNote.replacementSparePartSku = replacementSparePartSku;
+        creditNote.replacementQuantity = replacementQuantity || creditNote.quantity || 1;
+        creditNote.replacementAmount = replacementAmount;
+        creditNote.replacementDiscount = replacementDiscount;
+
+        // Return old spare part to available stock
+        await this.callInventoryService('/inventory/returns/process', {
+          itemType: 'SPARE_PART',
+          itemId: creditNote.sparePartId,
+          quantity: creditNote.quantity || 1,
+        });
+
+        // Allocate new spare part (decrement available stock)
+        if (replacementSparePartId) {
+          await this.callInventoryService(
+            `/inventory/spare-parts/${replacementSparePartId}/allocate`,
+            { quantity: creditNote.replacementQuantity },
+          );
+        }
+      }
+
+      logger.info(`Completing Return: ${creditNote.creditNoteNo}, Status: ${creditNote.status}`);
+      await this.repository.save(creditNote);
 
       return res.status(200).json({
         success: true,
@@ -349,7 +469,7 @@ export class CreditNoteController {
   };
 
   /**
-   * Get Stat Cards data.
+   * Stat cards data.
    */
   getStats = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -379,10 +499,7 @@ export class CreditNoteController {
         creditExchange: stats.find((s) => s.type === 'CREDIT_EXCHANGE')?.count || 0,
       };
 
-      return res.status(200).json({
-        success: true,
-        data: result,
-      });
+      return res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

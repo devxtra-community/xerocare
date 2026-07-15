@@ -91,7 +91,15 @@ export const rejectExpenseRequest = (
 
 export const payExpenseRequest = (
   id: string,
-  data: { paid_from_account: string; payment_reference?: string; notes?: string },
+  data: {
+    paid_from_account?: string;
+    payment_reference?: string;
+    payment_mode?: string;
+    cheque_number?: string;
+    cheque_bank_name?: string;
+    cheque_due_date?: string;
+    notes?: string;
+  },
 ): Promise<ExpenseRequest> => api.post(`${BASE}/${id}/pay`, data).then((r) => r.data.data);
 
 export const getExpenseRequestSummary = (filters?: {

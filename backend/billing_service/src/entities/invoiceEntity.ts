@@ -270,6 +270,9 @@ export class Invoice {
   @Column({ name: 'customer_state_province', type: 'varchar', length: 100, nullable: true })
   customerStateProvince?: string | null;
 
+  @Column({ name: 'customer_city', type: 'varchar', length: 100, nullable: true })
+  customerCity?: string | null;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   grossAmount?: number;
 

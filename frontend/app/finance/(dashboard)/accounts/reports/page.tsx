@@ -108,12 +108,12 @@ export default function ReportsHubPage() {
     const purchases: PurchaseOrder[] = await fetchPurchases({ fromDate: from, toDate: to });
     const rows = purchases.map((p) => ({
       'PO #': p.id,
-      Vendor: p.vendorName,
+      Vendor: p.vendor?.name ?? '',
       'PO Date': p.createdAt?.slice(0, 10),
-      'Total Cost': p.totalCost,
-      Labour: p.labour ?? 0,
-      Shipping: (p.shipping ?? 0) + (p.handling ?? 0),
-      Currency: p.currency,
+      'Total Cost': p.totalAmount ?? 0,
+      Labour: p.labourCost ?? 0,
+      Shipping: (p.shippingCost ?? 0) + (p.handlingFee ?? 0),
+      Currency: p.currencyCode ?? 'AED',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -168,12 +168,12 @@ export default function ReportsHubPage() {
       }));
     const inputRows = purchases.map((p) => ({
       Reference: p.id?.slice(0, 8),
-      Party: p.vendorName,
+      Party: p.vendor?.name ?? '',
       Date: p.createdAt?.slice(0, 10),
-      'Taxable Amount': p.totalCost,
-      'VAT %': '5',
-      'VAT Amount': p.totalCost * 0.05,
-      Currency: p.currency ?? getActiveCurrency(),
+      'Taxable Amount': p.totalAmount ?? 0,
+      'VAT %': p.purchaseOrigin === 'INTERNATIONAL' ? 'RC' : '5',
+      'VAT Amount': p.inputVatAmount ?? p.reverseChargeVatAmount ?? 0,
+      Currency: p.currencyCode ?? 'AED',
       Type: 'Input',
     }));
     const ws = XLSX.utils.json_to_sheet([...outputRows, ...inputRows]);
@@ -214,13 +214,18 @@ export default function ReportsHubPage() {
       'AMC',
     ].map(rev);
     const totalRev = rentalRev + leaseRev + salesRev + serviceRev + usageRev + amcRev;
-    const labourCost = purchases.reduce((s, p) => s + (p.labour ?? 0), 0);
+    const labourCost = purchases.reduce((s, p) => s + (p.labourCost ?? 0), 0);
     const salaries = payroll.reduce((s, p) => s + p.netSalary, 0);
     const vendorCost = purchases.reduce(
-      (s, p) => s + ((p.totalCost ?? 0) - (p.shipping ?? 0) - (p.handling ?? 0) - (p.labour ?? 0)),
+      (s, p) =>
+        s +
+        ((p.totalAmount ?? 0) - (p.shippingCost ?? 0) - (p.handlingFee ?? 0) - (p.labourCost ?? 0)),
       0,
     );
-    const shipping = purchases.reduce((s, p) => s + (p.shipping ?? 0) + (p.handling ?? 0), 0);
+    const shipping = purchases.reduce(
+      (s, p) => s + (p.shippingCost ?? 0) + (p.handlingFee ?? 0),
+      0,
+    );
     const now = new Date();
     const dep = products.reduce((sum, p) => {
       const months = Math.max(
@@ -291,13 +296,13 @@ export default function ReportsHubPage() {
     purchases.forEach((p) => {
       add(
         '5004 Vendor Purchase Cost',
-        p.totalCost - (p.shipping ?? 0) - (p.handling ?? 0) - (p.labour ?? 0),
+        (p.totalAmount ?? 0) - (p.shippingCost ?? 0) - (p.handlingFee ?? 0) - (p.labourCost ?? 0),
         0,
       );
-      add('2001 Accounts Payable', 0, p.totalCost);
-      if ((p.shipping ?? 0) + (p.handling ?? 0) > 0)
-        add('5005 Shipping & Handling', (p.shipping ?? 0) + (p.handling ?? 0), 0);
-      if ((p.labour ?? 0) > 0) add('5002 Technician Labour Cost', p.labour ?? 0, 0);
+      add('2001 Accounts Payable', 0, p.totalAmount ?? 0);
+      if ((p.shippingCost ?? 0) + (p.handlingFee ?? 0) > 0)
+        add('5005 Shipping & Handling', (p.shippingCost ?? 0) + (p.handlingFee ?? 0), 0);
+      if ((p.labourCost ?? 0) > 0) add('5002 Technician Labour Cost', p.labourCost ?? 0, 0);
     });
     payroll.forEach((p) => {
       add('5006 Employee Salary Expense', p.netSalary ?? 0, 0);

@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { State, City } from 'country-state-city';
 
 import { getActiveCurrency } from '@/lib/currency';
 type Vendor = {
@@ -53,6 +54,8 @@ type Vendor = {
   currency: string;
   countryCode?: string;
   countryName?: string;
+  stateProvince?: string;
+  city?: string;
 };
 
 type VendorFormData = {
@@ -65,6 +68,8 @@ type VendorFormData = {
   currency: string;
   countryCode?: string;
   countryName?: string;
+  stateProvince?: string;
+  city?: string;
 };
 
 // ISO 3166 country list, shared with the branch/admin-vendor country selectors.
@@ -117,8 +122,10 @@ export default function VendorTable({
         contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
         currency: data.currency,
-        countryCode: data.countryCode,
-        countryName: data.countryName,
+        countryCode: data.countryCode || undefined,
+        countryName: data.countryName || undefined,
+        stateProvince: data.stateProvince || undefined,
+        city: data.city || undefined,
       };
 
       if (editingVendor) {
@@ -357,6 +364,97 @@ export default function VendorTable({
   );
 }
 
+function CountrySubFields({
+  form,
+  setForm,
+}: {
+  form: VendorFormData;
+  setForm: React.Dispatch<React.SetStateAction<VendorFormData>>;
+}) {
+  if (!form.countryCode || form.countryCode === '') return null;
+
+  const states = State.getStatesOfCountry(form.countryCode);
+  const stateLabel =
+    form.countryCode === 'AE'
+      ? 'Emirate'
+      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(form.countryCode)
+        ? 'State'
+        : form.countryCode === 'CA'
+          ? 'Province'
+          : 'Region / Province';
+  const selectedState = states.find((s) => s.name === form.stateProvince);
+  const cities = selectedState
+    ? City.getCitiesOfState(form.countryCode, selectedState.isoCode)
+    : (City.getCitiesOfCountry(form.countryCode) ?? []);
+
+  return (
+    <>
+      <div className="space-y-2">
+        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+          {stateLabel}
+        </label>
+        {states.length > 0 ? (
+          <Select
+            value={form.stateProvince ?? ''}
+            onValueChange={(v) => setForm((f) => ({ ...f, stateProvince: v, city: undefined }))}
+          >
+            <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+              <SelectValue placeholder={`Select ${stateLabel}`} />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl max-h-64">
+              {states.map((s) => (
+                <SelectItem key={s.isoCode} value={s.name}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            placeholder={`Enter ${stateLabel}`}
+            value={form.stateProvince ?? ''}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                stateProvince: e.target.value || undefined,
+                city: undefined,
+              }))
+            }
+            className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+          />
+        )}
+      </div>
+      <div className="space-y-2">
+        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">City</label>
+        {cities.length > 0 ? (
+          <Select
+            value={form.city ?? ''}
+            onValueChange={(v) => setForm((f) => ({ ...f, city: v }))}
+          >
+            <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+              <SelectValue placeholder="Select city" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl max-h-64">
+              {cities.map((c) => (
+                <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            placeholder="Enter city"
+            value={form.city ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, city: e.target.value || undefined }))}
+            className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
 function VendorFormModal({
   initialData,
   open,
@@ -375,9 +473,11 @@ function VendorFormModal({
     phone: '',
     email: '',
     status: 'Active',
-    currency: getActiveCurrency(),
-    countryCode: undefined,
+    currency: 'QAR',
+    countryCode: '',
     countryName: undefined,
+    stateProvince: undefined,
+    city: undefined,
   });
 
   React.useEffect(() => {
@@ -393,6 +493,8 @@ function VendorFormModal({
           currency: initialData.currency || getActiveCurrency(),
           countryCode: initialData.countryCode,
           countryName: initialData.countryName,
+          stateProvince: initialData.stateProvince,
+          city: initialData.city,
         });
       } else {
         setForm({
@@ -402,9 +504,11 @@ function VendorFormModal({
           phone: '',
           email: '',
           status: 'Active',
-          currency: getActiveCurrency(),
-          countryCode: undefined,
+          currency: 'QAR',
+          countryCode: '',
           countryName: undefined,
+          stateProvince: undefined,
+          city: undefined,
         });
       }
     }
@@ -518,12 +622,14 @@ function VendorFormModal({
                 Country <span className="text-red-500">*</span>
               </label>
               <Select
-                value={form.countryCode}
+                value={form.countryCode ?? ''}
                 onValueChange={(value) =>
                   setForm({
                     ...form,
                     countryCode: value,
                     countryName: COUNTRY_OPTIONS.find((c) => c.code === value)?.name,
+                    stateProvince: undefined,
+                    city: undefined,
                   })
                 }
               >
@@ -539,6 +645,8 @@ function VendorFormModal({
                 </SelectContent>
               </Select>
             </div>
+
+            <CountrySubFields form={form} setForm={setForm} />
 
             <div className="col-span-2 space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
@@ -581,7 +689,7 @@ function VendorFormModal({
                   return;
                 }
                 // Country drives Domestic vs International classification — required.
-                if (!form.countryCode) {
+                if (!form.countryCode || form.countryCode === '') {
                   toast.error('Country is required');
                   return;
                 }

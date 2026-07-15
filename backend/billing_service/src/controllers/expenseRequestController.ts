@@ -7,6 +7,7 @@ import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { sign } from 'jsonwebtoken';
+import { Cheque } from '../entities/chequeEntity';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -381,17 +382,36 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
       throw new AppError('Only SUBMITTED requests can be approved', 400);
 
     const { paid_from_account, payment_reference, notes } = req.body ?? {};
+    const payImmediately = !!paid_from_account;
+
+    // Generate reference numbers BEFORE the transaction to avoid pool deadlock
+    // (pool max=1 — calling Source.getRepository inside a transaction blocks the only connection)
+    const expenseNo = await generateExpenseNo();
+    let cbRefNo = '';
+    if (payImmediately) {
+      const cbRepo = Source.getRepository(CashbookEntry);
+      const year = new Date().getFullYear();
+      const cbCount = await cbRepo
+        .createQueryBuilder('c')
+        .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year })
+        .getCount();
+      cbRefNo = `CBK-${year}-${String(cbCount + 1).padStart(5, '0')}`;
+    }
 
     await Source.transaction(async (manager) => {
-      // 1. Update request
-      request.status = 'APPROVED';
+      // 1. Update request status
+      request.status = payImmediately ? 'PAID' : 'APPROVED';
       request.reviewedBy = userId;
       request.reviewedAt = new Date();
       if (notes) request.notes = notes;
+      if (payImmediately) {
+        request.paidAt = new Date();
+        request.paidFromAccount = paid_from_account;
+        request.paymentReference = payment_reference;
+      }
       await manager.save(EmployeeExpenseRequest, request);
 
       // 2. Create expense_entry
-      const expenseNo = await generateExpenseNo();
       const entry = manager.create(ExpenseEntry, {
         expenseNo,
         date: request.date,
@@ -403,28 +423,58 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
         vatAmount: 0,
         netAmount: request.amount,
         currency: request.currency,
-        status: 'APPROVED',
+        status: payImmediately ? 'PAID' : 'APPROVED',
         approvedBy: userId,
+        paidFrom: payImmediately ? paid_from_account : undefined,
+        paymentMode: payImmediately ? 'Cash' : undefined,
+        paymentDate: payImmediately ? new Date() : undefined,
+        referenceNo: payment_reference || undefined,
         receiptUrl: request.receiptUrl,
         notes: request.notes,
         createdBy: userId,
       });
       const savedEntry = await manager.save(ExpenseEntry, entry);
 
-      // 3. Link expense entry
+      // 3. Link expense entry back to request
       request.expenseEntryId = savedEntry.id;
-      if (paid_from_account) {
-        request.paidFromAccount = paid_from_account;
-        request.paymentReference = payment_reference;
-      }
       await manager.save(EmployeeExpenseRequest, request);
+
+      // 4. If paying immediately: deduct from account + create cashbook entry
+      if (payImmediately) {
+        const accountRepo = manager.getRepository(CashBankAccount);
+        const account = await accountRepo.findOne({ where: { id: paid_from_account } });
+        if (account) {
+          account.currentBalance = Number(account.currentBalance) - Number(request.amount);
+          await manager.save(CashBankAccount, account);
+        }
+
+        const cbEntry = manager.create(CashbookEntry, {
+          referenceNo: cbRefNo,
+          date: new Date(),
+          accountId: paid_from_account,
+          entryType: 'PAYMENT',
+          amount: request.amount,
+          category: 'Expense',
+          description: `Employee expense: ${request.employeeName} - ${request.category}`,
+          linkedExpenseId: savedEntry.id,
+          paymentMode: 'Cash',
+          chequeNo: payment_reference || undefined,
+          notes,
+          createdBy: userId,
+          branchId: request.branchId,
+        });
+        await manager.save(CashbookEntry, cbEntry);
+      }
     });
 
     // Notify employee
+    const wasPaid = !!paid_from_account;
     await sendNotification(
       request.employeeId,
-      'Expense Approved ✅',
-      `Your expense of ${request.currency} ${Number(request.amount).toFixed(2)} for ${request.category} has been approved`,
+      wasPaid ? 'Expense Approved & Paid ✅' : 'Expense Approved ✅',
+      wasPaid
+        ? `Your expense of ${request.currency} ${Number(request.amount).toFixed(2)} for ${request.category} has been approved and paid`
+        : `Your expense of ${request.currency} ${Number(request.amount).toFixed(2)} for ${request.category} has been approved`,
       'EXPENSE_APPROVED',
     );
 
@@ -480,8 +530,23 @@ export const payExpenseRequest = async (req: Request, res: Response, next: NextF
       throw new AppError('Only Finance Managers can record payments', 403);
     }
 
-    const { paid_from_account, payment_reference, notes } = req.body;
-    if (!paid_from_account) throw new AppError('paid_from_account is required', 400);
+    const {
+      paid_from_account,
+      payment_reference,
+      payment_mode,
+      cheque_number,
+      cheque_bank_name,
+      cheque_due_date,
+      notes,
+    } = req.body;
+    const isCheque = (payment_mode ?? '').trim().toLowerCase() === 'cheque';
+
+    if (!isCheque && !paid_from_account) {
+      throw new AppError('paid_from_account is required for Cash/Bank payments', 400);
+    }
+    if (isCheque && (!cheque_number || !cheque_due_date)) {
+      throw new AppError('cheque_number and cheque_due_date are required for Cheque payments', 400);
+    }
 
     const repo = Source.getRepository(EmployeeExpenseRequest);
     const request = await repo.findOne({ where: { id: String(req.params.id) } });
@@ -490,57 +555,109 @@ export const payExpenseRequest = async (req: Request, res: Response, next: NextF
     if (request.status !== 'APPROVED')
       throw new AppError('Only APPROVED requests can be paid', 400);
 
-    await Source.transaction(async (manager) => {
-      // 1. Update request
-      request.status = 'PAID';
-      request.paidAt = new Date();
-      request.paidFromAccount = paid_from_account;
-      request.paymentReference = payment_reference;
-      await manager.save(EmployeeExpenseRequest, request);
+    if (isCheque) {
+      // Cheque path: mark paid, create PENDING ISSUED cheque — no balance movement until CLEARED
+      await Source.transaction(async (manager) => {
+        request.status = 'PAID';
+        request.paidAt = new Date();
+        request.paidFromAccount = undefined;
+        request.paymentReference = cheque_number;
+        await manager.save(EmployeeExpenseRequest, request);
 
-      // 2. Update expense_entry if linked
-      if (request.expenseEntryId) {
-        await manager.update(ExpenseEntry, request.expenseEntryId, {
-          status: 'PAID',
-          paidFrom: paid_from_account,
-          paymentDate: new Date(),
-          referenceNo: payment_reference,
-        });
-      }
-
-      // 3. Deduct from cash_bank_account
-      const accountRepo = manager.getRepository(CashBankAccount);
-      const account = await accountRepo.findOne({ where: { id: paid_from_account } });
-      if (account) {
-        account.currentBalance = Number(account.currentBalance) - Number(request.amount);
-        await manager.save(CashBankAccount, account);
-      }
-
-      // 4. Create cashbook entry
-      const cbRepo = manager.getRepository(CashbookEntry);
-      const year = new Date().getFullYear();
-      const cbCount = await cbRepo
-        .createQueryBuilder('c')
-        .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year })
-        .getCount();
-      const refNo = `CBK-${year}-${String(cbCount + 1).padStart(5, '0')}`;
-      const cbEntry = cbRepo.create({
-        referenceNo: refNo,
-        date: new Date(),
-        accountId: paid_from_account,
-        entryType: 'PAYMENT',
-        amount: request.amount,
-        category: 'Expense',
-        description: `Employee expense: ${request.employeeName} - ${request.category}`,
-        linkedExpenseId: request.expenseEntryId,
-        paymentMode: 'Bank Transfer',
-        chequeNo: payment_reference,
-        notes,
-        createdBy: userId,
-        branchId: request.branchId,
+        if (request.expenseEntryId) {
+          await manager.update(ExpenseEntry, request.expenseEntryId, {
+            status: 'PAID',
+            paymentMode: 'Cheque',
+            paymentDate: new Date(),
+            referenceNo: cheque_number,
+          });
+        }
       });
-      await manager.save(CashbookEntry, cbEntry);
-    });
+
+      // Create PENDING ISSUED cheque record (non-fatal if it fails)
+      try {
+        const chequeRepo = Source.getRepository(Cheque);
+        const existing = await chequeRepo.findOne({
+          where: { chequeNo: cheque_number, branchId: request.branchId },
+        });
+        if (!existing) {
+          const c = chequeRepo.create({
+            chequeNo: cheque_number,
+            bankName: cheque_bank_name || undefined,
+            partyName: request.employeeName,
+            amount: Number(request.amount),
+            dueDate: new Date(cheque_due_date),
+            issueDate: new Date(),
+            type: 'ISSUED',
+            status: 'PENDING',
+            description: `Employee expense: ${request.requestNo} — ${request.category}`,
+            branchId: request.branchId,
+            sourceType: 'EXPENSE',
+            sourceReferenceId: request.id,
+            sourceLabel: `Expense ${request.requestNo}`,
+            createdBy: userId,
+          });
+          await chequeRepo.save(c);
+        }
+      } catch (err) {
+        logger.error('[payExpenseRequest] Failed to create ISSUED cheque record', err);
+      }
+    } else {
+      // Cash / Bank Transfer path: move balance immediately
+      // Generate cashbook ref BEFORE the transaction (pool max=1 — calling Source.getRepository inside a transaction blocks the only connection)
+      const cbYear = new Date().getFullYear();
+      const cbCount = await Source.getRepository(CashbookEntry)
+        .createQueryBuilder('c')
+        .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+        .getCount();
+      const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+
+      await Source.transaction(async (manager) => {
+        request.status = 'PAID';
+        request.paidAt = new Date();
+        request.paidFromAccount = paid_from_account;
+        request.paymentReference = payment_reference;
+        await manager.save(EmployeeExpenseRequest, request);
+
+        if (request.expenseEntryId) {
+          await manager.update(ExpenseEntry, request.expenseEntryId, {
+            status: 'PAID',
+            paidFrom: paid_from_account,
+            paymentMode: payment_mode ?? 'Bank Transfer',
+            paymentDate: new Date(),
+            referenceNo: payment_reference,
+          });
+        }
+
+        const accountRepo = manager.getRepository(CashBankAccount);
+        const account = await accountRepo.findOne({ where: { id: paid_from_account } });
+        if (account) {
+          account.currentBalance = Number(account.currentBalance) - Number(request.amount);
+          await manager.save(CashBankAccount, account);
+        } else {
+          logger.warn(
+            `[payExpenseRequest] Account ${paid_from_account} not found — balance not deducted`,
+          );
+        }
+
+        const cbEntry = manager.create(CashbookEntry, {
+          referenceNo: cbRefNo,
+          date: new Date(),
+          accountId: paid_from_account,
+          entryType: 'PAYMENT',
+          amount: request.amount,
+          category: 'Expense',
+          description: `Employee expense: ${request.employeeName} - ${request.category}`,
+          linkedExpenseId: request.expenseEntryId,
+          paymentMode: payment_mode ?? 'Bank Transfer',
+          chequeNo: payment_reference,
+          notes,
+          createdBy: userId,
+          branchId: request.branchId,
+        });
+        await manager.save(CashbookEntry, cbEntry);
+      });
+    }
 
     await sendNotification(
       request.employeeId,

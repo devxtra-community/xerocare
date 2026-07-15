@@ -34,10 +34,12 @@ import { toast } from 'sonner';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getOpeningBalanceEntries, OpeningBalanceEntry } from '@/lib/openingBalance';
 
 import { getActiveCurrency } from '@/lib/currency';
 export default function CustomerReport() {
+  const currency = useBranchCurrency();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -668,10 +670,11 @@ export default function CustomerReport() {
                             </TableCell>
                             <TableCell className="text-right font-medium">
                               {prod.ownership === 'RENT' &&
-                                `${formatCurrency(prod.rent_price_monthly || 0)}/mo`}
+                                `${formatCurrency(prod.rent_price_monthly || 0, currency)}/mo`}
                               {prod.ownership === 'LEASE' &&
-                                `${formatCurrency(prod.lease_price_monthly || 0)}/mo`}
-                              {prod.ownership === 'SALE' && formatCurrency(prod.sale_price || 0)}
+                                `${formatCurrency(prod.lease_price_monthly || 0, currency)}/mo`}
+                              {prod.ownership === 'SALE' &&
+                                formatCurrency(prod.sale_price || 0, currency)}
                               {!prod.ownership && '-'}
                             </TableCell>
                             <TableCell className="text-center">
@@ -757,7 +760,7 @@ export default function CustomerReport() {
                                 )}
                               </TableCell>
                               <TableCell className="text-right font-bold text-slate-800">
-                                {formatCurrency(inv.totalAmount || inv.grossAmount || 0)}
+                                {formatCurrency(inv.totalAmount || inv.grossAmount || 0, currency)}
                               </TableCell>
                               <TableCell className="text-center">
                                 <span

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
@@ -19,13 +19,16 @@ import {
   createManualPayable,
   recordPayablePayment,
   fetchCashBankAccounts,
-  fetchPayableCharts,
+  fetchExpenseEntries,
+  payExpenseEntry,
   type ManualPayable,
+  type ExpenseEntry,
 } from '@/lib/finance/accountsApi';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import { fetchPurchases, agingBucket, type PurchaseOrder } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +50,6 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
-import { getActiveCurrency } from '@/lib/currency';
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -62,6 +64,7 @@ const PAYABLE_TYPES = [
   'SALARY_PAYABLE',
   'RENT_PAYABLE',
   'UTILITY_PAYABLE',
+  'EXPENSE_PAYABLE',
   'OTHER',
 ];
 const today = new Date().toISOString().slice(0, 10);
@@ -77,16 +80,20 @@ function AddPayableModal({
   onSaved: () => void;
 }) {
   const currentUser = getUserFromToken();
+  const branchCurrency = useBranchCurrency();
   const [form, setForm] = useState({
     type: 'VENDOR_INVOICE',
     payableTo: '',
     description: '',
     amount: '',
-    currency: getActiveCurrency(),
+    currency: branchCurrency,
     issueDate: today,
     dueDate: today,
     notes: '',
   });
+  useEffect(() => {
+    setForm((f) => ({ ...f, currency: branchCurrency }));
+  }, [branchCurrency]);
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const qc = useQueryClient();
   const mut = useMutation({
@@ -236,6 +243,7 @@ function PaymentModal({
     onSuccess: () => {
       toast.success('Payment recorded');
       qc.invalidateQueries({ queryKey: ['manual-payables'] });
+      qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
       onClose();
     },
     onError: () => toast.error('Failed to record payment'),
@@ -329,12 +337,127 @@ function PaymentModal({
   );
 }
 
+function ExpensePaymentModal({
+  expense,
+  accounts,
+  onClose,
+}: {
+  expense: ExpenseEntry & { outstanding: number };
+  accounts: { id: string; name: string }[];
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    paymentDate: today,
+    paidFrom: accounts[0]?.id ?? '',
+    paymentMode: 'Cash',
+    referenceNo: '',
+  });
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const qc = useQueryClient();
+  const mut = useMutation({
+    mutationFn: () => payExpenseEntry(expense.id, form),
+    onSuccess: () => {
+      toast.success('Expense payment recorded — account balance updated');
+      qc.invalidateQueries({ queryKey: ['approved-expenses-payable'] });
+      qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
+      qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
+      onClose();
+    },
+    onError: () => toast.error('Failed to record expense payment'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-bold text-slate-800">Pay Expense</h2>
+          <button onClick={onClose}>
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <div className="p-3 rounded-lg bg-amber-50 text-sm">
+            <p className="font-medium text-slate-800">{expense.description}</p>
+            <p className="text-muted-foreground text-xs">
+              Amount: {formatCurrency(expense.outstanding, expense.currency)}
+            </p>
+            <p className="text-xs text-amber-700 font-mono">{expense.expenseNo}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Payment Date</label>
+            <input
+              type="date"
+              value={form.paymentDate}
+              onChange={(e) => set('paymentDate', e.target.value)}
+              className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
+            <Select value={form.paidFrom} onValueChange={(v) => set('paidFrom', v)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Payment Mode</label>
+            <Select value={form.paymentMode} onValueChange={(v) => set('paymentMode', v)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['Cash', 'Bank Transfer', 'Card'].map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Reference #</label>
+            <Input
+              value={form.referenceNo}
+              onChange={(e) => set('referenceNo', e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending || !form.paidFrom}
+            className="flex-1"
+          >
+            {mut.isPending ? 'Processing...' : 'Pay Now'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AccountsPayablePage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [agingFilter, setAgingFilter] = useState('ALL');
   const [showAdd, setShowAdd] = useState(false);
   const [payingFor, setPayingFor] = useState<ManualPayable | null>(null);
+  const [payingForExpense, setPayingForExpense] = useState<
+    (ExpenseEntry & { outstanding: number }) | null
+  >(null);
   const [chartsOpen, setChartsOpen] = useState(true);
 
   const {
@@ -354,44 +477,58 @@ export default function AccountsPayablePage() {
     staleTime: 60_000,
   });
 
+  const { data: approvedExpenses = [] } = useQuery<ExpenseEntry[]>({
+    queryKey: ['approved-expenses-payable'],
+    queryFn: () => fetchExpenseEntries({ status: 'APPROVED' }),
+    staleTime: 30_000,
+  });
+
   const { data: accounts = [] } = useQuery({
     queryKey: ['cash-bank-accounts'],
     queryFn: () => fetchCashBankAccounts(),
     staleTime: 60_000,
   });
 
-  const { data: payCharts } = useQuery({
-    queryKey: ['payable-charts'],
-    queryFn: () =>
-      fetchPayableCharts() as Promise<{
-        byType: { name: string; value: number }[];
-        topVendors: { name: string; value: number }[];
-        monthly: { month: string; paid: number }[];
-      }>,
-    staleTime: 120_000,
-  });
-
-  // Merge purchase orders + manual payables
+  // Merge purchase orders + manual payables + approved expense entries
   const allPayables = useMemo(() => {
     const fromPurchases = purchases.map((p) => ({
       id: p.id,
       referenceNo: `PO-${p.id?.slice(0, 8)}`,
       type: 'VENDOR_INVOICE',
-      payableTo: p.vendorName,
-      amount: p.totalCost,
-      currency: p.currency ?? getActiveCurrency(),
+      payableTo: p.vendor?.name ?? '',
+      amount: p.totalAmount ?? 0,
+      currency: p.currencyCode ?? currency,
       issueDate: p.createdAt,
       dueDate: p.createdAt,
-      amountPaid: 0,
-      outstanding: p.totalCost,
-      status: 'PENDING',
+      amountPaid: p.paidAmount ?? 0,
+      outstanding: p.remainingAmount ?? p.totalAmount ?? 0,
+      status: p.status ?? 'PENDING',
       branchId: p.branchId,
       aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
       isPurchase: true,
+      isExpense: false,
     }));
-    const fromManual = manualPayables.map((p) => ({ ...p, isPurchase: false }));
-    return [...fromManual, ...fromPurchases];
-  }, [purchases, manualPayables]);
+    const fromManual = manualPayables.map((p) => ({ ...p, isPurchase: false, isExpense: false }));
+    const fromExpenses = approvedExpenses.map((e) => ({
+      id: e.id,
+      referenceNo: e.expenseNo,
+      type: 'EXPENSE_PAYABLE',
+      payableTo: e.description ?? e.category,
+      amount: Number(e.netAmount || e.amount),
+      currency: e.currency,
+      issueDate: String(e.date),
+      dueDate: String(e.date),
+      amountPaid: 0,
+      outstanding: Number(e.netAmount || e.amount),
+      status: 'APPROVED',
+      branchId: e.branchId,
+      aging: e.date ? agingBucket(String(e.date)) : 'Current',
+      isPurchase: false,
+      isExpense: true,
+      _raw: e,
+    }));
+    return [...fromManual, ...fromExpenses, ...fromPurchases];
+  }, [purchases, manualPayables, approvedExpenses, currency]);
 
   const filtered = useMemo(
     () =>
@@ -412,6 +549,44 @@ export default function AccountsPayablePage() {
     bucket: b,
     total: allPayables.filter((p) => p.aging === b).reduce((s, p) => s + (p.outstanding ?? 0), 0),
   }));
+
+  const payCharts = useMemo(() => {
+    const typeMap: Record<string, number> = {};
+    allPayables.forEach((p) => {
+      typeMap[p.type] = (typeMap[p.type] ?? 0) + (p.outstanding ?? 0);
+    });
+    const byType = Object.entries(typeMap)
+      .map(([name, value]) => ({ name: name.replace(/_/g, ' '), value }))
+      .sort((a, b) => b.value - a.value);
+
+    const vendorMap: Record<string, number> = {};
+    allPayables.forEach((p) => {
+      if (!p.payableTo) return;
+      vendorMap[p.payableTo] = (vendorMap[p.payableTo] ?? 0) + (p.outstanding ?? 0);
+    });
+    const topVendors = Object.entries(vendorMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+
+    // Monthly payable: group total amount incurred per month (by issueDate / createdAt).
+    // We show both the payable total (what was owed) and the paid amount (what was settled).
+    // This way the chart always has data even when no payments have been recorded yet.
+    const monthPayableMap: Record<string, { payable: number; paid: number }> = {};
+    allPayables.forEach((p) => {
+      const month = p.issueDate?.slice(0, 7) ?? '';
+      if (!month) return;
+      if (!monthPayableMap[month]) monthPayableMap[month] = { payable: 0, paid: 0 };
+      monthPayableMap[month].payable += Number(p.amount) || 0;
+      monthPayableMap[month].paid += Number(p.amountPaid) || 0;
+    });
+    const monthly = Object.entries(monthPayableMap)
+      .map(([month, v]) => ({ month, payable: v.payable, paid: v.paid }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12);
+
+    return { byType, topVendors, monthly };
+  }, [allPayables]);
 
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(
@@ -481,14 +656,14 @@ export default function AccountsPayablePage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           title="Total Payable"
-          value={formatCurrency(totalPayable)}
+          value={formatCurrency(totalPayable, currency)}
           subtitle="All payables"
         />
         {AGING_BUCKETS.map((b) => (
           <StatCard
             key={b}
             title={b}
-            value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0)}
+            value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0, currency)}
             subtitle=""
           />
         ))}
@@ -532,7 +707,7 @@ export default function AccountsPayablePage() {
                     axisLine={false}
                   />
                   <Tooltip
-                    formatter={(v: number) => formatCurrency(v)}
+                    formatter={(v: number) => formatCurrency(v, currency)}
                     contentStyle={{ borderRadius: '10px', fontSize: '12px' }}
                   />
                   <Bar dataKey="total" name="Payable" fill="#f59e0b" radius={[6, 6, 0, 0]} />
@@ -543,11 +718,16 @@ export default function AccountsPayablePage() {
               <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
                 Payable by Type
               </h4>
-              <DonutChart data={payCharts?.byType ?? []} height={200} />
+              <DonutChart data={payCharts?.byType ?? []} height={200} currency={currency} />
             </div>
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Top 5 Vendors</h4>
-              <HorizontalBarChart data={payCharts?.topVendors ?? []} height={200} color="#f59e0b" />
+              <HorizontalBarChart
+                data={payCharts?.topVendors ?? []}
+                height={200}
+                color="#f59e0b"
+                currency={currency}
+              />
             </div>
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
@@ -556,8 +736,12 @@ export default function AccountsPayablePage() {
               <SimpleBarChart
                 data={payCharts?.monthly ?? []}
                 xKey="month"
-                bars={[{ key: 'paid', color: '#8b5cf6', label: 'Paid' }]}
+                bars={[
+                  { key: 'payable', color: '#f59e0b', label: 'Payable' },
+                  { key: 'paid', color: '#10b981', label: 'Paid' },
+                ]}
                 height={200}
+                currency={currency}
               />
             </div>
           </div>
@@ -687,7 +871,14 @@ export default function AccountsPayablePage() {
                   <TableCell className="pr-4">
                     {!p.isPurchase && (p.outstanding ?? 0) > 0 && (
                       <button
-                        onClick={() => setPayingFor(p as unknown as ManualPayable)}
+                        onClick={() => {
+                          if (p.isExpense) {
+                            const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
+                            setPayingForExpense({ ...raw, outstanding: p.outstanding ?? 0 });
+                          } else {
+                            setPayingFor(p as unknown as ManualPayable);
+                          }
+                        }}
                         className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600"
                         title="Record Payment"
                       >
@@ -711,6 +902,13 @@ export default function AccountsPayablePage() {
       )}
       {payingFor && (
         <PaymentModal payable={payingFor} accounts={accounts} onClose={() => setPayingFor(null)} />
+      )}
+      {payingForExpense && (
+        <ExpensePaymentModal
+          expense={payingForExpense}
+          accounts={accounts}
+          onClose={() => setPayingForExpense(null)}
+        />
       )}
     </div>
   );

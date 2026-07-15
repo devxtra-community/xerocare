@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 import { redis } from '../config/redis';
 import { Request } from 'express';
@@ -6,7 +6,8 @@ import { Request } from 'express';
 // Key by IP + email/body so rotating-proxy attacks still hit per-target limits.
 // Falls back to IP-only for routes that don't carry an email in the body.
 function authKeyGenerator(req: Request): string {
-  const ip = (req.ip ?? req.socket?.remoteAddress ?? 'unknown').replace(/^::ffff:/, '');
+  const rawIp = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+  const ip = ipKeyGenerator(rawIp);
   const email = (typeof req.body?.email === 'string' ? req.body.email : '').toLowerCase().trim();
   return email ? `${ip}:${email}` : ip;
 }

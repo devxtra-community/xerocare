@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, Scale, RefreshCw, AlertTriangle } from 'lucide-react';
 import { fetchBalanceSheet } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 
@@ -23,6 +24,7 @@ function BSRow({
   highlight?: 'asset' | 'liability' | 'equity' | 'total';
   negative?: boolean;
 }) {
+  const currency = useBranchCurrency();
   const colorMap = {
     asset: 'text-blue-600',
     liability: 'text-red-600',
@@ -40,13 +42,16 @@ function BSRow({
         {label}
       </span>
       <span className={`text-sm font-semibold tabular-nums ${textColor}`}>
-        {display < 0 ? `(${formatCurrency(Math.abs(display))})` : formatCurrency(display)}
+        {display < 0
+          ? `(${formatCurrency(Math.abs(display), currency)})`
+          : formatCurrency(display, currency)}
       </span>
     </div>
   );
 }
 
 export default function BalanceSheetPage() {
+  const currency = useBranchCurrency();
   const [asOfDate, setAsOfDate] = useState(new Date().toISOString().slice(0, 10));
 
   const {
@@ -77,21 +82,24 @@ export default function BalanceSheetPage() {
       ['Cash in Hand', assets?.cash ?? 0],
       ['Cash at Bank', assets?.bank ?? 0],
       ['AR - Invoices Outstanding', assets?.invoiceAR ?? 0],
-      ['AR - Manual Receivables', assets?.manualReceivables ?? 0],
-      ['Total Accounts Receivable', assets?.receivables ?? 0],
+      ['AR - Manual Receivables', assets?.manualAR ?? 0],
+      ['Total Accounts Receivable', assets?.accountsReceivable ?? 0],
       ['Equipment (Gross)', assets?.fixedAssetsGross ?? 0],
       ['Less: Accumulated Depreciation', -(assets?.accumulatedDepreciation ?? 0)],
       ['Net Equipment Value (NBV)', assets?.fixedAssetsNet ?? 0],
       ['TOTAL ASSETS', assets?.total ?? 0],
       [],
       ['LIABILITIES'],
-      ['Accounts Payable (Vendors)', liabilities?.payables ?? 0],
+      ['Accounts Payable (Vendors)', liabilities?.accountsPayable ?? 0],
       ['Accrued Expenses (Pending)', liabilities?.accruedExpenses ?? 0],
       ['VAT / Tax Payable', liabilities?.vatPayable ?? 0],
       ['TOTAL LIABILITIES', liabilities?.total ?? 0],
       [],
       ['EQUITY'],
-      ['Net Equity', equity?.netEquity ?? 0],
+      ['Owner Capital', equity?.ownerCapital ?? 0],
+      ['Retained Earnings', equity?.retainedEarnings ?? 0],
+      ['Reserves', equity?.reserves ?? 0],
+      ['Dividends / Withdrawals', -(equity?.dividends ?? 0)],
       ['TOTAL EQUITY', equity?.total ?? 0],
       [],
       ['TOTAL LIABILITIES & EQUITY', bs?.totalLiabilitiesAndEquity ?? 0],
@@ -183,24 +191,24 @@ export default function BalanceSheetPage() {
             >
               {isBalanced
                 ? 'Balance sheet is balanced — Assets = Liabilities + Equity ✓'
-                : `Out of balance by ${formatCurrency(difference)} — add equity or manual entries to reconcile`}
+                : `Out of balance by ${formatCurrency(difference, currency)} — add equity or manual entries to reconcile`}
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
             <StatCard
               title="Total Assets"
-              value={formatCurrency(assets?.total ?? 0)}
+              value={formatCurrency(assets?.total ?? 0, currency)}
               subtitle="Cash + Fixed + Receivables"
             />
             <StatCard
               title="Total Liabilities"
-              value={formatCurrency(liabilities?.total ?? 0)}
+              value={formatCurrency(liabilities?.total ?? 0, currency)}
               subtitle="Payable to creditors"
             />
             <StatCard
               title="Total Equity"
-              value={formatCurrency(equity?.total ?? 0)}
+              value={formatCurrency(equity?.total ?? 0, currency)}
               subtitle="Owner's net worth"
             />
           </div>
@@ -222,15 +230,13 @@ export default function BalanceSheetPage() {
                   value={assets?.invoiceAR ?? 0}
                   indent
                 />
-                <BSRow
-                  label="Accounts Receivable (Manual)"
-                  value={assets?.manualReceivables ?? 0}
-                  indent
-                />
+                <BSRow label="Accounts Receivable (Manual)" value={assets?.manualAR ?? 0} indent />
                 <hr className="my-2 border-border" />
                 <BSRow
                   label="Total Current Assets"
-                  value={(assets?.cash ?? 0) + (assets?.bank ?? 0) + (assets?.receivables ?? 0)}
+                  value={
+                    (assets?.cash ?? 0) + (assets?.bank ?? 0) + (assets?.accountsReceivable ?? 0)
+                  }
                   bold
                   highlight="asset"
                 />
@@ -276,7 +282,7 @@ export default function BalanceSheetPage() {
                 </p>
                 <BSRow
                   label="Accounts Payable (Vendors)"
-                  value={liabilities?.payables ?? 0}
+                  value={liabilities?.accountsPayable ?? 0}
                   indent
                 />
                 <BSRow
@@ -304,9 +310,17 @@ export default function BalanceSheetPage() {
                   Equity
                 </p>
                 <BSRow
-                  label="Net Equity (from equity entries)"
-                  value={equity?.netEquity ?? 0}
+                  label="Owner Capital / Share Capital"
+                  value={equity?.ownerCapital ?? 0}
                   indent
+                />
+                <BSRow label="Retained Earnings" value={equity?.retainedEarnings ?? 0} indent />
+                <BSRow label="Reserves" value={equity?.reserves ?? 0} indent />
+                <BSRow
+                  label="Less: Dividends / Withdrawals"
+                  value={equity?.dividends ?? 0}
+                  indent
+                  negative
                 />
                 <hr className="my-2 border-border" />
                 <BSRow label="TOTAL EQUITY" value={equity?.total ?? 0} bold highlight="equity" />

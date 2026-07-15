@@ -36,6 +36,7 @@ import {
 import { getFinanceReport, FinanceReportItem } from '@/lib/invoice';
 import { getBranches, Branch } from '@/lib/branch';
 import { formatCurrency, formatCompactNumber } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { YearSelector } from '@/components/ui/YearSelector';
 import Pagination from '@/components/Pagination';
 
@@ -62,6 +63,7 @@ type Finance = {
  * Visualizes data using interactive charts and summary cards.
  */
 export default function FinanceReport() {
+  const currency = useBranchCurrency();
   const [finance, setFinance] = useState<Finance[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [search, setSearch] = useState('');
@@ -220,22 +222,22 @@ export default function FinanceReport() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Income"
-          value={formatCurrency(totalIncome)}
+          value={formatCurrency(totalIncome, currency)}
           subtitle={`${branchFilter === 'All' ? 'All branches' : branches.find((b) => b.id === branchFilter)?.name || 'Branch'} | ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
         <StatCard
           title="Total Expense"
-          value={formatCurrency(totalExpense)}
+          value={formatCurrency(totalExpense, currency)}
           subtitle={`${branchFilter === 'All' ? 'All branches' : branches.find((b) => b.id === branchFilter)?.name || 'Branch'} | ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
         <StatCard
           title="Net Profit"
-          value={formatCurrency(netProfit)}
+          value={formatCurrency(netProfit, currency)}
           subtitle={`Profit in ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
         <StatCard
           title="Payroll Expense"
-          value={formatCurrency(totalSalaryExpense)}
+          value={formatCurrency(totalSalaryExpense, currency)}
           subtitle={`Salaries in ${selectedYear === 'all' ? 'All Years' : selectedYear}`}
         />
       </div>
@@ -498,13 +500,13 @@ export default function FinanceReport() {
                   </TableCell>
                   <TableCell className="px-6 py-4 text-slate-600">{f.source}</TableCell>
                   <TableCell className="px-6 py-4 font-medium text-blue-600">
-                    {formatCurrency(f.income)}
+                    {formatCurrency(f.income, currency)}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-muted-foreground">
-                    {formatCurrency(f.expense)}
+                    {formatCurrency(f.expense, currency)}
                   </TableCell>
                   <TableCell className="px-6 py-4 font-bold text-primary">
-                    {formatCurrency(f.profit)}
+                    {formatCurrency(f.profit, currency)}
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <span
