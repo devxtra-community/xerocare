@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface PayrollHistoryItem {
   id: string;
   month: number;
@@ -142,7 +143,8 @@ export default function HRPayrollHistoryDialog({
                           {MONTH_NAMES[record.month - 1]} {record.year}
                         </TableCell>
                         <TableCell className="text-right font-bold text-sm text-blue-700">
-                          QAR {parseFloat(record.salary_amount.toString()).toLocaleString()}
+                          {getActiveCurrency()}{' '}
+                          {parseFloat(record.salary_amount.toString()).toLocaleString()}
                         </TableCell>
                         <TableCell className="text-center py-3">
                           <Badge

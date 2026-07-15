@@ -190,7 +190,7 @@ export default function FinanceQuotationTable({
         if (!silent) setLoading(false);
       }
     },
-    [saleType],
+    [saleType, currency],
   );
 
   // Request notification permission once

@@ -1,6 +1,7 @@
 import React from 'react';
 import { numberToWords } from '@/lib/numberToWords';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface SlabRange {
   from: number;
   to: number;
@@ -667,7 +668,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                       color: '#0f172a',
                                     }}
                                   >
-                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                    {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                   </td>
                                 </tr>
                               ))}
@@ -738,7 +739,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                       color: '#b91c1c',
                                     }}
                                   >
-                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                    {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                   </td>
                                 </tr>
                               ))}
@@ -809,7 +810,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                       color: '#059669',
                                     }}
                                   >
-                                    QAR {Number(s.rate || 0).toFixed(3)}
+                                    {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                   </td>
                                 </tr>
                               ))}
@@ -857,7 +858,8 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               <td style={tdStyle('left')}>{agreementDetails.rentType}</td>
               <td style={tdStyle('center')}>{agreementDetails.period}</td>
               <td style={tdStyle('center')}>
-                QAR {fmt(agreementDetails.advance || agreementDetails.deposit || 0)}
+                {getActiveCurrency()}{' '}
+                {fmt(agreementDetails.advance || agreementDetails.deposit || 0)}
               </td>
               <td style={tdStyle('center')}>{agreementDetails.duration}</td>
               <td style={tdStyle('center')}>
@@ -870,7 +872,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 )}
               </td>
               <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
-                QAR{' '}
+                {getActiveCurrency()}{' '}
                 {fmt(agreementDetails.discountedMonthlyRent || agreementDetails.monthlyRentAmount)}
               </td>
             </tr>
@@ -900,7 +902,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               label: 'Grand Total (Including VAT)',
               value: totals.total,
               num: totals.total,
-              prefix: 'QAR ',
+              prefix: `${getActiveCurrency()} `,
               isBold: true,
             },
           ].map((row, i) => (

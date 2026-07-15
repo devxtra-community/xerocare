@@ -18,7 +18,7 @@ import {
 } from '../entities/serviceTicketEntity';
 import { ServiceTicketItem, ServiceItemSource } from '../entities/serviceTicketItemEntity';
 import { SparePart } from '../entities/sparePartEntity';
-import { Product } from '../entities/productEntity';
+import { Product, OwnershipType, ProductStatus, PrintColour } from '../entities/productEntity';
 import { Branch } from '../entities/branchEntity';
 import { ServiceDiagnosis } from '../entities/serviceDiagnosisEntity';
 import { ServiceEstimate, ServiceEstimateStatus } from '../entities/serviceEstimateEntity';
@@ -32,7 +32,20 @@ import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
 import { ConsumableYieldHistory } from '../entities/consumableYieldHistoryEntity';
 import { InventoryReservation } from '../entities/inventoryReservationEntity';
 import { ServiceTicketActivity } from '../entities/serviceTicketActivityEntity';
-import { ServiceContract, ServiceContractType } from '../entities/serviceContractEntity';
+import {
+  ServiceContract,
+  ServiceContractType,
+  FsmaBillingMode,
+} from '../entities/serviceContractEntity';
+import { ContractMeterReading } from '../entities/contractMeterReadingEntity';
+import {
+  ContractCoverage,
+  FULL_COVERAGE,
+  NO_COVERAGE,
+  coverageForContractType,
+  normalizeCoverage,
+  coverageAllowsItem,
+} from '../helpers/contractCoverageHelper';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import axios from 'axios';
@@ -44,6 +57,11 @@ import {
   getCustomerName,
   getHelpDeskEmployeesByBranch,
 } from '../helpers/serviceHelpers';
+import {
+  evaluateWarranty,
+  copiesUsedFromCounters,
+  WarrantyEvaluation,
+} from '../helpers/warrantyHelper';
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET || 'secret';
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
@@ -209,15 +227,63 @@ export class ServiceController {
   }
 
   /**
-   * Automated Context and Job Type Identification.
+   * Coverage of the contract a ticket runs under, or null when the ticket is
+   * not in a contract context (warranty/rent tickets return null too — their
+   * "everything free" handling lives at the call sites).
    */
-  private async determineServiceContextAndJobType(serialNumber: string): Promise<{
+  private async getTicketContractCoverage(
+    contractReferenceId: string | null | undefined,
+  ): Promise<ContractCoverage | null> {
+    if (!contractReferenceId) return null;
+    const contract = await Source.getRepository(ServiceContract).findOne({
+      where: { id: contractReferenceId },
+    });
+    if (!contract) return null;
+    return normalizeCoverage(
+      contract.coverageRules || coverageForContractType(contract.contractType),
+    );
+  }
+
+  /** Maps sparePartId → part_category for coverage checks over item lists. */
+  private async getPartCategories(
+    sparePartIds: Array<string | null | undefined>,
+  ): Promise<Map<string, string | null>> {
+    const ids = [...new Set(sparePartIds.filter((v): v is string => !!v))];
+    const map = new Map<string, string | null>();
+    if (ids.length === 0) return map;
+    const parts = await Source.getRepository(SparePart).find({
+      where: { id: In(ids) },
+      select: ['id', 'part_category'],
+    });
+    for (const p of parts) map.set(p.id, p.part_category || null);
+    return map;
+  }
+
+  /**
+   * Automated Context and Job Type Identification.
+   *
+   * When `meterReading` is provided (e.g. asked from the customer while
+   * raising the ticket) it takes precedence over stored counters, so a
+   * copy-limited warranty that has silently expired is caught here.
+   */
+  private async determineServiceContextAndJobType(
+    serialNumber: string,
+    meterReading?: number,
+  ): Promise<{
     serviceContext: ServiceContext;
     contractReferenceId: string | null;
     productId: string | null;
     jobType: JobType;
     track: 'A' | 'B';
     linkedInvoiceId: string | null;
+    warrantyInfo: WarrantyEvaluation | null;
+    contractUsage: {
+      copiesUsed: number;
+      copyLimit: number;
+      copiesRemaining: number;
+      limitExceeded: boolean;
+      overagePerCopyRate: number;
+    } | null;
   }> {
     let serviceContext = ServiceContext.CHARGEABLE;
     let contractReferenceId: string | null = null;
@@ -225,6 +291,14 @@ export class ServiceController {
     let jobType = JobType.ONSITE;
     let track: 'A' | 'B' = 'B';
     let linkedInvoiceId: string | null = null;
+    let warrantyInfo: WarrantyEvaluation | null = null;
+    let contractUsage: {
+      copiesUsed: number;
+      copyLimit: number;
+      copiesRemaining: number;
+      limitExceeded: boolean;
+      overagePerCopyRate: number;
+    } | null = null;
 
     const product = await Source.getRepository(Product).findOne({
       where: { serial_no: serialNumber },
@@ -252,6 +326,11 @@ export class ServiceController {
         logger.error('Failed to fetch machine billing context from billing service:', err);
       }
 
+      const copiesUsed =
+        meterReading !== undefined && meterReading !== null
+          ? meterReading
+          : copiesUsedFromCounters(latestAllocation, product.meter_reading);
+
       // Step 1 - Check if machine is on RENT
       if (rentInvoice) {
         serviceContext = ServiceContext.RENT;
@@ -262,55 +341,19 @@ export class ServiceController {
         // Step 2 - Check if machine is under SALE warranty
         let isSaleWarrantyActive = false;
         if (saleInvoice) {
-          const saleDate = new Date(saleInvoice.effectiveFrom || saleInvoice.createdAt);
-          const currentDate = new Date();
+          warrantyInfo = evaluateWarranty({
+            warrantyType: saleInvoice.warrantyType || 'duration',
+            warrantyDurationValue: saleInvoice.warrantyDurationValue,
+            warrantyDurationUnit: saleInvoice.warrantyDurationUnit,
+            warrantyCopyLimit: saleInvoice.warrantyCopyLimit,
+            startDate: new Date(saleInvoice.effectiveFrom || saleInvoice.createdAt),
+            copiesUsed,
+            // Legacy fallback: item-level warranty string or product.warranty (months)
+            fallbackMonths: parseInt(saleInvoice.warranty || product.warranty || '12', 10) || 12,
+            fallbackCopyLimit: product.warranty_max_pages || 200000,
+          });
 
-          let copiesUsed = 0;
-          if (latestAllocation) {
-            copiesUsed =
-              (latestAllocation.currentBwA4 || 0) +
-              (latestAllocation.currentBwA3 || 0) * 2 +
-              (latestAllocation.currentColorA4 || 0) +
-              (latestAllocation.currentColorA3 || 0) * 2;
-          } else if (product.meter_reading) {
-            copiesUsed = product.meter_reading;
-          }
-
-          const invoiceWarrantyType = saleInvoice.warrantyType || 'duration';
-          let durationValid = true;
-          let copiesValid = true;
-
-          if (invoiceWarrantyType === 'duration' || invoiceWarrantyType === 'both') {
-            let endDate: Date;
-            if (saleInvoice.warrantyDurationValue && saleInvoice.warrantyDurationUnit) {
-              endDate = new Date(saleDate);
-              if (saleInvoice.warrantyDurationUnit === 'years')
-                endDate.setFullYear(
-                  endDate.getFullYear() + Number(saleInvoice.warrantyDurationValue),
-                );
-              else endDate.setMonth(endDate.getMonth() + Number(saleInvoice.warrantyDurationValue));
-            } else {
-              // Legacy fallback: item-level warranty string or product.warranty (months)
-              const warrantyMonths =
-                parseInt(saleInvoice.warranty || product.warranty || '12', 10) || 12;
-              endDate = new Date(saleDate);
-              endDate.setMonth(endDate.getMonth() + warrantyMonths);
-            }
-            durationValid = currentDate <= endDate;
-          }
-
-          if (invoiceWarrantyType === 'copies' || invoiceWarrantyType === 'both') {
-            const copyLimit = saleInvoice.warrantyCopyLimit || product.warranty_max_pages || 200000;
-            copiesValid = copiesUsed < copyLimit;
-          }
-
-          // 'both'     → AND: warranty valid only while BOTH hold; expires at whichever hits first
-          // 'duration' → only durationValid matters
-          // 'copies'   → only copiesValid matters
-          // 'none'     → never under warranty
-          const isUnderWarranty = invoiceWarrantyType !== 'none' && durationValid && copiesValid;
-
-          if (isUnderWarranty) {
+          if (warrantyInfo.isUnderWarranty) {
             serviceContext = ServiceContext.WARRANTY;
             track = 'A';
             linkedInvoiceId = saleInvoice.id;
@@ -321,55 +364,19 @@ export class ServiceController {
         if (!isSaleWarrantyActive) {
           // Step 3 - Check if machine is on LEASE
           if (leaseInvoice) {
-            const effectiveFrom = new Date(leaseInvoice.effectiveFrom);
-            const currentDate = new Date();
+            warrantyInfo = evaluateWarranty({
+              warrantyType: leaseInvoice.warrantyType || 'both',
+              warrantyDurationValue: leaseInvoice.warrantyDurationValue,
+              warrantyDurationUnit: leaseInvoice.warrantyDurationUnit,
+              warrantyCopyLimit: leaseInvoice.warrantyCopyLimit,
+              startDate: new Date(leaseInvoice.effectiveFrom),
+              copiesUsed,
+              fallbackMonths: Number(leaseInvoice.leaseTenureMonths) || 0,
+              fallbackCopyLimit:
+                Number(leaseInvoice.maxCopyLimit) || product.warranty_max_pages || 200000,
+            });
 
-            let copiesUsed = 0;
-            if (latestAllocation) {
-              copiesUsed =
-                (latestAllocation.currentBwA4 || 0) +
-                (latestAllocation.currentBwA3 || 0) * 2 +
-                (latestAllocation.currentColorA4 || 0) +
-                (latestAllocation.currentColorA3 || 0) * 2;
-            } else if (product.meter_reading) {
-              copiesUsed = product.meter_reading;
-            }
-
-            const leaseWarrantyType = leaseInvoice.warrantyType || 'both';
-            let durationValid = true;
-            let copiesValid = true;
-
-            if (leaseWarrantyType === 'duration' || leaseWarrantyType === 'both') {
-              let endDate: Date;
-              if (leaseInvoice.warrantyDurationValue && leaseInvoice.warrantyDurationUnit) {
-                endDate = new Date(effectiveFrom);
-                if (leaseInvoice.warrantyDurationUnit === 'years')
-                  endDate.setFullYear(
-                    endDate.getFullYear() + Number(leaseInvoice.warrantyDurationValue),
-                  );
-                else
-                  endDate.setMonth(endDate.getMonth() + Number(leaseInvoice.warrantyDurationValue));
-              } else {
-                // Fallback: use lease tenure months
-                const tenureMonths = Number(leaseInvoice.leaseTenureMonths) || 0;
-                endDate = new Date(effectiveFrom);
-                endDate.setMonth(endDate.getMonth() + tenureMonths);
-              }
-              durationValid = currentDate <= endDate;
-            }
-
-            if (leaseWarrantyType === 'copies' || leaseWarrantyType === 'both') {
-              const copyLimit =
-                leaseInvoice.warrantyCopyLimit ||
-                Number(leaseInvoice.maxCopyLimit) ||
-                product.warranty_max_pages ||
-                200000;
-              copiesValid = copiesUsed < copyLimit;
-            }
-
-            const isUnderWarranty = leaseWarrantyType !== 'none' && durationValid && copiesValid;
-
-            if (isUnderWarranty) {
+            if (warrantyInfo.isUnderWarranty) {
               serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
               track = 'A';
               linkedInvoiceId = leaseInvoice.id;
@@ -385,7 +392,8 @@ export class ServiceController {
             serviceContext !== ServiceContext.LEASE_UNDER_WARRANTY &&
             serviceContext !== ServiceContext.LEASE_EXPIRED
           ) {
-            const activeContract = await Source.getRepository(ServiceContract).findOne({
+            const contractRepo = Source.getRepository(ServiceContract);
+            const activeContract = await contractRepo.findOne({
               where: {
                 productId: productId,
                 status: 'ACTIVE',
@@ -405,6 +413,34 @@ export class ServiceController {
                   serviceContext = ServiceContext.AMC;
                   track = 'B';
                 }
+
+                // SMA is bounded by a copy limit too: report usage against it
+                // (from the reading asked at ticket creation, falling back to
+                // the machine's stored lifetime meter).
+                if (
+                  activeContract.contractType === 'SMA' &&
+                  activeContract.copyLimit != null &&
+                  activeContract.startMeterReading != null
+                ) {
+                  const currentMeter =
+                    meterReading !== undefined && meterReading !== null
+                      ? meterReading
+                      : product.meter_reading || 0;
+                  const used = Math.max(0, currentMeter - Number(activeContract.startMeterReading));
+                  const limit = Number(activeContract.copyLimit);
+                  contractUsage = {
+                    copiesUsed: used,
+                    copyLimit: limit,
+                    copiesRemaining: Math.max(0, limit - used),
+                    limitExceeded: used > limit,
+                    overagePerCopyRate: Number(activeContract.overagePerCopyRate) || 0,
+                  };
+                }
+              } else if (now > activeContract.endDate) {
+                // Term is over — flip the stale ACTIVE status so lists and
+                // stats stop counting it.
+                activeContract.status = 'EXPIRED';
+                await contractRepo.save(activeContract);
               }
             }
           }
@@ -417,7 +453,16 @@ export class ServiceController {
       jobType = JobType.WARRANTY_ONSITE;
     }
 
-    return { serviceContext, contractReferenceId, productId, jobType, track, linkedInvoiceId };
+    return {
+      serviceContext,
+      contractReferenceId,
+      productId,
+      jobType,
+      track,
+      linkedInvoiceId,
+      warrantyInfo,
+      contractUsage,
+    };
   }
 
   /**
@@ -438,7 +483,21 @@ export class ServiceController {
         jobType,
         scheduledVisitDate,
         ticketType,
+        meterReadingAtCreation,
       } = req.body;
+
+      const reportedMeterReading =
+        meterReadingAtCreation !== undefined &&
+        meterReadingAtCreation !== null &&
+        meterReadingAtCreation !== ''
+          ? Number(meterReadingAtCreation)
+          : undefined;
+      if (
+        reportedMeterReading !== undefined &&
+        (isNaN(reportedMeterReading) || reportedMeterReading < 0)
+      ) {
+        throw new AppError('Invalid meter reading provided', 400);
+      }
 
       const {
         serviceContext,
@@ -447,7 +506,23 @@ export class ServiceController {
         jobType: finalJobType,
         track,
         linkedInvoiceId,
-      } = await this.determineServiceContextAndJobType(serialNumber);
+      } = await this.determineServiceContextAndJobType(serialNumber, reportedMeterReading);
+
+      // Persist the fresh reading on the product so future warranty checks use it
+      if (reportedMeterReading !== undefined && productId) {
+        const productRepo = Source.getRepository(Product);
+        const product = await productRepo.findOne({ where: { id: productId } });
+        if (product) {
+          if (product.meter_reading && reportedMeterReading < product.meter_reading) {
+            throw new AppError(
+              `Meter reading ${reportedMeterReading} cannot be less than the current reading ${product.meter_reading}`,
+              400,
+            );
+          }
+          product.meter_reading = reportedMeterReading;
+          await productRepo.save(product);
+        }
+      }
 
       const ticketRepo = Source.getRepository(ServiceTicket);
       const now = new Date();
@@ -481,6 +556,7 @@ export class ServiceController {
         track,
         linkedInvoiceId,
         ticketType: ticketType || 'COMPLAINT',
+        meterReadingAtCreation: reportedMeterReading ?? null,
       });
 
       await ticketRepo.save(ticket);
@@ -684,6 +760,10 @@ export class ServiceController {
       const itemRepo = Source.getRepository(ServiceTicketItem);
       const ticketItems: ServiceTicketItem[] = [];
 
+      // Under a contract, "free" is per item category (e.g. SMA covers spare
+      // parts but charges toner). No contract + track A = everything free.
+      const contractCoverage = await this.getTicketContractCoverage(ticket.contractReferenceId);
+
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
         for (const itemData of items) {
@@ -691,6 +771,7 @@ export class ServiceController {
           let sku = itemData.sku || null;
           let barcodeId = itemData.barcodeId || null;
           let unitPrice = Number(itemData.unitPrice) || 0;
+          let partCategory: string | null = null;
 
           if (itemData.itemSource === ServiceItemSource.SPARE_PART && itemData.sparePartId) {
             const part = await sparePartRepo.findOne({
@@ -701,6 +782,7 @@ export class ServiceController {
               sku = part.sku;
               barcodeId = part.barcode_id || null;
               unitPrice = Number(part.base_price) || 0;
+              partCategory = part.part_category || null;
 
               // Check stock warnings
               if (part.quantity <= 5) {
@@ -719,7 +801,10 @@ export class ServiceController {
             }
           }
 
-          const isItemFree = isFreeContext ? true : !!itemData.isFree;
+          const coveredByContract = contractCoverage
+            ? coverageAllowsItem(contractCoverage, { partCategory, partName })
+            : true;
+          const isItemFree = isFreeContext ? coveredByContract : !!itemData.isFree;
           const finalPrice = isItemFree ? 0 : unitPrice;
 
           const serviceItem = itemRepo.create({
@@ -753,7 +838,8 @@ export class ServiceController {
       ticket.items = ticketItems;
       await ticketRepo.save(ticket);
 
-      // For Track A, automatically generate/send FOC Estimate to billing service
+      // For Track A, automatically generate/send FOC Estimate to billing service.
+      // Items excluded by the contract (e.g. toner under SMA) keep their price.
       if (isFreeContext) {
         const billingItems = ticketItems.map((item) => ({
           itemSource: item.itemSource,
@@ -762,9 +848,9 @@ export class ServiceController {
           partName: item.partName,
           sku: item.sku,
           quantity: item.quantity,
-          unitPrice: 0,
-          totalPrice: 0,
-          isFree: true,
+          unitPrice: Number(item.unitPrice) || 0,
+          totalPrice: Number(item.totalPrice) || 0,
+          isFree: item.isFree,
         }));
         try {
           const token = sign(
@@ -1421,24 +1507,33 @@ export class ServiceController {
       await revisionRepo.save(revision);
 
       const sparePartRepo = Source.getRepository(SparePart);
+      // Contract decides what stays free per item category: SMA/FSMA cover
+      // parts, AMC does not, and toner is only covered under FSMA.
+      const revisionCoverage = await this.getTicketContractCoverage(ticket.contractReferenceId);
       if (items && Array.isArray(items)) {
         for (const it of items) {
           let partName = it.partName || '';
           let sku = it.sku || '';
           let basePrice = Number(it.unitPrice) || 0;
+          let partCategory: string | null = null;
 
           if (it.sparePartId) {
             const part = await sparePartRepo.findOne({ where: { id: String(it.sparePartId) } });
             if (part) {
               partName = part.part_name;
               sku = part.sku;
+              partCategory = part.part_category || null;
               if (basePrice === 0) {
                 basePrice = Number(part.base_price) || 0;
               }
             }
           }
 
-          const isItemFree = ticket.serviceContext === ServiceContext.AMC ? true : !!it.isFree;
+          const isItemFree = revisionCoverage
+            ? coverageAllowsItem(revisionCoverage, { partCategory, partName })
+            : ticket.track === 'A'
+              ? true
+              : !!it.isFree;
           const finalPrice = isItemFree ? 0 : basePrice;
           const itemTotal = finalPrice * (it.quantity || 1);
           revisionTotal += itemTotal;
@@ -2019,6 +2114,88 @@ export class ServiceController {
   /**
    * GET /service/customers/:customerId/history
    */
+  /**
+   * Attaches `warrantyInfo` to every product allocation in a customer's
+   * billing history (grouped by bill type as returned by the billing service).
+   *
+   * - RENT: always fully covered (our machine).
+   * - SALE/LEASE: evaluated from the invoice's warranty fields, copies used
+   *   taken from allocation counters (A3 = 2 pages) or the product's meter.
+   */
+  private async enrichBillingHistoryWithWarranty(
+    billingHistory: Record<
+      string,
+      Array<{
+        effectiveFrom?: string;
+        createdAt?: string;
+        warrantyType?: string;
+        warrantyDurationValue?: number;
+        warrantyDurationUnit?: string;
+        warrantyCopyLimit?: number;
+        leaseTenureMonths?: number;
+        maxCopyLimit?: number;
+        productAllocations?: Array<{
+          productId?: string;
+          currentBwA4?: number;
+          currentBwA3?: number;
+          currentColorA4?: number;
+          currentColorA3?: number;
+          warrantyInfo?: unknown;
+        }>;
+      }>
+    >,
+  ): Promise<void> {
+    const productIds = new Set<string>();
+    for (const invoices of Object.values(billingHistory)) {
+      if (!Array.isArray(invoices)) continue;
+      for (const inv of invoices) {
+        for (const alloc of inv.productAllocations || []) {
+          if (alloc.productId) productIds.add(alloc.productId);
+        }
+      }
+    }
+
+    const products = productIds.size
+      ? await Source.getRepository(Product).find({ where: { id: In([...productIds]) } })
+      : [];
+    const productById = new Map(products.map((p) => [p.id, p]));
+
+    for (const [billType, invoices] of Object.entries(billingHistory)) {
+      if (!Array.isArray(invoices)) continue;
+      for (const inv of invoices) {
+        for (const alloc of inv.productAllocations || []) {
+          const product = alloc.productId ? productById.get(alloc.productId) : undefined;
+
+          if (billType === 'RENT') {
+            alloc.warrantyInfo = { isUnderWarranty: true, fullCoverage: true };
+            continue;
+          }
+          if (billType !== 'SALE' && billType !== 'LEASE') continue;
+
+          const startRaw = inv.effectiveFrom || inv.createdAt;
+          if (!startRaw) continue;
+
+          const copiesUsed = copiesUsedFromCounters(alloc, product?.meter_reading);
+          const isLease = billType === 'LEASE';
+
+          alloc.warrantyInfo = evaluateWarranty({
+            warrantyType: inv.warrantyType || (isLease ? 'both' : 'duration'),
+            warrantyDurationValue: inv.warrantyDurationValue,
+            warrantyDurationUnit: inv.warrantyDurationUnit,
+            warrantyCopyLimit: inv.warrantyCopyLimit,
+            startDate: new Date(startRaw),
+            copiesUsed,
+            fallbackMonths: isLease
+              ? Number(inv.leaseTenureMonths) || 0
+              : parseInt(product?.warranty || '12', 10) || 12,
+            fallbackCopyLimit:
+              (isLease ? Number(inv.maxCopyLimit) : 0) || product?.warranty_max_pages || 200000,
+          });
+        }
+      }
+    }
+  }
+
   getCustomerHistory = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const customerId = req.params.customerId as string;
@@ -2043,6 +2220,16 @@ export class ServiceController {
         logger.error('Failed to fetch billing history for customer history:', err);
       }
 
+      // Attach warranty status to each SALE/LEASE/RENT allocation so the UI
+      // never has to re-derive it (single source of truth: warrantyHelper).
+      if (billingHistory) {
+        try {
+          await this.enrichBillingHistoryWithWarranty(billingHistory);
+        } catch (err) {
+          logger.error('Failed to enrich billing history with warranty info:', err);
+        }
+      }
+
       const assignedProducts = await Source.getRepository(Product).find({
         where: { customer_id: customerId },
       });
@@ -2059,24 +2246,37 @@ export class ServiceController {
   getMachineContext = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { serialNumber } = req.params;
-      const details = await this.determineServiceContextAndJobType(String(serialNumber));
+      const meterReadingParam = req.query.meterReading as string | undefined;
+      const meterReading =
+        meterReadingParam !== undefined &&
+        meterReadingParam !== '' &&
+        !isNaN(Number(meterReadingParam))
+          ? Number(meterReadingParam)
+          : undefined;
+      const details = await this.determineServiceContextAndJobType(
+        String(serialNumber),
+        meterReading,
+      );
 
       let activeContract = null;
-      let coverage = { labour: false, consumables: false, travel: false };
+      let coverage: ContractCoverage = { ...NO_COVERAGE };
 
       if (details.contractReferenceId) {
         activeContract = await Source.getRepository(ServiceContract).findOne({
           where: { id: details.contractReferenceId as string },
         });
         if (activeContract) {
-          coverage = activeContract.coverageRules;
+          // Coverage rules are fixed per contract type; normalize legacy rows
+          coverage = normalizeCoverage(
+            activeContract.coverageRules || coverageForContractType(activeContract.contractType),
+          );
         }
       } else if (
         details.serviceContext === ServiceContext.RENT ||
         details.serviceContext === ServiceContext.WARRANTY ||
         details.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
       ) {
-        coverage = { labour: true, consumables: true, travel: true };
+        coverage = { ...FULL_COVERAGE };
       }
 
       res.status(200).json({
@@ -2087,6 +2287,8 @@ export class ServiceController {
           productId: details.productId,
           coverage,
           contract: activeContract,
+          warrantyInfo: details.warrantyInfo,
+          contractUsage: details.contractUsage,
         },
       });
     } catch (error) {
@@ -2418,27 +2620,51 @@ export class ServiceController {
         );
       }
 
-      const isFreeContext = [
+      // Warranty/rent contexts cover everything; contract contexts cover per
+      // item category (SMA/AMC charge toner, AMC charges parts too). Labour
+      // is free under all three contract types.
+      const baseFreeContext = [
         ServiceContext.RENT,
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
-        ServiceContext.FSMA,
-        ServiceContext.SMA,
       ].includes(ticket.serviceContext);
+      const quoteCoverage: ContractCoverage = baseFreeContext
+        ? { ...FULL_COVERAGE }
+        : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
+            ...NO_COVERAGE,
+          });
+      const partCategories = await this.getPartCategories(ticket.items.map((it) => it.sparePartId));
 
-      const items = ticket.items.map((it) => ({
-        description: it.partName,
-        quantity: it.quantity,
-        unitPrice: isFreeContext ? 0 : Number(it.unitPrice) || 0,
-        isFree: isFreeContext ? true : it.isFree,
-      }));
+      const hasContractContext = baseFreeContext || !!ticket.contractReferenceId;
 
+      const items = ticket.items.map((it) => {
+        const itemCovered = hasContractContext
+          ? coverageAllowsItem(quoteCoverage, {
+              partCategory: it.sparePartId ? partCategories.get(it.sparePartId) : null,
+              partName: it.partName,
+            })
+          : false;
+        const isFree = itemCovered || !!it.isFree;
+        return {
+          description: it.partName,
+          quantity: it.quantity,
+          unitPrice: isFree ? 0 : Number(it.unitPrice) || 0,
+          isFree,
+        };
+      });
+
+      const labourFree = hasContractContext && quoteCoverage.labour;
       items.push({
         description: 'Labor Cost / Service Charge',
         quantity: 1,
-        unitPrice: isFreeContext ? 0 : Number(laborCost) || 0,
-        isFree: isFreeContext,
+        unitPrice: labourFree ? 0 : Number(laborCost) || 0,
+        isFree: labourFree,
       });
+
+      const effectiveVisitCharge =
+        hasContractContext && quoteCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
+
+      const allFree = items.every((it) => it.isFree) && effectiveVisitCharge === 0;
 
       const billingPayload = {
         customerId: ticket.customerId,
@@ -2446,12 +2672,12 @@ export class ServiceController {
         createdBy: ticket.createdBy,
         serviceTicketId: ticket.id,
         items,
-        visitChargeAmount: Number(visitChargeAmount) || 0,
+        visitChargeAmount: effectiveVisitCharge,
         visitChargeMethod: visitChargeMethod || null,
         discountAmount: Number(discountAmount) || 0,
         technicianNoteToFinance: technicianNoteToFinance || null,
         saleType: 'PRODUCT_SALE',
-        status: isFreeContext ? 'CUSTOMER_ACCEPTED' : 'WAITING_FINANCE_APPROVAL',
+        status: allFree ? 'CUSTOMER_ACCEPTED' : 'WAITING_FINANCE_APPROVAL',
       };
 
       const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
@@ -2469,14 +2695,14 @@ export class ServiceController {
       );
       const quotation = quoteRes.data.data;
 
-      if (isFreeContext) {
+      if (allFree) {
         ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
       } else {
         ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
       }
 
       ticket.serviceQuotationId = quotation.id;
-      ticket.visitChargeAmount = Number(visitChargeAmount) || 0;
+      ticket.visitChargeAmount = effectiveVisitCharge;
       ticket.visitChargeMethod = visitChargeMethod || null;
       await ticketRepo.save(ticket);
 
@@ -2861,27 +3087,212 @@ export class ServiceController {
   /**
    * POST /service/contracts
    */
+  /**
+   * POST /service/external-machines
+   *
+   * Registers a machine the customer bought elsewhere so it can carry a
+   * service contract / tickets. Stored as a product with ownership EXTERNAL —
+   * no model/warehouse/vendor of ours, never part of sellable stock.
+   */
+  registerExternalMachine = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { customerId, brand, modelName, serialNumber, meterReading, printColour, description } =
+        req.body;
+
+      if (!customerId) throw new AppError('customerId is required.', 400);
+      if (!brand || !String(brand).trim()) throw new AppError('Brand is required.', 400);
+      if (!modelName || !String(modelName).trim())
+        throw new AppError('Model name is required.', 400);
+      if (!serialNumber || !String(serialNumber).trim())
+        throw new AppError('Serial number is required.', 400);
+      const meter = Number(meterReading);
+      if (meterReading === undefined || meterReading === '' || isNaN(meter) || meter < 0) {
+        throw new AppError('Current meter reading is required (0 or more).', 400);
+      }
+
+      const productRepo = Source.getRepository(Product);
+      const serial = String(serialNumber).trim();
+      const existing = await productRepo.findOne({ where: { serial_no: serial } });
+      if (existing) {
+        throw new AppError(
+          `A machine with serial number ${serial} already exists${
+            existing.customer_id ? ' and is assigned to a customer' : ''
+          }.`,
+          400,
+        );
+      }
+
+      const colour = Object.values(PrintColour).includes(printColour as PrintColour)
+        ? (printColour as PrintColour)
+        : PrintColour.BLACK_WHITE;
+
+      const product = productRepo.create({
+        serial_no: serial,
+        name: String(modelName).trim(),
+        brand: String(brand).trim(),
+        ownership: OwnershipType.EXTERNAL,
+        customer_id: customerId,
+        meter_reading: meter,
+        // Not our stock — keep it out of available inventory
+        product_status: ProductStatus.SOLD,
+        tax_rate: 0,
+        print_colour: colour,
+        description: description ? String(description) : undefined,
+      });
+      await productRepo.save(product);
+
+      res.status(201).json({ success: true, data: product });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Validates and normalizes the type-specific billing fields of a contract.
+   * Coverage is always derived from the type — client-sent rules are ignored.
+   */
+  private buildContractFields(body: Record<string, unknown>): Partial<ServiceContract> {
+    const contractType = body.contractType as ServiceContractType;
+    if (!Object.values(ServiceContractType).includes(contractType)) {
+      throw new AppError('Invalid contract type. Must be FSMA, SMA or AMC.', 400);
+    }
+
+    const numOrNull = (v: unknown): number | null =>
+      v === undefined || v === null || v === '' || isNaN(Number(v)) ? null : Number(v);
+
+    const fields: Partial<ServiceContract> = {
+      contractType,
+      coverageRules: coverageForContractType(contractType) as ServiceContract['coverageRules'],
+      contractValue: numOrNull(body.contractValue) || 0,
+      notes: (body.notes as string) || null,
+      monthlyCharge: null,
+      copyLimit: null,
+      overagePerCopyRate: null,
+      startMeterReading: null,
+      fsmaBillingMode: null,
+      ratePerClickBW: null,
+      ratePerClickColor: null,
+      ratePerClickCombined: null,
+      startMeterBW: null,
+      startMeterColor: null,
+    };
+
+    if (contractType === ServiceContractType.AMC) {
+      const monthlyCharge = numOrNull(body.monthlyCharge);
+      if (monthlyCharge === null || monthlyCharge <= 0) {
+        throw new AppError('AMC contracts require a monthly charge greater than 0.', 400);
+      }
+      fields.monthlyCharge = monthlyCharge;
+    } else if (contractType === ServiceContractType.SMA) {
+      const copyLimit = numOrNull(body.copyLimit);
+      const startMeterReading = numOrNull(body.startMeterReading);
+      const overagePerCopyRate = numOrNull(body.overagePerCopyRate);
+      if (copyLimit === null || copyLimit <= 0) {
+        throw new AppError('SMA contracts require a copy limit greater than 0.', 400);
+      }
+      if (startMeterReading === null || startMeterReading < 0) {
+        throw new AppError(
+          'SMA contracts require the machine current meter reading at signing.',
+          400,
+        );
+      }
+      if (overagePerCopyRate !== null && overagePerCopyRate < 0) {
+        throw new AppError('Overage per-copy rate cannot be negative.', 400);
+      }
+      fields.copyLimit = copyLimit;
+      fields.startMeterReading = startMeterReading;
+      fields.overagePerCopyRate = overagePerCopyRate ?? 0;
+      const smaMonthly = numOrNull(body.monthlyCharge);
+      if (smaMonthly !== null && smaMonthly < 0) {
+        throw new AppError('Monthly charge cannot be negative.', 400);
+      }
+      fields.monthlyCharge = smaMonthly;
+    } else {
+      // FSMA — billed per click monthly
+      const mode = body.fsmaBillingMode as FsmaBillingMode;
+      if (!Object.values(FsmaBillingMode).includes(mode)) {
+        throw new AppError('FSMA contracts require billing mode INDIVIDUAL or COMBINED.', 400);
+      }
+      fields.fsmaBillingMode = mode;
+      if (mode === FsmaBillingMode.INDIVIDUAL) {
+        const rateBW = numOrNull(body.ratePerClickBW);
+        const rateColor = numOrNull(body.ratePerClickColor);
+        const startBW = numOrNull(body.startMeterBW);
+        const startColor = numOrNull(body.startMeterColor);
+        if (rateBW === null || rateBW < 0 || rateColor === null || rateColor < 0) {
+          throw new AppError(
+            'FSMA INDIVIDUAL contracts require per-click rates for both B&W and colour.',
+            400,
+          );
+        }
+        if (startBW === null || startBW < 0 || startColor === null || startColor < 0) {
+          throw new AppError(
+            'FSMA INDIVIDUAL contracts require starting B&W and colour meter readings.',
+            400,
+          );
+        }
+        fields.ratePerClickBW = rateBW;
+        fields.ratePerClickColor = rateColor;
+        fields.startMeterBW = startBW;
+        fields.startMeterColor = startColor;
+        fields.startMeterReading = startBW + startColor;
+      } else {
+        const rate = numOrNull(body.ratePerClickCombined);
+        const startTotal = numOrNull(body.startMeterReading);
+        if (rate === null || rate < 0) {
+          throw new AppError('FSMA COMBINED contracts require a per-click rate.', 400);
+        }
+        if (startTotal === null || startTotal < 0) {
+          throw new AppError(
+            'FSMA COMBINED contracts require the starting total meter reading.',
+            400,
+          );
+        }
+        fields.ratePerClickCombined = rate;
+        fields.startMeterReading = startTotal;
+      }
+    }
+
+    return fields;
+  }
+
   createContract = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const {
-        customerId,
-        productId,
-        contractType,
-        startDate,
-        endDate,
-        contractValue,
-        coverageRules,
-        status,
-      } = req.body;
+      const { customerId, productId, startDate, endDate, status } = req.body;
+      if (!customerId || !productId) {
+        throw new AppError('customerId and productId are required.', 400);
+      }
+      if (!startDate) throw new AppError('startDate is required.', 400);
+
+      const fields = this.buildContractFields(req.body);
+      const start = new Date(startDate);
+      // Contracts default to a 1-year term
+      const end = endDate
+        ? new Date(endDate)
+        : new Date(new Date(start).setFullYear(start.getFullYear() + 1));
+      if (end <= start) throw new AppError('endDate must be after startDate.', 400);
+
       const contractRepo = Source.getRepository(ServiceContract);
+
+      // A machine can only be under one active contract at a time
+      const existing = await contractRepo.findOne({
+        where: { productId: String(productId), status: 'ACTIVE' },
+      });
+      if (existing && new Date(existing.endDate) > new Date()) {
+        throw new AppError(
+          `This machine already has an active ${existing.contractType} contract until ${new Date(
+            existing.endDate,
+          ).toLocaleDateString()}. Terminate it before creating a new one.`,
+          400,
+        );
+      }
+
       const contract = contractRepo.create({
+        ...fields,
         customerId,
         productId,
-        contractType,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        contractValue: Number(contractValue) || 0,
-        coverageRules: coverageRules || { labour: true, consumables: true, travel: true },
+        startDate: start,
+        endDate: end,
         status: status || 'ACTIVE',
       });
       await contractRepo.save(contract);
@@ -2909,7 +3320,55 @@ export class ServiceController {
         where: query,
         order: { created_at: 'DESC' },
       });
-      res.status(200).json({ success: true, data: contracts });
+
+      // Attach per-contract billing/usage summary in one query
+      let summaries: Array<{
+        contractId: string;
+        readingCount: string;
+        totalBilled: string;
+        lastTotalReading: number | null;
+        lastReadingDate: Date | null;
+      }> = [];
+      if (contracts.length > 0) {
+        summaries = await Source.getRepository(ContractMeterReading)
+          .createQueryBuilder('r')
+          .select('r.contractId', 'contractId')
+          .addSelect('COUNT(*)', 'readingCount')
+          .addSelect('COALESCE(SUM(r.amountCharged), 0)', 'totalBilled')
+          .addSelect('MAX(r.totalReading)', 'lastTotalReading')
+          .addSelect('MAX(r.readingDate)', 'lastReadingDate')
+          .where('r.contractId IN (:...ids)', { ids: contracts.map((c) => c.id) })
+          .groupBy('r.contractId')
+          .getRawMany();
+      }
+      const summaryMap = new Map(summaries.map((s) => [s.contractId, s]));
+
+      const data = contracts.map((c) => {
+        const s = summaryMap.get(c.id);
+        const lastTotal = s?.lastTotalReading != null ? Number(s.lastTotalReading) : null;
+        const copiesUsed =
+          c.contractType === ServiceContractType.SMA &&
+          c.startMeterReading != null &&
+          lastTotal != null
+            ? Math.max(0, lastTotal - Number(c.startMeterReading))
+            : null;
+        return {
+          ...c,
+          usageSummary: {
+            readingCount: Number(s?.readingCount || 0),
+            totalBilled: Number(s?.totalBilled || 0),
+            lastTotalReading: lastTotal,
+            lastReadingDate: s?.lastReadingDate || null,
+            copiesUsed,
+            copiesRemaining:
+              copiesUsed != null && c.copyLimit != null
+                ? Math.max(0, Number(c.copyLimit) - copiesUsed)
+                : null,
+          },
+        };
+      });
+
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }
@@ -2936,27 +3395,24 @@ export class ServiceController {
   updateContract = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const {
-        customerId,
-        productId,
-        contractType,
-        startDate,
-        endDate,
-        contractValue,
-        coverageRules,
-        status,
-      } = req.body;
+      const { customerId, productId, startDate, endDate, status } = req.body;
       const contractRepo = Source.getRepository(ServiceContract);
       const contract = await contractRepo.findOne({ where: { id: id as string } });
-      if (!contract) throw new Error('Service Contract not found');
+      if (!contract) throw new AppError('Service Contract not found', 404);
+
+      // Re-validate the full set of type-specific fields (merged over current
+      // values) so a type change can never leave stale billing fields behind.
+      const merged = { ...contract, ...req.body };
+      const fields = this.buildContractFields(merged);
+      Object.assign(contract, fields);
 
       if (customerId) contract.customerId = customerId;
       if (productId) contract.productId = productId;
-      if (contractType) contract.contractType = contractType;
       if (startDate) contract.startDate = new Date(startDate);
       if (endDate) contract.endDate = new Date(endDate);
-      if (contractValue !== undefined) contract.contractValue = Number(contractValue);
-      if (coverageRules !== undefined) contract.coverageRules = coverageRules;
+      if (new Date(contract.endDate) <= new Date(contract.startDate)) {
+        throw new AppError('endDate must be after startDate.', 400);
+      }
       if (status) contract.status = status;
 
       await contractRepo.save(contract);
@@ -2977,6 +3433,197 @@ export class ServiceController {
       if (!contract) throw new Error('Service Contract not found');
       await contractRepo.remove(contract);
       res.status(200).json({ success: true, message: 'Service Contract deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/contracts/:id/meter-readings
+   *
+   * Records the (typically monthly) meter reading against a contract and
+   * computes the amount to collect for the period:
+   * - AMC : flat monthlyCharge (meters optional, tracking only)
+   * - SMA : clicks beyond copyLimit this period × overagePerCopyRate
+   *         (+ monthlyCharge if configured)
+   * - FSMA INDIVIDUAL : bwClicks × ratePerClickBW + colorClicks × ratePerClickColor
+   * - FSMA COMBINED   : totalClicks × ratePerClickCombined
+   */
+  recordContractMeterReading = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { totalReading, bwReading, colorReading, readingDate, notes } = req.body;
+
+      const contractRepo = Source.getRepository(ServiceContract);
+      const contract = await contractRepo.findOne({ where: { id: id as string } });
+      if (!contract) throw new AppError('Service Contract not found', 404);
+      if (contract.status !== 'ACTIVE') {
+        throw new AppError(`Cannot record readings on a ${contract.status} contract.`, 400);
+      }
+
+      const readingRepo = Source.getRepository(ContractMeterReading);
+      const lastReading = await readingRepo.findOne({
+        where: { contractId: contract.id },
+        order: { readingDate: 'DESC', created_at: 'DESC' },
+      });
+
+      const numOrNull = (v: unknown): number | null =>
+        v === undefined || v === null || v === '' || isNaN(Number(v)) ? null : Number(v);
+
+      let newTotal = numOrNull(totalReading);
+      const newBW = numOrNull(bwReading);
+      const newColor = numOrNull(colorReading);
+
+      const isIndividualFsma =
+        contract.contractType === ServiceContractType.FSMA &&
+        contract.fsmaBillingMode === FsmaBillingMode.INDIVIDUAL;
+
+      if (isIndividualFsma) {
+        if (newBW === null || newColor === null) {
+          throw new AppError(
+            'FSMA INDIVIDUAL contracts require both B&W and colour meter readings.',
+            400,
+          );
+        }
+        newTotal = newBW + newColor;
+      } else if (contract.contractType !== ServiceContractType.AMC && newTotal === null) {
+        throw new AppError('totalReading is required.', 400);
+      }
+
+      // Meters only count upward — baselines come from the contract itself
+      const prevTotal = lastReading?.totalReading ?? contract.startMeterReading;
+      const prevBW = lastReading?.bwReading ?? contract.startMeterBW;
+      const prevColor = lastReading?.colorReading ?? contract.startMeterColor;
+      if (newTotal !== null && prevTotal != null && newTotal < Number(prevTotal)) {
+        throw new AppError(
+          `Total reading ${newTotal} cannot be less than the previous reading ${prevTotal}.`,
+          400,
+        );
+      }
+      if (newBW !== null && prevBW != null && newBW < Number(prevBW)) {
+        throw new AppError(
+          `B&W reading ${newBW} cannot be less than the previous reading ${prevBW}.`,
+          400,
+        );
+      }
+      if (newColor !== null && prevColor != null && newColor < Number(prevColor)) {
+        throw new AppError(
+          `Colour reading ${newColor} cannot be less than the previous reading ${prevColor}.`,
+          400,
+        );
+      }
+
+      const clicksTotal = newTotal !== null && prevTotal != null ? newTotal - Number(prevTotal) : 0;
+      const clicksBW = newBW !== null && prevBW != null ? newBW - Number(prevBW) : 0;
+      const clicksColor = newColor !== null && prevColor != null ? newColor - Number(prevColor) : 0;
+
+      let amountCharged = 0;
+      let chargeBreakdown: Record<string, unknown> = {};
+
+      if (contract.contractType === ServiceContractType.AMC) {
+        amountCharged = Number(contract.monthlyCharge) || 0;
+        chargeBreakdown = { type: 'AMC', monthlyCharge: amountCharged };
+      } else if (contract.contractType === ServiceContractType.SMA) {
+        const startMeter = Number(contract.startMeterReading) || 0;
+        const copyLimit = Number(contract.copyLimit) || 0;
+        const rate = Number(contract.overagePerCopyRate) || 0;
+        const usedToDate = Math.max(0, (newTotal as number) - startMeter);
+        const prevUsedToDate = Math.max(0, Number(prevTotal ?? startMeter) - startMeter);
+        // Only the overage newly accrued this period is billed
+        const overageClicks =
+          Math.max(0, usedToDate - copyLimit) - Math.max(0, prevUsedToDate - copyLimit);
+        const overageAmount = overageClicks * rate;
+        const monthly = Number(contract.monthlyCharge) || 0;
+        amountCharged = overageAmount + monthly;
+        chargeBreakdown = {
+          type: 'SMA',
+          usedToDate,
+          copyLimit,
+          copiesRemaining: Math.max(0, copyLimit - usedToDate),
+          overageClicks,
+          overagePerCopyRate: rate,
+          overageAmount,
+          monthlyCharge: monthly,
+          limitExceeded: usedToDate > copyLimit,
+        };
+      } else if (isIndividualFsma) {
+        const rateBW = Number(contract.ratePerClickBW) || 0;
+        const rateColor = Number(contract.ratePerClickColor) || 0;
+        amountCharged = clicksBW * rateBW + clicksColor * rateColor;
+        chargeBreakdown = {
+          type: 'FSMA_INDIVIDUAL',
+          clicksBW,
+          ratePerClickBW: rateBW,
+          amountBW: clicksBW * rateBW,
+          clicksColor,
+          ratePerClickColor: rateColor,
+          amountColor: clicksColor * rateColor,
+        };
+      } else {
+        const rate = Number(contract.ratePerClickCombined) || 0;
+        amountCharged = clicksTotal * rate;
+        chargeBreakdown = {
+          type: 'FSMA_COMBINED',
+          clicksTotal,
+          ratePerClickCombined: rate,
+        };
+      }
+
+      amountCharged = Math.round(amountCharged * 100) / 100;
+
+      const reading = readingRepo.create({
+        contractId: contract.id,
+        readingDate: readingDate ? new Date(readingDate) : new Date(),
+        totalReading: newTotal,
+        bwReading: newBW,
+        colorReading: newColor,
+        clicksTotal,
+        clicksBW,
+        clicksColor,
+        amountCharged,
+        chargeBreakdown,
+        notes: notes || null,
+        recordedBy: req.user?.userId || null,
+      });
+      await readingRepo.save(reading);
+
+      // Keep the machine's lifetime meter in sync so service tickets validate
+      // against the freshest value.
+      if (newTotal !== null) {
+        const productRepo = Source.getRepository(Product);
+        const product = await productRepo.findOne({ where: { id: contract.productId } });
+        if (product && (!product.meter_reading || newTotal > product.meter_reading)) {
+          product.meter_reading = newTotal;
+          await productRepo.save(product);
+        }
+      }
+
+      res.status(201).json({ success: true, data: reading });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/contracts/:id/meter-readings
+   */
+  getContractMeterReadings = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const contractRepo = Source.getRepository(ServiceContract);
+      const contract = await contractRepo.findOne({ where: { id: id as string } });
+      if (!contract) throw new AppError('Service Contract not found', 404);
+
+      const readings = await Source.getRepository(ContractMeterReading).find({
+        where: { contractId: contract.id },
+        order: { readingDate: 'DESC', created_at: 'DESC' },
+      });
+
+      const totalBilled = readings.reduce((sum, r) => sum + Number(r.amountCharged || 0), 0);
+      res.status(200).json({
+        success: true,
+        data: { contract, readings, totalBilled: Math.round(totalBilled * 100) / 100 },
+      });
     } catch (error) {
       next(error);
     }
@@ -3719,21 +4366,38 @@ For queries contact us at +974 4455 6677`;
         userId,
       );
 
-      // Call billing service to update the invoice
-      const isFreeContext = [
+      // Call billing service to update the invoice. Coverage is per item
+      // category under contracts (SMA/AMC charge toner, AMC charges parts).
+      const baseFreeContext = [
         ServiceContext.RENT,
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
-        ServiceContext.FSMA,
-        ServiceContext.SMA,
       ].includes(ticket.serviceContext);
+      const reviseCoverage: ContractCoverage = baseFreeContext
+        ? { ...FULL_COVERAGE }
+        : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
+            ...NO_COVERAGE,
+          });
+      const hasContractContext = baseFreeContext || !!ticket.contractReferenceId;
+      const revisePartCategories = await this.getPartCategories(
+        items.map((it: ReviseEstimateItem) => it.sparePartId),
+      );
 
-      const billingItems = items.map((it: ReviseEstimateItem) => ({
-        description: it.partName || it.description || 'Spare Part',
-        quantity: it.quantity,
-        unitPrice: isFreeContext ? 0 : Number(it.unitPrice) || 0,
-        isFree: isFreeContext ? true : !!it.isFree,
-      }));
+      const billingItems = items.map((it: ReviseEstimateItem) => {
+        const covered = hasContractContext
+          ? coverageAllowsItem(reviseCoverage, {
+              partCategory: it.sparePartId ? revisePartCategories.get(it.sparePartId) : null,
+              partName: it.partName || it.description,
+            })
+          : false;
+        const isFree = covered || !!it.isFree;
+        return {
+          description: it.partName || it.description || 'Spare Part',
+          quantity: it.quantity,
+          unitPrice: isFree ? 0 : Number(it.unitPrice) || 0,
+          isFree,
+        };
+      });
 
       const billingPayload = {
         items: billingItems,

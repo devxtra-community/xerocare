@@ -5,6 +5,7 @@ import { Calendar, CreditCard, X, DollarSign } from 'lucide-react';
 import { OpeningBalanceEntry } from '@/lib/openingBalance';
 import ContractProgressBar from './ContractProgressBar';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface OpeningBalanceDetailPanelProps {
   entry: OpeningBalanceEntry | null;
   customerName: string;
@@ -81,7 +82,7 @@ export default function OpeningBalanceDetailPanel({
               <p className="text-xs mt-1 leading-relaxed">
                 {entry.isFullySettled
                   ? 'This entry has been fully paid off. No further collection required.'
-                  : `QAR ${Number(entry.remainingBalance).toLocaleString()} is outstanding post go-live. Payments must be recorded against standard invoice #${entry.invoice?.invoiceNumber || ''}.`}
+                  : `${getActiveCurrency()} ${Number(entry.remainingBalance).toLocaleString()} is outstanding post go-live. Payments must be recorded against standard invoice #${entry.invoice?.invoiceNumber || ''}.`}
               </p>
             </div>
           </div>
@@ -130,7 +131,7 @@ export default function OpeningBalanceDetailPanel({
                   Original Contract Value
                 </span>
                 <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  QAR {Number(entry.originalTotalAmount).toLocaleString()}
+                  {getActiveCurrency()} {Number(entry.originalTotalAmount).toLocaleString()}
                 </span>
               </div>
               <div className="p-3 bg-slate-50 dark:bg-slate-800/30 rounded-2xl text-center">
@@ -138,7 +139,7 @@ export default function OpeningBalanceDetailPanel({
                   Paid Pre-Go-Live
                 </span>
                 <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  QAR {Number(entry.alreadyPaidAmount).toLocaleString()}
+                  {getActiveCurrency()} {Number(entry.alreadyPaidAmount).toLocaleString()}
                 </span>
               </div>
               <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-2xl text-center">
@@ -146,7 +147,7 @@ export default function OpeningBalanceDetailPanel({
                   Remaining Outstanding
                 </span>
                 <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
-                  QAR {Number(entry.remainingBalance).toLocaleString()}
+                  {getActiveCurrency()} {Number(entry.remainingBalance).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -165,7 +166,8 @@ export default function OpeningBalanceDetailPanel({
                       Monthly Billing Rate
                     </span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      QAR {Number(entry.monthlyBillingAmount || 0).toLocaleString()} / Month
+                      {getActiveCurrency()}{' '}
+                      {Number(entry.monthlyBillingAmount || 0).toLocaleString()} / Month
                     </span>
                   </div>
                   <div>
@@ -186,7 +188,8 @@ export default function OpeningBalanceDetailPanel({
                   <div>
                     <span className="text-xs text-muted-foreground block">Remaining Value</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      QAR {Number(entry.remainingContractValue || 0).toLocaleString()}
+                      {getActiveCurrency()}{' '}
+                      {Number(entry.remainingContractValue || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>

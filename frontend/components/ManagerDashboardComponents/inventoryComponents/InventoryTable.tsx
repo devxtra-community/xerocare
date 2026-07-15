@@ -35,6 +35,7 @@ interface InventoryTableProps {
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function InventoryTable({
   mode = 'global',
   warehouseId,
@@ -247,7 +248,7 @@ export default function InventoryTable({
                       {item.brand}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-bold text-primary text-[12px]">
-                      QAR {(item.product_cost || 0).toLocaleString()}
+                      {getActiveCurrency()} {(item.product_cost || 0).toLocaleString()}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center font-bold text-[12px]">
                       {item.total_qty}

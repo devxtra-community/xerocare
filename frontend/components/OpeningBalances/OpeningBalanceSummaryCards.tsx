@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Landmark, AlertCircle, CheckCircle, FileText } from 'lucide-react';
 import { OpeningBalanceEntry } from '@/lib/openingBalance';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface SummaryCardsProps {
   entries: OpeningBalanceEntry[];
 }
@@ -36,7 +37,7 @@ export default function OpeningBalanceSummaryCards({ entries }: SummaryCardsProp
               Total Migrated Value
             </p>
             <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-1">
-              QAR{' '}
+              {getActiveCurrency()}{' '}
               {totalOriginal.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -57,7 +58,7 @@ export default function OpeningBalanceSummaryCards({ entries }: SummaryCardsProp
               Remaining Outstanding
             </p>
             <h3 className="text-2xl font-bold text-amber-600 dark:text-amber-500 mt-1">
-              QAR{' '}
+              {getActiveCurrency()}{' '}
               {totalRemaining.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -78,14 +79,15 @@ export default function OpeningBalanceSummaryCards({ entries }: SummaryCardsProp
               Total Paid / Settled
             </p>
             <h3 className="text-2xl font-bold text-emerald-600 dark:text-emerald-500 mt-1">
-              QAR{' '}
+              {getActiveCurrency()}{' '}
               {(totalPaid + totalCollectedSinceGoLive).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
-              QAR {totalCollectedSinceGoLive.toLocaleString()} collected since go-live
+              {getActiveCurrency()} {totalCollectedSinceGoLive.toLocaleString()} collected since
+              go-live
             </p>
           </div>
           <div className="p-3 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500">

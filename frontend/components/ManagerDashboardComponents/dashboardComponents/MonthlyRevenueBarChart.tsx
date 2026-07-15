@@ -14,6 +14,7 @@ import {
 import { salesService } from '@/services/salesService';
 import { YearSelector } from '@/components/ui/YearSelector';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ChartDataItem {
   date: string;
   sale: number;
@@ -111,7 +112,7 @@ export default function MonthlyRevenueBarChart() {
                               className="text-[12px] font-medium"
                               style={{ color: entry.color }}
                             >
-                              QAR {entry.value.toLocaleString()}
+                              {getActiveCurrency()} {entry.value.toLocaleString()}
                             </span>
                           </div>
                         ),
@@ -120,7 +121,7 @@ export default function MonthlyRevenueBarChart() {
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] font-bold text-gray-800">Total:</span>
                           <span className="text-[12px] font-bold text-gray-800">
-                            QAR
+                            {getActiveCurrency()}
                             {(payload as { value: number }[])
                               .reduce((sum: number, entry) => sum + entry.value, 0)
                               .toLocaleString()}

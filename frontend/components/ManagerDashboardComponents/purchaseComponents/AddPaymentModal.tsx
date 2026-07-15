@@ -76,7 +76,7 @@ export default function AddPaymentModal({
     } else {
       setAttachment(null);
     }
-  }, [open]);
+  }, [open, paidFromAccount]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

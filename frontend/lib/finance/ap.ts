@@ -1,3 +1,5 @@
+import { getActiveCurrency } from '@/lib/currency';
+
 type Vendor = {
   id: string;
   name: string;
@@ -22,7 +24,7 @@ export interface APInvoice {
   dueDate: string;
   status: APInvoiceStatus;
   totalAmount: number;
-  currency: 'AED';
+  currency: string;
   lines: ApiInvoiceLine[];
   approvedBy?: string;
   approvedOn?: string;
@@ -57,7 +59,7 @@ export const apInvoices: APInvoice[] = [
     invoiceDate: '2026-01-10',
     dueDate: '2026-02-09',
     status: 'Approved',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     lines: [
       {
         id: 'l1',
@@ -78,7 +80,7 @@ export const apInvoices: APInvoice[] = [
     invoiceDate: '2025-12-10',
     dueDate: '2026-01-09',
     status: 'Paid',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     lines: [
       {
         id: 'l2',
@@ -109,7 +111,7 @@ export const apInvoices: APInvoice[] = [
     invoiceDate: '2025-12-10',
     dueDate: '2026-01-09',
     status: 'Draft',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     lines: [
       {
         id: 'l2',

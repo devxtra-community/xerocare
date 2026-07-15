@@ -7,6 +7,7 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { YearSelector } from '@/components/ui/YearSelector';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function PayrollPage() {
   const [data, setData] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,7 @@ export default function PayrollPage() {
           role: item.role,
           branchName: item.branch_name,
           department: item.department,
-          salaryPerMonth: `QAR ${parseFloat(item.salary).toLocaleString()}`,
+          salaryPerMonth: `${getActiveCurrency()} ${parseFloat(item.salary).toLocaleString()}`,
           leaveDays: item.leave_days,
           status: item.status,
           paidDate: item.paid_date ? new Date(item.paid_date).toLocaleDateString() : '-',

@@ -192,7 +192,7 @@ export default function ManagerTargetsPage() {
         <div className="text-sm text-muted-foreground">
           Total incentive for {month}:{' '}
           <span className="font-semibold text-emerald-600">
-            {formatCurrency(totalIncentive, rows[0]?.target.currencyCode || 'AED')}
+            {formatCurrency(totalIncentive, rows[0]?.target.currencyCode)}
           </span>
         </div>
       )}

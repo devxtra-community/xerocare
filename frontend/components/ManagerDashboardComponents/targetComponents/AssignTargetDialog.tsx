@@ -34,6 +34,7 @@ import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { formatCurrency } from '@/lib/format';
 import { getUserFromToken } from '@/lib/auth';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AssignTargetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -76,7 +77,7 @@ export default function AssignTargetDialog({
   const [targetMonth, setTargetMonth] = useState(currentMonthStr());
   const [targetAmount, setTargetAmount] = useState('');
   const [tiers, setTiers] = useState<TierRow[]>([]);
-  const [currencyCode, setCurrencyCode] = useState('AED');
+  const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -99,8 +100,8 @@ export default function AssignTargetDialog({
       .catch(() => toast.error('Failed to load employees'));
 
     getMyBranch()
-      .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
-      .catch(() => setCurrencyCode('AED'));
+      .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+      .catch(() => setCurrencyCode(getActiveCurrency()));
   }, [open]);
 
   const addTier = () => {

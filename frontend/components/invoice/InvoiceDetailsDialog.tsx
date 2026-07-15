@@ -33,6 +33,7 @@ import { RefreshCw } from 'lucide-react';
 import { InvoiceViewDialog } from '../employeeComponents/InvoiceViewDialog';
 import AuditTimeline from './AuditTimeline';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface InvoiceDetailsDialogProps {
   invoice: Invoice;
   onClose: () => void;
@@ -1024,7 +1025,7 @@ export function InvoiceDetailsDialog({
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right font-bold text-foreground text-sm align-top py-3">
-                          QAR{' '}
+                          {getActiveCurrency()}{' '}
                           {(
                             (item.quantity || 0) * (item.unitPrice || 0) ||
                             (currentInvoice.saleType === 'LEASE'
@@ -1099,7 +1100,7 @@ export function InvoiceDetailsDialog({
                     {mode === 'EMPLOYEE' ? 'Advance Balance' : 'Advance Adj.'}
                   </p>
                   <p className="text-sm font-bold text-success">
-                    - QAR {financialSummary.advanceAdjusted.toLocaleString()}
+                    - {getActiveCurrency()} {financialSummary.advanceAdjusted.toLocaleString()}
                   </p>
                 </div>
               )}
@@ -1108,7 +1109,7 @@ export function InvoiceDetailsDialog({
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase">Discount Given</p>
                   <p className="text-sm font-bold text-success">
-                    - QAR{' '}
+                    - {getActiveCurrency()}{' '}
                     {(
                       currentInvoice.discountAmount ||
                       (currentInvoice.grossAmount || currentInvoice.monthlyRent || 0) *
@@ -1126,7 +1127,7 @@ export function InvoiceDetailsDialog({
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Usage</p>
                       <p className="text-sm font-bold text-warning">
-                        + QAR {financialSummary.extraUsage.toLocaleString()}
+                        + {getActiveCurrency()} {financialSummary.extraUsage.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -1134,7 +1135,8 @@ export function InvoiceDetailsDialog({
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Extra Charges</p>
                       <p className="text-sm font-bold text-orange-600">
-                        + QAR {financialSummary.additionalCharges.toLocaleString()}
+                        + {getActiveCurrency()}{' '}
+                        {financialSummary.additionalCharges.toLocaleString()}
                       </p>
                     </div>
                   )}
@@ -1150,7 +1152,7 @@ export function InvoiceDetailsDialog({
                   <p
                     className={`text-lg font-bold ${financialSummary.pendingBalance > 0 ? 'text-danger' : 'text-success'}`}
                   >
-                    QAR
+                    {getActiveCurrency()}{' '}
                     {financialSummary.pendingBalance.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                     })}
@@ -1330,7 +1332,7 @@ export function InvoiceDetailsDialog({
                           {hist.invoiceNumber}
                         </TableCell>
                         <TableCell className="text-xs font-bold text-primary text-right">
-                          QAR
+                          {getActiveCurrency()}{' '}
                           {(hist.totalAmount || 0).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                           })}
@@ -1555,15 +1557,19 @@ export function InvoiceDetailsDialog({
                                             if (item.bwSlabRanges && item.bwSlabRanges.length > 0) {
                                               rates.push(`<strong>BW Slabs:</strong>`);
                                               item.bwSlabRanges.forEach((s) =>
-                                                rates.push(`${s.from}-${s.to}: QAR ${s.rate}`),
+                                                rates.push(
+                                                  `${s.from}-${s.to}: ${getActiveCurrency()} ${s.rate}`,
+                                                ),
                                               );
                                               if (item.bwExcessRate) {
                                                 rates.push(
-                                                  `> ${Math.max(...item.bwSlabRanges.map((s) => Number(s.to) || 0))}: QAR ${item.bwExcessRate}`,
+                                                  `> ${Math.max(...item.bwSlabRanges.map((s) => Number(s.to) || 0))}: ${getActiveCurrency()} ${item.bwExcessRate}`,
                                                 );
                                               }
                                             } else if (item.bwExcessRate)
-                                              rates.push(`BW: QAR ${item.bwExcessRate}`);
+                                              rates.push(
+                                                `BW: ${getActiveCurrency()} ${item.bwExcessRate}`,
+                                              );
 
                                             if (
                                               item.colorSlabRanges &&
@@ -1571,15 +1577,19 @@ export function InvoiceDetailsDialog({
                                             ) {
                                               rates.push(`<strong>Color Slabs:</strong>`);
                                               item.colorSlabRanges.forEach((s) =>
-                                                rates.push(`${s.from}-${s.to}: QAR ${s.rate}`),
+                                                rates.push(
+                                                  `${s.from}-${s.to}: ${getActiveCurrency()} ${s.rate}`,
+                                                ),
                                               );
                                               if (item.colorExcessRate) {
                                                 rates.push(
-                                                  `> ${Math.max(...item.colorSlabRanges.map((s) => Number(s.to) || 0))}: QAR ${item.colorExcessRate}`,
+                                                  `> ${Math.max(...item.colorSlabRanges.map((s) => Number(s.to) || 0))}: ${getActiveCurrency()} ${item.colorExcessRate}`,
                                                 );
                                               }
                                             } else if (item.colorExcessRate)
-                                              rates.push(`CLR: QAR ${item.colorExcessRate}`);
+                                              rates.push(
+                                                `CLR: ${getActiveCurrency()} ${item.colorExcessRate}`,
+                                              );
 
                                             if (
                                               item.comboSlabRanges &&
@@ -1587,15 +1597,19 @@ export function InvoiceDetailsDialog({
                                             ) {
                                               rates.push(`<strong>Combo Slabs:</strong>`);
                                               item.comboSlabRanges.forEach((s) =>
-                                                rates.push(`${s.from}-${s.to}: QAR ${s.rate}`),
+                                                rates.push(
+                                                  `${s.from}-${s.to}: ${getActiveCurrency()} ${s.rate}`,
+                                                ),
                                               );
                                               if (item.combinedExcessRate) {
                                                 rates.push(
-                                                  `> ${Math.max(...item.comboSlabRanges.map((s) => Number(s.to) || 0))}: QAR ${item.combinedExcessRate}`,
+                                                  `> ${Math.max(...item.comboSlabRanges.map((s) => Number(s.to) || 0))}: ${getActiveCurrency()} ${item.combinedExcessRate}`,
                                                 );
                                               }
                                             } else if (item.combinedExcessRate)
-                                              rates.push(`CMB: QAR ${item.combinedExcessRate}`);
+                                              rates.push(
+                                                `CMB: ${getActiveCurrency()} ${item.combinedExcessRate}`,
+                                              );
 
                                             return `
                                             <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -1610,7 +1624,7 @@ export function InvoiceDetailsDialog({
                                                 ${rates.length > 0 ? rates.join('<br/>') : '-'}
                                               </td>
                                               <td style="padding: 12px; text-align: center;">${item.quantity || 1}</td>
-                                              <td style="padding: 12px; text-align: right;">QAR ${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
+                                              <td style="padding: 12px; text-align: right;">${getActiveCurrency()} ${((item.quantity || 1) * (item.unitPrice || 0)).toLocaleString()}</td>
                                             </tr>
                                           `;
                                           })
@@ -1627,7 +1641,7 @@ export function InvoiceDetailsDialog({
                                  <h3 style="margin-top: 0; color: #111827;">Rental Details</h3>
                                  <p style="margin: 5px 0;"><strong>Plan Type:</strong> ${inv.rentType?.replace('_', ' ')}</p>
                                  <p style="margin: 5px 0;"><strong>Billing Period:</strong> ${inv.rentPeriod}</p>
-                                  <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> QAR ${inv.monthlyRent?.toLocaleString()}</p>
+                                  <p style="margin: 5px 0;"><strong>Monthly Rent:</strong> ${getActiveCurrency()} ${inv.monthlyRent?.toLocaleString()}</p>
                                  <p style="margin: 5px 0;"><strong>Contract Period:</strong> ${formatDate(inv.effectiveFrom)} - ${formatDate(inv.effectiveTo)}</p>
                                </div>
                              `;
@@ -1637,8 +1651,8 @@ export function InvoiceDetailsDialog({
                                  <h3 style="margin-top: 0; color: #111827;">Lease Details</h3>
                                  <p style="margin: 5px 0;"><strong>Lease Type:</strong> ${inv.leaseType}</p>
                                  <p style="margin: 5px 0;"><strong>Tenure:</strong> ${inv.leaseTenureMonths} Months</p>
-                                 ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> QAR ${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
-                                 ${inv.totalLeaseAmount ? `<p style="margin: 5px 0;"><strong>Total Lease Amount:</strong> QAR ${inv.totalLeaseAmount.toLocaleString()}</p>` : ''}
+                                 ${inv.monthlyEmiAmount ? `<p style="margin: 5px 0;"><strong>Monthly EMI:</strong> ${getActiveCurrency()} ${inv.monthlyEmiAmount.toLocaleString()}</p>` : ''}
+                                 ${inv.totalLeaseAmount ? `<p style="margin: 5px 0;"><strong>Total Lease Amount:</strong> ${getActiveCurrency()} ${inv.totalLeaseAmount.toLocaleString()}</p>` : ''}
                                </div>
                              `;
                           }
@@ -1658,10 +1672,10 @@ export function InvoiceDetailsDialog({
                               ${itemsHtml}
 
                               <div style="margin-top: 30px; text-align: right;">
-                                ${inv.grossAmount ? `<p style="margin: 5px 0; color: #6b7280;">Gross Amount: <strong>QAR ${inv.grossAmount.toLocaleString()}</strong></p>` : ''}
-                                ${inv.discountAmount && inv.discountAmount > 0 ? `<p style="margin: 5px 0; color: #dc2626;">Discount Given: <strong>- QAR ${inv.discountAmount.toLocaleString()}</strong> ${inv.discountPercent ? `(${inv.discountPercent}%)` : ''}</p>` : ''}
-                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">QAR ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
-                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>QAR ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
+                                ${inv.grossAmount ? `<p style="margin: 5px 0; color: #6b7280;">Gross Amount: <strong>${getActiveCurrency()} ${inv.grossAmount.toLocaleString()}</strong></p>` : ''}
+                                ${inv.discountAmount && inv.discountAmount > 0 ? `<p style="margin: 5px 0; color: #dc2626;">Discount Given: <strong>- ${getActiveCurrency()} ${inv.discountAmount.toLocaleString()}</strong> ${inv.discountPercent ? `(${inv.discountPercent}%)` : ''}</p>` : ''}
+                                <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">${getActiveCurrency()} ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
+                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>${getActiveCurrency()} ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
                               </div>
 
                               <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #9ca3af; font-size: 12px;">

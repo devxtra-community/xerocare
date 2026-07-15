@@ -14,6 +14,7 @@ import {
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCompactNumber } from '@/lib/format';
 
+import { getActiveCurrency } from '@/lib/currency';
 const data = [
   { month: 'Jan', revenue: 120000, expense: 85000 },
   { month: 'Feb', revenue: 98000, expense: 72000 },
@@ -48,7 +49,9 @@ export default function RevenueExpenseChart() {
           <Tooltip
             content={
               <ChartTooltipContent
-                valueFormatter={(val) => `QAR ${formatCompactNumber(Number(val))}`}
+                valueFormatter={(val) =>
+                  `${getActiveCurrency()} ${formatCompactNumber(Number(val))}`
+                }
                 footer={(payload) => {
                   const net = (Number(payload[0]?.value) || 0) - (Number(payload[1]?.value) || 0);
                   return (
@@ -61,7 +64,7 @@ export default function RevenueExpenseChart() {
                           net >= 0 ? 'text-emerald-600' : 'text-rose-600'
                         }`}
                       >
-                        {`QAR ${formatCompactNumber(net)}`}
+                        {`${getActiveCurrency()} ${formatCompactNumber(net)}`}
                       </span>
                     </div>
                   );

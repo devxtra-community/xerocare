@@ -1,5 +1,6 @@
 import { chartOfAccounts, GLPostingPreview, GLPreviewLine } from './finance';
 
+import { getActiveCurrency } from '@/lib/currency';
 /* ---------------- PRODUCT ---------------- */
 export type ProductMode = 'Sell' | 'Lease' | 'Rent';
 
@@ -148,7 +149,7 @@ export type Invoice = {
   issueDate: string;
   dueDate: string;
 
-  currency: 'USD' | 'AED';
+  currency: string;
 
   lines: InvoiceLine[];
 
@@ -191,7 +192,7 @@ export const arInvoices: Invoice[] = [
     customerId: 'cust-2',
     issueDate: '2026-01-2',
     dueDate: '2026-02-19',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     lines: [
       {
         id: 'l2',
@@ -237,7 +238,7 @@ export const arInvoices: Invoice[] = [
     customerId: 'cust-2',
     issueDate: '2025-12-06',
     dueDate: '2026-01-06',
-    currency: 'AED',
+    currency: getActiveCurrency(),
     lines: [
       {
         id: 'l4',

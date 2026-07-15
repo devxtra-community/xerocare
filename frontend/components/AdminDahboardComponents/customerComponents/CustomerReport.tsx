@@ -37,6 +37,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getOpeningBalanceEntries, OpeningBalanceEntry } from '@/lib/openingBalance';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function CustomerReport() {
   const currency = useBranchCurrency();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -449,7 +450,7 @@ export default function CustomerReport() {
                           )}
                           {getCustomerOutstandingMigratedBalance(cust.id) > 0 && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-100 flex items-center gap-1">
-                              OB: QAR{' '}
+                              OB: {getActiveCurrency()}{' '}
                               {getCustomerOutstandingMigratedBalance(cust.id).toLocaleString()}
                             </span>
                           )}
@@ -834,10 +835,11 @@ export default function CustomerReport() {
                               {ob.balanceType.replace(/_/g, ' ')}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              QAR {Number(ob.originalTotalAmount).toLocaleString()}
+                              {getActiveCurrency()}{' '}
+                              {Number(ob.originalTotalAmount).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right font-bold text-slate-800">
-                              QAR {Number(ob.remainingBalance).toLocaleString()}
+                              {getActiveCurrency()} {Number(ob.remainingBalance).toLocaleString()}
                             </TableCell>
                             <TableCell className="text-center">
                               <span

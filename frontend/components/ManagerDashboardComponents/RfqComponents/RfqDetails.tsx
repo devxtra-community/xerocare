@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/dialog';
 import { AlertCircle, Warehouse as WarehouseIcon } from 'lucide-react';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface RfqDetailsProps {
   id: string;
   basePath: string;
@@ -506,7 +507,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                     <span className="text-lg font-bold text-slate-900">
                       {formatCurrency(
                         v.total_quoted_amount as number,
-                        (v.vendor as { currency?: string })?.currency || 'QAR',
+                        (v.vendor as { currency?: string })?.currency || getActiveCurrency(),
                       )}
                     </span>
                   </div>
@@ -643,7 +644,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                         {formatCurrency(
                                           vp.unitPrice as number,
                                           (rfqVendor?.vendor as { currency?: string })?.currency ||
-                                            'QAR',
+                                            getActiveCurrency(),
                                         )}
                                       </span>
                                       {!!(vp as { isLowest?: boolean }).isLowest && (
@@ -749,7 +750,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                     vs.totalAmount as number,
                                     (rfqVendor?.vendor as { currency?: string })?.currency ||
                                       (vs.vendorCurrency as string) ||
-                                      'QAR',
+                                      getActiveCurrency(),
                                   )}
                                 </div>
                                 {showConversion && (

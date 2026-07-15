@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/select';
 import { State, City } from 'country-state-city';
 
+import { getActiveCurrency } from '@/lib/currency';
 type Vendor = {
   id: string;
   name: string;
@@ -489,7 +490,7 @@ function VendorFormModal({
           phone: initialData.phone,
           email: initialData.email,
           status: initialData.status,
-          currency: initialData.currency || 'QAR',
+          currency: initialData.currency || getActiveCurrency(),
           countryCode: initialData.countryCode,
           countryName: initialData.countryName,
           stateProvince: initialData.stateProvince,

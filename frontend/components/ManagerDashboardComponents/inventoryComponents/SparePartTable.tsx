@@ -23,6 +23,7 @@ import EditSparePartDialog from '@/components/ManagerDashboardComponents/sparePa
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface SparePartTableProps {
   showActions?: boolean;
   selectedYear: number | 'all';
@@ -243,7 +244,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
                       {item.vendor_name || '-'}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center text-[12px]">
-                      QAR {item.price}
+                      {getActiveCurrency()} {item.price}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-center font-bold text-primary text-[12px]">
                       {item.quantity}

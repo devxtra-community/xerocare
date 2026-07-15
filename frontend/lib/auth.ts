@@ -3,6 +3,7 @@ import { jwtDecode } from 'jwt-decode';
 import { EmployeeJob } from './employeeJob';
 import { FinanceJob } from './financeJob';
 import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
+import { clearActiveCurrency, initBranchCurrency } from './currency';
 
 export { setAccessTokenCookie, clearAccessTokenCookie };
 
@@ -60,6 +61,7 @@ export async function verifyLoginOtp(email: string, otp: string) {
   });
   localStorage.setItem('accessToken', res.data.accessToken);
   setAccessTokenCookie(res.data.accessToken);
+  await initBranchCurrency();
 
   return res.data;
 }
@@ -81,6 +83,7 @@ export async function verifyMagicLink(token: string) {
   const res = await api.post('/e/auth/magic-link/verify', { token });
   localStorage.setItem('accessToken', res.data.accessToken);
   setAccessTokenCookie(res.data.accessToken);
+  await initBranchCurrency();
 
   return res.data;
 }
@@ -118,6 +121,7 @@ export async function logout() {
     if (res.data.success) {
       localStorage.clear();
       clearAccessTokenCookie();
+      clearActiveCurrency();
       return res;
     }
   } catch (err) {

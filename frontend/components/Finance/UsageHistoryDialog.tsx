@@ -37,6 +37,7 @@ import UsageRecordingModal from './UsageRecordingModal';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface UsageHistoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -353,7 +354,7 @@ export default function UsageHistoryDialog({
                                                 : `${slab.from}-${slab.to}`;
                                           }
                                         }
-                                        appliedRateStr = `QAR ${applicableRate} (${applicableRange})`;
+                                        appliedRateStr = `${getActiveCurrency()} ${applicableRate} (${applicableRange})`;
                                       }
                                       return appliedRateStr;
                                     } catch {

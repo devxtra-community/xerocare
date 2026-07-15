@@ -30,6 +30,7 @@ interface EmployeeOrdersTableProps {
  */
 import { usePagination } from '@/hooks/usePagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function EmployeeOrdersTable({
   mode = 'EMPLOYEE',
   invoices: propInvoices,
@@ -214,7 +215,7 @@ export default function EmployeeOrdersTable({
               Total Amount
             </p>
             <p className="text-xl font-black text-primary tracking-tight">
-              QAR{' '}
+              {getActiveCurrency()}{' '}
               {aggregateTotal.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -316,7 +317,8 @@ export default function EmployeeOrdersTable({
                       {getTotalQuantity(invoice.items)}
                     </TableCell>
                     <TableCell className="font-bold text-primary whitespace-nowrap">
-                      QAR {(invoice.displayAmount ?? invoice.totalAmount ?? 0).toLocaleString()}
+                      {getActiveCurrency()}{' '}
+                      {(invoice.displayAmount ?? invoice.totalAmount ?? 0).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <span

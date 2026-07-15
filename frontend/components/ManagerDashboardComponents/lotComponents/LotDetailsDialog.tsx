@@ -279,8 +279,11 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
       const fileUrl = URL.createObjectURL(response.data);
       window.open(fileUrl);
     } catch (err: unknown) {
-      toast.error('Failed to generate product barcodes', {
-        description: await extractBlobErrorMessage(err),
+      const message = await extractBlobErrorMessage(err);
+      toast.error('Cannot print product barcodes', {
+        description: message.includes('No products found')
+          ? 'Products have not been added to inventory yet. Use "Add Products to Inventory" first — barcodes are generated during registration.'
+          : message,
       });
     }
   };
@@ -296,8 +299,11 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
       const fileUrl = URL.createObjectURL(response.data);
       window.open(fileUrl);
     } catch (err: unknown) {
-      toast.error('Failed to generate spare part barcodes', {
-        description: await extractBlobErrorMessage(err),
+      const message = await extractBlobErrorMessage(err);
+      toast.error('Cannot print spare part barcodes', {
+        description: message.includes('No registered spare parts')
+          ? 'Spare parts have not been added to inventory yet. Use "Add Spare to Inventory" first — barcodes are generated during registration.'
+          : message,
       });
     }
   };
@@ -309,6 +315,15 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
   const hasProducts = (currentLot.items || []).some((item) => item.itemType === LotItemType.MODEL);
   const hasSpareParts = (currentLot.items || []).some(
     (item) => item.itemType === LotItemType.SPARE_PART,
+  );
+  // Barcodes exist only for items already registered in inventory: products are
+  // created on allocation (usedQuantity > 0), spare parts once linked to a
+  // spare part record (sparePartId set).
+  const hasRegisteredProducts = (currentLot.items || []).some(
+    (item) => item.itemType === LotItemType.MODEL && item.usedQuantity > 0,
+  );
+  const hasRegisteredSpareParts = (currentLot.items || []).some(
+    (item) => item.itemType === LotItemType.SPARE_PART && (item.sparePartId || item.sparePart),
   );
 
   const handleAddToInventory = (itemId?: string, type?: LotItemType) => {
@@ -728,14 +743,23 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     >
                       <Plus size={12} /> Add Products to Inventory
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-[10px] gap-1.5 border-indigo-200 text-indigo-700"
-                      onClick={handlePrintProductBarcodes}
+                    <span
+                      title={
+                        hasRegisteredProducts
+                          ? undefined
+                          : 'Add products to inventory first — barcodes are generated during registration'
+                      }
                     >
-                      <FileText size={12} /> Print Barcodes
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[10px] gap-1.5 border-indigo-200 text-indigo-700"
+                        disabled={!hasRegisteredProducts}
+                        onClick={handlePrintProductBarcodes}
+                      >
+                        <FileText size={12} /> Print Barcodes
+                      </Button>
+                    </span>
                   </div>
                 )}
                 {currentLot.status === LotStatus.RECEIVED && hasSpareParts && (
@@ -748,25 +772,43 @@ export default function LotDetailsDialog({ lot, onClose, onSuccess }: LotDetails
                     >
                       <Plus size={12} /> Add Spare to Inventory
                     </Button>
+                    <span
+                      title={
+                        hasRegisteredSpareParts
+                          ? undefined
+                          : 'Add spare parts to inventory first — barcodes are generated during registration'
+                      }
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[10px] gap-1.5 border-amber-200 text-amber-700"
+                        disabled={!hasRegisteredSpareParts}
+                        onClick={handlePrintSparePartBarcodes}
+                      >
+                        <FileText size={12} /> Print Barcodes
+                      </Button>
+                    </span>
+                  </div>
+                )}
+                {currentLot.status !== LotStatus.RECEIVED && hasSpareParts && (
+                  <span
+                    title={
+                      hasRegisteredSpareParts
+                        ? undefined
+                        : 'Add spare parts to inventory first — barcodes are generated during registration'
+                    }
+                  >
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-7 text-[10px] gap-1.5 border-amber-200 text-amber-700"
+                      disabled={!hasRegisteredSpareParts}
                       onClick={handlePrintSparePartBarcodes}
                     >
-                      <FileText size={12} /> Print Barcodes
+                      <FileText size={12} /> Print Spare Barcodes
                     </Button>
-                  </div>
-                )}
-                {currentLot.status !== LotStatus.RECEIVED && hasSpareParts && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[10px] gap-1.5 border-amber-200 text-amber-700"
-                    onClick={handlePrintSparePartBarcodes}
-                  >
-                    <FileText size={12} /> Print Spare Barcodes
-                  </Button>
+                  </span>
                 )}
               </div>
               <div className="text-sm flex items-center gap-1.5 font-medium">

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 
+import { getActiveCurrency } from '@/lib/currency';
 const data = [
   { name: 'Sales', value: 450000, color: '#003F7D' },
   { name: 'Rental', value: 320000, color: '#0284C7' },
@@ -45,7 +46,9 @@ export default function RevenueBySourceChart() {
               </Pie>
               <Tooltip
                 content={
-                  <ChartTooltipContent valueFormatter={(val) => `QAR ${val.toLocaleString()}`} />
+                  <ChartTooltipContent
+                    valueFormatter={(val) => `${getActiveCurrency()} ${val.toLocaleString()}`}
+                  />
                 }
               />
               <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />

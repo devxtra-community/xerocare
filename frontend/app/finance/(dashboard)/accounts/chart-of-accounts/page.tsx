@@ -9,6 +9,7 @@ import {
   type ChartOfAccountsResponse,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { getActiveCurrency } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -128,7 +129,7 @@ export default function ChartOfAccountsPage() {
     });
   };
 
-  const currency = data?.currency ?? 'AED';
+  const currency = data?.currency ?? getActiveCurrency();
 
   if (isLoading)
     return (

@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { getActiveCurrency } from '@/lib/currency';
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
 export interface SlabRange {
@@ -710,7 +711,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                                     fontWeight: '700',
                                   }}
                                 >
-                                  QAR {fmt(s.rate)}
+                                  {getActiveCurrency()} {fmt(s.rate)}
                                 </td>
                               </tr>
                             ))}
@@ -762,7 +763,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                                     fontWeight: '700',
                                   }}
                                 >
-                                  QAR {fmt(s.rate)}
+                                  {getActiveCurrency()} {fmt(s.rate)}
                                 </td>
                               </tr>
                             ))}
@@ -814,7 +815,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                                     fontWeight: '700',
                                   }}
                                 >
-                                  QAR {fmt(s.rate)}
+                                  {getActiveCurrency()} {fmt(s.rate)}
                                 </td>
                               </tr>
                             ))}
@@ -960,7 +961,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 { l: 'Tenure / Duration', v: leaseDetails.duration },
                 {
                   l: 'Advance / Deposit',
-                  v: `QAR ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
+                  v: `${getActiveCurrency()} ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
                 },
                 { l: 'Start Date', v: leaseDetails.startDate || 'TBD' },
                 { l: 'End Date', v: leaseDetails.endDate || 'TBD' },
@@ -1004,7 +1005,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
             >
               <span>Subtotal (Before VAT)</span>
               <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
-                QAR {fmt(totals.subTotal)}
+                {getActiveCurrency()} {fmt(totals.subTotal)}
               </span>
             </div>
             <div
@@ -1016,7 +1017,9 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               }}
             >
               <span>VAT Amount</span>
-              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>QAR {fmt(totals.tax)}</span>
+              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
+                {getActiveCurrency()} {fmt(totals.tax)}
+              </span>
             </div>
             <div
               style={{
@@ -1030,7 +1033,9 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
               }}
             >
               <span>GRAND TOTAL (INCLUDING VAT)</span>
-              <span>QAR {fmt(totals.total)}</span>
+              <span>
+                {getActiveCurrency()} {fmt(totals.total)}
+              </span>
             </div>
 
             <div
@@ -1060,7 +1065,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                   lineHeight: '1',
                 }}
               >
-                QAR {fmt(leaseDetails.monthlyEmi)}
+                {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
               </div>
             </div>
           </div>
@@ -1079,7 +1084,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
         <div style={{ fontSize: '10px', color: TEXT_MUTED, lineHeight: '1.8' }}>
           <div style={{ fontWeight: '800', color: ACCENT_COLOR }}>TERMS & CONDITIONS:</div>
           <div>• Validity: {quotation.dueDate}</div>
-          <div>• All amounts are in Qatari Riyal (QAR)</div>
+          <div>• All amounts are in Qatari Riyal ({getActiveCurrency()})</div>
           <div>• Subject to Xerocare Standard Lease Agreement</div>
         </div>
         <div style={{ textAlign: 'center', position: 'relative' }}>

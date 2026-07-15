@@ -1,6 +1,7 @@
 import React from 'react';
 import { numberToWords } from '@/lib/numberToWords';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface Consumable {
   partName: string;
   description: string;
@@ -770,7 +771,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   Grand Total (Including VAT):
                 </span>
                 <span style={{ fontWeight: '500', fontSize: '18px' }}>
-                  QAR {fmt(totals.balanceDue)}
+                  {getActiveCurrency()} {fmt(totals.balanceDue)}
                 </span>
               </div>
               <div
@@ -1094,7 +1095,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                             fontWeight: '400',
                           }}
                         >
-                          Unit Price (QAR)
+                          Unit Price ({getActiveCurrency()})
                         </th>
                       </tr>
                     </thead>

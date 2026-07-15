@@ -12,6 +12,7 @@ import { EmployeeJob } from '@/lib/employeeJob';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ChartDataItem {
   name: string;
   value: number;
@@ -176,7 +177,8 @@ export default function EmployeeDashboardGraphs() {
                   tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
                   tickFormatter={
                     chart.type === 'sales'
-                      ? (val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
+                      ? (val) =>
+                          `${getActiveCurrency()} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
                       : undefined
                   }
                 />

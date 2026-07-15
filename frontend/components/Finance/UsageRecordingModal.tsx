@@ -29,6 +29,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { format } from 'date-fns';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface UsageInvoiceItem extends InvoiceItem {
   allocationId?: string;
   allocation?: {
@@ -1389,7 +1390,7 @@ export default function UsageRecordingModal({
                                 }
                                 return 'Slab-based';
                               }
-                              return `QAR ${Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
+                              return `${getActiveCurrency()} ${Number(ruleItems.bw?.bwExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
                             })()}
                           </span>
                         </span>
@@ -1554,7 +1555,7 @@ export default function UsageRecordingModal({
                                 }
                                 return 'Slab-based';
                               }
-                              return `QAR ${Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
+                              return `${getActiveCurrency()} ${Number(ruleItems.color?.colorExcessRate || ruleItems.combo?.combinedExcessRate || 0).toFixed(2)}`;
                             })()}
                           </span>
                         </span>
@@ -1691,13 +1692,13 @@ export default function UsageRecordingModal({
                       }
                     >
                       <option value="NONE">None</option>
-                      <option value="AMOUNT">By Amount (QAR)</option>
+                      <option value="AMOUNT">By Amount ({getActiveCurrency()})</option>
                       <option value="COPIES">By Copies (A4 Equivalent)</option>
                     </select>
                   </div>
                   {formData.discountType === 'AMOUNT' && (
                     <div className="space-y-2">
-                      <Label>Discount Amount (QAR)</Label>
+                      <Label>Discount Amount ({getActiveCurrency()})</Label>
                       <Input
                         type="number"
                         min="0"
@@ -2130,7 +2131,10 @@ export default function UsageRecordingModal({
                                         • Current Machine Usage ({currentVolume.toLocaleString()}{' '}
                                         units)
                                       </span>
-                                      <span>QAR {(currentVolume * applicableRate).toFixed(2)}</span>
+                                      <span>
+                                        {getActiveCurrency()}{' '}
+                                        {(currentVolume * applicableRate).toFixed(2)}
+                                      </span>
                                     </div>
                                     <div className="text-[9px] text-slate-400 italic pl-2">
                                       (BW A4: {currentDeltaA4.toLocaleString()}, A3:{' '}
@@ -2147,7 +2151,8 @@ export default function UsageRecordingModal({
                                       <div className="flex justify-between text-[10px]">
                                         <span>• Replaced Device (SN: {m.serialNumber})</span>
                                         <span>
-                                          {(m.bwDelta + m.clrDelta).toLocaleString()} units (QAR{' '}
+                                          {(m.bwDelta + m.clrDelta).toLocaleString()} units (
+                                          {getActiveCurrency()}{' '}
                                           {((m.bwDelta + m.clrDelta) * applicableRate).toFixed(2)})
                                         </span>
                                       </div>
@@ -2197,7 +2202,7 @@ export default function UsageRecordingModal({
                                 <div className="flex justify-between text-orange-600 font-bold mt-1 border-t border-slate-100 pt-1">
                                   <span>Total Excess Charge:</span>
                                   <span>
-                                    QAR{' '}
+                                    {getActiveCurrency()}{' '}
                                     {(() => {
                                       const included = Number(
                                         ruleItems.combo?.combinedIncludedLimit || 0,
@@ -2275,7 +2280,8 @@ export default function UsageRecordingModal({
                                             {currentVolume.toLocaleString()} units)
                                           </span>
                                           <span>
-                                            QAR {(currentVolume * applicableRate).toFixed(2)}
+                                            {getActiveCurrency()}{' '}
+                                            {(currentVolume * applicableRate).toFixed(2)}
                                           </span>
                                         </div>
                                       </div>
@@ -2289,7 +2295,8 @@ export default function UsageRecordingModal({
                                             <div className="flex justify-between text-[10px]">
                                               <span>• Replaced Device (SN: {m.serialNumber})</span>
                                               <span>
-                                                {m.bwDelta.toLocaleString()} units (QAR{' '}
+                                                {m.bwDelta.toLocaleString()} units (
+                                                {getActiveCurrency()}{' '}
                                                 {(m.bwDelta * applicableRate).toFixed(2)})
                                               </span>
                                             </div>
@@ -2337,7 +2344,7 @@ export default function UsageRecordingModal({
                                     <div className="flex justify-between text-orange-600 font-bold mt-1 border-t border-slate-100 pt-1">
                                       <span>Excess Charge:</span>
                                       <span>
-                                        QAR{' '}
+                                        {getActiveCurrency()}{' '}
                                         {(() => {
                                           const included = Number(
                                             ruleItems.bw?.bwIncludedLimit || 0,
@@ -2415,7 +2422,8 @@ export default function UsageRecordingModal({
                                             {currentVolume.toLocaleString()} units)
                                           </span>
                                           <span>
-                                            QAR {(currentVolume * applicableRate).toFixed(2)}
+                                            {getActiveCurrency()}{' '}
+                                            {(currentVolume * applicableRate).toFixed(2)}
                                           </span>
                                         </div>
                                       </div>
@@ -2429,7 +2437,8 @@ export default function UsageRecordingModal({
                                             <div className="flex justify-between text-[10px]">
                                               <span>• Replaced Device (SN: {m.serialNumber})</span>
                                               <span>
-                                                {m.clrDelta.toLocaleString()} units (QAR{' '}
+                                                {m.clrDelta.toLocaleString()} units (
+                                                {getActiveCurrency()}{' '}
                                                 {(m.clrDelta * applicableRate).toFixed(2)})
                                               </span>
                                             </div>
@@ -2477,7 +2486,7 @@ export default function UsageRecordingModal({
                                     <div className="flex justify-between text-orange-600 font-bold mt-1 border-t border-slate-100 pt-1">
                                       <span>Excess Charge:</span>
                                       <span>
-                                        QAR{' '}
+                                        {getActiveCurrency()}{' '}
                                         {(() => {
                                           const included = Number(
                                             ruleItems.color?.colorIncludedLimit || 0,
@@ -2511,10 +2520,10 @@ export default function UsageRecordingModal({
                         if (isLastMonth) {
                           const rentToShow = contract?.monthlyRent || 0;
                           // Always show rent (first month rent is now included)
-                          return `QAR ${rentToShow.toLocaleString()} (Adv. will be adjusted)`;
+                          return `${getActiveCurrency()} ${rentToShow.toLocaleString()} (Adv. will be adjusted)`;
                         }
 
-                        return `QAR ${amount.toLocaleString()}`;
+                        return `${getActiveCurrency()} ${amount.toLocaleString()}`;
                       })()}
                     </span>
                   </div>
@@ -2526,7 +2535,7 @@ export default function UsageRecordingModal({
                         <span className="font-medium font-bold">Discount Applied</span>
                         <span className="font-bold">
                           {formData.discountType === 'AMOUNT'
-                            ? `- QAR ${Number(formData.discountAmount || 0).toLocaleString()}`
+                            ? `- ${getActiveCurrency()} ${Number(formData.discountAmount || 0).toLocaleString()}`
                             : (() => {
                                 // Calculate total monetary discount from both types
                                 const bwDiscount = Number(formData.discountBwCopies || 0);
@@ -2607,7 +2616,7 @@ export default function UsageRecordingModal({
                                 }
 
                                 const totalMonetary = bwDiscount * bwRate + clrDiscount * clrRate;
-                                return `- QAR ${totalMonetary.toLocaleString()}`;
+                                return `- ${getActiveCurrency()} ${totalMonetary.toLocaleString()}`;
                               })()}
                         </span>
                       </div>
@@ -2647,7 +2656,7 @@ export default function UsageRecordingModal({
                                       0,
                                   );
                                 }
-                                return ` (- QAR ${(Number(formData.discountBwCopies) * rate).toLocaleString()})`;
+                                return ` (- ${getActiveCurrency()} ${(Number(formData.discountBwCopies) * rate).toLocaleString()})`;
                               })()}
                             </div>
                           )}
@@ -2687,7 +2696,7 @@ export default function UsageRecordingModal({
                                       0,
                                   );
                                 }
-                                return ` (- QAR ${(Number(formData.discountColorCopies) * rate).toLocaleString()})`;
+                                return ` (- ${getActiveCurrency()} ${(Number(formData.discountColorCopies) * rate).toLocaleString()})`;
                               })()}
                             </div>
                           )}

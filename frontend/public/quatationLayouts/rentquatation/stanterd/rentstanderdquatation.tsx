@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface SlabRange {
   from: number;
   to: number;
@@ -700,7 +701,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                                     color: '#0f172a',
                                   }}
                                 >
-                                  QAR {Number(s.rate || 0).toFixed(3)}
+                                  {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                 </td>
                               </tr>
                             ))}
@@ -755,7 +756,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                                     color: '#b91c1c',
                                   }}
                                 >
-                                  QAR {Number(s.rate || 0).toFixed(3)}
+                                  {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                 </td>
                               </tr>
                             ))}
@@ -810,7 +811,7 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
                                     color: BLUE,
                                   }}
                                 >
-                                  QAR {Number(s.rate || 0).toFixed(3)}
+                                  {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                 </td>
                               </tr>
                             ))}
@@ -843,9 +844,9 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
             TERMS &amp; CONDITIONS :
           </div>
           <div style={{ fontSize: '10.5px', color: '#666', lineHeight: '1.7', maxWidth: '310px' }}>
-            Rates are valid for 30 days from the quotation date. All amounts are in QAR unless
-            otherwise stated. Usage-based charges calculated on actual copies made. Monthly rent
-            payable at start of each cycle.
+            Rates are valid for 30 days from the quotation date. All amounts are in{' '}
+            {getActiveCurrency()} unless otherwise stated. Usage-based charges calculated on actual
+            copies made. Monthly rent payable at start of each cycle.
           </div>
         </div>
 
@@ -861,7 +862,9 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
             }}
           >
             <span style={{ fontWeight: '400', color: '#333' }}>Subtotal (Before VAT)</span>
-            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.subTotal)}</span>
+            <span style={{ fontWeight: '400' }}>
+              {getActiveCurrency()} {fmt(totals.subTotal)}
+            </span>
           </div>
           <div
             style={{
@@ -873,7 +876,9 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
             }}
           >
             <span style={{ fontWeight: '400', color: '#333' }}>VAT Amount</span>
-            <span style={{ fontWeight: '400' }}>QAR {fmt(totals.tax)}</span>
+            <span style={{ fontWeight: '400' }}>
+              {getActiveCurrency()} {fmt(totals.tax)}
+            </span>
           </div>
           <div
             style={{
@@ -889,7 +894,9 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
             }}
           >
             <span>Grand Total (Including VAT)</span>
-            <span>QAR {fmt(totals.total)}</span>
+            <span>
+              {getActiveCurrency()} {fmt(totals.total)}
+            </span>
           </div>
         </div>
       </div>

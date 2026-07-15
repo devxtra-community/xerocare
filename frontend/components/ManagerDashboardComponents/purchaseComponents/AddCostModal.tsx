@@ -17,6 +17,7 @@ import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { Calendar, FileText, Banknote } from 'lucide-react';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface AddCostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -31,7 +32,7 @@ export default function AddCostModal({
   onSuccess,
 }: AddCostModalProps) {
   const [loading, setLoading] = useState(false);
-  const [currencyCode, setCurrencyCode] = useState('AED');
+  const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
   const [formData, setFormData] = useState<AddCostDto>({
     amount: 0,
     costType: 'Other',
@@ -42,8 +43,8 @@ export default function AddCostModal({
   useEffect(() => {
     if (open) {
       getMyBranch()
-        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
-        .catch(() => setCurrencyCode('AED'));
+        .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+        .catch(() => setCurrencyCode(getActiveCurrency()));
     }
   }, [open]);
 

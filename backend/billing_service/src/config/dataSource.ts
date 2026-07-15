@@ -114,6 +114,15 @@ async function runPreMigrations() {
   await client.connect();
 
   try {
+    // Fresh database (no invoices table yet): skip all legacy fixes. The schema is
+    // created from entities via Source.synchronize() in connectWithRetry, after which
+    // pre-migrations run again to apply the raw-SQL extras.
+    const freshCheck = await client.query(`SELECT to_regclass('public.invoices') AS tbl;`);
+    if (!freshCheck.rows[0].tbl) {
+      logger.info('Fresh database detected (no invoices table) — skipping pre-migrations.');
+      return;
+    }
+
     // Drop the old broken enum type if it exists from failed TypeORM synchronize attempts
     await client.query(`DROP TYPE IF EXISTS invoices_status_enum_old CASCADE;`);
 
@@ -956,6 +965,16 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         await runPreMigrations();
         await Source.initialize();
         logger.info('Database connected successfully.');
+
+        // Fresh database: create the schema from entities, then apply the raw-SQL
+        // extras that pre-migrations skipped on the first (fresh) pass.
+        const invoicesTable = await Source.query(`SELECT to_regclass('public.invoices') AS tbl;`);
+        if (!invoicesTable[0].tbl) {
+          logger.info('Fresh database — creating schema from entities via synchronize...');
+          await Source.synchronize();
+          logger.info('Schema created. Re-running pre-migrations for raw-SQL extras...');
+          await runPreMigrations();
+        }
 
         // Reconcile customerId column to be nullable
         logger.info('Ensuring customerId column is nullable...');

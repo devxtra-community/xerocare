@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { getActiveCurrency } from '@/lib/currency';
 export interface SlabRange {
   from: number;
   to: number;
@@ -688,7 +689,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                 { label: 'MONTHS COUNT', value: agreementDetails.duration },
                 {
                   label: 'ADVANCE / DEPOSIT',
-                  value: `QAR ${fmt(agreementDetails.advance || agreementDetails.deposit || 0)}`,
+                  value: `${getActiveCurrency()} ${fmt(agreementDetails.advance || agreementDetails.deposit || 0)}`,
                 },
                 { label: 'DISCOUNT', value: `${agreementDetails.discountPercent}%` },
                 { label: 'START DATE', value: quotation.contractStartDate || 'TBD' },
@@ -720,7 +721,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
               Monthly Rental Charge
             </div>
             <div style={{ fontSize: '42px', fontWeight: '900', color: '#fff', lineHeight: '1' }}>
-              QAR {fmt(agreementDetails.discountedMonthlyRent)}
+              {getActiveCurrency()} {fmt(agreementDetails.discountedMonthlyRent)}
             </div>
             <div
               style={{ fontSize: '11px', color: ACCENT_COLOR, marginTop: '8px', fontWeight: '700' }}
@@ -802,7 +803,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                                     fontWeight: '700',
                                   }}
                                 >
-                                  QAR {Number(s.rate || 0).toFixed(3)}
+                                  {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                 </td>
                               </tr>
                             ))}
@@ -844,7 +845,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                                     fontWeight: '700',
                                   }}
                                 >
-                                  QAR {Number(s.rate || 0).toFixed(3)}
+                                  {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                 </td>
                               </tr>
                             ))}
@@ -886,7 +887,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                                     fontWeight: '700',
                                   }}
                                 >
-                                  QAR {Number(s.rate || 0).toFixed(3)}
+                                  {getActiveCurrency()} {Number(s.rate || 0).toFixed(3)}
                                 </td>
                               </tr>
                             ))}

@@ -39,6 +39,7 @@ import { useQuery } from '@tanstack/react-query';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface FinanceApprovalTableProps {
   saleType?: 'RENT' | 'LEASE' | 'SALE';
   onSuccess?: () => void;
@@ -108,7 +109,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
       invoice.items?.filter((i: InvoiceItem) => i.itemType === 'PRODUCT' && i.productId) || [];
 
     const formatCurrency = (amount: number) =>
-      `QAR ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+      `${getActiveCurrency()} ${Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
     let allocatedMachinesHtml = '';
     if (rentalItems.length > 0) {
@@ -186,14 +187,14 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                           tbl += `<table style="width: 100%; border-collapse: collapse; margin-top: 5px;">`;
                           if (slabs && slabs.length > 0) {
                             slabs.forEach((s) => {
-                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${s.from} - ${s.to}</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">QAR ${s.rate}</td></tr>`;
+                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">${s.from} - ${s.to}</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${s.rate}</td></tr>`;
                             });
                             if (excessRate) {
                               const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
-                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">> ${maxTo}</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">QAR ${excessRate}</td></tr>`;
+                              tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">> ${maxTo}</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${excessRate}</td></tr>`;
                             }
                           } else if (excessRate) {
-                            tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">Base Rate</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">QAR ${excessRate}</td></tr>`;
+                            tbl += `<tr><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">Base Rate</td><td style="padding: 6px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: bold;">${getActiveCurrency()} ${excessRate}</td></tr>`;
                           }
                           tbl += `</table></div>`;
                           return tbl;

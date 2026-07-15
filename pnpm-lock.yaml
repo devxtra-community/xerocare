@@ -589,6 +589,9 @@ importers:
       country-list:
         specifier: ^2.4.1
         version: 2.4.1
+      country-state-city:
+        specifier: ^3.2.1
+        version: 3.2.1
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -4465,6 +4468,12 @@ packages:
     resolution:
       {
         integrity: sha512-KhVV/UfUV3dSNpsWIqHTQxLpYDKPKz1UwkRjadt+YbX2PRhyCEihEoS5XgB7J7AMXpkicvl+tRHvkNI5wbji/g==,
+      }
+
+  country-state-city@3.2.1:
+    resolution:
+      {
+        integrity: sha512-kxbanqMc6izjhc/EHkGPCTabSPZ2G6eG4/97akAYHJUN4stzzFEvQPZoF8oXDQ+10gM/O/yUmISCR1ZVxyb6EA==,
       }
 
   crc-32@1.2.2:
@@ -12044,6 +12053,8 @@ snapshots:
   countries-list@3.3.0: {}
 
   country-list@2.4.1: {}
+
+  country-state-city@3.2.1: {}
 
   crc-32@1.2.2: {}
 

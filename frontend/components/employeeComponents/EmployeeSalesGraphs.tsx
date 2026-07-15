@@ -20,6 +20,7 @@ import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface SalesChartDataItem {
   name: string;
   salesCount: number;
@@ -140,7 +141,9 @@ const ForexChartContainer = ({
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }}
-              tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+              tickFormatter={(val) =>
+                `${getActiveCurrency()} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
+              }
               domain={['auto', 'auto']}
             />
             <Tooltip

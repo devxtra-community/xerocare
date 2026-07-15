@@ -26,6 +26,7 @@ import UsageHistoryDialog from './UsageHistoryDialog';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
+import { getActiveCurrency } from '@/lib/currency';
 /**
  * Table displaying monthly collection alerts for active contracts.
  * Shows pending usage recording, invoicing, and final summary actions.
@@ -212,7 +213,10 @@ export default function MonthlyCollectionTable({
       header: 'AMOUNT',
       cell: (alertItem: CollectionAlert) => {
         const isFinalMonth = alertItem.type === 'SUMMARY_PENDING';
-        if (isFinalMonth) return <span className="text-blue-600 font-bold">QAR 0 (Adjusted)</span>;
+        if (isFinalMonth)
+          return (
+            <span className="text-blue-600 font-bold">{getActiveCurrency()} 0 (Adjusted)</span>
+          );
         const isLease = alertItem.saleType === 'LEASE';
         const amount = isLease
           ? alertItem.monthlyLeaseAmount || alertItem.monthlyEmiAmount || alertItem.monthlyRent || 0

@@ -40,6 +40,7 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { YearSelector } from '@/components/ui/YearSelector';
 import Pagination from '@/components/Pagination';
 
+import { getActiveCurrency } from '@/lib/currency';
 type Finance = {
   id: string;
   month: string;
@@ -266,7 +267,9 @@ export default function FinanceReport() {
                   tickFormatter={(v) => `${formatCompactNumber(v)}`}
                 />
                 <Tooltip
-                  formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`]}
+                  formatter={(val: number) => [
+                    `${getActiveCurrency()} ${formatCompactNumber(val)}`,
+                  ]}
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',
@@ -335,7 +338,10 @@ export default function FinanceReport() {
                   tickFormatter={(val) => `${formatCompactNumber(val)}`}
                 />
                 <Tooltip
-                  formatter={(val: number) => [`QAR ${formatCompactNumber(val)}`, 'Net Profit']}
+                  formatter={(val: number) => [
+                    `${getActiveCurrency()} ${formatCompactNumber(val)}`,
+                    'Net Profit',
+                  ]}
                   contentStyle={{
                     borderRadius: '12px',
                     border: 'none',

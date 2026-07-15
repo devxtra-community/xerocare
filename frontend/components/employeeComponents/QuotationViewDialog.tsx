@@ -29,6 +29,7 @@ import {
 } from '@/lib/invoice';
 import { toast } from 'sonner';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
@@ -1789,7 +1790,8 @@ export function QuotationViewDialog({
                                                     copies
                                                   </span>
                                                   <span className="text-red-700">
-                                                    {Number(slab.rate).toFixed(3)} QAR
+                                                    {Number(slab.rate).toFixed(3)}{' '}
+                                                    {getActiveCurrency()}
                                                   </span>
                                                 </div>
                                               ))}
@@ -1832,7 +1834,8 @@ export function QuotationViewDialog({
                                                     copies
                                                   </span>
                                                   <span className="text-red-700">
-                                                    {Number(slab.rate).toFixed(3)} QAR
+                                                    {Number(slab.rate).toFixed(3)}{' '}
+                                                    {getActiveCurrency()}
                                                   </span>
                                                 </div>
                                               ))}
@@ -1875,7 +1878,8 @@ export function QuotationViewDialog({
                                                     copies
                                                   </span>
                                                   <span className="text-red-700">
-                                                    {Number(slab.rate).toFixed(3)} QAR
+                                                    {Number(slab.rate).toFixed(3)}{' '}
+                                                    {getActiveCurrency()}
                                                   </span>
                                                 </div>
                                               ))}
@@ -1952,7 +1956,7 @@ export function QuotationViewDialog({
                                     Yield
                                   </div>
                                   <div className="col-span-2 text-[9px] font-normal uppercase tracking-widest opacity-80 text-right">
-                                    Price (QAR)
+                                    Price ({getActiveCurrency()})
                                   </div>
                                 </div>
                                 <div className="divide-y divide-slate-50">
@@ -2032,7 +2036,7 @@ export function QuotationViewDialog({
                         Total
                       </p>
                       <p className="text-2xl font-normal text-slate-900 leading-none">
-                        QAR {Number(quotation.totalAmount || 0).toLocaleString()}
+                        {getActiveCurrency()} {Number(quotation.totalAmount || 0).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -2066,7 +2070,7 @@ export function QuotationViewDialog({
                             Advance / Deposit
                           </p>
                           <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
-                            QAR{' '}
+                            {getActiveCurrency()}{' '}
                             {(
                               quotation.advanceAmount ||
                               quotation.securityDepositAmount ||
@@ -2113,7 +2117,7 @@ export function QuotationViewDialog({
                         (quotation.monthlyRent || 0) === 0 ? (
                           <span className="italic opacity-60">Usage Based Billing</span>
                         ) : (
-                          `QAR ${Number(quotation.monthlyRent || 0).toLocaleString()}`
+                          `${getActiveCurrency()} ${Number(quotation.monthlyRent || 0).toLocaleString()}`
                         )}
                       </p>
                     </div>
@@ -2148,7 +2152,7 @@ export function QuotationViewDialog({
                             Advance / Deposit
                           </p>
                           <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
-                            QAR{' '}
+                            {getActiveCurrency()}{' '}
                             {(
                               quotation.advanceAmount ||
                               quotation.securityDepositAmount ||
@@ -2191,7 +2195,7 @@ export function QuotationViewDialog({
                         {quotation.leaseType === 'FSM' ? 'Monthly Lease' : 'Monthly EMI'}
                       </p>
                       <p className="text-xl font-normal text-slate-900 leading-none">
-                        QAR{' '}
+                        {getActiveCurrency()}{' '}
                         {Number(
                           quotation.leaseType === 'FSM'
                             ? quotation.monthlyLeaseAmount || 0

@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
+import { getActiveCurrency } from '@/lib/currency';
 export default function ARDashboardPage() {
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -16,9 +17,13 @@ export default function ARDashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <SummaryCard title="Total Receivables" value="QAR 12,45,000" />
-        <SummaryCard title="Overdue Amount" value="QAR 3,20,000" variant="danger" />
-        <SummaryCard title="Due This Week" value="QAR 1,80,000" />
+        <SummaryCard title="Total Receivables" value={`${getActiveCurrency()} 12,45,000`} />
+        <SummaryCard
+          title="Overdue Amount"
+          value={`${getActiveCurrency()} 3,20,000`}
+          variant="danger"
+        />
+        <SummaryCard title="Due This Week" value={`${getActiveCurrency()} 1,80,000`} />
         <SummaryCard title="Customers Over Limit" value="6" />
       </div>
 
@@ -63,10 +68,10 @@ function ARAgingCard() {
         <CardTitle>AR Aging Summary</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <AgingRow label="0–30 Days" amount="QAR 6,50,000" />
-        <AgingRow label="31–60 Days" amount="QAR 3,10,000" />
-        <AgingRow label="61–90 Days" amount="QAR 1,45,000" />
-        <AgingRow label="90+ Days" amount="QAR 1,40,000" />
+        <AgingRow label="0–30 Days" amount={`${getActiveCurrency()} 6,50,000`} />
+        <AgingRow label="31–60 Days" amount={`${getActiveCurrency()} 3,10,000`} />
+        <AgingRow label="61–90 Days" amount={`${getActiveCurrency()} 1,45,000`} />
+        <AgingRow label="90+ Days" amount={`${getActiveCurrency()} 1,40,000`} />
       </CardContent>
     </Card>
   );
@@ -89,9 +94,9 @@ function TopOverdueCustomers() {
       </CardHeader>
       <CardContent className="space-y-4">
         {[
-          { name: 'ABC Enterprises', amount: 'QAR 95,000', risk: 'High' },
-          { name: 'Print Solutions Ltd', amount: 'QAR 72,000', risk: 'Medium' },
-          { name: 'XYZ Office Care', amount: 'QAR 58,000', risk: 'High' },
+          { name: 'ABC Enterprises', amount: `${getActiveCurrency()} 95,000`, risk: 'High' },
+          { name: 'Print Solutions Ltd', amount: `${getActiveCurrency()} 72,000`, risk: 'Medium' },
+          { name: 'XYZ Office Care', amount: `${getActiveCurrency()} 58,000`, risk: 'High' },
         ].map((c) => (
           <div key={c.name} className="flex items-center justify-between">
             <div>

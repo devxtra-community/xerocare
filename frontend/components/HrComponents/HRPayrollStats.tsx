@@ -22,7 +22,8 @@ export default function HRPayrollStats({
 
   const totalPayrollValue = data.reduce((sum, item) => {
     // Remove currency symbol and commas before parsing
-    const value = parseFloat(item.salaryPerMonth.replace('QAR ', '').replace(/,/g, '')) || 0;
+    const value =
+      parseFloat(item.salaryPerMonth.replace(/^[A-Z]{3}\s*/, '').replace(/,/g, '')) || 0;
     return sum + value;
   }, 0);
 

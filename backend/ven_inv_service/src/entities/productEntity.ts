@@ -47,7 +47,9 @@ export class Product {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid' })
+  // model/warehouse/vendor are null for EXTERNAL machines (bought elsewhere,
+  // registered only to attach service contracts/tickets).
+  @Column({ type: 'uuid', nullable: true })
   @Index()
   model_id!: string;
 
@@ -55,7 +57,7 @@ export class Product {
   @JoinColumn({ name: 'model_id' })
   model!: Model;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   @Index()
   warehouse_id!: string;
 
@@ -70,7 +72,7 @@ export class Product {
   @JoinColumn({ name: 'spare_part_id' })
   spare_part?: SparePart;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   @Index() // Optimizes GROUP BY vendor_id
   vendor_id!: string;
 
@@ -94,7 +96,7 @@ export class Product {
   @Column({ type: 'varchar', length: 100 })
   brand!: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'date', nullable: true })
   MFD!: Date;
 
   @Column({ type: 'numeric', precision: 5, scale: 2 })

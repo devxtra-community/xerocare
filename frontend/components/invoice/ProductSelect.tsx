@@ -5,6 +5,7 @@ import { getAllProducts, Product, ProductStatus } from '@/lib/product';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 
+import { getActiveCurrency } from '@/lib/currency';
 export type SelectableItem = Product | SparePart;
 
 interface ProductSelectProps {
@@ -140,7 +141,7 @@ export function ProductSelect({
     return {
       value: item.id,
       label: label,
-      description: `${type} • QAR ${price.toLocaleString()} • Available: ${availableStock}${selectedQty > 0 ? ` (Selected: ${selectedQty})` : ''}`,
+      description: `${type} • ${getActiveCurrency()} ${price.toLocaleString()} • Available: ${availableStock}${selectedQty > 0 ? ` (Selected: ${selectedQty})` : ''}`,
       disabled: isDisabled,
     };
   });

@@ -48,6 +48,7 @@ import LeaseStandardQuotation from '../../public/quatationLayouts/leasequatation
 import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/premium/leasepremiumqutation';
 import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayout';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
@@ -1373,7 +1374,7 @@ export function InvoiceViewDialog({
                               Advance / Deposit
                             </p>
                             <p className="text-sm font-black text-black">
-                              QAR{' '}
+                              {getActiveCurrency()}{' '}
                               {(
                                 invoice.advanceAmount ||
                                 invoice.securityDepositAmount ||
@@ -1398,7 +1399,7 @@ export function InvoiceViewDialog({
                               Monthly
                             </p>
                             <p className="text-sm font-black text-black">
-                              QAR{' '}
+                              {getActiveCurrency()}{' '}
                               {(
                                 invoice.monthlyRent ||
                                 invoice.monthlyLeaseAmount ||
@@ -1413,7 +1414,7 @@ export function InvoiceViewDialog({
                     <div className="flex justify-end pt-2">
                       <div className="border-[2px] border-black px-8 py-3 bg-[#D1E5F4] shadow-[4px_4px_0px_rgba(0,0,0,1)]">
                         <p className="text-xl font-black text-black uppercase tracking-tight">
-                          Total: QAR{' '}
+                          Total: {getActiveCurrency()}{' '}
                           {Number(invoice.totalAmount || 0).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                           })}

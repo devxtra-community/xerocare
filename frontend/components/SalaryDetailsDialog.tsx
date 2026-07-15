@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, DollarSign, Clock, FileText, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface SalaryDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -82,7 +83,7 @@ export function SalaryDetailsDialog({ open, onOpenChange, payrollId }: SalaryDet
                   Amount Paid
                 </span>
                 <div className="text-lg font-bold text-primary">
-                  QAR {parseFloat(details.salary).toLocaleString()}
+                  {getActiveCurrency()} {parseFloat(details.salary).toLocaleString()}
                 </div>
               </div>
               <div className="bg-muted/30 p-4 rounded-xl space-y-1">

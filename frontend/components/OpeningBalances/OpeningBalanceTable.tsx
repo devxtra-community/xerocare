@@ -4,6 +4,7 @@ import React from 'react';
 import { Eye, Edit2, Trash2 } from 'lucide-react';
 import { OpeningBalanceEntry } from '@/lib/openingBalance';
 
+import { getActiveCurrency } from '@/lib/currency';
 interface OpeningBalanceTableProps {
   entries: OpeningBalanceEntry[];
   customerNames: Record<string, string>;
@@ -115,20 +116,20 @@ export default function OpeningBalanceTable({
                     </td>
                     <td className="py-4 px-6 text-right font-medium">
                       <div>
-                        QAR{' '}
+                        {getActiveCurrency()}{' '}
                         {Number(entry.originalTotalAmount).toLocaleString('en-US', {
                           minimumFractionDigits: 2,
                         })}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        Paid pre-live: QAR{' '}
+                        Paid pre-live: {getActiveCurrency()}{' '}
                         {Number(entry.alreadyPaidAmount).toLocaleString('en-US', {
                           minimumFractionDigits: 2,
                         })}
                       </div>
                     </td>
                     <td className="py-4 px-6 text-right font-semibold text-slate-900 dark:text-slate-100">
-                      QAR{' '}
+                      {getActiveCurrency()}{' '}
                       {Number(entry.remainingBalance).toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                       })}
