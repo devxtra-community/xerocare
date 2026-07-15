@@ -770,6 +770,16 @@ async function runPreMigrations() {
     `);
     logger.info('Cheque management tables created.');
 
+    // ─── Cheques: source tracing columns ──────────────────────────────────────
+    await client.query(`
+      ALTER TABLE cheques
+        ADD COLUMN IF NOT EXISTS source_type VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS source_reference_id UUID NULL,
+        ADD COLUMN IF NOT EXISTS source_label VARCHAR(500) NULL,
+        ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(100) NULL;
+    `);
+    logger.info('Cheque source tracing columns applied.');
+
     // ─── Tax Report: customer snapshot columns on invoices ─────────────────────
     await client.query(`
       ALTER TABLE invoices
@@ -792,25 +802,33 @@ async function runPreMigrations() {
     `);
     logger.info('Country tax rules table and invoice customer snapshot columns applied.');
 
-    // ─── customer_state_province column on invoices ────────────────────────────
+    // ─── customer_state_province and customer_city columns on invoices ──────────
     await client.query(`
       ALTER TABLE invoices
-        ADD COLUMN IF NOT EXISTS customer_state_province VARCHAR(100) NULL;
+        ADD COLUMN IF NOT EXISTS customer_state_province VARCHAR(100) NULL,
+        ADD COLUMN IF NOT EXISTS customer_city VARCHAR(100) NULL;
     `);
 
     // ─── Guarantee Cheques table ───────────────────────────────────────────────
-    // IMPORTANT: guarantee_cheques are collateral/security instruments, NOT cash-flow.
-    // They are never deposited and have NO cashbook_entries counterpart.
     await client.query(`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'guarantee_cheques_status_enum') THEN
-          CREATE TYPE guarantee_cheques_status_enum AS ENUM ('RECEIVED', 'RETURNED');
+          CREATE TYPE guarantee_cheques_status_enum AS ENUM ('RECEIVED', 'RETURNED', 'DEPOSITED');
         END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'guarantee_cheques_purpose_enum') THEN
           CREATE TYPE guarantee_cheques_purpose_enum AS ENUM ('PERFORMANCE_SECURITY', 'OTHER');
         END IF;
       END $$;
     `);
+    try {
+      await client.query(
+        `ALTER TYPE guarantee_cheques_status_enum ADD VALUE IF NOT EXISTS 'DEPOSITED';`,
+      );
+    } catch (err) {
+      logger.debug(
+        `Skipped adding DEPOSITED to guarantee_cheques_status_enum: ${(err as Error).message}`,
+      );
+    }
     await client.query(`
       CREATE TABLE IF NOT EXISTS guarantee_cheques (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -826,6 +844,8 @@ async function runPreMigrations() {
         purpose guarantee_cheques_purpose_enum NOT NULL DEFAULT 'PERFORMANCE_SECURITY',
         status guarantee_cheques_status_enum NOT NULL DEFAULT 'RECEIVED',
         returned_date DATE NULL,
+        deposited_date DATE NULL,
+        deposited_to_account_id UUID NULL,
         branch_id UUID NOT NULL,
         created_by UUID NOT NULL,
         notes TEXT NULL,
@@ -833,6 +853,11 @@ async function runPreMigrations() {
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
+    `);
+    await client.query(`
+      ALTER TABLE guarantee_cheques
+        ADD COLUMN IF NOT EXISTS deposited_date DATE NULL,
+        ADD COLUMN IF NOT EXISTS deposited_to_account_id UUID NULL;
     `);
     logger.info('Guarantee cheques table ensured.');
 
@@ -844,6 +869,41 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "isPoOrphaned" BOOLEAN DEFAULT NULL;
     `);
     logger.info('Cashbook reversal + PO-orphan columns ensured.');
+
+    // ─── Employee Targets & Target Achievements tables ──────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS employee_targets (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "employeeId" VARCHAR NOT NULL,
+        "branchId" VARCHAR NOT NULL,
+        "assignedBy" VARCHAR NOT NULL,
+        "targetMonth" VARCHAR(7) NOT NULL,
+        "targetAmount" DECIMAL(12, 2) NOT NULL,
+        "targetType" VARCHAR(255) NOT NULL,
+        "currencyCode" VARCHAR(3) NOT NULL,
+        "tiers" JSONB NOT NULL DEFAULT '[]',
+        "status" VARCHAR(255) NOT NULL DEFAULT 'ACTIVE',
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT uniq_employee_month UNIQUE ("employeeId", "targetMonth")
+      );
+
+      CREATE TABLE IF NOT EXISTS employee_target_achievements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "targetId" VARCHAR UNIQUE NOT NULL,
+        "employeeId" VARCHAR NOT NULL,
+        "branchId" VARCHAR NOT NULL,
+        "targetMonth" VARCHAR(7) NOT NULL,
+        "targetAmount" DECIMAL(12, 2) NOT NULL,
+        "achievedAmount" DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        "achievementPercent" DECIMAL(6, 2) NOT NULL DEFAULT 0,
+        "appliedTierPercent" DECIMAL(6, 2) NOT NULL DEFAULT 0,
+        "incentiveAmount" DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        "dealCount" INTEGER NOT NULL DEFAULT 0,
+        "calculatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "isFinalized" BOOLEAN NOT NULL DEFAULT FALSE
+      );
+    `);
+    logger.info('Employee targets and achievements tables ensured.');
 
     logger.info('Pre-migration enum values and tables added successfully');
 

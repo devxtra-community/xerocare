@@ -11,7 +11,9 @@ import {
   type OutputTaxRow,
   type InputTaxLocalRow,
   type InputTaxInternationalRow,
+  type CountryBreakdownRow,
 } from '@/lib/finance/accountsApi';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { fetchBranches, type Branch } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
@@ -105,7 +107,11 @@ function FilterBar({
         type="text"
         value={filters.country ?? ''}
         onChange={(e) =>
-          onChange({ country: e.target.value || undefined, stateProvince: undefined })
+          onChange({
+            country: e.target.value || undefined,
+            stateProvince: undefined,
+            city: undefined,
+          })
         }
         placeholder="Country (ISO)"
         maxLength={2}
@@ -115,9 +121,20 @@ function FilterBar({
         <input
           type="text"
           value={filters.stateProvince ?? ''}
-          onChange={(e) => onChange({ stateProvince: e.target.value || undefined })}
+          onChange={(e) =>
+            onChange({ stateProvince: e.target.value || undefined, city: undefined })
+          }
           placeholder="State / Emirate"
           className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-36"
+        />
+      )}
+      {filters.country && (
+        <input
+          type="text"
+          value={filters.city ?? ''}
+          onChange={(e) => onChange({ city: e.target.value || undefined })}
+          placeholder="City"
+          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-32"
         />
       )}
     </div>
@@ -162,6 +179,61 @@ function Pagination({
   );
 }
 
+function CountryBreakdownPanel({ breakdown }: { breakdown: CountryBreakdownRow[] }) {
+  const currency = useBranchCurrency();
+  const [expanded, setExpanded] = useState<string | null>(null);
+  if (!breakdown.length) return null;
+  return (
+    <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div className="px-4 py-3 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        Bills by Country &amp; State / Emirate
+      </div>
+      <div className="divide-y">
+        {breakdown.map((c) => (
+          <div key={c.country}>
+            <button
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50/40 transition-colors text-sm"
+              onClick={() => setExpanded((prev) => (prev === c.country ? null : c.country))}
+            >
+              <span className="font-semibold text-slate-800 flex items-center gap-2">
+                <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded">
+                  {c.country}
+                </span>
+                <span className="text-muted-foreground font-normal">
+                  {c.count} bill{c.count !== 1 ? 's' : ''}
+                </span>
+              </span>
+              <span className="font-bold tabular-nums text-emerald-700">
+                {formatCurrency(c.outputVat, currency)}
+              </span>
+            </button>
+            {expanded === c.country && c.states.length > 0 && (
+              <div className="bg-slate-50 divide-y border-t">
+                {c.states.map((s) => (
+                  <div
+                    key={s.state}
+                    className="flex items-center justify-between px-8 py-2 text-xs"
+                  >
+                    <span className="text-slate-600">
+                      {s.state} —{' '}
+                      <span className="text-muted-foreground">
+                        {s.count} bill{s.count !== 1 ? 's' : ''}
+                      </span>
+                    </span>
+                    <span className="font-semibold tabular-nums text-slate-700">
+                      {formatCurrency(s.outputVat, currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OutputTaxTab({
   filters,
   onGenerate,
@@ -170,6 +242,7 @@ function OutputTaxTab({
   branches: Branch[];
   onGenerate: (type: 'output', row: OutputTaxRow) => void;
 }) {
+  const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ['tax-output', filters, page],
@@ -177,7 +250,7 @@ function OutputTaxTab({
     placeholderData: (prev) => prev,
   });
 
-  const { rows = [], totals, pagination } = query.data ?? {};
+  const { rows = [], totals, pagination, countryBreakdown = [] } = query.data ?? {};
 
   const exportExcel = () => {
     if (!rows.length) return;
@@ -189,6 +262,7 @@ function OutputTaxTab({
         'Customer VAT No': r.customerVatNumber ?? '',
         Country: r.customerCountry ?? '',
         'State / Emirate': r.customerStateProvince ?? '',
+        City: r.customerCity ?? '',
         'Taxable Amount': r.taxableAmount,
         'Tax %': r.taxPercent ?? '',
         'Tax Name': r.taxName ?? '',
@@ -208,10 +282,13 @@ function OutputTaxTab({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <SummaryCard
           label="Total Taxable Amount"
-          value={formatCurrency(totals?.totalTaxableAmount ?? 0)}
+          value={formatCurrency(totals?.totalTaxableAmount ?? 0, currency)}
           sub={`${totals?.count ?? 0} invoices`}
         />
-        <SummaryCard label="Total Output VAT" value={formatCurrency(totals?.totalOutputVat ?? 0)} />
+        <SummaryCard
+          label="Total Output VAT"
+          value={formatCurrency(totals?.totalOutputVat ?? 0, currency)}
+        />
         <div className="flex items-center justify-end col-span-2 sm:col-span-1">
           <button
             onClick={exportExcel}
@@ -221,6 +298,8 @@ function OutputTaxTab({
           </button>
         </div>
       </div>
+
+      <CountryBreakdownPanel breakdown={countryBreakdown} />
 
       <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
         {query.isLoading ? (
@@ -252,6 +331,9 @@ function OutputTaxTab({
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest">
                     State / Emirate
                   </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    City
+                  </TableHead>
                   <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
                     Taxable Amt
                   </TableHead>
@@ -276,7 +358,7 @@ function OutputTaxTab({
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
                       No output tax records in this period
                     </TableCell>
                   </TableRow>
@@ -294,6 +376,9 @@ function OutputTaxTab({
                       <TableCell className="text-xs">{r.customerCountry ?? '—'}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {r.customerStateProvince ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.customerCity ?? '—'}
                       </TableCell>
                       <TableCell className="text-right text-sm">
                         {formatCurrency(r.taxableAmount, r.currencyCode)}
@@ -345,6 +430,7 @@ function InputTaxLocalTab({
   branches: Branch[];
   onGenerate: (type: 'local', row: InputTaxLocalRow) => void;
 }) {
+  const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ['tax-input-local', filters, page],
@@ -363,6 +449,8 @@ function InputTaxLocalTab({
         Vendor: r.vendorName,
         'Vendor VAT No': r.vendorVatNumber ?? '',
         Country: r.vendorCountry ?? '',
+        'State / Emirate': r.vendorStateProvince ?? '',
+        City: r.vendorCity ?? '',
         Category: r.purchaseCategory ?? '',
         'Taxable Amount': r.taxableAmount ?? '',
         'Tax %': r.taxPercent ?? '',
@@ -384,10 +472,13 @@ function InputTaxLocalTab({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <SummaryCard
           label="Total Taxable Amount"
-          value={formatCurrency(totals?.totalTaxableAmount ?? 0)}
+          value={formatCurrency(totals?.totalTaxableAmount ?? 0, currency)}
           sub={`${totals?.count ?? 0} purchases`}
         />
-        <SummaryCard label="Total Input VAT" value={formatCurrency(totals?.totalInputVat ?? 0)} />
+        <SummaryCard
+          label="Total Input VAT"
+          value={formatCurrency(totals?.totalInputVat ?? 0, currency)}
+        />
         <div className="flex items-center justify-end col-span-2 sm:col-span-1">
           <button
             onClick={exportExcel}
@@ -423,6 +514,12 @@ function InputTaxLocalTab({
                     Country
                   </TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    State
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    City
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
                     Category
                   </TableHead>
                   <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
@@ -446,7 +543,7 @@ function InputTaxLocalTab({
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-12 text-muted-foreground">
                       No local input tax records in this period
                     </TableCell>
                   </TableRow>
@@ -461,6 +558,12 @@ function InputTaxLocalTab({
                         {r.vendorVatNumber ?? '—'}
                       </TableCell>
                       <TableCell className="text-xs">{r.vendorCountry ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.vendorStateProvince ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.vendorCity ?? '—'}
+                      </TableCell>
                       <TableCell className="text-xs">{r.purchaseCategory ?? '—'}</TableCell>
                       <TableCell className="text-right text-sm">
                         {r.taxableAmount != null
@@ -521,6 +624,7 @@ function InputTaxInternationalTab({
   branches: Branch[];
   onGenerate: (type: 'international', row: InputTaxInternationalRow) => void;
 }) {
+  const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const query = useQuery({
     queryKey: ['tax-input-intl', filters, page],
@@ -539,6 +643,8 @@ function InputTaxInternationalTab({
         Branch: r.branch,
         Supplier: r.supplierName,
         'Supplier Country': r.supplierCountry ?? '',
+        'Supplier State': r.supplierStateProvince ?? '',
+        'Supplier City': r.supplierCity ?? '',
         'Supplier VAT No': r.supplierVatNumber ?? '',
         'Goods/Service': r.goodsOrService ?? '',
         'Taxable Amount': r.taxableAmount ?? '',
@@ -562,12 +668,12 @@ function InputTaxInternationalTab({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <SummaryCard
           label="Total Taxable Amount"
-          value={formatCurrency(totals?.totalTaxableAmount ?? 0)}
+          value={formatCurrency(totals?.totalTaxableAmount ?? 0, currency)}
           sub={`${totals?.count ?? 0} purchases`}
         />
         <SummaryCard
           label="Total Reverse Charge VAT"
-          value={formatCurrency(totals?.totalReverseChargeVat ?? 0)}
+          value={formatCurrency(totals?.totalReverseChargeVat ?? 0, currency)}
         />
         <div className="flex items-center justify-end col-span-2 sm:col-span-1">
           <button
@@ -604,6 +710,12 @@ function InputTaxInternationalTab({
                     Country
                   </TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    State
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    City
+                  </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
                     Type
                   </TableHead>
                   <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
@@ -630,7 +742,7 @@ function InputTaxInternationalTab({
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
                       No international input tax records in this period
                     </TableCell>
                   </TableRow>
@@ -645,6 +757,12 @@ function InputTaxInternationalTab({
                       </TableCell>
                       <TableCell className="font-medium text-sm">{r.supplierName}</TableCell>
                       <TableCell className="text-xs">{r.supplierCountry ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.supplierStateProvince ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.supplierCity ?? '—'}
+                      </TableCell>
                       <TableCell className="text-xs">{r.goodsOrService ?? '—'}</TableCell>
                       <TableCell className="text-right text-sm">
                         {r.taxableAmount != null

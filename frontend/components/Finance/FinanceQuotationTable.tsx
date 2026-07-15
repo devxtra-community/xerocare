@@ -27,6 +27,7 @@ import { getBranchInvoices, getInvoiceById, financeRejectInvoice, Invoice } from
 import { ApproveQuotationDialog } from '../invoice/ApproveQuotationDialog';
 
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
@@ -122,6 +123,7 @@ export default function FinanceQuotationTable({
   saleType?: string;
   hideActions?: boolean;
 }) {
+  const currency = useBranchCurrency();
   const [quotations, setQuotations] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -167,7 +169,7 @@ export default function FinanceQuotationTable({
             notifiedIds.current.add(q.id);
             if ('Notification' in window && Notification.permission === 'granted') {
               new Notification('📋 New Quotation for Review', {
-                body: `${q.invoiceNumber} from ${q.employeeName || 'an employee'} — QAR ${Number(q.totalAmount || 0).toLocaleString()}`,
+                body: `${q.invoiceNumber} from ${q.employeeName || 'an employee'} — ${currency} ${Number(q.totalAmount || 0).toLocaleString()}`,
                 icon: '/favicon.ico',
               });
             }
@@ -508,15 +510,18 @@ export default function FinanceQuotationTable({
                               return (
                                 <div>
                                   <div className="text-violet-700">
-                                    {formatCurrency(Number(completedExchange.replacementAmount))}
+                                    {formatCurrency(
+                                      Number(completedExchange.replacementAmount),
+                                      currency,
+                                    )}
                                   </div>
                                   <div className="text-[9px] text-slate-400 line-through">
-                                    {formatCurrency(q.totalAmount)}
+                                    {formatCurrency(q.totalAmount, currency)}
                                   </div>
                                 </div>
                               );
                             }
-                            return formatCurrency(q.totalAmount);
+                            return formatCurrency(q.totalAmount, currency);
                           })()}
                         </div>
                       </TableCell>

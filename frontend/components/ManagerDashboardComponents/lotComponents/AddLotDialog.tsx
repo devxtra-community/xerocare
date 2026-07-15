@@ -1026,7 +1026,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                       <div className="bg-transparent pt-3 text-right flex justify-end items-center gap-2">
                         <span className="text-gray-600 text-sm font-medium">Items Total:</span>
                         <span className="font-bold text-lg text-gray-900">
-                          {formatCurrency(calculateItemsTotal())}
+                          {formatCurrency(calculateItemsTotal(), currencyCode)}
                         </span>
                       </div>
                     </div>
@@ -1039,7 +1039,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                 <div className="flex items-center gap-2">
                   <span className="text-base text-gray-600 font-bold">Grand Total:</span>
                   <span className="text-2xl font-bold tracking-tight text-blue-600">
-                    {formatCurrency(calculateGrandTotal())}
+                    {formatCurrency(calculateGrandTotal(), currencyCode)}
                   </span>
                 </div>
                 <div className="flex gap-4">

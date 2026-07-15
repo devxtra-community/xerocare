@@ -20,10 +20,12 @@ import {
   fetchReceivableCharts,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, DonutChart, SimpleLineChart } from '@/components/accounts/charts';
 
 export default function ManagerAccountsOverview() {
+  const currency = useBranchCurrency();
   const { data: accounts = [] } = useQuery({
     queryKey: ['mgr-cash-bank'],
     queryFn: () => fetchCashBankAccounts(),
@@ -98,32 +100,32 @@ export default function ManagerAccountsOverview() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard
           title="Cash Balance"
-          value={formatCurrency(totalCash)}
+          value={formatCurrency(totalCash, currency)}
           subtitle="All cash accounts"
         />
         <StatCard
           title="Bank Balance"
-          value={formatCurrency(totalBank)}
+          value={formatCurrency(totalBank, currency)}
           subtitle="All bank accounts"
         />
         <StatCard
           title="Total Receivable"
-          value={formatCurrency(totalReceivable)}
+          value={formatCurrency(totalReceivable, currency)}
           subtitle="Outstanding"
         />
         <StatCard
           title="Total Payable"
-          value={formatCurrency(totalPayable)}
+          value={formatCurrency(totalPayable, currency)}
           subtitle="Outstanding"
         />
         <StatCard
           title="Total Expenses"
-          value={formatCurrency(totalExpenses)}
+          value={formatCurrency(totalExpenses, currency)}
           subtitle="All time"
         />
         <StatCard
           title="Overdue 90+"
-          value={formatCurrency(overdue90)}
+          value={formatCurrency(overdue90, currency)}
           subtitle="Critical overdue"
         />
       </div>
@@ -134,14 +136,14 @@ export default function ManagerAccountsOverview() {
           <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-red-500" /> Expense Category Breakdown
           </h3>
-          <DonutChart data={expCharts?.categoryDonut ?? []} height={250} />
+          <DonutChart data={expCharts?.categoryDonut ?? []} height={250} currency={currency} />
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
             <ReceiptText className="h-4 w-4 text-blue-500" /> Receivable by Type
           </h3>
-          <DonutChart data={rcvCharts?.byType ?? []} height={250} />
+          <DonutChart data={rcvCharts?.byType ?? []} height={250} currency={currency} />
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border p-5">
@@ -156,6 +158,7 @@ export default function ManagerAccountsOverview() {
               { key: 'collected', color: '#10b981', label: 'Collected' },
             ]}
             height={240}
+            currency={currency}
           />
         </div>
 
@@ -168,6 +171,7 @@ export default function ManagerAccountsOverview() {
             xKey="name"
             bars={[{ key: 'balance', color: '#3b82f6', label: 'Balance' }]}
             height={240}
+            currency={currency}
           />
         </div>
       </div>
@@ -220,8 +224,8 @@ export default function ManagerAccountsOverview() {
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
           <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
           <span className="text-sm font-medium">
-            {formatCurrency(overdue90)} in receivables is overdue by 90+ days. Contact your Finance
-            Manager.
+            {formatCurrency(overdue90, currency)} in receivables is overdue by 90+ days. Contact
+            your Finance Manager.
           </span>
         </div>
       )}

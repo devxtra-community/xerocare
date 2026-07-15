@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { Product } from '@/lib/product';
 import { SparePart } from '@/lib/spare-part';
 import { Invoice } from '@/lib/invoice';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { formatCurrency } from '@/lib/format';
 
 interface Customer {
   id: string;
@@ -70,6 +72,7 @@ function loadDefaultWarranty(): DefaultWarranty | null {
 }
 
 export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFormModalProps) {
+  const currency = useBranchCurrency();
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState('');
@@ -314,7 +317,9 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     const item = items[idx];
     const maxAllowed = item.maxDiscount || 0;
     if (val > maxAllowed) {
-      toast.warning(`Maximum discount allowed for ${item.description} is QAR ${maxAllowed}`);
+      toast.warning(
+        `Maximum discount allowed for ${item.description} is ${currency} ${maxAllowed}`,
+      );
       updateItem(idx, 'discount', maxAllowed);
     } else {
       updateItem(idx, 'discount', val);
@@ -354,7 +359,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       }
       if (item.discount > (item.maxDiscount || 0)) {
         return toast.error(
-          `Discount for ${item.description} cannot exceed max discount QAR ${item.maxDiscount || 0}`,
+          `Discount for ${item.description} cannot exceed max discount ${currency} ${item.maxDiscount || 0}`,
         );
       }
       if (item.itemType === 'SPARE_PART' && item.sparePartId) {
@@ -474,7 +479,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       await api.post(`/b/invoices/${successInvoice.id}/notify/email`, {
         recipient: notifyEmail,
         subject: `Your Invoice ${successInvoice.invoiceNumber || ''} from Xerocare`,
-        body: `Dear Customer, please find your invoice ${successInvoice.invoiceNumber || ''} details below.\nGrand Total: QAR ${successInvoice.totalAmount || 0}`,
+        body: `Dear Customer, please find your invoice ${successInvoice.invoiceNumber || ''} details below.\nGrand Total: ${currency} ${successInvoice.totalAmount || 0}`,
         attachments: [
           {
             filename: `Invoice-${successInvoice.invoiceNumber || successInvoice.id}.pdf`,
@@ -498,7 +503,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     try {
       await api.post(`/b/invoices/${successInvoice.id}/notify/whatsapp`, {
         recipient: notifyPhone,
-        body: `Dear Customer, here is your invoice ${successInvoice.invoiceNumber || ''} from Xerocare. Grand Total: QAR ${successInvoice.totalAmount || 0}`,
+        body: `Dear Customer, here is your invoice ${successInvoice.invoiceNumber || ''} from Xerocare. Grand Total: ${currency} ${successInvoice.totalAmount || 0}`,
       });
       toast.success('WhatsApp notification sent successfully!');
     } catch {
@@ -541,11 +546,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               <div>
                 <span className="font-semibold text-slate-500">Grand Total:</span>
                 <p className="font-bold text-green-600">
-                  QAR{' '}
-                  {(successInvoice.totalAmount || grandTotal).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(successInvoice.totalAmount || grandTotal, currency)}
                 </p>
               </div>
               <div>
@@ -868,11 +869,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                             />
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-700">
-                            QAR{' '}
-                            {itemTotal.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                            {formatCurrency(itemTotal, currency)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button
@@ -901,7 +898,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Amount Paid (QAR)
+                  Amount Paid ({currency})
                 </label>
                 <input
                   type="number"
@@ -943,44 +940,22 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
             <div className="flex flex-col gap-2 pt-4 border-t border-slate-200">
               <div className="flex justify-between items-center text-sm text-slate-600">
                 <span>Total (Without Tax):</span>
-                <span className="font-medium">
-                  QAR{' '}
-                  {subtotal.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
+                <span className="font-medium">{formatCurrency(subtotal, currency)}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-slate-600">
                 <span>Tax Amount:</span>
-                <span className="font-medium">
-                  QAR{' '}
-                  {taxTotal.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
+                <span className="font-medium">{formatCurrency(taxTotal, currency)}</span>
               </div>
               <div className="flex justify-between items-center text-base font-bold text-slate-800">
                 <span>Grand Total (With Tax):</span>
-                <span>
-                  QAR{' '}
-                  {grandTotal.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
+                <span>{formatCurrency(grandTotal, currency)}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-slate-500 pt-1 border-t border-dashed border-slate-200">
                 <span>Pending Balance:</span>
                 <span
                   className={`font-bold ${grandTotal - paymentAmount <= 0 ? 'text-green-600' : 'text-orange-600'}`}
                 >
-                  QAR{' '}
-                  {Math.max(0, grandTotal - paymentAmount).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {formatCurrency(Math.max(0, grandTotal - paymentAmount), currency)}
                 </span>
               </div>
             </div>

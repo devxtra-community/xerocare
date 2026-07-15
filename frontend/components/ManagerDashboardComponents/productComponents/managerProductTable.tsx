@@ -17,6 +17,7 @@ import { ProductFormModal } from '@/components/productComponents/ProductFormModa
 import { productService, Product } from '@/services/productService';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 /**
  * Manager Product Management Page.
@@ -25,6 +26,7 @@ import { formatCurrency } from '@/lib/format';
  * Displays key inventory stats like Total, Available, Rented, and Sold counts.
  */
 export default function ManagerProduct() {
+  const currency = useBranchCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -246,7 +248,11 @@ export default function ManagerProduct() {
               </div>
             ),
           },
-          { id: 'price', header: 'PRICE', cell: (p: Product) => formatCurrency(p.sale_price) },
+          {
+            id: 'price',
+            header: 'PRICE',
+            cell: (p: Product) => formatCurrency(p.sale_price, currency),
+          },
           {
             id: 'status',
             header: 'STATUS',

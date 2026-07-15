@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
@@ -53,6 +54,7 @@ export default function EmployeeLeaseTable({
   mode = 'EMPLOYEE',
   onRefresh,
 }: EmployeeLeaseTableProps) {
+  const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -342,6 +344,7 @@ export default function EmployeeLeaseTable({
                             : inv.totalAmount) ||
                           inv.monthlyRent ||
                           0,
+                        currency,
                       )}
                     </TableCell>
                     <TableCell>
@@ -539,6 +542,7 @@ function QuotationConverterDialog({
   initialSearch = '',
   title,
 }: QuotationConverterDialogProps) {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState(initialSearch);
 
   const filtered = quotations.filter(
@@ -631,7 +635,7 @@ function QuotationConverterDialog({
                   </div>
                   <div className="text-right">
                     <p className="font-black text-slate-900 text-sm tracking-tight mb-2">
-                      {formatCurrency(q.totalAmount || 0)}
+                      {formatCurrency(q.totalAmount || 0, currency)}
                     </p>
                     <Button
                       variant="secondary"

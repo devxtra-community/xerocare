@@ -11,10 +11,12 @@ import {
   fetchConsolidatedBalanceSheet,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 
 export default function BranchDeepDivePage() {
+  const currency = useBranchCurrency();
   const { branchId } = useParams<{ branchId: string }>();
 
   const params = { branchIds: branchId };
@@ -71,32 +73,32 @@ export default function BranchDeepDivePage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard
               title="Net Profit"
-              value={formatCurrency(kpis?.netProfit ?? 0)}
+              value={formatCurrency(kpis?.netProfit ?? 0, currency)}
               subtitle="This period"
             />
             <StatCard
               title="Total Receivable"
-              value={formatCurrency(kpis?.totalReceivable ?? 0)}
+              value={formatCurrency(kpis?.totalReceivable ?? 0, currency)}
               subtitle="Outstanding"
             />
             <StatCard
               title="Total Payable"
-              value={formatCurrency(kpis?.totalPayable ?? 0)}
+              value={formatCurrency(kpis?.totalPayable ?? 0, currency)}
               subtitle="Outstanding"
             />
             <StatCard
               title="Cash"
-              value={formatCurrency(kpis?.totalCash ?? 0)}
+              value={formatCurrency(kpis?.totalCash ?? 0, currency)}
               subtitle="Cash accounts"
             />
             <StatCard
               title="Bank"
-              value={formatCurrency(kpis?.totalBank ?? 0)}
+              value={formatCurrency(kpis?.totalBank ?? 0, currency)}
               subtitle="Bank accounts"
             />
             <StatCard
               title="Overdue"
-              value={formatCurrency(kpis?.overdueReceivables ?? 0)}
+              value={formatCurrency(kpis?.overdueReceivables ?? 0, currency)}
               subtitle="90+ days"
             />
           </div>
@@ -114,6 +116,7 @@ export default function BranchDeepDivePage() {
                   { key: 'expenses', color: '#ef4444', label: 'Expenses' },
                 ]}
                 height={240}
+                currency={currency}
               />
             </div>
 
@@ -138,7 +141,7 @@ export default function BranchDeepDivePage() {
                   >
                     <span className="text-sm text-gray-600">{item.label}</span>
                     <span className={`text-sm font-semibold ${item.color}`}>
-                      {formatCurrency(item.value)}
+                      {formatCurrency(item.value, currency)}
                     </span>
                   </div>
                 ))}
@@ -153,6 +156,7 @@ export default function BranchDeepDivePage() {
               xKey="month"
               lines={[{ key: 'net', color: '#6366f1', label: 'Net P&L' }]}
               height={200}
+              currency={currency}
             />
           </div>
         </>

@@ -23,6 +23,7 @@ import {
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Branch } from '@/lib/branch';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -46,6 +47,7 @@ export default function InventorySparePartsTable({
 }: {
   selectedYear: number | 'all';
 }) {
+  const currency = useBranchCurrency();
   const [data, setData] = useState<SparePartInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -309,7 +311,7 @@ export default function InventorySparePartsTable({
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center font-semibold text-gray-700">
-                      {formatCurrency(item.price || 0)}
+                      {formatCurrency(item.price || 0, currency)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right pr-6">
                       <Button

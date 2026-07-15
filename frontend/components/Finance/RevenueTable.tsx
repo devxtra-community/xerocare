@@ -25,6 +25,7 @@ import Pagination from '@/components/Pagination';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 // Revenue-generating statuses — covers SALE (PAID), RENT/LEASE (TRANSACTION_COMPLETED, ACTIVE_LEASE, etc.)
 const REVENUE_STATUSES = new Set([
@@ -39,6 +40,7 @@ const REVENUE_STATUSES = new Set([
 ]);
 
 export default function RevenueTable() {
+  const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -249,7 +251,7 @@ export default function RevenueTable() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right font-bold text-primary">
-                    {formatCurrency(row.amount || 0)}
+                    {formatCurrency(row.amount || 0, currency)}
                   </TableCell>
                 </TableRow>
               ))

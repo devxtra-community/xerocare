@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Search, Download } from 'lucide-react';
 import { fetchCashBankAccounts, fetchCashbookEntries } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -22,6 +23,7 @@ const TXN_BADGE: Record<string, string> = {
 };
 
 function CashBankContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const [activeTab, setActiveTab] = useState<'accounts' | 'cashbook'>('accounts');
@@ -113,16 +115,24 @@ function CashBankContent() {
       <BranchFilterBar />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total Cash" value={formatCurrency(totalCash)} subtitle="Cash accounts" />
-        <StatCard title="Total Bank" value={formatCurrency(totalBank)} subtitle="Bank accounts" />
+        <StatCard
+          title="Total Cash"
+          value={formatCurrency(totalCash, currency)}
+          subtitle="Cash accounts"
+        />
+        <StatCard
+          title="Total Bank"
+          value={formatCurrency(totalBank, currency)}
+          subtitle="Bank accounts"
+        />
         <StatCard
           title="Total Receipts"
-          value={formatCurrency(totalReceipts)}
+          value={formatCurrency(totalReceipts, currency)}
           subtitle="All branches"
         />
         <StatCard
           title="Total Payments"
-          value={formatCurrency(totalPayments)}
+          value={formatCurrency(totalPayments, currency)}
           subtitle="All branches"
         />
       </div>
@@ -134,6 +144,7 @@ function CashBankContent() {
           xKey="name"
           bars={[{ key: 'balance', color: '#3b82f6', label: 'Balance' }]}
           height={200}
+          currency={currency}
         />
       </div>
 
@@ -215,7 +226,7 @@ function CashBankContent() {
                         <td className="px-4 py-3 text-gray-500">{a.bankName ?? '—'}</td>
                         <td className="px-4 py-3 text-gray-500">{a.currency}</td>
                         <td className="px-4 py-3 font-semibold">
-                          {formatCurrency(a.currentBalance)}
+                          {formatCurrency(a.currentBalance, currency)}
                         </td>
                       </tr>
                     ))
@@ -257,13 +268,23 @@ function CashBankContent() {
                           {e.entryType}
                         </span>
                       </td>
-                      <td className="px-4 py-3 max-w-[200px] truncate">{e.description}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{e.category}</td>
+                      <td className="px-4 py-3 max-w-[200px] truncate" title={e.description}>
+                        {e.description}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500">
+                        {e.category === 'GUARANTEE_CHEQUE' ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-[10px]">
+                            Guarantee Cheque
+                          </span>
+                        ) : (
+                          e.category
+                        )}
+                      </td>
                       <td
                         className={`px-4 py-3 font-semibold ${e.entryType === 'RECEIPT' ? 'text-emerald-600' : 'text-red-600'}`}
                       >
                         {e.entryType === 'RECEIPT' ? '+' : '-'}
-                        {formatCurrency(e.amount)}
+                        {formatCurrency(e.amount, currency)}
                       </td>
                     </tr>
                   ))

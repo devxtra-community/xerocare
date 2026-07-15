@@ -1,10 +1,12 @@
 import { Source } from '../config/dataSource';
 import { PaymentLedger, PaymentMode } from '../entities/paymentLedgerEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { Cheque } from '../entities/chequeEntity';
 import { AppError } from '../errors/appError';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { logger } from '../config/logger';
 import { logAudit } from './auditLogService';
+import { postCashbookEntry, resolveCashAccount } from './cashbookService';
 
 export class PaymentService {
   private paymentRepo = Source.getRepository(PaymentLedger);
@@ -19,6 +21,10 @@ export class PaymentService {
     remarks?: string;
     recordedBy: string;
     receiptUrl?: string;
+    // Required when paymentMode === 'CHEQUE'
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDueDate?: string;
   }): Promise<PaymentLedger> {
     const invoice = await this.invoiceRepo.findOne({ where: { id: data.invoiceId } });
 
@@ -60,6 +66,89 @@ export class PaymentService {
 
     await this.paymentRepo.save(payment);
     logger.info(`Recorded payment of ${data.amountPaid} for Invoice ${invoice.invoiceNumber}`);
+
+    // Post to cashbook / create cheque record based on payment mode
+    if (invoice.branchId) {
+      const modeUpper = (data.paymentMode ?? '').trim().toUpperCase();
+      try {
+        if (modeUpper === 'CHEQUE') {
+          // Option B deferred: create a PENDING cheque record; no cashbook/balance movement yet.
+          // Cash at Bank only moves when Finance later deposits this cheque in the Cheques module.
+          const chequeNo = data.chequeNumber || data.referenceNumber;
+          if (!chequeNo) {
+            throw new AppError('Cheque number is required for cheque payments', 400);
+          }
+          if (!data.chequeDueDate) {
+            throw new AppError('Cheque due date is required for cheque payments', 400);
+          }
+          const chequeRepo = Source.getRepository(Cheque);
+          const saleType = (invoice.saleType ?? '').toUpperCase(); // SALE | RENT | LEASE
+          const srcType =
+            saleType === 'SALE'
+              ? 'SALE'
+              : saleType === 'RENT'
+                ? 'RENT'
+                : saleType === 'LEASE'
+                  ? 'LEASE'
+                  : 'SALE';
+          const cheque = chequeRepo.create({
+            chequeNo,
+            bankName: data.chequeBankName || undefined,
+            partyName: invoice.customerName || invoice.customerId || 'Customer',
+            amount: data.amountPaid,
+            dueDate: new Date(data.chequeDueDate),
+            issueDate: data.paymentDate ? new Date(data.paymentDate as string) : new Date(),
+            type: 'RECEIVED',
+            status: 'PENDING',
+            description: `Contract payment — ${invoice.invoiceNumber} (ledger ref: ${payment.id})`,
+            branchId: invoice.branchId,
+            createdBy: data.recordedBy,
+            sourceType: srcType,
+            sourceReferenceId: invoice.id,
+            sourceLabel: `${srcType === 'SALE' ? 'Invoice' : srcType} ${invoice.invoiceNumber}`,
+            invoiceNo: invoice.invoiceNumber,
+          });
+          await chequeRepo.save(cheque);
+          logger.info(
+            `Cheque record created (PENDING) for payment ${payment.id} on ${invoice.invoiceNumber}`,
+          );
+        } else {
+          // CASH → Cash in Hand; BANK_TRANSFER / CREDIT_CARD → Cash at Bank
+          const isCash = modeUpper === 'CASH';
+          const account = await resolveCashAccount(
+            Source.manager,
+            invoice.branchId,
+            data.paymentMode,
+          );
+          if (!account) {
+            throw new AppError(
+              `No default ${isCash ? 'Cash in Hand' : 'Cash at Bank'} account is configured for this branch. ` +
+                `Go to Accounts → Cash & Bank, add a ${isCash ? 'CASH' : 'BANK'}-type account and mark it as default.`,
+              422,
+            );
+          }
+          await postCashbookEntry({
+            date: data.paymentDate ? new Date(data.paymentDate as string) : new Date(),
+            entryType: 'RECEIPT',
+            amount: data.amountPaid,
+            category: 'Customer Payment',
+            branchId: invoice.branchId,
+            createdBy: data.recordedBy,
+            paymentMode: data.paymentMode,
+            accountId: account.id,
+            linkedInvoiceId: data.invoiceId,
+            description: `Receipt — ${invoice.invoiceNumber}`,
+            chequeNo: data.referenceNumber,
+            sourceType: 'INVOICE_PAYMENT',
+            sourceId: payment.id,
+          });
+        }
+      } catch (err) {
+        // Re-throw validation/config errors so the caller sees them clearly
+        if (err instanceof AppError) throw err;
+        logger.error('Failed to post invoice receipt to cashbook', err);
+      }
+    }
 
     await logAudit(
       invoice.id,

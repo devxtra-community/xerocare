@@ -5,6 +5,8 @@ import { LotItem, LotItemType } from '../entities/lotItemEntity';
 import { Purchase } from '../entities/purchaseEntity';
 import { SparePart } from '../entities/sparePartEntity';
 import { Vendor } from '../entities/vendorEntity';
+import { Branch } from '../entities/branchEntity';
+import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
 import { AppError } from '../errors/appError';
 import { CreateLotDto } from '../types/lotTypes';
 import { Model } from '../entities/modelEntity';
@@ -196,6 +198,15 @@ export class LotRepository {
         await manager.save(Vendor, vendor);
       }
 
+      // Fetch branch details for classification & currency inherit
+      const branch = data.branchId
+        ? await manager.findOne(Branch, { where: { id: data.branchId } })
+        : null;
+      if (branch) {
+        savedLot.currencyCode = branch.currency_code;
+        savedLot.purchaseOrigin = classifyPurchaseOrigin(branch.country_code, vendor?.countryCode);
+      }
+
       const finalLot = await manager.save(Lot, savedLot);
 
       // Auto-create a purchase record with zero costs so pricing can be filled in later
@@ -214,6 +225,43 @@ export class LotRepository {
       purchase.groundfieldCost = 0;
       purchase.totalAmount = itemsTotal;
       purchase.createdBy = data.createdBy;
+
+      // Copy purchase_origin from lot
+      purchase.purchaseOrigin = finalLot.purchaseOrigin;
+
+      // Vendor snapshot
+      purchase.vendorVatNumber = vendor?.vatNumber ?? null;
+      purchase.vendorCountry = vendor?.countryCode ?? null;
+      purchase.vendorStateProvince = vendor?.stateProvince ?? null;
+      purchase.vendorCity = vendor?.city ?? null;
+
+      // Currency inherited from lot
+      purchase.currencyCode = finalLot.currencyCode ?? null;
+      purchase.exchangeRate = finalLot.exchangeRateSnapshot
+        ? Number(finalLot.exchangeRateSnapshot)
+        : null;
+
+      // Tax rate and name from branch
+      purchase.taxPercent = branch?.tax_percent != null ? Number(branch.tax_percent) : null;
+      purchase.taxName = branch?.tax_name ?? null;
+
+      // Taxable amount (initially purchaseAmount since labour, shipping, etc. are 0)
+      purchase.taxableAmount = itemsTotal;
+
+      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
+        if (purchase.purchaseOrigin === 'DOMESTIC') {
+          purchase.inputVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.reverseChargeVatAmount = null;
+        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
+          purchase.reverseChargeVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.inputVatAmount = null;
+        }
+      }
+      purchase.vatClaimable = true;
+      purchase.taxStatus = 'PENDING';
+
       await manager.save(Purchase, purchase);
 
       return finalLot;

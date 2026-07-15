@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import StatCard from '@/components/StatCard';
 import { Invoice, getMyInvoices, getInvoiceHistory } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface EmployeeLeaseStatsProps {
   invoices?: Invoice[];
@@ -14,6 +15,7 @@ interface EmployeeLeaseStatsProps {
  * Displays total leases, leases this month, and total lease revenue.
  */
 export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeLeaseStatsProps) {
+  const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -130,7 +132,7 @@ export default function EmployeeLeaseStats({ invoices: propInvoices }: EmployeeL
     },
     {
       title: 'Total Revenue from Lease',
-      value: loading || loadingRevenue ? '...' : formatCurrency(totalRevenue),
+      value: loading || loadingRevenue ? '...' : formatCurrency(totalRevenue, currency),
       subtitle: 'Collected revenue',
     },
   ];

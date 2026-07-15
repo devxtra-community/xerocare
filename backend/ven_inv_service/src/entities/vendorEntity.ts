@@ -78,6 +78,12 @@ export class Vendor {
   @Column({ name: 'country_name', type: 'varchar', length: 100, nullable: true })
   countryName?: string;
 
+  @Column({ name: 'state_province', type: 'varchar', length: 100, nullable: true })
+  stateProvince?: string | null;
+
+  @Column({ name: 'city', type: 'varchar', length: 100, nullable: true })
+  city?: string | null;
+
   @Column({ name: 'bank_accounts', type: 'jsonb', nullable: true, default: () => "'[]'" })
   bankAccounts?: {
     bankName: string;

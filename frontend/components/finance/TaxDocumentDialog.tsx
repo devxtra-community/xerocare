@@ -36,112 +36,47 @@ interface TaxDocumentDialogProps {
   branch: BranchInfo;
 }
 
+// ─── Design Tokens (Normal Quotation style) ───────────────────────────────────
+
+const ACCENT = '#000000';
+const TEXT_MUTED = '#555555';
+const TEXT_LIGHT = '#888888';
+const LOGO_SRC =
+  '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png';
+
 // ─── Shared Styles ────────────────────────────────────────────────────────────
 
 const docStyle: React.CSSProperties = {
-  fontFamily: 'Arial, sans-serif',
+  fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
   fontSize: 13,
   color: '#1a1a1a',
-  background: '#fff',
-  padding: '40px 48px',
-  minWidth: 720,
+  background: '#ffffff',
+  padding: '50px 48px',
+  width: '100%',
+  boxSizing: 'border-box',
 };
 
-const headerBand: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  borderBottom: '3px solid #1e3a5f',
-  paddingBottom: 20,
-  marginBottom: 24,
-};
-
-const titleStyle: React.CSSProperties = {
-  fontSize: 22,
-  fontWeight: 800,
-  color: '#1e3a5f',
-  letterSpacing: 1.5,
-  textTransform: 'uppercase' as const,
-  textAlign: 'right' as const,
-};
-
-const sectionTitle: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  color: '#6b7280',
-  textTransform: 'uppercase' as const,
-  letterSpacing: 1.2,
-  marginBottom: 6,
-};
-
-const th: React.CSSProperties = {
-  background: '#1e3a5f',
-  color: '#fff',
-  padding: '8px 12px',
+const thStyle = (align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
+  padding: '10px 10px',
+  textAlign: align,
+  fontWeight: 300,
   fontSize: 11,
-  fontWeight: 700,
-  textTransform: 'uppercase' as const,
-  letterSpacing: 0.8,
-};
+  letterSpacing: 0.5,
+  textTransform: 'uppercase',
+  color: ACCENT,
+  borderTop: `1px solid ${ACCENT}`,
+  borderBottom: `1px solid ${ACCENT}`,
+});
 
-const td: React.CSSProperties = {
-  padding: '9px 12px',
-  borderBottom: '1px solid #e5e7eb',
-  fontSize: 13,
-};
+const tdStyle = (align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
+  padding: '12px 10px',
+  textAlign: align,
+  fontSize: 12,
+  borderBottom: '1px solid #eee',
+  verticalAlign: 'top',
+});
 
-const tdRight: React.CSSProperties = { ...td, textAlign: 'right' as const };
-
-function TotalLine({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 13 }}>
-      <div
-        style={{
-          width: 200,
-          textAlign: 'right',
-          paddingRight: 12,
-          color: '#4b5563',
-          fontWeight: bold ? 700 : 400,
-          paddingTop: 4,
-          paddingBottom: 4,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          width: 140,
-          textAlign: 'right',
-          fontWeight: bold ? 700 : 400,
-          paddingTop: 4,
-          paddingBottom: 4,
-          borderTop: bold ? '2px solid #1e3a5f' : undefined,
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function InfoBlock({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={sectionTitle}>{title}</div>
-      <div style={{ fontSize: 13, lineHeight: 1.7 }}>{children}</div>
-    </div>
-  );
-}
-
-function MetaLine({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
-  return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <span style={{ color: '#6b7280', minWidth: 160 }}>{label}:</span>
-      <span style={{ fontWeight: 600 }}>{value}</span>
-    </div>
-  );
-}
+// ─── Utility Components ───────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   const color = status === 'FILED' ? '#065f46' : status === 'RECORDED' ? '#1e40af' : '#92400e';
@@ -154,7 +89,7 @@ function StatusBadge({ status }: { status: string }) {
         padding: '2px 10px',
         borderRadius: 12,
         fontSize: 11,
-        fontWeight: 700,
+        fontWeight: 600,
         letterSpacing: 0.5,
       }}
     >
@@ -171,104 +106,271 @@ const fmtDate = (d?: string | null) =>
     ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
 
+// ─── Shared Doc Header ────────────────────────────────────────────────────────
+
+function DocHeader({
+  branch,
+  title,
+  subtitle,
+}: {
+  branch: BranchInfo;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <>
+      {/* Centered document title */}
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div
+          style={{
+            fontSize: 20,
+            fontWeight: 300,
+            color: ACCENT,
+            textTransform: 'uppercase',
+            letterSpacing: 2,
+          }}
+        >
+          {title}
+        </div>
+        {subtitle && (
+          <div style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 4 }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
+
+      {/* Company info (left) + Logo (right) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 32,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 17, fontWeight: 300, color: ACCENT, marginBottom: 6 }}>
+            {branch.name}
+          </div>
+          <div style={{ fontSize: 12, color: '#333', lineHeight: 1.6 }}>
+            {branch.address && <div>{branch.address}</div>}
+            {branch.tax_registration_number && <div>TRN: {branch.tax_registration_number}</div>}
+            {branch.country && <div>{branch.country}</div>}
+          </div>
+        </div>
+        <div
+          style={{
+            width: 160,
+            height: 75,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <img
+            src={LOGO_SRC}
+            alt="Xerocare"
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Shared Doc Footer ────────────────────────────────────────────────────────
+
+function DocFooter({ branch }: { branch: BranchInfo }) {
+  return (
+    <div
+      style={{
+        borderTop: `1px solid ${ACCENT}`,
+        paddingTop: 14,
+        marginTop: 40,
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: 11,
+        color: '#666',
+      }}
+    >
+      <div>www.xerocare.com</div>
+      <div>{branch.address ?? 'Doha, Qatar'}</div>
+      <div>mail@xerocare.com | +974 7071 7282</div>
+    </div>
+  );
+}
+
+// ─── Totals Block ─────────────────────────────────────────────────────────────
+
+function TotalsBlock({ rows }: { rows: { label: string; value: string; bold?: boolean }[] }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+      <div style={{ width: 280 }}>
+        {rows.map((row, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '8px 0',
+              borderBottom: row.bold ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
+            }}
+          >
+            <span
+              style={{
+                fontSize: 12,
+                textTransform: 'uppercase',
+                color: row.bold ? ACCENT : '#000',
+                fontWeight: 300,
+              }}
+            >
+              {row.label}
+            </span>
+            <span
+              style={{
+                fontSize: row.bold ? 14 : 12,
+                color: row.bold ? ACCENT : '#000',
+                fontWeight: 300,
+              }}
+            >
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Document Layouts ─────────────────────────────────────────────────────────
 
 function OutputTaxDocument({ row, branch }: { row: OutputTaxRow; branch: BranchInfo }) {
   return (
     <div style={docStyle}>
-      {/* Header */}
-      <div style={headerBand}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#1e3a5f' }}>{branch.name}</div>
-          {branch.address && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{branch.address}</div>
-          )}
-          {branch.tax_registration_number && (
-            <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
-              TRN: <strong>{branch.tax_registration_number}</strong>
-            </div>
-          )}
-          {branch.country && <div style={{ fontSize: 12, color: '#6b7280' }}>{branch.country}</div>}
+      <DocHeader branch={branch} title="Tax Invoice" />
+
+      {/* Bill To (left) + Invoice meta (right) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          borderTop: `1px solid ${ACCENT}`,
+          paddingTop: 18,
+          marginBottom: 28,
+        }}
+      >
+        {/* Bill To */}
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 300,
+              color: ACCENT,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              marginBottom: 8,
+            }}
+          >
+            Bill To
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 300, marginBottom: 4 }}>
+            {row.customerName ?? '—'}
+          </div>
+          <div style={{ fontSize: 12, color: TEXT_MUTED, lineHeight: 1.5 }}>
+            {row.customerVatNumber && <div>TRN: {row.customerVatNumber}</div>}
+            {row.customerCountry && (
+              <div>
+                {row.customerCountry}
+                {row.customerStateProvince ? `, ${row.customerStateProvince}` : ''}
+                {row.customerCity ? `, ${row.customerCity}` : ''}
+              </div>
+            )}
+          </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={titleStyle}>Tax Invoice</div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
-            No: <strong style={{ color: '#1a1a1a' }}>{row.invoiceNumber}</strong>
+
+        {/* Invoice meta */}
+        <div style={{ width: 230 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 300, color: '#111' }}>Invoice No :</span>
+            <span style={{ fontSize: 13, fontWeight: 300 }}>{row.invoiceNumber}</span>
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
-            Date: <strong style={{ color: '#1a1a1a' }}>{fmtDate(row.invoiceDate)}</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>Date :</span>
+            <span style={{ fontSize: 12, fontWeight: 300 }}>{fmtDate(row.invoiceDate)}</span>
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <StatusBadge status={row.status} />
           </div>
         </div>
       </div>
 
-      {/* Bill To */}
-      <div style={{ marginBottom: 28 }}>
-        <InfoBlock title="Bill To">
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{row.customerName ?? '—'}</div>
-          {row.customerVatNumber && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>TRN: {row.customerVatNumber}</div>
-          )}
-          {row.customerCountry && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>
-              {row.customerCountry}
-              {row.customerStateProvince ? `, ${row.customerStateProvince}` : ''}
-            </div>
-          )}
-        </InfoBlock>
+      {/* Items table */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 300,
+            color: ACCENT,
+            textTransform: 'uppercase',
+            marginBottom: 10,
+          }}
+        >
+          Invoice Details
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ backgroundColor: 'transparent' }}>
+              <th style={{ ...thStyle('left'), width: '40%' }}>Description</th>
+              <th style={thStyle('right')}>Taxable Amount</th>
+              <th style={thStyle('center')}>{row.taxName ?? 'VAT'} %</th>
+              <th style={thStyle('right')}>Tax Amount</th>
+              <th style={thStyle('right')}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ backgroundColor: '#fff' }}>
+              <td style={tdStyle('left')}>Goods / Services</td>
+              <td style={tdStyle('right')}>{fmt(row.taxableAmount, row.currencyCode)}</td>
+              <td style={tdStyle('center')}>
+                {row.taxPercent != null ? `${row.taxPercent}%` : '—'}
+              </td>
+              <td style={tdStyle('right')}>{fmt(row.outputVat, row.currencyCode)}</td>
+              <td style={tdStyle('right')}>{fmt(row.totalInvoice, row.currencyCode)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      {/* Table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-        <thead>
-          <tr>
-            <th style={{ ...th, textAlign: 'left', borderRadius: '4px 0 0 0' }}>Description</th>
-            <th style={{ ...th, textAlign: 'right' }}>Taxable Amount</th>
-            <th style={{ ...th, textAlign: 'right' }}>{row.taxName ?? 'VAT'} %</th>
-            <th style={{ ...th, textAlign: 'right' }}>Tax Amount</th>
-            <th style={{ ...th, textAlign: 'right', borderRadius: '0 4px 0 0' }}>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style={{ background: '#f9fafb' }}>
-            <td style={td}>Goods / Services</td>
-            <td style={tdRight}>{fmt(row.taxableAmount, row.currencyCode)}</td>
-            <td style={tdRight}>{row.taxPercent != null ? `${row.taxPercent}%` : '—'}</td>
-            <td style={tdRight}>{fmt(row.outputVat, row.currencyCode)}</td>
-            <td style={tdRight}>{fmt(row.totalInvoice, row.currencyCode)}</td>
-          </tr>
-        </tbody>
-      </table>
 
       {/* Totals */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
-        <TotalLine label="Taxable Amount" value={fmt(row.taxableAmount, row.currencyCode)} />
-        <TotalLine
-          label={`${row.taxName ?? 'VAT'} (${row.taxPercent ?? 0}%)`}
-          value={fmt(row.outputVat, row.currencyCode)}
-        />
-        <TotalLine
-          label="Total Invoice Amount"
-          value={fmt(row.totalInvoice, row.currencyCode)}
-          bold
-        />
-      </div>
+      <TotalsBlock
+        rows={[
+          { label: 'Taxable Amount', value: fmt(row.taxableAmount, row.currencyCode) },
+          {
+            label: `${row.taxName ?? 'VAT'} (${row.taxPercent ?? 0}%)`,
+            value: fmt(row.outputVat, row.currencyCode),
+          },
+          {
+            label: 'Total Invoice Amount',
+            value: fmt(row.totalInvoice, row.currencyCode),
+            bold: true,
+          },
+        ]}
+      />
 
-      {/* Footer */}
       <div
         style={{
           marginTop: 32,
-          paddingTop: 16,
-          borderTop: '1px solid #e5e7eb',
           fontSize: 11,
-          color: '#9ca3af',
+          color: TEXT_LIGHT,
           textAlign: 'center',
+          fontStyle: 'italic',
         }}
       >
         This is a computer-generated Tax Invoice. No signature required.
       </div>
+
+      <DocFooter branch={branch} />
     </div>
   );
 }
@@ -276,93 +378,129 @@ function OutputTaxDocument({ row, branch }: { row: OutputTaxRow; branch: BranchI
 function InputLocalDocument({ row, branch }: { row: InputTaxLocalRow; branch: BranchInfo }) {
   return (
     <div style={docStyle}>
-      {/* Header */}
-      <div style={headerBand}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#1e3a5f' }}>{branch.name}</div>
-          {branch.address && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{branch.address}</div>
-          )}
-          {branch.tax_registration_number && (
-            <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
-              TRN: <strong>{branch.tax_registration_number}</strong>
+      <DocHeader branch={branch} title="Purchase Tax Record" />
+
+      {/* Vendor (left) + Purchase meta (right) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          borderTop: `1px solid ${ACCENT}`,
+          paddingTop: 18,
+          marginBottom: 28,
+        }}
+      >
+        {/* Vendor info */}
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 300,
+              color: ACCENT,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              marginBottom: 8,
+            }}
+          >
+            Vendor
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 300, marginBottom: 4 }}>{row.vendorName}</div>
+          <div style={{ fontSize: 12, color: TEXT_MUTED, lineHeight: 1.5 }}>
+            {row.vendorVatNumber && <div>TRN: {row.vendorVatNumber}</div>}
+            {row.vendorCountry && <div>{row.vendorCountry}</div>}
+          </div>
+        </div>
+
+        {/* Purchase meta */}
+        <div style={{ width: 230 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>Date :</span>
+            <span style={{ fontSize: 12, fontWeight: 300 }}>{fmtDate(row.invoiceDate)}</span>
+          </div>
+          {row.branch && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: TEXT_MUTED }}>Branch :</span>
+              <span style={{ fontSize: 12, fontWeight: 300 }}>{row.branch}</span>
             </div>
           )}
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={titleStyle}>Purchase Tax Record</div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
-            Date: <strong style={{ color: '#1a1a1a' }}>{fmtDate(row.invoiceDate)}</strong>
+          {row.purchaseCategory && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: TEXT_MUTED }}>Category :</span>
+              <span style={{ fontSize: 12, fontWeight: 300 }}>{row.purchaseCategory}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>VAT Claimable :</span>
+            <span style={{ fontSize: 12, fontWeight: 300 }}>{row.vatClaimable ? 'Yes' : 'No'}</span>
           </div>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <StatusBadge status={row.taxStatus} />
           </div>
         </div>
       </div>
 
-      {/* Vendor Info */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
-        <InfoBlock title="Vendor">
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{row.vendorName}</div>
-          {row.vendorVatNumber && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>TRN: {row.vendorVatNumber}</div>
-          )}
-          {row.vendorCountry && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>Country: {row.vendorCountry}</div>
-          )}
-        </InfoBlock>
-        <InfoBlock title="Purchase Details">
-          <MetaLine label="Branch" value={row.branch} />
-          <MetaLine label="Category" value={row.purchaseCategory} />
-          <MetaLine label="Currency" value={row.currencyCode} />
-          <MetaLine label="VAT Claimable" value={row.vatClaimable ? 'Yes' : 'No'} />
-        </InfoBlock>
+      {/* Items table */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 300,
+            color: ACCENT,
+            textTransform: 'uppercase',
+            marginBottom: 10,
+          }}
+        >
+          Purchase Details
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ backgroundColor: 'transparent' }}>
+              <th style={{ ...thStyle('left'), width: '40%' }}>Category</th>
+              <th style={thStyle('right')}>Taxable Amount</th>
+              <th style={thStyle('center')}>{row.taxName ?? 'VAT'} %</th>
+              <th style={thStyle('right')}>Input VAT</th>
+              <th style={thStyle('right')}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ backgroundColor: '#fff' }}>
+              <td style={tdStyle('left')}>{row.purchaseCategory ?? 'Purchase'}</td>
+              <td style={tdStyle('right')}>{fmt(row.taxableAmount, row.currencyCode)}</td>
+              <td style={tdStyle('center')}>
+                {row.taxPercent != null ? `${row.taxPercent}%` : '—'}
+              </td>
+              <td style={tdStyle('right')}>{fmt(row.inputVatAmount, row.currencyCode)}</td>
+              <td style={tdStyle('right')}>{fmt(row.totalAmount, row.currencyCode)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      {/* Table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-        <thead>
-          <tr>
-            <th style={{ ...th, textAlign: 'left', borderRadius: '4px 0 0 0' }}>Category</th>
-            <th style={{ ...th, textAlign: 'right' }}>Taxable Amount</th>
-            <th style={{ ...th, textAlign: 'right' }}>{row.taxName ?? 'VAT'} %</th>
-            <th style={{ ...th, textAlign: 'right' }}>Input VAT</th>
-            <th style={{ ...th, textAlign: 'right', borderRadius: '0 4px 0 0' }}>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style={{ background: '#f9fafb' }}>
-            <td style={td}>{row.purchaseCategory ?? 'Purchase'}</td>
-            <td style={tdRight}>{fmt(row.taxableAmount, row.currencyCode)}</td>
-            <td style={tdRight}>{row.taxPercent != null ? `${row.taxPercent}%` : '—'}</td>
-            <td style={tdRight}>{fmt(row.inputVatAmount, row.currencyCode)}</td>
-            <td style={tdRight}>{fmt(row.totalAmount, row.currencyCode)}</td>
-          </tr>
-        </tbody>
-      </table>
 
       {/* Totals */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
-        <TotalLine label="Taxable Amount" value={fmt(row.taxableAmount, row.currencyCode)} />
-        <TotalLine
-          label={`${row.taxName ?? 'Input VAT'} (${row.taxPercent ?? 0}%)`}
-          value={fmt(row.inputVatAmount, row.currencyCode)}
-        />
-        <TotalLine label="Total Amount" value={fmt(row.totalAmount, row.currencyCode)} bold />
-      </div>
+      <TotalsBlock
+        rows={[
+          { label: 'Taxable Amount', value: fmt(row.taxableAmount, row.currencyCode) },
+          {
+            label: `${row.taxName ?? 'Input VAT'} (${row.taxPercent ?? 0}%)`,
+            value: fmt(row.inputVatAmount, row.currencyCode),
+          },
+          { label: 'Total Amount', value: fmt(row.totalAmount, row.currencyCode), bold: true },
+        ]}
+      />
 
       <div
         style={{
           marginTop: 32,
-          paddingTop: 16,
-          borderTop: '1px solid #e5e7eb',
           fontSize: 11,
-          color: '#9ca3af',
+          color: TEXT_LIGHT,
           textAlign: 'center',
+          fontStyle: 'italic',
         }}
       >
-        This is a computer-generated Purchase Tax Record for internal VAT reporting purposes.
+        Computer-generated Purchase Tax Record for internal VAT reporting purposes.
       </div>
+
+      <DocFooter branch={branch} />
     </div>
   );
 }
@@ -372,107 +510,141 @@ function InputIntlDocument({ row, branch }: { row: InputTaxInternationalRow; bra
     (row.taxableAmount ?? 0) + (row.customsDuty ?? 0) + (row.importVatReverseCharge ?? 0);
   return (
     <div style={docStyle}>
-      {/* Header */}
-      <div style={headerBand}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#1e3a5f' }}>{branch.name}</div>
-          {branch.address && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{branch.address}</div>
-          )}
-          {branch.tax_registration_number && (
-            <div style={{ fontSize: 12, color: '#374151', marginTop: 2 }}>
-              TRN: <strong>{branch.tax_registration_number}</strong>
-            </div>
-          )}
+      <DocHeader branch={branch} title="Self-Billed Tax Invoice" subtitle="(Reverse Charge)" />
+
+      {/* Supplier (left) + Import meta (right) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          borderTop: `1px solid ${ACCENT}`,
+          paddingTop: 18,
+          marginBottom: 28,
+        }}
+      >
+        {/* Supplier info */}
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 300,
+              color: ACCENT,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              marginBottom: 8,
+            }}
+          >
+            Supplier
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 300, marginBottom: 4 }}>{row.supplierName}</div>
+          <div style={{ fontSize: 12, color: TEXT_MUTED, lineHeight: 1.5 }}>
+            {row.supplierVatNumber && <div>VAT No: {row.supplierVatNumber}</div>}
+            {row.supplierCountry && <div>{row.supplierCountry}</div>}
+          </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={titleStyle}>Self-Billed Tax Invoice</div>
-          <div style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', marginTop: 2 }}>
-            (Reverse Charge)
-          </div>
+
+        {/* Import meta */}
+        <div style={{ width: 230 }}>
           {row.importInvoiceNo && (
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
-              Import Invoice: <strong style={{ color: '#1a1a1a' }}>{row.importInvoiceNo}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: TEXT_MUTED }}>Import Invoice :</span>
+              <span style={{ fontSize: 12, fontWeight: 300 }}>{row.importInvoiceNo}</span>
             </div>
           )}
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
-            Date: <strong style={{ color: '#1a1a1a' }}>{fmtDate(row.invoiceDate)}</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>Date :</span>
+            <span style={{ fontSize: 12, fontWeight: 300 }}>{fmtDate(row.invoiceDate)}</span>
           </div>
-          <div style={{ marginTop: 8 }}>
+          {row.importCountry && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: TEXT_MUTED }}>Import Country :</span>
+              <span style={{ fontSize: 12, fontWeight: 300 }}>{row.importCountry}</span>
+            </div>
+          )}
+          {row.customsEntryNo && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: TEXT_MUTED }}>Customs Entry :</span>
+              <span style={{ fontSize: 12, fontWeight: 300 }}>{row.customsEntryNo}</span>
+            </div>
+          )}
+          {row.exchangeRate != null && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 12, color: TEXT_MUTED }}>Exchange Rate :</span>
+              <span style={{ fontSize: 12, fontWeight: 300 }}>{row.exchangeRate}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>VAT Claimable :</span>
+            <span style={{ fontSize: 12, fontWeight: 300 }}>{row.vatClaimable ? 'Yes' : 'No'}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <StatusBadge status={row.taxStatus} />
           </div>
         </div>
       </div>
 
-      {/* Supplier / Details */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 28 }}>
-        <InfoBlock title="Supplier">
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{row.supplierName}</div>
-          {row.supplierVatNumber && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>VAT No: {row.supplierVatNumber}</div>
-          )}
-          {row.supplierCountry && (
-            <div style={{ fontSize: 12, color: '#4b5563' }}>Country: {row.supplierCountry}</div>
-          )}
-        </InfoBlock>
-        <InfoBlock title="Import Details">
-          <MetaLine label="Branch" value={row.branch} />
-          <MetaLine label="Import Country" value={row.importCountry} />
-          <MetaLine label="Customs Entry No" value={row.customsEntryNo} />
-          <MetaLine label="Currency" value={row.currencyCode} />
-          {row.exchangeRate != null && (
-            <MetaLine label="Exchange Rate" value={String(row.exchangeRate)} />
-          )}
-          <MetaLine label="VAT Claimable" value={row.vatClaimable ? 'Yes' : 'No'} />
-        </InfoBlock>
+      {/* Items table */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 300,
+            color: ACCENT,
+            textTransform: 'uppercase',
+            marginBottom: 10,
+          }}
+        >
+          Import Details
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ backgroundColor: 'transparent' }}>
+              <th style={{ ...thStyle('left'), width: '40%' }}>Goods / Service</th>
+              <th style={thStyle('right')}>Taxable Amount</th>
+              <th style={thStyle('right')}>Customs Duty</th>
+              <th style={thStyle('right')}>Reverse Charge VAT</th>
+              <th style={thStyle('right')}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ backgroundColor: '#fff' }}>
+              <td style={tdStyle('left')}>{row.goodsOrService ?? 'Import'}</td>
+              <td style={tdStyle('right')}>{fmt(row.taxableAmount, row.currencyCode)}</td>
+              <td style={tdStyle('right')}>{fmt(row.customsDuty, row.currencyCode)}</td>
+              <td style={tdStyle('right')}>{fmt(row.importVatReverseCharge, row.currencyCode)}</td>
+              <td style={tdStyle('right')}>{fmt(totalAmount, row.currencyCode)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-
-      {/* Table */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-        <thead>
-          <tr>
-            <th style={{ ...th, textAlign: 'left', borderRadius: '4px 0 0 0' }}>Goods / Service</th>
-            <th style={{ ...th, textAlign: 'right' }}>Taxable Amount</th>
-            <th style={{ ...th, textAlign: 'right' }}>Customs Duty</th>
-            <th style={{ ...th, textAlign: 'right' }}>Reverse Charge VAT</th>
-            <th style={{ ...th, textAlign: 'right', borderRadius: '0 4px 0 0' }}>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr style={{ background: '#f9fafb' }}>
-            <td style={td}>{row.goodsOrService ?? 'Import'}</td>
-            <td style={tdRight}>{fmt(row.taxableAmount, row.currencyCode)}</td>
-            <td style={tdRight}>{fmt(row.customsDuty, row.currencyCode)}</td>
-            <td style={tdRight}>{fmt(row.importVatReverseCharge, row.currencyCode)}</td>
-            <td style={tdRight}>{fmt(totalAmount, row.currencyCode)}</td>
-          </tr>
-        </tbody>
-      </table>
 
       {/* Totals */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 12 }}>
-        <TotalLine label="Taxable Amount" value={fmt(row.taxableAmount, row.currencyCode)} />
-        <TotalLine label="Customs Duty" value={fmt(row.customsDuty, row.currencyCode)} />
-        <TotalLine
-          label={`Reverse Charge VAT${row.taxPercent != null ? ` (${row.taxPercent}%)` : ''}`}
-          value={fmt(row.importVatReverseCharge, row.currencyCode)}
-        />
-        <TotalLine label="Total" value={fmt(totalAmount, row.currencyCode)} bold />
-      </div>
+      <TotalsBlock
+        rows={[
+          { label: 'Taxable Amount', value: fmt(row.taxableAmount, row.currencyCode) },
+          { label: 'Customs Duty', value: fmt(row.customsDuty, row.currencyCode) },
+          {
+            label: `Reverse Charge VAT${row.taxPercent != null ? ` (${row.taxPercent}%)` : ''}`,
+            value: fmt(row.importVatReverseCharge, row.currencyCode),
+          },
+          { label: 'Total', value: fmt(totalAmount, row.currencyCode), bold: true },
+        ]}
+      />
 
       <div
         style={{
           marginTop: 32,
-          paddingTop: 16,
-          borderTop: '1px solid #e5e7eb',
           fontSize: 11,
-          color: '#9ca3af',
+          color: TEXT_LIGHT,
           textAlign: 'center',
+          fontStyle: 'italic',
         }}
       >
         Self-billed under the Reverse Charge Mechanism. VAT declared by the recipient ({branch.name}
         ).
       </div>
+
+      <DocFooter branch={branch} />
     </div>
   );
 }
@@ -581,7 +753,7 @@ export default function TaxDocumentDialog({
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(
-      `<html><head><title>${docTitle}</title><style>body{margin:0;padding:0;}</style></head><body>`,
+      `<html><head><title>${docTitle}</title><style>*{box-sizing:border-box;}body{margin:0;padding:0;}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}</style></head><body>`,
     );
     win.document.write(printRef.current.innerHTML);
     win.document.write('</body></html>');
@@ -640,7 +812,7 @@ export default function TaxDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white">
+      <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-3 bg-slate-800 text-white">
           <div>

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 // Removed unused static data
 
@@ -31,6 +32,7 @@ interface SalesRow {
  * Provides a granular view of sales performance.
  */
 const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) => {
+  const currency = useBranchCurrency();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedModel, setSelectedModel] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -53,11 +55,11 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
               const date = new Date(inv.createdAt);
 
               // Correct price logic based on sale type
-              let displayPrice = formatCurrency(item.unitPrice || 0);
+              let displayPrice = formatCurrency(item.unitPrice || 0, currency);
               if (inv.saleType === 'RENT') {
-                displayPrice = `${formatCurrency(inv.monthlyRent || 0)}/Mo`;
+                displayPrice = `${formatCurrency(inv.monthlyRent || 0, currency)}/Mo`;
               } else if (inv.saleType === 'LEASE') {
-                displayPrice = `${formatCurrency(inv.monthlyEmiAmount || inv.monthlyLeaseAmount || 0)}/Mo`;
+                displayPrice = `${formatCurrency(inv.monthlyEmiAmount || inv.monthlyLeaseAmount || 0, currency)}/Mo`;
               }
 
               return {
@@ -79,7 +81,7 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
       }
     };
     fetchSales();
-  }, [selectedYear]);
+  }, [selectedYear, currency]);
 
   const uniqueModels = useMemo(() => {
     const models = new Set<string>();

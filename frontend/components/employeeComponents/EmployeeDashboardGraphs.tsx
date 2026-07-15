@@ -10,6 +10,7 @@ import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface ChartDataItem {
   name: string;
@@ -29,6 +30,7 @@ const ChartCard = ({ title, children }: { title: string; children: React.ReactNo
  * Adapts to show relevant metrics (Rent/Lease or Sales/Customers) based on employee role.
  */
 export default function EmployeeDashboardGraphs() {
+  const currency = useBranchCurrency();
   const [loading, setLoading] = useState(true);
   const [customerData, setCustomerData] = useState<ChartDataItem[]>([]);
   const [salesData, setSalesData] = useState<ChartDataItem[]>([]);
@@ -182,7 +184,9 @@ export default function EmployeeDashboardGraphs() {
                   content={
                     <ChartTooltipContent
                       valueFormatter={
-                        chart.type === 'sales' ? (val) => formatCurrency(Number(val)) : undefined
+                        chart.type === 'sales'
+                          ? (val) => formatCurrency(Number(val), currency)
+                          : undefined
                       }
                     />
                   }

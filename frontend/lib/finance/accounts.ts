@@ -384,15 +384,27 @@ export async function fetchSpareParts(params?: { branchId?: string }): Promise<S
 export interface PurchaseOrder {
   id: string;
   vendorId: string;
-  vendorName: string;
-  totalCost: number;
-  labour: number;
-  shipping: number;
-  handling: number;
-  currency: string;
+  vendor?: { id: string; name: string };
+  totalAmount: number;
+  labourCost?: number;
+  shippingCost?: number;
+  handlingFee?: number;
+  transportationCost?: number;
+  currencyCode?: string;
   branchId: string;
   createdAt: string;
   status?: string;
+  paidAmount?: number;
+  remainingAmount?: number;
+  purchaseCategory?: 'PRODUCT' | 'SPARE_PART' | 'SERVICE' | 'OTHER' | null;
+  purchaseOrigin?: string | null;
+  taxableAmount?: number | null;
+  taxPercent?: number | null;
+  taxName?: string | null;
+  inputVatAmount?: number | null;
+  reverseChargeVatAmount?: number | null;
+  customsDuty?: number | null;
+  vatClaimable?: boolean;
 }
 
 export async function fetchPurchases(params?: {

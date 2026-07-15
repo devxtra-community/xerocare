@@ -18,9 +18,11 @@ import {
 } from 'lucide-react';
 import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 
 export default function EmployeeProfilePage() {
+  const currency = useBranchCurrency();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -217,7 +219,9 @@ export default function EmployeeProfilePage() {
                   icon={<Briefcase />}
                   label="Monthly Salary"
                   value={
-                    employee.salary ? `${formatCurrency(Number(employee.salary))} / month` : '—'
+                    employee.salary
+                      ? `${formatCurrency(Number(employee.salary), currency)} / month`
+                      : '—'
                   }
                 />
               </div>

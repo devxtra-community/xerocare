@@ -49,6 +49,7 @@ import {
   EmployeeResponse,
 } from '@/lib/employee';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
 
@@ -97,6 +98,7 @@ function SortHeader({
 }
 
 export default function EmployeeTable() {
+  const currency = useBranchCurrency();
   const router = useRouter();
 
   // Search (debounced server-side)
@@ -478,7 +480,7 @@ export default function EmployeeTable() {
                     <span className="text-xs text-gray-600">{emp.branch?.name || '---'}</span>
                   </TableCell>
                   <TableCell className="px-3 py-4 text-sm font-semibold text-blue-700 tabular-nums">
-                    {formatCurrency(emp.salary || 0)}
+                    {formatCurrency(emp.salary || 0, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-4">
                     <Badge

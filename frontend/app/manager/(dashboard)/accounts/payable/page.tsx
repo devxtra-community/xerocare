@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Eye, Search, Download } from 'lucide-react';
 import { fetchManualPayables, fetchPayableCharts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
@@ -25,6 +26,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function ManagerPayablePage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
 
   const { data: payables = [], isLoading } = useQuery({
@@ -102,10 +104,10 @@ export default function ManagerPayablePage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
+          value={formatCurrency(totalOutstanding, currency)}
           subtitle="All payables"
         />
-        <StatCard title="Overdue" value={formatCurrency(overdue)} subtitle="Past due" />
+        <StatCard title="Overdue" value={formatCurrency(overdue, currency)} subtitle="Past due" />
         <StatCard title="Total Entries" value={payables.length.toString()} subtitle="Records" />
         <StatCard title="Shown" value={filtered.length.toString()} subtitle="Filtered" />
       </div>
@@ -113,22 +115,31 @@ export default function ManagerPayablePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">By Type</h3>
-          <DonutChart data={charts?.byType ?? []} height={220} />
+          <DonutChart data={charts?.byType ?? []} height={220} currency={currency} />
         </div>
         <div className="md:col-span-2 bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Payments</h3>
           <SimpleBarChart
             data={charts?.monthlyPayments ?? []}
             xKey="month"
-            bars={[{ key: 'amount', color: '#ef4444', label: 'Payments' }]}
+            bars={[
+              { key: 'payable', color: '#f59e0b', label: 'Payable' },
+              { key: 'paid', color: '#10b981', label: 'Paid' },
+            ]}
             height={220}
+            currency={currency}
           />
         </div>
       </div>
 
       <div className="bg-white rounded-xl border p-4">
         <h3 className="text-sm font-semibold text-gray-600 mb-3">Top Payees by Outstanding</h3>
-        <HorizontalBarChart data={charts?.topVendors ?? []} height={200} color="#f59e0b" />
+        <HorizontalBarChart
+          data={charts?.topVendors ?? []}
+          height={200}
+          color="#f59e0b"
+          currency={currency}
+        />
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -185,12 +196,12 @@ export default function ManagerPayablePage() {
                         <td className="px-4 py-3 text-xs text-gray-500">
                           {p.type?.replace(/_/g, ' ')}
                         </td>
-                        <td className="px-4 py-3">{formatCurrency(p.amount)}</td>
+                        <td className="px-4 py-3">{formatCurrency(p.amount, currency)}</td>
                         <td className="px-4 py-3 text-emerald-600">
-                          {formatCurrency(p.amountPaid ?? 0)}
+                          {formatCurrency(p.amountPaid ?? 0, currency)}
                         </td>
                         <td className="px-4 py-3 font-semibold">
-                          {formatCurrency(Number(p.amount) - Number(p.amountPaid ?? 0))}
+                          {formatCurrency(Number(p.amount) - Number(p.amountPaid ?? 0), currency)}
                         </td>
                         <td className="px-4 py-3">
                           <span

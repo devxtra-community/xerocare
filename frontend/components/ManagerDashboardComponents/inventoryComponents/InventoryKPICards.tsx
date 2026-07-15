@@ -3,6 +3,7 @@ import React from 'react';
 import StatCard from '@/components/StatCard';
 import { inventoryService, InventoryStats } from '@/services/inventoryService';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 /**
  * KPI Cards for Manager Inventory Dashboard.
@@ -10,6 +11,7 @@ import { formatCurrency } from '@/lib/format';
  * Provides high-level inventory health indicators.
  */
 export default function InventoryKPICards({ selectedYear }: { selectedYear: number | 'all' }) {
+  const currency = useBranchCurrency();
   const [stats, setStats] = React.useState<InventoryStats>({
     productStock: 0,
     spareStock: 0,
@@ -43,12 +45,12 @@ export default function InventoryKPICards({ selectedYear }: { selectedYear: numb
       />
       <StatCard
         title="Product Inventory Value"
-        value={formatCurrency(stats?.productValue ?? 0)}
+        value={formatCurrency(stats?.productValue ?? 0, currency)}
         subtitle={`${selectedYear === 'all' ? 'Total' : selectedYear} products worth`}
       />
       <StatCard
         title="Spare Parts Value"
-        value={formatCurrency(stats?.spareValue ?? 0)}
+        value={formatCurrency(stats?.spareValue ?? 0, currency)}
         subtitle={`${selectedYear === 'all' ? 'Total' : selectedYear} spare parts worth`}
       />
     </div>

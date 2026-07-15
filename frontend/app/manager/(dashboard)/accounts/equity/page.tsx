@@ -9,6 +9,7 @@ import {
   fetchEquityStatement,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
@@ -25,6 +26,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function ManagerEquityPage() {
+  const currency = useBranchCurrency();
   const currentYear = new Date().getFullYear();
 
   const { data: summary } = useQuery({
@@ -88,11 +90,11 @@ export default function ManagerEquityPage() {
       {/* Equity Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
         <p className="text-sm font-medium opacity-80 mb-1">Net Equity</p>
-        <p className="text-4xl font-bold">{formatCurrency(summary?.netEquity ?? 0)}</p>
+        <p className="text-4xl font-bold">{formatCurrency(summary?.netEquity ?? 0, currency)}</p>
         <p className="text-sm opacity-70 mt-1">Assets − Liabilities = Equity</p>
         <div className="flex gap-6 mt-4 text-sm">
           <span>
-            Total Assets: <strong>{formatCurrency(summary?.totalAssets ?? 0)}</strong>
+            Total Assets: <strong>{formatCurrency(summary?.totalAssets ?? 0, currency)}</strong>
           </span>
         </div>
       </div>
@@ -100,17 +102,17 @@ export default function ManagerEquityPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Share Capital"
-          value={formatCurrency(summary?.shareCapital ?? 0)}
+          value={formatCurrency(summary?.shareCapital ?? 0, currency)}
           subtitle="Paid-in capital"
         />
         <StatCard
           title="Retained Earnings"
-          value={formatCurrency(summary?.retainedEarnings ?? 0)}
+          value={formatCurrency(summary?.retainedEarnings ?? 0, currency)}
           subtitle="Accumulated"
         />
         <StatCard
           title="Owner Contribution"
-          value={formatCurrency(summary?.ownerContribution ?? 0)}
+          value={formatCurrency(summary?.ownerContribution ?? 0, currency)}
           subtitle="Capital input"
         />
         <StatCard title="Total Entries" value={entries.length.toString()} subtitle="Records" />
@@ -119,7 +121,7 @@ export default function ManagerEquityPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Equity Composition</h3>
-          <DonutChart data={byType} height={240} />
+          <DonutChart data={byType} height={240} currency={currency} />
         </div>
         {statement && (
           <div className="bg-white rounded-xl border p-4">
@@ -130,20 +132,20 @@ export default function ManagerEquityPage() {
               <div className="flex justify-between py-1.5 border-b">
                 <span className="text-gray-600">Opening Balance</span>
                 <span className="font-semibold">
-                  {formatCurrency(statement.opening?.total ?? 0)}
+                  {formatCurrency(statement.opening?.total ?? 0, currency)}
                 </span>
               </div>
               {statement.movements?.map((m, i: number) => (
                 <div key={i} className="flex justify-between py-1.5 border-b text-gray-500">
                   <span className="pl-4">{m.type?.replace(/_/g, ' ')}</span>
                   <span className={(m.total ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                    {formatCurrency(m.total ?? 0)}
+                    {formatCurrency(m.total ?? 0, currency)}
                   </span>
                 </div>
               ))}
               <div className="flex justify-between py-1.5 font-semibold text-gray-900">
                 <span>Closing Balance</span>
-                <span>{formatCurrency(statement.closing?.total ?? 0)}</span>
+                <span>{formatCurrency(statement.closing?.total ?? 0, currency)}</span>
               </div>
             </div>
           </div>
@@ -188,7 +190,9 @@ export default function ManagerEquityPage() {
                     <td className="px-4 py-3 max-w-[200px] truncate text-gray-600">
                       {e.description}
                     </td>
-                    <td className="px-4 py-3 font-semibold">{formatCurrency(e.amount)}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {formatCurrency(e.amount, currency)}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{e.currency}</td>
                   </tr>
                 ))

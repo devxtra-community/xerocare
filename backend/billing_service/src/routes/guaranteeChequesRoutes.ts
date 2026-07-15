@@ -6,7 +6,13 @@ import {
   GuaranteeChequeStatus,
   GuaranteeChequePurpose,
 } from '../entities/guaranteeChequeEntity';
+import { CashBankAccount } from '../entities/cashBankAccountEntity';
+import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
+
+function genGCRef(): string {
+  return `GCQ-${new Date().getFullYear()}-${Date.now().toString().slice(-7)}`;
+}
 
 const router = Router();
 
@@ -27,6 +33,8 @@ router.get('/stats', async (req, res, next) => {
         held_amount: string;
         returned_count: string;
         returned_amount: string;
+        deposited_count: string;
+        deposited_amount: string;
         pending_return_count: string;
       }[]
     >(`
@@ -35,6 +43,8 @@ router.get('/stats', async (req, res, next) => {
         COALESCE(SUM(gc.amount) FILTER (WHERE gc.status = 'RECEIVED'), 0)                   AS held_amount,
         COUNT(*) FILTER (WHERE gc.status = 'RETURNED')                                      AS returned_count,
         COALESCE(SUM(gc.amount) FILTER (WHERE gc.status = 'RETURNED'), 0)                   AS returned_amount,
+        COUNT(*) FILTER (WHERE gc.status = 'DEPOSITED')                                     AS deposited_count,
+        COALESCE(SUM(gc.amount) FILTER (WHERE gc.status = 'DEPOSITED'), 0)                  AS deposited_amount,
         COUNT(*) FILTER (
           WHERE gc.status = 'RECEIVED'
             AND gc.contract_invoice_id IS NOT NULL
@@ -54,6 +64,8 @@ router.get('/stats', async (req, res, next) => {
         heldAmount: parseFloat(r.held_amount),
         returnedCount: parseInt(r.returned_count, 10),
         returnedAmount: parseFloat(r.returned_amount),
+        depositedCount: parseInt(r.deposited_count, 10),
+        depositedAmount: parseFloat(r.deposited_amount),
         pendingReturnCount: parseInt(r.pending_return_count, 10),
       },
     });
@@ -261,6 +273,73 @@ router.post('/:id/return', async (req, res, next) => {
     cheque.returnedDate = returnedDate;
     const updated = await repo.save(cheque);
 
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── POST /:id/deposit — RECEIVED → DEPOSITED, creates cashbook RECEIPT ────────
+router.post('/:id/deposit', async (req, res, next) => {
+  try {
+    const { depositDate, bankAccountId, notes } = req.body;
+    if (!depositDate) throw new AppError('depositDate is required', 400);
+    if (!bankAccountId) throw new AppError('bankAccountId is required', 400);
+
+    const userId = req.user!.userId;
+
+    await Source.transaction(async (em) => {
+      const gcRepo = em.getRepository(GuaranteeCheque);
+      const accountRepo = em.getRepository(CashBankAccount);
+      const entryRepo = em.getRepository(CashbookEntry);
+
+      const qb = gcRepo
+        .createQueryBuilder('gc')
+        .where('gc.id = :id', { id: req.params.id })
+        .andWhere('gc.deletedAt IS NULL');
+      applyBranchQB(qb, 'gc', req.branchFilter ?? []);
+
+      const cheque = await qb.getOne();
+      if (!cheque) throw new AppError('Guarantee cheque not found', 404);
+      if (cheque.status !== GuaranteeChequeStatus.RECEIVED) {
+        throw new AppError(`Cannot deposit: cheque is already ${cheque.status.toLowerCase()}`, 400);
+      }
+
+      const account = await accountRepo.findOne({ where: { id: bankAccountId } });
+      if (!account) throw new AppError('Bank account not found', 404);
+
+      const ref = genGCRef();
+      await entryRepo.save(
+        entryRepo.create({
+          referenceNo: ref,
+          date: depositDate,
+          accountId: bankAccountId,
+          entryType: 'RECEIPT',
+          amount: Number(cheque.amount),
+          category: 'GUARANTEE_CHEQUE',
+          description: `Guarantee Cheque — ${cheque.customerName} · #${cheque.chequeNumber} · ${cheque.bankName}`,
+          chequeNo: cheque.chequeNumber,
+          paymentMode: 'Cheque',
+          sourceType: 'GUARANTEE_CHEQUE',
+          sourceId: cheque.id,
+          notes: notes || undefined,
+          createdBy: userId,
+          branchId: cheque.branchId,
+        }) as unknown as CashbookEntry,
+      );
+
+      account.currentBalance = Number(account.currentBalance) + Number(cheque.amount);
+      await accountRepo.save(account);
+
+      cheque.status = GuaranteeChequeStatus.DEPOSITED;
+      cheque.depositedDate = depositDate;
+      cheque.depositedToAccountId = bankAccountId;
+      await gcRepo.save(cheque);
+    });
+
+    const updated = await Source.getRepository(GuaranteeCheque).findOne({
+      where: { id: req.params.id },
+    });
     res.json({ success: true, data: updated });
   } catch (err) {
     next(err);

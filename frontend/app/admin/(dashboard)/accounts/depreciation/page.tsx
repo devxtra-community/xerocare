@@ -10,6 +10,7 @@ import {
   AssetDepreciationRegister,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -23,6 +24,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 function DepreciationContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const [search, setSearch] = useState('');
@@ -96,11 +98,19 @@ function DepreciationContent() {
       <BranchFilterBar />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total Cost" value={formatCurrency(totalCost)} subtitle="Purchase value" />
-        <StatCard title="Total NBV" value={formatCurrency(totalNBV)} subtitle="Net book value" />
+        <StatCard
+          title="Total Cost"
+          value={formatCurrency(totalCost, currency)}
+          subtitle="Purchase value"
+        />
+        <StatCard
+          title="Total NBV"
+          value={formatCurrency(totalNBV, currency)}
+          subtitle="Net book value"
+        />
         <StatCard
           title="Accumulated Dep."
-          value={formatCurrency(totalAccDep)}
+          value={formatCurrency(totalAccDep, currency)}
           subtitle="Total depreciated"
         />
         <StatCard title="Active Assets" value={activeCount.toString()} subtitle="In use" />
@@ -119,6 +129,7 @@ function DepreciationContent() {
               { key: 'nbv', color: '#10b981', label: 'NBV' },
             ]}
             height={240}
+            currency={currency}
           />
         </div>
         <div className="bg-white rounded-xl border p-4">
@@ -128,6 +139,7 @@ function DepreciationContent() {
             xKey="month"
             lines={[{ key: 'amount', color: '#f59e0b', label: 'Depreciation' }]}
             height={240}
+            currency={currency}
           />
         </div>
       </div>
@@ -196,10 +208,12 @@ function DepreciationContent() {
                         {a.productId?.slice(0, 8) ?? '—'}…
                       </td>
                       <td className="px-4 py-3">{String(a.purchaseDate).slice(0, 10)}</td>
-                      <td className="px-4 py-3">{formatCurrency(a.purchasePrice)}</td>
-                      <td className="px-4 py-3 text-red-600">{formatCurrency(a.accumulated)}</td>
+                      <td className="px-4 py-3">{formatCurrency(a.purchasePrice, currency)}</td>
+                      <td className="px-4 py-3 text-red-600">
+                        {formatCurrency(a.accumulated, currency)}
+                      </td>
                       <td className="px-4 py-3 font-semibold text-emerald-700">
-                        {formatCurrency(a.nbv)}
+                        {formatCurrency(a.nbv, currency)}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {a.method.replace(/_/g, ' ')}

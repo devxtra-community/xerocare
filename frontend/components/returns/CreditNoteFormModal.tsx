@@ -10,12 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { getCustomers } from '@/lib/customer';
 import { getCustomerById } from '@/lib/customer';
 import { getInvoicesByCustomerId, getInvoiceById } from '@/services/invoiceService';
 import { getProductById, Product } from '@/lib/product';
+import { getSparePartById, SparePart } from '@/lib/spare-part';
 import { toast } from 'sonner';
 import { CreditNoteRecord, Invoice, InvoiceItem as GlobalInvoiceItem } from '@/lib/invoice';
 import { Customer } from '@/lib/customer';
@@ -38,20 +40,25 @@ import {
   RefreshCw,
   CreditCard,
   X,
+  Wrench,
+  Box,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { QuotationViewDialog } from '@/components/employeeComponents/QuotationViewDialog';
 
 interface ReturnInvoiceItem {
   id: string;
-  productId: string;
+  productId?: string;
+  sparePartId?: string;
+  itemType?: string;
   description: string;
   quantity: number;
   unitPrice: number;
   totalAmount: number;
   serialNumber?: string;
-  itemType?: string;
+  sku?: string;
 }
 
 interface Props {
@@ -61,16 +68,16 @@ interface Props {
   record?: CreditNoteRecord | null;
 }
 
+type ItemCategory = 'PRODUCT' | 'SPARE_PART';
+
 /* ── helpers ── */
 function truncate(str: string, max = 40) {
   if (!str) return '';
   return str.length > max ? str.slice(0, max) + '…' : str;
 }
 
-/** Parse pipe-separated product descriptions like "CONS:HP GT52|70ml Bottle|Up to 8k pages[550]" */
 function parseProductLabel(raw: string) {
   if (!raw) return { short: 'Unknown Product', sub: '' };
-  // Strip leading category prefix like "CONS:", "SVC:", etc.
   const stripped = raw.replace(/^[A-Z]+:/i, '').trim();
   const parts = stripped.split('|');
   const short = truncate(parts[0]?.trim() || stripped, 38);
@@ -119,24 +126,39 @@ const RETURN_TYPES = [
 /* ─────────────────────────────────── */
 
 export default function CreditNoteFormModal({ open, onClose, onSave, record }: Props) {
+  const currency = useBranchCurrency();
+
+  // ── Category toggle ──
+  const [itemCategory, setItemCategory] = useState<ItemCategory>('PRODUCT');
+
+  // ── Shared form state ──
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<ReturnInvoiceItem | null>(null);
-  const [productMeta, setProductMeta] = useState<Product | null>(null);
-  const [customerDetails, setCustomerDetails] = useState<Customer | null>(null);
   const [returnType, setReturnType] = useState<string>('DIRECT_REFUND');
   const [notes, setNotes] = useState('');
   const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [loadingProduct, setLoadingProduct] = useState(false);
   const [loadingCustomer, setLoadingCustomer] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState<Customer | null>(null);
   const [viewQuotation, setViewQuotation] = useState(false);
+
+  // ── Product state ──
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<ReturnInvoiceItem | null>(null);
+  const [productMeta, setProductMeta] = useState<Product | null>(null);
+  const [loadingProduct, setLoadingProduct] = useState(false);
+
+  // ── Spare part state ──
+  const [selectedSparePartId, setSelectedSparePartId] = useState('');
+  const [selectedSparePart, setSelectedSparePart] = useState<ReturnInvoiceItem | null>(null);
+  const [sparePartMeta, setSparePartMeta] = useState<SparePart | null>(null);
+  const [returnQuantity, setReturnQuantity] = useState<number>(1);
 
   /* ── reset ── */
   const resetForm = () => {
+    setItemCategory('PRODUCT');
     setSelectedCustomer('');
     setSelectedInvoiceId('');
     setSelectedInvoice(null);
@@ -148,6 +170,20 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     setNotes('');
     setInvoices([]);
     setViewQuotation(false);
+    setSelectedSparePartId('');
+    setSelectedSparePart(null);
+    setSparePartMeta(null);
+    setReturnQuantity(1);
+  };
+
+  const resetItemSelection = () => {
+    setSelectedProductId('');
+    setSelectedProduct(null);
+    setProductMeta(null);
+    setSelectedSparePartId('');
+    setSelectedSparePart(null);
+    setSparePartMeta(null);
+    setReturnQuantity(1);
   };
 
   /* ── fetchers ── */
@@ -166,7 +202,6 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       setCustomerDetails(await getCustomerById(id));
     } catch (e) {
       console.error(e);
-      toast.error('Failed to load customer details');
     } finally {
       setLoadingCustomer(false);
     }
@@ -178,9 +213,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       if (!record) {
         setSelectedInvoiceId('');
         setSelectedInvoice(null);
-        setSelectedProductId('');
-        setSelectedProduct(null);
-        setProductMeta(null);
+        resetItemSelection();
       }
       try {
         const res = await getInvoicesByCustomerId(customerId);
@@ -188,15 +221,21 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
           const fetchedInvoices = res.data.data || [];
           setInvoices(fetchedInvoices);
 
-          // If editing and we haven't set the selectedInvoice yet
           if (record && !selectedInvoice) {
             const inv = fetchedInvoices.find((i: Invoice) => i.id === record.invoiceId);
             if (inv) {
               setSelectedInvoice(inv);
-              const prod = (inv.items || []).find(
-                (p: GlobalInvoiceItem) => p.productId === record.productId,
-              );
-              if (prod) setSelectedProduct(prod as unknown as ReturnInvoiceItem);
+              if (record.itemCategory === 'SPARE_PART' && record.sparePartId) {
+                const item = (inv.items || []).find(
+                  (p: GlobalInvoiceItem) => p.sparePartId === record.sparePartId,
+                );
+                if (item) setSelectedSparePart(item as unknown as ReturnInvoiceItem);
+              } else if (record.productId) {
+                const item = (inv.items || []).find(
+                  (p: GlobalInvoiceItem) => p.productId === record.productId,
+                );
+                if (item) setSelectedProduct(item as unknown as ReturnInvoiceItem);
+              }
             }
           }
         }
@@ -212,9 +251,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
 
   const handleInvoiceChange = useCallback(async (invoiceId: string) => {
     setSelectedInvoiceId(invoiceId);
-    setSelectedProductId('');
-    setSelectedProduct(null);
-    setProductMeta(null);
+    resetItemSelection();
     try {
       const res = await getInvoiceById(invoiceId);
       if (res.data.success) {
@@ -231,11 +268,16 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     if (open) {
       fetchCustomers();
       if (record) {
+        setItemCategory((record.itemCategory as ItemCategory) || 'PRODUCT');
         setSelectedCustomer(record.customerId);
         setSelectedInvoiceId(record.invoiceId);
-        // We need to fetch the invoice and product details too
         handleInvoiceChange(record.invoiceId);
-        setSelectedProductId(record.productId);
+        if (record.itemCategory === 'SPARE_PART') {
+          setSelectedSparePartId(record.sparePartId ?? '');
+          setReturnQuantity(record.quantity ?? 1);
+        } else {
+          setSelectedProductId(record.productId ?? '');
+        }
         setReturnType(record.type);
         setNotes(record.notes || '');
       }
@@ -243,9 +285,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
   }, [open, record, handleInvoiceChange]);
 
   useEffect(() => {
-    if (!open) {
-      resetForm();
-    }
+    if (!open) resetForm();
   }, [open]);
 
   useEffect(() => {
@@ -255,66 +295,102 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     }
   }, [selectedCustomer, fetchInvoices, fetchCustomerDetails]);
 
-  const fetchProductMeta = async (productId: string) => {
-    setLoadingProduct(true);
-    try {
-      setProductMeta(await getProductById(productId));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingProduct(false);
-    }
-  };
-
+  // Fetch product metadata
   useEffect(() => {
     if (selectedProduct?.productId) {
-      fetchProductMeta(selectedProduct.productId);
+      setLoadingProduct(true);
+      getProductById(selectedProduct.productId)
+        .then(setProductMeta)
+        .catch(console.error)
+        .finally(() => setLoadingProduct(false));
     } else {
       setProductMeta(null);
     }
   }, [selectedProduct]);
 
+  // Fetch spare part metadata
+  useEffect(() => {
+    if (selectedSparePart?.sparePartId) {
+      getSparePartById(selectedSparePart.sparePartId).then(setSparePartMeta).catch(console.error);
+    } else {
+      setSparePartMeta(null);
+    }
+  }, [selectedSparePart]);
+
+  /* ── item selection handlers ── */
   const handleProductChange = (key: string) => {
     setSelectedProductId(key);
-    const prod = (selectedInvoice?.items || []).find(
+    const item = (selectedInvoice?.items || []).find(
       (i: GlobalInvoiceItem) => i.productId === key || i.id === key,
     );
-    setSelectedProduct((prod as unknown as ReturnInvoiceItem) || null);
+    setSelectedProduct((item as unknown as ReturnInvoiceItem) || null);
+  };
+
+  const handleSparePartChange = (key: string) => {
+    setSelectedSparePartId(key);
+    const item = (selectedInvoice?.items || []).find(
+      (i: GlobalInvoiceItem) => i.sparePartId === key || i.id === key,
+    );
+    if (item) {
+      setSelectedSparePart(item as unknown as ReturnInvoiceItem);
+      setReturnQuantity(1);
+    } else {
+      setSelectedSparePart(null);
+    }
   };
 
   /* ── submit ── */
   const handleSubmit = () => {
-    if (!selectedCustomer || !selectedInvoice || !selectedProduct) {
-      toast.error('Please complete all required steps');
-      return;
-    }
     const customerObj = customers.find((c) => c.id === selectedCustomer);
-    onSave({
+    const base = {
       customerId: selectedCustomer,
       customerName: customerObj?.name || customerDetails?.name || 'Customer',
-      invoiceId: selectedInvoice.id,
-      invoiceNumber: selectedInvoice.invoiceNumber || '—',
-      productId: selectedProduct.productId,
-      productName: productMeta?.name || selectedProduct.description || 'Product',
-      modelName: productMeta?.model?.model_name || selectedProduct.description || '',
-      brand: productMeta?.brand || productMeta?.model?.brandRelation?.name || '',
-      serialNumber: productMeta?.serial_no || selectedProduct.serialNumber || '',
-      productAmount:
-        selectedProduct.unitPrice || selectedProduct.totalAmount || productMeta?.sale_price || 0,
+      invoiceId: selectedInvoice!.id,
+      invoiceNumber: selectedInvoice!.invoiceNumber || '—',
+      itemCategory,
       type: returnType,
       notes,
-    });
+    };
+
+    if (itemCategory === 'SPARE_PART') {
+      if (!selectedCustomer || !selectedInvoice || !selectedSparePart) {
+        toast.error('Please complete all required steps');
+        return;
+      }
+      const unitPrice = selectedSparePart.unitPrice || sparePartMeta?.base_price || 0;
+      onSave({
+        ...base,
+        sparePartId: selectedSparePart.sparePartId,
+        sku: selectedSparePart.sku || sparePartMeta?.sku || '',
+        productName: sparePartMeta?.part_name || selectedSparePart.description || 'Spare Part',
+        quantity: returnQuantity,
+        productAmount: unitPrice * returnQuantity,
+      });
+    } else {
+      if (!selectedCustomer || !selectedInvoice || !selectedProduct) {
+        toast.error('Please complete all required steps');
+        return;
+      }
+      onSave({
+        ...base,
+        productId: selectedProduct.productId,
+        productName: productMeta?.name || selectedProduct.description || 'Product',
+        modelName: productMeta?.model?.model_name || selectedProduct.description || '',
+        brand: productMeta?.brand || productMeta?.model?.brandRelation?.name || '',
+        serialNumber: productMeta?.serial_no || selectedProduct.serialNumber || '',
+        productAmount:
+          selectedProduct.unitPrice || selectedProduct.totalAmount || productMeta?.sale_price || 0,
+      });
+    }
   };
 
-  /* ── derived ── */
-  const invoiceItems = (() => {
+  /* ── derived invoice item lists ── */
+  const productInvoiceItems: ReturnInvoiceItem[] = (() => {
     if (!selectedInvoice) return [];
     const items = [...(selectedInvoice.items || [])];
 
-    // If this invoice has a replacement, that replacement is now the active product for this "invoice" record
     const replacement = selectedInvoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
-    if (replacement && replacement.replacementProductId) {
-      // Add the replacement product to the selectable list if not already there
+    if (replacement?.replacementProductId) {
       const alreadyHas = items.some((i) => i.productId === replacement.replacementProductId);
       if (!alreadyHas) {
         items.push({
@@ -329,16 +405,27 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
       }
     }
 
-    return items.filter(
-      (i: GlobalInvoiceItem) =>
-        (i.quantity || 0) > 0 &&
-        (i.productId ||
-          i.itemType === 'PRODUCT' ||
-          i.description.includes('HP') ||
-          i.description.includes('Canon')),
-    ) as unknown as ReturnInvoiceItem[];
+    return items
+      .filter(
+        (i: GlobalInvoiceItem) =>
+          (i.quantity || 0) > 0 &&
+          (i.itemType === 'PRODUCT' ||
+            i.itemType === 'PRICING_RULE' ||
+            (i.productId && !i.sparePartId)),
+      )
+      .map((i) => i as unknown as ReturnInvoiceItem);
   })();
 
+  const sparePartInvoiceItems: ReturnInvoiceItem[] = (() => {
+    if (!selectedInvoice) return [];
+    return (selectedInvoice.items || [])
+      .filter((i: GlobalInvoiceItem) => i.itemType === 'SPAREPART' || i.sparePartId)
+      .map((i) => i as unknown as ReturnInvoiceItem);
+  })();
+
+  const hasItemSelected = itemCategory === 'SPARE_PART' ? !!selectedSparePart : !!selectedProduct;
+
+  /* ── preview panel values ── */
   const productImageUrl = productMeta?.imageUrl;
   const productBrand = productMeta?.brand || productMeta?.model?.brandRelation?.name || '—';
   const productModel = productMeta?.model?.model_name || '—';
@@ -349,18 +436,22 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     ? format(new Date(selectedInvoice.createdAt), 'dd MMM yyyy')
     : '—';
   const invoiceNumber = selectedInvoice ? getDisplayInvoiceNumber(selectedInvoice) : '—';
-  const canSubmit = !!selectedCustomer && !!selectedInvoice && !!selectedProduct;
+
+  const spareImageUrl = sparePartMeta?.image_url;
+  const spareBrand = sparePartMeta?.brand || '—';
+  const sparePrice = sparePartMeta?.base_price;
+  const spareSku = sparePartMeta?.sku || selectedSparePart?.sku || '—';
+
+  const canSubmit = !!selectedCustomer && !!selectedInvoice && hasItemSelected;
 
   /* ── render ── */
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        {/* Force wider dialog via inline style — avoids Tailwind purge issues */}
         <DialogContent
           className="p-0 overflow-hidden rounded-2xl border-0 shadow-2xl sm:max-w-none"
           style={{ maxWidth: 920, width: '95vw' }}
         >
-          {/* Visually-hidden title required by Radix for screen-reader accessibility */}
           <DialogTitle className="sr-only">
             {record ? 'Update Credit Note' : 'Create Credit Note'}
           </DialogTitle>
@@ -391,7 +482,10 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                 {[
                   { label: 'Customer', done: !!selectedCustomer },
                   { label: 'Invoice', done: !!selectedInvoiceId },
-                  { label: 'Product', done: !!selectedProductId },
+                  {
+                    label: itemCategory === 'SPARE_PART' ? 'Spare Part' : 'Product',
+                    done: hasItemSelected,
+                  },
                 ].map((s, i) => (
                   <span
                     key={i}
@@ -420,6 +514,47 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
               {/* ── LEFT FORM ── */}
               <div className="flex-1 flex flex-col overflow-y-auto">
                 <div className="p-6 space-y-5 flex-1">
+                  {/* 0. Item Category Toggle */}
+                  <section className="space-y-2">
+                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      Item Category
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItemCategory('PRODUCT');
+                          resetItemSelection();
+                        }}
+                        disabled={!!record}
+                        className={`flex items-center gap-2 flex-1 rounded-xl border-2 py-2.5 px-4 text-xs font-semibold transition-all ${
+                          itemCategory === 'PRODUCT'
+                            ? 'border-primary bg-primary text-white shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <Box className="h-4 w-4" />
+                        Product
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setItemCategory('SPARE_PART');
+                          resetItemSelection();
+                        }}
+                        disabled={!!record}
+                        className={`flex items-center gap-2 flex-1 rounded-xl border-2 py-2.5 px-4 text-xs font-semibold transition-all ${
+                          itemCategory === 'SPARE_PART'
+                            ? 'border-orange-500 bg-orange-500 text-white shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      >
+                        <Wrench className="h-4 w-4" />
+                        Spare Part
+                      </button>
+                    </div>
+                  </section>
+
                   {/* 1. Customer */}
                   <section className="space-y-2">
                     <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -529,52 +664,133 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                           </span>
                           <span className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
-                            {formatCurrency(selectedInvoice.totalAmount)}
+                            {formatCurrency(selectedInvoice.totalAmount, currency)}
                           </span>
                         </div>
+                        {/* Spare part count badge */}
+                        {sparePartInvoiceItems.length > 0 && (
+                          <div className="mt-1.5 flex items-center gap-1 text-[10px] text-orange-600">
+                            <Wrench className="h-3 w-3" />
+                            {sparePartInvoiceItems.length} spare part line item
+                            {sparePartInvoiceItems.length > 1 ? 's' : ''}
+                          </div>
+                        )}
                       </div>
                     )}
                   </section>
 
-                  {/* 3. Product */}
+                  {/* 3. Item selection */}
                   <section className="space-y-2">
                     <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       <span className="w-4 h-4 rounded-full bg-primary text-white text-[9px] flex items-center justify-center font-bold">
                         3
                       </span>
-                      Product
+                      {itemCategory === 'SPARE_PART' ? 'Spare Part' : 'Product'}
                     </label>
-                    <Select
-                      value={selectedProductId}
-                      onValueChange={handleProductChange}
-                      disabled={!selectedInvoice || invoiceItems.length === 0}
-                    >
-                      <SelectTrigger className="h-9 rounded-lg border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary/20">
-                        <SelectValue
-                          placeholder={
-                            selectedInvoice && invoiceItems.length === 0
-                              ? 'No products in this invoice'
-                              : 'Select a product…'
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {invoiceItems.map((item: ReturnInvoiceItem, idx: number) => {
-                          const { short, sub } = parseProductLabel(item.description || '');
-                          return (
-                            <SelectItem
-                              key={item.productId || item.id || idx}
-                              value={item.productId || item.id}
-                            >
-                              <div className="flex flex-col py-0.5">
-                                <span className="text-xs font-medium text-slate-700">{short}</span>
-                                {sub && <span className="text-[10px] text-slate-400">{sub}</span>}
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+
+                    {itemCategory === 'SPARE_PART' ? (
+                      /* Spare part selector */
+                      <>
+                        <Select
+                          value={selectedSparePartId}
+                          onValueChange={handleSparePartChange}
+                          disabled={!selectedInvoice || sparePartInvoiceItems.length === 0}
+                        >
+                          <SelectTrigger className="h-9 rounded-lg border-orange-200 bg-white text-sm focus:ring-2 focus:ring-orange-200">
+                            <SelectValue
+                              placeholder={
+                                selectedInvoice && sparePartInvoiceItems.length === 0
+                                  ? 'No spare parts in this invoice'
+                                  : 'Select a spare part…'
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sparePartInvoiceItems.map((item, idx) => {
+                              const { short, sub } = parseProductLabel(item.description || '');
+                              return (
+                                <SelectItem
+                                  key={item.sparePartId || item.id || idx}
+                                  value={item.sparePartId || item.id}
+                                >
+                                  <div className="flex flex-col py-0.5">
+                                    <span className="text-xs font-medium text-slate-700">
+                                      {short}
+                                    </span>
+                                    {sub && (
+                                      <span className="text-[10px] text-slate-400">{sub}</span>
+                                    )}
+                                    {item.sku && (
+                                      <span className="text-[10px] text-orange-500 font-mono">
+                                        SKU: {item.sku}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+
+                        {selectedSparePart && (
+                          <div className="grid gap-2 pt-1">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                              Quantity to Return
+                            </label>
+                            <div className="flex items-center gap-3">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={selectedSparePart.quantity}
+                                value={returnQuantity}
+                                onChange={(e) =>
+                                  setReturnQuantity(Math.max(1, Number(e.target.value)))
+                                }
+                                className="h-9 w-28 rounded-lg border-orange-200 text-sm focus:ring-2 focus:ring-orange-200"
+                              />
+                              <span className="text-[11px] text-slate-400">
+                                of {selectedSparePart.quantity} purchased
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      /* Product selector */
+                      <Select
+                        value={selectedProductId}
+                        onValueChange={handleProductChange}
+                        disabled={!selectedInvoice || productInvoiceItems.length === 0}
+                      >
+                        <SelectTrigger className="h-9 rounded-lg border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary/20">
+                          <SelectValue
+                            placeholder={
+                              selectedInvoice && productInvoiceItems.length === 0
+                                ? 'No products in this invoice'
+                                : 'Select a product…'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productInvoiceItems.map((item: ReturnInvoiceItem, idx: number) => {
+                            const { short, sub } = parseProductLabel(item.description || '');
+                            return (
+                              <SelectItem
+                                key={item.productId || item.id || idx}
+                                value={item.productId || item.id || String(idx)}
+                              >
+                                <div className="flex flex-col py-0.5">
+                                  <span className="text-xs font-medium text-slate-700">
+                                    {short}
+                                  </span>
+                                  {sub && <span className="text-[10px] text-slate-400">{sub}</span>}
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </section>
 
                   {/* 4. Return Type */}
@@ -585,8 +801,6 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                       </span>
                       Return Type
                     </label>
-
-                    {/* ⚠ Use inline-flex / explicit widths to avoid Tailwind grid purge */}
                     <div
                       style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}
                     >
@@ -664,17 +878,103 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
               >
                 <div className="p-4 flex-1 flex flex-col overflow-y-auto">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-3">
-                    Product Preview
+                    {itemCategory === 'SPARE_PART' ? 'Spare Part Preview' : 'Product Preview'}
                   </p>
 
-                  {loadingProduct ? (
+                  {/* ── Spare part preview ── */}
+                  {itemCategory === 'SPARE_PART' && selectedSparePart ? (
+                    <div className="flex flex-col gap-3">
+                      <div className="rounded-xl overflow-hidden bg-white border border-slate-200 aspect-square flex items-center justify-center shadow-sm">
+                        {spareImageUrl ? (
+                          <img
+                            src={spareImageUrl}
+                            alt="Spare Part"
+                            className="object-contain w-full h-full p-3"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-1.5 text-slate-200">
+                            <Wrench className="h-10 w-10" />
+                            <span className="text-[10px] text-slate-400">No image</span>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">
+                          {sparePartMeta?.part_name || selectedSparePart.description}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-white border border-slate-100 divide-y divide-slate-50 overflow-hidden text-xs">
+                        {[
+                          { Icon: Tag, label: 'Brand', val: spareBrand },
+                          { Icon: Building2, label: 'SKU', val: spareSku, mono: true },
+                          ...(sparePrice
+                            ? [
+                                {
+                                  Icon: DollarSign,
+                                  label: 'Unit Price',
+                                  val: formatCurrency(sparePrice, currency),
+                                  accent: true,
+                                },
+                              ]
+                            : []),
+                          {
+                            Icon: Package,
+                            label: 'Return Qty',
+                            val: String(returnQuantity),
+                            accent: true,
+                          },
+                          ...(sparePrice
+                            ? [
+                                {
+                                  Icon: DollarSign,
+                                  label: 'Return Total',
+                                  val: formatCurrency(sparePrice * returnQuantity, currency),
+                                  accent: true,
+                                },
+                              ]
+                            : []),
+                          { Icon: Calendar, label: 'Sold', val: soldDate },
+                          { Icon: FileText, label: 'Invoice', val: invoiceNumber },
+                        ].map(
+                          ({
+                            Icon,
+                            label,
+                            val,
+                            mono,
+                            accent,
+                          }: {
+                            Icon: React.ElementType;
+                            label: string;
+                            val: string | number;
+                            mono?: boolean;
+                            accent?: boolean;
+                          }) => (
+                            <div
+                              key={label}
+                              className="flex items-center justify-between px-3 py-2"
+                            >
+                              <span className="flex items-center gap-1.5 text-slate-400 font-medium text-[10px]">
+                                <Icon className="h-3 w-3" />
+                                {label}
+                              </span>
+                              <span
+                                className={`block truncate font-semibold text-[10px] max-w-[120px] ${accent ? 'text-emerald-600' : 'text-slate-700'} ${mono ? 'font-mono' : ''}`}
+                              >
+                                {val}
+                              </span>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  ) : itemCategory === 'PRODUCT' && loadingProduct ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-2">
                       <Loader2 className="h-5 w-5 animate-spin text-primary/40" />
                       <span className="text-[10px] text-slate-400">Loading…</span>
                     </div>
-                  ) : selectedProduct && productMeta ? (
+                  ) : itemCategory === 'PRODUCT' && selectedProduct && productMeta ? (
+                    /* Product preview */
                     <div className="flex flex-col gap-3">
-                      {/* Image */}
                       <div className="rounded-xl overflow-hidden bg-white border border-slate-200 aspect-square flex items-center justify-center shadow-sm">
                         {productImageUrl ? (
                           <img
@@ -689,15 +989,11 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                           </div>
                         )}
                       </div>
-
-                      {/* Name */}
                       <div>
                         <p className="text-xs font-bold text-slate-800 leading-snug line-clamp-2">
                           {productMeta.name || selectedProduct.description}
                         </p>
                       </div>
-
-                      {/* Stats grid */}
                       <div className="rounded-lg bg-white border border-slate-100 divide-y divide-slate-50 overflow-hidden text-xs">
                         {[
                           { Icon: Tag, label: 'Brand', val: productBrand },
@@ -708,7 +1004,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                                 {
                                   Icon: DollarSign,
                                   label: 'Price',
-                                  val: formatCurrency(productPrice),
+                                  val: formatCurrency(productPrice, currency),
                                   accent: true,
                                 },
                               ]
@@ -753,7 +1049,6 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                           ),
                         )}
                       </div>
-
                       <button
                         onClick={() => setViewQuotation(true)}
                         className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors py-2 text-xs font-semibold"
@@ -762,22 +1057,19 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                         View Invoice / Quotation
                       </button>
                     </div>
-                  ) : selectedInvoice && !selectedProduct ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-6">
-                      <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
-                        <Package className="h-5 w-5 text-slate-200" />
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-relaxed max-w-[160px]">
-                        Select a product to preview details
-                      </p>
-                    </div>
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-6">
                       <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-slate-200" />
+                        {itemCategory === 'SPARE_PART' ? (
+                          <Wrench className="h-5 w-5 text-slate-200" />
+                        ) : (
+                          <Package className="h-5 w-5 text-slate-200" />
+                        )}
                       </div>
                       <p className="text-[10px] text-slate-400 leading-relaxed max-w-[160px]">
-                        Complete the steps to preview product details here
+                        {selectedInvoice
+                          ? `Select a ${itemCategory === 'SPARE_PART' ? 'spare part' : 'product'} to preview`
+                          : 'Complete the steps to preview details here'}
                       </p>
                     </div>
                   )}

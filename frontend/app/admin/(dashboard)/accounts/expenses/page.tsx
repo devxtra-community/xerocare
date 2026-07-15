@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Search, Download } from 'lucide-react';
 import { fetchExpenseEntries, fetchExpenseCharts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, StackedBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -19,6 +20,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 function ExpensesContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const [search, setSearch] = useState('');
@@ -87,7 +89,11 @@ function ExpensesContent() {
       <BranchFilterBar />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total Amount" value={formatCurrency(total)} subtitle="Filtered" />
+        <StatCard
+          title="Total Amount"
+          value={formatCurrency(total, currency)}
+          subtitle="Filtered"
+        />
         <StatCard title="Pending" value={pending.toString()} subtitle="Awaiting approval" />
         <StatCard title="Entries" value={filtered.length.toString()} subtitle="Shown" />
         <StatCard
@@ -100,7 +106,7 @@ function ExpensesContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Category Breakdown</h3>
-          <DonutChart data={charts?.categoryDonut ?? []} height={220} />
+          <DonutChart data={charts?.categoryDonut ?? []} height={220} currency={currency} />
         </div>
         <div className="bg-white rounded-xl border p-4">
           <h3 className="text-sm font-semibold text-gray-600 mb-3">Monthly Trend</h3>
@@ -109,6 +115,7 @@ function ExpensesContent() {
             xKey="month"
             keys={charts?.categories ?? []}
             height={220}
+            currency={currency}
           />
         </div>
       </div>
@@ -165,7 +172,9 @@ function ExpensesContent() {
                       <td className="px-4 py-3">{e.date?.slice(0, 10)}</td>
                       <td className="px-4 py-3">{e.category.replace(/_/g, ' ')}</td>
                       <td className="px-4 py-3 max-w-[200px] truncate">{e.description}</td>
-                      <td className="px-4 py-3 font-semibold">{formatCurrency(e.amount)}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatCurrency(e.amount, currency)}
+                      </td>
                       <td className="px-4 py-3">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[e.status] ?? 'bg-gray-100 text-gray-700'}`}

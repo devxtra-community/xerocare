@@ -15,6 +15,7 @@ import { getVendorRequests } from '@/lib/vendor';
 import { format } from 'date-fns';
 import { FileText, Loader2, Eye } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 // import { Button } from '@/components/ui/button';
 
 interface VendorRequest {
@@ -41,6 +42,7 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 export default function VendorRequestHistory({ vendorName }: VendorRequestHistoryProps) {
+  const currency = useBranchCurrency();
   const params = useParams();
   const id = params.id as string;
   const [requests, setRequests] = useState<VendorRequest[]>([]);
@@ -137,7 +139,7 @@ export default function VendorRequestHistory({ vendorName }: VendorRequestHistor
                   {req.products}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-xs text-right font-bold text-slate-700">
-                  {formatCurrency(req.total_amount || 0)}
+                  {formatCurrency(req.total_amount || 0, currency)}
                 </TableCell>
               </TableRow>
             ))}

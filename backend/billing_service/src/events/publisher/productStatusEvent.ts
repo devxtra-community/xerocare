@@ -12,6 +12,7 @@ export async function emitProductStatusUpdate(payload: {
   invoiceId: string;
   approvedBy: string;
   approvedAt: Date;
+  branchId?: string;
   customerId?: string | null;
 }) {
   const channel = await getRabbitChannel();
@@ -24,7 +25,7 @@ export async function emitProductStatusUpdate(payload: {
     billId: payload.invoiceId,
     invoiceId: payload.invoiceId,
     productId: payload.productId,
-    branchId: '', // Will be populated if needed
+    branchId: payload.branchId ?? '',
     billType: payload.billType,
     approvedBy: payload.approvedBy,
     approvedAt: payload.approvedAt.toISOString(),

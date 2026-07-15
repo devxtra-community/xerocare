@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Purchase } from '@/services/purchaseService';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Button } from '@/components/ui/button';
 import {
   FileText,
@@ -42,6 +43,7 @@ export default function ViewPurchaseDialog({
   purchase,
   onSuccess,
 }: ViewPurchaseDialogProps) {
+  const currency = useBranchCurrency();
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   const getStatusStyle = (status: string) => {
@@ -89,7 +91,7 @@ export default function ViewPurchaseDialog({
                 Total Lot Amount
               </p>
               <p className="text-xl font-black text-primary">
-                {formatCurrency(purchase.totalAmount)}
+                {formatCurrency(purchase.totalAmount, currency)}
               </p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 italic">
@@ -107,7 +109,7 @@ export default function ViewPurchaseDialog({
                 Balance Due
               </p>
               <p className="text-xl font-black text-red-600">
-                {formatCurrency(purchase.remainingAmount)}
+                {formatCurrency(purchase.remainingAmount, currency)}
               </p>
             </div>
           </div>
@@ -149,7 +151,7 @@ export default function ViewPurchaseDialog({
                     Lot Purchase Amount
                   </span>
                   <span className="text-sm font-bold text-slate-800">
-                    {formatCurrency(purchase.purchaseAmount)}
+                    {formatCurrency(purchase.purchaseAmount, currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -158,7 +160,7 @@ export default function ViewPurchaseDialog({
                     Additional Costs
                   </span>
                   <span className="text-sm font-bold text-primary">
-                    {formatCurrency(purchase.totalAmount - purchase.purchaseAmount)}
+                    {formatCurrency(purchase.totalAmount - purchase.purchaseAmount, currency)}
                   </span>
                 </div>
               </div>
@@ -218,7 +220,7 @@ export default function ViewPurchaseDialog({
                         </td>
                         <td className="px-4 py-3 text-slate-500">{p.paymentMethod}</td>
                         <td className="px-4 py-3 font-black text-slate-800 text-right">
-                          {formatCurrency(p.amount)}
+                          {formatCurrency(p.amount, currency)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {p.attachmentUrl ? (
@@ -281,6 +283,7 @@ function CostItem({
   label: string;
   value: number;
 }) {
+  const currency = useBranchCurrency();
   return (
     <div className="p-3 rounded-lg bg-slate-50/50 border border-slate-100 italic transition-all hover:bg-white hover:shadow-sm hover:border-slate-200">
       <div className="flex items-center gap-2 mb-1">
@@ -289,7 +292,7 @@ function CostItem({
           {label}
         </span>
       </div>
-      <p className="text-sm font-bold text-slate-700">{formatCurrency(value)}</p>
+      <p className="text-sm font-bold text-slate-700">{formatCurrency(value, currency)}</p>
     </div>
   );
 }

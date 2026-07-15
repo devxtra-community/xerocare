@@ -22,6 +22,25 @@ export const Source = new DataSource({
   },
 });
 
+async function runPreMigrations(): Promise<void> {
+  const { Client } = await import('pg');
+  const client = new Client({ connectionString: process.env.CRM_DATABASE_URL });
+  try {
+    await client.connect();
+    // ─── customers: city column (3-tier location hierarchy) ──────────────────
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL;
+    `);
+    logger.info('CRM pre-migration: customers.city column ensured.');
+  } catch (err) {
+    logger.error('CRM pre-migration failed:', err);
+    throw err;
+  } finally {
+    await client.end();
+  }
+}
+
 export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSource> => {
   let attempt = 1;
   let delay = initialDelayMs;
@@ -33,6 +52,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         logger.info(
           `Attempting database connection (Attempt ${attempt})... [SSL: ${isNeon ? 'ON' : 'OFF'}]`,
         );
+        await runPreMigrations();
         await Source.initialize();
         logger.info('Database connected successfully.');
       }

@@ -23,6 +23,7 @@ import {
 import Image from 'next/image';
 import { getProductById, Product as BaseProduct } from '@/lib/product';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 import Barcode from 'react-barcode';
 
@@ -88,6 +89,7 @@ function parseFeaturesFromDescription(description?: string): ProductFeature[] {
 }
 
 export default function ProductDetailPage() {
+  const currency = useBranchCurrency();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -242,7 +244,7 @@ export default function ProductDetailPage() {
                 Selling Price
               </p>
               <p className="text-3xl font-extrabold text-blue-800">
-                {formatCurrency(product.sale_price)}
+                {formatCurrency(product.sale_price, currency)}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -251,7 +253,7 @@ export default function ProductDetailPage() {
                   Wholesale Price
                 </p>
                 <p className="text-sm font-semibold text-slate-700">
-                  {formatCurrency(product.wholesale_price || 0)}
+                  {formatCurrency(product.wholesale_price || 0, currency)}
                 </p>
               </div>
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
@@ -265,7 +267,7 @@ export default function ProductDetailPage() {
                   Purchase Price
                 </p>
                 <p className="text-sm font-semibold text-slate-700">
-                  {formatCurrency(product.purchase_price)}
+                  {formatCurrency(product.purchase_price, currency)}
                 </p>
               </div>
             )}
@@ -429,7 +431,7 @@ export default function ProductDetailPage() {
                         <td className="px-4 py-3 text-slate-600">{c.description || '—'}</td>
                         <td className="px-4 py-3 text-slate-600">{c.yield || '—'}</td>
                         <td className="px-4 py-3 font-bold text-primary text-right">
-                          {formatCurrency(Number(c.price || 0))}
+                          {formatCurrency(Number(c.price || 0), currency)}
                         </td>
                       </tr>
                     ))}

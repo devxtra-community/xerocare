@@ -3802,40 +3802,39 @@ For queries contact us at +974 4455 6677`;
           branchClause = `AND t."branchId" IN (${ids.map((b) => `'${b}'`).join(',')})`;
       }
 
-      const dateFromClause = dateFrom
-        ? `AND (e.created_at::date >= '${dateFrom}' OR r.created_at::date >= '${dateFrom}')`
-        : '';
-      const dateToClause = dateTo
-        ? `AND (e.created_at::date <= '${dateTo}' OR r.created_at::date <= '${dateTo}')`
-        : '';
+      const dateFromEstClause = dateFrom ? `AND e.created_at::date >= '${dateFrom}'` : '';
+      const dateToEstClause = dateTo ? `AND e.created_at::date <= '${dateTo}'` : '';
+
+      const dateFromRevClause = dateFrom ? `AND r.created_at::date >= '${dateFrom}'` : '';
+      const dateToRevClause = dateTo ? `AND r.created_at::date <= '${dateTo}'` : '';
 
       // Spare parts from CUSTOMER_APPROVED/COMPLETED estimates (via estimate items)
       const cogsRows = await db.query<{ amount: string }[]>(`
-        SELECT COALESCE(SUM(sei.total_price), 0) AS amount
+        SELECT COALESCE(SUM(sei."totalPrice"), 0) AS amount
         FROM service_estimate_items sei
         JOIN service_estimates e ON sei."estimateId" = e.id
         JOIN service_tickets t ON e."ticketId" = t.id
-        WHERE sei.item_source = 'SPARE_PART'
-          AND sei.is_approved = true
+        WHERE sei."itemSource" = 'SPARE_PART'
+          AND sei."isApproved" = true
           AND e.status IN ('CUSTOMER_APPROVED')
           AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
           ${branchClause}
-          ${dateFromClause}
-          ${dateToClause}
+          ${dateFromEstClause}
+          ${dateToEstClause}
       `);
 
       // Spare parts from estimate revisions (latest approved revision)
       const cogsRevRows = await db.query<{ amount: string }[]>(`
-        SELECT COALESCE(SUM(sei.total_price), 0) AS amount
+        SELECT COALESCE(SUM(sei."totalPrice"), 0) AS amount
         FROM service_estimate_items sei
         JOIN service_estimate_revisions r ON sei."revisionId" = r.id
-        JOIN service_tickets t ON r."ticketId" = t.id
-        WHERE sei.item_source = 'SPARE_PART'
-          AND sei.is_approved = true
+        JOIN service_tickets t ON r.ticket_id = t.id
+        WHERE sei."itemSource" = 'SPARE_PART'
+          AND sei."isApproved" = true
           AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
           ${branchClause}
-          ${dateFromClause}
-          ${dateToClause}
+          ${dateFromRevClause}
+          ${dateToRevClause}
       `);
 
       // Labour cost from estimates
@@ -3846,19 +3845,19 @@ For queries contact us at +974 4455 6677`;
         WHERE e.status = 'CUSTOMER_APPROVED'
           AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
           ${branchClause}
-          ${dateFromClause}
-          ${dateToClause}
+          ${dateFromEstClause}
+          ${dateToEstClause}
       `);
 
       // Labour from revisions
       const labourRevRows = await db.query<{ amount: string }[]>(`
         SELECT COALESCE(SUM(r."labourCost"), 0) AS amount
         FROM service_estimate_revisions r
-        JOIN service_tickets t ON r."ticketId" = t.id
+        JOIN service_tickets t ON r.ticket_id = t.id
         WHERE t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
           ${branchClause}
-          ${dateFromClause}
-          ${dateToClause}
+          ${dateFromRevClause}
+          ${dateToRevClause}
       `);
 
       const cogsAmount = Number(cogsRows[0]?.amount ?? 0) + Number(cogsRevRows[0]?.amount ?? 0);

@@ -7,6 +7,7 @@ import { Plus, Search, Loader2, Eye, FileText, Wallet } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 import DirectSaleFormModal from './DirectSaleFormModal';
 import { getUserFromToken } from '@/lib/auth';
@@ -49,6 +50,7 @@ interface EmployeeSalesTableProps {
  * Features search, creation of new sales, and detailed invoice view.
  */
 export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesTableProps) {
+  const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectModeOpen, setSelectModeOpen] = useState(false);
   const [directSaleFormOpen, setDirectSaleFormOpen] = useState(false);
@@ -395,15 +397,18 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                           return (
                             <div>
                               <div className="text-sm font-black text-violet-700">
-                                {formatCurrency(Number(completedExchange.replacementAmount))}
+                                {formatCurrency(
+                                  Number(completedExchange.replacementAmount),
+                                  currency,
+                                )}
                               </div>
                               <div className="text-[10px] text-slate-400 font-semibold line-through">
-                                {formatCurrency(inv.totalAmount)}
+                                {formatCurrency(inv.totalAmount, currency)}
                               </div>
                             </div>
                           );
                         }
-                        return formatCurrency(inv.totalAmount);
+                        return formatCurrency(inv.totalAmount, currency);
                       })()}
                     </TableCell>
                     <TableCell>
@@ -658,6 +663,7 @@ function QuotationConverterDialog({
   initialSearch = '',
   title,
 }: QuotationConverterDialogProps) {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState(initialSearch);
 
   const filtered = quotations.filter(
@@ -750,7 +756,7 @@ function QuotationConverterDialog({
                   </div>
                   <div className="text-right">
                     <p className="font-black text-slate-900 text-sm tracking-tight mb-2">
-                      {formatCurrency(q.totalAmount || 0)}
+                      {formatCurrency(q.totalAmount || 0, currency)}
                     </p>
                     <Button
                       variant="secondary"

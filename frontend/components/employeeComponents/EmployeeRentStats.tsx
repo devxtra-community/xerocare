@@ -4,6 +4,7 @@ import React from 'react';
 import StatCard from '@/components/StatCard';
 import { Invoice } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface EmployeeRentStatsProps {
   invoices: Invoice[];
@@ -17,6 +18,7 @@ interface EmployeeRentStatsProps {
  * Displays total rentals, rentals this month, and total rent revenue.
  */
 export default function EmployeeRentStats({ invoices, rentTotalOverride }: EmployeeRentStatsProps) {
+  const currency = useBranchCurrency();
   // 1. Total Rent: Active, pending, or completed rental contracts
   const activeRentals = invoices.filter(
     (inv) =>
@@ -84,7 +86,10 @@ export default function EmployeeRentStats({ invoices, rentTotalOverride }: Emplo
     },
     {
       title: 'Total Income from Rent',
-      value: formatCurrency(rentTotalOverride !== undefined ? rentTotalOverride : totalIncome),
+      value: formatCurrency(
+        rentTotalOverride !== undefined ? rentTotalOverride : totalIncome,
+        currency,
+      ),
       subtitle: 'Collected revenue',
     },
   ];

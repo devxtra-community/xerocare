@@ -1,5 +1,6 @@
 import StatCard from '@/components/StatCard';
 import { formatCurrency, formatCompactNumber } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 export interface VendorStatsProps {
   totalVendors: number;
@@ -18,13 +19,14 @@ export default function VendorStats({
   totalSpending,
   totalOrders,
 }: VendorStatsProps) {
+  const currency = useBranchCurrency();
   // Local formatter to rule out lib conflicts
   const formatValue = (val: number, isCurrency = false) => {
     if (val >= 1000) {
       const kValue = (val / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-      return isCurrency ? `QAR ${kValue}` : kValue;
+      return isCurrency ? `${currency} ${kValue}` : kValue;
     }
-    return isCurrency ? formatCurrency(val) : formatCompactNumber(val);
+    return isCurrency ? formatCurrency(val, currency) : formatCompactNumber(val);
   };
 
   return (

@@ -17,11 +17,18 @@ import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
+import {
+  createCheque,
+  fetchCashBankAccounts,
+  withdrawFromCashBank,
+} from '@/lib/finance/accountsApi';
 
 interface AddPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   purchaseId: string;
+  purchaseRef?: string; // PO number or description for cheque source label
+  vendorName?: string;
   totalAmount: number;
   paidAmount: number;
   onSuccess: () => void;
@@ -31,6 +38,8 @@ export default function AddPaymentModal({
   open,
   onOpenChange,
   purchaseId,
+  purchaseRef,
+  vendorName,
   totalAmount,
   paidAmount,
   onSuccess,
@@ -40,6 +49,11 @@ export default function AddPaymentModal({
   const [currencyCode, setCurrencyCode] = useState('AED');
   const [attachment, setAttachment] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDueDate, setChequeDueDate] = useState('');
+  const [accounts, setAccounts] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [paidFromAccount, setPaidFromAccount] = useState('');
   const [formData, setFormData] = useState<AddPaymentDto>({
     amount: 0,
     paymentMethod: 'Bank Transfer',
@@ -53,6 +67,12 @@ export default function AddPaymentModal({
       getMyBranch()
         .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
         .catch(() => setCurrencyCode('AED'));
+      fetchCashBankAccounts()
+        .then((accs) => {
+          setAccounts(accs);
+          if (accs.length > 0 && !paidFromAccount) setPaidFromAccount(accs[0].id);
+        })
+        .catch(() => setAccounts([]));
     } else {
       setAttachment(null);
     }
@@ -85,14 +105,75 @@ export default function AddPaymentModal({
     }
 
     if (Number(formData.amount) > remainingAmount + 0.01) {
-      toast.error(`Amount exceeds remaining payable: ${formatCurrency(remainingAmount)}`);
+      toast.error(
+        `Amount exceeds remaining payable: ${formatCurrency(remainingAmount, currencyCode)}`,
+      );
+      setLoading(false);
+      return;
+    }
+
+    const isCheque = formData.paymentMethod === 'Cheque';
+    if (isCheque && (!chequeNumber || !chequeBankName || !chequeDueDate)) {
+      toast.error('Cheque number, bank name, and due date are required for cheque payments');
       setLoading(false);
       return;
     }
 
     try {
-      await purchaseService.addPayment(purchaseId, formData, attachment);
-      toast.success('Payment recorded successfully');
+      await purchaseService.addPayment(
+        purchaseId,
+        {
+          ...formData,
+          referenceNumber: isCheque ? chequeNumber : formData.referenceNumber,
+        },
+        attachment,
+      );
+
+      // For CHEQUE payments: create a linked PENDING ISSUED cheque in the billing service
+      if (isCheque) {
+        try {
+          await createCheque({
+            chequeNo: chequeNumber,
+            bankName: chequeBankName,
+            partyName: vendorName || 'Vendor',
+            amount: formData.amount,
+            dueDate: chequeDueDate,
+            issueDate: formData.paymentDate,
+            type: 'ISSUED',
+            description: formData.description || undefined,
+            sourceType: 'PURCHASE',
+            sourceReferenceId: purchaseId,
+            sourceLabel: purchaseRef ? `Purchase ${purchaseRef}` : 'Purchase Order',
+          });
+        } catch {
+          // Non-fatal: payment was recorded; log issue without blocking success
+          console.warn('[AddPaymentModal] Failed to create linked ISSUED cheque record');
+        }
+        toast.success(
+          'Payment recorded — PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
+        );
+      } else {
+        // Deduct from selected cash/bank account
+        if (paidFromAccount) {
+          try {
+            await withdrawFromCashBank(paidFromAccount, {
+              date: formData.paymentDate ?? new Date().toISOString().split('T')[0],
+              amount: formData.amount,
+              purpose: 'Vendor Purchase Payment',
+              referenceNo: formData.referenceNumber || undefined,
+              description: formData.description || `Purchase payment — ${vendorName ?? ''}`,
+            });
+          } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { message?: string } } }).response?.data
+              ?.message;
+            console.warn('[AddPaymentModal] Failed to deduct from cash/bank account:', msg);
+            toast.warning(
+              msg ?? 'Payment recorded but account balance could not be deducted automatically',
+            );
+          }
+        }
+        toast.success('Payment recorded successfully');
+      }
       onSuccess();
       onOpenChange(false);
     } catch (error: unknown) {
@@ -117,7 +198,9 @@ export default function AddPaymentModal({
           </DialogHeader>
           <div className="mt-2 text-slate-400 text-xs">
             Remaining to pay:{' '}
-            <span className="text-white font-bold">{formatCurrency(remainingAmount)}</span>
+            <span className="text-white font-bold">
+              {formatCurrency(remainingAmount, currencyCode)}
+            </span>
           </div>
         </div>
 
@@ -199,6 +282,67 @@ export default function AddPaymentModal({
               </SelectContent>
             </Select>
           </div>
+
+          {formData.paymentMethod !== 'Cheque' && accounts.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Pay From Account</Label>
+              <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                <SelectTrigger className="h-10 text-xs border-slate-200">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id} className="text-xs">
+                      {a.name} ({a.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {formData.paymentMethod === 'Cheque' && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+              <p className="text-xs font-bold text-amber-700">
+                Cheque details — creates a PENDING issued cheque. Cash at Bank moves only when
+                Finance marks it Cleared.
+              </p>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase">
+                  Cheque Number *
+                </Label>
+                <Input
+                  required
+                  placeholder="e.g. CHQ-001234"
+                  className="h-10 text-xs border-slate-200"
+                  value={chequeNumber}
+                  onChange={(e) => setChequeNumber(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase">Our Bank *</Label>
+                  <Input
+                    required
+                    placeholder="e.g. Emirates NBD"
+                    className="h-10 text-xs border-slate-200"
+                    value={chequeBankName}
+                    onChange={(e) => setChequeBankName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase">Due Date *</Label>
+                  <Input
+                    type="date"
+                    required
+                    className="h-10 text-xs border-slate-200"
+                    value={chequeDueDate}
+                    onChange={(e) => setChequeDueDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">

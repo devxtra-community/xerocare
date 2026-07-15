@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Download, RefreshCw } from 'lucide-react';
 import { fetchCashbookEntries, fetchCashBankAccounts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,6 +63,7 @@ function CFRow({
   bold?: boolean;
   highlight?: 'positive' | 'negative' | 'neutral';
 }) {
+  const currency = useBranchCurrency();
   const color =
     highlight === 'positive'
       ? 'text-emerald-600'
@@ -78,7 +80,9 @@ function CFRow({
       <span
         className={`text-sm font-semibold tabular-nums ${bold ? color : value < 0 ? 'text-red-600' : 'text-slate-700'}`}
       >
-        {value < 0 ? `(${formatCurrency(Math.abs(value))})` : formatCurrency(value)}
+        {value < 0
+          ? `(${formatCurrency(Math.abs(value), currency)})`
+          : formatCurrency(value, currency)}
       </span>
     </div>
   );
@@ -122,6 +126,7 @@ function classifyEntry(category: string): 'operating' | 'investing' | 'financing
 }
 
 export default function CashFlowPage() {
+  const currency = useBranchCurrency();
   const [period, setPeriod] = useState<Period>('this_month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -312,17 +317,17 @@ export default function CashFlowPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
             <StatCard
               title="Net Operating"
-              value={formatCurrency(netOperating)}
+              value={formatCurrency(netOperating, currency)}
               subtitle={`${cashbook.length} cashbook entries`}
             />
             <StatCard
               title="Net Change in Cash"
-              value={formatCurrency(netChange)}
+              value={formatCurrency(netChange, currency)}
               subtitle="Total period movement"
             />
             <StatCard
               title="Closing Balance"
-              value={formatCurrency(closingBalance)}
+              value={formatCurrency(closingBalance, currency)}
               subtitle="All accounts combined"
             />
           </div>

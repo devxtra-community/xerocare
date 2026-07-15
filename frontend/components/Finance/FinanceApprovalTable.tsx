@@ -34,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FinanceApprovalModal } from './FinanceApprovalModal';
 import { ActivateContractModal } from './ActivateContractModal';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useQuery } from '@tanstack/react-query';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -49,6 +50,7 @@ interface FinanceApprovalTableProps {
  * Allows finance team to review, approve, or reject invoices created by employees.
  */
 export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableProps) {
+  const currency = useBranchCurrency();
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -437,19 +439,19 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                       return (
                         <div className="flex flex-col">
                           <span className="text-violet-700">
-                            {formatCurrency(Number(completedExchange.replacementAmount))}
+                            {formatCurrency(Number(completedExchange.replacementAmount), currency)}
                           </span>
                           <span className="text-[9px] text-slate-400 font-normal line-through">
-                            {formatCurrency(inv.totalAmount)}
+                            {formatCurrency(inv.totalAmount, currency)}
                           </span>
                         </div>
                       );
                     }
-                    return formatCurrency(inv.totalAmount);
+                    return formatCurrency(inv.totalAmount, currency);
                   })()}
                 </TableCell>
                 <TableCell className="text-blue-600 font-semibold">
-                  {formatCurrency(inv.advanceAmount || 0)}
+                  {formatCurrency(inv.advanceAmount || 0, currency)}
                 </TableCell>
                 <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>{inv.employeeName || 'Unknown'}</TableCell>

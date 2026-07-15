@@ -10,9 +10,20 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Pencil, Trash2, Send, CheckCircle2, XCircle, PlayCircle } from 'lucide-react';
+import {
+  Eye,
+  Pencil,
+  Trash2,
+  Send,
+  CheckCircle2,
+  XCircle,
+  PlayCircle,
+  Wrench,
+  Package,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import { CreditNoteRecord } from '@/lib/invoice';
 
@@ -39,6 +50,7 @@ export default function ReturnsTable({
   onReject,
   onComplete,
 }: Props) {
+  const currency = useBranchCurrency();
   const getStatusBadge = (status: string, type: string) => {
     switch (status) {
       case 'DRAFT':
@@ -151,12 +163,23 @@ export default function ReturnsTable({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider border-blue-200 text-blue-600 bg-blue-50"
-                    >
-                      {record.type.replace('_', ' ')}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge
+                        variant="outline"
+                        className="rounded-full px-3 py-0.5 text-[10px] font-bold tracking-wider border-blue-200 text-blue-600 bg-blue-50 w-fit"
+                      >
+                        {record.type.replace('_', ' ')}
+                      </Badge>
+                      {record.itemCategory === 'SPARE_PART' ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5 w-fit">
+                          <Wrench className="h-2.5 w-2.5" /> Spare Part
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-200 rounded-full px-2 py-0.5 w-fit">
+                          <Package className="h-2.5 w-2.5" /> Product
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="font-semibold text-foreground">
                     {/* For completed exchanges, show new product amount; for all others show the returned amount */}
@@ -165,14 +188,14 @@ export default function ReturnsTable({
                     record.replacementAmount ? (
                       <div>
                         <div className="text-sm font-black text-violet-700">
-                          {formatCurrency(record.replacementAmount)}
+                          {formatCurrency(record.replacementAmount, currency)}
                         </div>
                         <div className="text-[10px] text-slate-400 font-semibold line-through">
-                          {formatCurrency(record.productAmount)}
+                          {formatCurrency(record.productAmount, currency)}
                         </div>
                       </div>
                     ) : (
-                      formatCurrency(record.productAmount)
+                      formatCurrency(record.productAmount, currency)
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm font-medium">

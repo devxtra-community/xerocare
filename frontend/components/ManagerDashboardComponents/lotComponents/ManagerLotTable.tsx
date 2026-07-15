@@ -10,6 +10,7 @@ import StatCard from '@/components/StatCard';
 import { Lot, lotService } from '@/lib/lot';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
 import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 import AddLotDialog from './AddLotDialog';
@@ -21,6 +22,7 @@ import LotDetailsDialog from './LotDetailsDialog';
  * Provides access to create new lots and view detailed lot reports.
  */
 export default function ManagerLotTable() {
+  const currency = useBranchCurrency();
   const [lots, setLots] = useState<Lot[]>([]);
   const [search, setSearch] = useState('');
   const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
@@ -66,7 +68,7 @@ export default function ManagerLotTable() {
         <StatCard title="Total Lots" value={stats.totalLots.toString()} subtitle="All orders" />
         <StatCard
           title="Total Spending"
-          value={formatCurrency(stats.totalAmount)}
+          value={formatCurrency(stats.totalAmount, currency)}
           subtitle="Lifetime"
         />
       </div>
@@ -133,7 +135,7 @@ export default function ManagerLotTable() {
               id: 'total',
               header: 'TOTAL AMOUNT',
               // Transfer lots carry the (converted) purchase value of the moved stock
-              cell: (lot: Lot) => formatCurrency(Number(lot.totalAmount)),
+              cell: (lot: Lot) => formatCurrency(Number(lot.totalAmount), currency),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {

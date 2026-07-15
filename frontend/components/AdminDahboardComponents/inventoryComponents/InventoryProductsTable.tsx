@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import api from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { toast } from 'sonner';
@@ -63,6 +64,7 @@ interface InventoryResponse {
  * Allows drilling down into specific inventory segments.
  */
 export default function InventoryProductsTable({ selectedYear }: { selectedYear: number | 'all' }) {
+  const currency = useBranchCurrency();
   const router = useRouter();
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(10);
   const [data, setData] = useState<InventoryItem[]>([]);
@@ -362,7 +364,7 @@ export default function InventoryProductsTable({ selectedYear }: { selectedYear:
                       </span>
                     </TableCell>
                     <TableCell className="px-6 py-4 text-center font-semibold text-gray-700">
-                      {formatCurrency(item.product_cost || 0)}
+                      {formatCurrency(item.product_cost || 0, currency)}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right pr-6">
                       <div className="flex justify-end gap-1">

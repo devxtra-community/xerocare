@@ -21,6 +21,7 @@ import {
 } from '@/lib/invoice';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
@@ -39,6 +40,7 @@ export default function ConsolidatedStatementDialog({
   onClose,
   collection,
 }: ConsolidatedStatementDialogProps) {
+  const currency = useBranchCurrency();
   const [loading, setLoading] = useState(true);
   const [history, setHistory] = useState<UsageRecord[]>([]);
   const [contract, setContract] = useState<Invoice | null>(null);
@@ -360,25 +362,25 @@ export default function ConsolidatedStatementDialog({
                               </TableCell>
                             )}
                             <TableCell className="text-right text-slate-600">
-                              {formatCurrency(Number(record.rent || 0))}
+                              {formatCurrency(Number(record.rent || 0), currency)}
                             </TableCell>
                             {!isEmi && (
                               <TableCell className="text-right text-orange-600">
-                                {formatCurrency(Number(record.exceededAmount || 0))}
+                                {formatCurrency(Number(record.exceededAmount || 0), currency)}
                               </TableCell>
                             )}
                             {isFsm && (
                               <TableCell className="text-right text-red-600 font-medium">
-                                - {formatCurrency(Number(record.discountAmount || 0))}
+                                - {formatCurrency(Number(record.discountAmount || 0), currency)}
                               </TableCell>
                             )}
                             <TableCell className="text-right text-indigo-600 font-medium">
                               {Number(record.advanceAdjusted || 0) > 0
-                                ? `- ${formatCurrency(Number(record.advanceAdjusted || 0))}`
+                                ? `- ${formatCurrency(Number(record.advanceAdjusted || 0), currency)}`
                                 : '-'}
                             </TableCell>
                             <TableCell className="text-right font-bold text-blue-700">
-                              {formatCurrency(Number(record.finalTotal || 0))}
+                              {formatCurrency(Number(record.finalTotal || 0), currency)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -397,7 +399,7 @@ export default function ConsolidatedStatementDialog({
                                 {isFsm && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-orange-700">
-                                  {formatCurrency(collection.advanceAmount)}
+                                  {formatCurrency(collection.advanceAmount, currency)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -417,7 +419,7 @@ export default function ConsolidatedStatementDialog({
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-red-700">
-                                  - {formatCurrency(collection.discountAmount)}
+                                  - {formatCurrency(collection.discountAmount, currency)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -437,7 +439,7 @@ export default function ConsolidatedStatementDialog({
                                 {isFsm && <TableCell className="text-right">-</TableCell>}
                                 <TableCell className="text-right">-</TableCell>
                                 <TableCell className="text-right font-black text-blue-700">
-                                  {formatCurrency(collection.securityDepositAmount)}
+                                  {formatCurrency(collection.securityDepositAmount, currency)}
                                 </TableCell>
                               </TableRow>
                             )
@@ -456,6 +458,7 @@ export default function ConsolidatedStatementDialog({
                                 (sum, record) => sum + Number(record.finalTotal || 0),
                                 0,
                               ),
+                              currency,
                             )}
                           </TableCell>
                         </TableRow>
@@ -493,7 +496,7 @@ export default function ConsolidatedStatementDialog({
                   </div>
                   <div className="flex justify-between items-baseline">
                     <span className="text-2xl font-black text-blue-600">
-                      {formatCurrency(collection.securityDepositAmount)}
+                      {formatCurrency(collection.securityDepositAmount, currency)}
                     </span>
                     <span className="text-xs text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded">
                       {collection.securityDepositMode || 'RECORDED'}
@@ -522,6 +525,7 @@ export default function ConsolidatedStatementDialog({
                     {formatCurrency(
                       collection.grossAmount ||
                         history.reduce((sum, r) => sum + Number(r.finalTotal || 0), 0),
+                      currency,
                     )}
                   </span>
                 </div>
@@ -529,7 +533,7 @@ export default function ConsolidatedStatementDialog({
                   <div className="flex justify-between text-indigo-600">
                     <span className="font-semibold">Advance Used</span>
                     <span className="font-bold">
-                      - {formatCurrency(collection.advanceAdjusted || 0)}
+                      - {formatCurrency(collection.advanceAdjusted || 0, currency)}
                     </span>
                   </div>
                 )}
@@ -537,7 +541,7 @@ export default function ConsolidatedStatementDialog({
                   <div className="flex justify-between text-red-600">
                     <span className="font-semibold">Discount Applied</span>
                     <span className="font-bold">
-                      - {formatCurrency(collection.discountAmount || 0)}
+                      - {formatCurrency(collection.discountAmount || 0, currency)}
                     </span>
                   </div>
                 )}
@@ -553,6 +557,7 @@ export default function ConsolidatedStatementDialog({
                       history.reduce((sum, r) => sum + Number(r.finalTotal || 0), 0)) -
                       (collection.discountAmount || 0) -
                       (collection.advanceAdjusted || 0),
+                    currency,
                   )}
                 </span>
                 <span className="text-xs font-bold text-slate-500 mt-2 bg-slate-200 px-3 py-1 rounded-full uppercase tracking-tighter">

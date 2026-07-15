@@ -8,6 +8,7 @@ import MonthlySalesBarChart from './monthlysalesChart';
 import MostSoldProductChart from './MostSoldProductChart';
 import { getAdminSalesStats, AdminSalesStats } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { YearSelector } from '@/components/ui/YearSelector';
 
 /**
@@ -16,6 +17,7 @@ import { YearSelector } from '@/components/ui/YearSelector';
  * Aggregates key metrics like Total Revenue, Orders, and Products Sold.
  */
 export default function AdminSalesPage() {
+  const currency = useBranchCurrency();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [stats, setStats] = useState<AdminSalesStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ export default function AdminSalesPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : formatCurrency(stats?.totalRevenue || 0)}
+            value={loading ? '...' : formatCurrency(stats?.totalRevenue || 0, currency)}
             subtitle={`${selectedYear === 'all' ? 'Lifetime Sale' : `Sale in ${selectedYear}`}`}
           />
           <StatCard

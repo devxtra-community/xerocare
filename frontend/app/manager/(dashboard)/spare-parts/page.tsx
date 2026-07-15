@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { StandardTable } from '@/components/table/StandardTable';
 import { usePagination } from '@/hooks/usePagination';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { sparePartService, SparePartInventoryItem } from '@/services/sparePartService';
 import AddSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/AddSparePartDialog';
@@ -20,6 +21,7 @@ import { lotService } from '@/lib/lot';
 export const dynamic = 'force-dynamic';
 
 function SparePartsContent() {
+  const currency = useBranchCurrency();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -234,7 +236,7 @@ function SparePartsContent() {
               {
                 id: 'price',
                 header: 'SELLING PRICE',
-                cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0),
+                cell: (item: SparePartInventoryItem) => formatCurrency(item.price || 0, currency),
                 className: 'font-semibold text-[11px] text-primary uppercase',
               },
               {

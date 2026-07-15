@@ -4,6 +4,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 const agingData = [
   { bucket: 'Current', amount: 42000, color: 'bg-emerald-500', percentage: 55 },
@@ -18,6 +19,7 @@ const agingData = [
  * Highlights total receivables and overdue amounts with risk distribution.
  */
 export default function ARAgingChart() {
+  const currency = useBranchCurrency();
   const totalAR = agingData.reduce((acc, curr) => acc + curr.amount, 0);
   const overdueTotal = totalAR - agingData[0].amount;
 
@@ -30,11 +32,13 @@ export default function ARAgingChart() {
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase">
                 Receivables Risk
               </CardTitle>
-              <p className="text-2xl font-bold">{formatCurrency(totalAR)}</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalAR, currency)}</p>
             </div>
             <div className="text-right">
               <p className="text-xs font-bold text-rose-600">OVERDUE</p>
-              <p className="text-lg font-bold text-slate-700">{formatCurrency(overdueTotal)}</p>
+              <p className="text-lg font-bold text-slate-700">
+                {formatCurrency(overdueTotal, currency)}
+              </p>
             </div>
           </div>
         </CardHeader>
@@ -47,7 +51,7 @@ export default function ARAgingChart() {
                   key={item.bucket}
                   style={{ width: `${item.percentage}%` }}
                   className={`${item.color} h-full transition-all hover:opacity-80 cursor-help`}
-                  title={`${item.bucket}: ${formatCurrency(item.amount)}`}
+                  title={`${item.bucket}: ${formatCurrency(item.amount, currency)}`}
                 />
               ))}
             </div>
@@ -62,7 +66,7 @@ export default function ARAgingChart() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-bold text-foreground tabular-nums">
-                      {formatCurrency(item.amount)}
+                      {formatCurrency(item.amount, currency)}
                     </span>
                     <span className="text-xs text-slate-400 w-8 text-right">
                       {item.percentage}%

@@ -6,12 +6,14 @@ import { useSearchParams } from 'next/navigation';
 import { Download } from 'lucide-react';
 import { fetchConsolidatedPL } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import * as XLSX from 'xlsx';
 
 function PLContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const period = searchParams.get('period') ?? 'this_year';
@@ -74,15 +76,19 @@ function PLContent() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Revenue"
-          value={formatCurrency(pl?.totalIncome ?? 0)}
+          value={formatCurrency(pl?.totalIncome ?? 0, currency)}
           subtitle="Period"
         />
         <StatCard
           title="Total Expenses"
-          value={formatCurrency(pl?.totalExpenses ?? 0)}
+          value={formatCurrency(pl?.totalExpenses ?? 0, currency)}
           subtitle="Period"
         />
-        <StatCard title="Net Profit" value={formatCurrency(pl?.netProfit ?? 0)} subtitle="Period" />
+        <StatCard
+          title="Net Profit"
+          value={formatCurrency(pl?.netProfit ?? 0, currency)}
+          subtitle="Period"
+        />
         <StatCard
           title="Margin"
           value={`${pl?.margin?.toFixed(1) ?? 0}%`}
@@ -107,6 +113,7 @@ function PLContent() {
                   { key: 'expenses', color: '#ef4444', label: 'Expenses' },
                 ]}
                 height={260}
+                currency={currency}
               />
             </div>
             <div className="bg-white rounded-xl border p-5">
@@ -116,6 +123,7 @@ function PLContent() {
                 xKey="month"
                 lines={[{ key: 'net', color: '#6366f1', label: 'Net P&L' }]}
                 height={260}
+                currency={currency}
               />
             </div>
           </div>
@@ -142,15 +150,15 @@ function PLContent() {
                       <tr key={row.month} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium">{row.month}</td>
                         <td className="px-4 py-3 text-right text-emerald-600">
-                          {formatCurrency(row.income)}
+                          {formatCurrency(row.income, currency)}
                         </td>
                         <td className="px-4 py-3 text-right text-red-600">
-                          {formatCurrency(row.expenses)}
+                          {formatCurrency(row.expenses, currency)}
                         </td>
                         <td
                           className={`px-4 py-3 text-right font-semibold ${row.net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
                         >
-                          {formatCurrency(row.net)}
+                          {formatCurrency(row.net, currency)}
                         </td>
                         <td
                           className={`px-4 py-3 text-right text-xs ${m >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
@@ -165,15 +173,15 @@ function PLContent() {
                   <tr>
                     <td className="px-4 py-3">Total</td>
                     <td className="px-4 py-3 text-right text-emerald-700">
-                      {formatCurrency(pl?.totalIncome ?? 0)}
+                      {formatCurrency(pl?.totalIncome ?? 0, currency)}
                     </td>
                     <td className="px-4 py-3 text-right text-red-700">
-                      {formatCurrency(pl?.totalExpenses ?? 0)}
+                      {formatCurrency(pl?.totalExpenses ?? 0, currency)}
                     </td>
                     <td
                       className={`px-4 py-3 text-right ${(pl?.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
                     >
-                      {formatCurrency(pl?.netProfit ?? 0)}
+                      {formatCurrency(pl?.netProfit ?? 0, currency)}
                     </td>
                     <td className="px-4 py-3 text-right text-xs">{pl?.margin?.toFixed(1) ?? 0}%</td>
                   </tr>

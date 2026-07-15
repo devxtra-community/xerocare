@@ -58,6 +58,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { Send } from 'lucide-react';
 import RequestProductDialog from '@/components/ManagerDashboardComponents/VendorComponents/RequestProductDialog';
+import { State, City } from 'country-state-city';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const countryList = require('country-list');
 
@@ -87,6 +88,8 @@ type Vendor = {
   currency: string;
   countryCode?: string;
   countryName?: string;
+  stateProvince?: string;
+  city?: string;
   bankAccounts?: BankAccount[];
   branchId?: string | null;
   branchName?: string;
@@ -102,6 +105,8 @@ type VendorFormData = {
   currency: string;
   countryCode?: string;
   countryName?: string;
+  stateProvince?: string;
+  city?: string;
   vatNumber?: string;
   bankAccounts: BankAccount[];
   branchId?: string;
@@ -462,6 +467,8 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         currency: data.currency,
         countryCode: data.countryCode || undefined,
         countryName: data.countryName || undefined,
+        stateProvince: data.stateProvince || undefined,
+        city: data.city || undefined,
         vatNumber: data.vatNumber || undefined,
         bankAccounts: data.bankAccounts || [],
         // Only admins send a branch; the backend pins managers to their own.
@@ -806,6 +813,8 @@ function VendorFormModal({
     currency: 'QAR',
     countryCode: undefined,
     countryName: undefined,
+    stateProvince: undefined,
+    city: undefined,
     vatNumber: undefined,
     bankAccounts: [],
     branchId: undefined,
@@ -826,6 +835,8 @@ function VendorFormModal({
           currency: initialData.currency || 'QAR',
           countryCode: initialData.countryCode,
           countryName: initialData.countryName,
+          stateProvince: initialData.stateProvince,
+          city: initialData.city,
           vatNumber: (initialData as { vatNumber?: string }).vatNumber,
           bankAccounts: initialData.bankAccounts || [],
           branchId: initialData.branchId || undefined,
@@ -841,6 +852,8 @@ function VendorFormModal({
           currency: 'QAR',
           countryCode: undefined,
           countryName: undefined,
+          stateProvince: undefined,
+          city: undefined,
           vatNumber: undefined,
           bankAccounts: [],
           branchId: undefined,
@@ -856,8 +869,8 @@ function VendorFormModal({
       countryCode: code,
       countryName: name,
       currency: suggestedCurrency || f.currency,
-      // The dial code lives in the prefix box, not in the input — keep only
-      // the national number here (dial code is prepended on save).
+      stateProvince: undefined,
+      city: undefined,
       phone: stripDialCode(f.phone),
     }));
     setCountryOpen(false);
@@ -1003,6 +1016,96 @@ function VendorFormModal({
                 </PopoverContent>
               </Popover>
             </div>
+
+            {/* State / Province / Emirate */}
+            {form.countryCode &&
+              (() => {
+                const states = State.getStatesOfCountry(form.countryCode);
+                const stateLabel =
+                  form.countryCode === 'AE'
+                    ? 'Emirate'
+                    : ['US', 'IN', 'AU', 'MX', 'BR'].includes(form.countryCode)
+                      ? 'State'
+                      : form.countryCode === 'CA'
+                        ? 'Province'
+                        : 'Region / Province';
+                const selectedState = states.find((s) => s.name === form.stateProvince);
+                const cities = selectedState
+                  ? City.getCitiesOfState(form.countryCode, selectedState.isoCode)
+                  : (City.getCitiesOfCountry(form.countryCode) ?? []);
+                return (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        {stateLabel}
+                      </label>
+                      {states.length > 0 ? (
+                        <Select
+                          value={form.stateProvince ?? ''}
+                          onValueChange={(v) =>
+                            setForm((f) => ({ ...f, stateProvince: v, city: undefined }))
+                          }
+                        >
+                          <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                            <SelectValue placeholder={`Select ${stateLabel}`} />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl max-h-64">
+                            {states.map((s) => (
+                              <SelectItem key={s.isoCode} value={s.name}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          placeholder={`Enter ${stateLabel}`}
+                          value={form.stateProvince ?? ''}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              stateProvince: e.target.value || undefined,
+                              city: undefined,
+                            }))
+                          }
+                          className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        City
+                      </label>
+                      {cities.length > 0 ? (
+                        <Select
+                          value={form.city ?? ''}
+                          onValueChange={(v) => setForm((f) => ({ ...f, city: v }))}
+                        >
+                          <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                            <SelectValue placeholder="Select city" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl max-h-64">
+                            {cities.map((c) => (
+                              <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          placeholder="Enter city"
+                          value={form.city ?? ''}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, city: e.target.value || undefined }))
+                          }
+                          className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        />
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
 
             {/* VAT Number */}
             <div className="space-y-2">

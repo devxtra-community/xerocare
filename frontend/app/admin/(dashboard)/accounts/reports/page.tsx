@@ -6,10 +6,12 @@ import { useSearchParams } from 'next/navigation';
 import { Download, FileText, BarChart2, TrendingUp, Scale, BookOpen, PieChart } from 'lucide-react';
 import { fetchConsolidatedBalanceSheet, fetchConsolidatedPL } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import * as XLSX from 'xlsx';
 
 function ReportsContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const period = searchParams.get('period') ?? 'this_year';
@@ -190,12 +192,12 @@ function ReportsContent() {
               ].map((i) => (
                 <div key={i.label} className="flex justify-between py-1.5 text-sm">
                   <span className="text-gray-600">{i.label}</span>
-                  <span className="font-medium">{formatCurrency(i.value)}</span>
+                  <span className="font-medium">{formatCurrency(i.value, currency)}</span>
                 </div>
               ))}
               <div className="flex justify-between py-2 border-t mt-1 font-semibold text-sm text-blue-700">
                 <span>Total Assets</span>
-                <span>{formatCurrency(bs.totalAssets)}</span>
+                <span>{formatCurrency(bs.totalAssets, currency)}</span>
               </div>
             </div>
             {/* Liabilities */}
@@ -208,12 +210,12 @@ function ReportsContent() {
               ].map((i) => (
                 <div key={i.label} className="flex justify-between py-1.5 text-sm">
                   <span className="text-gray-600">{i.label}</span>
-                  <span className="font-medium">{formatCurrency(i.value)}</span>
+                  <span className="font-medium">{formatCurrency(i.value, currency)}</span>
                 </div>
               ))}
               <div className="flex justify-between py-2 border-t mt-1 font-semibold text-sm text-red-700">
                 <span>Total Liabilities</span>
-                <span>{formatCurrency(bs.totalLiabilities)}</span>
+                <span>{formatCurrency(bs.totalLiabilities, currency)}</span>
               </div>
             </div>
             {/* Equity */}
@@ -221,7 +223,7 @@ function ReportsContent() {
               <h4 className="text-xs font-semibold uppercase text-emerald-600 mb-3">Equity</h4>
               <div className="flex justify-between py-1.5 text-sm">
                 <span className="text-gray-600">Total Equity</span>
-                <span className="font-medium">{formatCurrency(bs.totalEquity)}</span>
+                <span className="font-medium">{formatCurrency(bs.totalEquity, currency)}</span>
               </div>
               <div className="mt-4 p-3 rounded-lg text-sm">
                 {Math.abs(bs.totalAssets - bs.totalLiabilities - bs.totalEquity) < 1 ? (
@@ -231,6 +233,7 @@ function ReportsContent() {
                     ⚠ Difference:{' '}
                     {formatCurrency(
                       Math.abs(bs.totalAssets - bs.totalLiabilities - bs.totalEquity),
+                      currency,
                     )}
                   </span>
                 )}
@@ -271,7 +274,9 @@ function ReportsContent() {
               <div key={item.label} className="text-center p-4 bg-gray-50 rounded-xl">
                 <p className="text-xs text-gray-500 mb-1">{item.label}</p>
                 <p className={`text-xl font-bold ${item.color}`}>
-                  {item.isCurrency === false ? item.value : formatCurrency(item.value as number)}
+                  {item.isCurrency === false
+                    ? item.value
+                    : formatCurrency(item.value as number, currency)}
                 </p>
               </div>
             ))}

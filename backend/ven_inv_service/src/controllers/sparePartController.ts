@@ -205,6 +205,40 @@ export const getInventoryValue = async (req: Request, res: Response) => {
 };
 
 /**
+ * Returns total product inventory value (purchase_price) for AVAILABLE products.
+ * Internal endpoint — used by billing_service chart-of-accounts.
+ * Products are linked to branches via their warehouse.
+ */
+export const getProductInventoryValue = async (req: Request, res: Response) => {
+  try {
+    const branchIds = req.query.branchIds as string | undefined;
+    const ids = branchIds ? branchIds.split(',').filter(Boolean) : [];
+
+    let branchClause = '';
+    if (ids.length === 1) {
+      branchClause = `AND w.branch_id = '${ids[0]}'`;
+    } else if (ids.length > 1) {
+      branchClause = `AND w.branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
+    }
+
+    const rows = await Source.query<{ total: string }[]>(`
+      SELECT COALESCE(SUM(p.purchase_price), 0)::numeric AS total
+      FROM products p
+      JOIN warehouses w ON w.id = p.warehouse_id
+      WHERE p.product_status = 'AVAILABLE'
+        AND p.purchase_price IS NOT NULL
+        ${branchClause}
+    `);
+
+    const total = Number(rows[0]?.total ?? 0);
+    res.json({ total });
+  } catch (error) {
+    logger.error('Error in getProductInventoryValue:', error);
+    res.status(500).json({ total: 0 });
+  }
+};
+
+/**
  * Gets stock levels of a spare part across warehouses in the user's branch.
  */
 export const getSparePartStock = async (req: Request, res: Response) => {

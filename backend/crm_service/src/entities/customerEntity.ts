@@ -38,6 +38,9 @@ export class Customer {
   @Column({ name: 'state_province', type: 'varchar', length: 100, nullable: true })
   stateProvince?: string | null;
 
+  @Column({ name: 'city', type: 'varchar', length: 100, nullable: true })
+  city?: string | null;
+
   @Column({ name: 'bank_name', type: 'varchar', length: 100, nullable: true })
   bankName?: string | null;
 

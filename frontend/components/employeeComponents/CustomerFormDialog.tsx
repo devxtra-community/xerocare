@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label';
 
 import { Customer, CreateCustomerData } from '@/lib/customer';
 import { getCountryDataList } from 'countries-list';
-import { State } from 'country-state-city';
+import { State, City } from 'country-state-city';
 
 interface CustomerFormDialogProps {
   open: boolean;
@@ -61,6 +61,7 @@ export default function CustomerFormDialog({
     address: '',
     status: 'ACTIVE',
     stateProvince: '',
+    city: '',
     bankName: '',
     bankAccountNumber: '',
   });
@@ -77,6 +78,7 @@ export default function CustomerFormDialog({
         vatNumber: customer.vatNumber ?? undefined,
         country: customer.country ?? undefined,
         stateProvince: customer.stateProvince ?? undefined,
+        city: customer.city ?? undefined,
         bankName: customer.bankName ?? '',
         bankAccountNumber: customer.bankAccountNumber ?? '',
       });
@@ -109,6 +111,7 @@ export default function CustomerFormDialog({
         address: '',
         status: 'ACTIVE',
         stateProvince: '',
+        city: '',
         bankName: '',
         bankAccountNumber: '',
       });
@@ -307,38 +310,80 @@ export default function CustomerFormDialog({
                       ? 'State'
                       : formData.country === 'CA'
                         ? 'Province'
-                        : 'City / District';
+                        : 'Region / Province';
+                const selectedState = states.find((s) => s.name === formData.stateProvince);
+                const cities = selectedState
+                  ? City.getCitiesOfState(formData.country, selectedState.isoCode)
+                  : (City.getCitiesOfCountry(formData.country) ?? []);
                 return (
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                      {label}
-                    </Label>
-                    {states.length > 0 ? (
-                      <Select
-                        value={formData.stateProvince ?? ''}
-                        onValueChange={(val) => handleSelectChange('stateProvince', val)}
-                      >
-                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                          <SelectValue placeholder={`Select ${label}`} />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
-                          {states.map((s) => (
-                            <SelectItem key={s.isoCode} value={s.name}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        name="stateProvince"
-                        value={formData.stateProvince ?? ''}
-                        onChange={handleChange}
-                        placeholder={`Enter ${label}`}
-                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                      />
-                    )}
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                        {label}
+                      </Label>
+                      {states.length > 0 ? (
+                        <Select
+                          value={formData.stateProvince ?? ''}
+                          onValueChange={(val) => {
+                            handleSelectChange('stateProvince', val);
+                            handleSelectChange('city', '');
+                          }}
+                        >
+                          <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                            <SelectValue placeholder={`Select ${label}`} />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                            {states.map((s) => (
+                              <SelectItem key={s.isoCode} value={s.name}>
+                                {s.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          name="stateProvince"
+                          value={formData.stateProvince ?? ''}
+                          onChange={(e) => {
+                            handleChange(e);
+                            handleSelectChange('city', '');
+                          }}
+                          placeholder={`Enter ${label}`}
+                          className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                        City
+                      </Label>
+                      {cities.length > 0 ? (
+                        <Select
+                          value={formData.city ?? ''}
+                          onValueChange={(val) => handleSelectChange('city', val)}
+                        >
+                          <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                            <SelectValue placeholder="Select city" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                            {cities.map((c) => (
+                              <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          name="city"
+                          value={formData.city ?? ''}
+                          onChange={handleChange}
+                          placeholder="Enter city"
+                          className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        />
+                      )}
+                    </div>
+                  </>
                 );
               })()}
 

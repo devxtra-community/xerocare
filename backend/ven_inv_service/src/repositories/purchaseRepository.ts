@@ -93,6 +93,8 @@ export class PurchaseRepository {
       // Vendor snapshot
       purchase.vendorVatNumber = lot.vendor?.vatNumber ?? null;
       purchase.vendorCountry = lot.vendor?.countryCode ?? null;
+      purchase.vendorStateProvince = lot.vendor?.stateProvince ?? null;
+      purchase.vendorCity = lot.vendor?.city ?? null;
 
       // Currency inherited from lot
       purchase.currencyCode = lot.currencyCode ?? null;
@@ -257,6 +259,27 @@ export class PurchaseRepository {
         Number(purchase.shippingCost) +
         Number(purchase.groundfieldCost) +
         dynamicCostsTotal;
+
+      // Recalculate taxable amount and VAT whenever costs change
+      purchase.taxableAmount =
+        purchaseAmount +
+        Number(purchase.labourCost) +
+        Number(purchase.handlingFee) +
+        Number(purchase.transportationCost) +
+        Number(purchase.shippingCost) +
+        Number(purchase.groundfieldCost);
+
+      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
+        if (purchase.purchaseOrigin === 'DOMESTIC') {
+          purchase.inputVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.reverseChargeVatAmount = null;
+        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
+          purchase.reverseChargeVatAmount =
+            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
+          purchase.inputVatAmount = null;
+        }
+      }
 
       return await manager.save(Purchase, purchase);
     });

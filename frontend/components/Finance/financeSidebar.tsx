@@ -30,6 +30,7 @@ import {
   Bell,
   ShieldCheck,
   ArrowLeft,
+  Banknote,
 } from 'lucide-react';
 
 import {
@@ -89,6 +90,7 @@ export default function FinanceSidebar() {
     { title: 'Day Book', icon: CalendarDays, href: '/finance/accounts/day-book' },
     { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
     { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
+    { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
     { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
     { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
     { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },

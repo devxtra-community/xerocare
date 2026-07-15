@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import EmployeeRequestsTab from '@/components/expenses/EmployeeRequestsTab';
@@ -31,8 +31,10 @@ import {
   fetchExpenseCharts,
   type ExpenseEntry,
 } from '@/lib/finance/accountsApi';
+import { fetchPurchases, type PurchaseOrder } from '@/lib/finance/accounts';
 import { StackedBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +94,36 @@ const STATUS_BADGE: Record<string, string> = {
 const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'Cheque', 'Card'];
 
 const today = new Date().toISOString().slice(0, 10);
+
+function mapPurchaseCategory(cat: PurchaseOrder['purchaseCategory']): string {
+  switch (cat) {
+    case 'PRODUCT':
+      return 'VENDOR_PURCHASE';
+    case 'SPARE_PART':
+      return 'SPARE_PARTS';
+    case 'SERVICE':
+      return 'LABOUR';
+    default:
+      return 'OTHER';
+  }
+}
+
+interface ExpenseTableRow {
+  id: string;
+  source: 'Manual' | 'Purchase';
+  isPurchase: boolean;
+  date: string;
+  expenseNo: string;
+  category: string;
+  description: string;
+  amount: number;
+  currency: string;
+  status: string;
+  taxAmount: number;
+  taxLabel: string;
+  taxPercent?: number | null;
+  _entry?: ExpenseEntry;
+}
 const thisMonthStart = `${today.slice(0, 7)}-01`;
 
 function ExpenseModal({
@@ -106,6 +138,7 @@ function ExpenseModal({
   onSaved: () => void;
 }) {
   const currentUser = getUserFromToken();
+  const branchCurrency = useBranchCurrency();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     expenseNo: expense?.expenseNo ?? '',
@@ -114,7 +147,7 @@ function ExpenseModal({
     subCategory: expense?.subCategory ?? '',
     description: expense?.description ?? '',
     amount: expense?.amount?.toString() ?? '',
-    currency: expense?.currency ?? 'AED',
+    currency: expense?.currency ?? branchCurrency,
     vatIncluded: false,
     vatAmount: expense?.vatAmount?.toString() ?? '0',
     netAmount: expense?.netAmount?.toString() ?? '',
@@ -125,6 +158,11 @@ function ExpenseModal({
     referenceNo: expense?.referenceNo ?? '',
     notes: expense?.notes ?? '',
   });
+  useEffect(() => {
+    if (branchCurrency) {
+      setForm((f) => ({ ...f, currency: expense?.currency ?? branchCurrency }));
+    }
+  }, [branchCurrency, expense]);
 
   const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -260,16 +298,9 @@ function ExpenseModal({
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Currency</label>
-                  <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AED">AED</SelectItem>
-                      <SelectItem value="QAR">QAR</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="mt-1 px-3 py-2 rounded-md border border-border text-sm bg-muted/40 text-muted-foreground">
+                    {form.currency || branchCurrency}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -405,7 +436,7 @@ function ExpenseModal({
           {step < 4 ? (
             <Button
               onClick={() => setStep((s) => s + 1)}
-              disabled={!form.description || !form.amount}
+              disabled={step === 1 ? !form.description : step === 2 ? !form.amount : false}
             >
               Next
             </Button>
@@ -434,6 +465,11 @@ function PayExpenseModal({
   const [paidFrom, setPaidFrom] = useState(expense.paidFrom ?? '');
   const [paymentMode, setPaymentMode] = useState(expense.paymentMode ?? PAYMENT_MODES[0]);
   const [paymentDate, setPaymentDate] = useState(today);
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDueDate, setChequeDueDate] = useState('');
+
+  const isCheque = paymentMode === 'Cheque';
 
   const payMut = useMutation({
     mutationFn: () =>
@@ -441,9 +477,16 @@ function PayExpenseModal({
         paidFrom: paidFrom || undefined,
         paymentMode,
         paymentDate,
+        chequeNumber: isCheque ? chequeNumber : undefined,
+        chequeBankName: isCheque ? chequeBankName : undefined,
+        chequeDueDate: isCheque ? chequeDueDate : undefined,
       }),
     onSuccess: () => {
-      toast.success('Expense marked as paid');
+      toast.success(
+        isCheque
+          ? 'Expense paid — PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.'
+          : 'Expense marked as paid',
+      );
       onPaid();
     },
     onError: () => toast.error('Failed to mark as paid'),
@@ -480,24 +523,26 @@ function PayExpenseModal({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600">
-              Paid From Account{' '}
-              <span className="font-normal text-muted-foreground">(optional)</span>
-            </label>
-            <Select value={paidFrom} onValueChange={setPaidFrom}>
-              <SelectTrigger>
-                <SelectValue placeholder="Auto (branch default by mode)" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name} ({a.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isCheque && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600">
+                Paid From Account{' '}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <Select value={paidFrom} onValueChange={setPaidFrom}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Auto (branch default by mode)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name} ({a.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-600">Payment Date</label>
             <input
@@ -507,6 +552,46 @@ function PayExpenseModal({
               onChange={(e) => setPaymentDate(e.target.value)}
             />
           </div>
+          {isCheque && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+              <p className="text-xs font-bold text-amber-700">
+                Cheque Details — creates a PENDING issued cheque. Cash at Bank decreases only when
+                Finance marks it Cleared in Accounts → Cheques.
+              </p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-600">Cheque Number *</label>
+                <input
+                  required
+                  value={chequeNumber}
+                  onChange={(e) => setChequeNumber(e.target.value)}
+                  placeholder="e.g. CHQ-001234"
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Our Bank *</label>
+                  <input
+                    required
+                    value={chequeBankName}
+                    onChange={(e) => setChequeBankName(e.target.value)}
+                    placeholder="e.g. Emirates NBD"
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Due Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={chequeDueDate}
+                    onChange={(e) => setChequeDueDate(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
           <Button variant="outline" onClick={onClose}>
@@ -514,7 +599,9 @@ function PayExpenseModal({
           </Button>
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={payMut.isPending}
+            disabled={
+              payMut.isPending || (isCheque && (!chequeNumber || !chequeBankName || !chequeDueDate))
+            }
             onClick={() => payMut.mutate()}
           >
             {payMut.isPending ? 'Saving...' : 'Mark Paid'}
@@ -526,6 +613,7 @@ function PayExpenseModal({
 }
 
 export default function ExpenseManagementPage() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'expenses' | 'requests'>(
     searchParams?.get('tab') === 'requests' ? 'requests' : 'expenses',
@@ -556,6 +644,12 @@ export default function ExpenseManagementPage() {
   const { data: accounts = [] } = useQuery({
     queryKey: ['cash-bank-accounts'],
     queryFn: () => fetchCashBankAccounts(),
+    staleTime: 60_000,
+  });
+
+  const { data: purchases = [] } = useQuery<PurchaseOrder[]>({
+    queryKey: ['purchases-expenses'],
+    queryFn: () => fetchPurchases(),
     staleTime: 60_000,
   });
 
@@ -590,46 +684,126 @@ export default function ExpenseManagementPage() {
     onError: () => toast.error('Failed to delete'),
   });
 
+  const allRows = useMemo((): ExpenseTableRow[] => {
+    const manual: ExpenseTableRow[] = expenses.map((e) => ({
+      id: e.id,
+      source: 'Manual',
+      isPurchase: false,
+      date: e.date,
+      expenseNo: e.expenseNo,
+      category: e.category,
+      description: e.description,
+      amount: Number(e.amount),
+      currency: e.currency,
+      status: e.status,
+      taxAmount: Number(e.vatAmount) || 0,
+      taxLabel: (Number(e.vatAmount) || 0) > 0 ? 'VAT' : '',
+      _entry: e,
+    }));
+    const fromPurchases: ExpenseTableRow[] = purchases
+      .filter((p) => {
+        const d = (p.createdAt ?? '').slice(0, 10);
+        return d >= fromDate && d <= toDate;
+      })
+      .map((p) => {
+        const isDomestic = p.purchaseOrigin === 'DOMESTIC';
+        const isInternational = p.purchaseOrigin === 'INTERNATIONAL';
+
+        // ── Tax amount resolution (priority order) ──────────────────────────
+        // 1. Use stored computed VAT columns (most accurate — set at purchase creation)
+        // 2. Fall back to taxPercent × taxableAmount if stored amounts are null
+        // 3. Fall back to generic calculation from any available data
+        let taxAmt = 0;
+        let taxLabel = '';
+
+        const storedInputVat = Number(p.inputVatAmount) || 0;
+        const storedRcVat = Number(p.reverseChargeVatAmount) || 0;
+        const taxPct = Number(p.taxPercent) || 0;
+        const taxableBase = Number(p.taxableAmount) || 0;
+
+        if (isDomestic) {
+          taxAmt = storedInputVat || (taxPct && taxableBase ? taxableBase * (taxPct / 100) : 0);
+          taxLabel = p.taxName || 'Input VAT';
+        } else if (isInternational) {
+          taxAmt = storedRcVat || (taxPct && taxableBase ? taxableBase * (taxPct / 100) : 0);
+          taxLabel = p.taxName || 'RC VAT';
+        } else {
+          // purchaseOrigin not set — pick whichever stored amount is non-zero first,
+          // then calculate from taxPercent/taxableAmount
+          taxAmt =
+            storedInputVat ||
+            storedRcVat ||
+            (taxPct && taxableBase ? taxableBase * (taxPct / 100) : 0);
+          taxLabel = p.taxName || 'VAT';
+        }
+
+        const originLabel = isDomestic ? 'Domestic' : isInternational ? 'International' : '';
+        const vendorName = p.vendor?.name ?? '';
+        const catLabel = p.purchaseCategory?.replace(/_/g, ' ') ?? 'Purchase';
+        // Use purchase's own currencyCode; fall back to branch currency (not hardcoded AED)
+        const purchaseCurrency = p.currencyCode || currency;
+        return {
+          id: `purchase-${p.id}`,
+          source: 'Purchase' as const,
+          isPurchase: true,
+          date: p.createdAt?.slice(0, 10) ?? '',
+          expenseNo: `PO-${p.id?.slice(0, 8)}`,
+          category: mapPurchaseCategory(p.purchaseCategory),
+          description: [catLabel, vendorName, originLabel].filter(Boolean).join(' · '),
+          amount: Number(p.totalAmount) || 0,
+          currency: purchaseCurrency,
+          status: p.status === 'PAID' ? 'PAID' : 'PENDING',
+          taxAmount: taxAmt,
+          taxLabel,
+          taxPercent: p.taxPercent ?? null,
+        };
+      });
+    return [...manual, ...fromPurchases];
+  }, [expenses, purchases, fromDate, toDate, currency]);
+
   const filtered = useMemo(
     () =>
-      expenses.filter((e) => {
-        const matchCat = categoryFilter === 'ALL' || e.category === categoryFilter;
-        const matchStatus = statusFilter === 'ALL' || e.status === statusFilter;
+      allRows.filter((row) => {
+        const matchCat = categoryFilter === 'ALL' || row.category === categoryFilter;
+        const matchStatus = statusFilter === 'ALL' || row.status === statusFilter;
         const matchSearch =
           !search ||
-          e.description?.toLowerCase().includes(search.toLowerCase()) ||
-          e.expenseNo?.toLowerCase().includes(search.toLowerCase());
+          row.description?.toLowerCase().includes(search.toLowerCase()) ||
+          row.expenseNo?.toLowerCase().includes(search.toLowerCase());
         return matchCat && matchStatus && matchSearch;
       }),
-    [expenses, categoryFilter, statusFilter, search],
+    [allRows, categoryFilter, statusFilter, search],
   );
 
-  const totalMonth = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const pendingCount = expenses.filter((e) => e.status === 'PENDING').length;
-  const approvedTotal = expenses
-    .filter((e) => e.status === 'APPROVED')
-    .reduce((s, e) => s + Number(e.amount), 0);
+  const totalMonth = allRows.reduce((s, r) => s + r.amount, 0);
+  const pendingCount = allRows.filter((r) => r.status === 'PENDING').length;
+  const approvedTotal = allRows
+    .filter((r) => r.status === 'APPROVED')
+    .reduce((s, r) => s + r.amount, 0);
 
   const donutData = useMemo(() => {
     const map: Record<string, number> = {};
-    expenses.forEach((e) => {
-      map[e.category] = (map[e.category] ?? 0) + Number(e.amount);
+    allRows.forEach((r) => {
+      map[r.category] = (map[r.category] ?? 0) + r.amount;
     });
     return Object.entries(map)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [expenses]);
+  }, [allRows]);
 
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(
-      filtered.map((e) => ({
-        'Expense #': e.expenseNo,
-        Date: e.date,
-        Category: e.category,
-        Description: e.description,
-        Amount: e.amount,
-        Currency: e.currency,
-        Status: e.status,
+      filtered.map((row) => ({
+        'Expense #': row.expenseNo,
+        Source: row.source,
+        Date: row.date?.slice(0, 10) ?? '',
+        Category: row.category,
+        Description: row.description,
+        Amount: row.amount,
+        'Tax Type': row.taxLabel || '—',
+        'Tax Amount': row.taxAmount || '',
+        Currency: row.currency,
+        Status: row.status,
       })),
     );
     const wb = XLSX.utils.book_new();
@@ -728,12 +902,12 @@ export default function ExpenseManagementPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard
                   title="This Period Total"
-                  value={formatCurrency(totalMonth)}
+                  value={formatCurrency(totalMonth, currency)}
                   subtitle="All categories"
                 />
                 <StatCard
                   title="Approved"
-                  value={formatCurrency(approvedTotal)}
+                  value={formatCurrency(approvedTotal, currency)}
                   subtitle="This period"
                 />
                 <StatCard
@@ -774,6 +948,7 @@ export default function ExpenseManagementPage() {
                         data={chartData?.monthlyTrend ?? []}
                         xKey="month"
                         keys={chartData?.categories ?? EXPENSE_CATEGORIES}
+                        currency={currency}
                       />
                     </div>
                     <div>
@@ -807,7 +982,7 @@ export default function ExpenseManagementPage() {
                               <span className="text-xs">{v.replace(/_/g, ' ')}</span>
                             )}
                           />
-                          <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                          <Tooltip formatter={(v: number) => formatCurrency(v, currency)} />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
@@ -820,6 +995,7 @@ export default function ExpenseManagementPage() {
                         xKey="name"
                         bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
                         height={200}
+                        currency={currency}
                       />
                     </div>
                     <div>
@@ -831,6 +1007,7 @@ export default function ExpenseManagementPage() {
                         xKey="month"
                         bars={[{ key: 'total', color: '#10b981', label: 'Total' }]}
                         height={200}
+                        currency={currency}
                       />
                     </div>
                   </div>
@@ -894,8 +1071,14 @@ export default function ExpenseManagementPage() {
                       <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                         Description
                       </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Source
+                      </TableHead>
                       <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                         Amount
+                      </TableHead>
+                      <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Tax
                       </TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                         Status
@@ -908,82 +1091,127 @@ export default function ExpenseManagementPage() {
                   <TableBody>
                     {filtered.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-16 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
                           No expenses found
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filtered.map((e) => (
-                        <TableRow key={e.id} className="hover:bg-blue-50/50 transition-colors">
+                      filtered.map((row) => (
+                        <TableRow key={row.id} className="hover:bg-blue-50/50 transition-colors">
                           <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
-                            {e.date?.slice(0, 10)}
+                            {row.date?.slice(0, 10)}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-blue-600 font-bold">
-                            {e.expenseNo}
+                            {row.expenseNo}
                           </TableCell>
                           <TableCell>
                             <span
                               className="px-2 py-0.5 rounded-md text-xs font-semibold"
                               style={{
-                                background: `${CATEGORY_COLORS[e.category] ?? '#94a3b8'}20`,
-                                color: CATEGORY_COLORS[e.category] ?? '#94a3b8',
+                                background: `${CATEGORY_COLORS[row.category] ?? '#94a3b8'}20`,
+                                color: CATEGORY_COLORS[row.category] ?? '#94a3b8',
                               }}
                             >
-                              {e.category.replace(/_/g, ' ')}
+                              {row.category.replace(/_/g, ' ')}
                             </span>
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                            {e.description}
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-red-600">
-                            {formatCurrency(Number(e.amount), e.currency)}
+                            {row.description}
                           </TableCell>
                           <TableCell>
                             <span
-                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[e.status] ?? ''}`}
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                                row.source === 'Purchase'
+                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200'
+                              }`}
                             >
-                              {e.status}
+                              {row.source}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-red-600">
+                            {formatCurrency(row.amount, row.currency)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {row.taxAmount > 0 ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                {row.taxLabel && (
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide ${
+                                      row.taxLabel.toLowerCase().includes('input')
+                                        ? 'bg-green-100 text-green-700'
+                                        : row.taxLabel.toLowerCase().includes('rc') ||
+                                            row.taxLabel.toLowerCase().includes('reverse')
+                                          ? 'bg-orange-100 text-orange-700'
+                                          : 'bg-blue-50 text-blue-600'
+                                    }`}
+                                  >
+                                    {row.taxLabel}
+                                    {row.taxPercent ? ` ${row.taxPercent}%` : ''}
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold text-slate-700">
+                                  {formatCurrency(row.taxAmount, row.currency)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[row.status] ?? ''}`}
+                            >
+                              {row.status}
                             </span>
                           </TableCell>
                           <TableCell className="pr-4">
                             <div className="flex items-center gap-1">
-                              {e.status === 'PENDING' && (
+                              {!row.isPurchase && row._entry && row.status === 'PENDING' && (
                                 <button
-                                  onClick={() => approveMut.mutate(e.id)}
+                                  onClick={() => approveMut.mutate(row._entry!.id)}
                                   title="Approve"
                                   className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
                                 >
                                   <CheckCircle className="h-3.5 w-3.5" />
                                 </button>
                               )}
-                              {e.status !== 'PAID' && e.status !== 'REJECTED' && (
-                                <button
-                                  onClick={() => setPaying(e)}
-                                  title="Mark Paid"
-                                  className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                                >
-                                  <Wallet className="h-3.5 w-3.5" />
-                                </button>
+                              {!row.isPurchase &&
+                                row._entry &&
+                                row.status !== 'PAID' &&
+                                row.status !== 'REJECTED' && (
+                                  <button
+                                    onClick={() => setPaying(row._entry!)}
+                                    title="Mark Paid"
+                                    className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                  >
+                                    <Wallet className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              {!row.isPurchase && row._entry && (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setEditing(row._entry!);
+                                      setShowModal(true);
+                                    }}
+                                    className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                    title="Edit"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('Delete this expense?'))
+                                        deleteMut.mutate(row._entry!.id);
+                                    }}
+                                    className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
                               )}
-                              <button
-                                onClick={() => {
-                                  setEditing(e);
-                                  setShowModal(true);
-                                }}
-                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                                title="Edit"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm('Delete this expense?')) deleteMut.mutate(e.id);
-                                }}
-                                className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1008,6 +1236,7 @@ export default function ExpenseManagementPage() {
                   onPaid={() => {
                     setPaying(null);
                     qc.invalidateQueries({ queryKey: ['expense-entries'] });
+                    qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
                   }}
                 />
               )}

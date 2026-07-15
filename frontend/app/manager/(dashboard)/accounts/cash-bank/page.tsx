@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Eye, Search, Download } from 'lucide-react';
 import { fetchCashBankAccounts, fetchCashbookEntries } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
@@ -20,6 +21,7 @@ const TXN_BADGE: Record<string, string> = {
 };
 
 export default function ManagerCashBankPage() {
+  const currency = useBranchCurrency();
   const [activeTab, setActiveTab] = useState<'accounts' | 'cashbook'>('accounts');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -125,16 +127,24 @@ export default function ManagerCashBankPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard title="Total Cash" value={formatCurrency(totalCash)} subtitle="Cash accounts" />
-        <StatCard title="Total Bank" value={formatCurrency(totalBank)} subtitle="Bank accounts" />
+        <StatCard
+          title="Total Cash"
+          value={formatCurrency(totalCash, currency)}
+          subtitle="Cash accounts"
+        />
+        <StatCard
+          title="Total Bank"
+          value={formatCurrency(totalBank, currency)}
+          subtitle="Bank accounts"
+        />
         <StatCard
           title="Total Receipts"
-          value={formatCurrency(totalReceipts)}
+          value={formatCurrency(totalReceipts, currency)}
           subtitle="All time"
         />
         <StatCard
           title="Total Payments"
-          value={formatCurrency(totalPayments)}
+          value={formatCurrency(totalPayments, currency)}
           subtitle="All time"
         />
       </div>
@@ -146,6 +156,7 @@ export default function ManagerCashBankPage() {
           xKey="name"
           bars={[{ key: 'balance', color: '#3b82f6', label: 'Balance' }]}
           height={200}
+          currency={currency}
         />
       </div>
 
@@ -229,7 +240,7 @@ export default function ManagerCashBankPage() {
                         <td className="px-4 py-3 text-gray-500">{a.bankName ?? '—'}</td>
                         <td className="px-4 py-3 text-gray-500">{a.currency}</td>
                         <td className="px-4 py-3 font-semibold text-gray-900">
-                          {formatCurrency(a.currentBalance)}
+                          {formatCurrency(a.currentBalance, currency)}
                         </td>
                       </tr>
                     ))
@@ -281,7 +292,7 @@ export default function ManagerCashBankPage() {
                         className={`px-4 py-3 font-semibold ${e.entryType === 'RECEIPT' ? 'text-emerald-600' : 'text-red-600'}`}
                       >
                         {e.entryType === 'RECEIPT' ? '+' : '-'}
-                        {formatCurrency(e.amount)}
+                        {formatCurrency(e.amount, currency)}
                       </td>
                     </tr>
                   ))

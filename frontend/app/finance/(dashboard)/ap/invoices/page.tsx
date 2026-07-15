@@ -24,10 +24,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 type DateRange = 'all' | 'today' | 'last_7' | 'last_30' | 'this_month' | 'last_month' | 'custom';
 
 export default function APInvoiceListPage() {
+  const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [dateRange, setDateRange] = useState<DateRange>('all');
   const [fromDate, setFromDate] = useState('');
@@ -82,7 +84,7 @@ export default function APInvoiceListPage() {
         <StatsCard
           title="Total Payables"
           value={totalPayable}
-          currency="AED"
+          currency={currency}
           icon={<ArrowDownLeft className="text-blue-600" />}
         />
         <StatsCard

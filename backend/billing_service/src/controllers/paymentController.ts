@@ -7,7 +7,17 @@ const paymentService = new PaymentService();
 
 export const recordPayment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { invoiceId, amountPaid, paymentMode, paymentDate, referenceNumber, remarks } = req.body;
+    const {
+      invoiceId,
+      amountPaid,
+      paymentMode,
+      paymentDate,
+      referenceNumber,
+      remarks,
+      chequeNumber,
+      chequeBankName,
+      chequeDueDate,
+    } = req.body;
     // @ts-expect-error: req.user is populated by auth middleware
     const recordedBy = req.user?.userId || req.user?.employeeId || 'SYSTEM';
 
@@ -31,6 +41,9 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       remarks,
       recordedBy,
       receiptUrl,
+      chequeNumber: chequeNumber || undefined,
+      chequeBankName: chequeBankName || undefined,
+      chequeDueDate: chequeDueDate || undefined,
     });
 
     res.status(201).json({

@@ -32,6 +32,7 @@ import { Loader2, History, Send, Mail, Eye, X, Image as ImageIcon, Edit } from '
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import UsageRecordingModal from './UsageRecordingModal';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -54,6 +55,7 @@ export default function UsageHistoryDialog({
   customerName,
   onSuccess,
 }: UsageHistoryDialogProps) {
+  const currency = useBranchCurrency();
   const [history, setHistory] = useState<UsageRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -362,26 +364,26 @@ export default function UsageHistoryDialog({
                               )}
                               <TableCell className="text-right">
                                 <span className="font-black text-orange-600 text-sm">
-                                  {formatCurrency(Number(record.exceededAmount))}
+                                  {formatCurrency(Number(record.exceededAmount), currency)}
                                 </span>
                               </TableCell>
                             </>
                           )}
 
                           <TableCell className="text-right font-bold text-slate-700">
-                            {formatCurrency(Number(record.rent))}
+                            {formatCurrency(Number(record.rent), currency)}
                           </TableCell>
                           {!isEmiLease && (
                             <TableCell className="text-right font-bold text-emerald-600">
-                              {formatCurrency(Number(record.discountAmount || 0))}
+                              {formatCurrency(Number(record.discountAmount || 0), currency)}
                             </TableCell>
                           )}
                           <TableCell className="text-right font-bold text-blue-600">
-                            {formatCurrency(Number(record.advanceAdjusted || 0))}
+                            {formatCurrency(Number(record.advanceAdjusted || 0), currency)}
                           </TableCell>
                           <TableCell className="text-right bg-blue-50/30 group-hover:bg-blue-100/50 transition-colors">
                             <span className="font-black text-blue-700 text-base">
-                              {formatCurrency(Number(record.finalTotal))}
+                              {formatCurrency(Number(record.finalTotal), currency)}
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
@@ -508,7 +510,8 @@ export default function UsageHistoryDialog({
 // --- SUB-COMPONENTS ---
 
 function UsageDetailsModal({ record }: { record: UsageRecord }) {
-  const localFormatCurrency = (amount: number) => formatCurrency(amount);
+  const currency = useBranchCurrency();
+  const localFormatCurrency = (amount: number) => formatCurrency(amount, currency);
 
   const isFixedLimit = record.rentType === 'FIXED_LIMIT';
   const isFxedCombo = record.rentType === 'FIXED_COMBO';

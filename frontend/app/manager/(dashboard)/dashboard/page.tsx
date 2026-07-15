@@ -11,10 +11,12 @@ import SalaryDistributionChart from '@/components/ManagerDashboardComponents/das
 import DashboardPage from '@/components/DashboardPage';
 import { YearSelector } from '@/components/ui/YearSelector';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getBranchInvoices, Invoice } from '@/lib/invoice';
 import { CalendarRange, AlertTriangle, AlertCircle } from 'lucide-react';
 
 export default function Dashboard() {
+  const currency = useBranchCurrency();
   const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
   const [branchName, setBranchName] = useState('Branch');
   const [totalSales, setTotalSales] = useState(0);
@@ -92,22 +94,22 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
           <StatCard
             title="Total Revenue"
-            value={loading ? '...' : formatCurrency(totalSales)}
+            value={loading ? '...' : formatCurrency(totalSales, currency)}
             subtitle="All sales, rent, and lease"
           />
           <StatCard
             title="Product Sales"
-            value={loading ? '...' : formatCurrency(saleAmount)}
+            value={loading ? '...' : formatCurrency(saleAmount, currency)}
             subtitle="Products and spare parts"
           />
           <StatCard
             title="Rent Revenue"
-            value={loading ? '...' : formatCurrency(rentAmount)}
+            value={loading ? '...' : formatCurrency(rentAmount, currency)}
             subtitle="Rental income"
           />
           <StatCard
             title="Lease Revenue"
-            value={loading ? '...' : formatCurrency(leaseAmount)}
+            value={loading ? '...' : formatCurrency(leaseAmount, currency)}
             subtitle="Lease income"
           />
         </div>

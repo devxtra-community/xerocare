@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { getProductById } from '@/lib/product';
 import { getAllSpareParts, getSparePartById } from '@/lib/spare-part';
@@ -73,6 +74,7 @@ export function InvoiceDetailsDialog({
   mode = 'EMPLOYEE',
   onApproveNext,
 }: InvoiceDetailsDialogProps) {
+  const currency = useBranchCurrency();
   const [currentInvoice, setCurrentInvoice] = React.useState<Invoice>(invoice);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [productDetails, setProductDetails] = React.useState<Record<string, any>>({});
@@ -610,10 +612,10 @@ export function InvoiceDetailsDialog({
                                     {bwExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    {formatCurrency(bwExcessRate)}
+                                    {formatCurrency(bwExcessRate, currency)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    {formatCurrency(bwExcessAmount)}
+                                    {formatCurrency(bwExcessAmount, currency)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -654,10 +656,10 @@ export function InvoiceDetailsDialog({
                                     {colorExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    {formatCurrency(colorExcessRate)}
+                                    {formatCurrency(colorExcessRate, currency)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    {formatCurrency(colorExcessAmount)}
+                                    {formatCurrency(colorExcessAmount, currency)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -703,10 +705,10 @@ export function InvoiceDetailsDialog({
                                     {comboExcess.toLocaleString()}
                                   </TableCell>
                                   <TableCell className="text-center font-bold text-gray-500 text-xs">
-                                    {formatCurrency(comboExcessRate)}
+                                    {formatCurrency(comboExcessRate, currency)}
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-primary text-xs">
-                                    {formatCurrency(comboExcessAmount)}
+                                    {formatCurrency(comboExcessAmount, currency)}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -923,7 +925,7 @@ export function InvoiceDetailsDialog({
                                 {item.bwSlabRanges.map(
                                   (s: { from: number; to: number; rate: number }, i: number) => (
                                     <span key={i} className="whitespace-nowrap">
-                                      {s.from}-{s.to}: {formatCurrency(s.rate)}
+                                      {s.from}-{s.to}: {formatCurrency(s.rate, currency)}
                                     </span>
                                   ),
                                 )}
@@ -936,13 +938,13 @@ export function InvoiceDetailsDialog({
                                           Number(s.to) || 0,
                                       ),
                                     )}
-                                    : {formatCurrency(item.bwExcessRate)}
+                                    : {formatCurrency(item.bwExcessRate, currency)}
                                   </span>
                                 )}
                               </div>
                             ) : item.bwExcessRate ? (
                               <span className="whitespace-nowrap">
-                                BW: {formatCurrency(item.bwExcessRate)}
+                                BW: {formatCurrency(item.bwExcessRate, currency)}
                               </span>
                             ) : null}
 
@@ -954,7 +956,7 @@ export function InvoiceDetailsDialog({
                                 {item.colorSlabRanges.map(
                                   (s: { from: number; to: number; rate: number }, i: number) => (
                                     <span key={i} className="whitespace-nowrap">
-                                      {s.from}-{s.to}: {formatCurrency(s.rate)}
+                                      {s.from}-{s.to}: {formatCurrency(s.rate, currency)}
                                     </span>
                                   ),
                                 )}
@@ -967,13 +969,13 @@ export function InvoiceDetailsDialog({
                                           Number(s.to) || 0,
                                       ),
                                     )}
-                                    : {formatCurrency(item.colorExcessRate)}
+                                    : {formatCurrency(item.colorExcessRate, currency)}
                                   </span>
                                 )}
                               </div>
                             ) : item.colorExcessRate ? (
                               <span className="whitespace-nowrap mt-1">
-                                CLR: {formatCurrency(item.colorExcessRate)}
+                                CLR: {formatCurrency(item.colorExcessRate, currency)}
                               </span>
                             ) : null}
 
@@ -985,7 +987,7 @@ export function InvoiceDetailsDialog({
                                 {item.comboSlabRanges.map(
                                   (s: { from: number; to: number; rate: number }, i: number) => (
                                     <span key={i} className="whitespace-nowrap">
-                                      {s.from}-{s.to}: {formatCurrency(s.rate)}
+                                      {s.from}-{s.to}: {formatCurrency(s.rate, currency)}
                                     </span>
                                   ),
                                 )}
@@ -998,13 +1000,13 @@ export function InvoiceDetailsDialog({
                                           Number(s.to) || 0,
                                       ),
                                     )}
-                                    : {formatCurrency(item.combinedExcessRate)}
+                                    : {formatCurrency(item.combinedExcessRate, currency)}
                                   </span>
                                 )}
                               </div>
                             ) : item.combinedExcessRate ? (
                               <span className="whitespace-nowrap mt-1">
-                                CMB: {formatCurrency(item.combinedExcessRate)}
+                                CMB: {formatCurrency(item.combinedExcessRate, currency)}
                               </span>
                             ) : null}
 
@@ -1067,14 +1069,16 @@ export function InvoiceDetailsDialog({
                                 currentInvoice.monthlyEmiAmount ||
                                 0
                             : currentInvoice.monthlyEmiAmount || 0,
+                          currency,
                         )
                       : mode === 'EMPLOYEE' && currentInvoice.type === 'PROFORMA'
                         ? formatCurrency(
                             currentInvoice.displayAmount ||
                               (currentInvoice.advanceAmount || 0) +
                                 (currentInvoice.usageRevenue || 0),
+                            currency,
                           )
-                        : formatCurrency(financialSummary.monthlyRent)}
+                        : formatCurrency(financialSummary.monthlyRent, currency)}
                   </p>
                 </div>
               )}
@@ -1085,7 +1089,7 @@ export function InvoiceDetailsDialog({
                     Total Lease Amount
                   </p>
                   <p className="text-sm font-bold text-gray-700">
-                    {formatCurrency(currentInvoice.totalLeaseAmount || 0)}
+                    {formatCurrency(currentInvoice.totalLeaseAmount || 0, currency)}
                   </p>
                 </div>
               )}
@@ -1209,7 +1213,7 @@ export function InvoiceDetailsDialog({
                                 {cn.brand} · {cn.modelName}
                               </p>
                               <p className="text-[9px] font-black text-rose-600 mt-1 bg-rose-100 px-2 py-0.5 rounded-full inline-block">
-                                Credit: {formatCurrency(cn.productAmount)}
+                                Credit: {formatCurrency(cn.productAmount, currency)}
                               </p>
                             </div>
 
@@ -1230,7 +1234,7 @@ export function InvoiceDetailsDialog({
                                 </p>
                               )}
                               <p className="text-[9px] font-black text-emerald-600 mt-1 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">
-                                Price: {formatCurrency(cn.replacementAmount || 0)}
+                                Price: {formatCurrency(cn.replacementAmount || 0, currency)}
                               </p>
                             </div>
                           </div>
@@ -1245,20 +1249,20 @@ export function InvoiceDetailsDialog({
                                 New Product Price
                               </span>
                               <span className="font-bold text-slate-800">
-                                {formatCurrency(cn.replacementAmount || 0)}
+                                {formatCurrency(cn.replacementAmount || 0, currency)}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs text-emerald-600">
                               <span className="font-semibold">Returned Credit</span>
                               <span className="font-bold">
-                                − {formatCurrency(cn.productAmount)}
+                                − {formatCurrency(cn.productAmount, currency)}
                               </span>
                             </div>
                             {(cn.replacementDiscount || 0) > 0 && (
                               <div className="flex justify-between text-xs text-rose-500">
                                 <span className="font-semibold">Exchange Discount</span>
                                 <span className="font-bold">
-                                  − {formatCurrency(cn.replacementDiscount)}
+                                  − {formatCurrency(cn.replacementDiscount, currency)}
                                 </span>
                               </div>
                             )}
@@ -1272,7 +1276,7 @@ export function InvoiceDetailsDialog({
                                   className={`text-sm font-black ${variation >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}
                                 >
                                   {variation >= 0 ? '+' : ''}
-                                  {formatCurrency(variation)}
+                                  {formatCurrency(variation, currency)}
                                 </p>
                                 <p className="text-[8px] font-bold text-slate-400 italic">
                                   {variation >= 0
@@ -1357,6 +1361,7 @@ export function InvoiceDetailsDialog({
                     ? (currentInvoice.advanceAmount || 0) + (currentInvoice.usageRevenue || 0)
                     : grandTotal) ||
                   grandTotal,
+                currency,
               )}
             </p>
           </div>

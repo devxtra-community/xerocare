@@ -13,6 +13,7 @@ import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { AppError } from '../errors/appError';
@@ -21,6 +22,7 @@ import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
 import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
+import { Cheque } from '../entities/chequeEntity';
 
 // ─── INTERNAL SERVICE HELPER ──────────────────────────────────────────────────
 
@@ -64,23 +66,34 @@ import { nowInBusinessTz, todayInBusinessTz } from '../utils/businessDate';
 
 function getPeriodRange(period?: string): { fromDate: string; toDate: string } {
   // Use business timezone so early-morning UTC moments land on the correct local month/year.
+  // NOTE: Avoid toISOString() for date-only values — it converts to UTC which produces
+  // off-by-one dates for UTC+ timezones (e.g. July 1 00:00 IST = June 30 18:30 UTC).
   const { year: y, month0: m } = nowInBusinessTz();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // lastDayOf: day=0 trick gives the last day of the previous month
+  const lastDayOf = (yr: number, mo1: number) => new Date(yr, mo1, 0).getDate();
+
   switch (period) {
     case 'this_month': {
-      const from = new Date(y, m, 1).toISOString().slice(0, 10);
-      const to = new Date(y, m + 1, 0).toISOString().slice(0, 10);
-      return { fromDate: from, toDate: to };
+      const mo = m + 1; // 1-indexed month
+      return { fromDate: `${y}-${pad(mo)}-01`, toDate: `${y}-${pad(mo)}-${pad(lastDayOf(y, mo))}` };
     }
     case 'last_month': {
-      const from = new Date(y, m - 1, 1).toISOString().slice(0, 10);
-      const to = new Date(y, m, 0).toISOString().slice(0, 10);
-      return { fromDate: from, toDate: to };
+      const mo = m === 0 ? 12 : m; // m is 0-indexed; last month in 1-indexed
+      const yr = m === 0 ? y - 1 : y;
+      return {
+        fromDate: `${yr}-${pad(mo)}-01`,
+        toDate: `${yr}-${pad(mo)}-${pad(lastDayOf(yr, mo))}`,
+      };
     }
     case 'this_quarter': {
-      const q = Math.floor(m / 3);
-      const from = new Date(y, q * 3, 1).toISOString().slice(0, 10);
-      const to = new Date(y, q * 3 + 3, 0).toISOString().slice(0, 10);
-      return { fromDate: from, toDate: to };
+      const q = Math.floor(m / 3); // 0-indexed quarter
+      const qStartMo = q * 3 + 1; // 1-indexed start month
+      const qEndMo = q * 3 + 3; // 1-indexed end month
+      return {
+        fromDate: `${y}-${pad(qStartMo)}-01`,
+        toDate: `${y}-${pad(qEndMo)}-${pad(lastDayOf(y, qEndMo))}`,
+      };
     }
     case 'last_year':
       return { fromDate: `${y - 1}-01-01`, toDate: `${y - 1}-12-31` };
@@ -284,8 +297,13 @@ export const getOrphanedCashbookEntries = async (
 // ─── DAY BOOK ─────────────────────────────────────────────────────────────────
 
 function toYmd(d: Date | string): string {
-  if (d instanceof Date) return d.toISOString().slice(0, 10);
-  return String(d).slice(0, 10);
+  // Always use the business timezone so entries near midnight land on the correct local day.
+  // A plain DATE column string (e.g. "2026-07-10") passes through unchanged.
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const date = typeof d === 'string' ? new Date(d) : d;
+  return date.toLocaleDateString('en-CA', {
+    timeZone: process.env.BUSINESS_TIMEZONE ?? 'Asia/Qatar',
+  });
 }
 
 interface DayBookDay {
@@ -297,27 +315,113 @@ interface DayBookDay {
   entries: CashbookEntry[];
 }
 
-// Cash day book: per-day total earnings (receipts), total expenses (payments) and transactions,
-// built from real cashbook entries (auto-posted invoice receipts + expense payments + manual).
+// Cash day book: per-day total earnings (receipts), total expenses (payments) and transactions.
+// Merges data from three sources to guarantee completeness:
+//  1. cashbook_entries  — auto-posted + manual entries (primary)
+//  2. payment_transactions — invoice receipts not yet mirrored into cashbook
+//  3. expense_entries (PAID/APPROVED) — expense payments not yet mirrored into cashbook
 export const getDayBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const repo = Source.getRepository(CashbookEntry);
     const { fromDate, toDate, accountId } = req.query;
+    const { toBusinessDate } = await import('../utils/businessDate');
     const today = todayInBusinessTz();
     const from = (fromDate as string) || today;
     const to = (toDate as string) || from;
+    const branchFilter = req.branchFilter ?? [];
 
-    const qb = repo.createQueryBuilder('e');
-    applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
-    qb.andWhere('e.date >= :from', { from }).andWhere('e.date <= :to', { to });
-    if (accountId) qb.andWhere('e.accountId = :accountId', { accountId });
-    qb.orderBy('e.date', 'DESC').addOrderBy('e.createdAt', 'DESC');
-    const entries = await qb.getMany();
+    // ── 1. Cashbook entries (primary source) ────────────────────────────────
+    const cbRepo = Source.getRepository(CashbookEntry);
+    const cbQb = cbRepo.createQueryBuilder('e');
+    applyBranchQB(cbQb as never, 'e', branchFilter);
+    cbQb.andWhere('e.date >= :from', { from }).andWhere('e.date <= :to', { to });
+    if (accountId) cbQb.andWhere('e.accountId = :accountId', { accountId });
+    cbQb.orderBy('e.date', 'DESC').addOrderBy('e.createdAt', 'DESC');
+    const cbEntries = await cbQb.getMany();
+
+    // Track which source IDs are already in cashbook (idempotency)
+    const postedInvoiceTxIds = new Set<string>();
+    const postedExpenseIds = new Set<string>();
+    for (const e of cbEntries) {
+      if (e.sourceType === 'INVOICE_PAYMENT' && e.sourceId) postedInvoiceTxIds.add(e.sourceId);
+      if (e.sourceType === 'EXPENSE' && e.sourceId) postedExpenseIds.add(e.sourceId);
+    }
+
+    // ── 2. Payment transactions not yet in cashbook ─────────────────────────
+    // Join with invoices to get branchId for filtering
+    const txRepo = Source.getRepository(PaymentTransaction);
+    const txQb = txRepo
+      .createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.invoice', 'inv')
+      .where(`CAST(tx.transaction_date AS DATE) >= :from`, { from })
+      .andWhere(`CAST(tx.transaction_date AS DATE) <= :to`, { to });
+
+    if (branchFilter.length > 0) {
+      txQb.andWhere('inv.branchId IN (:...branches)', { branches: branchFilter });
+    }
+    const allTxs = await txQb.getMany();
+    // Synthetic cashbook-style entries for unmirrored payment transactions
+    const synthReceipts: CashbookEntry[] = allTxs
+      .filter((tx) => !postedInvoiceTxIds.has(tx.id))
+      .map((tx) => {
+        const e = new CashbookEntry();
+        e.id = tx.id;
+        e.referenceNo = tx.referenceNumber ?? `RCPT-${tx.id.slice(0, 8).toUpperCase()}`;
+        e.date = new Date(toBusinessDate(tx.transactionDate));
+        e.entryType = 'RECEIPT';
+        e.amount = Number(tx.amount);
+        e.category = 'Customer Payment';
+        e.description = tx.invoice
+          ? `Receipt for invoice ${tx.invoice.invoiceNumber}`
+          : 'Invoice Receipt';
+        e.paymentMode = tx.paymentMode;
+        e.branchId = tx.invoice?.branchId ?? '';
+        e.createdAt = tx.createdAt;
+        e.isReversed = false;
+        e.sourceType = 'INVOICE_PAYMENT';
+        e.sourceId = tx.id;
+        return e;
+      });
+
+    // ── 3. Paid expense entries not yet in cashbook ──────────────────────────
+    const expRepo = Source.getRepository(ExpenseEntry);
+    const expQb = expRepo
+      .createQueryBuilder('exp')
+      .where('exp.status IN (:...statuses)', { statuses: ['PAID', 'APPROVED'] })
+      .andWhere(`COALESCE(exp.paymentDate, exp.date) BETWEEN :from AND :to`, { from, to });
+    applyBranchQB(expQb as never, 'exp', branchFilter);
+    const paidExpenses = await expQb.getMany();
+    const synthPayments: CashbookEntry[] = paidExpenses
+      .filter((exp) => !postedExpenseIds.has(exp.id))
+      .map((exp) => {
+        const e = new CashbookEntry();
+        e.id = exp.id;
+        e.referenceNo = exp.expenseNo ?? `EXP-${exp.id.slice(0, 8).toUpperCase()}`;
+        e.date = new Date(exp.paymentDate ?? exp.date);
+        e.entryType = 'PAYMENT';
+        e.amount = Number(exp.netAmount);
+        e.category = exp.category;
+        e.description = exp.description;
+        e.paymentMode = exp.paymentMode;
+        e.branchId = exp.branchId;
+        e.createdAt = exp.createdAt;
+        e.isReversed = false;
+        e.sourceType = 'EXPENSE';
+        e.sourceId = exp.id;
+        return e;
+      });
+
+    // ── Merge & aggregate ────────────────────────────────────────────────────
+    const allEntries = [...cbEntries, ...synthReceipts, ...synthPayments].sort((a, b) => {
+      const da = toYmd(a.date);
+      const db = toYmd(b.date);
+      if (da !== db) return da < db ? 1 : -1; // most recent day first
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
     const dayMap = new Map<string, DayBookDay>();
     let grandReceipts = 0;
     let grandPayments = 0;
-    for (const e of entries) {
+    for (const e of allEntries) {
       const key = toYmd(e.date);
       let day = dayMap.get(key);
       if (!day) {
@@ -357,7 +461,7 @@ export const getDayBook = async (req: Request, res: Response, next: NextFunction
           totalReceipts: grandReceipts,
           totalPayments: grandPayments,
           net: grandReceipts - grandPayments,
-          transactionCount: entries.length,
+          transactionCount: allEntries.length,
         },
       },
     });
@@ -464,21 +568,107 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
     if (entry.status !== 'APPROVED')
       throw new AppError('Expense must be APPROVED before payment', 400);
 
-    const { paidFrom, paymentMode, paymentDate, referenceNo } = req.body as {
+    const {
+      paidFrom,
+      paymentMode,
+      paymentDate,
+      referenceNo,
+      chequeNumber,
+      chequeBankName,
+      chequeDueDate,
+    } = req.body as {
       paidFrom?: string;
       paymentMode?: string;
       paymentDate?: string;
       referenceNo?: string;
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
     };
+
+    const isCheque = (paymentMode ?? '').trim().toLowerCase() === 'cheque';
 
     entry.status = 'PAID';
     entry.paidFrom = paidFrom ?? entry.paidFrom;
     entry.paymentMode = paymentMode ?? entry.paymentMode;
     entry.paymentDate = paymentDate ? new Date(paymentDate) : (entry.paymentDate ?? new Date());
-    entry.referenceNo = referenceNo ?? entry.referenceNo;
+    entry.referenceNo = isCheque
+      ? (chequeNumber ?? referenceNo ?? entry.referenceNo)
+      : (referenceNo ?? entry.referenceNo);
     const saved = await repo.save(entry);
 
-    await postExpensePayment(saved, req.user?.userId);
+    if (isCheque) {
+      // Cheque: create PENDING ISSUED cheque record. No cashbook entry until Finance marks it CLEARED.
+      if (chequeNumber && chequeDueDate) {
+        try {
+          const chequeRepo = Source.getRepository(Cheque);
+          const existingCheque = await chequeRepo.findOne({
+            where: { chequeNo: chequeNumber, branchId: entry.branchId },
+          });
+          if (!existingCheque) {
+            const c = chequeRepo.create({
+              chequeNo: chequeNumber,
+              bankName: chequeBankName || undefined,
+              partyName: entry.description?.slice(0, 100) || entry.category,
+              amount: Number(entry.netAmount),
+              dueDate: new Date(chequeDueDate),
+              issueDate: saved.paymentDate ?? new Date(),
+              type: 'ISSUED',
+              status: 'PENDING',
+              description: `Expense: ${entry.expenseNo} — ${entry.description?.slice(0, 200) || entry.category}`,
+              branchId: entry.branchId,
+              sourceType: 'EXPENSE',
+              sourceReferenceId: entry.id,
+              sourceLabel: `Expense ${entry.expenseNo}`,
+              createdBy: req.user?.userId ?? 'SYSTEM',
+            });
+            await chequeRepo.save(c);
+          }
+        } catch (err) {
+          logger.error('[payExpenseEntry] Failed to create ISSUED cheque record', err);
+        }
+      }
+    } else {
+      // Direct balance deduction — generate cashbook ref BEFORE transaction (poolSize=1 safety)
+      const cbYear = new Date().getFullYear();
+      const cbCount = await Source.getRepository(CashbookEntry)
+        .createQueryBuilder('c')
+        .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+        .getCount();
+      const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+
+      await Source.transaction(async (manager) => {
+        if (saved.paidFrom) {
+          const accountRepo = manager.getRepository(CashBankAccount);
+          const account = await accountRepo.findOne({ where: { id: saved.paidFrom } });
+          if (account) {
+            account.currentBalance = Number(account.currentBalance) - Number(saved.netAmount);
+            await manager.save(CashBankAccount, account);
+          } else {
+            logger.warn(
+              `[payExpenseEntry] Account ${saved.paidFrom} not found — balance not deducted`,
+            );
+          }
+        }
+        const cbEntry = manager.create(CashbookEntry, {
+          referenceNo: cbRefNo,
+          date: saved.paymentDate ?? saved.date,
+          accountId: saved.paidFrom ?? undefined,
+          entryType: 'PAYMENT' as const,
+          amount: Number(saved.netAmount),
+          category: saved.category,
+          description: saved.description ?? undefined,
+          linkedExpenseId: saved.id,
+          paymentMode: saved.paymentMode ?? undefined,
+          notes: saved.notes ?? undefined,
+          sourceType: 'EXPENSE',
+          sourceId: saved.id,
+          createdBy: req.user?.userId ?? 'SYSTEM',
+          branchId: saved.branchId,
+        });
+        await manager.save(CashbookEntry, cbEntry);
+      });
+    }
     res.json({ success: true, data: saved });
   } catch (err) {
     next(err);
@@ -1096,6 +1286,7 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     if (!payable) throw new AppError('Payable not found', 404);
 
     let saved!: ManualPayable;
+    let paymentId: string | undefined;
     await Source.transaction(async (em) => {
       const payableRepo = em.getRepository(ManualPayable);
       const paymentRepo = em.getRepository(PayablePayment);
@@ -1105,7 +1296,8 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
         payableId: payable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as PayablePayment;
-      await paymentRepo.save(payment);
+      const savedPayment = await paymentRepo.save(payment);
+      paymentId = savedPayment.id;
 
       payable.amountPaid = Number(payable.amountPaid) + Number(req.body.amount);
       payable.outstanding = Number(payable.amount) - Number(payable.amountPaid);
@@ -1113,6 +1305,28 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
       else if (Number(payable.amountPaid) > 0) payable.status = 'PARTIAL';
       saved = await payableRepo.save(payable);
     });
+
+    // Post cashbook entry + deduct account balance (pool size 1 — must be outside the transaction above)
+    if (req.body.paidFromAccount && paymentId) {
+      try {
+        await postCashbookEntry({
+          date: req.body.paymentDate ?? new Date(),
+          entryType: 'PAYMENT',
+          amount: Number(req.body.amount),
+          category: 'Payable Payment',
+          branchId: payable.branchId,
+          createdBy: req.user?.userId ?? 'SYSTEM',
+          paymentMode: req.body.paymentMode,
+          accountId: req.body.paidFromAccount,
+          description: `Payable: ${payable.payableTo} — ${payable.type}`,
+          notes: req.body.notes,
+          sourceType: 'MANUAL_PAYABLE',
+          sourceId: paymentId,
+        });
+      } catch (err) {
+        logger.warn('[recordPayablePayment] Failed to post cashbook entry (non-fatal)', err);
+      }
+    }
 
     res.json({ success: true, data: saved });
   } catch (err) {
@@ -1552,13 +1766,54 @@ export const getPayableCharts = async (req: Request, res: Response, next: NextFu
 
     const typeMap: Record<string, number> = {};
     const vendorMap: Record<string, number> = {};
-    const monthlyPayments: Record<string, number> = {};
+    // monthlyData stores { payable: total_amount_owed, paid: amount_paid } per month
+    const monthlyData: Record<string, { payable: number; paid: number }> = {};
 
     for (const p of rows) {
       typeMap[p.type] = (typeMap[p.type] ?? 0) + Number(p.amount);
       vendorMap[p.payableTo] = (vendorMap[p.payableTo] ?? 0) + Number(p.amount);
       const month = String(p.issueDate).slice(0, 7);
-      monthlyPayments[month] = (monthlyPayments[month] ?? 0) + Number(p.amountPaid ?? 0);
+      if (!month || month === 'undefined') continue;
+      if (!monthlyData[month]) monthlyData[month] = { payable: 0, paid: 0 };
+      // Use total amount incurred (not just paid) so chart shows data even with no payments
+      monthlyData[month].payable += Number(p.amount) || 0;
+      monthlyData[month].paid += Number(p.amountPaid ?? 0) || 0;
+    }
+
+    // Also pull purchase orders from inventory service to include in monthly chart
+    try {
+      const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+      const purchaseRes = await fetch(`${INV_URL}/purchases`);
+      if (purchaseRes.ok) {
+        const purchaseJson = (await purchaseRes.json()) as {
+          success: boolean;
+          data: Array<{
+            id: string;
+            totalAmount: number;
+            paidAmount?: number;
+            createdAt: string;
+            vendor?: { name: string };
+            purchaseOrigin?: string;
+          }>;
+        };
+        const purchases = purchaseJson?.data ?? [];
+        for (const p of purchases) {
+          const month = String(p.createdAt).slice(0, 7);
+          if (!month || month === 'undefined') continue;
+          if (!monthlyData[month]) monthlyData[month] = { payable: 0, paid: 0 };
+          monthlyData[month].payable += Number(p.totalAmount) || 0;
+          monthlyData[month].paid += Number(p.paidAmount ?? 0) || 0;
+
+          // Also add to vendor map
+          const vendor = p.vendor?.name ?? 'Unknown Vendor';
+          vendorMap[vendor] = (vendorMap[vendor] ?? 0) + Number(p.totalAmount);
+
+          // Purchases are VENDOR_INVOICE type
+          typeMap['VENDOR_INVOICE'] = (typeMap['VENDOR_INVOICE'] ?? 0) + Number(p.totalAmount);
+        }
+      }
+    } catch {
+      // If inventory service is unavailable, proceed with manual payables only
     }
 
     const byType = Object.entries(typeMap).map(([name, value]) => ({ name, value }));
@@ -1566,11 +1821,12 @@ export const getPayableCharts = async (req: Request, res: Response, next: NextFu
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([name, value]) => ({ name, value }));
-    const monthly = Object.entries(monthlyPayments)
+    const monthly = Object.entries(monthlyData)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, paid]) => ({ month, paid }));
+      .slice(-12)
+      .map(([month, v]) => ({ month, payable: v.payable, paid: v.paid, amount: v.payable }));
 
-    res.json({ success: true, data: { byType, topVendors, monthly } });
+    res.json({ success: true, data: { byType, topVendors, monthly, monthlyPayments: monthly } });
   } catch (err) {
     next(err);
   }
@@ -1701,25 +1957,86 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       dateTo = range.toDate;
     }
 
+    // Determine base currency: prefer the most-used invoice currency in this period
+    // (avoids silently dropping all revenue when the branch currency ≠ invoice currency
+    // and no exchange rate is configured). Falls back to branch currency, then 'AED'.
     let baseCurrency = 'AED';
     if (branchF.length === 1) {
       const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
       const info = await getBranchCurrencyInfo(branchF[0]);
       baseCurrency = info?.currencyCode ?? 'AED';
     }
+    // Override with the dominant invoice currency so revenue is never zeroed by missing FX rates
+    const dominantCcyRow = await Source.query<{ currency_code: string; cnt: string }[]>(`
+      SELECT COALESCE("currency_code", 'AED') AS currency_code, COUNT(*) AS cnt
+      FROM invoices
+      WHERE "deletedAt" IS NULL
+        AND status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+        AND (type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT','INVOICED','PAID')))
+        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+      GROUP BY "currency_code"
+      ORDER BY cnt DESC
+      LIMIT 1
+    `);
+    if (dominantCcyRow[0]?.currency_code) {
+      baseCurrency = dominantCcyRow[0].currency_code;
+    }
 
     const pl = await computeProfitAndLoss(Source, branchF, dateFrom, dateTo, baseCurrency, INV_URL);
 
+    // Count invoices in period (all non-draft/cancelled types that generate revenue)
+    const invRepo = Source.getRepository(Invoice);
+    const invCountQb = invRepo
+      .createQueryBuilder('i')
+      .select('COUNT(i.id)', 'cnt')
+      .where(`CAST(i."createdAt" AS DATE) BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
+      .andWhere(`i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')`)
+      .andWhere(
+        `(i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))`,
+      )
+      .andWhere('i."deletedAt" IS NULL');
+    applyBranchQB(invCountQb as never, 'i', branchF);
+    const invCountRow = await invCountQb.getRawOne<{ cnt: string }>();
+    const invoiceCount = Number(invCountRow?.cnt ?? 0);
+
+    // Count expense entries in period
+    const expRepo = Source.getRepository(ExpenseEntry);
+    const expCountQb = expRepo
+      .createQueryBuilder('e')
+      .select('COUNT(e.id)', 'cnt')
+      .where(`e.date BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
+      .andWhere(`e.status IN ('APPROVED','PAID')`);
+    applyBranchQB(expCountQb as never, 'e', branchF);
+    const expCountRow = await expCountQb.getRawOne<{ cnt: string }>();
+    const expenseCount = Number(expCountRow?.cnt ?? 0);
+
+    // Total tax collected from invoices in period — apply SAME branch filter as revenue
+    const taxQb = invRepo
+      .createQueryBuilder('i')
+      .select(`COALESCE(SUM(i.tax_amount), 0)`, 'total')
+      .where(`CAST(i."createdAt" AS DATE) BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
+      .andWhere(`i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')`)
+      .andWhere(
+        `(i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))`,
+      )
+      .andWhere('i."deletedAt" IS NULL');
+    applyBranchQB(taxQb as never, 'i', branchF);
+    const taxRow = await taxQb.getRawOne<{ total: string }>();
+    const totalTax = Number(taxRow?.total ?? 0);
+
+    // All revenue lines — always include all types for display; non-zero filtered on frontend
     const revenueByType: Record<string, number> = {
       RENT: pl.rentalRevenue,
       LEASE: pl.leaseRevenue,
-      SALE: pl.salesRevenue,
+      SALE: pl.salesRevenue, // SALE + PRODUCT_SALE combined
       SERVICE: pl.serviceRevenue,
       AMC_SMA: pl.amcSmaRevenue,
-      USAGE: pl.usageRevenue,
       SPAREPART_SALE: pl.sparePartSalesRevenue,
+      USAGE: pl.usageRevenue,
     };
-    const expByCategory: Record<string, number> = {
+
+    // Only include expense lines that are non-zero
+    const allExpByCategory: Record<string, number> = {
       SPARE_PARTS: pl.costOfParts,
       LABOUR: pl.labourCost,
       DEPRECIATION: pl.depreciationExpense,
@@ -1734,6 +2051,9 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       INSURANCE: pl.insuranceExpense,
       OTHER: pl.otherExpenses,
     };
+    const expByCategory = Object.fromEntries(
+      Object.entries(allExpByCategory).filter(([, v]) => v !== 0),
+    );
 
     const margin = pl.totalRevenue > 0 ? +((pl.netProfit / pl.totalRevenue) * 100).toFixed(2) : 0;
 
@@ -1747,12 +2067,16 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
         netProfit: +pl.netProfit.toFixed(2),
         grossProfit: +pl.grossProfit.toFixed(2),
         margin,
+        totalTax: +totalTax.toFixed(2),
         totalIncome: +pl.totalRevenue.toFixed(2),
+        invoiceCount,
+        expenseCount,
         revenueByType,
         expByCategory,
         currency: baseCurrency,
         currencyWarnings: pl.currencyWarnings,
         dataWarnings: pl.dataWarnings,
+        monthly: [],
       },
     });
   } catch (err) {
@@ -2235,7 +2559,11 @@ export const depositToCashBank = async (req: Request, res: Response, next: NextF
         if (cashAcc) {
           const newBalance = Number(cashAcc.currentBalance) - Number(amount);
           if (newBalance < 0)
-            throw new AppError('Insufficient cash balance in linked cash account', 400);
+            throw new AppError(
+              `Insufficient cash in "${cashAcc.name}" (available: ${cashAcc.currency} ${Number(cashAcc.currentBalance).toFixed(2)}). ` +
+                `Either add cash to that account first, or leave the "From Cash Account" field empty to record the bank deposit without a cash deduction.`,
+              400,
+            );
           await entryRepo.save(
             entryRepo.create({
               referenceNo: genRef('PAY'),
@@ -2577,6 +2905,32 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       currency = info?.currencyCode ?? 'AED';
     }
 
+    // Override with dominant invoice currency for the period so that missing FX rates
+    // don't silently zero out all revenue (mirrors logic in getProfitLoss).
+    const uuidReCoA = /^[0-9a-f-]{36}$/i;
+    const safeBranchesCoA = branchF.filter((b) => uuidReCoA.test(b));
+    const bSqlCoA =
+      safeBranchesCoA.length === 1
+        ? `AND "branchId" = '${safeBranchesCoA[0]}'`
+        : safeBranchesCoA.length > 1
+          ? `AND "branchId" IN (${safeBranchesCoA.map((b) => `'${b}'`).join(',')})`
+          : '';
+    const dominantCcyRow = await Source.query<{ currency_code: string; cnt: string }[]>(`
+      SELECT COALESCE("currency_code", 'AED') AS currency_code, COUNT(*) AS cnt
+      FROM invoices
+      WHERE "deletedAt" IS NULL
+        AND status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+        AND (type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT','INVOICED','PAID')))
+        AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
+        ${bSqlCoA}
+      GROUP BY "currency_code"
+      ORDER BY cnt DESC
+      LIMIT 1
+    `);
+    if (dominantCcyRow[0]?.currency_code) {
+      currency = dominantCcyRow[0].currency_code;
+    }
+
     const [pl, bs] = await Promise.all([
       computeProfitAndLoss(Source, branchF, periodFrom, periodTo, currency, INV_URL),
       computeBalanceSheet(Source, branchF, today, currency, INV_URL),
@@ -2589,6 +2943,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       securityDepositsReceivable,
       prepaidExpenses,
       sparePartsInventory,
+      productInventory,
       inventoryUnavailable,
       equipmentGrossCost,
       accumulatedDepreciation,
@@ -2648,7 +3003,8 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       accountsReceivable +
       securityDepositsReceivable +
       prepaidExpenses +
-      sparePartsInventory;
+      sparePartsInventory +
+      productInventory;
     const totalNonCurrentAssets = equipmentNBV;
     const totalCurrentLiabilities =
       accountsPayable +
@@ -2714,6 +3070,12 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
               '1006',
               'Spare Parts Inventory',
               sparePartsInventory,
+              currency,
+            ),
+            productInventory: makeAccountBalance(
+              '1009',
+              'Product Inventory',
+              productInventory,
               currency,
             ),
             totalCurrentAssets: +totalCurrentAssets.toFixed(2),
@@ -2942,6 +3304,7 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       dateTo,
       country,
       stateProvince,
+      city,
       page = '1',
       limit = '50',
     } = req.query as Record<string, string>;
@@ -2971,23 +3334,27 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
     }
     if (country) qb.andWhere('i.customerCountry = :country', { country });
     if (stateProvince) qb.andWhere('i.customerStateProvince = :stateProvince', { stateProvince });
+    if (city) qb.andWhere('i.customerCity = :city', { city });
 
-    const total = await qb.getCount();
-    const invoices = await qb
-      .orderBy('i.createdAt', 'DESC')
-      .skip((pageNum - 1) * limitNum)
-      .take(limitNum)
-      .getMany();
+    const [total, invoices] = await Promise.all([
+      qb.getCount(),
+      qb
+        .orderBy('i.createdAt', 'DESC')
+        .skip((pageNum - 1) * limitNum)
+        .take(limitNum)
+        .getMany(),
+    ]);
 
     const rows = invoices.map((inv) => ({
       invoiceNumber: inv.invoiceNumber,
       invoiceDate: inv.effectiveFrom ?? inv.createdAt,
       branchId: inv.branchId,
       customerId: inv.customerId,
-      customerName: inv.customerName,
-      customerVatNumber: inv.customerVatNumber,
-      customerCountry: inv.customerCountry,
-      customerStateProvince: inv.customerStateProvince,
+      customerName: inv.customerName ?? null,
+      customerVatNumber: inv.customerVatNumber ?? null,
+      customerCountry: inv.customerCountry ?? null,
+      customerStateProvince: inv.customerStateProvince ?? null,
+      customerCity: inv.customerCity ?? null,
       taxableAmount: Number(inv.totalAmount ?? 0),
       taxPercent: inv.taxPercent,
       taxName: inv.taxName,
@@ -2997,15 +3364,163 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       status: inv.status,
     }));
 
-    const totalTaxableAmount = rows.reduce((s, r) => s + r.taxableAmount, 0);
-    const totalOutputVat = rows.reduce((s, r) => s + r.outputVat, 0);
+    // Enrich rows where customer snapshot is missing by fetching from CRM service
+    const CRM_URL = process.env.CRM_SERVICE_URL ?? 'http://localhost:3005';
+    const missingIds = [
+      ...new Set(
+        rows
+          .filter((r) => r.customerId && (!r.customerName || !r.customerCountry))
+          .map((r) => r.customerId as string),
+      ),
+    ];
+    const customerCache: Record<
+      string,
+      {
+        name: string | null;
+        vatNumber: string | null;
+        country: string | null;
+        stateProvince: string | null;
+        city: string | null;
+      }
+    > = {};
+    if (missingIds.length > 0) {
+      await Promise.allSettled(
+        missingIds.map(async (id) => {
+          const resp = await internalFetchJSON<{
+            data: {
+              name: string;
+              vatNumber?: string | null;
+              country?: string | null;
+              stateProvince?: string | null;
+              city?: string | null;
+            };
+          }>(`${CRM_URL}/customers/${id}`);
+          if (resp?.data) {
+            customerCache[id] = {
+              name: resp.data.name ?? null,
+              vatNumber: resp.data.vatNumber ?? null,
+              country: resp.data.country ?? null,
+              stateProvince: resp.data.stateProvince ?? null,
+              city: resp.data.city ?? null,
+            };
+          }
+        }),
+      );
+    }
+    const enrichedRows = rows.map((r) => {
+      const c = r.customerId ? customerCache[r.customerId] : undefined;
+      if (!c) return r;
+      return {
+        ...r,
+        customerName: r.customerName ?? c.name,
+        customerVatNumber: r.customerVatNumber ?? c.vatNumber,
+        customerCountry: r.customerCountry ?? c.country,
+        customerStateProvince: r.customerStateProvince ?? c.stateProvince,
+        customerCity: r.customerCity ?? c.city,
+      };
+    });
+
+    // Country / state breakdown aggregate (full result set, not paginated)
+    const bfParams: (string | string[] | Date | string[])[] = [];
+    let pi = 1;
+    const bfClause =
+      branchFilter.length === 1
+        ? `AND "branchId" = $${pi++}` + (bfParams.push(branchFilter[0]) && '')
+        : branchFilter.length > 1
+          ? `AND "branchId" = ANY($${pi++}::text[])` + (bfParams.push(branchFilter) && '')
+          : '';
+    const dfClause = dateFrom
+      ? `AND "createdAt" >= $${pi++}` + (bfParams.push(dateFrom) && '')
+      : '';
+    const dtClause = dateTo
+      ? (() => {
+          const end = new Date(dateTo);
+          end.setHours(23, 59, 59, 999);
+          const clause = `AND "createdAt" <= $${pi++}`;
+          bfParams.push(end as unknown as string);
+          return clause;
+        })()
+      : '';
+    const cClause = country
+      ? `AND "customer_country" = $${pi++}` + (bfParams.push(country) && '')
+      : '';
+    const spClause = stateProvince
+      ? `AND "customer_state_province" = $${pi++}` + (bfParams.push(stateProvince) && '')
+      : '';
+    const cityClause = city ? `AND "customer_city" = $${pi++}` + (bfParams.push(city) && '') : '';
+
+    const breakdownRaw = await Source.query<
+      {
+        country: string;
+        state: string;
+        city: string;
+        invoice_count: string;
+        taxable_amount: string;
+        output_vat: string;
+      }[]
+    >(
+      `
+      SELECT
+        COALESCE("customer_country", 'Unknown') AS country,
+        COALESCE("customer_state_province", 'Unknown') AS state,
+        COALESCE("customer_city", '') AS city,
+        COUNT(*) AS invoice_count,
+        COALESCE(SUM("totalAmount"), 0) AS taxable_amount,
+        COALESCE(SUM("tax_amount"), 0) AS output_vat
+      FROM invoices
+      WHERE status IN ('INVOICED', 'PAID', 'ACTIVE_CONTRACT')
+        AND "isTemplate" = false
+        AND "is_opening_entry" = false
+        AND "deletedAt" IS NULL
+        ${bfClause} ${dfClause} ${dtClause} ${cClause} ${spClause} ${cityClause}
+      GROUP BY COALESCE("customer_country", 'Unknown'), COALESCE("customer_state_province", 'Unknown'), COALESCE("customer_city", '')
+      ORDER BY output_vat DESC
+    `,
+      bfParams,
+    );
+
+    // Collapse state rows under each country
+    const cMap: Record<
+      string,
+      {
+        count: number;
+        taxableAmount: number;
+        outputVat: number;
+        states: { state: string; count: number; outputVat: number }[];
+      }
+    > = {};
+    for (const row of breakdownRaw) {
+      if (!cMap[row.country])
+        cMap[row.country] = { count: 0, taxableAmount: 0, outputVat: 0, states: [] };
+      cMap[row.country].count += Number(row.invoice_count);
+      cMap[row.country].taxableAmount += Number(row.taxable_amount);
+      cMap[row.country].outputVat += Number(row.output_vat);
+      cMap[row.country].states.push({
+        state: row.state,
+        count: Number(row.invoice_count),
+        outputVat: +Number(row.output_vat).toFixed(2),
+      });
+    }
+    const countryBreakdown = Object.entries(cMap)
+      .map(([c, d]) => ({
+        country: c,
+        count: d.count,
+        taxableAmount: +d.taxableAmount.toFixed(2),
+        outputVat: +d.outputVat.toFixed(2),
+        states: d.states.sort((a, b) => b.outputVat - a.outputVat),
+      }))
+      .sort((a, b) => b.outputVat - a.outputVat);
+
+    const totalTaxableAmount = enrichedRows.reduce((s, r) => s + r.taxableAmount, 0);
+    const totalOutputVat = enrichedRows.reduce((s, r) => s + r.outputVat, 0);
 
     res.json({
       success: true,
       data: {
-        rows,
+        rows: enrichedRows,
         totals: { totalTaxableAmount, totalOutputVat, count: total },
         pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+        countryBreakdown,
       },
     });
   } catch (err) {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -36,6 +36,8 @@ import {
 } from '@/lib/finance/accountsApi';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import api from '@/lib/api';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,10 +131,25 @@ function AccountModal({
 }) {
   const isEdit = !!account;
   const currentUser = getUserFromToken();
+  const branchCurrency = useBranchCurrency();
+
+  // Fetch full branch info to get currency label/name for display
+  const { data: branchInfo, isLoading: loadingBranch } = useQuery<Record<string, string> | null>({
+    queryKey: ['branch-info', currentUser?.branchId ?? 'none'],
+    queryFn: async () => {
+      if (currentUser?.branchId) {
+        const res = await api.get(`/i/branch/${currentUser.branchId}`);
+        return res.data?.data ?? res.data ?? null;
+      }
+      return null;
+    },
+    staleTime: 600_000,
+  });
+
   const [form, setForm] = useState<AccountFormData>({
     name: account?.name ?? '',
     type: account?.type ?? defaultType ?? 'CASH',
-    currency: account?.currency ?? 'AED',
+    currency: account?.currency ?? branchCurrency,
     openingBalance: account?.openingBalance?.toString() ?? '0',
     openingDate: account?.openingDate?.slice(0, 10) ?? today,
     notes: account?.notes ?? '',
@@ -142,6 +159,13 @@ function AccountModal({
     accountType: account?.accountType ?? 'CURRENT',
     contactPerson: account?.contactPerson ?? '',
   });
+
+  // Sync currency to branch currency whenever it's fetched (for new accounts only)
+  useEffect(() => {
+    if (!account && branchCurrency) {
+      setForm((f) => ({ ...f, currency: branchCurrency }));
+    }
+  }, [branchCurrency, account]);
 
   const set = (k: keyof AccountFormData, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -238,22 +262,39 @@ function AccountModal({
 
           <div>
             <label className="text-sm font-medium text-slate-700">Currency *</label>
-            <Select
-              value={form.currency}
-              onValueChange={(v) => set('currency', v)}
-              disabled={isEdit}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AED">AED — Dirham</SelectItem>
-                <SelectItem value="QAR">QAR — Qatari Riyal</SelectItem>
-                <SelectItem value="USD">USD — US Dollar</SelectItem>
-              </SelectContent>
-            </Select>
-            {isEdit && (
-              <p className="text-xs text-muted-foreground mt-0.5">Cannot change after creation</p>
+            {isEdit ? (
+              <>
+                <div className="mt-1 flex items-center gap-2 px-3 py-2 border rounded-lg bg-slate-50">
+                  <span className="font-semibold text-slate-800">{form.currency}</span>
+                  <span className="text-xs text-slate-400">— {account?.currency}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">Cannot change after creation</p>
+              </>
+            ) : (
+              <>
+                <div
+                  className={`mt-1 flex items-center gap-2 px-3 py-2 border rounded-lg ${
+                    loadingBranch ? 'bg-slate-50 animate-pulse' : 'bg-blue-50 border-blue-200'
+                  }`}
+                >
+                  {loadingBranch ? (
+                    <span className="text-sm text-slate-400">Fetching branch currency…</span>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-blue-800">{form.currency}</span>
+                      {branchInfo?.name && (
+                        <span className="text-xs text-blue-500 ml-1">— {branchInfo.name}</span>
+                      )}
+                      <span className="ml-auto text-xs text-blue-400 flex items-center gap-1">
+                        🔒 Branch currency
+                      </span>
+                    </>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Auto-set from your branch configuration
+                </p>
+              </>
             )}
           </div>
 
@@ -616,6 +657,18 @@ function BankActionModal({
   const isCashDeposit = isDeposit && form.category === 'CASH_DEPOSIT';
   const isCashWithdrawal = !isDeposit && form.category === 'CASH_WITHDRAWAL';
 
+  // Find linked cash account object for balance check
+  const linkedCashAccount = form.linkedCashAccountId
+    ? allAccounts.find((a) => a.id === form.linkedCashAccountId)
+    : null;
+  const linkedCashBalance = linkedCashAccount ? Number(linkedCashAccount.currentBalance) : null;
+  const linkedCashInsufficient =
+    isCashDeposit &&
+    form.linkedCashAccountId &&
+    form.amount &&
+    linkedCashBalance !== null &&
+    parseFloat(form.amount) > linkedCashBalance;
+
   const mut = useMutation({
     mutationFn: async () => {
       const amt = parseFloat(form.amount);
@@ -623,6 +676,17 @@ function BankActionModal({
       if (!isDeposit && amt > Number(account.currentBalance)) {
         throw new Error(
           `Insufficient bank balance. Available: ${fmtMoney(Number(account.currentBalance), account.currency)}`,
+        );
+      }
+      // Pre-validate linked cash account balance to avoid 400 from backend
+      if (
+        isCashDeposit &&
+        form.linkedCashAccountId &&
+        linkedCashBalance !== null &&
+        amt > linkedCashBalance
+      ) {
+        throw new Error(
+          `Insufficient cash balance in "${linkedCashAccount?.name}". Available: ${fmtMoney(linkedCashBalance, account.currency)}. Either add cash to that account first, or leave the cash account field empty to record the deposit without a cash deduction.`,
         );
       }
       if (isDeposit) {
@@ -741,24 +805,32 @@ function BankActionModal({
             <div>
               <label className="text-sm font-medium text-slate-700">
                 {isCashDeposit ? 'From Cash Account' : 'To Cash Account'}
+                <span className="text-xs text-slate-400 ml-1">(optional)</span>
               </label>
               <Select
                 value={form.linkedCashAccountId}
                 onValueChange={(v) => set('linkedCashAccountId', v)}
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select cash account (optional)..." />
+                  <SelectValue placeholder="Skip — deposit without cash deduction" />
                 </SelectTrigger>
                 <SelectContent>
                   {allAccounts
                     .filter((a) => a.type === 'CASH' && a.isActive)
                     .map((a) => (
                       <SelectItem key={a.id} value={a.id}>
-                        {a.name}
+                        {a.name} — {fmtMoney(Number(a.currentBalance), a.currency)}
                       </SelectItem>
                     ))}
                 </SelectContent>
               </Select>
+              {linkedCashInsufficient && (
+                <div className="mt-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                  ⚠️ Cash account has insufficient balance (
+                  {fmtMoney(linkedCashBalance ?? 0, account.currency)} available). Leave this field
+                  empty to record the bank deposit without deducting cash.
+                </div>
+              )}
             </div>
           )}
 
@@ -809,7 +881,7 @@ function BankActionModal({
             </Button>
             <Button
               className={`flex-1 text-white ${isDeposit ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}
-              disabled={!form.amount || !form.category || mut.isPending}
+              disabled={!form.amount || !form.category || mut.isPending || !!linkedCashInsufficient}
               onClick={() => mut.mutate()}
             >
               {mut.isPending ? 'Processing…' : isDeposit ? 'Record Deposit' : 'Record Withdrawal'}
@@ -1390,6 +1462,7 @@ type ModalState =
   | null;
 
 export default function CashBankPage() {
+  const currency = useBranchCurrency();
   const [tab, setTab] = useState<ActiveTab>('cash');
   const [modal, setModal] = useState<ModalState>(null);
   const [search, setSearch] = useState('');
@@ -1508,7 +1581,8 @@ export default function CashBankPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Cash & Bank Accounts</h1>
           <p className="text-muted-foreground text-sm">
-            {activeAccounts.length} active accounts · {formatCurrency(totalCash + totalBank)} total
+            {activeAccounts.length} active accounts ·{' '}
+            {formatCurrency(totalCash + totalBank, currency)} total
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1592,7 +1666,7 @@ export default function CashBankPage() {
                     Total Cash in Hand
                   </p>
                   <p className="text-2xl font-bold text-emerald-800 mt-0.5">
-                    {formatCurrency(totalCash)}
+                    {formatCurrency(totalCash, currency)}
                   </p>
                   <p className="text-xs text-emerald-600 mt-0.5">{cashAccounts.length} accounts</p>
                 </div>
@@ -1718,7 +1792,7 @@ export default function CashBankPage() {
                     Total Cash at Bank
                   </p>
                   <p className="text-2xl font-bold text-blue-800 mt-0.5">
-                    {formatCurrency(totalBank)}
+                    {formatCurrency(totalBank, currency)}
                   </p>
                   <p className="text-xs text-blue-600 mt-0.5">
                     {bankAccounts.length} bank accounts
@@ -1856,6 +1930,7 @@ export default function CashBankPage() {
                     cashbookEntries
                       .filter((e) => e.entryType === 'RECEIPT')
                       .reduce((s, e) => s + Number(e.amount), 0),
+                    currency,
                   )}
                   subtitle="All time"
                 />
@@ -1865,6 +1940,7 @@ export default function CashBankPage() {
                     cashbookEntries
                       .filter((e) => e.entryType === 'PAYMENT')
                       .reduce((s, e) => s + Number(e.amount), 0),
+                    currency,
                   )}
                   subtitle="All time"
                 />
@@ -1921,18 +1997,30 @@ export default function CashBankPage() {
                               {e.entryType}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-slate-500">{e.category}</td>
+                          <td className="px-4 py-2.5 text-xs text-slate-500">
+                            {e.category === 'GUARANTEE_CHEQUE' ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 text-[10px]">
+                                Guarantee Cheque
+                              </span>
+                            ) : (
+                              e.category
+                            )}
+                          </td>
                           <td
-                            className="px-4 py-2.5 max-w-[160px] truncate text-slate-700"
+                            className="px-4 py-2.5 max-w-[200px] truncate text-slate-700"
                             title={e.description}
                           >
                             {e.description}
                           </td>
                           <td className="px-4 py-2.5 tabular-nums text-red-600 text-right">
-                            {e.entryType === 'PAYMENT' ? formatCurrency(Number(e.amount)) : '—'}
+                            {e.entryType === 'PAYMENT'
+                              ? formatCurrency(Number(e.amount), currency)
+                              : '—'}
                           </td>
                           <td className="px-4 py-2.5 tabular-nums text-emerald-600 text-right">
-                            {e.entryType === 'RECEIPT' ? formatCurrency(Number(e.amount)) : '—'}
+                            {e.entryType === 'RECEIPT'
+                              ? formatCurrency(Number(e.amount), currency)
+                              : '—'}
                           </td>
                         </tr>
                       ))}
@@ -2009,7 +2097,7 @@ export default function CashBankPage() {
                             className={`px-4 py-3 tabular-nums font-semibold ${TXN_COLOR[e.entryType]}`}
                           >
                             {e.entryType === 'PAYMENT' ? '−' : '+'}
-                            {formatCurrency(Number(e.amount))}
+                            {formatCurrency(Number(e.amount), currency)}
                           </td>
                           <td className="px-4 py-3 text-slate-700">{e.description}</td>
                         </tr>

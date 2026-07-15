@@ -11,6 +11,7 @@ import {
 } from '@/lib/finance/accountsApi';
 import { AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -23,6 +24,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 function AccountsOverviewContent() {
+  const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const period = searchParams.get('period') ?? 'this_year';
@@ -98,32 +100,32 @@ function AccountsOverviewContent() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <StatCard
             title="Net Profit"
-            value={formatCurrency(kpis?.netProfit ?? 0)}
+            value={formatCurrency(kpis?.netProfit ?? 0, currency)}
             subtitle="Consolidated"
           />
           <StatCard
             title="Total Receivable"
-            value={formatCurrency(kpis?.totalReceivable ?? 0)}
+            value={formatCurrency(kpis?.totalReceivable ?? 0, currency)}
             subtitle="Outstanding"
           />
           <StatCard
             title="Total Payable"
-            value={formatCurrency(kpis?.totalPayable ?? 0)}
+            value={formatCurrency(kpis?.totalPayable ?? 0, currency)}
             subtitle="Outstanding"
           />
           <StatCard
             title="Total Cash"
-            value={formatCurrency(kpis?.totalCash ?? 0)}
+            value={formatCurrency(kpis?.totalCash ?? 0, currency)}
             subtitle="Cash accounts"
           />
           <StatCard
             title="Total Bank"
-            value={formatCurrency(kpis?.totalBank ?? 0)}
+            value={formatCurrency(kpis?.totalBank ?? 0, currency)}
             subtitle="Bank accounts"
           />
           <StatCard
             title="Overdue 90+"
-            value={formatCurrency(kpis?.overdueReceivables ?? 0)}
+            value={formatCurrency(kpis?.overdueReceivables ?? 0, currency)}
             subtitle="Critical"
           />
         </div>
@@ -141,6 +143,7 @@ function AccountsOverviewContent() {
               { key: 'expenses', color: '#ef4444', label: 'Expenses' },
             ]}
             height={240}
+            currency={currency}
           />
         </div>
 
@@ -154,6 +157,7 @@ function AccountsOverviewContent() {
               { key: 'expenses', color: '#f97316', label: 'Expenses' },
             ]}
             height={240}
+            currency={currency}
           />
         </div>
 
@@ -164,6 +168,7 @@ function AccountsOverviewContent() {
             xKey="name"
             bars={[{ key: 'net', color: '#6366f1', label: 'Net Profit' }]}
             height={200}
+            currency={currency}
           />
         </div>
       </div>
@@ -211,16 +216,20 @@ function AccountsOverviewContent() {
                       <td className="px-4 py-3 font-mono text-xs text-gray-600">
                         {row.branchId.slice(0, 8)}…
                       </td>
-                      <td className="px-4 py-3 text-emerald-600">{formatCurrency(row.revenue)}</td>
-                      <td className="px-4 py-3 text-red-600">{formatCurrency(row.expenses)}</td>
+                      <td className="px-4 py-3 text-emerald-600">
+                        {formatCurrency(row.revenue, currency)}
+                      </td>
+                      <td className="px-4 py-3 text-red-600">
+                        {formatCurrency(row.expenses, currency)}
+                      </td>
                       <td
                         className={`px-4 py-3 font-semibold ${row.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
                       >
-                        {formatCurrency(row.netProfit)}
+                        {formatCurrency(row.netProfit, currency)}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{row.marginPct?.toFixed(1)}%</td>
-                      <td className="px-4 py-3">{formatCurrency(row.receivables)}</td>
-                      <td className="px-4 py-3">{formatCurrency(row.payables)}</td>
+                      <td className="px-4 py-3">{formatCurrency(row.receivables, currency)}</td>
+                      <td className="px-4 py-3">{formatCurrency(row.payables, currency)}</td>
                       <td className="px-4 py-3">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[row.status] ?? 'bg-gray-100 text-gray-600'}`}

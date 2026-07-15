@@ -14,6 +14,7 @@ import {
 } from '@/lib/employeeExpenses';
 import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,9 +88,13 @@ function ViewApproveModal({
         payment_reference: payNow ? paymentReference : undefined,
       }),
     onSuccess: () => {
-      toast.success('Expense approved');
+      toast.success(payNow ? 'Expense approved and paid' : 'Expense approved');
       qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
       qc.invalidateQueries({ queryKey: ['expense-requests-summary'] });
+      if (payNow) {
+        qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
+        qc.invalidateQueries({ queryKey: ['approved-expenses-payable'] });
+      }
       onClose();
     },
     onError: () => toast.error('Failed to approve'),
@@ -303,6 +308,8 @@ function ViewApproveModal({
 
 // ─── Pay Modal ────────────────────────────────────────────────────────────────
 
+const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'Cheque', 'Card'];
+
 function PayModal({
   expense,
   accounts,
@@ -314,29 +321,48 @@ function PayModal({
 }) {
   const qc = useQueryClient();
   const [paidFromAccount, setPaidFromAccount] = useState('');
+  const [paymentMode, setPaymentMode] = useState('Bank Transfer');
   const [paymentDate, setPaymentDate] = useState(today);
   const [paymentReference, setPaymentReference] = useState('');
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDueDate, setChequeDueDate] = useState('');
   const [notes, setNotes] = useState('');
+
+  const isCheque = paymentMode === 'Cheque';
 
   const payMut = useMutation({
     mutationFn: () =>
       payExpenseRequest(expense.id, {
-        paid_from_account: paidFromAccount,
-        payment_reference: paymentReference,
+        paid_from_account: isCheque ? undefined : paidFromAccount,
+        payment_reference: isCheque ? chequeNumber : paymentReference,
+        payment_mode: paymentMode,
+        cheque_number: isCheque ? chequeNumber : undefined,
+        cheque_bank_name: isCheque ? chequeBankName : undefined,
+        cheque_due_date: isCheque ? chequeDueDate : undefined,
         notes,
       }),
     onSuccess: () => {
       toast.success(
-        `Payment recorded. ${expense.currency} ${Number(expense.amount).toFixed(2)} deducted`,
+        isCheque
+          ? 'Payment recorded — PENDING cheque created. Go to Accounts → Cheques to issue when handed to employee.'
+          : `Payment recorded. ${expense.currency} ${Number(expense.amount).toFixed(2)} deducted`,
       );
       qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
       qc.invalidateQueries({ queryKey: ['expense-requests-summary'] });
+      if (!isCheque) {
+        qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
+        qc.invalidateQueries({ queryKey: ['approved-expenses-payable'] });
+      }
       onClose();
     },
     onError: () => toast.error('Failed to record payment'),
   });
 
   const selectedAccount = accounts.find((a) => a.id === paidFromAccount);
+  const canSubmit = isCheque
+    ? !!(chequeNumber && chequeBankName && chequeDueDate)
+    : !!paidFromAccount;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -363,20 +389,40 @@ function PayModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Paid From Account *</label>
-            <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+            <label className="text-xs font-medium text-muted-foreground">Payment Mode *</label>
+            <Select value={paymentMode} onValueChange={setPaymentMode}>
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select account..." />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name} ({a.type})
+                {PAYMENT_MODES.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {!isCheque && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Paid From Account *
+              </label>
+              <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select account..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name} ({a.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-muted-foreground">Payment Date *</label>
@@ -389,15 +435,53 @@ function PayModal({
             />
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Payment Reference</label>
-            <Input
-              value={paymentReference}
-              onChange={(e) => setPaymentReference(e.target.value)}
-              className="mt-1"
-              placeholder="Cheque #, transfer ref, etc."
-            />
-          </div>
+          {isCheque ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+              <p className="text-xs font-bold text-amber-700">
+                Cheque details — creates a PENDING issued cheque. Cash at Bank decreases only when
+                Finance marks it Cleared in Accounts → Cheques.
+              </p>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Cheque Number *</label>
+                <input
+                  value={chequeNumber}
+                  onChange={(e) => setChequeNumber(e.target.value)}
+                  placeholder="e.g. CHQ-001234"
+                  className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Our Bank *</label>
+                  <input
+                    value={chequeBankName}
+                    onChange={(e) => setChequeBankName(e.target.value)}
+                    placeholder="e.g. Emirates NBD"
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Due Date *</label>
+                  <input
+                    type="date"
+                    value={chequeDueDate}
+                    onChange={(e) => setChequeDueDate(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Payment Reference</label>
+              <Input
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                className="mt-1"
+                placeholder="Transfer ref, receipt #, etc."
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
@@ -416,12 +500,14 @@ function PayModal({
           </Button>
           <Button
             onClick={() => payMut.mutate()}
-            disabled={!paidFromAccount || payMut.isPending}
+            disabled={!canSubmit || payMut.isPending}
             className="bg-purple-600 text-white hover:bg-purple-700"
           >
             {payMut.isPending
               ? 'Recording...'
-              : `Record Payment${selectedAccount ? ` — ${selectedAccount.name}` : ''}`}
+              : isCheque
+                ? 'Record — Create Cheque'
+                : `Record Payment${selectedAccount ? ` — ${selectedAccount.name}` : ''}`}
           </Button>
         </div>
       </div>
@@ -432,6 +518,7 @@ function PayModal({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function EmployeeRequestsTab() {
+  const currency = useBranchCurrency();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [viewing, setViewing] = useState<ExpenseRequest | null>(null);
@@ -480,22 +567,22 @@ export default function EmployeeRequestsTab() {
           <StatCard
             title="Pending Review"
             value={summary.submitted.count.toString()}
-            subtitle={formatCurrency(summary.submitted.total_amount)}
+            subtitle={formatCurrency(summary.submitted.total_amount, currency)}
           />
           <StatCard
             title="Approved This Month"
             value={summary.approved.count.toString()}
-            subtitle={formatCurrency(summary.approved.total_amount)}
+            subtitle={formatCurrency(summary.approved.total_amount, currency)}
           />
           <StatCard
             title="Rejected"
             value={summary.rejected.count.toString()}
-            subtitle={formatCurrency(summary.rejected.total_amount)}
+            subtitle={formatCurrency(summary.rejected.total_amount, currency)}
           />
           <StatCard
             title="Total Paid"
             value={summary.paid.count.toString()}
-            subtitle={formatCurrency(summary.paid.total_amount)}
+            subtitle={formatCurrency(summary.paid.total_amount, currency)}
           />
         </div>
       )}

@@ -371,7 +371,7 @@ export default function AddPurchaseDialog({
                       const lot = lots.find((l) => l.id === formData.lotId);
                       const base =
                         lot?.items?.reduce((sum, item) => sum + Number(item.totalPrice), 0) || 0;
-                      return formatCurrency(base);
+                      return formatCurrency(base, currencyCode);
                     })()}
                   </p>
                 </div>
@@ -386,6 +386,7 @@ export default function AddPurchaseDialog({
                         formData.transportationCost +
                         formData.shippingCost +
                         formData.groundfieldCost,
+                      currencyCode,
                     )}
                   </p>
                 </div>
@@ -407,7 +408,7 @@ export default function AddPurchaseDialog({
                     formData.transportationCost +
                     formData.shippingCost +
                     formData.groundfieldCost;
-                  return formatCurrency(base + extras);
+                  return formatCurrency(base + extras, currencyCode);
                 })()}
               </p>
             </div>

@@ -47,6 +47,19 @@ export class Cheque {
   @Column({ name: 'cashbook_entry_id', type: 'uuid', nullable: true })
   cashbookEntryId?: string;
 
+  // Source tracing — which bill/PO/expense generated this cheque
+  @Column({ name: 'source_type', type: 'varchar', nullable: true })
+  sourceType?: string; // SALE | RENT | LEASE | PURCHASE | EXPENSE
+
+  @Column({ name: 'source_reference_id', type: 'uuid', nullable: true })
+  sourceReferenceId?: string;
+
+  @Column({ name: 'source_label', type: 'varchar', length: 500, nullable: true })
+  sourceLabel?: string; // e.g. "Invoice INV-0012" or "Rent RC-0012 — July 2026"
+
+  @Column({ name: 'invoice_no', type: 'varchar', length: 100, nullable: true })
+  invoiceNo?: string;
+
   @Column({ name: 'created_by' })
   createdBy!: string;
 

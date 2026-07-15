@@ -59,6 +59,7 @@ export interface BalanceSheetResult {
   securityDepositsReceivable: number;
   prepaidExpenses: number;
   sparePartsInventory: number;
+  productInventory: number;
   inventoryUnavailable: boolean;
 
   // Non-Current Assets
@@ -219,7 +220,6 @@ export async function computeProfitAndLoss(
   const bParam = safeBranches.length > 0 ? safeBranches : null;
   const bSql = branchSql('i', '"branchId"', bParam);
   const bSqlExp = branchSql('e', '"branchId"', bParam);
-  const bSqlDep = branchSql('d', '"branchId"', bParam);
   const bSqlUsage = branchSql('u', '"branchId"', bParam);
   const bSqlAllInv = branchSql('inv', '"branchId"', bParam);
   const bSqlAllExp = branchSql('ex', '"branchId"', bParam);
@@ -230,7 +230,7 @@ export async function computeProfitAndLoss(
 
   // Revenue queries — GROUP BY currency_code so we can convert each group
   const EXCL_STATUS = `'DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED'`;
-  const EXCL_TYPE = `'QUOTATION','PROFORMA','OPENING'`;
+  const VALID_INVOICES = `(type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))`;
 
   type CcyRow = { currency_code: string | null; amount: string };
 
@@ -249,89 +249,89 @@ export async function computeProfitAndLoss(
     allTimeDepAmount,
     creditNoteRows,
   ] = await Promise.all([
-    // 4001 Rental Revenue — RENT invoices (FINAL type only, period-filtered)
+    // 4001 Rental Revenue — RENT invoices (period-filtered)
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices i
       WHERE "saleType" = 'RENT'
         AND status NOT IN (${EXCL_STATUS})
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 4002 Lease Revenue
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices i
       WHERE "saleType" = 'LEASE'
         AND status NOT IN (${EXCL_STATUS})
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 4003 Sales Revenue — SALE + PRODUCT_SALE only (SPAREPART_SALE goes to 4007)
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices i
       WHERE "saleType" IN ('SALE', 'PRODUCT_SALE')
         AND status NOT IN (${EXCL_STATUS})
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 4004 Service Revenue — chargeable service only, excludes AMC/FSMA/SMA
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices i
       WHERE "saleType" = 'SERVICE'
         AND ("billType" IS NULL OR "billType" NOT IN ('AMC', 'FSMA', 'SMA'))
         AND status NOT IN (${EXCL_STATUS})
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 4006 AMC/FSMA/SMA Revenue
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices i
       WHERE "billType" IN ('AMC', 'FSMA', 'SMA')
         AND status NOT IN (${EXCL_STATUS})
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 4007 Spare Parts Sales Revenue — SPAREPART_SALE invoices only
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices i
       WHERE "saleType" = 'SPAREPART_SALE'
         AND status NOT IN (${EXCL_STATUS})
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 4005 Usage/Copy Revenue — exceeded_charge ONLY from usage_records (overage, not base rent)
     // Join contract invoice for currency code and branch filter
     db.query<CcyRow[]>(`
-      SELECT COALESCE(inv."currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE(inv."currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM(u."exceededCharge"), 0) AS amount
       FROM usage_records u
       JOIN invoices inv ON inv.id = u."contractId"
@@ -339,7 +339,7 @@ export async function computeProfitAndLoss(
         AND u."billingPeriodEnd" <= '${dateTo}'
         AND inv."deletedAt" IS NULL
         ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
-      GROUP BY inv."currencyCode"
+      GROUP BY inv."currency_code"
     `),
     // Expenses by category — APPROVED or PAID, period-filtered
     db.query<{ category: string; amount: string }[]>(`
@@ -362,18 +362,17 @@ export async function computeProfitAndLoss(
           AND
             EXTRACT(YEAR FROM DATE '${dateTo}')::int * 100 + EXTRACT(MONTH FROM DATE '${dateTo}')::int
         )
-        ${bSqlDep}
     `),
     // All-time revenue — for retained earnings (no date filter, no type exclusion except CANCELLED)
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices inv
       WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-        AND type NOT IN (${EXCL_TYPE})
+        AND ${VALID_INVOICES}
         AND "deletedAt" IS NULL
         ${bSqlAllInv}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // All-time expenses — for retained earnings
     db.query<{ amount: string }[]>(`
@@ -471,7 +470,25 @@ export async function computeProfitAndLoss(
   const marketingExpense = expMap['MARKETING'] ?? 0;
   const maintenanceExpense = expMap['MAINTENANCE'] ?? 0;
   const insuranceExpense = expMap['INSURANCE'] ?? 0;
-  const otherExpenses = expMap['OTHER'] ?? 0;
+
+  // Known category keys — everything else rolls into otherExpenses so nothing is silently dropped
+  const KNOWN_CATEGORIES = new Set([
+    'SPARE_PARTS',
+    'LABOUR',
+    'VENDOR_PURCHASE',
+    'SALARY',
+    'TRAVEL',
+    'RENT',
+    'UTILITIES',
+    'MARKETING',
+    'MAINTENANCE',
+    'INSURANCE',
+    'OTHER',
+  ]);
+  let otherExpenses = expMap['OTHER'] ?? 0;
+  for (const [cat, amt] of Object.entries(expMap)) {
+    if (!KNOWN_CATEGORIES.has(cat)) otherExpenses += amt;
+  }
 
   const totalRevenue =
     rentalRevenue +
@@ -588,7 +605,7 @@ export async function computeBalanceSheet(
     `),
     // 1003 Invoice AR — INVOICED invoices minus payments received
     db.query<CcyRow[]>(`
-      SELECT COALESCE(i."currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM(i."totalAmount" - COALESCE(pt.paid, 0)), 0) AS amount
       FROM invoices i
       LEFT JOIN (
@@ -600,7 +617,7 @@ export async function computeBalanceSheet(
         AND i."totalAmount" > 0
         AND i."deletedAt" IS NULL
         ${bSql('i')}
-      GROUP BY i."currencyCode"
+      GROUP BY i."currency_code"
     `),
     // 1003 Manual AR — non-security-deposit, without linked invoice
     db.query<{ amount: string }[]>(`
@@ -652,14 +669,14 @@ export async function computeBalanceSheet(
     `),
     // 2003 VAT Payable — output VAT collected from PAID/INVOICED invoices (will subtract remitted below)
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM(tax_amount), 0) AS amount
       FROM invoices
       WHERE status IN ('PAID', 'INVOICED')
         AND tax_amount > 0
         AND "deletedAt" IS NULL
         ${bSql('invoices')}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // 2003 VAT already remitted to authority (subtract from VAT Payable)
     db.query<{ amount: string }[]>(`
@@ -669,7 +686,7 @@ export async function computeBalanceSheet(
     `),
     // 2004 Security Deposits Received from customers — on active RENT/LEASE contracts
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("securityDepositAmount"), 0) AS amount
       FROM invoices
       WHERE "securityDepositAmount" > 0
@@ -677,7 +694,7 @@ export async function computeBalanceSheet(
         AND status NOT IN ('CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
         AND "deletedAt" IS NULL
         ${bSql('invoices')}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // Equity entries
     db.query<{ type: string; amount: string }[]>(`
@@ -688,14 +705,14 @@ export async function computeBalanceSheet(
     `),
     // All-time revenue for retained earnings
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currencyCode", '${baseCurrency}') AS currency_code,
+      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
       FROM invoices
       WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
         AND type NOT IN ('QUOTATION', 'PROFORMA', 'OPENING')
         AND "deletedAt" IS NULL
         ${bSql('invoices')}
-      GROUP BY "currencyCode"
+      GROUP BY "currency_code"
     `),
     // All-time expenses for retained earnings
     db.query<{ amount: string }[]>(`
@@ -756,11 +773,19 @@ export async function computeBalanceSheet(
     equipmentNBV += dep.nbv;
   }
 
-  // ── Inventory value (1006) — cross-service ────────────────────────────────────
-  const invValueUrl = `${invUrl}/spare-parts/inventory-value${bParam ? `?branchIds=${bParam.join(',')}` : ''}`;
-  const invValueData = await internalGet<{ total: number; currency: string }>(invValueUrl);
+  // ── Inventory value (1006/1009) — cross-service ──────────────────────────────
+  const branchQs = bParam ? `?branchIds=${bParam.join(',')}` : '';
+  const [invValueData, prodInvData] = await Promise.all([
+    internalGet<{ total: number; currency: string }>(
+      `${invUrl}/spare-parts/inventory-value${branchQs}`,
+    ),
+    internalGet<{ total: number }>(`${invUrl}/products/inventory-value${branchQs}`),
+  ]);
+
   let sparePartsInventory = 0;
+  let productInventory = 0;
   let inventoryUnavailable = false;
+
   if (invValueData === null) {
     inventoryUnavailable = true;
     dataWarnings.push(
@@ -775,6 +800,10 @@ export async function computeBalanceSheet(
     );
     if (warning) currencyWarnings.push(warning);
     else sparePartsInventory = value;
+  }
+
+  if (prodInvData !== null) {
+    productInventory = prodInvData.total ?? 0;
   }
 
   // ── Liabilities ──────────────────────────────────────────────────────────────
@@ -821,7 +850,8 @@ export async function computeBalanceSheet(
     accountsReceivable +
     securityDepositsReceivable +
     prepaidExpenses +
-    sparePartsInventory;
+    sparePartsInventory +
+    productInventory;
   const totalNonCurrentAssets = equipmentNBV;
   const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
 
@@ -849,6 +879,7 @@ export async function computeBalanceSheet(
     securityDepositsReceivable,
     prepaidExpenses,
     sparePartsInventory,
+    productInventory,
     inventoryUnavailable,
     equipmentGrossCost,
     accumulatedDepreciation,

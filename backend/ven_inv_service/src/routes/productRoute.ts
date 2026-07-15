@@ -8,6 +8,7 @@ import {
   getproductbyid,
   getProductHistoryData,
 } from '../controllers/productController';
+import { getProductInventoryValue } from '../controllers/sparePartController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 import { uploadProductImage } from '../middlewares/uploadProductImage';
@@ -18,6 +19,9 @@ import { Source } from '../config/db';
  * It manages product details, pictures, and prices.
  */
 const productRoute = Router();
+
+// Internal endpoint — no auth required (service-to-service call from billing_service)
+productRoute.get('/inventory-value', getProductInventoryValue);
 
 // --- 1. Basic Product Management ---
 

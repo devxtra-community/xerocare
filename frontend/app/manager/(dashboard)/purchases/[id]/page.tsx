@@ -27,11 +27,13 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 import AddPaymentModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddPaymentModal';
 import AddCostModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddCostModal';
 
 export default function PurchaseDetailsPage() {
+  const currency = useBranchCurrency();
   const { id } = useParams();
   const router = useRouter();
   const [purchase, setPurchase] = useState<Purchase | null>(null);
@@ -137,7 +139,7 @@ export default function PurchaseDetailsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <StatCard
               label="Total Lot Value"
-              value={formatCurrency(purchase.totalAmount)}
+              value={formatCurrency(purchase.totalAmount, currency)}
               icon={Calculator}
               className="bg-primary text-white"
               valueClass="text-white"
@@ -145,14 +147,14 @@ export default function PurchaseDetailsPage() {
             />
             <StatCard
               label="Amount Paid"
-              value={formatCurrency(purchase.paidAmount)}
+              value={formatCurrency(purchase.paidAmount, currency)}
               icon={CreditCard}
               className="bg-white border-slate-100"
               valueClass="text-slate-800"
             />
             <StatCard
               label="Balance Due"
-              value={formatCurrency(purchase.remainingAmount)}
+              value={formatCurrency(purchase.remainingAmount, currency)}
               icon={TrendingDown}
               className="bg-white border-slate-100 shadow-sm"
               valueClass="text-primary"
@@ -206,7 +208,7 @@ export default function PurchaseDetailsPage() {
                           </p>
                         </div>
                         <p className="text-sm font-black text-slate-800">
-                          {formatCurrency(c.amount)}
+                          {formatCurrency(c.amount, currency)}
                         </p>
                       </div>
                     ))}
@@ -271,7 +273,7 @@ export default function PurchaseDetailsPage() {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 text-sm font-black text-slate-800 text-right">
-                            {formatCurrency(p.amount)}
+                            {formatCurrency(p.amount, currency)}
                           </td>
                         </tr>
                       ))}
@@ -392,6 +394,7 @@ function CostItem({
   label: string;
   value: number;
 }) {
+  const currency = useBranchCurrency();
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-1">
@@ -400,7 +403,7 @@ function CostItem({
           {label}
         </span>
       </div>
-      <p className="text-sm font-black text-slate-700">{formatCurrency(value)}</p>
+      <p className="text-sm font-black text-slate-700">{formatCurrency(value, currency)}</p>
     </div>
   );
 }

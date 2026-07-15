@@ -24,6 +24,7 @@ import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
 import { Loader2, Calendar, Coins } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { format } from 'date-fns';
@@ -115,6 +116,7 @@ export default function UsageRecordingModal({
   invoice: editingInvoice,
 }: UsageRecordingModalProps) {
   const queryClient = useQueryClient();
+  const currency = useBranchCurrency();
   const { data: contract } = useQuery({
     queryKey: ['invoice', contractId || editingInvoice?.referenceContractId],
     queryFn: () => getInvoiceById(contractId || editingInvoice!.referenceContractId!),
@@ -1276,8 +1278,9 @@ export default function UsageRecordingModal({
                           0,
                       );
 
-                      if (isFinalMonth) return `${formatCurrency(0)} (Adjusted from Advance)`;
-                      return formatCurrency(amount);
+                      if (isFinalMonth)
+                        return `${formatCurrency(0, currency)} (Adjusted from Advance)`;
+                      return formatCurrency(amount, currency);
                     })()}
                   </span>
                 </div>
@@ -1298,13 +1301,13 @@ export default function UsageRecordingModal({
                   <div className="flex justify-between">
                     <span>Contract Advance Held:</span>
                     <span className="font-bold">
-                      {formatCurrency(Number(contract?.advanceAmount || 0))}
+                      {formatCurrency(Number(contract?.advanceAmount || 0), currency)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>This Month&apos;s Rent:</span>
                     <span className="font-bold">
-                      {formatCurrency(Number(contract?.monthlyRent || 0))}
+                      {formatCurrency(Number(contract?.monthlyRent || 0), currency)}
                     </span>
                   </div>
                   <div className="border-t border-amber-200/50 my-1"></div>
@@ -1316,6 +1319,7 @@ export default function UsageRecordingModal({
                           0,
                           Number(contract?.monthlyRent || 0) - Number(contract?.advanceAmount || 0),
                         ),
+                        currency,
                       )}
                     </span>
                   </div>
@@ -1324,6 +1328,7 @@ export default function UsageRecordingModal({
                       * Remaining advance of{' '}
                       {formatCurrency(
                         Number(contract?.advanceAmount || 0) - Number(contract?.monthlyRent || 0),
+                        currency,
                       )}{' '}
                       will be refunded or adjusted in final settlement.
                     </p>
@@ -2694,7 +2699,7 @@ export default function UsageRecordingModal({
                   <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
                     <span className="font-bold text-sm text-slate-800">Grand Total</span>
                     <span className="font-bold text-lg text-green-600">
-                      {formatCurrency(estimatedCost)}
+                      {formatCurrency(estimatedCost, currency)}
                     </span>
                   </div>
                 </div>

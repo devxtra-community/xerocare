@@ -6,6 +6,7 @@ import { Eye, Download } from 'lucide-react';
 import { fetchExpenseEntries, fetchManualReceivables } from '@/lib/finance/accountsApi';
 import { fetchARInvoices } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
@@ -13,6 +14,7 @@ import * as XLSX from 'xlsx';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function ManagerProfitLossPage() {
+  const currency = useBranchCurrency();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
 
@@ -116,17 +118,17 @@ export default function ManagerProfitLossPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           title="Total Income"
-          value={formatCurrency(totalIncome)}
+          value={formatCurrency(totalIncome, currency)}
           subtitle={`FY ${year}`}
         />
         <StatCard
           title="Total Expenses"
-          value={formatCurrency(totalExpenses)}
+          value={formatCurrency(totalExpenses, currency)}
           subtitle={`FY ${year}`}
         />
         <StatCard
           title="Net Profit"
-          value={formatCurrency(netProfit)}
+          value={formatCurrency(netProfit, currency)}
           subtitle={netProfit >= 0 ? 'Profitable' : 'Net Loss'}
         />
         <StatCard title="Profit Margin" value={`${margin.toFixed(1)}%`} subtitle="Of revenue" />
@@ -142,6 +144,7 @@ export default function ManagerProfitLossPage() {
             { key: 'expenses', color: '#ef4444', label: 'Expenses' },
           ]}
           height={260}
+          currency={currency}
         />
       </div>
 
@@ -152,6 +155,7 @@ export default function ManagerProfitLossPage() {
           xKey="month"
           lines={[{ key: 'net', color: '#6366f1', label: 'Net P&L' }]}
           height={200}
+          currency={currency}
         />
       </div>
 
@@ -178,15 +182,15 @@ export default function ManagerProfitLossPage() {
                   <tr key={row.month} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{row.month}</td>
                     <td className="px-4 py-3 text-right text-emerald-600">
-                      {formatCurrency(row.income)}
+                      {formatCurrency(row.income, currency)}
                     </td>
                     <td className="px-4 py-3 text-right text-red-600">
-                      {formatCurrency(row.expenses)}
+                      {formatCurrency(row.expenses, currency)}
                     </td>
                     <td
                       className={`px-4 py-3 text-right font-semibold ${row.net >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
                     >
-                      {formatCurrency(row.net)}
+                      {formatCurrency(row.net, currency)}
                     </td>
                     <td
                       className={`px-4 py-3 text-right text-xs ${rowMargin >= 0 ? 'text-emerald-600' : 'text-red-600'}`}
@@ -201,15 +205,15 @@ export default function ManagerProfitLossPage() {
               <tr>
                 <td className="px-4 py-3">Total</td>
                 <td className="px-4 py-3 text-right text-emerald-700">
-                  {formatCurrency(totalIncome)}
+                  {formatCurrency(totalIncome, currency)}
                 </td>
                 <td className="px-4 py-3 text-right text-red-700">
-                  {formatCurrency(totalExpenses)}
+                  {formatCurrency(totalExpenses, currency)}
                 </td>
                 <td
                   className={`px-4 py-3 text-right ${netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}
                 >
-                  {formatCurrency(netProfit)}
+                  {formatCurrency(netProfit, currency)}
                 </td>
                 <td
                   className={`px-4 py-3 text-right text-xs ${margin >= 0 ? 'text-emerald-700' : 'text-red-700'}`}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -28,6 +28,7 @@ import {
   type EquityType,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import {
   DonutChart,
@@ -70,6 +71,7 @@ interface ModalProps {
 
 function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProps) {
   const today = new Date().toISOString().slice(0, 10);
+  const branchCurrency = useBranchCurrency();
   const [form, setForm] = useState({
     date: entry?.date?.slice(0, 10) ?? today,
     type: (entry?.type ?? 'SHARE_CAPITAL') as EquityType,
@@ -80,6 +82,11 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
     linkedCashAccountId: entry?.linkedCashAccountId ?? '',
     notes: entry?.notes ?? '',
   });
+  useEffect(() => {
+    if (!entry) {
+      setForm((f) => ({ ...f, currency: branchCurrency }));
+    }
+  }, [branchCurrency, entry]);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -228,6 +235,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EquityPage() {
+  const currency = useBranchCurrency();
   const qc = useQueryClient();
   const [tab, setTab] = useState<'overview' | 'entries' | 'statement' | 'balance'>('overview');
   const [modal, setModal] = useState<null | 'add' | EquityEntry>(null);
@@ -356,23 +364,29 @@ export default function EquityPage() {
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <p className="text-blue-200 text-sm mb-1">Net Equity Position</p>
-              <p className="text-3xl font-bold">{formatCurrency(summary.netEquity)}</p>
+              <p className="text-3xl font-bold">{formatCurrency(summary.netEquity, currency)}</p>
               <p className="text-blue-200 text-sm mt-1">
-                Total Assets: {formatCurrency(summary.totalAssets)}
+                Total Assets: {formatCurrency(summary.totalAssets, currency)}
               </p>
             </div>
             <div className="grid grid-cols-3 gap-6 text-center">
               <div>
                 <p className="text-blue-200 text-xs">Share Capital</p>
-                <p className="text-xl font-semibold">{formatCurrency(summary.shareCapital)}</p>
+                <p className="text-xl font-semibold">
+                  {formatCurrency(summary.shareCapital, currency)}
+                </p>
               </div>
               <div>
                 <p className="text-blue-200 text-xs">Retained Earnings</p>
-                <p className="text-xl font-semibold">{formatCurrency(summary.retainedEarnings)}</p>
+                <p className="text-xl font-semibold">
+                  {formatCurrency(summary.retainedEarnings, currency)}
+                </p>
               </div>
               <div>
                 <p className="text-blue-200 text-xs">Reserves</p>
-                <p className="text-xl font-semibold">{formatCurrency(summary.reserves)}</p>
+                <p className="text-xl font-semibold">
+                  {formatCurrency(summary.reserves, currency)}
+                </p>
               </div>
             </div>
           </div>
@@ -398,32 +412,32 @@ export default function EquityPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard
               title="Share Capital"
-              value={formatCurrency(summary?.shareCapital ?? 0)}
+              value={formatCurrency(summary?.shareCapital ?? 0, currency)}
               subtitle="Paid-in capital"
             />
             <StatCard
               title="Retained Earnings"
-              value={formatCurrency(summary?.retainedEarnings ?? 0)}
+              value={formatCurrency(summary?.retainedEarnings ?? 0, currency)}
               subtitle="Cumulative profit"
             />
             <StatCard
               title="Reserves"
-              value={formatCurrency(summary?.reserves ?? 0)}
+              value={formatCurrency(summary?.reserves ?? 0, currency)}
               subtitle="Set aside"
             />
             <StatCard
               title="Owner Contribution"
-              value={formatCurrency(summary?.ownerContribution ?? 0)}
+              value={formatCurrency(summary?.ownerContribution ?? 0, currency)}
               subtitle="Additional paid-in"
             />
             <StatCard
               title="Dividends YTD"
-              value={formatCurrency(summary?.dividends ?? 0)}
+              value={formatCurrency(summary?.dividends ?? 0, currency)}
               subtitle="Distributed"
             />
             <StatCard
               title="Net Equity"
-              value={formatCurrency(summary?.netEquity ?? 0)}
+              value={formatCurrency(summary?.netEquity ?? 0, currency)}
               subtitle="Total equity"
             />
           </div>
@@ -431,7 +445,7 @@ export default function EquityPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl shadow-sm border p-5">
               <h3 className="text-sm font-semibold text-gray-700 mb-4">Equity Composition</h3>
-              <DonutChart data={compositionData} />
+              <DonutChart data={compositionData} currency={currency} />
             </div>
             <div className="bg-white rounded-xl shadow-sm border p-5">
               <h3 className="text-sm font-semibold text-gray-700 mb-4">Equity Growth Over Time</h3>
@@ -439,6 +453,7 @@ export default function EquityPage() {
                 data={summary?.growthLine ?? []}
                 xKey="month"
                 lines={[{ key: 'equity', color: '#3b82f6', label: 'Net Equity' }]}
+                currency={currency}
               />
             </div>
           </div>
@@ -452,6 +467,7 @@ export default function EquityPage() {
                 data={assetLiabEquity}
                 xKey="label"
                 bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
+                currency={currency}
               />
             </div>
             <div className="bg-white rounded-xl shadow-sm border p-5">
@@ -475,6 +491,7 @@ export default function EquityPage() {
                     fill: sign > 0 ? '#10b981' : '#ef4444',
                   };
                 })}
+                currency={currency}
               />
             </div>
           </div>
@@ -538,7 +555,7 @@ export default function EquityPage() {
                           {e.description}
                         </td>
                         <td className="px-4 py-3 font-semibold text-gray-800">
-                          {formatCurrency(e.amount)}
+                          {formatCurrency(e.amount, currency)}
                         </td>
                         <td className="px-4 py-3 text-gray-500">{e.currency}</td>
                         <td className="px-4 py-3">
@@ -614,16 +631,16 @@ export default function EquityPage() {
                         Opening Balance ({Number(statement.year) - 1})
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {formatCurrency(statement.opening.shareCapital)}
+                        {formatCurrency(statement.opening.shareCapital, currency)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {formatCurrency(statement.opening.retainedEarnings)}
+                        {formatCurrency(statement.opening.retainedEarnings, currency)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {formatCurrency(statement.opening.reserves)}
+                        {formatCurrency(statement.opening.reserves, currency)}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        {formatCurrency(statement.opening.total)}
+                        {formatCurrency(statement.opening.total, currency)}
                       </td>
                     </tr>
                     {statement.movements.map((m, i) => (
@@ -638,16 +655,16 @@ export default function EquityPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right text-gray-700">
-                          {m.shareCapital ? formatCurrency(m.shareCapital) : '—'}
+                          {m.shareCapital ? formatCurrency(m.shareCapital, currency) : '—'}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-700">
-                          {m.retainedEarnings ? formatCurrency(m.retainedEarnings) : '—'}
+                          {m.retainedEarnings ? formatCurrency(m.retainedEarnings, currency) : '—'}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-700">
-                          {m.reserves ? formatCurrency(m.reserves) : '—'}
+                          {m.reserves ? formatCurrency(m.reserves, currency) : '—'}
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
-                          {formatCurrency(m.total)}
+                          {formatCurrency(m.total, currency)}
                         </td>
                       </tr>
                     ))}
@@ -663,16 +680,16 @@ export default function EquityPage() {
                         Closing Balance ({statement.year})
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {formatCurrency(statement.closing.shareCapital)}
+                        {formatCurrency(statement.closing.shareCapital, currency)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {formatCurrency(statement.closing.retainedEarnings)}
+                        {formatCurrency(statement.closing.retainedEarnings, currency)}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {formatCurrency(statement.closing.reserves)}
+                        {formatCurrency(statement.closing.reserves, currency)}
                       </td>
                       <td className="px-4 py-3 text-right text-lg">
-                        {formatCurrency(statement.closing.total)}
+                        {formatCurrency(statement.closing.total, currency)}
                       </td>
                     </tr>
                   </tbody>
@@ -701,7 +718,7 @@ export default function EquityPage() {
                   <>
                     <AlertTriangle className="h-5 w-5 text-amber-500" />{' '}
                     <span className="font-semibold">
-                      Balance Sheet Difference: {formatCurrency(balanceSheet.difference)}
+                      Balance Sheet Difference: {formatCurrency(balanceSheet.difference, currency)}
                     </span>
                   </>
                 )}
@@ -718,25 +735,25 @@ export default function EquityPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Cash & Bank</span>
                       <span className="font-medium">
-                        {formatCurrency(balanceSheet.assets.cash)}
+                        {formatCurrency(balanceSheet.assets.cash, currency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Fixed Assets (NBV)</span>
                       <span className="font-medium">
-                        {formatCurrency(balanceSheet.assets.fixedAssetsNet)}
+                        {formatCurrency(balanceSheet.assets.fixedAssetsNet, currency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Accounts Receivable</span>
                       <span className="font-medium">
-                        {formatCurrency(balanceSheet.assets.receivables)}
+                        {formatCurrency(balanceSheet.assets.accountsReceivable, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold">
                       <span>Total Assets</span>
                       <span className="text-blue-700">
-                        {formatCurrency(balanceSheet.assets.total)}
+                        {formatCurrency(balanceSheet.assets.total, currency)}
                       </span>
                     </div>
                   </div>
@@ -752,19 +769,19 @@ export default function EquityPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Accounts Payable</span>
                       <span className="font-medium">
-                        {formatCurrency(balanceSheet.liabilities.payables)}
+                        {formatCurrency(balanceSheet.liabilities.accountsPayable, currency)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Accrued Expenses</span>
                       <span className="font-medium">
-                        {formatCurrency(balanceSheet.liabilities.accruedExpenses)}
+                        {formatCurrency(balanceSheet.liabilities.accruedExpenses, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold">
                       <span>Total Liabilities</span>
                       <span className="text-red-700">
-                        {formatCurrency(balanceSheet.liabilities.total)}
+                        {formatCurrency(balanceSheet.liabilities.total, currency)}
                       </span>
                     </div>
                   </div>
@@ -780,18 +797,20 @@ export default function EquityPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Net Equity</span>
                       <span className="font-medium">
-                        {formatCurrency(balanceSheet.equity.netEquity)}
+                        {formatCurrency(balanceSheet.equity.total, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold">
                       <span>Total Equity</span>
                       <span className="text-emerald-700">
-                        {formatCurrency(balanceSheet.equity.total)}
+                        {formatCurrency(balanceSheet.equity.total, currency)}
                       </span>
                     </div>
                     <div className="border-t pt-3 flex justify-between font-semibold text-gray-800">
                       <span>Liabilities + Equity</span>
-                      <span>{formatCurrency(balanceSheet.totalLiabilitiesAndEquity)}</span>
+                      <span>
+                        {formatCurrency(balanceSheet.totalLiabilitiesAndEquity, currency)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -808,13 +827,13 @@ export default function EquityPage() {
                       group: 'Assets',
                       Cash: balanceSheet.assets.cash,
                       'Fixed Assets': balanceSheet.assets.fixedAssetsNet,
-                      Receivables: balanceSheet.assets.receivables,
+                      Receivables: balanceSheet.assets.accountsReceivable,
                     },
                     {
                       group: 'L + E',
-                      Payables: balanceSheet.liabilities.payables,
+                      Payables: balanceSheet.liabilities.accountsPayable,
                       'Accrued Exp': balanceSheet.liabilities.accruedExpenses,
-                      Equity: balanceSheet.equity.netEquity,
+                      Equity: balanceSheet.equity.total,
                     },
                   ]}
                   xKey="group"
@@ -826,6 +845,7 @@ export default function EquityPage() {
                     { key: 'Accrued Exp', color: '#f97316' },
                     { key: 'Equity', color: '#06b6d4' },
                   ]}
+                  currency={currency}
                 />
               </div>
             </>

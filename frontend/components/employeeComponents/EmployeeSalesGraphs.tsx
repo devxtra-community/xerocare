@@ -18,6 +18,7 @@ import { getMyInvoices, Invoice } from '@/lib/invoice';
 import { Loader2 } from 'lucide-react';
 import { ChartTooltipContent } from '@/components/ui/ChartTooltip';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 interface SalesChartDataItem {
   name: string;
@@ -36,50 +37,59 @@ const ChartContainer = ({
   color: string;
   dataKeyAmount: string;
   data: SalesChartDataItem[];
-}) => (
-  <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
-    <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">{title}</h4>
-    <div className="flex-1 w-full min-h-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          margin={{
-            top: 10,
-            right: 10,
-            left: -20,
-            bottom: 0,
-          }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            vertical={false}
-            stroke="#e2e8f0"
-            strokeOpacity={0.5}
-          />
-          <XAxis
-            dataKey="name"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
-            dy={10}
-            interval={0}
-          />
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
-            tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
-          />
-          <Tooltip
-            content={<ChartTooltipContent valueFormatter={(val) => formatCurrency(Number(val))} />}
-            cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
-          />
-          <Bar dataKey={dataKeyAmount} fill={color} radius={[4, 4, 0, 0]} barSize={10} />
-        </BarChart>
-      </ResponsiveContainer>
+}) => {
+  const currency = useBranchCurrency();
+  return (
+    <div className="bg-card p-5 rounded-2xl shadow-sm border border-blue-100/50 flex flex-col h-[300px] w-full">
+      <h4 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-8">
+        {title}
+      </h4>
+      <div className="flex-1 w-full min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{
+              top: 10,
+              right: 10,
+              left: -20,
+              bottom: 0,
+            }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="#e2e8f0"
+              strokeOpacity={0.5}
+            />
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              dy={10}
+              interval={0}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+              tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+            />
+            <Tooltip
+              content={
+                <ChartTooltipContent
+                  valueFormatter={(val) => formatCurrency(Number(val), currency)}
+                />
+              }
+              cursor={{ fill: '#f1f5f9', opacity: 0.4 }}
+            />
+            <Bar dataKey={dataKeyAmount} fill={color} radius={[4, 4, 0, 0]} barSize={10} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ForexChartContainer = ({
   title,
@@ -92,6 +102,7 @@ const ForexChartContainer = ({
   dataKeyAmount: string;
   data: SalesChartDataItem[];
 }) => {
+  const currency = useBranchCurrency();
   const average =
     data.reduce((sum, item) => sum + (Number(item[dataKeyAmount]) || 0), 0) / data.length || 0;
 
@@ -134,7 +145,9 @@ const ForexChartContainer = ({
             />
             <Tooltip
               content={
-                <ChartTooltipContent valueFormatter={(value) => formatCurrency(Number(value))} />
+                <ChartTooltipContent
+                  valueFormatter={(value) => formatCurrency(Number(value), currency)}
+                />
               }
               cursor={{ stroke: color, strokeWidth: 1, strokeDasharray: '4 4' }}
             />

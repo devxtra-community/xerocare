@@ -35,6 +35,7 @@ import {
 } from '@/lib/finance/accountsApi';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -217,7 +218,11 @@ function AddAssetModal({
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // Fetch branch name from API using branchId in JWT
-  const { data: branchData } = useQuery<{ name: string; id: string } | null>({
+  const { data: branchData } = useQuery<{
+    name: string;
+    id: string;
+    currency_code?: string;
+  } | null>({
     queryKey: ['branch-detail', currentUser?.branchId],
     queryFn: () =>
       currentUser?.branchId
@@ -825,7 +830,7 @@ function AddAssetModal({
                       usefulLifeMonths={parseInt(form.usefulLifeMonths) || 60}
                       annualDepreciationPct={parseFloat(form.annualDepreciationPct) || 20}
                       method={form.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE'}
-                      currency="AED"
+                      currency={branchData?.currency_code ?? 'AED'}
                     />
                   )}
                 </div>
@@ -886,6 +891,7 @@ function ScheduleDrawer({
   asset: AssetDepreciationRegister;
   onClose: () => void;
 }) {
+  const currency = useBranchCurrency();
   const { data: schedule = [], isLoading } = useQuery<DepreciationScheduleRow[]>({
     queryKey: ['dep-schedule', asset.id],
     queryFn: () => fetchDepreciationSchedule(asset.id),
@@ -960,16 +966,16 @@ function ScheduleDrawer({
                       {r.year}-{String(r.month).padStart(2, '0')}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
-                      {formatCurrency(r.openingNBV)}
+                      {formatCurrency(r.openingNBV, currency)}
                     </TableCell>
                     <TableCell className="text-right text-xs text-red-600">
-                      {formatCurrency(r.monthlyDep)}
+                      {formatCurrency(r.monthlyDep, currency)}
                     </TableCell>
                     <TableCell className="text-right text-xs text-muted-foreground">
-                      {formatCurrency(r.accumulatedDep)}
+                      {formatCurrency(r.accumulatedDep, currency)}
                     </TableCell>
                     <TableCell className="text-right font-bold text-xs pr-4">
-                      {formatCurrency(r.closingNBV)}
+                      {formatCurrency(r.closingNBV, currency)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -987,6 +993,7 @@ function ScheduleDrawer({
 type SubTab = 'rules' | 'register' | 'summary' | 'journal';
 
 export default function DepreciationPage() {
+  const currency = useBranchCurrency();
   const currentUser = getUserFromToken();
   const [subTab, setSubTab] = useState<SubTab>('register');
   const [showBrandRuleModal, setShowBrandRuleModal] = useState(false);
@@ -1414,16 +1421,16 @@ export default function DepreciationPage() {
                             {a.purchaseDate?.slice(0, 10)}
                           </TableCell>
                           <TableCell className="text-right text-sm">
-                            {formatCurrency(Number(a.purchasePrice))}
+                            {formatCurrency(Number(a.purchasePrice), currency)}
                           </TableCell>
                           <TableCell className="text-right text-sm text-red-600 font-medium">
-                            {formatCurrency(Number(a.monthlyDep) || 0)}
+                            {formatCurrency(Number(a.monthlyDep) || 0, currency)}
                           </TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">
-                            {formatCurrency(Number(a.accumulated) || 0)}
+                            {formatCurrency(Number(a.accumulated) || 0, currency)}
                           </TableCell>
                           <TableCell className="text-right font-bold text-slate-800">
-                            {formatCurrency(Number(a.nbv) || Number(a.purchasePrice))}
+                            {formatCurrency(Number(a.nbv) || Number(a.purchasePrice), currency)}
                           </TableCell>
                           <TableCell>
                             <span
@@ -1480,19 +1487,23 @@ export default function DepreciationPage() {
             <StatCard title="Total Assets" value={assets.length.toString()} subtitle="Enrolled" />
             <StatCard
               title="Total Cost"
-              value={formatCurrency(totalCost)}
+              value={formatCurrency(totalCost, currency)}
               subtitle="Original value"
             />
             <StatCard
               title="Accumulated Dep"
-              value={formatCurrency(totalAccumulated)}
+              value={formatCurrency(totalAccumulated, currency)}
               subtitle="To date"
             />
-            <StatCard title="Net Book Value" value={formatCurrency(totalNBV)} subtitle="Current" />
+            <StatCard
+              title="Net Book Value"
+              value={formatCurrency(totalNBV, currency)}
+              subtitle="Current"
+            />
             <StatCard title="Fully Depreciated" value={fullyDep.toString()} subtitle="Assets" />
             <StatCard
               title="This Month"
-              value={formatCurrency(thisMonthDep)}
+              value={formatCurrency(thisMonthDep, currency)}
               subtitle="Dep. charge"
             />
           </div>
@@ -1519,7 +1530,7 @@ export default function DepreciationPage() {
                       axisLine={false}
                     />
                     <Tooltip
-                      formatter={(v: number) => formatCurrency(v)}
+                      formatter={(v: number) => formatCurrency(v, currency)}
                       contentStyle={{ borderRadius: '10px', fontSize: '12px' }}
                     />
                     <Bar dataKey="nbv" name="NBV" fill="#3b82f6" radius={[6, 6, 0, 0]} />
@@ -1566,6 +1577,7 @@ export default function DepreciationPage() {
                   { key: 'nbv', color: '#3b82f6', label: 'NBV' },
                 ]}
                 height={200}
+                currency={currency}
               />
             </div>
             <div className="rounded-2xl bg-card shadow-sm border border-slate-100 p-4">
@@ -1577,6 +1589,7 @@ export default function DepreciationPage() {
                 xKey="month"
                 lines={[{ key: 'amount', color: '#f59e0b', label: 'Dep. Charge' }]}
                 height={200}
+                currency={currency}
               />
             </div>
           </div>
@@ -1633,7 +1646,7 @@ export default function DepreciationPage() {
                         {j.periodYear}-{String(j.periodMonth).padStart(2, '0')}
                       </TableCell>
                       <TableCell className="text-right font-bold text-slate-800">
-                        {formatCurrency(Number(j.totalAmount))}
+                        {formatCurrency(Number(j.totalAmount), currency)}
                       </TableCell>
                       <TableCell>
                         <span
@@ -1727,7 +1740,7 @@ export default function DepreciationPage() {
             <p className="text-sm text-muted-foreground">
               This will post depreciation for your branch.
               <br />
-              This month charge: <strong>{formatCurrency(thisMonthDep)}</strong>
+              This month charge: <strong>{formatCurrency(thisMonthDep, currency)}</strong>
             </p>
             <div className="flex gap-3">
               <Button
