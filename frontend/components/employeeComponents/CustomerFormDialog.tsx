@@ -24,7 +24,7 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 
 import { Customer, CreateCustomerData, CustomerBankAccount } from '@/lib/customer';
 import { getCountryDataList } from 'countries-list';
-import { State } from 'country-state-city';
+import { State, City } from 'country-state-city';
 
 interface CustomerFormDialogProps {
   open: boolean;
@@ -35,12 +35,9 @@ interface CustomerFormDialogProps {
 
 const ALL_COUNTRIES = getCountryDataList();
 
-/** ISO2 → flag emoji via regional indicator symbols. */
 const isoToFlag = (iso2: string) =>
   iso2.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 65));
 
-// Sorted by name so scrolling matches alphabetical expectation; string labels keep
-// the SearchableSelect text filter working (it matches on the label).
 const COUNTRY_OPTIONS: SearchableSelectOption[] = [...ALL_COUNTRIES]
   .sort((a, b) => a.name.localeCompare(b.name))
   .map((c) => ({
@@ -48,7 +45,6 @@ const COUNTRY_OPTIONS: SearchableSelectOption[] = [...ALL_COUNTRIES]
     label: `${isoToFlag(c.iso2)} ${c.name} (${c.iso2})`,
   }));
 
-/** Dial code for an ISO2 country, e.g. "QA" → "+974". */
 const dialCodeForCountry = (iso2?: string | null) => {
   if (!iso2) return undefined;
   const country = ALL_COUNTRIES.find((c) => c.iso2 === iso2);
@@ -67,10 +63,6 @@ const BLANK_BANK: CustomerBankAccount = {
   isPrimary: false,
 };
 
-/**
- * Modal dialog for creating or editing customer profiles.
- * Handles form validation and pre-fills data when editing existing customers.
- */
 export default function CustomerFormDialog({
   open,
   onOpenChange,
@@ -78,7 +70,6 @@ export default function CustomerFormDialog({
   onSubmit,
 }: CustomerFormDialogProps) {
   const [loading, setLoading] = useState(false);
-  // Dial code parsed from an existing phone; used only when no country is selected.
   const [parsedDial, setParsedDial] = useState<string | null>(null);
   const [rawPhone, setRawPhone] = useState('');
   const [addingBank, setAddingBank] = useState(false);
@@ -97,7 +88,6 @@ export default function CustomerFormDialog({
     setAddingBank(false);
     setBankDraft({ ...BLANK_BANK });
     if (customer) {
-      // Map entity data to form data
       setFormData({
         name: customer.name,
         email: customer.email,
@@ -107,9 +97,11 @@ export default function CustomerFormDialog({
         vatNumber: customer.vatNumber ?? undefined,
         country: customer.country ?? undefined,
         stateProvince: customer.stateProvince ?? undefined,
+        city: customer.city ?? undefined,
+        bankName: customer.bankName ?? '',
+        bankAccountNumber: customer.bankAccountNumber ?? '',
       });
 
-      // Prefer the structured list; fall back to the legacy flat pair.
       if (customer.bankAccounts && customer.bankAccounts.length > 0) {
         setBankAccounts(customer.bankAccounts);
       } else if (customer.bankName || customer.bankAccountNumber) {
@@ -164,7 +156,6 @@ export default function CustomerFormDialog({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // The phone dial code is derived from the selected country.
   const handleCountryChange = (iso2: string) => {
     setFormData((prev) => ({ ...prev, country: iso2, stateProvince: '' }));
   };
@@ -193,7 +184,6 @@ export default function CustomerFormDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Auto-commit the bank draft if the inline form is open and has any data.
     let finalBankAccounts = bankAccounts;
     const draftHasData =
       bankDraft.bankName || bankDraft.accountHolderName || bankDraft.accountNumber;
@@ -217,7 +207,6 @@ export default function CustomerFormDialog({
           ? `${dialCode} ${rawPhone.trim()}`
           : rawPhone.trim()
         : '';
-      // Keep the legacy flat pair in sync with the primary (or first) account.
       const primary = finalBankAccounts.find((a) => a.isPrimary) || finalBankAccounts[0];
       await onSubmit({
         ...formData,
@@ -234,7 +223,6 @@ export default function CustomerFormDialog({
     }
   };
 
-  // Country selection drives the dial code; an existing phone's prefix is the fallback.
   const dialCode = dialCodeForCountry(formData.country) || parsedDial;
 
   return (
@@ -315,7 +303,6 @@ export default function CustomerFormDialog({
                   Phone Number
                 </Label>
                 <div className="flex items-center h-12 rounded-xl bg-muted/50 border border-transparent focus-within:ring-2 focus-within:ring-blue-400 focus-within:bg-card focus-within:border-transparent transition-all overflow-hidden relative shadow-sm">
-                  {/* Dial-code prefix — derived from the selected country */}
                   <div className="flex items-center gap-1.5 px-3 h-full bg-blue-50 border-r border-blue-100 shrink-0 min-w-[64px] justify-center">
                     {formData.country && (
                       <span className="text-base leading-none select-none">
@@ -326,8 +313,6 @@ export default function CustomerFormDialog({
                       {dialCode || '+--'}
                     </span>
                   </div>
-
-                  {/* Phone Number Input */}
                   <input
                     type="tel"
                     value={rawPhone}
@@ -348,38 +333,80 @@ export default function CustomerFormDialog({
                         ? 'State'
                         : formData.country === 'CA'
                           ? 'Province'
-                          : 'City / District';
+                          : 'Region / Province';
+                  const selectedState = states.find((s) => s.name === formData.stateProvince);
+                  const cities = selectedState
+                    ? City.getCitiesOfState(formData.country, selectedState.isoCode)
+                    : (City.getCitiesOfCountry(formData.country) ?? []);
                   return (
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                        {label}
-                      </Label>
-                      {states.length > 0 ? (
-                        <Select
-                          value={formData.stateProvince ?? ''}
-                          onValueChange={(val) => handleSelectChange('stateProvince', val)}
-                        >
-                          <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                            <SelectValue placeholder={`Select ${label}`} />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
-                            {states.map((s) => (
-                              <SelectItem key={s.isoCode} value={s.name}>
-                                {s.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          name="stateProvince"
-                          value={formData.stateProvince ?? ''}
-                          onChange={handleChange}
-                          placeholder={`Enter ${label}`}
-                          className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                        />
-                      )}
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                          {label}
+                        </Label>
+                        {states.length > 0 ? (
+                          <Select
+                            value={formData.stateProvince ?? ''}
+                            onValueChange={(val) => {
+                              handleSelectChange('stateProvince', val);
+                              handleSelectChange('city', '');
+                            }}
+                          >
+                            <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                              <SelectValue placeholder={`Select ${label}`} />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                              {states.map((s) => (
+                                <SelectItem key={s.isoCode} value={s.name}>
+                                  {s.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            name="stateProvince"
+                            value={formData.stateProvince ?? ''}
+                            onChange={(e) => {
+                              handleChange(e);
+                              handleSelectChange('city', '');
+                            }}
+                            placeholder={`Enter ${label}`}
+                            className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                          />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                          City
+                        </Label>
+                        {cities.length > 0 ? (
+                          <Select
+                            value={formData.city ?? ''}
+                            onValueChange={(val) => handleSelectChange('city', val)}
+                          >
+                            <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                              <SelectValue placeholder="Select city" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                              {cities.map((c) => (
+                                <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
+                                  {c.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input
+                            name="city"
+                            value={formData.city ?? ''}
+                            onChange={handleChange}
+                            placeholder="Enter city"
+                            className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                          />
+                        )}
+                      </div>
+                    </>
                   );
                 })()}
             </div>
@@ -463,7 +490,6 @@ export default function CustomerFormDialog({
                 )}
               </div>
 
-              {/* Existing bank accounts list */}
               {bankAccounts.length > 0 && (
                 <div className="space-y-2">
                   {bankAccounts.map((acc, idx) => (
@@ -521,7 +547,6 @@ export default function CustomerFormDialog({
                 </div>
               )}
 
-              {/* Add bank account inline form */}
               {addingBank && (
                 <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/30 space-y-3">
                   <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">

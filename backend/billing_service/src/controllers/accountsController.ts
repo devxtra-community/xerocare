@@ -1311,7 +1311,6 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     if (!payable) throw new AppError('Payable not found', 404);
 
     let saved!: ManualPayable;
-    let paymentId: string | undefined;
     await Source.transaction(async (em) => {
       const payableRepo = em.getRepository(ManualPayable);
       const paymentRepo = em.getRepository(PayablePayment);
@@ -1321,8 +1320,7 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
         payableId: payable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as PayablePayment;
-      const savedPayment = await paymentRepo.save(payment);
-      paymentId = savedPayment.id;
+      await paymentRepo.save(payment);
 
       payable.amountPaid = Number(payable.amountPaid) + Number(req.body.amount);
       payable.outstanding = Number(payable.amount) - Number(payable.amountPaid);
@@ -1330,28 +1328,6 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
       else if (Number(payable.amountPaid) > 0) payable.status = 'PARTIAL';
       saved = await payableRepo.save(payable);
     });
-
-    // Post cashbook entry + deduct account balance (pool size 1 — must be outside the transaction above)
-    if (req.body.paidFromAccount && paymentId) {
-      try {
-        await postCashbookEntry({
-          date: req.body.paymentDate ?? new Date(),
-          entryType: 'PAYMENT',
-          amount: Number(req.body.amount),
-          category: 'Payable Payment',
-          branchId: payable.branchId,
-          createdBy: req.user?.userId ?? 'SYSTEM',
-          paymentMode: req.body.paymentMode,
-          accountId: req.body.paidFromAccount,
-          description: `Payable: ${payable.payableTo} — ${payable.type}`,
-          notes: req.body.notes,
-          sourceType: 'MANUAL_PAYABLE',
-          sourceId: paymentId,
-        });
-      } catch (err) {
-        logger.warn('[recordPayablePayment] Failed to post cashbook entry (non-fatal)', err);
-      }
-    }
 
     res.json({ success: true, data: saved });
   } catch (err) {
