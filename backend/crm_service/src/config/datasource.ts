@@ -42,6 +42,11 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.info('Fresh database — creating schema from entities via synchronize...');
           await Source.synchronize();
           logger.info('Schema created from entities.');
+        } else {
+          // Existing database: additive columns for older deployments.
+          await Source.query(
+            `ALTER TABLE customers ADD COLUMN IF NOT EXISTS bank_accounts JSONB DEFAULT '[]';`,
+          );
         }
       }
       return Source;

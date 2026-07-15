@@ -33,6 +33,8 @@ export interface PostCashbookEntryInput {
 const REF_PREFIX: Record<string, string> = {
   INVOICE_PAYMENT: 'RCPT',
   EXPENSE: 'EXP',
+  RECEIVABLE_PAYMENT: 'RCVP',
+  PAYABLE_PAYMENT: 'PAYP',
 };
 
 function isCashMode(paymentMode?: string): boolean {

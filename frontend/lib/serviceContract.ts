@@ -20,10 +20,43 @@ export interface ContractUsageSummary {
   copiesRemaining: number | null;
 }
 
+export interface ContractMachineInfo {
+  modelName: string;
+  brand: string;
+  serialNumber: string;
+  ownership?: string | null;
+  meterReading?: number | null;
+}
+
+export interface ContractTicketSummary {
+  id: string;
+  ticketNumber: string;
+  status: string;
+  ticketType: string;
+  jobType: string;
+  issueDescription: string;
+  workPerformed?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+  itemsTotal: number;
+  visitChargeAmount: number;
+  discountAmount: number;
+  totalCost: number;
+}
+
+export interface ContractServiceHistory {
+  ticketCount: number;
+  completedCount: number;
+  totalServiceCost: number;
+  tickets: ContractTicketSummary[];
+}
+
 export interface ServiceContract {
   id: string;
   productId: string;
   customerId: string;
+  /** Machine details resolved server-side (works for external machines too). */
+  machine?: ContractMachineInfo | null;
   contractType: ServiceContractType;
   startDate: string;
   endDate: string;
@@ -73,7 +106,13 @@ export const getServiceContracts = async (
   return response.data.data;
 };
 
-export const getServiceContractById = async (id: string): Promise<ServiceContract> => {
+export interface ServiceContractDetail extends ServiceContract {
+  readings: ContractMeterReading[];
+  totalBilled: number;
+  serviceHistory: ContractServiceHistory;
+}
+
+export const getServiceContractById = async (id: string): Promise<ServiceContractDetail> => {
   const response = await api.get(`/i/service/contracts/${id}`);
   return response.data.data;
 };

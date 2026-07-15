@@ -586,16 +586,23 @@ export async function computeBalanceSheet(
       WHERE "isActive" = true ${bSql('cash_bank_accounts')}
       GROUP BY type, currency
     `),
-    // 1003 Invoice AR — INVOICED invoices minus payments received
+    // 1003 Invoice AR — INVOICED invoices minus payments received (both payment
+    // tables: payment_transactions + legacy payment_ledgers)
     db.query<CcyRow[]>(`
       SELECT COALESCE(i."currencyCode", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM(i."totalAmount" - COALESCE(pt.paid, 0)), 0) AS amount
+             COALESCE(SUM(GREATEST(0, i."totalAmount" - COALESCE(pt.paid, 0))), 0) AS amount
       FROM invoices i
       LEFT JOIN (
-        SELECT "invoice_id", SUM(amount) AS paid
-        FROM payment_transactions
-        GROUP BY "invoice_id"
-      ) pt ON pt."invoice_id" = i.id
+        SELECT invoice_id, SUM(paid) AS paid FROM (
+          SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
+          FROM payment_transactions
+          GROUP BY "invoice_id"
+          UNION ALL
+          SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS paid
+          FROM payment_ledgers
+          GROUP BY "invoiceId"
+        ) u GROUP BY invoice_id
+      ) pt ON pt.invoice_id = i.id
       WHERE i.status = 'INVOICED'
         AND i."totalAmount" > 0
         AND i."deletedAt" IS NULL

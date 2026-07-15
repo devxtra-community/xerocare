@@ -883,6 +883,52 @@ async function runPreMigrations() {
         err,
       );
     }
+
+    // Receipt attachments now live on payment_transactions (unified payment path).
+    await client.query(
+      `ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS receipt_url VARCHAR;`,
+    );
+
+    // Reconcile invoice_ledger with the union of both historical payment tables.
+    // Payments recorded through the legacy /payments/record path only wrote
+    // payment_ledgers rows and never updated the ledger, so paid/balance amounts
+    // under-reported. Recomputing from source tables is idempotent.
+    logger.info('Reconciling invoice_ledger from payment_transactions + payment_ledgers...');
+    try {
+      await client.query(`
+        WITH paid AS (
+          SELECT i.id AS invoice_id,
+            COALESCE((SELECT SUM(pt.amount) FROM payment_transactions pt WHERE pt.invoice_id = i.id), 0)
+            + COALESCE((SELECT SUM(pl."amountPaid") FROM payment_ledgers pl WHERE pl."invoiceId" = i.id), 0) AS total_paid
+          FROM invoices i
+        )
+        UPDATE invoice_ledger il
+        SET paid_amount = paid.total_paid,
+            balance_amount = GREATEST(0, il.total_amount - paid.total_paid),
+            updated_at = NOW()
+        FROM paid
+        WHERE il.invoice_id = paid.invoice_id
+          AND il.deleted_at IS NULL
+          AND il.paid_amount IS DISTINCT FROM paid.total_paid;
+      `);
+      await client.query(`
+        INSERT INTO invoice_ledger (id, invoice_id, total_amount, paid_amount, balance_amount, created_at, updated_at)
+        SELECT gen_random_uuid(), i.id, COALESCE(i."totalAmount", 0), p.total_paid,
+               GREATEST(0, COALESCE(i."totalAmount", 0) - p.total_paid), NOW(), NOW()
+        FROM invoices i
+        JOIN (
+          SELECT invoice_id, SUM(total_paid) AS total_paid FROM (
+            SELECT invoice_id, SUM(amount) AS total_paid FROM payment_transactions GROUP BY invoice_id
+            UNION ALL
+            SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS total_paid FROM payment_ledgers GROUP BY "invoiceId"
+          ) u GROUP BY invoice_id
+        ) p ON p.invoice_id = i.id
+        WHERE NOT EXISTS (SELECT 1 FROM invoice_ledger il WHERE il.invoice_id = i.id);
+      `);
+      logger.info('invoice_ledger reconciliation completed.');
+    } catch (err) {
+      logger.warn('invoice_ledger reconciliation failed (non-fatal):', err);
+    }
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

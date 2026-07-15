@@ -50,6 +50,9 @@ export class PaymentTransaction {
   @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
   currencyCode?: string;
 
+  @Column({ name: 'receipt_url', type: 'varchar', nullable: true })
+  receiptUrl?: string; // Proof of payment (screenshot/PDF) uploaded to R2
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

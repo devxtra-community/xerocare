@@ -1,5 +1,17 @@
 import api from './api';
 
+export interface CustomerBankAccount {
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  accountType?: 'Savings Account' | 'Current Account' | 'Business Account';
+  routingNumber?: string;
+  swiftCode?: string;
+  iban?: string;
+  address?: string;
+  isPrimary?: boolean;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -13,6 +25,7 @@ export interface Customer {
   stateProvince?: string | null;
   bankName?: string | null;
   bankAccountNumber?: string | null;
+  bankAccounts?: CustomerBankAccount[] | null;
 
   isActive: boolean;
   createdAt: string;
@@ -76,6 +89,7 @@ export interface CreateCustomerData {
   stateProvince?: string;
   bankName?: string;
   bankAccountNumber?: string;
+  bankAccounts?: CustomerBankAccount[];
 }
 
 /**

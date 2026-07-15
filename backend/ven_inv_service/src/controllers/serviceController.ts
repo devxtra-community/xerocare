@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
-import { IsNull, FindOptionsWhere, In } from 'typeorm';
+import { IsNull, FindOptionsWhere, In, Between } from 'typeorm';
 import {
   generateServiceQuotationPdf,
   generateServiceCompletionBillPdf,
@@ -63,7 +63,10 @@ import {
   WarrantyEvaluation,
 } from '../helpers/warrantyHelper';
 
-const ACCESS_SECRET = process.env.ACCESS_SECRET || 'secret';
+const ACCESS_SECRET = process.env.ACCESS_SECRET;
+if (!ACCESS_SECRET) {
+  throw new Error('ACCESS_SECRET environment variable must be set');
+}
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
@@ -3343,7 +3346,20 @@ export class ServiceController {
       }
       const summaryMap = new Map(summaries.map((s) => [s.contractId, s]));
 
+      // Resolve machine details directly so the client doesn't depend on its
+      // (branch-filtered) product list — external machines have no warehouse
+      // and would otherwise show up as "Unknown Product".
+      const contractProductIds = [...new Set(contracts.map((c) => c.productId).filter(Boolean))];
+      const contractProducts = contractProductIds.length
+        ? await Source.getRepository(Product).find({
+            where: { id: In(contractProductIds) },
+            relations: { model: true },
+          })
+        : [];
+      const productMap = new Map(contractProducts.map((p) => [p.id, p]));
+
       const data = contracts.map((c) => {
+        const p = c.productId ? productMap.get(c.productId) : undefined;
         const s = summaryMap.get(c.id);
         const lastTotal = s?.lastTotalReading != null ? Number(s.lastTotalReading) : null;
         const copiesUsed =
@@ -3354,6 +3370,13 @@ export class ServiceController {
             : null;
         return {
           ...c,
+          machine: p
+            ? {
+                modelName: p.model?.model_name || p.name,
+                brand: p.brand,
+                serialNumber: p.serial_no,
+              }
+            : null,
           usageSummary: {
             readingCount: Number(s?.readingCount || 0),
             totalBilled: Number(s?.totalBilled || 0),
@@ -3382,8 +3405,96 @@ export class ServiceController {
       const { id } = req.params;
       const contractRepo = Source.getRepository(ServiceContract);
       const contract = await contractRepo.findOne({ where: { id: id as string } });
-      if (!contract) throw new Error('Service Contract not found');
-      res.status(200).json({ success: true, data: contract });
+      if (!contract) throw new AppError('Service Contract not found', 404);
+
+      // Machine details (resolved server-side; works for external machines too)
+      const product = contract.productId
+        ? await Source.getRepository(Product).findOne({
+            where: { id: contract.productId },
+            relations: { model: true },
+          })
+        : null;
+
+      // Meter readings + billed-to-date
+      const readings = await Source.getRepository(ContractMeterReading).find({
+        where: { contractId: contract.id },
+        order: { readingDate: 'DESC', created_at: 'DESC' },
+      });
+      const totalBilled = readings.reduce((sum, r) => sum + Number(r.amountCharged || 0), 0);
+
+      // Service tickets under this contract: linked by reference, or raised for
+      // the same machine inside the contract period.
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticketWhere: FindOptionsWhere<ServiceTicket>[] = [{ contractReferenceId: contract.id }];
+      if (contract.productId) {
+        ticketWhere.push({
+          productId: contract.productId,
+          created_at: Between(new Date(contract.startDate), new Date(contract.endDate)),
+        });
+      }
+      const tickets = await ticketRepo.find({ where: ticketWhere, order: { created_at: 'DESC' } });
+
+      // Per-ticket cost = billable items + visit charge − discount
+      const ticketIds = tickets.map((t) => t.id);
+      const items = ticketIds.length
+        ? await Source.getRepository(ServiceTicketItem).find({ where: { ticketId: In(ticketIds) } })
+        : [];
+      const itemsTotalByTicket = new Map<string, number>();
+      for (const item of items) {
+        if (item.isFree) continue;
+        const line =
+          item.totalPrice != null
+            ? Number(item.totalPrice)
+            : Number(item.unitPrice || 0) * Number(item.quantity || 1);
+        itemsTotalByTicket.set(item.ticketId, (itemsTotalByTicket.get(item.ticketId) || 0) + line);
+      }
+
+      const ticketSummaries = tickets.map((t) => {
+        const itemsTotal = itemsTotalByTicket.get(t.id) || 0;
+        const totalCost = Math.max(
+          0,
+          itemsTotal + Number(t.visitChargeAmount || 0) - Number(t.discountAmount || 0),
+        );
+        return {
+          id: t.id,
+          ticketNumber: t.ticketNumber,
+          status: t.status,
+          ticketType: t.ticketType,
+          jobType: t.jobType,
+          issueDescription: t.issueDescription,
+          workPerformed: t.workPerformed,
+          createdAt: t.created_at,
+          completedAt: t.completedAt,
+          itemsTotal,
+          visitChargeAmount: Number(t.visitChargeAmount || 0),
+          discountAmount: Number(t.discountAmount || 0),
+          totalCost,
+        };
+      });
+
+      const data = {
+        ...contract,
+        machine: product
+          ? {
+              modelName: product.model?.model_name || product.name,
+              brand: product.brand,
+              serialNumber: product.serial_no,
+              ownership: product.ownership || null,
+              meterReading: product.meter_reading ?? null,
+            }
+          : null,
+        readings,
+        totalBilled,
+        serviceHistory: {
+          ticketCount: ticketSummaries.length,
+          completedCount: ticketSummaries.filter((t) => t.status === ServiceTicketStatus.COMPLETED)
+            .length,
+          totalServiceCost: ticketSummaries.reduce((sum, t) => sum + t.totalCost, 0),
+          tickets: ticketSummaries,
+        },
+      };
+
+      res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
     }
@@ -3406,8 +3517,19 @@ export class ServiceController {
       const fields = this.buildContractFields(merged);
       Object.assign(contract, fields);
 
-      if (customerId) contract.customerId = customerId;
-      if (productId) contract.productId = productId;
+      // A contract is bound to its customer and machine for life — reject swaps.
+      if (customerId && customerId !== contract.customerId) {
+        throw new AppError(
+          'The customer of a contract cannot be changed. Delete this contract and create a new one instead.',
+          400,
+        );
+      }
+      if (productId && productId !== contract.productId) {
+        throw new AppError(
+          'The machine of a contract cannot be changed. Delete this contract and create a new one instead.',
+          400,
+        );
+      }
       if (startDate) contract.startDate = new Date(startDate);
       if (endDate) contract.endDate = new Date(endDate);
       if (new Date(contract.endDate) <= new Date(contract.startDate)) {
@@ -3521,8 +3643,10 @@ export class ServiceController {
       let chargeBreakdown: Record<string, unknown> = {};
 
       if (contract.contractType === ServiceContractType.AMC) {
-        amountCharged = Number(contract.monthlyCharge) || 0;
-        chargeBreakdown = { type: 'AMC', monthlyCharge: amountCharged };
+        // AMC is a fixed annual/monthly agreement billed outside meter readings.
+        // Readings are kept for tracking only — clicks are never charged.
+        amountCharged = 0;
+        chargeBreakdown = { type: 'AMC', trackingOnly: true };
       } else if (contract.contractType === ServiceContractType.SMA) {
         const startMeter = Number(contract.startMeterReading) || 0;
         const copyLimit = Number(contract.copyLimit) || 0;

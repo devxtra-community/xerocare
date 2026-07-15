@@ -57,7 +57,9 @@ app.use(
         allowedOrigins.includes(origin) ||
         (isDev && origin.startsWith('http://localhost:')) ||
         (isDev && origin.startsWith('http://127.0.0.1:')) ||
-        origin.startsWith('https://xerocare.apps.mastrovia.com')
+        // Exact match only — a prefix check would also admit e.g.
+        // https://xerocare.apps.mastrovia.com.evil.com
+        origin === 'https://xerocare.apps.mastrovia.com'
       ) {
         callback(null, true);
       } else {

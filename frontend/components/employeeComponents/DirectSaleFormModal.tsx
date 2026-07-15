@@ -51,25 +51,6 @@ interface SaleItem {
   maxDiscount?: number;
 }
 
-const DEFAULT_WARRANTY_KEY = 'xerocare_direct_sale_default_warranty';
-
-interface DefaultWarranty {
-  warrantyType: 'none' | 'duration' | 'copies' | 'both';
-  warrantyDurationValue: string;
-  warrantyDurationUnit: 'months' | 'years';
-  warrantyCopyLimit: string;
-}
-
-function loadDefaultWarranty(): DefaultWarranty | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(DEFAULT_WARRANTY_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFormModalProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -81,21 +62,11 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [paymentReference, setPaymentReference] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Warranty states (for product sales) — seeded from the last-used defaults,
-  // saved to localStorage after a successful sale below.
-  const defaultWarranty = loadDefaultWarranty();
-  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>(
-    defaultWarranty?.warrantyType || 'none',
-  );
-  const [warrantyDurationValue, setWarrantyDurationValue] = useState(
-    defaultWarranty?.warrantyDurationValue || '',
-  );
-  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>(
-    defaultWarranty?.warrantyDurationUnit || 'months',
-  );
-  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState(
-    defaultWarranty?.warrantyCopyLimit || '',
-  );
+  // Warranty states (for product sales) — business default: 2 years + 100,000 copies.
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('both');
+  const [warrantyDurationValue, setWarrantyDurationValue] = useState('2');
+  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('years');
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('100000');
 
   const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
   const [sparePartStocks, setSparePartStocks] = useState<
@@ -332,7 +303,8 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       const discount = item.discount || 0;
       const itemSubtotal = (item.unitPrice - discount) * quantity;
       const taxRate = item.taxRate || 0;
-      const itemTax = item.unitPrice * (taxRate / 100) * quantity;
+      // Tax on the discounted price — must match backend calculation.
+      const itemTax = itemSubtotal * (taxRate / 100);
       subtotal += itemSubtotal;
       taxTotal += itemTax;
     });
@@ -404,19 +376,6 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       const res = await api.post('/b/invoices/direct-sale', payload);
       const createdInvoice = res.data.data || res.data;
       setSuccessInvoice(createdInvoice);
-
-      // Remember this warranty config as the default for the next direct sale.
-      if (items.some((it) => it.itemType === 'PRODUCT') && typeof window !== 'undefined') {
-        window.localStorage.setItem(
-          DEFAULT_WARRANTY_KEY,
-          JSON.stringify({
-            warrantyType,
-            warrantyDurationValue,
-            warrantyDurationUnit,
-            warrantyCopyLimit,
-          }),
-        );
-      }
 
       // Pre-fill customer notifications info
       const cust = customers.find((c) => c.id === customerId);
@@ -745,7 +704,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                   <tbody className="divide-y divide-slate-200">
                     {items.map((item, idx) => {
                       const itemSubtotal = (item.unitPrice - item.discount) * item.quantity;
-                      const itemTax = item.unitPrice * ((item.taxRate || 0) / 100) * item.quantity;
+                      const itemTax = itemSubtotal * ((item.taxRate || 0) / 100);
                       const itemTotal = itemSubtotal + itemTax;
 
                       return (

@@ -996,6 +996,7 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
     if (!receivable) throw new AppError('Receivable not found', 404);
 
     let saved!: ManualReceivable;
+    let savedPayment!: ReceivablePayment;
     await Source.transaction(async (em) => {
       const receivableRepo = em.getRepository(ManualReceivable);
       const paymentRepo = em.getRepository(ReceivablePayment);
@@ -1005,7 +1006,7 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
         receivableId: receivable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as ReceivablePayment;
-      await paymentRepo.save(payment);
+      savedPayment = await paymentRepo.save(payment);
 
       receivable.amountPaid = Number(receivable.amountPaid) + Number(req.body.amount);
       receivable.outstanding = Number(receivable.amount) - Number(receivable.amountPaid);
@@ -1013,6 +1014,30 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
       else if (Number(receivable.amountPaid) > 0) receivable.status = 'PARTIAL';
       saved = await receivableRepo.save(receivable);
     });
+
+    // Mirror the receipt into the cashbook / day book so it reaches the accounts
+    // pages and moves the cash/bank balance. Best-effort after commit; idempotent
+    // on (sourceType, sourceId).
+    try {
+      await postCashbookEntry({
+        date: req.body.paymentDate || todayInBusinessTz(),
+        entryType: 'RECEIPT',
+        amount: Number(req.body.amount),
+        category: 'Receivable Collection',
+        branchId: receivable.branchId,
+        createdBy: req.user?.userId ?? req.body.createdBy ?? 'SYSTEM',
+        paymentMode: req.body.paymentMode,
+        accountId: req.body.paidToAccount,
+        autoResolveAccount: true,
+        description: `Receipt against receivable ${receivable.customerName || receivable.id}`,
+        chequeNo: req.body.referenceNo,
+        notes: req.body.notes,
+        sourceType: 'RECEIVABLE_PAYMENT',
+        sourceId: savedPayment.id,
+      });
+    } catch (postErr) {
+      logger.error('Failed to post receivable payment to cashbook', postErr);
+    }
 
     res.json({ success: true, data: saved });
   } catch (err) {
@@ -1096,6 +1121,7 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     if (!payable) throw new AppError('Payable not found', 404);
 
     let saved!: ManualPayable;
+    let savedPayment!: PayablePayment;
     await Source.transaction(async (em) => {
       const payableRepo = em.getRepository(ManualPayable);
       const paymentRepo = em.getRepository(PayablePayment);
@@ -1105,7 +1131,7 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
         payableId: payable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as PayablePayment;
-      await paymentRepo.save(payment);
+      savedPayment = await paymentRepo.save(payment);
 
       payable.amountPaid = Number(payable.amountPaid) + Number(req.body.amount);
       payable.outstanding = Number(payable.amount) - Number(payable.amountPaid);
@@ -1113,6 +1139,30 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
       else if (Number(payable.amountPaid) > 0) payable.status = 'PARTIAL';
       saved = await payableRepo.save(payable);
     });
+
+    // Mirror the payment into the cashbook / day book so it reaches the accounts
+    // pages and moves the cash/bank balance. Best-effort after commit; idempotent
+    // on (sourceType, sourceId).
+    try {
+      await postCashbookEntry({
+        date: req.body.paymentDate || todayInBusinessTz(),
+        entryType: 'PAYMENT',
+        amount: Number(req.body.amount),
+        category: 'Payable Settlement',
+        branchId: payable.branchId,
+        createdBy: req.user?.userId ?? req.body.createdBy ?? 'SYSTEM',
+        paymentMode: req.body.paymentMode,
+        accountId: req.body.paidFromAccount,
+        autoResolveAccount: true,
+        description: `Payment against payable ${payable.referenceNo || payable.id}`,
+        chequeNo: req.body.referenceNo,
+        notes: req.body.notes,
+        sourceType: 'PAYABLE_PAYMENT',
+        sourceId: savedPayment.id,
+      });
+    } catch (postErr) {
+      logger.error('Failed to post payable payment to cashbook', postErr);
+    }
 
     res.json({ success: true, data: saved });
   } catch (err) {

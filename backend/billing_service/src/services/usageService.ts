@@ -1422,13 +1422,24 @@ export class UsageService {
     const contract = await this.invoiceRepo.findById(contractId);
     if (!contract) return;
 
+    // Carry the contract's tax/currency snapshot onto the summary invoice so the
+    // grand total (tax-inclusive, same semantic as all other invoices) is auditable.
+    const summaryBase = totalRent + totalExcess;
+    const summaryTaxPercent = Number(contract.taxPercent || 0);
+    const summaryTaxAmount = summaryBase * (summaryTaxPercent / 100);
+
     const summaryInvoice = await this.invoiceRepo.createInvoice({
       invoiceNumber: await this.invoiceRepo.generateInvoiceNumber(),
       type: InvoiceType.FINAL,
       isSummaryInvoice: true,
       referenceContractId: contractId,
-      grossAmount: totalRent + totalExcess,
-      totalAmount: totalRent + totalExcess,
+      grossAmount: summaryBase,
+      totalAmount: summaryBase + summaryTaxAmount,
+      taxAmount: summaryTaxPercent > 0 ? summaryTaxAmount : undefined,
+      taxPercent: contract.taxPercent,
+      taxName: contract.taxName,
+      taxRegistrationNumber: contract.taxRegistrationNumber,
+      currencyCode: contract.currencyCode,
       status: InvoiceStatus.INVOICED, // Default to INVOICED for final summary
       customerId: contract.customerId,
       branchId: contract.branchId,
@@ -1464,13 +1475,23 @@ export class UsageService {
 
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
 
+    // Same tax/currency snapshot + tax-inclusive grand total as generateFinalSummary.
+    const summaryBase = totalRent + totalExcess;
+    const summaryTaxPercent = Number(contract.taxPercent || 0);
+    const summaryTaxAmount = summaryBase * (summaryTaxPercent / 100);
+
     const summaryInvoice = manager.create('Invoice', {
       invoiceNumber,
       type: InvoiceType.FINAL,
       isSummaryInvoice: true,
       referenceContractId: contractId,
-      grossAmount: totalRent + totalExcess,
-      totalAmount: totalRent + totalExcess,
+      grossAmount: summaryBase,
+      totalAmount: summaryBase + summaryTaxAmount,
+      taxAmount: summaryTaxPercent > 0 ? summaryTaxAmount : undefined,
+      taxPercent: contract.taxPercent,
+      taxName: contract.taxName,
+      taxRegistrationNumber: contract.taxRegistrationNumber,
+      currencyCode: contract.currencyCode,
       status: InvoiceStatus.INVOICED,
       customerId: contract.customerId,
       branchId: contract.branchId,

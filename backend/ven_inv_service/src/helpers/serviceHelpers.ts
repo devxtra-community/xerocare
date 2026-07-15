@@ -3,7 +3,10 @@ import { sign } from 'jsonwebtoken';
 
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
-const ACCESS_SECRET = process.env.ACCESS_SECRET || 'secret';
+const ACCESS_SECRET = process.env.ACCESS_SECRET;
+if (!ACCESS_SECRET) {
+  throw new Error('ACCESS_SECRET environment variable must be set');
+}
 
 interface HelperEmployee {
   id: string;

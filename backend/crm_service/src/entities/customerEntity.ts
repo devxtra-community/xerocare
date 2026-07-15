@@ -44,6 +44,19 @@ export class Customer {
   @Column({ name: 'bank_account_number', type: 'varchar', length: 50, nullable: true })
   bankAccountNumber?: string | null;
 
+  @Column({ name: 'bank_accounts', type: 'jsonb', nullable: true, default: () => "'[]'" })
+  bankAccounts?: {
+    bankName: string;
+    accountHolderName: string;
+    accountNumber: string;
+    accountType?: 'Savings Account' | 'Current Account' | 'Business Account';
+    routingNumber?: string;
+    swiftCode?: string;
+    iban?: string;
+    address?: string;
+    isPrimary?: boolean;
+  }[];
+
   @Column({ default: true })
   isActive!: boolean;
 

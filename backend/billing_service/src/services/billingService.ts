@@ -721,6 +721,9 @@ export class BillingService {
           invoice.taxPercent = branchInfo.taxPercent;
           invoice.taxAmount = Number(invoice.totalAmount) * (branchInfo.taxPercent / 100);
           invoice.taxRegistrationNumber = branchInfo.taxRegistrationNumber;
+          // totalAmount is the grand total payable (tax-inclusive) — same semantic as
+          // direct sales and what InvoiceLedger tracks against payments.
+          invoice.totalAmount = Number(invoice.totalAmount) + invoice.taxAmount;
         }
       }
     } catch (err) {
@@ -3171,18 +3174,21 @@ export class BillingService {
 
       let grossAmount = 0;
       let totalDiscount = 0;
+      let totalTax = 0;
 
       for (const item of payload.items) {
         const quantity = item.itemType === 'SPARE_PART' ? item.quantity! : 1;
         const discount = item.discount || 0;
         const taxRate = item.taxRate || 0;
 
-        const taxAmount = item.unitPrice * (taxRate / 100) * quantity;
+        // Tax is levied on the consideration actually charged (price after discount).
         const subtotalAfterDiscount = (item.unitPrice - discount) * quantity;
+        const taxAmount = subtotalAfterDiscount * (taxRate / 100);
         const itemTotal = subtotalAfterDiscount + taxAmount;
 
         grossAmount += item.unitPrice * quantity;
         totalDiscount += discount * quantity;
+        totalTax += taxAmount;
         calculatedTotal += itemTotal;
 
         const invItem = new InvoiceItem();
@@ -3239,7 +3245,26 @@ export class BillingService {
 
       savedInvoice.grossAmount = grossAmount;
       savedInvoice.discountAmount = totalDiscount;
-      savedInvoice.totalAmount = grossAmount - totalDiscount;
+      savedInvoice.taxAmount = totalTax;
+      // Grand total payable: (gross - discount) + tax. Must match what the customer
+      // is asked to pay and what the ledger tracks.
+      savedInvoice.totalAmount = calculatedTotal;
+
+      // Snapshot branch currency/tax config so the invoice stays auditable even if
+      // branch settings change later.
+      try {
+        const branchInfo = await getBranchCurrencyInfo(payload.branchId);
+        if (branchInfo) {
+          savedInvoice.currencyCode = branchInfo.currencyCode;
+          if (branchInfo.hasTax) {
+            savedInvoice.taxName = branchInfo.taxName;
+            savedInvoice.taxPercent = branchInfo.taxPercent;
+            savedInvoice.taxRegistrationNumber = branchInfo.taxRegistrationNumber;
+          }
+        }
+      } catch (err) {
+        logger.warn('Could not fetch branch info for tax snapshot on direct sale', err);
+      }
 
       // Apply warranty fields for product sales
       if (hasProducts && payload.warrantyType) {
@@ -3264,22 +3289,34 @@ export class BillingService {
       savedInvoice.status = paymentStatus;
       await queryRunner.manager.save(savedInvoice);
 
-      // Handle payment if provided
-      if (payload.paymentAmount && payload.paymentAmount > 0) {
-        if (!payload.paymentMode)
-          throw new AppError('paymentMode required if paymentAmount provided', 400);
-        await queryRunner.manager.insert('payment_ledgers', {
-          invoiceId: savedInvoice.id,
-          amountPaid: payload.paymentAmount,
-          paymentMode: payload.paymentMode,
-          paymentDate: new Date(),
-          referenceNumber: payload.paymentReference,
-          remarks: 'Direct Sale Payment',
-          recordedBy: payload.createdBy,
-        });
+      if (payload.paymentAmount && payload.paymentAmount > 0 && !payload.paymentMode) {
+        throw new AppError('paymentMode required if paymentAmount provided', 400);
       }
 
       await queryRunner.commitTransaction();
+
+      // Record the payment through the standard flow AFTER commit so it creates the
+      // PaymentTransaction, updates the InvoiceLedger and posts to the cashbook/day book.
+      // Best-effort: the sale itself must survive a payment-recording failure.
+      if (payload.paymentAmount && payload.paymentAmount > 0) {
+        try {
+          await this.recordPayment(
+            savedInvoice.id,
+            {
+              paymentMode: payload.paymentMode!,
+              referenceNumber: payload.paymentReference,
+              amount: Number(payload.paymentAmount),
+              remarks: 'Direct Sale Payment',
+            },
+            payload.createdBy,
+          );
+        } catch (err) {
+          logger.error(
+            `Failed to record payment for direct sale ${savedInvoice.invoiceNumber}`,
+            err,
+          );
+        }
+      }
 
       // Emit Events POST-COMMIT
       for (const allocation of allocationsToEmit) {
@@ -3453,6 +3490,11 @@ export class BillingService {
         layoutId: template.layoutId,
         notes: template.notes,
         totalAmount: template.totalAmount,
+        taxAmount: template.taxAmount,
+        taxPercent: template.taxPercent,
+        taxName: template.taxName,
+        taxRegistrationNumber: template.taxRegistrationNumber,
+        currencyCode: template.currencyCode,
         isTemplate: false,
         templateId,
         assignedEmployeeId: employeeId,
@@ -3684,8 +3726,19 @@ export class BillingService {
         totalAmount: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
           quotation.saleType,
         )
-          ? Number(quotation.grossAmount || 0) - finalDiscount
+          ? (Number(quotation.grossAmount || 0) - finalDiscount) *
+            (1 + Number(quotation.taxPercent || 0) / 100)
           : quotation.totalAmount,
+        taxAmount: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
+          quotation.saleType,
+        )
+          ? (Number(quotation.grossAmount || 0) - finalDiscount) *
+            (Number(quotation.taxPercent || 0) / 100)
+          : quotation.taxAmount,
+        taxPercent: quotation.taxPercent,
+        taxName: quotation.taxName,
+        taxRegistrationNumber: quotation.taxRegistrationNumber,
+        currencyCode: quotation.currencyCode,
         grossAmount: quotation.grossAmount,
         items: clonedItems,
       });
@@ -4357,6 +4410,13 @@ export class BillingService {
       transactionDate?: string | Date;
       remarks?: string;
       isSecurityDeposit?: boolean;
+      receiptUrl?: string;
+      /**
+       * Skips the invoice-status gate. Used by the legacy /payments/record path
+       * (advance collected at quotation conversion) which validated against the
+       * pending balance instead of the status.
+       */
+      bypassStatusCheck?: boolean;
     },
     userId?: string,
   ): Promise<PaymentTransaction> {
@@ -4373,11 +4433,45 @@ export class BillingService {
     const isSecurityDeposit =
       data.isSecurityDeposit === true || data.remarks?.toLowerCase() === 'security deposit';
 
-    if (!isActiveOrInvoiced && !isSecurityDeposit) {
+    if (
+      !isActiveOrInvoiced &&
+      !isSecurityDeposit &&
+      !invoice.isDirectSale &&
+      !data.bypassStatusCheck
+    ) {
       throw new AppError(
         'Payment is only allowed for active contracts/invoiced sales, unless it is a Security Deposit',
         400,
       );
+    }
+
+    if (Number(data.amount) <= 0) {
+      throw new AppError('Payment amount must be greater than zero', 400);
+    }
+
+    // Paid-so-far must count both payment tables: payment_transactions (current path)
+    // and payment_ledgers (legacy /payments/record path), so the ledger and the
+    // overpayment guard stay correct for invoices with history in either table.
+    const transactionRepoForSum = Source.getRepository(PaymentTransaction);
+    const { PaymentLedger } = await import('../entities/paymentLedgerEntity');
+    const legacyRepo = Source.getRepository(PaymentLedger);
+    const [priorTxns, legacyRows] = await Promise.all([
+      transactionRepoForSum.find({ where: { invoiceId } }),
+      legacyRepo.find({ where: { invoiceId } }),
+    ]);
+    const paidSoFar =
+      priorTxns.reduce((sum, t) => sum + Number(t.amount), 0) +
+      legacyRows.reduce((sum, p) => sum + Number(p.amountPaid), 0);
+
+    // Overpayment guard (skipped for security deposits, which sit outside the invoice total).
+    if (!isSecurityDeposit && Number(invoice.totalAmount) > 0) {
+      const pendingBalance = Number(invoice.totalAmount) - paidSoFar;
+      if (Number(data.amount) > pendingBalance + 0.01) {
+        throw new AppError(
+          `Payment amount (${data.amount}) exceeds pending balance (${pendingBalance.toFixed(2)})`,
+          400,
+        );
+      }
     }
 
     // Save transaction
@@ -4392,6 +4486,8 @@ export class BillingService {
       : new Date();
     transaction.recordedBy = userId;
     transaction.remarks = data.remarks || (isSecurityDeposit ? 'Security Deposit' : undefined);
+    transaction.currencyCode = invoice.currencyCode || undefined;
+    transaction.receiptUrl = data.receiptUrl;
 
     await transactionRepo.save(transaction);
 
@@ -4408,7 +4504,10 @@ export class BillingService {
     }
 
     if (ledger) {
-      ledger.paidAmount = Number(ledger.paidAmount) + Number(transaction.amount);
+      // Recompute from the full payment history (both tables) rather than
+      // incrementing, so ledgers stay correct even for invoices whose earlier
+      // payments went through the legacy path.
+      ledger.paidAmount = paidSoFar + Number(transaction.amount);
       ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
       await ledgerRepo.save(ledger);
 

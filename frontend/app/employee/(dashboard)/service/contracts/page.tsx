@@ -53,7 +53,9 @@ import {
   Gauge,
   Check,
   X,
+  Eye,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface CustomerMachine {
@@ -168,6 +170,7 @@ const emptyForm = (): ContractFormState => ({
 });
 
 export default function ServiceContractsPage() {
+  const router = useRouter();
   const [contracts, setContracts] = useState<ServiceContract[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -418,7 +421,8 @@ export default function ServiceContractsPage() {
     const num = (v: string) => (v === '' || isNaN(Number(v)) ? null : Number(v));
 
     if (c.contractType === 'AMC') {
-      return { amount: Number(c.monthlyCharge) || 0, detail: 'Fixed monthly charge' };
+      // AMC readings are tracking-only — the contract fee is billed separately.
+      return null;
     }
     if (c.contractType === 'FSMA' && c.fsmaBillingMode === 'INDIVIDUAL') {
       const bw = num(readingForm.bwReading);
@@ -478,7 +482,9 @@ export default function ServiceContractsPage() {
         notes: readingForm.notes || undefined,
       });
       toast.success(
-        `Reading recorded — ${getActiveCurrency()} ${Number(saved.amountCharged).toFixed(2)} to collect for this period.`,
+        billingContract.contractType === 'AMC'
+          ? 'Meter reading recorded (tracking only — nothing to collect).'
+          : `Reading recorded — ${getActiveCurrency()} ${Number(saved.amountCharged).toFixed(2)} to collect for this period.`,
       );
       setReadingForm({ totalReading: '', bwReading: '', colorReading: '', notes: '' });
       const res = await getContractMeterReadings(billingContract.id);
@@ -580,8 +586,10 @@ export default function ServiceContractsPage() {
     const customer = customers.find((cust) => cust.id === c.customerId);
     const product = products.find((prod) => prod.id === c.productId);
     const customerName = customer ? customer.name.toLowerCase() : '';
-    const serialNo = product ? product.serial_no.toLowerCase() : '';
-    const modelName = product ? product.name.toLowerCase() : '';
+    const serialNo = (c.machine?.serialNumber || product?.serial_no || '').toLowerCase();
+    const modelName = (
+      c.machine ? `${c.machine.brand} ${c.machine.modelName}` : product?.name || ''
+    ).toLowerCase();
 
     const matchesSearch =
       customerName.includes(searchTerm.toLowerCase()) ||
@@ -872,7 +880,7 @@ export default function ServiceContractsPage() {
             <TableRow>
               <TableHead className="font-bold text-xs text-slate-600 w-[20%]">Customer</TableHead>
               <TableHead className="font-bold text-xs text-slate-600 w-[25%]">
-                Machine (Serial)
+                Machine (Model)
               </TableHead>
               <TableHead className="font-bold text-xs text-slate-600 w-[10%]">Type</TableHead>
               <TableHead className="font-bold text-xs text-slate-600 w-[12%]">Start Date</TableHead>
@@ -911,10 +919,11 @@ export default function ServiceContractsPage() {
                     <TableCell className="py-3">
                       <div className="flex flex-col min-w-0">
                         <span className="font-bold text-xs text-slate-800 truncate">
-                          {product ? `${product.brand} ${product.name}` : 'Unknown Product'}
-                        </span>
-                        <span className="font-mono text-[10px] text-slate-400 mt-0.5 truncate">
-                          S/N: {product ? product.serial_no : 'N/A'}
+                          {c.machine
+                            ? `${c.machine.brand} ${c.machine.modelName}`
+                            : product
+                              ? `${product.brand} ${product.name}`
+                              : 'Unknown Product'}
                         </span>
                       </div>
                     </TableCell>
@@ -959,6 +968,15 @@ export default function ServiceContractsPage() {
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => router.push(`/employee/service/contracts/${c.id}`)}
+                          title="View contract details"
+                          className="h-7 w-7 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1010,21 +1028,35 @@ export default function ServiceContractsPage() {
 
           <form onSubmit={handleSave} className="flex flex-col flex-1 min-h-0">
             <div className="grid grid-cols-2 gap-4 overflow-y-auto px-6 py-4">
-              {/* Customer Selection */}
+              {/* Customer Selection — fixed for the contract's lifetime once created */}
               <div className="col-span-2 flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Select Customer</label>
-                <SearchableSelect
-                  options={customerOptions}
-                  value={formState.customerId}
-                  onValueChange={(val) =>
-                    setFormState((prev) => ({ ...prev, customerId: val, productId: '' }))
-                  }
-                  placeholder="Choose customer..."
-                />
+                <label className="text-xs font-bold text-slate-600">
+                  {editingContract ? 'Customer' : 'Select Customer'}
+                </label>
+                {editingContract ? (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    <span className="text-xs font-semibold text-slate-700">
+                      {customers.find((cust) => cust.id === formState.customerId)?.name ||
+                        'Unknown Customer'}
+                    </span>
+                    <span className="block text-[10px] text-slate-400 mt-0.5">
+                      The customer cannot be changed — this contract belongs to them.
+                    </span>
+                  </div>
+                ) : (
+                  <SearchableSelect
+                    options={customerOptions}
+                    value={formState.customerId}
+                    onValueChange={(val) =>
+                      setFormState((prev) => ({ ...prev, customerId: val, productId: '' }))
+                    }
+                    placeholder="Choose customer..."
+                  />
+                )}
               </div>
 
               {/* CUSTOMER MACHINES SUMMARY PANEL */}
-              {formState.customerId && (
+              {formState.customerId && !editingContract && (
                 <div className="col-span-2 border border-slate-100 rounded-xl p-4 bg-slate-50/50 space-y-3">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-1.5">
                     <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -1120,26 +1152,35 @@ export default function ServiceContractsPage() {
               {/* Selected machine (picked from the registry above) */}
               {formState.productId ? (
                 (() => {
+                  const editMachine = editingContract?.machine;
                   const regMachine = customerMachines.find((m) => m.id === formState.productId);
                   const prodMachine = products.find((p) => p.id === formState.productId);
-                  const label = regMachine
-                    ? `${regMachine.modelName} (S/N: ${regMachine.serialNumber})`
-                    : prodMachine
-                      ? `${prodMachine.brand} ${prodMachine.name} (S/N: ${prodMachine.serial_no})`
-                      : 'Selected machine';
+                  const label = editMachine
+                    ? `${editMachine.brand} ${editMachine.modelName} (S/N: ${editMachine.serialNumber})`
+                    : regMachine
+                      ? `${regMachine.modelName} (S/N: ${regMachine.serialNumber})`
+                      : prodMachine
+                        ? `${prodMachine.brand} ${prodMachine.name} (S/N: ${prodMachine.serial_no})`
+                        : 'Selected machine';
                   return (
                     <div className="col-span-2 flex items-center justify-between p-2.5 bg-emerald-50/50 border border-emerald-200 rounded-xl">
                       <span className="text-xs font-semibold text-emerald-800 flex items-center gap-1.5">
                         <Check className="h-3.5 w-3.5" />
                         {label}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setFormState((prev) => ({ ...prev, productId: '' }))}
-                        className="text-[10px] font-bold text-slate-400 hover:text-rose-600"
-                      >
-                        Clear
-                      </button>
+                      {editingContract ? (
+                        <span className="text-[10px] font-bold text-slate-400">
+                          Machine cannot be changed
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setFormState((prev) => ({ ...prev, productId: '' }))}
+                          className="text-[10px] font-bold text-slate-400 hover:text-rose-600"
+                        >
+                          Clear
+                        </button>
+                      )}
                     </div>
                   );
                 })()
@@ -1603,7 +1644,7 @@ export default function ServiceContractsPage() {
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-xs">
               {billingContract?.contractType === 'AMC' &&
-                'AMC bills a fixed monthly fee — record an entry each month to log the collection.'}
+                'AMC covers service visits & labour for the contract fee — meter readings here are optional, for tracking only, and are never charged.'}
               {billingContract?.contractType === 'SMA' &&
                 'Enter the machine meter each month/visit. Copies beyond the contract limit are billed at the agreed per-copy rate.'}
               {billingContract?.contractType === 'FSMA' &&
@@ -1663,6 +1704,13 @@ export default function ServiceContractsPage() {
                   free while the contract is within time and copy limit.
                 </p>
               )}
+              {billingContract.contractType === 'AMC' && (
+                <p className="text-[11px] text-blue-700 bg-blue-50/60 border border-blue-100 rounded-lg p-2.5">
+                  AMC has no per-click or monthly meter billing — readings are optional and kept
+                  only to track machine usage. Spare parts and toner are billed as used via service
+                  tickets.
+                </p>
+              )}
 
               {/* Record new reading */}
               <form
@@ -1671,7 +1719,9 @@ export default function ServiceContractsPage() {
               >
                 <span className="text-xs font-bold text-slate-700 block">
                   Record{' '}
-                  {billingContract.contractType === 'AMC' ? 'Monthly Billing' : 'New Reading'}
+                  {billingContract.contractType === 'AMC'
+                    ? 'Meter Reading (tracking only)'
+                    : 'New Reading'}
                 </span>
                 <div className="grid grid-cols-2 gap-3">
                   {billingContract.contractType === 'FSMA' &&
@@ -1789,7 +1839,11 @@ export default function ServiceContractsPage() {
                   disabled={savingReading}
                   className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm"
                 >
-                  {savingReading ? 'Saving...' : 'Save & Compute Charge'}
+                  {savingReading
+                    ? 'Saving...'
+                    : billingContract.contractType === 'AMC'
+                      ? 'Save Reading'
+                      : 'Save & Compute Charge'}
                 </Button>
               </form>
 
