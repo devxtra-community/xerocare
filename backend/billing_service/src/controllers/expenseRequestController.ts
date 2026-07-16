@@ -381,6 +381,126 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
     if (request.status !== 'SUBMITTED')
       throw new AppError('Only SUBMITTED requests can be approved', 400);
 
+    // ── MANAGER_PURCHASE approval path ─────────────────────────────────────────
+    if (request.requestSource === 'MANAGER_PURCHASE') {
+      const { notes } = req.body ?? {};
+      const isCheque = (request.paymentMode ?? '').trim().toLowerCase() === 'cheque';
+
+      if (isCheque) {
+        // Cheque path: create the ISSUED cheque record (PENDING), no cash deduction yet.
+        // PurchasePayment was already recorded at submission. Cash moves when Finance
+        // marks the cheque Cleared in the Cheques module.
+        await Source.transaction(async (manager) => {
+          request.status = 'PAID';
+          request.reviewedBy = userId;
+          request.reviewedAt = new Date();
+          request.paidAt = new Date();
+          if (notes) request.notes = notes;
+          await manager.save(EmployeeExpenseRequest, request);
+        });
+
+        // Create ISSUED cheque record (non-fatal if it fails)
+        if (request.chequeNumber) {
+          try {
+            const chequeRepo = Source.getRepository(Cheque);
+            const existing = await chequeRepo.findOne({
+              where: { chequeNo: request.chequeNumber, branchId: request.branchId },
+            });
+            if (!existing) {
+              const c = chequeRepo.create({
+                chequeNo: request.chequeNumber,
+                bankName: request.chequeBankName || undefined,
+                partyName: request.vendorName || request.employeeName,
+                amount: Number(request.amount),
+                dueDate: request.chequeDueDate ? new Date(request.chequeDueDate) : new Date(),
+                issueDate: new Date(),
+                type: 'ISSUED',
+                status: 'PENDING',
+                description: `Vendor purchase: ${request.purchaseRef || request.requestNo} — ${request.vendorName || 'vendor'}`,
+                branchId: request.branchId,
+                sourceType: 'PURCHASE',
+                sourceReferenceId: request.purchaseId || undefined,
+                sourceLabel: request.purchaseRef
+                  ? `Purchase ${request.purchaseRef}`
+                  : 'Purchase Order',
+                createdBy: userId,
+              });
+              await chequeRepo.save(c);
+            }
+          } catch (err) {
+            logger.error(
+              '[approveExpenseRequest] Failed to create ISSUED cheque for MANAGER_PURCHASE',
+              err,
+            );
+          }
+        }
+      } else {
+        // Cash / Bank Transfer path: deduct from the Manager-selected account now.
+        const accountId = request.paidFromAccountId;
+        if (!accountId) {
+          throw new AppError('No payment account stored on this request', 400);
+        }
+
+        // Generate cashbook ref BEFORE transaction (pool max=1)
+        const cbYear = new Date().getFullYear();
+        const cbCount = await Source.getRepository(CashbookEntry)
+          .createQueryBuilder('c')
+          .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+          .getCount();
+        const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+
+        await Source.transaction(async (manager) => {
+          request.status = 'PAID';
+          request.reviewedBy = userId;
+          request.reviewedAt = new Date();
+          request.paidAt = new Date();
+          request.paidFromAccount = accountId;
+          if (notes) request.notes = notes;
+          await manager.save(EmployeeExpenseRequest, request);
+
+          const accountRepo = manager.getRepository(CashBankAccount);
+          const account = await accountRepo.findOne({ where: { id: accountId } });
+          if (!account) {
+            throw new AppError(
+              `Cash/Bank account ${accountId} not found — approval aborted. The account may have been removed. Ask the Manager to resubmit with a valid account.`,
+              400,
+            );
+          }
+          account.currentBalance = Number(account.currentBalance) - Number(request.amount);
+          await manager.save(CashBankAccount, account);
+
+          const cbEntry = manager.create(CashbookEntry, {
+            referenceNo: cbRefNo,
+            date: new Date(),
+            accountId,
+            entryType: 'PAYMENT',
+            amount: request.amount,
+            category: 'Vendor Purchase',
+            description: `Vendor payment: ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
+            paymentMode: request.paymentMode || 'Cash',
+            notes: notes || request.notes,
+            createdBy: userId,
+            branchId: request.branchId,
+          });
+          await manager.save(CashbookEntry, cbEntry);
+        });
+      }
+
+      // Notify the Manager
+      await sendNotification(
+        request.employeeId,
+        'Purchase Payment Approved ✅',
+        isCheque
+          ? `Your ${request.currency} ${Number(request.amount).toFixed(2)} cheque payment to ${request.vendorName || 'vendor'} has been approved. Cheque is now ISSUED (PENDING clearance).`
+          : `Your ${request.currency} ${Number(request.amount).toFixed(2)} payment to ${request.vendorName || 'vendor'} has been approved and funds deducted.`,
+        'EXPENSE_APPROVED',
+      );
+
+      const updated = await repo.findOne({ where: { id: String(req.params.id) } });
+      return res.json({ success: true, data: updated });
+    }
+
+    // ── EMPLOYEE_EXPENSE approval path (unchanged) ──────────────────────────────
     const { paid_from_account, payment_reference, notes } = req.body ?? {};
     const payImmediately = !!paid_from_account;
 
@@ -510,14 +630,394 @@ export const rejectExpenseRequest = async (req: Request, res: Response, next: Ne
     request.rejectionReason = rejection_reason.trim();
     const saved = await repo.save(request);
 
-    await sendNotification(
-      request.employeeId,
-      'Expense Rejected ❌',
-      `Your ${request.category} expense was rejected. Reason: ${rejection_reason}. You can resubmit after corrections.`,
-      'EXPENSE_REJECTED',
-    );
+    if (request.requestSource === 'MANAGER_PURCHASE') {
+      // Reverse the PurchasePayment that was recorded at submission to restore outstanding balance.
+      if (request.purchasePaymentId && request.branchId) {
+        try {
+          const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+          const serviceToken = makeServiceToken();
+          const voidRes = await fetch(`${venInvUrl}/purchases/internal/void-payment`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${serviceToken}`,
+              'x-internal-service': 'billing',
+            },
+            body: JSON.stringify({
+              paymentId: request.purchasePaymentId,
+              branchId: request.branchId,
+            }),
+          });
+          if (!voidRes.ok) {
+            const errText = await voidRes.text();
+            logger.warn(
+              '[rejectExpenseRequest] ven_inv void-payment failed (non-critical):',
+              voidRes.status,
+              errText,
+            );
+          } else {
+            logger.info('[rejectExpenseRequest] PurchasePayment voided successfully', {
+              purchasePaymentId: request.purchasePaymentId,
+              requestNo: request.requestNo,
+            });
+          }
+        } catch (voidErr) {
+          logger.warn(
+            '[rejectExpenseRequest] Failed to void PurchasePayment (non-critical):',
+            voidErr,
+          );
+        }
+      }
+
+      await sendNotification(
+        request.employeeId,
+        'Purchase Payment Rejected ❌',
+        `Your ${request.currency} ${Number(request.amount).toFixed(2)} payment request to ${request.vendorName || 'vendor'} was rejected. Reason: ${rejection_reason}. Outstanding balance on the purchase has been restored.`,
+        'EXPENSE_REJECTED',
+      );
+    } else {
+      await sendNotification(
+        request.employeeId,
+        'Expense Rejected ❌',
+        `Your ${request.category} expense was rejected. Reason: ${rejection_reason}. You can resubmit after corrections.`,
+        'EXPENSE_REJECTED',
+      );
+    }
 
     res.json({ success: true, data: saved });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Manager Purchase Payment Request ─────────────────────────────────────────
+// Called directly by the Manager's AddPaymentModal (JWT-authenticated).
+// Records the PurchasePayment in ven_inv immediately (outstanding reduces) but
+// holds the cash movement until Finance approves.
+
+export const createManagerPurchasePaymentRequest = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { userId, role, branchId } = req.user!;
+    if (role !== 'MANAGER') {
+      throw new AppError('Only Branch Managers can submit purchase payment requests', 403);
+    }
+
+    const {
+      purchaseId,
+      purchaseRef,
+      vendorName,
+      amount,
+      paymentMethod,
+      paidFromAccountId,
+      chequeNumber,
+      chequeBankName,
+      chequeDueDate,
+      description,
+      referenceNumber,
+      paymentDate,
+      currency,
+    } = req.body;
+
+    if (!purchaseId || !amount || !paymentMethod) {
+      throw new AppError('purchaseId, amount, and paymentMethod are required', 400);
+    }
+
+    const empInfo = await fetchEmployeeInfo(userId);
+    const managerName = empInfo?.name || 'Branch Manager';
+    const empBranchId = empInfo?.branchId || branchId || '';
+    const branchName = empInfo?.branchName || 'Unknown Branch';
+
+    // Payment proof uploaded by the Manager (multipart `proof` field → R2).
+    const proofFile = req.file as { key?: string } | undefined;
+    const R2_BASE_URL =
+      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
+    const proofUrl = proofFile?.key ? `${R2_BASE_URL}/${proofFile.key}` : undefined;
+
+    // Step 1: Record PurchasePayment in ven_inv immediately (outstanding reduces now).
+    // Cash is NOT moved yet — that happens when Finance approves.
+    const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+    const serviceToken = makeServiceToken();
+    const venInvRes = await fetch(`${venInvUrl}/purchases/internal/record-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceToken}`,
+        'x-internal-service': 'billing',
+      },
+      body: JSON.stringify({
+        purchaseId,
+        branchId: empBranchId,
+        amount: parseFloat(String(amount)),
+        paymentMethod,
+        description:
+          description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+        referenceNumber,
+        paymentDate: paymentDate || new Date().toISOString().split('T')[0],
+        createdBy: userId,
+        attachmentUrl: proofUrl,
+      }),
+    });
+
+    let purchasePaymentId: string | undefined;
+    let purchaseOrigin: string | undefined;
+    if (venInvRes.ok) {
+      const venInvData = await venInvRes.json();
+      purchasePaymentId = venInvData.data?.id;
+      purchaseOrigin = venInvData.data?.purchaseOrigin || undefined;
+    } else {
+      const errText = await venInvRes.text();
+      logger.warn('[ManagerPurchaseReq] ven_inv record-payment failed:', venInvRes.status, errText);
+      throw new AppError(`Failed to record purchase payment in inventory service: ${errText}`, 502);
+    }
+
+    // Step 2: Route by paymentMethod.
+    // Cheque → bypass approval queue; create ISSUED cheque directly (Cheques-to-Vendors page).
+    // Cash / Bank → go through Finance approval queue (existing flow).
+    if (paymentMethod === 'Cheque') {
+      const chequeRepo = Source.getRepository(Cheque);
+      const chequeNo = chequeNumber || referenceNumber || `CHQ-${Date.now()}`;
+      const existing = await chequeRepo.findOne({ where: { chequeNo, branchId: empBranchId } });
+      if (!existing) {
+        const cheque = chequeRepo.create({
+          chequeNo,
+          bankName: chequeBankName || undefined,
+          partyName: vendorName || 'Vendor',
+          amount: parseFloat(String(amount)),
+          dueDate: chequeDueDate ? new Date(chequeDueDate) : new Date(),
+          issueDate: paymentDate ? new Date(paymentDate) : new Date(),
+          type: 'ISSUED',
+          status: 'PENDING',
+          description:
+            description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+          branchId: empBranchId,
+          sourceType: 'PURCHASE',
+          sourceReferenceId: purchaseId,
+          sourceLabel: purchaseRef ? `Purchase ${purchaseRef}` : 'Purchase Order',
+          createdBy: userId,
+        });
+        await chequeRepo.save(cheque);
+      }
+      logger.info('[ManagerPurchaseReq] Cheque created directly (no approval queue)', {
+        chequeNo,
+        purchaseId,
+        purchasePaymentId,
+        amount,
+      });
+      return res.status(201).json({
+        success: true,
+        data: {
+          purchasePaymentId,
+          chequeNo,
+          message:
+            'PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
+        },
+      });
+    }
+
+    // Cash / Bank: create approval-queue request and hold funds until Finance approves.
+    const requestNo = await generateRequestNo();
+    const repo = Source.getRepository(EmployeeExpenseRequest);
+
+    const request = repo.create({
+      requestNo,
+      employeeId: userId,
+      employeeName: managerName,
+      employeeRole: 'MANAGER',
+      branchId: empBranchId,
+      branchName,
+      date: paymentDate ? new Date(paymentDate) : new Date(),
+      category: 'Vendor Purchase',
+      subCategory: paymentMethod,
+      description:
+        description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+      amount: parseFloat(String(amount)),
+      currency: currency || 'AED',
+      status: 'SUBMITTED',
+      submittedAt: new Date(),
+      requestSource: 'MANAGER_PURCHASE',
+      purchaseId,
+      purchaseRef: purchaseRef || undefined,
+      vendorName: vendorName || undefined,
+      purchaseOrigin: purchaseOrigin || undefined,
+      receiptUrl: proofUrl,
+      paymentMode: paymentMethod,
+      paidFromAccountId: paidFromAccountId || undefined,
+      purchasePaymentId: purchasePaymentId || undefined,
+      chequeNumber: chequeNumber || undefined,
+      chequeBankName: chequeBankName || undefined,
+      chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : undefined,
+      notes: `Manager purchase payment request. PurchasePayment recorded in ven_inv (ID: ${purchasePaymentId || 'N/A'}). Cash held pending Finance approval.`,
+    });
+
+    const saved = await repo.save(request);
+
+    // Notify Finance Managers to review.
+    const fmIds = await findFinanceManagersOfBranch(empBranchId);
+    for (const fmId of fmIds) {
+      await sendNotification(
+        fmId,
+        'Purchase Payment — Approval Required',
+        `${managerName} requests ${currency || 'AED'} ${parseFloat(String(amount)).toFixed(2)} payment to ${vendorName || 'vendor'} via ${paymentMethod}. Cash held until you approve.`,
+        'EXPENSE_REQUEST',
+        '/finance/accounts/expenses?tab=requests',
+      );
+    }
+
+    logger.info('[ManagerPurchaseReq] Created successfully', {
+      requestNo,
+      purchaseId,
+      purchasePaymentId,
+      amount,
+      paymentMethod,
+    });
+
+    res.status(201).json({ success: true, data: saved });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Internal endpoint (called by ven_inv_service after purchase payment) ─────
+
+export const createExpenseRequestFromPurchasePayment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    if (req.headers['x-internal-service'] !== 'ven-inv') {
+      throw new AppError('Unauthorized', 401);
+    }
+
+    const {
+      employeeId,
+      branchId,
+      amount,
+      paymentMethod,
+      currency,
+      vendorName,
+      purchaseRef,
+      purchaseId,
+      purchaseOrigin,
+      description,
+      attachmentUrl,
+      date,
+      paidFromAccountId,
+    } = req.body;
+
+    if (!employeeId || !branchId || !amount) {
+      throw new AppError('employeeId, branchId and amount are required', 400);
+    }
+
+    const empInfo = await fetchEmployeeInfo(employeeId);
+    const employeeName = empInfo?.name || 'Branch Manager';
+    const branchName = empInfo?.branchName || 'Unknown Branch';
+
+    const requestNo = await generateRequestNo();
+    const repo = Source.getRepository(EmployeeExpenseRequest);
+
+    const request = repo.create({
+      requestNo,
+      employeeId,
+      employeeName,
+      employeeRole: 'MANAGER',
+      branchId,
+      branchName,
+      date: date ? new Date(date) : new Date(),
+      category: 'Vendor Purchase',
+      subCategory: paymentMethod || 'Cash',
+      description: description || `Purchase payment to ${vendorName || 'vendor'}`,
+      amount: parseFloat(String(amount)),
+      currency: currency || 'AED',
+      receiptUrl: attachmentUrl || undefined,
+      // Keep requestSource = EMPLOYEE_EXPENSE (default): funds were already deducted
+      // below, so this must never enter the MANAGER_PURCHASE approve-deduct branch.
+      purchaseId: purchaseId || undefined,
+      purchaseRef: purchaseRef || undefined,
+      vendorName: vendorName || undefined,
+      purchaseOrigin: purchaseOrigin || undefined,
+      paymentMode: paymentMethod || undefined,
+      notes: `Auto-created from purchase payment. Ref: ${purchaseRef || 'N/A'}. Method: ${paymentMethod || 'N/A'}.`,
+      status: 'SUBMITTED',
+      submittedAt: new Date(),
+    });
+
+    const saved = await repo.save(request);
+
+    // Immediately deduct from cash/bank account (bypasses MANAGER read-only restriction
+    // since this is a server-to-server internal call with no parseBranchFilter middleware)
+    if (paidFromAccountId && paymentMethod !== 'Cheque') {
+      try {
+        // Generate cashbook ref BEFORE transaction (pool max=1 constraint)
+        const cbYear = new Date().getFullYear();
+        const cbCount = await Source.getRepository(CashbookEntry)
+          .createQueryBuilder('c')
+          .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+          .getCount();
+        const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+
+        await Source.transaction(async (manager) => {
+          const accountRepo = manager.getRepository(CashBankAccount);
+          const account = await accountRepo.findOne({ where: { id: paidFromAccountId } });
+          if (account) {
+            account.currentBalance = Number(account.currentBalance) - parseFloat(String(amount));
+            await manager.save(CashBankAccount, account);
+          } else {
+            logger.warn(
+              `[ExpenseRequest] Account ${paidFromAccountId} not found — balance not deducted`,
+            );
+          }
+
+          const cbEntry = manager.create(CashbookEntry, {
+            referenceNo: cbRefNo,
+            date: date ? new Date(date) : new Date(),
+            accountId: paidFromAccountId,
+            entryType: 'PAYMENT',
+            amount: parseFloat(String(amount)),
+            category: 'Vendor Purchase',
+            description: `Vendor payment: ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+            paymentMode: paymentMethod || 'Cash',
+            notes: `Auto-deducted from purchase payment. Ref: ${purchaseRef || 'N/A'}.`,
+            createdBy: employeeId,
+            branchId,
+          });
+          await manager.save(CashbookEntry, cbEntry);
+        });
+
+        logger.info('[ExpenseRequest] Balance deducted immediately for purchase payment', {
+          paidFromAccountId,
+          amount,
+          purchaseRef,
+        });
+      } catch (deductErr) {
+        logger.warn('[ExpenseRequest] Account deduction failed (non-critical):', deductErr);
+      }
+    }
+
+    const fmIds = await findFinanceManagersOfBranch(branchId);
+    for (const fmId of fmIds) {
+      await sendNotification(
+        fmId,
+        'Purchase Payment — Review Required',
+        `${employeeName} paid ${currency || 'AED'} ${Number(amount).toFixed(2)} to ${vendorName || 'vendor'} (${purchaseRef || 'N/A'}) via ${paymentMethod || 'Cash'}. Amount already deducted from account.`,
+        'EXPENSE_REQUEST',
+        '/finance/accounts/expenses?tab=requests',
+      );
+    }
+
+    logger.info('[ExpenseRequest] Auto-created from purchase payment', {
+      requestNo,
+      employeeId,
+      branchId,
+      amount,
+      purchaseRef,
+    });
+
+    res.status(201).json({ success: true, data: saved });
   } catch (err) {
     next(err);
   }

@@ -71,6 +71,8 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
     'BANK_TRANSFER',
   );
   const [depositRef, setDepositRef] = useState('');
+  const [depositChequeBankName, setDepositChequeBankName] = useState('');
+  const [depositChequeDueDate, setDepositChequeDueDate] = useState('');
 
   // Meter Readings
   const rentalItems =
@@ -298,6 +300,10 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
           mode: depositMode,
           reference: depositRef,
           receivedDate: new Date().toISOString().split('T')[0],
+          ...(depositMode === 'CHEQUE' && {
+            chequeBankName: depositChequeBankName || undefined,
+            chequeDueDate: depositChequeDueDate || undefined,
+          }),
         };
       }
 
@@ -454,14 +460,40 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                         </Select>
                       </div>
                       <div className="space-y-1.5 col-span-2">
-                        <Label className="text-xs text-slate-500">Reference / Check No.</Label>
+                        <Label className="text-xs text-slate-500">
+                          {depositMode === 'CHEQUE' ? 'Cheque Number' : 'Reference No.'}
+                        </Label>
                         <Input
                           value={depositRef}
                           onChange={(e) => setDepositRef(e.target.value)}
-                          placeholder="Optional reference..."
+                          placeholder={
+                            depositMode === 'CHEQUE' ? 'e.g. 001234' : 'Optional reference...'
+                          }
                           className="bg-white"
                         />
                       </div>
+                      {depositMode === 'CHEQUE' && (
+                        <>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-slate-500">Bank Name</Label>
+                            <Input
+                              value={depositChequeBankName}
+                              onChange={(e) => setDepositChequeBankName(e.target.value)}
+                              placeholder="e.g. QNB, HSBC..."
+                              className="bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-slate-500">Cheque Due Date</Label>
+                            <Input
+                              type="date"
+                              value={depositChequeDueDate}
+                              onChange={(e) => setDepositChequeDueDate(e.target.value)}
+                              className="bg-white"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

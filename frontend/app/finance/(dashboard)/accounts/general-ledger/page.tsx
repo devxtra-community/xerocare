@@ -174,34 +174,84 @@ export default function GeneralLedgerPage() {
       });
     });
     purchases.forEach((p) => {
+      // Four non-overlapping cost buckets that sum to exactly p.totalAmount (which already
+      // includes shipping/handling/transport/groundfield/labour internally — see
+      // purchaseRepository.ts) plus customsDuty, which is tracked separately and never part
+      // of totalAmount. Posting totalAmount as 5004 AND shipping/handling again as 5005 would
+      // double-count; this split avoids that.
+      const vendorPurchaseCost = Number(p.purchaseAmount ?? 0) + Number(p.documentationFee ?? 0);
+      const shippingHandling =
+        Number(p.shippingCost ?? 0) +
+        Number(p.handlingFee ?? 0) +
+        Number(p.transportationCost ?? 0) +
+        Number(p.groundfieldCost ?? 0);
+      const importLabour = Number(p.labourCost ?? 0);
+      const customsDuty = Number(p.customsDuty ?? 0);
+      const dateStr = p.createdAt?.slice(0, 10) ?? '';
+      const vendorName = p.vendor?.name ?? '';
+      const cur = p.currencyCode ?? currency;
+
       rows.push({
-        date: p.createdAt?.slice(0, 10) ?? '',
+        date: dateStr,
         account: '5004 Vendor Purchase Cost',
-        description: `Purchase from ${p.vendor?.name ?? ''}`,
+        description: `Purchase from ${vendorName}`,
         source: 'Purchase Order',
-        debit: p.totalAmount ?? 0,
+        debit: vendorPurchaseCost,
         credit: 0,
-        currency: p.currencyCode ?? currency,
+        currency: cur,
       });
       rows.push({
-        date: p.createdAt?.slice(0, 10) ?? '',
+        date: dateStr,
         account: '2001 Accounts Payable',
-        description: `Purchase from ${p.vendor?.name ?? ''}`,
+        description: `Purchase from ${vendorName}`,
         source: 'Purchase Order',
         debit: 0,
         credit: p.totalAmount ?? 0,
-        currency: p.currencyCode ?? currency,
+        currency: cur,
       });
-      if ((p.shippingCost ?? 0) + (p.handlingFee ?? 0) > 0)
+      if (shippingHandling > 0)
         rows.push({
-          date: p.createdAt?.slice(0, 10) ?? '',
+          date: dateStr,
           account: '5005 Shipping & Handling',
-          description: `Freight on PO from ${p.vendor?.name ?? ''}`,
+          description: `Freight on PO from ${vendorName}`,
           source: 'Purchase Order',
-          debit: (p.shippingCost ?? 0) + (p.handlingFee ?? 0),
+          debit: shippingHandling,
           credit: 0,
-          currency: p.currencyCode ?? currency,
+          currency: cur,
         });
+      if (importLabour > 0)
+        rows.push({
+          date: dateStr,
+          account: '5014 Import / Purchase Labour Cost',
+          description: `Import labour on PO from ${vendorName}`,
+          source: 'Purchase Order',
+          debit: importLabour,
+          credit: 0,
+          currency: cur,
+        });
+      if (customsDuty > 0) {
+        // Customs duty is owed to the customs authority, not the vendor — it never adds to
+        // Accounts Payable (2001). Modeled as paid at clearance, matching how other direct
+        // expenses (e.g. payroll below) credit Cash at Bank rather than a payable.
+        rows.push({
+          date: dateStr,
+          account: '5015 Customs Duty',
+          description: `Customs duty on PO from ${vendorName}`,
+          source: 'Purchase Order',
+          debit: customsDuty,
+          credit: 0,
+          currency: cur,
+        });
+        rows.push({
+          date: dateStr,
+          account: '1002 Cash at Bank',
+          description: `Customs duty paid on PO from ${vendorName}`,
+          source: 'Purchase Order',
+          debit: 0,
+          credit: customsDuty,
+          currency: cur,
+        });
+      }
     });
     payroll.forEach((p) => {
       const dateStr = `${p.year}-${String(p.month).padStart(2, '0')}-28`;

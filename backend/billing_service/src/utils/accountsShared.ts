@@ -20,12 +20,12 @@ export interface PnLResult {
   sparePartSalesRevenue: number;
   totalRevenue: number;
 
-  // Expense accounts 5001-5012
+  // Expense accounts 5001-5015
   costOfParts: number;
-  labourCost: number;
+  labourCost: number; // 5002: Technician Labour (service-ticket labour only — never blended with purchase-side labour)
   depreciationExpense: number;
-  vendorPurchases: number; // inventory POs + manual expense entries VENDOR_PURCHASE
-  shippingHandling: number; // shippingCost + handlingFee + transportCost + groundfieldCost
+  vendorPurchases: number; // 5004: inventory PO purchase_amount + documentation_fee + manual expense entries VENDOR_PURCHASE
+  shippingHandling: number; // 5005: shippingCost + handlingFee + transportCost + groundfieldCost
   salaryExpense: number;
   travelExpense: number;
   rentExpense: number;
@@ -34,6 +34,8 @@ export interface PnLResult {
   maintenanceExpense: number;
   insuranceExpense: number;
   otherExpenses: number;
+  importLabourCost: number; // 5014: purchase-side labour_cost (e.g. import/customs-clearance) — distinct from 5002
+  customsDuty: number; // 5015: purchases.customs_duty, expensed directly (not capitalized into inventory)
   totalExpenses: number;
 
   grossProfit: number;
@@ -430,38 +432,60 @@ export async function computeProfitAndLoss(
       '5001/5002: Inventory service unavailable — spare parts consumed and service labour may be understated (manual expense entries still counted).',
     );
 
-  // 5004/5005 — vendor purchase costs from Inventory service purchases
+  // 5004/5005/5014/5015 — vendor purchase costs from Inventory service purchases
   const purchaseCostUrl = `${invUrl}/purchases/internal/cost-report?${bParam ? `branchIds=${bParam.join(',')}` : ''}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
   const purchaseCostData = await internalGet<{
-    currencyGroups: { currencyCode: string; purchaseCost: number; shippingHandling: number }[];
+    currencyGroups: {
+      currencyCode: string;
+      purchaseCost: number;
+      shippingHandling: number;
+      importLabourCost: number;
+      customsDuty: number;
+    }[];
   }>(purchaseCostUrl);
   let crossServiceVendorPurchases = 0;
   let crossServiceShipping = 0;
+  let crossServiceImportLabour = 0;
+  let crossServiceCustomsDuty = 0;
   if (!purchaseCostData) {
     dataWarnings.push(
-      '5004/5005: Inventory service unavailable — purchase costs and shipping may be understated (manual expense entries still counted).',
+      '5004/5005/5014/5015: Inventory service unavailable — purchase costs, shipping, import labour and customs duty may be understated (manual expense entries still counted).',
     );
   } else {
     for (const grp of purchaseCostData.currencyGroups ?? []) {
       const pcResult = convertAmt(grp.purchaseCost, grp.currencyCode, baseCurrency, rates);
       const shResult = convertAmt(grp.shippingHandling, grp.currencyCode, baseCurrency, rates);
+      const ilResult = convertAmt(grp.importLabourCost, grp.currencyCode, baseCurrency, rates);
+      const cdResult = convertAmt(grp.customsDuty, grp.currencyCode, baseCurrency, rates);
       if (pcResult.warning) {
         if (!currencyWarnings.includes(pcResult.warning)) currencyWarnings.push(pcResult.warning);
       } else crossServiceVendorPurchases += pcResult.value;
       if (shResult.warning) {
         if (!currencyWarnings.includes(shResult.warning)) currencyWarnings.push(shResult.warning);
       } else crossServiceShipping += shResult.value;
+      if (ilResult.warning) {
+        if (!currencyWarnings.includes(ilResult.warning)) currencyWarnings.push(ilResult.warning);
+      } else crossServiceImportLabour += ilResult.value;
+      if (cdResult.warning) {
+        if (!currencyWarnings.includes(cdResult.warning)) currencyWarnings.push(cdResult.warning);
+      } else crossServiceCustomsDuty += cdResult.value;
     }
   }
 
   // 5001: cross-service COGS + manual expense entries SPARE_PARTS
   const costOfParts = crossServiceCogs + (expMap['SPARE_PARTS'] ?? 0);
-  // 5002: cross-service labour + manual expense entries LABOUR
+  // 5002: cross-service labour + manual expense entries LABOUR (service-ticket/technician labour only)
   const labourCost = crossServiceLabour + (expMap['LABOUR'] ?? 0);
-  // 5004: Inventory POs + manual expense entries VENDOR_PURCHASE
+  // 5004: Inventory POs (purchase_amount + documentation_fee only) + manual expense entries VENDOR_PURCHASE
   const vendorPurchases = crossServiceVendorPurchases + (expMap['VENDOR_PURCHASE'] ?? 0);
   // 5005: Inventory PO shipping/handling
   const shippingHandling = crossServiceShipping;
+  // 5014: purchase-side labour_cost (import/customs-clearance) + manual expense entries IMPORT_LABOUR —
+  // kept distinct from 5002 Technician Labour, which is service-ticket labour only.
+  const importLabourCost = crossServiceImportLabour + (expMap['IMPORT_LABOUR'] ?? 0);
+  // 5015: purchases.customs_duty + manual expense entries CUSTOMS_DUTY — expensed directly per
+  // business decision (not capitalized into inventory 1006/1009).
+  const customsDuty = crossServiceCustomsDuty + (expMap['CUSTOMS_DUTY'] ?? 0);
 
   const salaryExpense = expMap['SALARY'] ?? 0;
   const travelExpense = expMap['TRAVEL'] ?? 0;
@@ -483,6 +507,8 @@ export async function computeProfitAndLoss(
     'MARKETING',
     'MAINTENANCE',
     'INSURANCE',
+    'IMPORT_LABOUR',
+    'CUSTOMS_DUTY',
     'OTHER',
   ]);
   let otherExpenses = expMap['OTHER'] ?? 0;
@@ -512,6 +538,8 @@ export async function computeProfitAndLoss(
     marketingExpense +
     maintenanceExpense +
     insuranceExpense +
+    importLabourCost +
+    customsDuty +
     otherExpenses;
 
   const grossProfit = totalRevenue - costOfParts - labourCost;
@@ -543,6 +571,8 @@ export async function computeProfitAndLoss(
     marketingExpense,
     maintenanceExpense,
     insuranceExpense,
+    importLabourCost,
+    customsDuty,
     otherExpenses,
     totalExpenses,
     grossProfit,

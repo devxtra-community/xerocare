@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { numberToWords } from '@/lib/numberToWords';
 export interface QuotationLineItem {
   brand: string;
   modelNo?: string;
@@ -683,7 +684,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                   lineHeight: '1.4',
                 }}
               >
-                {numberToWords(totals.total)} Qatari Riyals Only
+                {numberToWords(totals.total, getActiveCurrency())}
               </div>
             </div>
 
@@ -742,61 +743,5 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
     </div>
   );
 };
-
-function numberToWords(num: number): string {
-  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const tens = [
-    '',
-    '',
-    'Twenty',
-    'Thirty',
-    'Forty',
-    'Fifty',
-    'Sixty',
-    'Seventy',
-    'Eighty',
-    'Ninety',
-  ];
-  const teens = [
-    'Ten',
-    'Eleven',
-    'Twelve',
-    'Thirteen',
-    'Fourteen',
-    'Fifteen',
-    'Sixteen',
-    'Seventeen',
-    'Eighteen',
-    'Nineteen',
-  ];
-
-  const convertGroup = (n: number): string => {
-    let res = '';
-    if (n >= 100) {
-      res += ones[Math.floor(n / 100)] + ' Hundred ';
-      n %= 100;
-    }
-    if (n >= 10 && n <= 19) {
-      res += teens[n - 10] + ' ';
-    } else if (n >= 20) {
-      res += tens[Math.floor(n / 10)] + ' ' + ones[n % 10] + ' ';
-    } else if (n > 0) {
-      res += ones[n] + ' ';
-    }
-    return res;
-  };
-
-  if (num === 0) return 'Zero';
-
-  let totalStr = '';
-  const thousand = Math.floor(num / 1000);
-  num %= 1000;
-  const remainder = Math.floor(num);
-
-  if (thousand > 0) totalStr += convertGroup(thousand) + 'Thousand ';
-  if (remainder > 0) totalStr += convertGroup(remainder);
-
-  return totalStr.trim();
-}
 
 export default SparePartsPremiumQuotation;

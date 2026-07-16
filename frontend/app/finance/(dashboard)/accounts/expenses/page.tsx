@@ -19,6 +19,8 @@ import {
   ChevronDown,
   ChevronUp,
   Wallet,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import {
   fetchExpenseEntries,
@@ -64,12 +66,18 @@ const EXPENSE_CATEGORIES = [
   'SPARE_PARTS',
   'LABOUR',
   'VENDOR_PURCHASE',
+  'SHIPPING_HANDLING',
+  'IMPORT_LABOUR',
+  'CUSTOMS_DUTY',
   'MARKETING',
   'MAINTENANCE',
   'INSURANCE',
   'OTHER',
 ];
 
+// IMPORT_LABOUR (5014, purchase-side import/customs-clearance labour) is kept visually and
+// categorically distinct from LABOUR (5002, service-ticket Technician Labour) — same reason
+// the account codes are split: blending them would misrepresent both numbers.
 const CATEGORY_COLORS: Record<string, string> = {
   SALARY: '#6366f1',
   TRAVEL: '#f59e0b',
@@ -78,6 +86,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   SPARE_PARTS: '#ef4444',
   LABOUR: '#8b5cf6',
   VENDOR_PURCHASE: '#ec4899',
+  SHIPPING_HANDLING: '#0ea5e9',
+  IMPORT_LABOUR: '#a855f7',
+  CUSTOMS_DUTY: '#d97706',
   MARKETING: '#14b8a6',
   MAINTENANCE: '#f97316',
   INSURANCE: '#06b6d4',
@@ -123,6 +134,7 @@ interface ExpenseTableRow {
   taxLabel: string;
   taxPercent?: number | null;
   _entry?: ExpenseEntry;
+  _purchase?: PurchaseOrder;
 }
 const thisMonthStart = `${today.slice(0, 7)}-01`;
 
@@ -612,6 +624,217 @@ function PayExpenseModal({
   );
 }
 
+// ─── Expense / Purchase Detail Modal (complete details + payment proof) ───────
+function ProofSection({ url }: { url?: string | null }) {
+  const isImage = !!url && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+  if (!url) return <p className="text-sm text-slate-400">No proof uploaded.</p>;
+  return (
+    <div className="space-y-2">
+      {isImage && (
+        <img
+          src={url}
+          alt="Payment proof"
+          className="w-full max-h-64 object-contain rounded-lg border bg-slate-50"
+        />
+      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+      >
+        <FileText className="h-4 w-4" /> View Full Proof
+      </a>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 text-sm">
+      <dt className="text-muted-foreground whitespace-nowrap">{label}</dt>
+      <dd className="font-medium text-slate-800 text-right break-words min-w-0">{value}</dd>
+    </div>
+  );
+}
+
+function ExpenseDetailModal({
+  row,
+  accounts,
+  onClose,
+}: {
+  row: ExpenseTableRow;
+  accounts: { id: string; name: string; type: string }[];
+  onClose: () => void;
+}) {
+  const entry = row._entry;
+  const po = row._purchase;
+
+  // Full purchase (with payment transactions incl. proof attachments) for purchase rows
+  const { data: fullPurchase, isLoading: loadingPurchase } = useQuery({
+    queryKey: ['purchase-detail', po?.id],
+    queryFn: async () => {
+      const { purchaseService } = await import('@/services/purchaseService');
+      return purchaseService.getPurchaseById(po!.id);
+    },
+    enabled: !!po?.id,
+  });
+
+  const origin = po?.purchaseOrigin;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {row.isPurchase ? 'Purchase Expense Details' : 'Expense Details'}
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-6 space-y-5">
+          <dl className="space-y-2.5">
+            <DetailRow
+              label="Reference"
+              value={<span className="font-mono">{row.expenseNo}</span>}
+            />
+            <DetailRow label="Date" value={row.date?.slice(0, 10) || '—'} />
+            <DetailRow label="Category" value={row.category.replace(/_/g, ' ')} />
+            <DetailRow label="Description" value={row.description || '—'} />
+            {row.isPurchase && origin && (
+              <DetailRow
+                label="Purchase Type"
+                value={
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide ${
+                      origin === 'DOMESTIC'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-indigo-100 text-indigo-700'
+                    }`}
+                  >
+                    {origin === 'DOMESTIC' ? 'LOCAL PURCHASE' : 'INTERNATIONAL PURCHASE'}
+                  </span>
+                }
+              />
+            )}
+            {po?.vendor?.name && <DetailRow label="Vendor" value={po.vendor.name} />}
+            <DetailRow label="Amount" value={formatCurrency(row.amount, row.currency)} />
+            {row.taxAmount > 0 && (
+              <DetailRow
+                label={row.taxLabel || 'Tax'}
+                value={formatCurrency(row.taxAmount, row.currency)}
+              />
+            )}
+            {po && (
+              <>
+                <DetailRow
+                  label="Paid"
+                  value={formatCurrency(Number(po.paidAmount || 0), row.currency)}
+                />
+                <DetailRow
+                  label="Remaining"
+                  value={formatCurrency(
+                    Number(
+                      po.remainingAmount ?? Number(po.totalAmount) - Number(po.paidAmount || 0),
+                    ),
+                    row.currency,
+                  )}
+                />
+              </>
+            )}
+            {entry && (
+              <>
+                {entry.subCategory && <DetailRow label="Sub-category" value={entry.subCategory} />}
+                {entry.paymentMode && <DetailRow label="Payment Mode" value={entry.paymentMode} />}
+                {entry.paidFrom && (
+                  <DetailRow
+                    label="Paid From"
+                    value={accounts.find((a) => a.id === entry.paidFrom)?.name || entry.paidFrom}
+                  />
+                )}
+                {entry.paymentDate && (
+                  <DetailRow label="Payment Date" value={String(entry.paymentDate).slice(0, 10)} />
+                )}
+                {entry.referenceNo && <DetailRow label="Reference No" value={entry.referenceNo} />}
+                {entry.notes && <DetailRow label="Notes" value={entry.notes} />}
+              </>
+            )}
+            <DetailRow
+              label="Status"
+              value={
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[row.status] ?? ''}`}
+                >
+                  {row.status}
+                </span>
+              }
+            />
+          </dl>
+
+          {/* Purchase payment transactions with per-payment proof */}
+          {row.isPurchase && (
+            <div className="border-t pt-4 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Payment Transactions
+              </p>
+              {loadingPurchase ? (
+                <p className="text-sm text-slate-400">Loading payments…</p>
+              ) : (fullPurchase?.payments?.length ?? 0) === 0 ? (
+                <p className="text-sm text-slate-400">No payments recorded yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {fullPurchase!.payments!.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border bg-slate-50/60 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-800">
+                          {formatCurrency(Number(p.amount), row.currency)}
+                          <span className="ml-2 text-[10px] font-bold text-slate-500 bg-slate-200/60 px-1.5 py-0.5 rounded">
+                            {p.paymentMethod}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {String(p.paymentDate).slice(0, 10)}
+                          {p.referenceNumber ? ` · ${p.referenceNumber}` : ''}
+                        </p>
+                      </div>
+                      {p.attachmentUrl ? (
+                        <a
+                          href={p.attachmentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline"
+                        >
+                          <FileText className="h-3.5 w-3.5" /> Proof
+                        </a>
+                      ) : (
+                        <span className="shrink-0 text-[10px] text-slate-400">No proof</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Manual expense proof */}
+          {!row.isPurchase && (
+            <div className="border-t pt-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                Payment Proof / Receipt
+              </p>
+              <ProofSection url={entry?.receiptUrl} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ExpenseManagementPage() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
@@ -626,6 +849,7 @@ export default function ExpenseManagementPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<ExpenseEntry | null>(null);
   const [paying, setPaying] = useState<ExpenseEntry | null>(null);
+  const [viewing, setViewing] = useState<ExpenseTableRow | null>(null);
   const [chartsOpen, setChartsOpen] = useState(true);
 
   const qc = useQueryClient();
@@ -705,7 +929,7 @@ export default function ExpenseManagementPage() {
         const d = (p.createdAt ?? '').slice(0, 10);
         return d >= fromDate && d <= toDate;
       })
-      .map((p) => {
+      .flatMap((p) => {
         const isDomestic = p.purchaseOrigin === 'DOMESTIC';
         const isInternational = p.purchaseOrigin === 'INTERNATIONAL';
 
@@ -742,21 +966,100 @@ export default function ExpenseManagementPage() {
         const catLabel = p.purchaseCategory?.replace(/_/g, ' ') ?? 'Purchase';
         // Use purchase's own currencyCode; fall back to branch currency (not hardcoded AED)
         const purchaseCurrency = p.currencyCode || currency;
-        return {
-          id: `purchase-${p.id}`,
-          source: 'Purchase' as const,
-          isPurchase: true,
-          date: p.createdAt?.slice(0, 10) ?? '',
-          expenseNo: `PO-${p.id?.slice(0, 8)}`,
-          category: mapPurchaseCategory(p.purchaseCategory),
-          description: [catLabel, vendorName, originLabel].filter(Boolean).join(' · '),
-          amount: Number(p.totalAmount) || 0,
-          currency: purchaseCurrency,
-          status: p.status === 'PAID' ? 'PAID' : 'PENDING',
-          taxAmount: taxAmt,
-          taxLabel,
-          taxPercent: p.taxPercent ?? null,
-        };
+        const date = p.createdAt?.slice(0, 10) ?? '';
+        const status = p.status === 'PAID' ? 'PAID' : 'PENDING';
+        const poShort = p.id?.slice(0, 8);
+        const description = [catLabel, vendorName, originLabel].filter(Boolean).join(' · ');
+
+        // Split each purchase into its constituent Chart-of-Accounts buckets so Finance
+        // can see (and export) the cost breakdown per purchase, not just one opaque total.
+        // The sum of these rows always equals p.totalAmount exactly (customsDuty is tracked
+        // separately and was never part of totalAmount — see purchaseRepository.ts) — no
+        // double-counting against the 5004/5005/5014/5015 totals shown elsewhere.
+        // Full VAT/reverse-charge tax carried only on the anchor row so per-purchase totals
+        // in the Tax column aren't inflated by summing across split rows.
+        const vendorPurchaseCost = Number(p.purchaseAmount ?? 0) + Number(p.documentationFee ?? 0);
+        const shippingHandling =
+          Number(p.shippingCost ?? 0) +
+          Number(p.handlingFee ?? 0) +
+          Number(p.transportationCost ?? 0) +
+          Number(p.groundfieldCost ?? 0);
+        const importLabour = Number(p.labourCost ?? 0);
+        const customsDutyAmt = Number(p.customsDuty ?? 0);
+
+        const rows: ExpenseTableRow[] = [
+          {
+            id: `purchase-${p.id}-vendor`,
+            source: 'Purchase' as const,
+            isPurchase: true,
+            date,
+            expenseNo: `PO-${poShort}`,
+            category: mapPurchaseCategory(p.purchaseCategory),
+            description,
+            amount: vendorPurchaseCost,
+            currency: purchaseCurrency,
+            status,
+            taxAmount: taxAmt,
+            taxLabel,
+            taxPercent: p.taxPercent ?? null,
+            _purchase: p,
+          },
+        ];
+        if (shippingHandling > 0) {
+          rows.push({
+            id: `purchase-${p.id}-shipping`,
+            source: 'Purchase' as const,
+            isPurchase: true,
+            date,
+            expenseNo: `PO-${poShort}-SH`,
+            category: 'SHIPPING_HANDLING',
+            description: `Shipping & Handling · ${description}`,
+            amount: shippingHandling,
+            currency: purchaseCurrency,
+            status,
+            taxAmount: 0,
+            taxLabel: '',
+            taxPercent: null,
+            _purchase: p,
+          });
+        }
+        if (importLabour > 0) {
+          rows.push({
+            id: `purchase-${p.id}-labour`,
+            source: 'Purchase' as const,
+            isPurchase: true,
+            date,
+            expenseNo: `PO-${poShort}-LAB`,
+            category: 'IMPORT_LABOUR',
+            description: `Import / Purchase Labour · ${description}`,
+            amount: importLabour,
+            currency: purchaseCurrency,
+            status,
+            taxAmount: 0,
+            taxLabel: '',
+            taxPercent: null,
+            _purchase: p,
+          });
+        }
+        if (customsDutyAmt > 0) {
+          rows.push({
+            id: `purchase-${p.id}-duty`,
+            source: 'Purchase' as const,
+            isPurchase: true,
+            date,
+            expenseNo: `PO-${poShort}-DUTY`,
+            category: 'CUSTOMS_DUTY',
+            description: `Customs Duty · ${description}`,
+            amount: customsDutyAmt,
+            currency: purchaseCurrency,
+            status,
+            taxAmount: 0,
+            taxLabel: '',
+            taxPercent: null,
+            _purchase: p,
+          });
+        }
+        return rows;
       });
     return [...manual, ...fromPurchases];
   }, [expenses, purchases, fromDate, toDate, currency]);
@@ -1167,6 +1470,13 @@ export default function ExpenseManagementPage() {
                           </TableCell>
                           <TableCell className="pr-4">
                             <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => setViewing(row)}
+                                title="View details & payment proof"
+                                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
                               {!row.isPurchase && row._entry && row.status === 'PENDING' && (
                                 <button
                                   onClick={() => approveMut.mutate(row._entry!.id)}
@@ -1238,6 +1548,13 @@ export default function ExpenseManagementPage() {
                     qc.invalidateQueries({ queryKey: ['expense-entries'] });
                     qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
                   }}
+                />
+              )}
+              {viewing && (
+                <ExpenseDetailModal
+                  row={viewing}
+                  accounts={accounts}
+                  onClose={() => setViewing(null)}
                 />
               )}
             </>

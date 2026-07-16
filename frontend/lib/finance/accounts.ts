@@ -201,6 +201,19 @@ export const CHART_OF_ACCOUNTS: ChartAccount[] = [
     group: 'EXPENSES',
     description: 'General office and administrative costs',
   },
+  {
+    code: '5014',
+    name: 'Import / Purchase Labour Cost',
+    group: 'EXPENSES',
+    description:
+      'Purchase-side labour (e.g. import/customs-clearance) — distinct from 5002 Technician Labour',
+  },
+  {
+    code: '5015',
+    name: 'Customs Duty',
+    group: 'EXPENSES',
+    description: 'Import customs duty on International purchases, expensed directly',
+  },
 ];
 
 // ─────────────────────────────────────────────
@@ -386,10 +399,13 @@ export interface PurchaseOrder {
   vendorId: string;
   vendor?: { id: string; name: string };
   totalAmount: number;
+  purchaseAmount?: number;
+  documentationFee?: number;
   labourCost?: number;
   shippingCost?: number;
   handlingFee?: number;
   transportationCost?: number;
+  groundfieldCost?: number;
   currencyCode?: string;
   branchId: string;
   createdAt: string;
@@ -403,7 +419,10 @@ export interface PurchaseOrder {
   taxName?: string | null;
   inputVatAmount?: number | null;
   reverseChargeVatAmount?: number | null;
+  customsEntryNo?: string | null;
   customsDuty?: number | null;
+  importInvoiceNo?: string | null;
+  goodsOrService?: 'GOODS' | 'SERVICE' | null;
   vatClaimable?: boolean;
 }
 

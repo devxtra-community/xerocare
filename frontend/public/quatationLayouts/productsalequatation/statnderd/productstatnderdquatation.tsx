@@ -755,7 +755,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
                   marginTop: '1px',
                 }}
               >
-                {numberToWords(num)}
+                {numberToWords(num, getActiveCurrency())}
               </div>
             </div>
           ))}

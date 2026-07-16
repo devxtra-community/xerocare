@@ -100,14 +100,25 @@ export class PurchaseRepository {
       purchase.currencyCode = lot.currencyCode ?? null;
       purchase.exchangeRate = lot.exchangeRateSnapshot ? Number(lot.exchangeRateSnapshot) : null;
 
-      // taxableAmount: all cost components except documentationFee (non-taxable admin charge)
+      // Optional fields (set before taxableAmount so customsDuty can feed into it)
+      purchase.purchaseCategory = data.purchaseCategory ?? null;
+      purchase.importInvoiceNo = data.importInvoiceNo ?? null;
+      purchase.customsEntryNo = data.customsEntryNo ?? null;
+      purchase.customsDuty = data.customsDuty != null ? Number(data.customsDuty) : null;
+      purchase.goodsOrService = data.goodsOrService ?? null;
+
+      // taxableAmount: all cost components except documentationFee (non-taxable admin charge),
+      // plus customsDuty — standard import-VAT practice (UAE/KSA/Qatar FTA) assesses reverse-charge
+      // VAT on customs value + duty, not duty-exclusive. customsDuty is 0 for DOMESTIC purchases
+      // (never populated there) so this is a no-op outside INTERNATIONAL purchases.
       purchase.taxableAmount =
         purchaseAmount +
         Number(data.labourCost) +
         Number(data.handlingFee) +
         Number(data.transportationCost) +
         Number(data.shippingCost) +
-        Number(data.groundfieldCost);
+        Number(data.groundfieldCost) +
+        Number(purchase.customsDuty ?? 0);
 
       // Tax rate and name (caller may supply from branch config or country_tax_rules)
       purchase.taxPercent = data.taxPercent != null ? Number(data.taxPercent) : null;
@@ -124,13 +135,6 @@ export class PurchaseRepository {
           purchase.inputVatAmount = null;
         }
       }
-
-      // Optional fields
-      purchase.purchaseCategory = data.purchaseCategory ?? null;
-      purchase.importInvoiceNo = data.importInvoiceNo ?? null;
-      purchase.customsEntryNo = data.customsEntryNo ?? null;
-      purchase.customsDuty = data.customsDuty != null ? Number(data.customsDuty) : null;
-      purchase.goodsOrService = data.goodsOrService ?? null;
       purchase.vatClaimable = data.vatClaimable !== false; // default true
       purchase.taxStatus = 'PENDING';
 
@@ -237,6 +241,11 @@ export class PurchaseRepository {
       if (data.shippingCost !== undefined) purchase.shippingCost = Number(data.shippingCost);
       if (data.groundfieldCost !== undefined)
         purchase.groundfieldCost = Number(data.groundfieldCost);
+      if (data.importInvoiceNo !== undefined) purchase.importInvoiceNo = data.importInvoiceNo;
+      if (data.customsEntryNo !== undefined) purchase.customsEntryNo = data.customsEntryNo;
+      if (data.customsDuty !== undefined)
+        purchase.customsDuty = data.customsDuty != null ? Number(data.customsDuty) : null;
+      if (data.goodsOrService !== undefined) purchase.goodsOrService = data.goodsOrService;
 
       // Re-calculate purchase amount from lot items
       let purchaseAmount = 0;
@@ -260,14 +269,16 @@ export class PurchaseRepository {
         Number(purchase.groundfieldCost) +
         dynamicCostsTotal;
 
-      // Recalculate taxable amount and VAT whenever costs change
+      // Recalculate taxable amount and VAT whenever costs change. Includes customsDuty —
+      // standard import-VAT practice assesses reverse-charge VAT on customs value + duty.
       purchase.taxableAmount =
         purchaseAmount +
         Number(purchase.labourCost) +
         Number(purchase.handlingFee) +
         Number(purchase.transportationCost) +
         Number(purchase.shippingCost) +
-        Number(purchase.groundfieldCost);
+        Number(purchase.groundfieldCost) +
+        Number(purchase.customsDuty ?? 0);
 
       if (purchase.taxPercent != null && purchase.taxableAmount != null) {
         if (purchase.purchaseOrigin === 'DOMESTIC') {

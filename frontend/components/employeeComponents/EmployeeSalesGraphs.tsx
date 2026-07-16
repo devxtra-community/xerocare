@@ -74,7 +74,9 @@ const ChartContainer = ({
               axisLine={false}
               tickLine={false}
               tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
-              tickFormatter={(val) => `QAR ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
+              tickFormatter={(val) =>
+                `${currency} ${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`
+              }
             />
             <Tooltip
               content={

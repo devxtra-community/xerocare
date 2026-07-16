@@ -169,15 +169,9 @@ function AddPayableModal({
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Currency</label>
-              <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AED">AED</SelectItem>
-                  <SelectItem value="QAR">QAR</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="mt-1 flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                {form.currency}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -491,23 +485,27 @@ export default function AccountsPayablePage() {
 
   // Merge purchase orders + manual payables + approved expense entries
   const allPayables = useMemo(() => {
-    const fromPurchases = purchases.map((p) => ({
-      id: p.id,
-      referenceNo: `PO-${p.id?.slice(0, 8)}`,
-      type: 'VENDOR_INVOICE',
-      payableTo: p.vendor?.name ?? '',
-      amount: p.totalAmount ?? 0,
-      currency: p.currencyCode ?? currency,
-      issueDate: p.createdAt,
-      dueDate: p.createdAt,
-      amountPaid: p.paidAmount ?? 0,
-      outstanding: p.remainingAmount ?? p.totalAmount ?? 0,
-      status: p.status ?? 'PENDING',
-      branchId: p.branchId,
-      aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
-      isPurchase: true,
-      isExpense: false,
-    }));
+    // Only include vendor purchases that still have an outstanding balance.
+    // Fully-paid purchases have remainingAmount=0 and should not appear in AP.
+    const fromPurchases = purchases
+      .filter((p) => (p.remainingAmount ?? p.totalAmount ?? 0) > 0)
+      .map((p) => ({
+        id: p.id,
+        referenceNo: `PO-${p.id?.slice(0, 8)}`,
+        type: 'VENDOR_INVOICE',
+        payableTo: p.vendor?.name ?? '',
+        amount: p.totalAmount ?? 0,
+        currency: p.currencyCode ?? currency,
+        issueDate: p.createdAt,
+        dueDate: p.createdAt,
+        amountPaid: p.paidAmount ?? 0,
+        outstanding: Number(p.remainingAmount ?? p.totalAmount ?? 0),
+        status: p.status ?? 'PENDING',
+        branchId: p.branchId,
+        aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
+        isPurchase: true,
+        isExpense: false,
+      }));
     const fromManual = manualPayables.map((p) => ({ ...p, isPurchase: false, isExpense: false }));
     const fromExpenses = approvedExpenses.map((e) => ({
       id: e.id,
@@ -544,10 +542,12 @@ export default function AccountsPayablePage() {
     [allPayables, typeFilter, agingFilter, search],
   );
 
-  const totalPayable = allPayables.reduce((s, p) => s + (p.outstanding ?? 0), 0);
+  const totalPayable = allPayables.reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
   const agingTotals = AGING_BUCKETS.map((b) => ({
     bucket: b,
-    total: allPayables.filter((p) => p.aging === b).reduce((s, p) => s + (p.outstanding ?? 0), 0),
+    total: allPayables
+      .filter((p) => p.aging === b)
+      .reduce((s, p) => s + Number(p.outstanding ?? 0), 0),
   }));
 
   const payCharts = useMemo(() => {

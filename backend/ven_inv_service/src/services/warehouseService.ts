@@ -12,7 +12,16 @@ export class WarehouseService {
     if (!payload.warehouseName || !payload.warehouseCode) {
       throw new AppError('Warehouse name and code are required', 400);
     }
-    return this.repo.create(payload);
+    if (!payload.branchId) delete payload.branchId;
+    try {
+      return await this.repo.create(payload);
+    } catch (err: unknown) {
+      const dbErr = err as { code?: string };
+      if (dbErr.code === '23505') {
+        throw new AppError('A warehouse with this code already exists', 409);
+      }
+      throw err;
+    }
   }
 
   /**
@@ -41,7 +50,16 @@ export class WarehouseService {
     if (!warehouse) {
       throw new AppError('Warehouse not found', 404);
     }
-    return this.repo.update(id, payload);
+    if (!payload.branchId) delete payload.branchId;
+    try {
+      return await this.repo.update(id, payload);
+    } catch (err: unknown) {
+      const dbErr = err as { code?: string };
+      if (dbErr.code === '23505') {
+        throw new AppError('A warehouse with this code already exists', 409);
+      }
+      throw err;
+    }
   }
 
   /**

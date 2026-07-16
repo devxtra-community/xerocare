@@ -783,7 +783,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   marginTop: '1px',
                 }}
               >
-                {numberToWords(totals.balanceDue)}
+                {numberToWords(totals.balanceDue, getActiveCurrency())}
               </div>
             </div>
 

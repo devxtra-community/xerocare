@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { getCurrencyFullName } from '@/lib/currencyNames';
 // ─── Shared Types (same as LeaseNormalQuotation) ──────────────────────────────
 
 export interface SlabRange {
@@ -1279,8 +1280,9 @@ const LeaseStandardQuotation: React.FC<LeaseStandardQuotationProps> = ({
               Terms &amp; Conditions:
             </div>
             <div style={{ fontSize: '10px', color: '#666', lineHeight: '1.6' }}>
-              Payment is due within 15 days. Standard lease terms apply. All amounts are in Qatari
-              Riyal ({getActiveCurrency()}). Cheque should be in favor of:{' '}
+              Payment is due within 15 days. Standard lease terms apply. All amounts are in{' '}
+              {getCurrencyFullName(getActiveCurrency())} ({getActiveCurrency()}). Cheque should be
+              in favor of:{' '}
               <span style={{ fontWeight: '700', color: NAVY }}>{companyInfo.name}</span>
             </div>
           </div>

@@ -165,20 +165,32 @@ export function QuotationConversionFlow({
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
-      // 1. Convert Quotation → Proforma (Starts Ledger)
-      if (quotation.type !== 'PROFORMA' && quotation.type !== 'FINAL') {
-        await convertToTransaction(quotation.id);
+      // 1. Convert Quotation → Proforma (idempotent: backend returns early for PROFORMA/FINAL)
+      // Always call so we get the live type and contractStatus back, avoiding stale-prop issues.
+      const converted = await convertToTransaction(quotation.id);
+      const liveType = converted.type;
+      const liveContractStatus = converted.contractStatus;
+
+      // Already fully activated — nothing more to do
+      if (liveType === 'FINAL') {
+        toast.success('Conversion complete!', {
+          description: `Invoice ${quotation.invoiceNumber} is already active.`,
+        });
+        onSuccess();
+        return;
       }
 
-      // 2. Allocate machines (assign serial numbers)
-      const itemsToAllocate = serialUpdates.filter((u) => u.itemId && u.productId);
-      if (itemsToAllocate.length > 0) {
-        await allocateMachinesInvoice(quotation.id, {
-          itemUpdates: itemsToAllocate.map((u) => ({
-            id: u.itemId,
-            productId: u.productId,
-          })),
-        });
+      // 2. Allocate machines (skip if already in PENDING_CONFIRMATION to avoid duplicate allocations)
+      if (liveContractStatus !== 'PENDING_CONFIRMATION') {
+        const itemsToAllocate = serialUpdates.filter((u) => u.itemId && u.productId);
+        if (itemsToAllocate.length > 0) {
+          await allocateMachinesInvoice(quotation.id, {
+            itemUpdates: itemsToAllocate.map((u) => ({
+              id: u.itemId,
+              productId: u.productId,
+            })),
+          });
+        }
       }
 
       // 3. Activate the contract to make it a final sale (only for non-Rent/Lease)

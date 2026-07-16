@@ -433,10 +433,18 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
 
                     <TableCell>
                       {(() => {
-                        // Derive a clean payment status from the invoice status
-                        const isPaid = inv.status === 'PAID';
-                        const isPartial = inv.status === 'PARTIAL';
+                        // Derive payment status from actual paid amounts (falls back to
+                        // invoice status when the backend didn't send totalPaid).
+                        const total = Number(inv.totalAmount || 0);
+                        const paid = Number(inv.totalPaid || 0);
                         const isRefunded = inv.status === 'REFUNDED';
+                        const isPaid = inv.status === 'PAID' || (total > 0 && paid >= total - 0.01);
+                        const isActivated = ['ACTIVE_CONTRACT', 'INVOICED', 'PAID'].includes(
+                          inv.status,
+                        );
+                        // Money received before activation = advance; after = partial payment.
+                        const isAdvance = !isPaid && paid > 0 && !isActivated;
+                        const isPartial = !isPaid && paid > 0 && isActivated;
 
                         const completedExchange = inv.creditNotes?.find(
                           (cn) => cn.status === 'PRODUCT_REPLACED' && cn.type === 'CREDIT_EXCHANGE',
@@ -451,14 +459,18 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                             ? 'PAID'
                             : isPartial
                               ? 'PARTIAL'
-                              : 'PENDING';
+                              : isAdvance
+                                ? 'ADVANCE'
+                                : 'PENDING';
                         let cls = isRefunded
                           ? 'bg-red-100 text-red-700 hover:bg-red-100'
                           : isPaid
                             ? 'bg-green-100 text-green-700 hover:bg-green-100'
                             : isPartial
                               ? 'bg-amber-100 text-amber-700 hover:bg-amber-100'
-                              : 'bg-slate-100 text-slate-600 hover:bg-slate-100';
+                              : isAdvance
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-100'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-100';
 
                         if (completedExchange) {
                           label = 'CREDIT EXCHANGE';

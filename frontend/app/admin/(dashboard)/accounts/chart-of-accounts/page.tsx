@@ -362,6 +362,7 @@ function ChartOfAccountsContent() {
             <Row ab={expenses.labourCost} />
             <Row ab={expenses.depreciation} />
             <Row ab={expenses.vendorPurchases} />
+            <Row ab={expenses.shippingHandling} />
             <Row ab={expenses.salaryExpense} />
             <Row ab={expenses.travelExpense} />
             <Row ab={expenses.rentExpense} />
@@ -369,6 +370,8 @@ function ChartOfAccountsContent() {
             <Row ab={expenses.marketingExpense} />
             <Row ab={expenses.maintenanceExpense} />
             <Row ab={expenses.insuranceExpense} />
+            <Row ab={expenses.importLabourCost} />
+            <Row ab={expenses.customsDuty} />
             <Row ab={expenses.otherExpenses} />
             <SubTotal label="TOTAL EXPENSES" value={expenses.totalExpenses} currency={currency} />
           </div>

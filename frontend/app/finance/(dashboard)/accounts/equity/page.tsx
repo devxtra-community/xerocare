@@ -166,15 +166,9 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Currency</label>
-              <select
-                value={form.currency}
-                onChange={(e) => set('currency', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {['AED', 'USD', 'QAR', 'EUR'].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-muted font-medium">
+                {form.currency}
+              </div>
             </div>
           </div>
           <div>

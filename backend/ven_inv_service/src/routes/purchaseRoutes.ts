@@ -25,4 +25,14 @@ router.post('/internal/batch-exists', (req, res, next) =>
   purchaseController.batchExistsPurchases(req, res, next),
 );
 
+// Internal endpoint: billing_service records a PurchasePayment on Finance approval (no callback loop)
+router.post('/internal/record-payment', (req, res, next) =>
+  purchaseController.recordPaymentInternal(req, res, next),
+);
+
+// Internal endpoint: billing_service voids a PurchasePayment on Finance rejection
+router.post('/internal/void-payment', (req, res, next) =>
+  purchaseController.voidPaymentInternal(req, res, next),
+);
+
 export default router;

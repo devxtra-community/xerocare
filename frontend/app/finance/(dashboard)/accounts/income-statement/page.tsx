@@ -44,6 +44,8 @@ const EXPENSE_LABELS: Record<string, string> = {
   MARKETING: 'Marketing & Advertising',
   MAINTENANCE: 'Maintenance & Repairs',
   INSURANCE: 'Insurance',
+  IMPORT_LABOUR: 'Import / Purchase Labour Cost',
+  CUSTOMS_DUTY: 'Customs Duty',
   OTHER: 'Other Expenses',
 };
 

@@ -161,19 +161,30 @@ export class PurchaseController {
         queryParams.push(dateTo);
       }
 
-      // Group by currency so Billing can apply per-currency exchange-rate conversion
+      // Group by currency so Billing can apply per-currency exchange-rate conversion.
+      // Four non-overlapping buckets that sum to exactly purchase_amount + documentation_fee
+      // + labour_cost + handling_fee + transportation_cost + shipping_cost + groundfield_cost
+      // (== total_amount) plus customs_duty (tracked separately, never part of total_amount):
+      //   5004 purchase_cost      = purchase_amount + documentation_fee
+      //   5005 shipping_handling  = shipping_cost + handling_fee + transportation_cost + groundfield_cost
+      //   5014 import_labour_cost = labour_cost (import/purchase labour — distinct from 5002 Technician Labour)
+      //   5015 customs_duty       = customs_duty (expensed directly, not capitalized into inventory)
       const rows = await Source.query<
         {
           currency_code: string | null;
           purchase_cost: string;
           shipping_handling: string;
+          import_labour_cost: string;
+          customs_duty: string;
         }[]
       >(
         `
         SELECT
           COALESCE(p.currency_code, 'AED') AS currency_code,
-          COALESCE(SUM(p.purchase_amount + p.labour_cost + p.documentation_fee), 0) AS purchase_cost,
-          COALESCE(SUM(p.shipping_cost + p.handling_fee + p.transportation_cost + p.groundfield_cost), 0) AS shipping_handling
+          COALESCE(SUM(p.purchase_amount + p.documentation_fee), 0) AS purchase_cost,
+          COALESCE(SUM(p.shipping_cost + p.handling_fee + p.transportation_cost + p.groundfield_cost), 0) AS shipping_handling,
+          COALESCE(SUM(p.labour_cost), 0) AS import_labour_cost,
+          COALESCE(SUM(p.customs_duty), 0) AS customs_duty
         FROM purchases p
         WHERE 1=1
           ${branchClause}
@@ -191,9 +202,83 @@ export class PurchaseController {
         currencyCode: r.currency_code ?? 'AED',
         purchaseCost: Number(r.purchase_cost),
         shippingHandling: Number(r.shipping_handling),
+        importLabourCost: Number(r.import_labour_cost),
+        customsDuty: Number(r.customs_duty),
       }));
 
       return res.json({ success: true, currencyGroups });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Internal: billing_service calls this when Finance approves a Manager purchase payment request.
+  // Records the PurchasePayment without firing the billing notification callback (avoids circular call).
+  async recordPaymentInternal(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (req.headers['x-internal-service'] !== 'billing') {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+      const {
+        purchaseId,
+        branchId,
+        amount,
+        paymentMethod,
+        description,
+        referenceNumber,
+        paymentDate,
+        createdBy,
+        attachmentUrl,
+      } = req.body;
+      if (!purchaseId || !branchId || !amount || !paymentMethod) {
+        return res.status(400).json({
+          success: false,
+          message: 'purchaseId, branchId, amount, paymentMethod are required',
+        });
+      }
+      const payment = await purchaseService.recordPaymentInternalOnly(
+        purchaseId,
+        {
+          amount: Number(amount),
+          paymentMethod,
+          description,
+          referenceNumber,
+          paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+          createdBy,
+          attachmentUrl,
+        },
+        branchId,
+      );
+      // Include the purchase's origin (DOMESTIC/INTERNATIONAL) so the billing
+      // approval-queue record can snapshot it for Finance visibility.
+      let purchaseOrigin: string | undefined;
+      try {
+        const purchase = await purchaseService.getPurchaseById(purchaseId, branchId);
+        purchaseOrigin = (purchase as { purchaseOrigin?: string } | null)?.purchaseOrigin;
+      } catch {
+        /* origin enrichment is best-effort */
+      }
+      return res.status(201).json({ success: true, data: { ...payment, purchaseOrigin } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // Internal: billing_service calls this when Finance rejects a Manager purchase payment request.
+  // Deletes the PurchasePayment so the outstanding balance is restored.
+  async voidPaymentInternal(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (req.headers['x-internal-service'] !== 'billing') {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+      const { paymentId, branchId } = req.body;
+      if (!paymentId || !branchId) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'paymentId and branchId are required' });
+      }
+      await purchaseService.voidPayment(paymentId, branchId);
+      return res.json({ success: true, message: 'Payment voided' });
     } catch (err) {
       next(err);
     }

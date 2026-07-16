@@ -204,6 +204,10 @@ export async function getInputTaxInternational(req: Request, res: Response, next
       .getMany();
 
     const rows = purchases.map((p) => {
+      const customsDuty = p.customsDuty != null ? Number(p.customsDuty) : 0;
+      // Fallback formula mirrors purchaseRepository.ts exactly (incl. customsDuty in the VAT
+      // base per standard import-VAT practice) — only used for legacy rows saved before
+      // taxableAmount was persisted at creation.
       const taxableAmount =
         p.taxableAmount != null
           ? Number(p.taxableAmount)
@@ -212,7 +216,8 @@ export async function getInputTaxInternational(req: Request, res: Response, next
             Number(p.handlingFee ?? 0) +
             Number(p.transportationCost ?? 0) +
             Number(p.shippingCost ?? 0) +
-            Number(p.groundfieldCost ?? 0);
+            Number(p.groundfieldCost ?? 0) +
+            customsDuty;
       const taxPercent =
         p.taxPercent != null
           ? Number(p.taxPercent)
@@ -241,7 +246,9 @@ export async function getInputTaxInternational(req: Request, res: Response, next
         importVatReverseCharge,
         taxPercent,
         customsEntryNo: p.customsEntryNo ?? '—',
-        customsDuty: p.customsDuty != null ? Number(p.customsDuty) : 0,
+        customsDuty,
+        shippingCost: Number(p.shippingCost ?? 0),
+        labourCost: Number(p.labourCost ?? 0),
         currencyCode: p.currencyCode ?? p.lot?.currencyCode ?? p.branch?.currency_code ?? 'AED',
         exchangeRate: p.exchangeRate ?? p.lot?.exchangeRateSnapshot ?? 1,
         vatClaimable: p.vatClaimable,

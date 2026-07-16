@@ -1086,11 +1086,16 @@ function VendorFormModal({
                             <SelectValue placeholder="Select city" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl max-h-64">
-                            {cities.map((c) => (
-                              <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
+                            {cities
+                              .filter((c, i, arr) => arr.findIndex((x) => x.name === c.name) === i)
+                              .map((c, idx) => (
+                                <SelectItem
+                                  key={`${c.stateCode ?? ''}-${c.name}-${idx}`}
+                                  value={c.name}
+                                >
+                                  {c.name}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       ) : (

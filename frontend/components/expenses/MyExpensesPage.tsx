@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -125,6 +125,14 @@ function ExpenseFormModal({
 
   const set = (k: keyof CreateExpenseRequestPayload, v: string | number) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  // useBranchCurrency() is async — update form currency once it resolves.
+  // Skip for editing (expense already has a stored currency).
+  useEffect(() => {
+    if (currency && !expense) {
+      setForm((f) => ({ ...f, currency }));
+    }
+  }, [currency]);
 
   const qc = useQueryClient();
 

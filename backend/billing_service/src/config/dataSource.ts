@@ -246,6 +246,21 @@ async function runPreMigrations() {
 
       // Create new ledger/payment tables if not exists
       await client.query(`
+        CREATE TABLE IF NOT EXISTS payment_ledgers (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            "invoiceId" UUID REFERENCES invoices(id) ON DELETE CASCADE,
+            "amountPaid" DECIMAL(12,2) NOT NULL,
+            "paymentMode" VARCHAR(50) NOT NULL,
+            "paymentDate" DATE NOT NULL,
+            "referenceNumber" VARCHAR(255),
+            remarks TEXT,
+            "receiptUrl" VARCHAR(255),
+            "recordedBy" VARCHAR(255) NOT NULL,
+            "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await client.query(`
         CREATE TABLE IF NOT EXISTS invoice_ledger (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
@@ -700,6 +715,23 @@ async function runPreMigrations() {
       CREATE INDEX IF NOT EXISTS idx_expense_req_date ON employee_expense_requests(date);
     `);
     logger.info('Employee expense requests table created/verified.');
+
+    // ─── Manager Purchase Payment Request columns on employee_expense_requests ──
+    await client.query(`
+      ALTER TABLE employee_expense_requests
+        ADD COLUMN IF NOT EXISTS "requestSource" VARCHAR NOT NULL DEFAULT 'EMPLOYEE_EXPENSE',
+        ADD COLUMN IF NOT EXISTS "purchaseId" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "purchaseRef" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "vendorName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "paymentMode" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "paidFromAccountId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "purchasePaymentId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "chequeNumber" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "chequeBankName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "chequeDueDate" DATE NULL,
+        ADD COLUMN IF NOT EXISTS "purchaseOrigin" VARCHAR NULL;
+    `);
+    logger.info('Manager purchase payment request columns on expense_requests ensured.');
     // ─── Cash & Bank extended columns + reconciliation table ─────────────────
     await client.query(`
       ALTER TABLE cash_bank_accounts
@@ -870,6 +902,24 @@ async function runPreMigrations() {
     `);
     logger.info('Guarantee cheques table ensured.');
 
+    // ─── credit_notes: spare-part support + tax snapshot + payment mode columns ─
+    await client.query(`
+      ALTER TABLE credit_notes
+        ADD COLUMN IF NOT EXISTS item_category VARCHAR(20) NOT NULL DEFAULT 'PRODUCT',
+        ADD COLUMN IF NOT EXISTS "sparePartId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "sku" VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS "quantity" INTEGER NULL,
+        ADD COLUMN IF NOT EXISTS tax_name VARCHAR(50) NULL,
+        ADD COLUMN IF NOT EXISTS tax_percent DECIMAL(5,2) NULL,
+        ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "paymentMode" VARCHAR(100) NULL,
+        ADD COLUMN IF NOT EXISTS "replacementSparePartId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "replacementSparePartName" VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS "replacementSparePartSku" VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS "replacementQuantity" INTEGER NULL;
+    `);
+    logger.info('credit_notes spare-part and tax columns ensured.');
+
     // ─── Cashbook: reversal tracking + PO orphan flag ─────────────────────────
     await client.query(`
       ALTER TABLE cashbook_entries
@@ -949,17 +999,30 @@ async function runPreMigrations() {
       `ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS receipt_url VARCHAR;`,
     );
 
+    // payment_ledgers predates the receiptUrl column in its CREATE TABLE DDL —
+    // CREATE TABLE IF NOT EXISTS never adds columns to an existing table, so the
+    // entity/table mismatch made every SELECT on PaymentLedger fail with 500.
+    await client.query(
+      `ALTER TABLE payment_ledgers ADD COLUMN IF NOT EXISTS "receiptUrl" VARCHAR(255);`,
+    );
+
     // Reconcile invoice_ledger with the union of both historical payment tables.
     // Payments recorded through the legacy /payments/record path only wrote
     // payment_ledgers rows and never updated the ledger, so paid/balance amounts
     // under-reported. Recomputing from source tables is idempotent.
+    // Security deposits (remarks = 'security deposit') are refundable caution money
+    // held outside the invoice total, so they are excluded from all settlement sums.
     logger.info('Reconciling invoice_ledger from payment_transactions + payment_ledgers...');
     try {
       await client.query(`
         WITH paid AS (
           SELECT i.id AS invoice_id,
-            COALESCE((SELECT SUM(pt.amount) FROM payment_transactions pt WHERE pt.invoice_id = i.id), 0)
-            + COALESCE((SELECT SUM(pl."amountPaid") FROM payment_ledgers pl WHERE pl."invoiceId" = i.id), 0) AS total_paid
+            COALESCE((SELECT SUM(pt.amount) FROM payment_transactions pt
+              WHERE pt.invoice_id = i.id
+                AND (pt.remarks IS NULL OR LOWER(TRIM(pt.remarks)) != 'security deposit')), 0)
+            + COALESCE((SELECT SUM(pl."amountPaid") FROM payment_ledgers pl
+              WHERE pl."invoiceId" = i.id
+                AND (pl.remarks IS NULL OR LOWER(TRIM(pl.remarks)) != 'security deposit')), 0) AS total_paid
           FROM invoices i
         )
         UPDATE invoice_ledger il
@@ -978,9 +1041,13 @@ async function runPreMigrations() {
         FROM invoices i
         JOIN (
           SELECT invoice_id, SUM(total_paid) AS total_paid FROM (
-            SELECT invoice_id, SUM(amount) AS total_paid FROM payment_transactions GROUP BY invoice_id
+            SELECT invoice_id, SUM(amount) AS total_paid FROM payment_transactions
+              WHERE (remarks IS NULL OR LOWER(TRIM(remarks)) != 'security deposit')
+              GROUP BY invoice_id
             UNION ALL
-            SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS total_paid FROM payment_ledgers GROUP BY "invoiceId"
+            SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS total_paid FROM payment_ledgers
+              WHERE (remarks IS NULL OR LOWER(TRIM(remarks)) != 'security deposit')
+              GROUP BY "invoiceId"
           ) u GROUP BY invoice_id
         ) p ON p.invoice_id = i.id
         WHERE NOT EXISTS (SELECT 1 FROM invoice_ledger il WHERE il.invoice_id = i.id);
@@ -988,6 +1055,35 @@ async function runPreMigrations() {
       logger.info('invoice_ledger reconciliation completed.');
     } catch (err) {
       logger.warn('invoice_ledger reconciliation failed (non-fatal):', err);
+    }
+
+    // Direct sales used to be force-marked PAID at activation regardless of money
+    // received. Demote any such invoice whose recorded payments (excluding security
+    // deposits) do not cover the total back to INVOICED. recordPayment() flips them
+    // to PAID again once fully settled. Idempotent — safe to run on every boot.
+    try {
+      const demoted = await client.query(`
+        UPDATE invoices i
+        SET status = 'INVOICED'
+        WHERE i.status = 'PAID'
+          AND i."saleType" IN ('SALE', 'PRODUCT_SALE', 'SPAREPART_SALE')
+          AND COALESCE(i."totalAmount", 0) > 0.01
+          AND (
+            COALESCE((SELECT SUM(pt.amount) FROM payment_transactions pt
+              WHERE pt.invoice_id = i.id
+                AND (pt.remarks IS NULL OR LOWER(TRIM(pt.remarks)) != 'security deposit')), 0)
+            + COALESCE((SELECT SUM(pl."amountPaid") FROM payment_ledgers pl
+              WHERE pl."invoiceId" = i.id
+                AND (pl.remarks IS NULL OR LOWER(TRIM(pl.remarks)) != 'security deposit')), 0)
+          ) < COALESCE(i."totalAmount", 0) - 0.01;
+      `);
+      if (demoted.rowCount && demoted.rowCount > 0) {
+        logger.info(
+          `Demoted ${demoted.rowCount} not-fully-paid direct sale(s) from PAID to INVOICED.`,
+        );
+      }
+    } catch (err) {
+      logger.warn('PAID→INVOICED direct-sale correction failed (non-fatal):', err);
     }
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);

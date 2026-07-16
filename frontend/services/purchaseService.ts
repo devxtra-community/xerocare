@@ -27,7 +27,7 @@ export interface Purchase {
   id: string;
   purchaseAmount: number;
   documentationFee: number; // Cost for processing paperwork
-  labourCost: number; // Cost for workers involved in the purchase
+  labourCost: number; // Cost for workers involved in the purchase (import/customs-clearance labour on International purchases)
   handlingFee: number; // Fees for moving and managing items
   transportationCost: number; // Cost for moving goods locally
   shippingCost: number; // Cost for international or long-distance shipping
@@ -48,6 +48,30 @@ export interface Purchase {
   branch?: Branch;
   payments?: Payment[];
   costs?: PurchaseCost[];
+
+  // ─── International purchase fields ────────────────────────────────────────
+  importInvoiceNo?: string | null;
+  customsEntryNo?: string | null;
+  customsDuty?: number | null;
+  goodsOrService?: 'GOODS' | 'SERVICE' | null;
+
+  // ─── Tax fields ─────────────────────────────────────────────────────────────
+  taxableAmount?: number | null;
+  taxPercent?: number | null;
+  taxName?: string | null;
+  inputVatAmount?: number | null;
+  reverseChargeVatAmount?: number | null;
+  vatClaimable?: boolean;
+  taxStatus?: 'PENDING' | 'RECORDED' | 'FILED';
+
+  // ─── Vendor snapshot (copied at creation) ─────────────────────────────────
+  vendorVatNumber?: string | null;
+  vendorCountry?: string | null;
+  vendorStateProvince?: string | null;
+  vendorCity?: string | null;
+  currencyCode?: string | null;
+  exchangeRate?: number | null;
+  purchaseCategory?: 'PRODUCT' | 'SPARE_PART' | 'SERVICE' | 'OTHER' | null;
 }
 
 export interface AddPaymentDto {
@@ -60,6 +84,7 @@ export interface AddPaymentDto {
   chequeNumber?: string;
   chequeBankName?: string;
   chequeDueDate?: string;
+  paidFromAccountId?: string;
 }
 
 export interface AddCostDto {
@@ -77,6 +102,12 @@ export interface CreatePurchaseDTO {
   transportationCost: number;
   shippingCost: number;
   groundfieldCost: number;
+  // International purchase fields — optional, relevant when the lot's purchase
+  // origin is INTERNATIONAL (import from outside the branch's country).
+  importInvoiceNo?: string;
+  customsEntryNo?: string;
+  customsDuty?: number;
+  goodsOrService?: 'GOODS' | 'SERVICE';
 }
 
 /**

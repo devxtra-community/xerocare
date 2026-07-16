@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import axios from 'axios';
+import { In } from 'typeorm';
 import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
 import { Cheque } from '../entities/chequeEntity';
 import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
 import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
+import { Invoice } from '../entities/invoiceEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { logger } from '../config/logger';
 
 const router = Router();
@@ -33,6 +36,53 @@ function logHistory(
   const histRepo = manager.getRepository(ChequeStatusHistory);
   const h = histRepo.create({ chequeId, fromStatus, toStatus, changedBy, notes });
   return histRepo.save(h);
+}
+
+/**
+ * Enrich INVOICE-sourced cheques with the source invoice's saleType (SALE / RENT /
+ * LEASE …) and the matching cheque payment's receiptUrl (payment proof upload).
+ */
+async function enrichChequesWithInvoiceDetails<T extends Cheque>(
+  cheques: T[],
+): Promise<(T & { saleType?: string | null; receiptUrl?: string | null })[]> {
+  const invoiceIds = [
+    ...new Set(
+      cheques
+        .filter((c) => c.sourceType === 'INVOICE' && c.sourceReferenceId)
+        .map((c) => c.sourceReferenceId as string),
+    ),
+  ];
+  if (invoiceIds.length === 0) return cheques;
+
+  const [invoices, chequeTxs] = await Promise.all([
+    Source.getRepository(Invoice).find({
+      where: { id: In(invoiceIds) },
+      select: ['id', 'saleType'],
+    }),
+    Source.getRepository(PaymentTransaction).find({
+      where: { invoiceId: In(invoiceIds) },
+      order: { createdAt: 'DESC' },
+    }),
+  ]);
+  const saleTypeMap = new Map(invoices.map((i) => [i.id, i.saleType as string]));
+
+  return cheques.map((c) => {
+    if (c.sourceType !== 'INVOICE' || !c.sourceReferenceId) return c;
+    const txsForInvoice = chequeTxs.filter(
+      (t) =>
+        t.invoiceId === c.sourceReferenceId && (t.paymentMode ?? '').toUpperCase() === 'CHEQUE',
+    );
+    // Best match: same cheque/reference number; fall back to same amount.
+    const tx =
+      txsForInvoice.find((t) => t.referenceNumber && t.referenceNumber === c.chequeNo) ??
+      txsForInvoice.find((t) => Number(t.amount) === Number(c.amount)) ??
+      txsForInvoice[0];
+    return {
+      ...c,
+      saleType: saleTypeMap.get(c.sourceReferenceId) ?? null,
+      receiptUrl: tx?.receiptUrl ?? null,
+    };
+  });
 }
 
 /** Resolve branchIds filter — admin may pass ?branchIds=id1,id2; non-admin locked to own branch. */
@@ -74,7 +124,8 @@ router.get('/', async (req, res, next) => {
     if (dateTo) qb.andWhere('c.dueDate <= :dateTo', { dateTo });
 
     const cheques = await qb.getMany();
-    res.json({ success: true, data: cheques });
+    const enriched = await enrichChequesWithInvoiceDetails(cheques);
+    res.json({ success: true, data: enriched });
   } catch (err) {
     next(err);
   }
@@ -151,7 +202,8 @@ router.get('/:id', async (req, res, next) => {
       order: { changedAt: 'ASC' },
     });
 
-    res.json({ success: true, data: { ...cheque, history } });
+    const [enriched] = await enrichChequesWithInvoiceDetails([cheque]);
+    res.json({ success: true, data: { ...enriched, history } });
   } catch (err) {
     next(err);
   }
@@ -247,8 +299,8 @@ router.patch('/:id', async (req, res, next) => {
   }
 });
 
-// ── POST /:id/deposit — record cheque deposited to bank (no balance yet) ──────
-// Cash at Bank increases only when cheque is later CLEARED.
+// ── POST /:id/deposit — deposit RECEIVED cheque; Cash at Bank increases NOW ────
+// Spec: RECEIVED cheques → Cash at Bank at DEPOSIT (not Clear).
 router.post('/:id/deposit', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
@@ -267,10 +319,34 @@ router.post('/:id/deposit', async (req, res, next) => {
 
     await Source.transaction(async (m) => {
       const chqRepo = m.getRepository(Cheque);
-      // Record which account will receive funds when cleared — no balance movement yet
+      const entryRepo = m.getRepository(CashbookEntry);
+      const accountRepo = m.getRepository(CashBankAccount);
+
       cheque.status = 'DEPOSITED';
       cheque.accountId = accountId;
       cheque.issueDate = depositDate ? new Date(depositDate) : (new Date() as unknown as Date);
+
+      // RECEIVED cheques: Cash at Bank increases at Deposit.
+      const entry = entryRepo.create({
+        referenceNo: `CHQ-DEP-${cheque.chequeNo}-${Date.now()}`,
+        date: depositDate ? new Date(depositDate) : new Date(),
+        accountId,
+        entryType: 'RECEIPT',
+        amount: Number(cheque.amount),
+        category: 'Cheque Deposit',
+        description: `Cheque deposited — ${cheque.partyName} #${cheque.chequeNo}${cheque.sourceLabel ? ` · ${cheque.sourceLabel}` : ''}`,
+        paymentMode: 'Cheque',
+        chequeNo: cheque.chequeNo,
+        notes: notes || undefined,
+        createdBy: userId,
+        branchId,
+        sourceType: 'CHEQUE_DEPOSIT',
+        sourceId: cheque.id,
+      });
+      const savedEntry = await entryRepo.save(entry);
+      cheque.cashbookEntryId = savedEntry.id;
+      await accountRepo.increment({ id: accountId }, 'currentBalance', Number(cheque.amount));
+
       await chqRepo.save(cheque);
       await logHistory(m, cheque.id, 'PENDING', 'DEPOSITED', userId, notes);
     });
@@ -278,7 +354,7 @@ router.post('/:id/deposit', async (req, res, next) => {
     await sendNotification(
       userId,
       'Cheque Deposited',
-      `Cheque #${cheque.chequeNo} from ${cheque.partyName} deposited to bank — awaiting clearance.`,
+      `Cheque #${cheque.chequeNo} from ${cheque.partyName} deposited — Cash at Bank updated.`,
     );
     res.json({ success: true, data: cheque });
   } catch (err) {
@@ -318,7 +394,9 @@ router.post('/:id/issue', async (req, res, next) => {
   }
 });
 
-// ── POST /:id/clear — bank confirms funds cleared; THIS is when balance moves ──
+// ── POST /:id/clear — confirm clearing ───────────────────────────────────────
+// Spec asymmetry: RECEIVED → Cash at Bank moved at DEPOSIT (not here).
+//                 ISSUED   → Cash at Bank moves at CLEAR (here).
 router.post('/:id/clear', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
@@ -339,19 +417,16 @@ router.post('/:id/clear', async (req, res, next) => {
       const entryRepo = m.getRepository(CashbookEntry);
       const accountRepo = m.getRepository(CashBankAccount);
 
-      // Move cash: RECEIVED cheque cleared → Cash at Bank +amount
-      //            ISSUED cheque cleared   → Cash at Bank -amount
-      // Guard: if cashbookEntryId is already set (legacy cheque deposited with old behaviour),
-      // the balance was already moved at deposit time — skip creating a new entry.
-      if (!cheque.cashbookEntryId && cheque.accountId) {
-        const isReceipt = cheque.type === 'RECEIVED';
+      // Only ISSUED cheques move balance at Clear.
+      // RECEIVED cheques already moved balance at Deposit — nothing more needed.
+      if (cheque.type === 'ISSUED' && cheque.accountId) {
         const entry = entryRepo.create({
           referenceNo: `CHQ-CLR-${cheque.chequeNo}-${Date.now()}`,
           date: new Date(),
           accountId: cheque.accountId,
-          entryType: isReceipt ? 'RECEIPT' : 'PAYMENT',
+          entryType: 'PAYMENT',
           amount: Number(cheque.amount),
-          category: isReceipt ? 'Cheque Receipt' : 'Cheque Payment',
+          category: 'Cheque Payment',
           description: `Cheque cleared — ${cheque.partyName} #${cheque.chequeNo}${cheque.sourceLabel ? ` · ${cheque.sourceLabel}` : ''}`,
           paymentMode: 'Cheque',
           chequeNo: cheque.chequeNo,
@@ -363,20 +438,11 @@ router.post('/:id/clear', async (req, res, next) => {
         });
         const saved = await entryRepo.save(entry);
         cheque.cashbookEntryId = saved.id;
-
-        if (isReceipt) {
-          await accountRepo.increment(
-            { id: cheque.accountId },
-            'currentBalance',
-            Number(cheque.amount),
-          );
-        } else {
-          await accountRepo.decrement(
-            { id: cheque.accountId },
-            'currentBalance',
-            Number(cheque.amount),
-          );
-        }
+        await accountRepo.decrement(
+          { id: cheque.accountId },
+          'currentBalance',
+          Number(cheque.amount),
+        );
       }
 
       cheque.status = 'CLEARED';

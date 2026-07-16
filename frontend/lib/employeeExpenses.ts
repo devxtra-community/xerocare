@@ -26,6 +26,19 @@ export interface ExpenseRequest {
   paymentReference?: string;
   expenseEntryId?: string;
   notes?: string;
+  // Manager purchase payment fields
+  requestSource?: 'EMPLOYEE_EXPENSE' | 'MANAGER_PURCHASE';
+  purchaseId?: string;
+  purchaseRef?: string;
+  vendorName?: string;
+  /** DOMESTIC (local) or INTERNATIONAL — snapshotted from the purchase */
+  purchaseOrigin?: string;
+  paymentMode?: string;
+  paidFromAccountId?: string;
+  purchasePaymentId?: string;
+  chequeNumber?: string;
+  chequeBankName?: string;
+  chequeDueDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -108,3 +121,35 @@ export const getExpenseRequestSummary = (filters?: {
   to?: string;
 }): Promise<ExpenseRequestSummary> =>
   api.get(`${BASE}/summary`, { params: filters }).then((r) => r.data.data);
+
+export interface ManagerPurchasePaymentRequestPayload {
+  purchaseId: string;
+  purchaseRef?: string;
+  vendorName?: string;
+  amount: number;
+  paymentMethod: string;
+  paidFromAccountId?: string;
+  chequeNumber?: string;
+  chequeBankName?: string;
+  chequeDueDate?: string;
+  description?: string;
+  referenceNumber?: string;
+  paymentDate?: string;
+  currency?: string;
+}
+
+export const createManagerPurchasePaymentRequest = (
+  data: ManagerPurchasePaymentRequestPayload,
+  proofFile?: File | null,
+): Promise<ExpenseRequest> => {
+  // Multipart so the Manager's payment proof (image/PDF) uploads with the request.
+  const form = new FormData();
+  // purchaseId first — the upload middleware keys the R2 path off it.
+  form.append('purchaseId', data.purchaseId);
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === 'purchaseId' || value === undefined || value === null) return;
+    form.append(key, String(value));
+  });
+  if (proofFile) form.append('proof', proofFile);
+  return api.post(`${BASE}/manager-purchase`, form).then((r) => r.data.data);
+};

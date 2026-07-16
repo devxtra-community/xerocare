@@ -14,6 +14,7 @@ import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { AppError } from '../errors/appError';
@@ -23,6 +24,9 @@ import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
 import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
 import { Cheque } from '../entities/chequeEntity';
+
+// Nil UUID used as createdBy when no real user ID is available (cashbook_entries.createdBy UUID NOT NULL).
+const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
 
 // ─── INTERNAL SERVICE HELPER ──────────────────────────────────────────────────
 
@@ -243,7 +247,7 @@ export const reverseCashbookEntry = async (req: Request, res: Response, next: Ne
     if (original.isReversed) throw new AppError('Entry has already been reversed', 400);
 
     const branchId = original.branchId;
-    const userId = req.user?.userId ?? 'SYSTEM';
+    const userId = req.user?.userId ?? SYSTEM_UUID;
 
     // Build the reversing entry — opposite type, same amount, same account
     const reversalRefCount = await repo.count();
@@ -316,10 +320,11 @@ interface DayBookDay {
 }
 
 // Cash day book: per-day total earnings (receipts), total expenses (payments) and transactions.
-// Merges data from three sources to guarantee completeness:
+// Merges data from four sources to guarantee completeness:
 //  1. cashbook_entries  — auto-posted + manual entries (primary)
 //  2. payment_transactions — invoice receipts not yet mirrored into cashbook
 //  3. expense_entries (PAID/APPROVED) — expense payments not yet mirrored into cashbook
+//  4. payment_ledgers  — legacy invoice receipts (old payment path) not yet backfilled
 export const getDayBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { fromDate, toDate, accountId } = req.query;
@@ -410,8 +415,47 @@ export const getDayBook = async (req: Request, res: Response, next: NextFunction
         return e;
       });
 
+    // ── 4. Legacy payment_ledgers not yet backfilled into cashbook ───────────
+    const lpRepo = Source.getRepository(PaymentLedger);
+    const lpQb = lpRepo
+      .createQueryBuilder('lp')
+      .leftJoinAndSelect('lp.invoice', 'lpInv')
+      .where(`lp.paymentDate >= :from`, { from })
+      .andWhere(`lp.paymentDate <= :to`, { to });
+    if (branchFilter.length > 0) {
+      lpQb.andWhere('lpInv.branchId IN (:...lpBranches)', { lpBranches: branchFilter });
+    }
+    const legacyPayments = await lpQb.getMany();
+    // Exclude any already backfilled into cashbook (sourceId = lp.id in cashbook_entries)
+    const synthLegacyReceipts: CashbookEntry[] = legacyPayments
+      .filter((lp) => !postedInvoiceTxIds.has(lp.id))
+      .map((lp) => {
+        const e = new CashbookEntry();
+        e.id = lp.id;
+        e.referenceNo = lp.referenceNumber ?? `RCPT-${lp.id.slice(0, 8).toUpperCase()}`;
+        e.date = new Date(toYmd(lp.paymentDate));
+        e.entryType = 'RECEIPT';
+        e.amount = Number(lp.amountPaid);
+        e.category = 'Customer Payment';
+        e.description = lp.invoice
+          ? `Receipt for invoice ${lp.invoice.invoiceNumber}`
+          : 'Invoice Receipt (Legacy)';
+        e.paymentMode = lp.paymentMode;
+        e.branchId = lp.invoice?.branchId ?? '';
+        e.createdAt = lp.createdAt;
+        e.isReversed = false;
+        e.sourceType = 'INVOICE_PAYMENT';
+        e.sourceId = lp.id;
+        return e;
+      });
+
     // ── Merge & aggregate ────────────────────────────────────────────────────
-    const allEntries = [...cbEntries, ...synthReceipts, ...synthPayments].sort((a, b) => {
+    const allEntries = [
+      ...cbEntries,
+      ...synthReceipts,
+      ...synthPayments,
+      ...synthLegacyReceipts,
+    ].sort((a, b) => {
       const da = toYmd(a.date);
       const db = toYmd(b.date);
       if (da !== db) return da < db ? 1 : -1; // most recent day first
@@ -481,7 +525,7 @@ async function postExpensePayment(expense: ExpenseEntry, userId?: string): Promi
       amount: Number(expense.netAmount),
       category: expense.category,
       branchId: expense.branchId,
-      createdBy: userId ?? expense.createdBy ?? 'SYSTEM',
+      createdBy: userId ?? expense.createdBy ?? SYSTEM_UUID,
       paymentMode: expense.paymentMode,
       accountId: expense.paidFrom,
       autoResolveAccount: true,
@@ -620,7 +664,7 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
               sourceType: 'EXPENSE',
               sourceReferenceId: entry.id,
               sourceLabel: `Expense ${entry.expenseNo}`,
-              createdBy: req.user?.userId ?? 'SYSTEM',
+              createdBy: req.user?.userId ?? SYSTEM_UUID,
             });
             await chequeRepo.save(c);
           }
@@ -663,7 +707,7 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
           notes: saved.notes ?? undefined,
           sourceType: 'EXPENSE',
           sourceId: saved.id,
-          createdBy: req.user?.userId ?? 'SYSTEM',
+          createdBy: req.user?.userId ?? SYSTEM_UUID,
           branchId: saved.branchId,
         });
         await manager.save(CashbookEntry, cbEntry);
@@ -1208,23 +1252,57 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
     // Mirror the receipt into the cashbook / day book so it reaches the accounts
     // pages and moves the cash/bank balance. Best-effort after commit; idempotent
     // on (sourceType, sourceId).
+    //
+    // CHEQUE: do NOT credit any account now — money hasn't cleared yet.
+    // Create a PENDING RECEIVED cheque; Finance deposits → clears it in Accounts → Cheques.
+    const isChequeRcv = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
     try {
-      await postCashbookEntry({
-        date: req.body.paymentDate || todayInBusinessTz(),
-        entryType: 'RECEIPT',
-        amount: Number(req.body.amount),
-        category: 'Receivable Collection',
-        branchId: receivable.branchId,
-        createdBy: req.user?.userId ?? req.body.createdBy ?? 'SYSTEM',
-        paymentMode: req.body.paymentMode,
-        accountId: req.body.paidToAccount,
-        autoResolveAccount: true,
-        description: `Receipt against receivable ${receivable.customerName || receivable.id}`,
-        chequeNo: req.body.referenceNo,
-        notes: req.body.notes,
-        sourceType: 'RECEIVABLE_PAYMENT',
-        sourceId: savedPayment.id,
-      });
+      if (isChequeRcv) {
+        const { Cheque } = await import('../entities/chequeEntity');
+        const chequeRepo = Source.getRepository(Cheque);
+        const chequeNo = req.body.chequeNumber || req.body.referenceNo || `CHQ-RCV-${Date.now()}`;
+        const existing = await chequeRepo.findOne({
+          where: { chequeNo, branchId: receivable.branchId },
+        });
+        if (!existing) {
+          const cheque = chequeRepo.create({
+            chequeNo,
+            bankName: req.body.chequeBankName || undefined,
+            partyName: receivable.customerName || 'Customer',
+            amount: Number(req.body.amount),
+            dueDate: req.body.chequeDueDate
+              ? new Date(req.body.chequeDueDate)
+              : new Date(req.body.paymentDate || Date.now()),
+            issueDate: new Date(req.body.paymentDate || Date.now()),
+            type: 'RECEIVED',
+            status: 'PENDING',
+            description: `Customer cheque — receivable ${receivable.customerName || receivable.id}`,
+            branchId: receivable.branchId,
+            sourceType: 'RECEIVABLE',
+            sourceReferenceId: receivable.id,
+            sourceLabel: `Receivable — ${receivable.customerName || receivable.referenceNo}`,
+            createdBy: req.user?.userId ?? SYSTEM_UUID,
+          });
+          await chequeRepo.save(cheque);
+        }
+      } else {
+        await postCashbookEntry({
+          date: req.body.paymentDate || todayInBusinessTz(),
+          entryType: 'RECEIPT',
+          amount: Number(req.body.amount),
+          category: 'Receivable Collection',
+          branchId: receivable.branchId,
+          createdBy: req.user?.userId ?? req.body.createdBy ?? SYSTEM_UUID,
+          paymentMode: req.body.paymentMode,
+          accountId: req.body.paidToAccount,
+          autoResolveAccount: true,
+          description: `Receipt against receivable ${receivable.customerName || receivable.id}`,
+          chequeNo: req.body.referenceNo,
+          notes: req.body.notes,
+          sourceType: 'RECEIVABLE_PAYMENT',
+          sourceId: savedPayment.id,
+        });
+      }
     } catch (postErr) {
       logger.error('Failed to post receivable payment to cashbook', postErr);
     }
@@ -2050,6 +2128,8 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       MARKETING: pl.marketingExpense,
       MAINTENANCE: pl.maintenanceExpense,
       INSURANCE: pl.insuranceExpense,
+      IMPORT_LABOUR: pl.importLabourCost,
+      CUSTOMS_DUTY: pl.customsDuty,
       OTHER: pl.otherExpenses,
     };
     const expByCategory = Object.fromEntries(
@@ -2524,7 +2604,7 @@ export const depositToCashBank = async (req: Request, res: Response, next: NextF
   try {
     const id = req.params.id as string;
     const { date, amount, source, referenceNo, description, notes, linkedCashAccountId } = req.body;
-    const userId = req.user?.userId ?? '';
+    const userId = req.user?.userId ?? SYSTEM_UUID;
 
     if (!amount || Number(amount) <= 0) throw new AppError('Amount must be positive', 400);
 
@@ -2605,7 +2685,7 @@ export const withdrawFromCashBank = async (req: Request, res: Response, next: Ne
       notes,
       linkedCashAccountId,
     } = req.body;
-    const userId = req.user?.userId ?? '';
+    const userId = req.user?.userId ?? SYSTEM_UUID;
 
     if (!amount || Number(amount) <= 0) throw new AppError('Amount must be positive', 400);
 
@@ -2686,7 +2766,7 @@ export const transferBetweenAccounts = async (req: Request, res: Response, next:
       notes,
       exchangeRate,
     } = req.body;
-    const userId = req.user?.userId ?? '';
+    const userId = req.user?.userId ?? SYSTEM_UUID;
 
     if (!fromAccountId || !toAccountId)
       throw new AppError('Both from and to account are required', 400);
@@ -2823,7 +2903,7 @@ export const reconcileAccount = async (req: Request, res: Response, next: NextFu
   try {
     const id = req.params.id as string;
     const { reconciliationDate, statementDate, statementBalance, notes } = req.body;
-    const userId = req.user?.userId ?? '';
+    const userId = req.user?.userId ?? SYSTEM_UUID;
 
     const account = await Source.getRepository(CashBankAccount).findOne({ where: { id } });
     if (!account) throw new AppError('Account not found', 404);
@@ -2990,6 +3070,8 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       marketingExpense,
       maintenanceExpense,
       insuranceExpense,
+      importLabourCost,
+      customsDuty,
       otherExpenses,
       totalExpenses,
       grossProfit,
@@ -3213,6 +3295,13 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             currency,
           ),
           otherExpenses: makeAccountBalance('5013', 'Other Expenses', otherExpenses, currency),
+          importLabourCost: makeAccountBalance(
+            '5014',
+            'Import / Purchase Labour Cost',
+            importLabourCost,
+            currency,
+          ),
+          customsDuty: makeAccountBalance('5015', 'Customs Duty', customsDuty, currency),
           totalExpenses: +totalExpenses.toFixed(2),
         },
 

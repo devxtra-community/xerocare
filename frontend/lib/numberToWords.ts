@@ -1,7 +1,11 @@
+import { getCurrencyFullName, getCurrencyMinorUnitName } from './currencyNames';
+
 /**
- * Utility to convert numbers to Qatari Riyal words.
+ * Converts a number to its currency-in-words form, e.g. "One Thousand Qatari
+ * Riyals and Fifty Dirhams Only". Pass the transaction's own currency_code so
+ * the words match the amount; omit it to fall back to the active branch currency.
  */
-export function numberToWords(num: number): string {
+export function numberToWords(num: number, currencyCode?: string): string {
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const tens = [
     '',
@@ -49,7 +53,10 @@ export function numberToWords(num: number): string {
   const n = typeof num === 'string' ? parseFloat(num) : num;
   if (isNaN(n) || n === null || n === undefined) return '';
 
-  if (n === 0) return 'Zero Qatari Riyals Only';
+  const majorName = getCurrencyFullName(currencyCode);
+  const minorName = getCurrencyMinorUnitName(currencyCode);
+
+  if (n === 0) return `Zero ${majorName} Only`;
 
   let integerStr = '';
   // Ensure we handle fixed decimals for precision
@@ -80,10 +87,10 @@ export function numberToWords(num: number): string {
     }
   }
 
-  let finalWords = integerStr.trim() + ' Qatari Riyals';
+  let finalWords = integerStr.trim() + ' ' + majorName;
 
   if (decimalPart > 0) {
-    finalWords += ' and ' + convertGroup(decimalPart).trim() + ' Dirhams';
+    finalWords += ' and ' + convertGroup(decimalPart).trim() + ' ' + minorName;
   }
 
   return finalWords + ' Only';

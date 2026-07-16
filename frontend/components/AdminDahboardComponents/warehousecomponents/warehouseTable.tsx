@@ -91,7 +91,10 @@ export default function WarehouseReport() {
       setEditingWarehouse(null);
     } catch (error) {
       console.error('Save failed:', error);
-      toast.error('Failed to save warehouse');
+      const message =
+        (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+        'Failed to save warehouse';
+      toast.error(message);
     }
   };
 

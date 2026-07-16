@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { getCurrencyFullName } from '@/lib/currencyNames';
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 
 export interface SlabRange {
@@ -1084,7 +1085,9 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
         <div style={{ fontSize: '10px', color: TEXT_MUTED, lineHeight: '1.8' }}>
           <div style={{ fontWeight: '800', color: ACCENT_COLOR }}>TERMS & CONDITIONS:</div>
           <div>• Validity: {quotation.dueDate}</div>
-          <div>• All amounts are in Qatari Riyal ({getActiveCurrency()})</div>
+          <div>
+            • All amounts are in {getCurrencyFullName(getActiveCurrency())} ({getActiveCurrency()})
+          </div>
           <div>• Subject to Xerocare Standard Lease Agreement</div>
         </div>
         <div style={{ textAlign: 'center', position: 'relative' }}>

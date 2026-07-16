@@ -256,17 +256,9 @@ function GuaranteeModal({
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Currency</label>
-              <Select value={currencyCode} onValueChange={setCurrencyCode}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AED">AED</SelectItem>
-                  <SelectItem value="QAR">QAR</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="mt-1 flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                {currencyCode}
+              </div>
             </div>
           </div>
 

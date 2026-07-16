@@ -127,6 +127,10 @@ export interface Invoice {
   customerId: string | null;
   createdBy: string;
   totalAmount: number;
+  /** Sum of all recorded payments (both payment tables) — set by branch-invoices */
+  totalPaid?: number;
+  /** totalAmount - totalPaid, floored at 0 — set by branch-invoices */
+  pendingBalance?: number;
   status: InvoiceStatus;
   contractStatus?: 'PENDING_CONFIRMATION' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   contractConfirmationUrl?: string;
@@ -568,6 +572,8 @@ export const activateContractInvoice = async (
       mode: 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER';
       reference?: string;
       receivedDate?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
     };
     itemUpdates?: {
       id: string;

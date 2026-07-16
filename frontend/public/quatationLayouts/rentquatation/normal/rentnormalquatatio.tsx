@@ -948,7 +948,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                   marginTop: '1px',
                 }}
               >
-                {numberToWords(row.num)}
+                {numberToWords(row.num, getActiveCurrency())}
               </div>
             </div>
           ))}

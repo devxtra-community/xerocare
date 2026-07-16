@@ -18,6 +18,9 @@ import { fetchBranches, type Branch } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import * as XLSX from 'xlsx';
+import { TaxLocationFilter } from '@/components/accounts/TaxLocationFilter';
+import { TaxPeriodFilter } from '@/components/accounts/TaxPeriodFilter';
+import { getTaxPeriodRange, type TaxPeriod } from '@/lib/finance/taxReportPeriod';
 import {
   Table,
   TableBody,
@@ -67,33 +70,36 @@ function FilterBar({
   onChange,
   isAdmin,
   branches,
+  period,
+  onPeriodChange,
+  customFrom,
+  customTo,
+  onCustomDateChange,
 }: {
   filters: TaxReportFilters;
   onChange: (f: Partial<TaxReportFilters>) => void;
   isAdmin: boolean;
   branches: { id: string; name: string }[];
+  period: TaxPeriod;
+  onPeriodChange: (p: TaxPeriod) => void;
+  customFrom: string;
+  customTo: string;
+  onCustomDateChange: (delta: { customFrom?: string; customTo?: string }) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <input
-        type="date"
-        value={filters.dateFrom ?? ''}
-        onChange={(e) => onChange({ dateFrom: e.target.value || undefined })}
-        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
-        placeholder="From"
-      />
-      <span className="text-muted-foreground text-sm">to</span>
-      <input
-        type="date"
-        value={filters.dateTo ?? ''}
-        onChange={(e) => onChange({ dateTo: e.target.value || undefined })}
-        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+      <TaxPeriodFilter
+        period={period}
+        onPeriodChange={onPeriodChange}
+        customFrom={customFrom}
+        customTo={customTo}
+        onCustomChange={onCustomDateChange}
       />
       {isAdmin && (
         <select
           value={filters.branchIds ?? ''}
           onChange={(e) => onChange({ branchIds: e.target.value || undefined })}
-          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm h-10"
         >
           <option value="">All Branches</option>
           {branches.map((b) => (
@@ -103,40 +109,14 @@ function FilterBar({
           ))}
         </select>
       )}
-      <input
-        type="text"
-        value={filters.country ?? ''}
-        onChange={(e) =>
-          onChange({
-            country: e.target.value || undefined,
-            stateProvince: undefined,
-            city: undefined,
-          })
-        }
-        placeholder="Country (ISO)"
-        maxLength={2}
-        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-32 uppercase"
+      <TaxLocationFilter
+        value={{
+          country: filters.country,
+          stateProvince: filters.stateProvince,
+          city: filters.city,
+        }}
+        onChange={onChange}
       />
-      {filters.country && (
-        <input
-          type="text"
-          value={filters.stateProvince ?? ''}
-          onChange={(e) =>
-            onChange({ stateProvince: e.target.value || undefined, city: undefined })
-          }
-          placeholder="State / Emirate"
-          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-36"
-        />
-      )}
-      {filters.country && (
-        <input
-          type="text"
-          value={filters.city ?? ''}
-          onChange={(e) => onChange({ city: e.target.value || undefined })}
-          placeholder="City"
-          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm w-32"
-        />
-      )}
     </div>
   );
 }
@@ -236,10 +216,12 @@ function CountryBreakdownPanel({ breakdown }: { breakdown: CountryBreakdownRow[]
 
 function OutputTaxTab({
   filters,
+  periodReady,
   onGenerate,
 }: {
   filters: TaxReportFilters;
   branches: Branch[];
+  periodReady: boolean;
   onGenerate: (type: 'output', row: OutputTaxRow) => void;
 }) {
   const currency = useBranchCurrency();
@@ -248,6 +230,7 @@ function OutputTaxTab({
     queryKey: ['tax-output', filters, page],
     queryFn: () => getOutputTax({ ...filters, page, limit: 50 }),
     placeholderData: (prev) => prev,
+    enabled: periodReady,
   });
 
   const { rows = [], totals, pagination, countryBreakdown = [] } = query.data ?? {};
@@ -279,11 +262,15 @@ function OutputTaxTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryCard
+          label="Bills"
+          value={String(totals?.count ?? 0)}
+          sub="invoices matching filters"
+        />
         <SummaryCard
           label="Total Taxable Amount"
           value={formatCurrency(totals?.totalTaxableAmount ?? 0, currency)}
-          sub={`${totals?.count ?? 0} invoices`}
         />
         <SummaryCard
           label="Total Output VAT"
@@ -424,10 +411,12 @@ function OutputTaxTab({
 
 function InputTaxLocalTab({
   filters,
+  periodReady,
   onGenerate,
 }: {
   filters: TaxReportFilters;
   branches: Branch[];
+  periodReady: boolean;
   onGenerate: (type: 'local', row: InputTaxLocalRow) => void;
 }) {
   const currency = useBranchCurrency();
@@ -436,6 +425,7 @@ function InputTaxLocalTab({
     queryKey: ['tax-input-local', filters, page],
     queryFn: () => getInputTaxLocal({ ...filters, page, limit: 50 }),
     placeholderData: (prev) => prev,
+    enabled: periodReady,
   });
 
   const { rows = [], totals, pagination } = query.data ?? {};
@@ -469,11 +459,15 @@ function InputTaxLocalTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryCard
+          label="Bills"
+          value={String(totals?.count ?? 0)}
+          sub="purchases matching filters"
+        />
         <SummaryCard
           label="Total Taxable Amount"
           value={formatCurrency(totals?.totalTaxableAmount ?? 0, currency)}
-          sub={`${totals?.count ?? 0} purchases`}
         />
         <SummaryCard
           label="Total Input VAT"
@@ -618,10 +612,12 @@ function InputTaxLocalTab({
 
 function InputTaxInternationalTab({
   filters,
+  periodReady,
   onGenerate,
 }: {
   filters: TaxReportFilters;
   branches: Branch[];
+  periodReady: boolean;
   onGenerate: (type: 'international', row: InputTaxInternationalRow) => void;
 }) {
   const currency = useBranchCurrency();
@@ -630,6 +626,7 @@ function InputTaxInternationalTab({
     queryKey: ['tax-input-intl', filters, page],
     queryFn: () => getInputTaxInternational({ ...filters, page, limit: 50 }),
     placeholderData: (prev) => prev,
+    enabled: periodReady,
   });
 
   const { rows = [], totals, pagination } = query.data ?? {};
@@ -652,6 +649,8 @@ function InputTaxInternationalTab({
         'Tax %': r.taxPercent ?? '',
         'Customs Entry No': r.customsEntryNo ?? '',
         'Customs Duty': r.customsDuty ?? '',
+        'Shipping Cost': r.shippingCost ?? '',
+        'Labour Cost': r.labourCost ?? '',
         Currency: r.currencyCode ?? '',
         'Exchange Rate': r.exchangeRate ?? '',
         'VAT Claimable': r.vatClaimable ? 'Yes' : 'No',
@@ -665,11 +664,15 @@ function InputTaxInternationalTab({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryCard
+          label="Bills"
+          value={String(totals?.count ?? 0)}
+          sub="purchases matching filters"
+        />
         <SummaryCard
           label="Total Taxable Amount"
           value={formatCurrency(totals?.totalTaxableAmount ?? 0, currency)}
-          sub={`${totals?.count ?? 0} purchases`}
         />
         <SummaryCard
           label="Total Reverse Charge VAT"
@@ -724,8 +727,17 @@ function InputTaxInternationalTab({
                   <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
                     Rev. Charge VAT
                   </TableHead>
+                  <TableHead className="text-[10px] font-bold uppercase tracking-widest">
+                    Customs Entry No
+                  </TableHead>
                   <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
                     Customs Duty
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Shipping Cost
+                  </TableHead>
+                  <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest">
+                    Labour Cost
                   </TableHead>
                   <TableHead className="text-[10px] font-bold uppercase tracking-widest">
                     Currency
@@ -742,7 +754,7 @@ function InputTaxInternationalTab({
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={17} className="text-center py-12 text-muted-foreground">
                       No international input tax records in this period
                     </TableCell>
                   </TableRow>
@@ -774,10 +786,21 @@ function InputTaxInternationalTab({
                           ? formatCurrency(r.importVatReverseCharge, r.currencyCode)
                           : '—'}
                       </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {r.customsEntryNo ?? '—'}
+                      </TableCell>
                       <TableCell className="text-right text-sm">
                         {r.customsDuty != null
                           ? formatCurrency(r.customsDuty, r.currencyCode)
                           : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.shippingCost != null
+                          ? formatCurrency(r.shippingCost, r.currencyCode)
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.labourCost != null ? formatCurrency(r.labourCost, r.currencyCode) : '—'}
                       </TableCell>
                       <TableCell className="text-xs">{r.currencyCode ?? '—'}</TableCell>
                       <TableCell>
@@ -831,6 +854,11 @@ export default function TaxReportPage() {
   const [activeTab, setActiveTab] = useState<Tab>('output');
   const [filters, setFilters] = useState<TaxReportFilters>({});
   const [docDialog, setDocDialog] = useState<DialogState>(null);
+  // Period preset — same idiom as income-statement / cash-flow. Defaults to
+  // This Month, matching the convention on those sibling report pages.
+  const [period, setPeriod] = useState<TaxPeriod>('this_month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches'],
@@ -838,16 +866,31 @@ export default function TaxReportPage() {
     staleTime: 600_000,
   });
 
+  const { from: periodFrom, to: periodTo } = useMemo(
+    () => getTaxPeriodRange(period, customFrom, customTo),
+    [period, customFrom, customTo],
+  );
+
   const mergedFilters = useMemo((): TaxReportFilters => {
+    const withPeriod: TaxReportFilters = { ...filters, dateFrom: periodFrom, dateTo: periodTo };
     if (!isAdmin && user?.branchId) {
-      return { ...filters, branchId: user.branchId, branchIds: undefined };
+      return { ...withPeriod, branchId: user.branchId, branchIds: undefined };
     }
-    return filters;
-  }, [filters, isAdmin, user?.branchId]);
+    return withPeriod;
+  }, [filters, periodFrom, periodTo, isAdmin, user?.branchId]);
 
   const handleFilterChange = (delta: Partial<TaxReportFilters>) => {
     setFilters((f) => ({ ...f, ...delta }));
   };
+
+  const handleCustomDateChange = (delta: { customFrom?: string; customTo?: string }) => {
+    if (delta.customFrom !== undefined) setCustomFrom(delta.customFrom);
+    if (delta.customTo !== undefined) setCustomTo(delta.customTo);
+  };
+
+  // Guard against firing a query with an empty date range while the user is
+  // still picking a Custom period — same pattern as income-statement.tsx.
+  const periodReady = period !== 'custom' || (!!customFrom && !!customTo);
 
   const activeBranch = useMemo(() => {
     if (!user?.branchId) return branches[0];
@@ -881,6 +924,11 @@ export default function TaxReportPage() {
           onChange={handleFilterChange}
           isAdmin={isAdmin}
           branches={branches}
+          period={period}
+          onPeriodChange={setPeriod}
+          customFrom={customFrom}
+          customTo={customTo}
+          onCustomDateChange={handleCustomDateChange}
         />
       </div>
 
@@ -906,6 +954,7 @@ export default function TaxReportPage() {
         <OutputTaxTab
           filters={mergedFilters}
           branches={branches}
+          periodReady={periodReady}
           onGenerate={(type, row) => setDocDialog({ type, row })}
         />
       )}
@@ -913,6 +962,7 @@ export default function TaxReportPage() {
         <InputTaxLocalTab
           filters={mergedFilters}
           branches={branches}
+          periodReady={periodReady}
           onGenerate={(type, row) => setDocDialog({ type, row })}
         />
       )}
@@ -920,6 +970,7 @@ export default function TaxReportPage() {
         <InputTaxInternationalTab
           filters={mergedFilters}
           branches={branches}
+          periodReady={periodReady}
           onGenerate={(type, row) => setDocDialog({ type, row })}
         />
       )}

@@ -73,4 +73,12 @@ export class PurchasePaymentRepository {
       order: { paymentDate: 'DESC' },
     });
   }
+
+  async voidPayment(paymentId: string, branchId: string): Promise<void> {
+    const payment = await this.repo.findOne({ where: { id: paymentId, branchId } });
+    if (!payment) {
+      throw new AppError('Purchase payment not found', 404);
+    }
+    await this.repo.remove(payment);
+  }
 }

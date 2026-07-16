@@ -1087,7 +1087,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   textAlign: 'right',
                 }}
               >
-                {numberToWords(totals.subTotal)}
+                {numberToWords(totals.subTotal, getActiveCurrency())}
               </div>
             </div>
 
@@ -1112,7 +1112,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   textAlign: 'right',
                 }}
               >
-                {numberToWords(totals.tax)}
+                {numberToWords(totals.tax, getActiveCurrency())}
               </div>
             </div>
 
@@ -1145,7 +1145,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   marginTop: '2px',
                 }}
               >
-                {numberToWords(totals.total)}
+                {numberToWords(totals.total, getActiveCurrency())}
               </div>
             </div>
           </div>
@@ -1166,7 +1166,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                 marginTop: '4px',
               }}
             >
-              {numberToWords(leaseDetails.monthlyEmi)}
+              {numberToWords(leaseDetails.monthlyEmi, getActiveCurrency())}
             </div>
           </div>
         </div>

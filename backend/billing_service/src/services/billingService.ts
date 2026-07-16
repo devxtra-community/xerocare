@@ -1573,7 +1573,7 @@ export class BillingService {
       );
     }
 
-    if (invoice.type === InvoiceType.PROFORMA) {
+    if (invoice.type === InvoiceType.PROFORMA || invoice.type === InvoiceType.FINAL) {
       return invoice;
     }
 
@@ -1789,6 +1789,8 @@ export class BillingService {
       mode: SecurityDepositMode;
       reference?: string;
       receivedDate?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
     },
     itemUpdates?: {
       id: string;
@@ -1909,7 +1911,9 @@ export class BillingService {
         invoice.saleType === SaleType.SPAREPART_SALE
       ) {
         invoice.type = InvoiceType.FINAL;
-        invoice.status = InvoiceStatus.PAID;
+        // Activation only finalizes the sale — payment status is tracked separately.
+        // recordPayment() flips the status to PAID once the balance reaches zero.
+        invoice.status = InvoiceStatus.INVOICED;
         invoice.contractStatus = ContractStatus.ACTIVE; // Set to Active for consistency
       } else {
         invoice.contractStatus = ContractStatus.ACTIVE;
@@ -1918,6 +1922,31 @@ export class BillingService {
 
       const savedInvoice = await queryRunner.manager.save(invoice);
       await queryRunner.commitTransaction();
+
+      // Record deposit as a PaymentTransaction so it appears in cashbook / cheques page.
+      // Must run after commit so the invoice row is visible to recordPayment's query.
+      if (deposit && deposit.amount > 0) {
+        try {
+          await this.recordPayment(
+            savedInvoice.id,
+            {
+              paymentMode: deposit.mode as string,
+              referenceNumber: deposit.reference,
+              amount: deposit.amount,
+              transactionDate: deposit.receivedDate || new Date().toISOString().split('T')[0],
+              remarks: 'Security Deposit',
+              // For CHEQUE mode: pass cheque details so a Cheque record is created
+              chequeNumber:
+                (deposit.mode as string) === 'CHEQUE' ? deposit.reference || undefined : undefined,
+              chequeBankName: deposit.chequeBankName,
+              chequeDueDate: deposit.chequeDueDate,
+            },
+            userId,
+          );
+        } catch (err) {
+          logger.error(`Failed to record deposit for contract ${savedInvoice.id}`, err);
+        }
+      }
 
       await logAudit(
         savedInvoice.id,
@@ -2325,6 +2354,36 @@ export class BillingService {
   async getBranchInvoices(branchId: string) {
     const invoices = await this.invoiceRepo.findByBranchId(branchId);
 
+    // Batch-sum payments per invoice from both payment tables so the frontend
+    // can derive the payment status (PENDING / ADVANCE / PARTIAL / PAID).
+    const paidMap = new Map<string, number>();
+    const invoiceIds = invoices.map((i) => i.id);
+    if (invoiceIds.length > 0) {
+      const { PaymentLedger } = await import('../entities/paymentLedgerEntity');
+      const [txSums, ledgerSums] = await Promise.all([
+        Source.getRepository(PaymentTransaction)
+          .createQueryBuilder('tx')
+          .select('tx.invoice_id', 'invoiceId')
+          .addSelect('SUM(tx.amount)', 'total')
+          .where('tx.invoice_id IN (:...ids)', { ids: invoiceIds })
+          // Security deposits are refundable caution money, not invoice settlement
+          .andWhere(`(tx.remarks IS NULL OR LOWER(TRIM(tx.remarks)) != 'security deposit')`)
+          .groupBy('tx.invoice_id')
+          .getRawMany<{ invoiceId: string; total: string }>(),
+        Source.getRepository(PaymentLedger)
+          .createQueryBuilder('lp')
+          .select('lp."invoiceId"', 'invoiceId')
+          .addSelect('SUM(lp."amountPaid")', 'total')
+          .where('lp."invoiceId" IN (:...ids)', { ids: invoiceIds })
+          .andWhere(`(lp.remarks IS NULL OR LOWER(TRIM(lp.remarks)) != 'security deposit')`)
+          .groupBy('lp."invoiceId"')
+          .getRawMany<{ invoiceId: string; total: string }>(),
+      ]);
+      for (const row of [...txSums, ...ledgerSums]) {
+        paidMap.set(row.invoiceId, (paidMap.get(row.invoiceId) ?? 0) + Number(row.total));
+      }
+    }
+
     // Enrich with usageRevenue and discountAmount for stats accuracy
     const enriched = await Promise.all(
       invoices.map(async (invoice) => {
@@ -2335,10 +2394,13 @@ export class BillingService {
         );
         const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
 
+        const totalPaid = paidMap.get(invoice.id) ?? 0;
         return {
           ...invoice,
           usageRevenue,
           discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+          totalPaid,
+          pendingBalance: Math.max(0, Number(invoice.totalAmount || 0) - totalPaid),
         };
       }),
     );
@@ -4419,6 +4481,10 @@ export class BillingService {
        * pending balance instead of the status.
        */
       bypassStatusCheck?: boolean;
+      /** Cheque details — required when paymentMode is CHEQUE */
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
     },
     userId?: string,
   ): Promise<PaymentTransaction> {
@@ -4461,9 +4527,17 @@ export class BillingService {
       transactionRepoForSum.find({ where: { invoiceId } }),
       legacyRepo.find({ where: { invoiceId } }),
     ]);
+    // Security deposits sit outside the invoice total (refundable caution money),
+    // so they must never count toward invoice settlement.
+    const isDepositTxn = (remarks?: string) =>
+      (remarks ?? '').trim().toLowerCase() === 'security deposit';
     const paidSoFar =
-      priorTxns.reduce((sum, t) => sum + Number(t.amount), 0) +
-      legacyRows.reduce((sum, p) => sum + Number(p.amountPaid), 0);
+      priorTxns
+        .filter((t) => !isDepositTxn(t.remarks))
+        .reduce((sum, t) => sum + Number(t.amount), 0) +
+      legacyRows
+        .filter((p) => !isDepositTxn(p.remarks))
+        .reduce((sum, p) => sum + Number(p.amountPaid), 0);
 
     // Overpayment guard (skipped for security deposits, which sit outside the invoice total).
     if (!isSecurityDeposit && Number(invoice.totalAmount) > 0) {
@@ -4508,9 +4582,14 @@ export class BillingService {
     if (ledger) {
       // Recompute from the full payment history (both tables) rather than
       // incrementing, so ledgers stay correct even for invoices whose earlier
-      // payments went through the legacy path.
-      ledger.paidAmount = paidSoFar + Number(transaction.amount);
-      ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
+      // payments went through the legacy path. Security deposits are excluded —
+      // they are refundable money held aside, not settlement of the invoice.
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      ledger.paidAmount = round2(paidSoFar + (isSecurityDeposit ? 0 : Number(transaction.amount)));
+      ledger.balanceAmount = Math.max(
+        0,
+        round2(Number(ledger.totalAmount) - Number(ledger.paidAmount)),
+      );
       await ledgerRepo.save(ledger);
 
       // Check if invoice is an opening balance entry
@@ -4532,8 +4611,13 @@ export class BillingService {
         }
       }
 
-      // Check if invoice is fully paid
-      if (ledger.balanceAmount === 0 && invoice.status !== InvoiceStatus.PAID) {
+      // Check if invoice is fully paid (never triggered by a security deposit alone —
+      // deposits are excluded from paidAmount, and zero-total invoices are skipped)
+      if (
+        Number(ledger.totalAmount) > 0 &&
+        ledger.balanceAmount === 0 &&
+        invoice.status !== InvoiceStatus.PAID
+      ) {
         const oldStatus = invoice.status;
         invoice.status = InvoiceStatus.PAID;
         await this.invoiceRepo.save(invoice);
@@ -4552,24 +4636,72 @@ export class BillingService {
 
     // Mirror the receipt into the cashbook / day book and move the cash/bank balance.
     // Best-effort: a posting failure must never break payment recording.
+    //
+    // CHEQUE payments: do NOT credit any account now — money hasn't cleared yet.
+    // Instead create a PENDING RECEIVED cheque record. Finance deposits → clears it
+    // in Accounts → Cheques, which posts the bank cashbook entry at that point.
+    //
+    // CASH / BANK_TRANSFER: post immediately to the matching account.
     if (invoice.branchId) {
       try {
         const { toBusinessDate } = await import('../utils/businessDate');
-        await postCashbookEntry({
-          date: toBusinessDate(transaction.transactionDate),
-          entryType: 'RECEIPT',
-          amount: Number(transaction.amount),
-          category: 'Customer Payment',
-          branchId: invoice.branchId,
-          createdBy: userId || 'SYSTEM',
-          paymentMode: transaction.paymentMode,
-          autoResolveAccount: true,
-          linkedInvoiceId: invoiceId,
-          description: `Receipt for invoice ${invoice.invoiceNumber}`,
-          chequeNo: transaction.referenceNumber,
-          sourceType: 'INVOICE_PAYMENT',
-          sourceId: transaction.id,
-        });
+        const isChequePayment = (data.paymentMode ?? '').toUpperCase() === 'CHEQUE';
+
+        if (isChequePayment) {
+          // Create a PENDING RECEIVED cheque — no balance moves until cleared.
+          const { Cheque } = await import('../entities/chequeEntity');
+          const chequeRepo = Source.getRepository(Cheque);
+          const chequeNo = data.chequeNumber || data.referenceNumber || `CHQ-${Date.now()}`;
+          const existing = await chequeRepo.findOne({
+            where: { chequeNo, branchId: invoice.branchId },
+          });
+          if (!existing) {
+            const cheque = chequeRepo.create({
+              chequeNo,
+              bankName: data.chequeBankName || undefined,
+              partyName: invoice.customerName || 'Customer',
+              amount: Number(transaction.amount),
+              dueDate: data.chequeDueDate
+                ? new Date(data.chequeDueDate)
+                : new Date(transaction.transactionDate),
+              issueDate: new Date(transaction.transactionDate),
+              type: 'RECEIVED',
+              status: 'PENDING',
+              description: `Customer cheque payment — Invoice ${invoice.invoiceNumber}`,
+              branchId: invoice.branchId,
+              sourceType: 'INVOICE',
+              sourceReferenceId: invoiceId,
+              sourceLabel: (() => {
+                const base = `Invoice ${invoice.invoiceNumber}`;
+                if (invoice.billingPeriodStart && invoice.billingPeriodEnd) {
+                  const fmt = (d: Date) =>
+                    new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+                  return `${base} — ${fmt(invoice.billingPeriodStart)} to ${fmt(invoice.billingPeriodEnd)}`;
+                }
+                return base;
+              })(),
+              invoiceNo: invoice.invoiceNumber,
+              createdBy: userId || 'SYSTEM',
+            });
+            await chequeRepo.save(cheque);
+          }
+        } else {
+          await postCashbookEntry({
+            date: toBusinessDate(transaction.transactionDate),
+            entryType: 'RECEIPT',
+            amount: Number(transaction.amount),
+            category: 'Customer Payment',
+            branchId: invoice.branchId,
+            createdBy: userId || '00000000-0000-0000-0000-000000000000',
+            paymentMode: transaction.paymentMode,
+            autoResolveAccount: true,
+            linkedInvoiceId: invoiceId,
+            description: `Receipt for invoice ${invoice.invoiceNumber}`,
+            chequeNo: transaction.referenceNumber,
+            sourceType: 'INVOICE_PAYMENT',
+            sourceId: transaction.id,
+          });
+        }
       } catch (err) {
         logger.error('Failed to post invoice receipt to cashbook', err);
       }

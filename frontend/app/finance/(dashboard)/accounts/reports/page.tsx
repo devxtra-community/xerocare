@@ -294,15 +294,28 @@ export default function ReportsHubPage() {
       }
     });
     purchases.forEach((p) => {
-      add(
-        '5004 Vendor Purchase Cost',
-        (p.totalAmount ?? 0) - (p.shippingCost ?? 0) - (p.handlingFee ?? 0) - (p.labourCost ?? 0),
-        0,
-      );
+      // Four non-overlapping cost buckets (see general-ledger page for the same derivation).
+      // labour_cost is purchase-side (import/customs-clearance) labour — it must NOT be posted
+      // to 5002 Technician Labour, which is service-ticket labour only; blending the two would
+      // misrepresent both numbers.
+      const vendorPurchaseCost = (p.purchaseAmount ?? 0) + (p.documentationFee ?? 0);
+      const shippingHandling =
+        (p.shippingCost ?? 0) +
+        (p.handlingFee ?? 0) +
+        (p.transportationCost ?? 0) +
+        (p.groundfieldCost ?? 0);
+      const customsDuty = p.customsDuty ?? 0;
+
+      add('5004 Vendor Purchase Cost', vendorPurchaseCost, 0);
       add('2001 Accounts Payable', 0, p.totalAmount ?? 0);
-      if ((p.shippingCost ?? 0) + (p.handlingFee ?? 0) > 0)
-        add('5005 Shipping & Handling', (p.shippingCost ?? 0) + (p.handlingFee ?? 0), 0);
-      if ((p.labourCost ?? 0) > 0) add('5002 Technician Labour Cost', p.labourCost ?? 0, 0);
+      if (shippingHandling > 0) add('5005 Shipping & Handling', shippingHandling, 0);
+      if ((p.labourCost ?? 0) > 0) add('5014 Import / Purchase Labour Cost', p.labourCost ?? 0, 0);
+      if (customsDuty > 0) {
+        // Customs duty is owed to the customs authority, not the vendor — modeled as paid at
+        // clearance, so it credits Cash at Bank rather than adding to Accounts Payable.
+        add('5015 Customs Duty', customsDuty, 0);
+        add('1002 Cash at Bank', 0, customsDuty);
+      }
     });
     payroll.forEach((p) => {
       add('5006 Employee Salary Expense', p.netSalary ?? 0, 0);

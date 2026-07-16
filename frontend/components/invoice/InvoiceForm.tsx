@@ -423,11 +423,16 @@ export default function InvoiceForm() {
                             <SelectValue placeholder="Select city" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
-                            {txnCities.map((c) => (
-                              <SelectItem key={`${c.name}-${c.stateCode}`} value={c.name}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
+                            {txnCities
+                              .filter((c, i, arr) => arr.findIndex((x) => x.name === c.name) === i)
+                              .map((c, idx) => (
+                                <SelectItem
+                                  key={`${c.stateCode ?? ''}-${c.name}-${idx}`}
+                                  value={c.name}
+                                >
+                                  {c.name}
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       ) : (

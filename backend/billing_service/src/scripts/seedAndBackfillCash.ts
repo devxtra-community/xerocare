@@ -106,7 +106,7 @@ async function main() {
         amount: Number(tx.amount),
         category: 'Customer Payment',
         branchId: invoice.branchId,
-        createdBy: tx.recordedBy || 'SYSTEM',
+        createdBy: tx.recordedBy || '00000000-0000-0000-0000-000000000000',
         paymentMode: tx.paymentMode,
         autoResolveAccount: true,
         linkedInvoiceId: tx.invoiceId,

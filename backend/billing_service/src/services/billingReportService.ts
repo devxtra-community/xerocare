@@ -919,6 +919,10 @@ export class BillingReportService {
     const contract = await this.invoiceRepo.findById(contractId);
     if (!contract) throw new AppError('Contract not found', 404);
 
+    // Source dynamically from the contract's own currency_code (set from the
+    // branch at creation time) — never hardcode a currency literal here.
+    const currency = contract.currencyCode || 'QAR';
+
     const finalInvoices = await this.invoiceRepo.findFinalInvoicesByContractId(contractId);
     const summaryInvoice = finalInvoices.find((inv) => inv.isSummaryInvoice);
     const monthlyInvoices = finalInvoices
@@ -966,16 +970,16 @@ export class BillingReportService {
           doc.font('Helvetica');
           if (slabs && slabs.length > 0) {
             slabs.forEach((s) => {
-              doc.text(`    ${s.from} - ${s.to}: QAR ${s.rate}`, 60, currentY);
+              doc.text(`    ${s.from} - ${s.to}: ${currency} ${s.rate}`, 60, currentY);
               currentY += 12;
             });
             if (excessRate) {
               const maxTo = Math.max(...slabs.map((s) => Number(s.to) || 0));
-              doc.text(`    > ${maxTo}: QAR ${excessRate}`, 60, currentY);
+              doc.text(`    > ${maxTo}: ${currency} ${excessRate}`, 60, currentY);
               currentY += 12;
             }
           } else if (excessRate) {
-            doc.text(`    Base Rate: QAR ${excessRate}`, 60, currentY);
+            doc.text(`    Base Rate: ${currency} ${excessRate}`, 60, currentY);
             currentY += 12;
           }
         };
@@ -1011,7 +1015,7 @@ export class BillingReportService {
 
       doc.text(period, itemCodeX, y);
       doc.text(inv.invoiceNumber, descriptionX, y);
-      doc.text(`QAR ${Number(inv.totalAmount).toFixed(2)}`, amountX, y);
+      doc.text(`${currency} ${Number(inv.totalAmount).toFixed(2)}`, amountX, y);
       y += 20;
     });
 
@@ -1024,7 +1028,7 @@ export class BillingReportService {
       summaryInvoice?.discountAmount ||
       monthlyInvoices.reduce((s, i) => s + Number(i.discountAmount || 0), 0);
     const totalCollected = Number(grossVal) - Number(discVal);
-    doc.text(`Total Due: QAR ${totalCollected.toFixed(2)}`, amountX, y + 20);
+    doc.text(`Total Due: ${currency} ${totalCollected.toFixed(2)}`, amountX, y + 20);
 
     doc.end();
   }
@@ -1038,6 +1042,10 @@ export class BillingReportService {
 
     const quotation = await this.invoiceRepo.findById(quotationId);
     if (!quotation) throw new AppError('Quotation not found', 404);
+
+    // Source dynamically from the quotation's own currency_code (set from the
+    // branch at creation time) — never hardcode a currency literal here.
+    const currency = quotation.currencyCode || 'QAR';
 
     const [customer, employee, paymentTransactions] = await Promise.all([
       this.getCustomerDetails(quotation.customerId),
@@ -1443,7 +1451,7 @@ export class BillingReportService {
     doc
       .fillColor('#1e293b')
       .text(
-        `QAR ${totalBeforeDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${totalBeforeDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         valueX,
         totalY,
         { width: valueWidth, align: 'right' },
@@ -1457,7 +1465,7 @@ export class BillingReportService {
       doc
         .fillColor('#dc2626')
         .text(
-          `- QAR ${finalDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          `- ${currency} ${finalDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
           valueX,
           totalY,
           { width: valueWidth, align: 'right' },
@@ -1471,7 +1479,7 @@ export class BillingReportService {
     doc
       .fillColor('#1e293b')
       .text(
-        `QAR ${totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         valueX,
         totalY,
         { width: valueWidth, align: 'right' },
@@ -1488,7 +1496,7 @@ export class BillingReportService {
     doc
       .fontSize(12)
       .text(
-        `QAR ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         totalsX + 115,
         totalY + 11,
         { width: 85, align: 'right' },
@@ -1504,7 +1512,7 @@ export class BillingReportService {
       doc
         .fillColor('#16a34a')
         .text(
-          `- QAR ${amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          `- ${currency} ${amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
           valueX,
           totalY,
           { width: valueWidth, align: 'right' },
@@ -1515,7 +1523,7 @@ export class BillingReportService {
       doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b');
       doc.text('Balance Due', totalsX, totalY, { width: labelWidth });
       doc.text(
-        `QAR ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         valueX,
         totalY,
         { width: valueWidth, align: 'right' },
@@ -1639,6 +1647,10 @@ export class BillingReportService {
 
     const invoice = await this.invoiceRepo.findById(invoiceId);
     if (!invoice) throw new AppError('Invoice not found', 404);
+
+    // Source dynamically from the invoice's own currency_code (set from the
+    // branch at creation time) — never hardcode a currency literal here.
+    const currency = invoice.currencyCode || 'QAR';
 
     const [customer, employee, paymentTransactions] = await Promise.all([
       this.getCustomerDetails(invoice.customerId),
@@ -1865,8 +1877,8 @@ export class BillingReportService {
     doc.text('MPN', mpnX + 5, currentY + 8);
     doc.text('ITEMS / DESCRIPTION', descX, currentY + 8);
     doc.text('QTY', qtyX, currentY + 8, { width: 30, align: 'center' });
-    doc.text('RATE (QAR)', rateX, currentY + 8, { width: 75, align: 'right' });
-    doc.text('TOTAL (QAR)', totalX, currentY + 8, { width: 50, align: 'right' });
+    doc.text(`RATE (${currency})`, rateX, currentY + 8, { width: 75, align: 'right' });
+    doc.text(`TOTAL (${currency})`, totalX, currentY + 8, { width: 50, align: 'right' });
 
     currentY += 30;
 
@@ -2011,7 +2023,7 @@ export class BillingReportService {
     doc
       .fillColor('#1e293b')
       .text(
-        `QAR ${totalBeforeDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${totalBeforeDiscount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         valueX,
         totalY,
         { width: valueWidth, align: 'right' },
@@ -2025,7 +2037,7 @@ export class BillingReportService {
       doc
         .fillColor('#dc2626')
         .text(
-          `- QAR ${finalDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          `- ${currency} ${finalDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
           valueX,
           totalY,
           { width: valueWidth, align: 'right' },
@@ -2039,7 +2051,7 @@ export class BillingReportService {
     doc
       .fillColor('#1e293b')
       .text(
-        `QAR ${totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${totalVat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         valueX,
         totalY,
         { width: valueWidth, align: 'right' },
@@ -2056,7 +2068,7 @@ export class BillingReportService {
     doc
       .fontSize(12)
       .text(
-        `QAR ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         totalsX_ + 115,
         totalY + 11,
         { width: 85, align: 'right' },
@@ -2072,7 +2084,7 @@ export class BillingReportService {
       doc
         .fillColor('#16a34a')
         .text(
-          `- QAR ${amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          `- ${currency} ${amountPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
           valueX,
           totalY,
           { width: valueWidth, align: 'right' },
@@ -2083,7 +2095,7 @@ export class BillingReportService {
       doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b');
       doc.text('Balance Due', totalsX_, totalY, { width: labelWidth });
       doc.text(
-        `QAR ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+        `${currency} ${balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
         valueX,
         totalY,
         { width: valueWidth, align: 'right' },

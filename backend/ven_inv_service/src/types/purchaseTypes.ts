@@ -26,6 +26,7 @@ export interface AddPaymentDto {
   paymentDate?: Date;
   createdBy?: string;
   attachmentUrl?: string;
+  paidFromAccountId?: string;
 }
 
 export interface AddCostDto {

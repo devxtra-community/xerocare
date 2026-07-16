@@ -159,15 +159,9 @@ function AddReceivableModal({
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Currency</label>
-              <Select value={form.currency} onValueChange={(v) => set('currency', v)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AED">AED</SelectItem>
-                  <SelectItem value="QAR">QAR</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="mt-1 flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm font-medium text-foreground">
+                {form.currency}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -223,15 +217,23 @@ function PaymentModal({
     paidToAccount: accounts[0]?.id ?? '',
     paymentMode: 'Bank Transfer',
     referenceNo: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDueDate: '',
     notes: '',
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const isCheque = form.paymentMode === 'Cheque';
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: () =>
       recordReceivablePayment(receivable.id, { ...form, amount: parseFloat(form.amount) }),
     onSuccess: () => {
-      toast.success('Payment recorded');
+      toast.success(
+        isCheque
+          ? 'Cheque recorded (PENDING). Go to Accounts → Cheques to deposit when cleared.'
+          : 'Payment recorded',
+      );
       qc.invalidateQueries({ queryKey: ['manual-receivables'] });
       onClose();
     },
@@ -274,21 +276,23 @@ function PaymentModal({
               />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Paid To Account</label>
-            <Select value={form.paidToAccount} onValueChange={(v) => set('paidToAccount', v)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isCheque && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Paid To Account</label>
+              <Select value={form.paidToAccount} onValueChange={(v) => set('paidToAccount', v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Payment Mode</label>
             <Select value={form.paymentMode} onValueChange={(v) => set('paymentMode', v)}>
@@ -304,21 +308,63 @@ function PaymentModal({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Reference #</label>
-            <Input
-              value={form.referenceNo}
-              onChange={(e) => set('referenceNo', e.target.value)}
-              className="mt-1"
-            />
-          </div>
+          {isCheque ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-xs font-semibold text-amber-700">
+                Cheque received — bank balance updates when Finance clears it in Accounts → Cheques.
+              </p>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Cheque Number *</label>
+                <Input
+                  required
+                  placeholder="e.g. CHQ-001234"
+                  value={form.chequeNumber}
+                  onChange={(e) => set('chequeNumber', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Customer Bank *
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. HDFC Bank"
+                    value={form.chequeBankName}
+                    onChange={(e) => set('chequeBankName', e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Due Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.chequeDueDate}
+                    onChange={(e) => set('chequeDueDate', e.target.value)}
+                    className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Reference #</label>
+              <Input
+                value={form.referenceNo}
+                onChange={(e) => set('referenceNo', e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          )}
         </div>
         <div className="flex gap-3 px-6 pb-5">
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
           <Button onClick={() => mut.mutate()} disabled={mut.isPending} className="flex-1">
-            {mut.isPending ? 'Saving...' : 'Record'}
+            {mut.isPending ? 'Saving...' : isCheque ? 'Record Cheque' : 'Record'}
           </Button>
         </div>
       </div>

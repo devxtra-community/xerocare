@@ -76,39 +76,72 @@ function ViewApproveModal({
 }) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<'view' | 'approve' | 'reject'>('view');
-  const [payNow, setPayNow] = useState(false);
+  const [payNow, setPayNow] = useState(true);
   const [paidFromAccount, setPaidFromAccount] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
 
+  const isPurchaseRequest = expense.requestSource === 'MANAGER_PURCHASE';
+  // Show the purchase-details box for any request tied to a purchase (including
+  // auto-created records from direct Finance/Admin payments).
+  const hasPurchaseInfo = isPurchaseRequest || !!expense.purchaseRef || !!expense.purchaseId;
+  const isChequeMode = (expense.paymentMode ?? '').toLowerCase() === 'cheque';
+  const isImageProof =
+    !!expense.receiptUrl && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(expense.receiptUrl);
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
+    qc.invalidateQueries({ queryKey: ['expense-requests-summary'] });
+    qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
+    qc.invalidateQueries({ queryKey: ['purchases-ap'] });
+  };
+
   const approveMut = useMutation({
     mutationFn: () =>
-      approveExpenseRequest(expense.id, {
-        paid_from_account: payNow ? paidFromAccount : undefined,
-        payment_reference: payNow ? paymentReference : undefined,
-      }),
+      isPurchaseRequest
+        ? approveExpenseRequest(expense.id, {})
+        : approveExpenseRequest(expense.id, {
+            paid_from_account: payNow ? paidFromAccount : undefined,
+            payment_reference: payNow ? paymentReference : undefined,
+          }),
     onSuccess: () => {
-      toast.success(payNow ? 'Expense approved and paid' : 'Expense approved');
-      qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
-      qc.invalidateQueries({ queryKey: ['expense-requests-summary'] });
-      if (payNow) {
-        qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
-        qc.invalidateQueries({ queryKey: ['approved-expenses-payable'] });
+      if (isPurchaseRequest) {
+        toast.success(
+          isChequeMode
+            ? 'Purchase payment approved — cheque issued (pending clearance)'
+            : 'Purchase payment approved — funds deducted from account',
+        );
+      } else {
+        toast.success(payNow ? 'Expense approved and paid' : 'Expense approved');
       }
+      invalidateAll();
       onClose();
     },
-    onError: () => toast.error('Failed to approve'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to approve';
+      toast.error(msg);
+    },
   });
 
   const rejectMut = useMutation({
     mutationFn: () => rejectExpenseRequest(expense.id, rejectionReason),
     onSuccess: () => {
-      toast.success('Expense rejected');
-      qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
-      qc.invalidateQueries({ queryKey: ['expense-requests-summary'] });
+      toast.success(
+        isPurchaseRequest
+          ? 'Purchase payment rejected — outstanding balance restored'
+          : 'Expense rejected',
+      );
+      invalidateAll();
       onClose();
     },
-    onError: () => toast.error('Failed to reject'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to reject';
+      toast.error(msg);
+    },
   });
 
   const isProcessing = approveMut.isPending || rejectMut.isPending;
@@ -118,7 +151,9 @@ function ViewApproveModal({
       <div className="bg-card rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div>
-            <h2 className="font-bold text-slate-800">Expense Request</h2>
+            <h2 className="font-bold text-slate-800">
+              {isPurchaseRequest ? 'Purchase Payment Request' : 'Expense Request'}
+            </h2>
             <p className="text-xs text-muted-foreground">{expense.requestNo}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-slate-800">
@@ -127,7 +162,7 @@ function ViewApproveModal({
         </div>
 
         <div className="px-6 py-4 space-y-4 overflow-y-auto">
-          {/* Employee info */}
+          {/* Requester info */}
           <div className="bg-muted/40 rounded-xl p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div>
@@ -144,17 +179,112 @@ function ViewApproveModal({
             </div>
           </div>
 
+          {/* Purchase-specific details */}
+          {hasPurchaseInfo && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+              <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">
+                Purchase Payment Details
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {expense.vendorName && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Vendor</span>
+                    <p className="font-semibold">{expense.vendorName}</p>
+                  </div>
+                )}
+                {expense.purchaseRef && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Purchase Ref</span>
+                    <p className="font-mono text-xs font-bold text-amber-700">
+                      {expense.purchaseRef}
+                    </p>
+                  </div>
+                )}
+                {expense.purchaseOrigin && (
+                  <div>
+                    <span className="text-xs font-medium text-muted-foreground">Purchase Type</span>
+                    <p>
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide ${
+                          expense.purchaseOrigin === 'DOMESTIC'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-indigo-100 text-indigo-700'
+                        }`}
+                      >
+                        {expense.purchaseOrigin === 'DOMESTIC'
+                          ? 'LOCAL PURCHASE'
+                          : 'INTERNATIONAL PURCHASE'}
+                      </span>
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">Payment Mode</span>
+                  <p className="font-medium">{expense.paymentMode || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-muted-foreground">Amount</span>
+                  <p className="font-bold text-red-600">
+                    {formatCurrency(Number(expense.amount), expense.currency)}
+                  </p>
+                </div>
+                {!isChequeMode && expense.paidFromAccountId && (
+                  <div className="col-span-2">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Pay From Account
+                    </span>
+                    <p className="text-sm font-medium">
+                      {accounts.find((a) => a.id === expense.paidFromAccountId)?.name ||
+                        expense.paidFromAccountId}
+                    </p>
+                  </div>
+                )}
+                {isChequeMode && expense.chequeNumber && (
+                  <>
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Cheque #</span>
+                      <p className="font-mono text-xs">{expense.chequeNumber}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Bank</span>
+                      <p className="text-sm">{expense.chequeBankName || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Due Date</span>
+                      <p className="text-sm">{expense.chequeDueDate?.slice(0, 10) || '—'}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              {isPurchaseRequest &&
+                (isChequeMode ? (
+                  <p className="text-xs text-amber-700">
+                    Approving will create a PENDING ISSUED cheque. Cash at Bank moves when Finance
+                    marks it Cleared in Accounts → Cheques.
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-700">
+                    Approving will immediately deduct funds from the Manager-selected account and
+                    create a Cashbook entry.
+                  </p>
+                ))}
+            </div>
+          )}
+
+          {/* Standard expense fields */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-xs font-medium text-muted-foreground">Date</span>
               <p className="font-medium">{expense.date?.slice(0, 10)}</p>
             </div>
-            <div>
-              <span className="text-xs font-medium text-muted-foreground">Amount</span>
-              <p className="font-bold text-red-600">
-                {formatCurrency(Number(expense.amount), expense.currency)}
-              </p>
-            </div>
+            {!isPurchaseRequest && (
+              <div>
+                <span className="text-xs font-medium text-muted-foreground">Amount</span>
+                <p className="font-bold text-red-600">
+                  {formatCurrency(Number(expense.amount), expense.currency)}
+                </p>
+              </div>
+            )}
             <div>
               <span className="text-xs font-medium text-muted-foreground">Category</span>
               <p className="font-medium">{getCategoryLabel(expense.category)}</p>
@@ -175,20 +305,33 @@ function ViewApproveModal({
                 <p className="text-sm">{new Date(expense.submittedAt).toLocaleString()}</p>
               </div>
             )}
-            {expense.receiptUrl && (
-              <div className="col-span-2">
-                <span className="text-xs font-medium text-muted-foreground">Receipt</span>
-                <a
-                  href={expense.receiptUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 text-primary text-sm hover:underline"
-                >
-                  <FileText className="h-4 w-4" />
-                  View Receipt
-                </a>
-              </div>
-            )}
+            <div className="col-span-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Payment Proof / Receipt
+              </span>
+              {expense.receiptUrl ? (
+                <div className="mt-1 space-y-2">
+                  {isImageProof && (
+                    <img
+                      src={expense.receiptUrl}
+                      alt="Payment proof"
+                      className="w-full max-h-64 object-contain rounded-lg border bg-slate-50"
+                    />
+                  )}
+                  <a
+                    href={expense.receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-primary text-sm font-semibold hover:underline"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View Full Proof
+                  </a>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400 mt-1">No proof uploaded.</p>
+              )}
+            </div>
           </div>
 
           {/* Reject form */}
@@ -200,7 +343,11 @@ function ViewApproveModal({
                 onChange={(e) => setRejectionReason(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 rounded-md border border-red-300 text-sm bg-white resize-none"
-                placeholder="Please provide a clear reason so the employee can understand and resubmit if needed"
+                placeholder={
+                  isPurchaseRequest
+                    ? 'Provide a clear reason. The purchase payment record will be reversed.'
+                    : 'Please provide a clear reason so the employee can understand and resubmit if needed'
+                }
               />
               {rejectionReason && rejectionReason.length < 20 && (
                 <p className="text-xs text-red-600">Min 20 characters required</p>
@@ -208,8 +355,8 @@ function ViewApproveModal({
             </div>
           )}
 
-          {/* Approve form */}
-          {mode === 'approve' && (
+          {/* Approve form — only for EMPLOYEE_EXPENSE (MANAGER_PURCHASE uses stored payment info) */}
+          {mode === 'approve' && !isPurchaseRequest && (
             <div className="space-y-3 border border-emerald-200 rounded-xl p-4 bg-emerald-50">
               <label className="flex items-center gap-2 text-sm font-medium text-emerald-800 cursor-pointer">
                 <input
@@ -276,7 +423,11 @@ function ViewApproveModal({
                 className="bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 <CheckCircle2 className="h-4 w-4 mr-1" />
-                Approve
+                {isPurchaseRequest
+                  ? isChequeMode
+                    ? 'Approve & Issue Cheque'
+                    : 'Approve & Pay'
+                  : 'Approve'}
               </Button>
             </div>
           )}
@@ -294,10 +445,16 @@ function ViewApproveModal({
           {mode === 'approve' && (
             <Button
               onClick={() => approveMut.mutate()}
-              disabled={isProcessing || (payNow && !paidFromAccount)}
+              disabled={isProcessing || (!isPurchaseRequest && payNow && !paidFromAccount)}
               className="bg-emerald-600 text-white hover:bg-emerald-700"
             >
-              {approveMut.isPending ? 'Approving...' : 'Confirm Approval'}
+              {approveMut.isPending
+                ? 'Approving...'
+                : isPurchaseRequest
+                  ? isChequeMode
+                    ? 'Confirm — Issue Cheque'
+                    : 'Confirm — Deduct Funds'
+                  : 'Confirm Approval'}
             </Button>
           )}
         </div>
@@ -630,12 +787,15 @@ export default function EmployeeRequestsTab() {
                   Request #
                 </TableHead>
                 <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Employee
+                  Source
                 </TableHead>
                 <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Category
+                  Requester
                 </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground max-w-[200px]">
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Category / Vendor
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground max-w-[180px]">
                   Description
                 </TableHead>
                 <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -652,13 +812,15 @@ export default function EmployeeRequestsTab() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-16 text-muted-foreground">
-                    No expense requests found
+                  <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
+                    No requests found
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((r) => {
                   const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.PENDING;
+                  const isPurchaseReq =
+                    r.requestSource === 'MANAGER_PURCHASE' || !!r.purchaseRef || !!r.purchaseId;
                   return (
                     <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
                       <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
@@ -670,16 +832,65 @@ export default function EmployeeRequestsTab() {
                         {r.requestNo}
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-col gap-1 items-start">
+                          {isPurchaseReq ? (
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-amber-50 text-amber-700 border-amber-200 whitespace-nowrap">
+                              Purchase
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-blue-50 text-blue-700 border-blue-200 whitespace-nowrap">
+                              Expense
+                            </span>
+                          )}
+                          {r.purchaseOrigin && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide whitespace-nowrap ${
+                                r.purchaseOrigin === 'DOMESTIC'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-indigo-100 text-indigo-700'
+                              }`}
+                            >
+                              {r.purchaseOrigin === 'DOMESTIC' ? 'LOCAL' : 'INTERNATIONAL'}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div>
                           <p className="text-sm font-medium">{r.employeeName}</p>
                           <p className="text-xs text-muted-foreground">{r.employeeRole}</p>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs font-medium">
-                        {getCategoryLabel(r.category)}
+                        {isPurchaseReq ? (
+                          <div>
+                            <p className="font-semibold">{r.vendorName || 'Vendor'}</p>
+                            {r.purchaseRef && (
+                              <p className="text-muted-foreground font-mono text-[10px]">
+                                {r.purchaseRef}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          getCategoryLabel(r.category)
+                        )}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
-                        {r.description}
+                      <TableCell className="text-xs text-muted-foreground max-w-[180px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate">{r.description}</span>
+                          {r.receiptUrl && (
+                            <a
+                              href={r.receiptUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="View payment proof"
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0 text-blue-500 hover:text-blue-700"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-bold text-red-600">
                         {formatCurrency(Number(r.amount), r.currency)}
@@ -708,7 +919,7 @@ export default function EmployeeRequestsTab() {
                               Review
                             </button>
                           )}
-                          {r.status === 'APPROVED' && (
+                          {r.status === 'APPROVED' && !isPurchaseReq && (
                             <button
                               onClick={() => setPaying(r)}
                               className="px-2 py-1 rounded-md bg-purple-600 text-white text-[11px] font-semibold hover:bg-purple-700"

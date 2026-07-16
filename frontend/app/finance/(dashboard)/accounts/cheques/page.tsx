@@ -14,6 +14,8 @@ import {
   ArrowUpCircle,
   TrendingUp,
   TrendingDown,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -51,6 +53,122 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
 };
 
 type ActionType = 'deposit' | 'issue' | 'clear' | 'bounce' | 'cancel';
+
+// Transaction-type badge for the cheque's source invoice
+const SALE_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
+  SALE: { label: 'SALE', cls: 'bg-blue-100 text-blue-700' },
+  PRODUCT_SALE: { label: 'PRODUCT SALE', cls: 'bg-blue-100 text-blue-700' },
+  SPAREPART_SALE: { label: 'SPARE PART SALE', cls: 'bg-blue-100 text-blue-700' },
+  RENT: { label: 'RENT', cls: 'bg-orange-100 text-orange-700' },
+  LEASE: { label: 'LEASE', cls: 'bg-purple-100 text-purple-700' },
+};
+
+function SaleTypeBadge({ saleType }: { saleType?: string | null }) {
+  if (!saleType) return null;
+  const badge = SALE_TYPE_BADGE[saleType] ?? {
+    label: saleType.replace(/_/g, ' '),
+    cls: 'bg-slate-100 text-slate-600',
+  };
+  return (
+    <span
+      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${badge.cls}`}
+    >
+      {badge.label}
+    </span>
+  );
+}
+
+// ─── Cheque Detail Modal (transaction details + payment proof) ────────────────
+function ChequeDetailModal({
+  cheque,
+  currency,
+  onClose,
+}: {
+  cheque: Cheque;
+  currency: string;
+  onClose: () => void;
+}) {
+  const rows: { label: string; value: React.ReactNode }[] = [
+    { label: 'Cheque Number', value: <span className="font-mono">{cheque.chequeNo}</span> },
+    { label: cheque.type === 'RECEIVED' ? 'Customer' : 'Party', value: cheque.partyName },
+    { label: 'Bank', value: cheque.bankName ?? '—' },
+    { label: 'Amount', value: formatCurrency(cheque.amount, currency) },
+    { label: 'Due Date', value: String(cheque.dueDate).slice(0, 10) },
+    {
+      label: 'Status',
+      value: (
+        <span
+          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[cheque.status] ?? 'bg-gray-100 text-gray-600'}`}
+        >
+          {STATUS_ICON[cheque.status]}
+          {cheque.status}
+        </span>
+      ),
+    },
+  ];
+  if (cheque.saleType) {
+    rows.push({ label: 'Transaction Type', value: <SaleTypeBadge saleType={cheque.saleType} /> });
+  }
+  if (cheque.invoiceNo) rows.push({ label: 'Invoice', value: cheque.invoiceNo });
+  if (cheque.sourceLabel) rows.push({ label: 'Source', value: cheque.sourceLabel });
+  if (cheque.description) rows.push({ label: 'Description', value: cheque.description });
+
+  const isImageProof =
+    !!cheque.receiptUrl && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(cheque.receiptUrl);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">Cheque Details</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
+            ×
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <dl className="space-y-2.5">
+            {rows.map((r) => (
+              <div key={r.label} className="flex items-start justify-between gap-4 text-sm">
+                <dt className="text-gray-500 whitespace-nowrap">{r.label}</dt>
+                <dd className="font-medium text-gray-800 text-right break-words min-w-0">
+                  {r.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          {/* Payment proof */}
+          <div className="border-t pt-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+              Payment Proof
+            </p>
+            {cheque.receiptUrl ? (
+              <div className="space-y-2">
+                {isImageProof && (
+                  <img
+                    src={cheque.receiptUrl}
+                    alt="Payment proof"
+                    className="w-full max-h-64 object-contain rounded-lg border bg-gray-50"
+                  />
+                )}
+                <a
+                  href={cheque.receiptUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
+                >
+                  <FileText className="h-4 w-4" /> View Payment Proof
+                </a>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No payment proof uploaded.</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Add Cheque Modal ─────────────────────────────────────────────────────────
 function AddChequeModal({
@@ -286,7 +404,7 @@ function ChequeActionModal({
     deposit: {
       label: 'Deposit to Bank',
       color: 'bg-blue-600 hover:bg-blue-700',
-      desc: 'Mark cheque as deposited. Cash at Bank increases only when you mark it Cleared.',
+      desc: 'Mark cheque as deposited. Cash at Bank increases immediately at Deposit.',
     },
     issue: {
       label: 'Issue to Vendor',
@@ -296,15 +414,21 @@ function ChequeActionModal({
     clear: {
       label: 'Mark Cleared',
       color: 'bg-emerald-600 hover:bg-emerald-700',
-      desc: 'Bank confirms funds cleared. This moves the Cash at Bank balance.',
+      desc:
+        cheque.type === 'ISSUED'
+          ? 'Bank confirms payment cleared. Cash at Bank decreases now.'
+          : 'Bank confirms cheque cleared. Cash at Bank already moved at Deposit — no additional change.',
     },
     bounce: {
       label: 'Mark Bounced',
       color: 'bg-red-600 hover:bg-red-700',
-      desc: 'Cheque bounced. No balance reversal needed (money never moved).',
+      desc:
+        cheque.type === 'RECEIVED'
+          ? 'Cheque bounced. Cash at Bank will be reversed (funds added at Deposit are returned).'
+          : 'Cheque bounced. No balance change — cash only moves at Clear for issued cheques.',
     },
     cancel: {
-      label: 'Cancel Cheque',
+      label: cheque.type === 'RECEIVED' ? 'Decline Cheque' : 'Cancel Cheque',
       color: 'bg-gray-600 hover:bg-gray-700',
       desc: 'Cancel this pending cheque.',
     },
@@ -401,9 +525,11 @@ function ChequeActionModal({
 function ActionButtons({
   cheque,
   onAction,
+  onView,
 }: {
   cheque: Cheque;
   onAction: (c: Cheque, a: ActionType) => void;
+  onView: (c: Cheque) => void;
 }) {
   const actions: { action: ActionType; label: string; className: string; show: boolean }[] = [
     {
@@ -432,15 +558,21 @@ function ActionButtons({
     },
     {
       action: 'cancel',
-      label: 'Cancel',
+      label: cheque.type === 'RECEIVED' ? 'Decline' : 'Cancel',
       className: 'bg-gray-100 text-gray-600 hover:bg-gray-200',
       show: cheque.status === 'PENDING',
     },
   ];
   const visible = actions.filter((a) => a.show);
-  if (visible.length === 0) return <span className="text-xs text-gray-400">—</span>;
   return (
-    <div className="flex gap-1 flex-wrap">
+    <div className="flex gap-1 flex-wrap items-center">
+      <button
+        onClick={() => onView(cheque)}
+        title="View details & payment proof"
+        className="text-xs font-medium px-2 py-1 rounded-md transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+      >
+        <Eye className="h-3.5 w-3.5" /> View
+      </button>
       {visible.map(({ action, label, className }) => (
         <button
           key={action}
@@ -533,12 +665,14 @@ function ChequeTable({
   loading,
   currency,
   onAction,
+  onView,
   emptyLabel,
 }: {
   cheques: Cheque[];
   loading: boolean;
   currency: string;
   onAction: (c: Cheque, a: ActionType) => void;
+  onView: (c: Cheque) => void;
   emptyLabel: string;
 }) {
   const isOverdue = (c: Cheque) =>
@@ -583,16 +717,19 @@ function ChequeTable({
                 {isOverdue(c) && <span className="ml-1 text-red-500">⚠</span>}
               </td>
               <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px]">
-                {c.sourceLabel ? (
-                  <span
-                    className="inline-block px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-medium text-slate-600 max-w-[150px] truncate"
-                    title={c.sourceLabel}
-                  >
-                    {c.sourceLabel}
-                  </span>
-                ) : (
-                  '—'
-                )}
+                <div className="flex flex-col gap-1 items-start">
+                  <SaleTypeBadge saleType={c.saleType} />
+                  {c.sourceLabel ? (
+                    <span
+                      className="inline-block px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-medium text-slate-600 max-w-[150px] truncate"
+                      title={c.sourceLabel}
+                    >
+                      {c.sourceLabel}
+                    </span>
+                  ) : (
+                    !c.saleType && '—'
+                  )}
+                </div>
               </td>
               <td className="px-4 py-3">
                 <span
@@ -603,7 +740,7 @@ function ChequeTable({
                 </span>
               </td>
               <td className="px-4 py-3">
-                <ActionButtons cheque={c} onAction={onAction} />
+                <ActionButtons cheque={c} onAction={onAction} onView={onView} />
               </td>
             </tr>
           ))}
@@ -625,6 +762,7 @@ export default function ChequesPage() {
   const [actionState, setActionState] = useState<{ cheque: Cheque; action: ActionType } | null>(
     null,
   );
+  const [viewCheque, setViewCheque] = useState<Cheque | null>(null);
 
   const params = useMemo(() => {
     const p: Record<string, string> = { type: activeTab === 'received' ? 'RECEIVED' : 'ISSUED' };
@@ -788,6 +926,7 @@ export default function ChequesPage() {
           loading={isLoading}
           currency={currency}
           onAction={openAction}
+          onView={setViewCheque}
           emptyLabel={`No ${activeTab === 'received' ? 'received' : 'issued'} cheques found`}
         />
       </div>
@@ -806,6 +945,13 @@ export default function ChequesPage() {
           action={actionState.action}
           cashAccounts={bankAccounts}
           onClose={() => setActionState(null)}
+        />
+      )}
+      {viewCheque && (
+        <ChequeDetailModal
+          cheque={viewCheque}
+          currency={currency}
+          onClose={() => setViewCheque(null)}
         />
       )}
     </div>

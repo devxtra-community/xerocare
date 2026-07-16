@@ -87,6 +87,46 @@ export class EmployeeExpenseRequest {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  // Discriminator: 'EMPLOYEE_EXPENSE' (default) or 'MANAGER_PURCHASE'
+  @Column({ type: 'varchar', default: 'EMPLOYEE_EXPENSE' })
+  requestSource!: string;
+
+  // MANAGER_PURCHASE fields — null for EMPLOYEE_EXPENSE requests
+  @Column({ type: 'varchar', nullable: true })
+  purchaseId?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  purchaseRef?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  vendorName?: string;
+
+  // DOMESTIC (local) or INTERNATIONAL — snapshotted from the purchase at request time
+  @Column({ type: 'varchar', nullable: true })
+  purchaseOrigin?: string;
+
+  // paymentMode selected by Manager (Cash / Bank Transfer / Cheque)
+  @Column({ type: 'varchar', nullable: true })
+  paymentMode?: string;
+
+  // cash/bank account Manager selected to pay from
+  @Column({ type: 'uuid', nullable: true })
+  paidFromAccountId?: string;
+
+  // ID of the PurchasePayment recorded in ven_inv at submission; voided on rejection
+  @Column({ type: 'uuid', nullable: true })
+  purchasePaymentId?: string;
+
+  // cheque fields for Cheque-mode MANAGER_PURCHASE
+  @Column({ type: 'varchar', nullable: true })
+  chequeNumber?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  chequeBankName?: string;
+
+  @Column({ type: 'date', nullable: true })
+  chequeDueDate?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

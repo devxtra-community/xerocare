@@ -528,7 +528,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
                     marginTop: '1px',
                   }}
                 >
-                  {numberToWords(row.num)}
+                  {numberToWords(row.num, getActiveCurrency())}
                 </div>
               )}
             </div>

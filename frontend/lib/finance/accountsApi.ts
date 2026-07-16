@@ -625,6 +625,9 @@ export async function recordReceivablePayment(
     paidToAccount?: string;
     paymentMode?: string;
     referenceNo?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDueDate?: string;
     notes?: string;
   },
 ): Promise<ManualReceivable> {
@@ -966,6 +969,7 @@ export interface ChartOfAccountsResponse {
     labourCost: AccountBalance;
     depreciation: AccountBalance;
     vendorPurchases: AccountBalance;
+    shippingHandling: AccountBalance;
     salaryExpense: AccountBalance;
     travelExpense: AccountBalance;
     rentExpense: AccountBalance;
@@ -974,6 +978,8 @@ export interface ChartOfAccountsResponse {
     maintenanceExpense: AccountBalance;
     insuranceExpense: AccountBalance;
     otherExpenses: AccountBalance;
+    importLabourCost: AccountBalance;
+    customsDuty: AccountBalance;
     totalExpenses: number;
   };
   summary: {
@@ -1116,6 +1122,10 @@ export interface Cheque {
   sourceReferenceId?: string;
   sourceLabel?: string;
   invoiceNo?: string;
+  /** Transaction type of the source invoice (SALE / PRODUCT_SALE / RENT / LEASE …) */
+  saleType?: string | null;
+  /** Payment proof (screenshot/PDF) uploaded with the cheque payment, if any */
+  receiptUrl?: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -1314,6 +1324,8 @@ export interface InputTaxInternationalRow {
   taxPercent?: number;
   customsEntryNo?: string;
   customsDuty?: number;
+  shippingCost?: number;
+  labourCost?: number;
   currencyCode?: string;
   exchangeRate?: number;
   vatClaimable: boolean;

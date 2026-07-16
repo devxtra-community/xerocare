@@ -52,3 +52,26 @@ export const uploadPaymentReceipt = multer({
     cb(null, true);
   },
 });
+
+// Proof of payment for expense requests / manager purchase payments.
+export const uploadExpenseProof = multer({
+  storage: multerS3({
+    s3: r2,
+    bucket: process.env.R2_BUCKET!,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (req: Request, file, cb) => {
+      const refId = req.body?.purchaseId || req.body?.requestId || 'general';
+      const fileName = `expense-proofs/${refId}/${Date.now()}-${file.originalname}`;
+      cb(null, fileName);
+    },
+    acl: 'public-read',
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    if (!allowed) {
+      return cb(new Error('Only image or PDF proofs are allowed'));
+    }
+    cb(null, true);
+  },
+});

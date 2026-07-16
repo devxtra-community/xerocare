@@ -17,6 +17,9 @@ import {
   Loader2,
   Info,
   Plus,
+  Landmark,
+  Hash,
+  FileText,
 } from 'lucide-react';
 import { purchaseService, CreatePurchaseDTO, Purchase } from '@/services/purchaseService';
 import { lotService, Lot } from '@/lib/lot';
@@ -58,7 +61,14 @@ export default function AddPurchaseDialog({
     transportationCost: 0,
     shippingCost: 0,
     groundfieldCost: 0,
+    importInvoiceNo: '',
+    customsEntryNo: '',
+    customsDuty: 0,
+    goodsOrService: 'GOODS',
   });
+
+  const selectedLot = lots.find((l) => l.id === formData.lotId);
+  const isInternational = selectedLot?.purchaseOrigin === 'INTERNATIONAL';
 
   const fetchLots = async () => {
     try {
@@ -88,6 +98,10 @@ export default function AddPurchaseDialog({
           transportationCost: purchaseData.transportationCost,
           shippingCost: purchaseData.shippingCost,
           groundfieldCost: purchaseData.groundfieldCost,
+          importInvoiceNo: purchaseData.importInvoiceNo ?? '',
+          customsEntryNo: purchaseData.customsEntryNo ?? '',
+          customsDuty: purchaseData.customsDuty ?? 0,
+          goodsOrService: purchaseData.goodsOrService ?? 'GOODS',
         });
       } else {
         setFormData({
@@ -98,6 +112,10 @@ export default function AddPurchaseDialog({
           transportationCost: 0,
           shippingCost: 0,
           groundfieldCost: 0,
+          importInvoiceNo: '',
+          customsEntryNo: '',
+          customsDuty: 0,
+          goodsOrService: 'GOODS',
         });
       }
     }
@@ -359,6 +377,109 @@ export default function AddPurchaseDialog({
             </div>
           </div>
 
+          {isInternational && (
+            <div className="space-y-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <h4 className="text-sm font-bold text-amber-800 flex items-center gap-2 border-b border-amber-200 pb-2">
+                <Landmark className="h-4 w-4" />
+                International Purchase Details
+              </h4>
+              <p className="text-[11px] text-amber-700 -mt-2">
+                This lot is an International purchase — customs duty is tracked separately from the
+                landed cost total above and is expensed on its own Chart of Accounts line (5015),
+                not added into the total.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* Import Invoice No */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="importInvoiceNo"
+                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Import Invoice No
+                  </Label>
+                  <Input
+                    id="importInvoiceNo"
+                    className="h-11"
+                    value={formData.importInvoiceNo ?? ''}
+                    onChange={(e) => setFormData({ ...formData, importInvoiceNo: e.target.value })}
+                    placeholder="e.g. INV-2026-00123"
+                  />
+                </div>
+
+                {/* Customs Entry No */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="customsEntryNo"
+                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  >
+                    <Hash className="h-3.5 w-3.5" />
+                    Customs Entry No
+                  </Label>
+                  <Input
+                    id="customsEntryNo"
+                    className="h-11"
+                    value={formData.customsEntryNo ?? ''}
+                    onChange={(e) => setFormData({ ...formData, customsEntryNo: e.target.value })}
+                    placeholder="e.g. CE-2026-04567"
+                  />
+                </div>
+
+                {/* Customs Duty */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="customsDuty"
+                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  >
+                    <Landmark className="h-3.5 w-3.5" />
+                    Customs Duty
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                      {currencyCode}
+                    </span>
+                    <Input
+                      id="customsDuty"
+                      type="number"
+                      step="0.01"
+                      className="pl-12 h-11"
+                      value={formData.customsDuty ?? 0}
+                      onChange={(e) =>
+                        setFormData({ ...formData, customsDuty: Number(e.target.value) })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Goods or Service */}
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="goodsOrService"
+                    className="text-xs font-semibold text-slate-600 flex items-center gap-2"
+                  >
+                    <Package className="h-3.5 w-3.5" />
+                    Goods / Service
+                  </Label>
+                  <select
+                    id="goodsOrService"
+                    className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={formData.goodsOrService ?? 'GOODS'}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        goodsOrService: e.target.value as 'GOODS' | 'SERVICE',
+                      })
+                    }
+                  >
+                    <option value="GOODS">Goods</option>
+                    <option value="SERVICE">Service</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-slate-900 rounded-2xl p-5 text-white flex flex-col sm:flex-row justify-between items-center gap-4 italic shadow-xl shadow-slate-200">
             <div className="space-y-1 text-center sm:text-left">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -391,6 +512,16 @@ export default function AddPurchaseDialog({
                     )}
                   </p>
                 </div>
+                {isInternational && Number(formData.customsDuty) > 0 && (
+                  <div>
+                    <p className="text-[9px] text-slate-500 uppercase font-bold">
+                      Customs Duty (separate)
+                    </p>
+                    <p className="text-sm font-bold text-amber-400">
+                      {formatCurrency(Number(formData.customsDuty), currencyCode)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="text-center sm:text-right">
@@ -412,6 +543,12 @@ export default function AddPurchaseDialog({
                   return formatCurrency(base + extras, currencyCode);
                 })()}
               </p>
+              {isInternational && Number(formData.customsDuty) > 0 && (
+                <p className="text-[10px] text-amber-400 mt-0.5">
+                  + {formatCurrency(Number(formData.customsDuty), currencyCode)} customs duty
+                  (tracked separately)
+                </p>
+              )}
             </div>
           </div>
 

@@ -20,6 +20,11 @@ import { toast } from 'sonner';
 
 type Period = 'today' | 'this_week' | 'this_month' | 'custom';
 
+function localDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function getDateRange(
   period: Period,
   customFrom: string,
@@ -28,19 +33,19 @@ function getDateRange(
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
-  const today = now.toISOString().slice(0, 10);
+  const today = localDate(now);
   if (period === 'custom') return { from: customFrom, to: customTo };
   if (period === 'today') return { from: today, to: today };
   if (period === 'this_week') {
     const day = now.getDay(); // 0 = Sun
     const monday = new Date(now);
     monday.setDate(now.getDate() - ((day + 6) % 7));
-    return { from: monday.toISOString().slice(0, 10), to: today };
+    return { from: localDate(monday), to: today };
   }
-  // this_month
+  // this_month — use local year/month so month boundaries are correct in all timezones
   return {
-    from: new Date(y, m, 1).toISOString().slice(0, 10),
-    to: new Date(y, m + 1, 0).toISOString().slice(0, 10),
+    from: `${y}-${String(m + 1).padStart(2, '0')}-01`,
+    to: localDate(new Date(y, m + 1, 0)),
   };
 }
 

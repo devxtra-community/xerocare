@@ -17,11 +17,9 @@ import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
-import {
-  createCheque,
-  fetchCashBankAccounts,
-  withdrawFromCashBank,
-} from '@/lib/finance/accountsApi';
+import { createCheque, fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import { createManagerPurchasePaymentRequest } from '@/lib/employeeExpenses';
+import { getUserFromToken } from '@/lib/auth';
 
 interface AddPaymentModalProps {
   open: boolean;
@@ -119,61 +117,93 @@ export default function AddPaymentModal({
       return;
     }
 
-    try {
-      await purchaseService.addPayment(
-        purchaseId,
-        {
-          ...formData,
-          referenceNumber: isCheque ? chequeNumber : formData.referenceNumber,
-        },
-        attachment,
-      );
+    const currentUser = getUserFromToken();
+    if (!currentUser) {
+      toast.error('Session expired. Please refresh and log in again.');
+      setLoading(false);
+      return;
+    }
+    const isManager = currentUser.role === 'MANAGER';
 
-      // For CHEQUE payments: create a linked PENDING ISSUED cheque in the billing service
-      if (isCheque) {
-        try {
-          await createCheque({
-            chequeNo: chequeNumber,
-            bankName: chequeBankName,
-            partyName: vendorName || 'Vendor',
+    if (isManager && !isCheque && !paidFromAccount) {
+      toast.error(
+        'No payment account loaded. Please wait for accounts to load or contact Finance to add a Cash/Bank account for your branch.',
+      );
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (isManager) {
+        // Manager payments always go through the Finance approval queue.
+        // PurchasePayment is recorded immediately in ven_inv (outstanding reduces),
+        // but cash is held until Finance approves.
+        await createManagerPurchasePaymentRequest(
+          {
+            purchaseId,
+            purchaseRef: purchaseRef || undefined,
+            vendorName: vendorName || undefined,
             amount: formData.amount,
-            dueDate: chequeDueDate,
-            issueDate: formData.paymentDate,
-            type: 'ISSUED',
+            paymentMethod: formData.paymentMethod,
+            paidFromAccountId: !isCheque && paidFromAccount ? paidFromAccount : undefined,
+            chequeNumber: isCheque ? chequeNumber : undefined,
+            chequeBankName: isCheque ? chequeBankName : undefined,
+            chequeDueDate: isCheque ? chequeDueDate : undefined,
             description: formData.description || undefined,
-            sourceType: 'PURCHASE',
-            sourceReferenceId: purchaseId,
-            sourceLabel: purchaseRef ? `Purchase ${purchaseRef}` : 'Purchase Order',
-          });
-        } catch {
-          // Non-fatal: payment was recorded; log issue without blocking success
-          console.warn('[AddPaymentModal] Failed to create linked ISSUED cheque record');
-        }
-        toast.success(
-          'Payment recorded — PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
+            referenceNumber: isCheque ? chequeNumber : formData.referenceNumber,
+            paymentDate: formData.paymentDate,
+            currency: currencyCode,
+          },
+          attachment,
         );
-      } else {
-        // Deduct from selected cash/bank account
-        if (paidFromAccount) {
-          try {
-            await withdrawFromCashBank(paidFromAccount, {
-              date: formData.paymentDate ?? new Date().toISOString().split('T')[0],
-              amount: formData.amount,
-              purpose: 'Vendor Purchase Payment',
-              referenceNo: formData.referenceNumber || undefined,
-              description: formData.description || `Purchase payment — ${vendorName ?? ''}`,
-            });
-          } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } } }).response?.data
-              ?.message;
-            console.warn('[AddPaymentModal] Failed to deduct from cash/bank account:', msg);
-            toast.warning(
-              msg ?? 'Payment recorded but account balance could not be deducted automatically',
-            );
-          }
+
+        if (isCheque) {
+          toast.success(
+            'PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
+          );
+        } else {
+          toast.success(
+            'Payment request submitted for Finance approval. Funds will be deducted once approved.',
+          );
         }
-        toast.success('Payment recorded successfully');
+      } else {
+        // Finance / Admin — immediate payment, existing flow
+        await purchaseService.addPayment(
+          purchaseId,
+          {
+            ...formData,
+            referenceNumber: isCheque ? chequeNumber : formData.referenceNumber,
+            paidFromAccountId: !isCheque && paidFromAccount ? paidFromAccount : undefined,
+          },
+          attachment,
+        );
+
+        if (isCheque) {
+          try {
+            await createCheque({
+              chequeNo: chequeNumber,
+              bankName: chequeBankName,
+              partyName: vendorName || 'Vendor',
+              amount: formData.amount,
+              dueDate: chequeDueDate,
+              issueDate: formData.paymentDate,
+              type: 'ISSUED',
+              description: formData.description || undefined,
+              sourceType: 'PURCHASE',
+              sourceReferenceId: purchaseId,
+              sourceLabel: purchaseRef ? `Purchase ${purchaseRef}` : 'Purchase Order',
+            });
+          } catch {
+            console.warn('[AddPaymentModal] Failed to create linked ISSUED cheque record');
+          }
+          toast.success(
+            'Payment recorded — PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
+          );
+        } else {
+          toast.success('Payment recorded successfully');
+        }
       }
+
       onSuccess();
       onOpenChange(false);
     } catch (error: unknown) {
@@ -393,6 +423,13 @@ export default function AddPaymentModal({
             )}
           </div>
 
+          {getUserFromToken()?.role === 'MANAGER' && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              Payment requests require Finance approval before funds are deducted. Outstanding
+              balance updates immediately; cash moves only after approval.
+            </div>
+          )}
+
           <div className="pt-4 flex gap-3">
             <Button
               type="button"
@@ -407,7 +444,11 @@ export default function AddPaymentModal({
               className="flex-1 bg-primary hover:bg-primary/90 font-bold"
               disabled={loading}
             >
-              {loading ? 'Recording...' : 'Record Payment'}
+              {loading
+                ? 'Submitting...'
+                : getUserFromToken()?.role === 'MANAGER'
+                  ? 'Request Payment Approval'
+                  : 'Record Payment'}
             </Button>
           </div>
         </form>
