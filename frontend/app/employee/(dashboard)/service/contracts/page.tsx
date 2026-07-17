@@ -685,6 +685,9 @@ export default function ServiceContractsPage() {
     // 4. Assigned Products / External
     if (intel.assignedProducts) {
       intel.assignedProducts.forEach((prod) => {
+        // Same rule as above: rented machines are always fully covered and
+        // never need a contract, even when reserved/assigned in inventory.
+        if (prod.ownership === 'RENT') return;
         if (!list.some((item) => item.serialNumber === prod.serial_no)) {
           list.push({
             id: prod.id,
@@ -699,6 +702,24 @@ export default function ServiceContractsPage() {
         }
       });
     }
+
+    // 5. Overlay live service contracts (AMC/SMA/FSMA live in their own table,
+    // not in billing history, so SALE/EXTERNAL machines above default to 'None').
+    const activeForCustomer = contracts.filter(
+      (c) => c.status === 'ACTIVE' && c.customerId === formState.customerId,
+    );
+    list.forEach((m) => {
+      if (m.activeContract && m.activeContract !== 'None') return;
+      const match = activeForCustomer.find(
+        (c) =>
+          c.productId === m.id ||
+          (!!c.machine?.serialNumber && c.machine.serialNumber === m.serialNumber),
+      );
+      if (match) {
+        m.activeContract = match.contractType;
+        m.contractExpiry = match.endDate || m.contractExpiry;
+      }
+    });
 
     return list;
   };

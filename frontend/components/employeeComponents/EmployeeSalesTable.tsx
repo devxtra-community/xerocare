@@ -3,8 +3,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Eye, FileText, Wallet } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { Plus, Search, Loader2, Eye, FileText, Wallet, Activity } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -50,6 +50,7 @@ interface EmployeeSalesTableProps {
  * Features search, creation of new sales, and detailed invoice view.
  */
 export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesTableProps) {
+  const router = useRouter();
   const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectModeOpen, setSelectModeOpen] = useState(false);
@@ -505,6 +506,19 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
+                        {currentUser &&
+                          ['MANAGER', 'FINANCE', 'ADMIN'].includes(currentUser.role) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
+                              onClick={() => router.push(`/employee/invoices/${inv.id}`)}
+                              title="Full details & activity log"
+                            >
+                              <Activity className="h-4 w-4" />
+                            </Button>
+                          )}
 
                         {['PROFORMA', 'FINAL'].includes(inv.type || '') && (
                           <Button
