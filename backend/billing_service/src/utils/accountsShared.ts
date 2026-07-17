@@ -283,10 +283,10 @@ export async function computeProfitAndLoss(
         FROM usage_records u
         JOIN invoices inv ON inv.id = u."contractId"
         WHERE inv."saleType" = 'RENT'
-          AND u."billingPeriodStart" >= '${dateFrom}'
-          AND u."billingPeriodEnd" <= '${dateTo}'
+          AND u."billingPeriodStart" <= '${dateTo}'
+          AND u."billingPeriodEnd" >= '${dateFrom}'
           AND inv."deletedAt" IS NULL
-          ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
+          ${branchSql('inv', '"branchId"', bParam)}
         GROUP BY inv."currency_code"
       )
     `),
@@ -315,10 +315,10 @@ export async function computeProfitAndLoss(
         FROM usage_records u
         JOIN invoices inv ON inv.id = u."contractId"
         WHERE inv."saleType" = 'LEASE'
-          AND u."billingPeriodStart" >= '${dateFrom}'
-          AND u."billingPeriodEnd" <= '${dateTo}'
+          AND u."billingPeriodStart" <= '${dateTo}'
+          AND u."billingPeriodEnd" >= '${dateFrom}'
           AND inv."deletedAt" IS NULL
-          ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
+          ${branchSql('inv', '"branchId"', bParam)}
         GROUP BY inv."currency_code"
       )
     `),
@@ -738,7 +738,7 @@ export async function computeBalanceSheet(
     `),
     // 1003 Manual AR — non-security-deposit, without linked invoice
     db.query<{ amount: string }[]>(`
-      SELECT COALESCE(SUM(outstanding), 0) AS amount
+      SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
       FROM manual_receivables
       WHERE status IN ('PENDING', 'PARTIAL', 'OVERDUE')
         AND type != 'SECURITY_DEPOSIT'
@@ -747,7 +747,7 @@ export async function computeBalanceSheet(
     `),
     // 1004 Security Deposits Receivable (paid TO others, held as asset)
     db.query<{ amount: string }[]>(`
-      SELECT COALESCE(SUM(outstanding), 0) AS amount
+      SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
       FROM manual_receivables
       WHERE type = 'SECURITY_DEPOSIT'
         AND status NOT IN ('PAID', 'WRITTEN_OFF')
@@ -773,10 +773,12 @@ export async function computeBalanceSheet(
       WHERE status != 'DISPOSED' ${bSql('asset_depreciation_register')}
     `),
     // 2001 Accounts Payable — outstanding manual payables
+    // Use COALESCE(outstanding, amount - amountPaid) so that records created without
+    // an explicit outstanding snapshot are still counted correctly.
     db.query<{ amount: string }[]>(`
-      SELECT COALESCE(SUM(outstanding), 0) AS amount
+      SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
       FROM manual_payables
-      WHERE status != 'PAID' ${bSql('manual_payables')}
+      WHERE status NOT IN ('PAID') ${bSql('manual_payables')}
     `),
     // 2002 Accrued Expenses — APPROVED but not yet PAID expense entries
     db.query<{ amount: string }[]>(`
@@ -996,7 +998,15 @@ export async function computeBalanceSheet(
   );
 
   const deferredRevenue = 0;
-  const salaryPayable = 0;
+
+  // 2006 Salary Payable — outstanding SALARY_PAYABLE manual payables
+  const salaryPayableRows = await db.query<{ amount: string }[]>(`
+    SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
+    FROM manual_payables
+    WHERE type = 'SALARY_PAYABLE'
+      AND status NOT IN ('PAID') ${bSql('manual_payables')}
+  `);
+  const salaryPayable = Number(salaryPayableRows[0]?.amount ?? 0);
 
   // ── Equity ───────────────────────────────────────────────────────────────────
   const eqByType: Record<string, number> = {};

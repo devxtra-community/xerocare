@@ -1294,6 +1294,17 @@ function QuotationFormModal({
   const [rentType, setRentType] = useState('FIXED_LIMIT');
   const [rentPeriod, setRentPeriod] = useState('MONTHLY');
   const [monthlyRent, setMonthlyRent] = useState('');
+
+  // CPC / CPC_COMBO billing is per-copy, not a periodic rent — Monthly Rent must be
+  // cleared when switching to either, so a stale value from a previous FIXED_* selection
+  // can't get silently carried over and sent to the backend (which rejects monthlyRent
+  // > 0 for CPC models). Used by both the RENT and LEASE-FSM billing-type selectors.
+  const handleRentTypeChange = (value: string) => {
+    setRentType(value);
+    if (value === 'CPC' || value === 'CPC_COMBO') {
+      setMonthlyRent('');
+    }
+  };
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [discountPercent, setDiscountPercent] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().split('T')[0]);
@@ -1555,6 +1566,12 @@ function QuotationFormModal({
         setTotalLeaseAmount((Number(monthlyEmiAmount) * Number(leaseTenureMonths)).toFixed(2));
       }
     } else if (leaseType === 'FSM') {
+      // CPC / CPC_COMBO billing is per-copy, not a periodic rent — Monthly Rent must
+      // stay empty (and unsent) for these, matching the backend's rejection of
+      // monthlyRent > 0 for CPC models. Skip the auto-calc entirely for these types
+      // so entering Total Lease Amount can't silently repopulate it.
+      if (rentType === 'CPC' || rentType === 'CPC_COMBO') return;
+
       const p = getPeriodsForRent(rentPeriod, Number(leaseTenureMonths));
       if (p <= 0) return;
       if (lastEditedLease === 'TOTAL' && totalLeaseAmount) {
@@ -1568,6 +1585,7 @@ function QuotationFormModal({
     monthlyEmiAmount,
     monthlyRent,
     leaseType,
+    rentType,
     rentPeriod,
     leaseTenureMonths,
     lastEditedLease,
@@ -2228,7 +2246,12 @@ function QuotationFormModal({
         notes: `[STYLE:${selectedLayoutStyle || 'normal'}]`,
         rentType: rentType as CreateInvoicePayload['rentType'],
         rentPeriod: rentPeriod as CreateInvoicePayload['rentPeriod'],
-        monthlyRent: monthlyRent ? Number(monthlyRent) : undefined,
+        // CPC / CPC_COMBO billing is per-copy — the backend rejects monthlyRent > 0 for
+        // these, so never send it regardless of what the (now-cleared) state holds.
+        monthlyRent:
+          rentType !== 'CPC' && rentType !== 'CPC_COMBO' && monthlyRent
+            ? Number(monthlyRent)
+            : undefined,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
         effectiveFrom,
@@ -2313,7 +2336,12 @@ function QuotationFormModal({
         // Warranty
         // For FSM Leases, we need rentType and monthly rent mapped dynamically
         rentType: leaseType === 'FSM' ? (rentType as CreateInvoicePayload['rentType']) : undefined,
-        monthlyRent: leaseType === 'FSM' && monthlyRent ? Number(monthlyRent) : undefined,
+        // CPC / CPC_COMBO billing is per-copy — the backend rejects monthlyRent > 0 for
+        // these, so never send it regardless of what the (now-cleared) state holds.
+        monthlyRent:
+          leaseType === 'FSM' && rentType !== 'CPC' && rentType !== 'CPC_COMBO' && monthlyRent
+            ? Number(monthlyRent)
+            : undefined,
         monthlyLeaseAmount:
           leaseType === 'FSM' && totalLeaseAmount ? Number(totalLeaseAmount) : undefined,
         effectiveFrom,
@@ -3299,7 +3327,7 @@ function QuotationFormModal({
                       <label className="text-[11px] font-bold text-blue-600 uppercase flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-blue-400" /> Rent Type / Model
                       </label>
-                      <Select value={rentType} onValueChange={setRentType}>
+                      <Select value={rentType} onValueChange={handleRentTypeChange}>
                         <SelectTrigger className="h-9 text-sm border-blue-100">
                           <SelectValue />
                         </SelectTrigger>
@@ -3707,7 +3735,7 @@ function QuotationFormModal({
                           <span className="w-2 h-2 rounded-full bg-blue-400" /> Service Billing Type
                           (FSM)
                         </label>
-                        <Select value={rentType} onValueChange={setRentType}>
+                        <Select value={rentType} onValueChange={handleRentTypeChange}>
                           <SelectTrigger className="h-9 text-sm border-blue-100 w-full">
                             <SelectValue placeholder="Select Billing Type" />
                           </SelectTrigger>
