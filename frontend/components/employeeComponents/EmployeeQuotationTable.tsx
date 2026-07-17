@@ -21,6 +21,7 @@ import {
   Wrench,
   Copy,
   Scan,
+  Send,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -1025,6 +1026,17 @@ export default function EmployeeQuotationTable() {
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
+                        {(q.status === 'DRAFT' || q.status === 'FINANCE_REJECTED') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleSendToFinance(q.id)}
+                            title="Send to Finance"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
                         {q.status === 'ASSIGNED' && (
                           <Button
                             variant="ghost"
@@ -2158,6 +2170,7 @@ function QuotationFormModal({
           `[STYLE:${selectedLayoutStyle || 'normal'}]` +
           (quotationType === 'PRODUCT_SALE' ? '' : ''),
         discountAmount: totalDiscount,
+        validityDays: validDays,
         effectiveFrom: new Date().toISOString().split('T')[0],
         effectiveTo: validityDate.toISOString().split('T')[0],
         // Warranty — only for PRODUCT_SALE
@@ -2231,6 +2244,7 @@ function QuotationFormModal({
         monthlyRent: monthlyRent ? Number(monthlyRent) : undefined,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
+        validityDays: validDays,
         effectiveFrom,
         effectiveTo: effectiveTo || undefined,
 
@@ -2316,6 +2330,7 @@ function QuotationFormModal({
         monthlyRent: leaseType === 'FSM' && monthlyRent ? Number(monthlyRent) : undefined,
         monthlyLeaseAmount:
           leaseType === 'FSM' && totalLeaseAmount ? Number(totalLeaseAmount) : undefined,
+        validityDays: validDays,
         effectiveFrom,
         effectiveTo: effectiveTo || undefined,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
@@ -2702,8 +2717,8 @@ function QuotationFormModal({
                 <CustomerSelect value={customerId} onChange={setCustomerId} />
               </div>
 
-              {/* Validity & Notes (Sale only) */}
-              {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
+              {/* Validity & Notes (all quotation types) */}
+              {['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE'].includes(quotationType) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">

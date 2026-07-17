@@ -416,6 +416,29 @@ async function runPreMigrations() {
         );
       `);
 
+      // Columns added to credit_notes after the table was first created
+      // (spare-part returns, tax snapshot, refund payment mode).
+      await client.query(`
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS item_category VARCHAR(20) NOT NULL DEFAULT 'PRODUCT';
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "sparePartId" UUID NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS sku VARCHAR(255) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS quantity INT NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS tax_name VARCHAR(50) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS tax_percent DECIMAL(5,2) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(12,2) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "paymentMode" VARCHAR(255) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementSparePartId" UUID NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementSparePartName" VARCHAR(255) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementSparePartSku" VARCHAR(255) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementQuantity" INT NULL;
+        -- Product fields are optional now that spare-part credit notes exist
+        ALTER TABLE credit_notes ALTER COLUMN "productId" DROP NOT NULL;
+        ALTER TABLE credit_notes ALTER COLUMN "productName" DROP NOT NULL;
+        ALTER TABLE credit_notes ALTER COLUMN "modelName" DROP NOT NULL;
+        ALTER TABLE credit_notes ALTER COLUMN brand DROP NOT NULL;
+        CREATE INDEX IF NOT EXISTS "IDX_credit_notes_spare_part_id" ON credit_notes ("sparePartId");
+      `);
+
       logger.info(
         'Guaranteed invoice_ledger, payment_transactions, and opening_balance_entries tables exist.',
       );

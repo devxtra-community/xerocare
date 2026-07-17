@@ -596,16 +596,46 @@ export class ServiceController {
       const { assignedTechnicianId, scheduledVisitDate } = req.body;
       if (!assignedTechnicianId) throw new Error('Technician ID is required');
 
+      const callerRole = req.user?.role;
+      const callerJob = req.user?.employeeJob;
+      const mayAssign =
+        callerRole === 'MANAGER' || callerRole === 'ADMIN' || callerJob === 'SERVICE_HELP_DESK';
+      if (!mayAssign) {
+        throw new AppError(
+          'Only the branch manager, admin, or service help desk can assign technicians',
+          403,
+        );
+      }
+
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Reassignment releases the previous technician's claim (a manager's claim survives).
+      if (
+        ticket.diagnosisStartedBy &&
+        ticket.diagnosisStartedBy === ticket.assignedTechnicianId &&
+        ticket.assignedTechnicianId !== assignedTechnicianId
+      ) {
+        ticket.diagnosisStartedBy = null;
+        ticket.diagnosisStartedAt = null;
+      }
+
       ticket.assignedTechnicianId = assignedTechnicianId;
       if (scheduledVisitDate) {
         ticket.scheduledVisitDate = new Date(scheduledVisitDate);
       }
-      ticket.status = ServiceTicketStatus.ASSIGNED;
+      // The manager may diagnose/estimate before assignment; assigning a
+      // technician afterwards must not regress a ticket already in the
+      // estimate/approval flow back to ASSIGNED.
+      if (
+        ticket.status === ServiceTicketStatus.OPEN ||
+        ticket.status === ServiceTicketStatus.ASSIGNED ||
+        (ticket.status === ServiceTicketStatus.FREE_SERVICE && !ticket.diagnosisCompletedAt)
+      ) {
+        ticket.status = ServiceTicketStatus.ASSIGNED;
+      }
       await ticketRepo.save(ticket);
 
       await this.logActivity(
@@ -640,13 +670,33 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      ticket.diagnosisStartedAt = new Date();
+      // Only the assigned technician or the branch manager/admin may open a ticket.
+      const userId = req.user?.userId;
+      const role = req.user?.role;
+      const isManager = role === 'MANAGER' || role === 'ADMIN';
+      if (!isManager && ticket.assignedTechnicianId !== userId) {
+        throw new AppError(
+          'Only the assigned technician or the branch manager can open this ticket',
+          403,
+        );
+      }
+      // First opener is recorded for audit; the branch manager and the
+      // assigned technician may both work the ticket (manager can estimate
+      // before assignment, technician can estimate after being assigned).
+      if (!ticket.diagnosisStartedAt) {
+        ticket.diagnosisStartedAt = new Date();
+      }
+      if (!ticket.diagnosisStartedBy) {
+        ticket.diagnosisStartedBy = userId || null;
+      }
       await ticketRepo.save(ticket);
 
       await this.logActivity(
         ticket.id,
         'DIAGNOSIS_STARTED',
-        `Technician started diagnosis.`,
+        isManager && ticket.assignedTechnicianId !== userId
+          ? 'Branch manager opened the ticket and started diagnosis.'
+          : 'Technician started diagnosis.',
         req.user?.userId,
       );
 
@@ -678,7 +728,24 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Same rules as start-diagnosis: assigned technician or manager.
+      const diagUserId = req.user?.userId;
+      const diagRole = req.user?.role;
+      const diagIsManager = diagRole === 'MANAGER' || diagRole === 'ADMIN';
+      if (!diagIsManager && ticket.assignedTechnicianId !== diagUserId) {
+        throw new AppError(
+          'Only the assigned technician or the branch manager can diagnose this ticket',
+          403,
+        );
+      }
+      if (!ticket.diagnosisStartedBy) {
+        ticket.diagnosisStartedBy = diagUserId || null;
+      }
+
+      // OPEN is allowed so the branch manager can diagnose and estimate
+      // before a technician is assigned.
       const allowedDiagnoseStatuses: ServiceTicketStatus[] = [
+        ServiceTicketStatus.OPEN,
         ServiceTicketStatus.ASSIGNED,
         ServiceTicketStatus.DIAGNOSED,
         ServiceTicketStatus.FREE_SERVICE,

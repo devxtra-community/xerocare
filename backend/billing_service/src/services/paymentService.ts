@@ -78,6 +78,36 @@ export class PaymentService {
       );
     }
 
+    // Validate everything the post-save cashbook/cheque step needs BEFORE saving
+    // the payment row. Otherwise a config error (e.g. no default cash account)
+    // leaves an orphaned payment behind and every retry hits the overpayment guard.
+    const modeUpper = (data.paymentMode ?? '').trim().toUpperCase();
+    let resolvedAccount: Awaited<ReturnType<typeof resolveCashAccount>> = null;
+    if (invoice.branchId) {
+      if (modeUpper === 'CHEQUE') {
+        if (!(data.chequeNumber || data.referenceNumber)) {
+          throw new AppError('Cheque number is required for cheque payments', 400);
+        }
+        if (!data.chequeDueDate) {
+          throw new AppError('Cheque due date is required for cheque payments', 400);
+        }
+      } else {
+        const isCash = modeUpper === 'CASH';
+        resolvedAccount = await resolveCashAccount(
+          Source.manager,
+          invoice.branchId,
+          data.paymentMode,
+        );
+        if (!resolvedAccount) {
+          throw new AppError(
+            `No default ${isCash ? 'Cash in Hand' : 'Cash at Bank'} account is configured for this branch. ` +
+              `Go to Accounts → Cash & Bank, add a ${isCash ? 'CASH' : 'BANK'}-type account and mark it as default.`,
+            422,
+          );
+        }
+      }
+    }
+
     const payment = this.paymentRepo.create({
       invoiceId: data.invoiceId,
       amountPaid: data.amountPaid,
@@ -94,18 +124,11 @@ export class PaymentService {
 
     // Post to cashbook / create cheque record based on payment mode
     if (invoice.branchId) {
-      const modeUpper = (data.paymentMode ?? '').trim().toUpperCase();
       try {
         if (modeUpper === 'CHEQUE') {
           // Option B deferred: create a PENDING cheque record; no cashbook/balance movement yet.
           // Cash at Bank only moves when Finance later deposits this cheque in the Cheques module.
           const chequeNo = data.chequeNumber || data.referenceNumber;
-          if (!chequeNo) {
-            throw new AppError('Cheque number is required for cheque payments', 400);
-          }
-          if (!data.chequeDueDate) {
-            throw new AppError('Cheque due date is required for cheque payments', 400);
-          }
           const chequeRepo = Source.getRepository(Cheque);
           const saleType = (invoice.saleType ?? '').toUpperCase(); // SALE | RENT | LEASE
           const srcType =
@@ -121,7 +144,7 @@ export class PaymentService {
             bankName: data.chequeBankName || undefined,
             partyName: invoice.customerName || invoice.customerId || 'Customer',
             amount: data.amountPaid,
-            dueDate: new Date(data.chequeDueDate),
+            dueDate: new Date(data.chequeDueDate!),
             issueDate: data.paymentDate ? new Date(data.paymentDate as string) : new Date(),
             type: 'RECEIVED',
             status: 'PENDING',
@@ -139,19 +162,8 @@ export class PaymentService {
           );
         } else {
           // CASH → Cash in Hand; BANK_TRANSFER / CREDIT_CARD → Cash at Bank
-          const isCash = modeUpper === 'CASH';
-          const account = await resolveCashAccount(
-            Source.manager,
-            invoice.branchId,
-            data.paymentMode,
-          );
-          if (!account) {
-            throw new AppError(
-              `No default ${isCash ? 'Cash in Hand' : 'Cash at Bank'} account is configured for this branch. ` +
-                `Go to Accounts → Cash & Bank, add a ${isCash ? 'CASH' : 'BANK'}-type account and mark it as default.`,
-              422,
-            );
-          }
+          // Account already validated & resolved before the payment row was saved.
+          const account = resolvedAccount!;
           await postCashbookEntry({
             date: data.paymentDate ? new Date(data.paymentDate as string) : new Date(),
             entryType: 'RECEIPT',

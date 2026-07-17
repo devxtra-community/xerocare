@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 import { requestRefresh } from './auth-refresh';
 import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
 
@@ -10,7 +11,9 @@ import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   withCredentials: true,
-  timeout: 15000,
+  // Generous timeout: the leads database lives in MongoDB Atlas (cloud) and a
+  // cold cluster can take >15s on the first request.
+  timeout: 30000,
 });
 
 /**
@@ -28,7 +31,51 @@ const maskData = (data: unknown): unknown => {
 
 interface CustomConfig {
   _startTime?: number;
+  /** Set to true on a request to suppress the automatic error toast. */
+  skipErrorToast?: boolean;
 }
+
+/**
+ * Global error visibility: no API failure may die silently in the console.
+ * Shows a toast for every failed request unless the caller opts out with
+ * `skipErrorToast: true`. The toast id is derived from the endpoint, so a
+ * burst of identical failures collapses into a single toast.
+ */
+const showApiErrorToast = (error: {
+  code?: string;
+  message?: string;
+  config?: { url?: string; method?: string } & CustomConfig;
+  response?: { status?: number; data?: { message?: string; error?: string } };
+}) => {
+  if (error.config?.skipErrorToast) return;
+  if (error.code === 'ERR_CANCELED') return; // aborted navigation, not a failure
+
+  const status = error.response?.status;
+  const url = error.config?.url || '';
+
+  let title: string;
+  if (error.code === 'ECONNABORTED' || /timeout/i.test(error.message || '')) {
+    title = 'The server is taking too long to respond.';
+  } else if (!error.response) {
+    title = 'Cannot reach the server. Please check your connection.';
+  } else if (status === 403) {
+    title = 'You do not have permission for this action.';
+  } else if (status === 404) {
+    title = 'The requested record was not found.';
+  } else if (status && status >= 500) {
+    title = 'Something went wrong on the server.';
+  } else {
+    title = 'The request could not be completed.';
+  }
+
+  const serverMessage = error.response?.data?.message || error.response?.data?.error;
+
+  toast.error(title, {
+    id: `api-error-${status ?? 'network'}-${url}`,
+    description: serverMessage || `${error.config?.method?.toUpperCase() || ''} ${url}`.trim(),
+    duration: 6000,
+  });
+};
 
 // Security Check: Every time we send a message, we attach a "Digital ID Card"
 // (AccessToken) so the server knows who is asking.
@@ -111,6 +158,12 @@ api.interceptors.response.use(
     if (error.response?.data) console.log('Error Data:', error.response.data);
     console.log('Full Error Object:', error);
     console.groupEnd();
+
+    // Surface every failure to the user — 401s are excluded because they are
+    // either silently retried after a token refresh or end in a login redirect.
+    if (status !== 401) {
+      showApiErrorToast(error);
+    }
 
     const originalRequest = error.config;
     const errorCode = error.response?.data?.code;

@@ -435,7 +435,8 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS "repairStartedAt" TIMESTAMP NULL,
           ADD COLUMN IF NOT EXISTS "repairCompletedAt" TIMESTAMP NULL,
           ADD COLUMN IF NOT EXISTS "diagnosisDuration" INTEGER NULL,
-          ADD COLUMN IF NOT EXISTS "repairDuration" INTEGER NULL;
+          ADD COLUMN IF NOT EXISTS "repairDuration" INTEGER NULL,
+          ADD COLUMN IF NOT EXISTS "diagnosisStartedBy" UUID NULL;
         `);
         logger.info('Guaranteed service_tickets time tracking columns exist.');
 

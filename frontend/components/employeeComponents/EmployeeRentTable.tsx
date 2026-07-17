@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Loader2, Eye, FileText, Plus, Send, ClipboardList } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import { Search, Loader2, Eye, FileText, Plus, Send, ClipboardList, Activity } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { getUserFromToken } from '@/lib/auth';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -62,6 +63,9 @@ export default function EmployeeRentTable({
   mode = 'EMPLOYEE',
   onRefresh,
 }: EmployeeRentTableProps) {
+  const router = useRouter();
+  const currentUser = getUserFromToken();
+  const canViewLogs = currentUser && ['MANAGER', 'FINANCE', 'ADMIN'].includes(currentUser.role);
   const currency = useBranchCurrency();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -384,6 +388,18 @@ export default function EmployeeRentTable({
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
+                        {canViewLogs && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
+                            onClick={() => router.push(`/employee/invoices/${inv.id}`)}
+                            title="Full details & activity log"
+                          >
+                            <Activity className="h-4 w-4" />
+                          </Button>
+                        )}
 
                         {inv.status === 'DRAFT' && (
                           <Button

@@ -87,7 +87,13 @@ export function QuotationViewDialog({
   const returnCreditNote = quotation.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
   const isReturnInvoice = !!returnCreditNote;
 
-  const isExpired = quotation.effectiveTo ? new Date() > new Date(quotation.effectiveTo) : false;
+  // Quotation validity lives in expiryDate; effectiveTo is the contract period end
+  // for RENT/LEASE, so it must not be used to decide quotation expiry there.
+  const isExpired = quotation.expiryDate
+    ? new Date() > new Date(quotation.expiryDate)
+    : quotation.effectiveTo && !['RENT', 'LEASE'].includes(quotation.saleType)
+      ? new Date() > new Date(quotation.effectiveTo)
+      : false;
   const isExtensionRequested =
     quotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
     quotation.status === 'WAITING_FINANCE_APPROVAL';

@@ -55,7 +55,7 @@ import {
   ConsumableYieldHistory,
   WarrantyInfo,
 } from '@/lib/serviceTicket';
-import { ServiceContract } from '@/lib/serviceContract';
+import { ServiceContract, getServiceContracts } from '@/lib/serviceContract';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -154,6 +154,9 @@ interface MachineAllocation {
   meterReading?: number;
   warrantyInfo?: WarrantyInfo;
 }
+
+// Local-timezone YYYY-MM-DD, for <input type="date"> min and validation.
+const todayLocalISO = () => new Date().toLocaleDateString('en-CA');
 
 function ActiveTimer({ startTime }: { startTime: string }) {
   const [elapsed, setElapsed] = useState('');
@@ -385,6 +388,10 @@ export default function ServiceDashboardPage() {
   const [isOtherMachine, setIsOtherMachine] = useState(false);
   const [modalIntelData, setModalIntelData] = useState<CustomerServiceHistory | null>(null);
   const [loadingModalIntel, setLoadingModalIntel] = useState(false);
+  // Live AMC/SMA/FSMA contracts for the selected customer; billing history
+  // doesn't include them, so external/purchased machines would otherwise
+  // show no contract coverage in the machine registry.
+  const [customerActiveContracts, setCustomerActiveContracts] = useState<ServiceContract[]>([]);
 
   const [assignForm, setAssignForm] = useState({
     technicianId: '',
@@ -539,6 +546,10 @@ export default function ServiceDashboardPage() {
         toast.error('Scheduled Visit Date is required for On-Site service.');
         return;
       }
+      if (newTicket.jobType === 'ONSITE' && newTicket.scheduledVisitDate < todayLocalISO()) {
+        toast.error('Scheduled Visit Date cannot be in the past.');
+        return;
+      }
       // Copy-limited warranties need the customer's meter reading to decide
       // whether the warranty is still valid.
       if (
@@ -612,6 +623,10 @@ export default function ServiceDashboardPage() {
       }
       if (newTicket.jobType === 'ONSITE' && !newTicket.scheduledVisitDate) {
         toast.error('Scheduled Visit Date is required for On-Site service.');
+        return;
+      }
+      if (newTicket.jobType === 'ONSITE' && newTicket.scheduledVisitDate < todayLocalISO()) {
+        toast.error('Scheduled Visit Date cannot be in the past.');
         return;
       }
 
@@ -1391,12 +1406,17 @@ export default function ServiceDashboardPage() {
   const loadModalCustomerIntel = async (customerId: string) => {
     if (!customerId) {
       setModalIntelData(null);
+      setCustomerActiveContracts([]);
       return;
     }
     try {
       setLoadingModalIntel(true);
-      const data = await getCustomerServiceHistory(customerId);
+      const [data, contracts] = await Promise.all([
+        getCustomerServiceHistory(customerId),
+        getServiceContracts({ customerId, status: 'ACTIVE' }).catch(() => [] as ServiceContract[]),
+      ]);
       setModalIntelData(data);
+      setCustomerActiveContracts(contracts);
     } catch (error) {
       console.error('Failed to load modal customer intelligence history:', error);
       toast.error('Failed to load customer machine history');
@@ -1429,6 +1449,7 @@ export default function ServiceDashboardPage() {
     setSelectedMachine(null);
     setIsOtherMachine(false);
     setModalIntelData(null);
+    setCustomerActiveContracts([]);
     setCreationPath('existing');
     setActiveMachineTab('rented');
     setMeterReadingInput('');
@@ -1642,6 +1663,13 @@ export default function ServiceDashboardPage() {
     const list: MachineAllocation[] = [];
     modalIntelData.assignedProducts.forEach((prod) => {
       if (prod.ownership === 'EXTERNAL') {
+        // AMC/SMA/FSMA contracts live in their own table, not in billing
+        // history — overlay them so coverage is visible before selection.
+        const contract = customerActiveContracts.find(
+          (c) =>
+            c.productId === prod.id ||
+            (!!c.machine?.serialNumber && c.machine.serialNumber === prod.serial_no),
+        );
         list.push({
           id: prod.id,
           modelName: prod.name,
@@ -1649,6 +1677,9 @@ export default function ServiceDashboardPage() {
           brandName: prod.brand,
           type: 'EXTERNAL',
           meterReading: prod.meter_reading || 0,
+          contractType: contract?.contractType,
+          contractReferenceId: contract?.id,
+          effectiveTo: contract?.endDate,
         });
       }
     });
@@ -1834,8 +1865,8 @@ export default function ServiceDashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Action buttons based on jobs */}
-          {isHelpDesk && (
+          {/* Action buttons based on jobs — manager has full authority in the branch */}
+          {(isHelpDesk || isManagerOrAdmin) && (
             <Button
               onClick={() => setShowCreateModal(true)}
               className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl shadow-sm gap-2"
@@ -2074,9 +2105,22 @@ export default function ServiceDashboardPage() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-end gap-1">
-                          {/* HELP DESK ACTIONS */}
-                          {isHelpDesk &&
-                            (ticket.status === 'OPEN' || ticket.status === 'FREE_SERVICE') && (
+                          {/* HELP DESK / MANAGER ACTIONS */}
+                          {(isHelpDesk || isManagerOrAdmin) &&
+                            (ticket.status === 'OPEN' ||
+                              ticket.status === 'FREE_SERVICE' ||
+                              // Manager may have estimated before assignment;
+                              // a technician can still be assigned mid-flow.
+                              (!ticket.assignedTechnicianId &&
+                                [
+                                  'DIAGNOSED',
+                                  'WAITING_FINANCE_APPROVAL',
+                                  'FINANCE_APPROVED',
+                                  'FINANCE_REJECTED',
+                                  'QUOTED',
+                                  'CUSTOMER_APPROVED',
+                                  'REVISED',
+                                ].includes(ticket.status))) && (
                               <Button
                                 size="sm"
                                 className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
@@ -2112,9 +2156,11 @@ export default function ServiceDashboardPage() {
                               </>
                             )}
 
-                          {/* TECHNICIAN ACTIONS */}
-                          {isTechnician &&
-                            ticket.status === 'ASSIGNED' &&
+                          {/* TECHNICIAN / MANAGER ACTIONS — manager may diagnose
+                              before assignment; assigned technician after */}
+                          {((isTechnician && ticket.status === 'ASSIGNED') ||
+                            (isManagerOrAdmin &&
+                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED'))) &&
                             !ticket.diagnosisStartedAt && (
                               <Button
                                 size="sm"
@@ -2126,8 +2172,24 @@ export default function ServiceDashboardPage() {
                               </Button>
                             )}
 
-                          {isTechnician &&
-                            ticket.status === 'ASSIGNED' &&
+                          {(isTechnician || isManagerOrAdmin) &&
+                            (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
+                            ticket.diagnosisStartedAt &&
+                            ticket.diagnosisStartedBy &&
+                            ticket.diagnosisStartedBy !== user?.userId && (
+                              <span
+                                className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md select-none"
+                                title="Diagnosis was started by another user"
+                              >
+                                Opened by{' '}
+                                {ticket.diagnosisStartedBy === ticket.assignedTechnicianId
+                                  ? 'Technician'
+                                  : 'Manager'}
+                              </span>
+                            )}
+
+                          {(isTechnician || isManagerOrAdmin) &&
+                            (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
                             ticket.diagnosisStartedAt && (
                               <div className="flex items-center gap-1">
                                 <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
@@ -2173,7 +2235,7 @@ export default function ServiceDashboardPage() {
                               </Button>
                             )}
 
-                          {isTechnician &&
+                          {(isTechnician || isManagerOrAdmin) &&
                             (ticket.status === 'FINANCE_REJECTED' ||
                               ticket.status === 'REVISED') && (
                               <Button
@@ -2220,10 +2282,10 @@ export default function ServiceDashboardPage() {
                               </Button>
                             )}
 
-                          {isTechnician &&
+                          {((isTechnician && ticket.assignedTechnicianId === user?.userId) ||
+                            isManagerOrAdmin) &&
                             (ticket.status === 'CUSTOMER_APPROVED' ||
                               ticket.status === 'FREE_SERVICE') &&
-                            ticket.assignedTechnicianId === user?.userId &&
                             !ticket.repairStartedAt && (
                               <Button
                                 size="sm"
@@ -2235,7 +2297,7 @@ export default function ServiceDashboardPage() {
                               </Button>
                             )}
 
-                          {isTechnician &&
+                          {(isTechnician || isManagerOrAdmin) &&
                             ticket.status === 'IN_PROGRESS' &&
                             ticket.repairStartedAt && (
                               <div className="flex items-center gap-1">
@@ -2843,12 +2905,12 @@ export default function ServiceDashboardPage() {
                                           setNewTicket((prev) => ({
                                             ...prev,
                                             productId: machine.id,
-                                            contractReferenceId: '',
+                                            contractReferenceId: machine.contractReferenceId || '',
                                             productBrand: machine.brandName || 'Xerox',
                                             productModel: machine.modelName,
                                             productName: machine.modelName,
                                             serialNumber: machine.serialNumber,
-                                            serviceContext: 'CHARGEABLE',
+                                            serviceContext: machine.contractType || 'CHARGEABLE',
                                             jobType: 'ONSITE',
                                           }));
                                         }}
@@ -2862,9 +2924,16 @@ export default function ServiceDashboardPage() {
                                           <span className="font-bold text-slate-800">
                                             {machine.modelName}
                                           </span>
-                                          <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
-                                            EXTERNAL
-                                          </span>
+                                          <div className="flex items-center gap-1">
+                                            {machine.contractType && (
+                                              <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold px-1.5 py-0.5 rounded">
+                                                Under {machine.contractType}
+                                              </span>
+                                            )}
+                                            <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded">
+                                              EXTERNAL
+                                            </span>
+                                          </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-500">
                                           <div>
@@ -2879,6 +2948,23 @@ export default function ServiceDashboardPage() {
                                               {machine.meterReading}
                                             </span>
                                           </div>
+                                          {machine.contractType && (
+                                            <div className="col-span-2">
+                                              Active Contract:{' '}
+                                              <span className="font-bold text-indigo-600">
+                                                {machine.contractType}
+                                              </span>
+                                              {machine.effectiveTo && (
+                                                <span className="text-slate-500">
+                                                  {' '}
+                                                  · valid until{' '}
+                                                  {new Date(
+                                                    machine.effectiveTo,
+                                                  ).toLocaleDateString()}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     ))
@@ -3510,6 +3596,7 @@ export default function ServiceDashboardPage() {
                           </label>
                           <Input
                             type="date"
+                            min={todayLocalISO()}
                             value={newTicket.scheduledVisitDate}
                             onChange={(e) =>
                               setNewTicket({ ...newTicket, scheduledVisitDate: e.target.value })

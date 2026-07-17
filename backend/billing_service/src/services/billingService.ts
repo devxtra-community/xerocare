@@ -1162,6 +1162,18 @@ export class BillingService {
       );
     }
 
+    if (
+      action === 'accept' &&
+      invoice.type === InvoiceType.QUOTATION &&
+      invoice.expiryDate &&
+      new Date(invoice.expiryDate) < new Date()
+    ) {
+      throw new AppError(
+        'This quotation has expired and can no longer be accepted. Please contact us to renew it.',
+        400,
+      );
+    }
+
     const oldStatus = invoice.status;
     const newStatus =
       action === 'accept' ? InvoiceStatus.CUSTOMER_ACCEPTED : InvoiceStatus.CUSTOMER_REJECTED;
@@ -1390,7 +1402,12 @@ export class BillingService {
     invoice.financeApprovedAt = new Date();
 
     if (payload?.effectiveTo) {
-      invoice.effectiveTo = payload.effectiveTo;
+      // Validity extension: the date extends the quotation's validity window.
+      // effectiveTo is the contract period end for RENT/LEASE — never overwrite it there.
+      invoice.expiryDate = new Date(payload.effectiveTo);
+      if (invoice.saleType !== SaleType.RENT && invoice.saleType !== SaleType.LEASE) {
+        invoice.effectiveTo = payload.effectiveTo;
+      }
     }
 
     if (invoice.billType === 'SERVICE') {
@@ -1513,6 +1530,13 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
+    if (invoice.type !== InvoiceType.QUOTATION) {
+      throw new AppError('Only quotations can request a validity extension', 400);
+    }
+    if (!invoice.expiryDate || new Date(invoice.expiryDate) >= new Date()) {
+      throw new AppError('Quotation is still valid. Extension is only needed after expiry.', 400);
+    }
+
     const oldStatus = invoice.status;
     invoice.status = InvoiceStatus.WAITING_FINANCE_APPROVAL;
     const saved = await this.invoiceRepo.save(invoice);
@@ -1566,7 +1590,7 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (invoice.effectiveTo && new Date(invoice.effectiveTo) < new Date()) {
+    if (invoice.expiryDate && new Date(invoice.expiryDate) < new Date()) {
       throw new AppError(
         'Quotation validity has expired. Please request a validity extension from Finance.',
         400,
@@ -1723,6 +1747,21 @@ export class BillingService {
               (item.itemType as unknown) === 'SPAREPART'
                 ? product.sku || product.lot_id || 'Part'
                 : product.serial_no || 'Unknown';
+
+            // Idempotency: a retried conversion must not allocate the same unit twice.
+            const existingAllocation = await queryRunner.manager.findOne(ProductAllocation, {
+              where: {
+                contractId: invoice.id,
+                productId: update.productId,
+                status: AllocationStatus.ALLOCATED,
+              },
+            });
+            if (existingAllocation) {
+              logger.info(
+                `[allocateMachines] Allocation already exists for contract ${invoice.id} / product ${update.productId} — skipping duplicate insert.`,
+              );
+              continue;
+            }
 
             // Create basic allocation record without meter readings yet
             await queryRunner.manager.insert(ProductAllocation, {
@@ -4177,6 +4216,8 @@ export class BillingService {
     invoice.estimateExpired = false;
     invoice.validityExtensionDays = days;
     invoice.validityExtensionFee = fee;
+    invoice.expiryDate = baseValidUntil;
+    invoice.validityDays = totalDays;
 
     const oldStatus = invoice.status;
     invoice.status = InvoiceStatus.FINANCE_APPROVED;

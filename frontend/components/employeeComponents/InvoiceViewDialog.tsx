@@ -18,8 +18,6 @@ import { getAllSpareParts } from '@/lib/spare-part';
 import { getAllModels } from '@/lib/model';
 import { Invoice, sendEmailNotification, sendWhatsappNotification } from '@/lib/invoice';
 import { toast } from 'sonner';
-import { getUserFromToken } from '@/lib/auth';
-import AuditTimeline from '../invoice/AuditTimeline';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -104,9 +102,6 @@ export function InvoiceViewDialog({
   // Detect if this invoice has a completed return / replacement
   const returnCreditNote = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
   const isReturnInvoice = !!returnCreditNote;
-
-  const currentUser = getUserFromToken();
-  const canViewTimeline = currentUser && ['MANAGER', 'FINANCE', 'ADMIN'].includes(currentUser.role);
 
   useEffect(() => {
     const fetchFullDetails = async () => {
@@ -1558,17 +1553,6 @@ export function InvoiceViewDialog({
                         </div>
                       );
                     })}
-
-                  <div className="h-px bg-violet-100 my-4" />
-                  <AuditTimeline entityId={invoice.id} />
-                </div>
-              )}
-
-            {canViewTimeline &&
-              (!invoice.creditNotes ||
-                !invoice.creditNotes.some((cn) => cn.status === 'PRODUCT_REPLACED')) && (
-                <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-gray-100 bg-slate-50/50 p-6 overflow-y-auto max-h-[35vh] md:max-h-full">
-                  <AuditTimeline entityId={invoice.id} />
                 </div>
               )}
           </div>
