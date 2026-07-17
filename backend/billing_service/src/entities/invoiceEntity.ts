@@ -169,6 +169,18 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   advanceAmount?: number;
 
+  /**
+   * Stable default payment mode for this contract's recurring billing — set once from
+   * the first payment ever recorded (the advance) and never overwritten afterward, so
+   * Finance overriding one period's mode doesn't change what later periods default to.
+   * Used to pre-fill the usage-bill payment flow; Finance can still freely override it.
+   */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  preferredPaymentMode?: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  preferredChequeBankName?: string;
+
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   discountPercent?: number;
 

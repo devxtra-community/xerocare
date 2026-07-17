@@ -713,11 +713,14 @@ export class BillingService {
     }
 
     // ─── Snapshot: branch currency/tax + customer info ────────────────────────
+    // Rent/Lease contracts are VAT-exempt (confirmed business/regulatory position) — no
+    // tax_name/tax_percent/tax_amount is calculated or applied for these sale types.
+    const isTaxExemptSaleType = [SaleType.RENT, SaleType.LEASE].includes(payload.saleType);
     try {
       const branchInfo = await getBranchCurrencyInfo(payload.branchId);
       if (branchInfo) {
         invoice.currencyCode = branchInfo.currencyCode;
-        if (branchInfo.hasTax && branchInfo.taxPercent) {
+        if (!isTaxExemptSaleType && branchInfo.hasTax && branchInfo.taxPercent) {
           invoice.taxName = branchInfo.taxName;
           invoice.taxPercent = branchInfo.taxPercent;
           invoice.taxAmount = Number(invoice.totalAmount) * (branchInfo.taxPercent / 100);
@@ -4485,6 +4488,14 @@ export class BillingService {
       chequeNumber?: string;
       chequeBankName?: string;
       chequeDueDate?: string;
+      /**
+       * Overrides the auto-derived "MMM YYYY to MMM YYYY" period text in the created
+       * cheque's sourceLabel (which otherwise falls back to invoice.billingPeriodStart/End —
+       * fields that are never populated on an ongoing Rent/Lease contract invoice, since the
+       * same invoice is reused across every billing period). Used by recurring usage-bill
+       * payments so the cheque reads e.g. "Invoice RC-0012 — Aug 2026", not just "Invoice RC-0012".
+       */
+      periodLabel?: string;
     },
     userId?: string,
   ): Promise<PaymentTransaction> {
@@ -4566,6 +4577,23 @@ export class BillingService {
     transaction.receiptUrl = data.receiptUrl;
 
     await transactionRepo.save(transaction);
+
+    // Capture this contract's stable default payment mode from the first real payment
+    // ever recorded (typically the advance) — never overwritten afterward, so later
+    // per-period overrides (e.g. a usage bill paid by Bank instead) don't change what
+    // subsequent periods default back to. Security deposits are excluded (tracked
+    // separately via securityDepositMode) since they aren't the recurring-billing mode.
+    const isFirstRealPayment =
+      !isSecurityDeposit &&
+      priorTxns.filter((t) => !isDepositTxn(t.remarks)).length === 0 &&
+      legacyRows.filter((p) => !isDepositTxn(p.remarks)).length === 0;
+    if (isFirstRealPayment && !invoice.preferredPaymentMode) {
+      invoice.preferredPaymentMode = data.paymentMode;
+      if ((data.paymentMode ?? '').toUpperCase() === 'CHEQUE' && data.chequeBankName) {
+        invoice.preferredChequeBankName = data.chequeBankName;
+      }
+      await this.invoiceRepo.saveInvoice(invoice);
+    }
 
     // If active or invoiced or security deposit, we can maintain the ledger.
     const ledgerRepo = Source.getRepository(InvoiceLedger);
@@ -4673,6 +4701,7 @@ export class BillingService {
               sourceReferenceId: invoiceId,
               sourceLabel: (() => {
                 const base = `Invoice ${invoice.invoiceNumber}`;
+                if (data.periodLabel) return `${base} — ${data.periodLabel}`;
                 if (invoice.billingPeriodStart && invoice.billingPeriodEnd) {
                   const fmt = (d: Date) =>
                     new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });

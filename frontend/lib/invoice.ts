@@ -155,6 +155,10 @@ export interface Invoice {
   monthlyLeaseAmount?: number;
   monthlyRent?: number;
   advanceAmount?: number;
+  // Stable default payment mode for this contract's recurring billing — set once from
+  // the first payment ever recorded (the advance) and never overwritten afterward.
+  preferredPaymentMode?: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD';
+  preferredChequeBankName?: string;
   discountPercent?: number;
   discountAmount?: number;
   effectiveFrom?: string;

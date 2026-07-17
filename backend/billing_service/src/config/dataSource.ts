@@ -1085,6 +1085,16 @@ async function runPreMigrations() {
     } catch (err) {
       logger.warn('PAID→INVOICED direct-sale correction failed (non-fatal):', err);
     }
+
+    // ─── Contract's stable default payment mode (Rent/Lease Finance pre-fill) ───
+    // Set once from the first payment ever recorded against a contract (the advance,
+    // typically) and never overwritten afterward — Finance overriding a later period's
+    // mode must not change what subsequent periods default back to.
+    await client.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS "preferredPaymentMode" VARCHAR(20) NULL,
+        ADD COLUMN IF NOT EXISTS "preferredChequeBankName" VARCHAR(150) NULL;
+    `);
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

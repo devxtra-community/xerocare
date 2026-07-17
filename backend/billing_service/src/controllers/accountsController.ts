@@ -13,6 +13,7 @@ import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { SaleType } from '../entities/enums/saleType';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
@@ -3408,7 +3409,12 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       .where('i.status IN (:...statuses)', { statuses: OUTPUT_TAX_STATUSES })
       .andWhere('i.isTemplate = false')
       .andWhere('i.isOpeningEntry = false')
-      .andWhere('i.deletedAt IS NULL');
+      .andWhere('i.deletedAt IS NULL')
+      // Rent/Lease is VAT-exempt — no tax is collected on these contracts, so they're
+      // not taxable transactions and are omitted entirely rather than shown as a 0.00 row.
+      .andWhere('i.saleType NOT IN (:...taxExemptSaleTypes)', {
+        taxExemptSaleTypes: [SaleType.RENT, SaleType.LEASE],
+      });
 
     if (branchFilter.length === 1) {
       qb.andWhere('i.branchId = :bf', { bf: branchFilter[0] });

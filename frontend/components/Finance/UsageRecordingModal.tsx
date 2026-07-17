@@ -166,6 +166,16 @@ export default function UsageRecordingModal({
   });
   const [file, setFile] = useState<File | null>(null);
 
+  // Optional: collect this period's payment in the same action that generates the bill.
+  // Off by default so Finance can still record usage alone and collect payment separately.
+  const [collectPayment, setCollectPayment] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
+  const [paymentReferenceNumber, setPaymentReferenceNumber] = useState('');
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [chequeNumber, setChequeNumber] = useState('');
+  const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDueDate, setChequeDueDate] = useState('');
+
   const isSimplifiedLease = contract?.saleType === 'LEASE' && contract?.leaseType !== 'FSM';
 
   React.useEffect(() => {
@@ -499,6 +509,21 @@ export default function UsageRecordingModal({
         colorA4Count: String(aggClrA4),
         colorA3Count: String(aggClrA3),
       }));
+
+      // Pre-fill this period's payment mode from the contract's stable default (set once
+      // from the advance payment at signing) — Finance can still freely override it below.
+      // Bank name carries over as a convenience; cheque number/due date are always left
+      // blank since each period is a genuinely new physical cheque.
+      if (contract.preferredPaymentMode) {
+        setPaymentMode(
+          contract.preferredPaymentMode === 'CREDIT_CARD'
+            ? 'BANK_TRANSFER'
+            : contract.preferredPaymentMode,
+        );
+        if (contract.preferredPaymentMode === 'CHEQUE' && contract.preferredChequeBankName) {
+          setChequeBankName(contract.preferredChequeBankName);
+        }
+      }
 
       isInitialized.current = true;
     }
@@ -986,6 +1011,12 @@ export default function UsageRecordingModal({
       }
     }
 
+    if (collectPayment && paymentMode === 'CHEQUE') {
+      if (!chequeNumber) errors.push('Cheque number is required for cheque payments');
+      if (!chequeBankName) errors.push('Cheque bank name is required for cheque payments');
+      if (!chequeDueDate) errors.push('Cheque due date is required for cheque payments');
+    }
+
     if (errors.length > 0) {
       errors.forEach((e) => toast.error(e));
       return false;
@@ -1132,6 +1163,18 @@ export default function UsageRecordingModal({
 
         if (file) {
           payload.append('file', file);
+        }
+
+        if (collectPayment) {
+          payload.append('paymentMode', paymentMode);
+          payload.append('paymentDate', paymentDate);
+          if (paymentMode === 'CHEQUE') {
+            payload.append('chequeNumber', chequeNumber);
+            payload.append('chequeBankName', chequeBankName);
+            payload.append('chequeDueDate', chequeDueDate);
+          } else if (paymentReferenceNumber) {
+            payload.append('paymentReferenceNumber', paymentReferenceNumber);
+          }
         }
 
         // const response = await recordUsage(payload);
@@ -2714,6 +2757,93 @@ export default function UsageRecordingModal({
                 </div>
               </div>
             )}
+
+            <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={collectPayment}
+                  onChange={(e) => setCollectPayment(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Collect payment for this period now
+              </label>
+
+              {collectPayment && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-slate-600">Payment Mode</Label>
+                    <select
+                      value={paymentMode}
+                      onChange={(e) =>
+                        setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')
+                      }
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="CASH">Cash</option>
+                      <option value="BANK_TRANSFER">Bank Transfer</option>
+                      <option value="CHEQUE">Cheque</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold text-slate-600">Payment Date</Label>
+                    <Input
+                      type="date"
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                    />
+                  </div>
+
+                  {paymentMode === 'CHEQUE' ? (
+                    <>
+                      <div className="space-y-2 sm:col-span-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                        Creates a PENDING cheque record. Cash at Bank increases only when it&apos;s
+                        deposited in Accounts → Cheques.
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-slate-600">
+                          Cheque Number
+                        </Label>
+                        <Input
+                          value={chequeNumber}
+                          onChange={(e) => setChequeNumber(e.target.value)}
+                          placeholder="e.g. CHQ-001234"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-slate-600">Bank Name</Label>
+                        <Input
+                          value={chequeBankName}
+                          onChange={(e) => setChequeBankName(e.target.value)}
+                          placeholder="e.g. Emirates NBD"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-slate-600">
+                          Cheque Due Date
+                        </Label>
+                        <Input
+                          type="date"
+                          value={chequeDueDate}
+                          onChange={(e) => setChequeDueDate(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-slate-600">
+                        Reference Number (Optional)
+                      </Label>
+                      <Input
+                        value={paymentReferenceNumber}
+                        onChange={(e) => setPaymentReferenceNumber(e.target.value)}
+                        placeholder="e.g. TXN-123456"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label>

@@ -251,31 +251,76 @@ export async function computeProfitAndLoss(
     allTimeDepAmount,
     creditNoteRows,
   ] = await Promise.all([
-    // 4001 Rental Revenue — RENT invoices (period-filtered)
+    // 4001 Rental Revenue — RENT contracts reuse a single invoice across their whole
+    // lifecycle, so revenue can't be read from invoice.totalAmount filtered by
+    // invoice.createdAt (that mixes every period's accrual into one snapshot and
+    // misattributes it all to the signing date). Instead: the advance is recognized
+    // once, in its signing period; each billed period's monthlyRent is recognized in
+    // ITS OWN period (mirroring how 4005 already reads usage_records for exceededCharge)
+    // — net of advanceAdjusted, the amount the final period drew down from the advance,
+    // so that dollar isn't recognized twice.
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
-      FROM invoices i
-      WHERE "saleType" = 'RENT'
-        AND status NOT IN (${EXCL_STATUS})
-        AND ${VALID_INVOICES}
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
-        AND "deletedAt" IS NULL
-        ${bSql}
-      GROUP BY "currency_code"
+      (
+        SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(COALESCE(i."advanceAmount", 0) + COALESCE(adv."totalAdvanceAdjusted", 0)), 0) AS amount
+        FROM invoices i
+        LEFT JOIN (
+          SELECT "contractId", SUM(COALESCE("advanceAdjusted", 0)) AS "totalAdvanceAdjusted"
+          FROM usage_records GROUP BY "contractId"
+        ) adv ON adv."contractId" = i.id
+        WHERE i."saleType" = 'RENT'
+          AND i.status NOT IN (${EXCL_STATUS})
+          AND ${VALID_INVOICES}
+          AND CAST(i."createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+          AND i."deletedAt" IS NULL
+          ${bSql}
+        GROUP BY i."currency_code"
+      )
+      UNION ALL
+      (
+        SELECT COALESCE(inv."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(u."monthlyRent" - COALESCE(u."advanceAdjusted", 0)), 0) AS amount
+        FROM usage_records u
+        JOIN invoices inv ON inv.id = u."contractId"
+        WHERE inv."saleType" = 'RENT'
+          AND u."billingPeriodStart" >= '${dateFrom}'
+          AND u."billingPeriodEnd" <= '${dateTo}'
+          AND inv."deletedAt" IS NULL
+          ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
+        GROUP BY inv."currency_code"
+      )
     `),
-    // 4002 Lease Revenue
+    // 4002 Lease Revenue — same advance-at-signing + period-filtered-rent approach as 4001
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
-      FROM invoices i
-      WHERE "saleType" = 'LEASE'
-        AND status NOT IN (${EXCL_STATUS})
-        AND ${VALID_INVOICES}
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
-        AND "deletedAt" IS NULL
-        ${bSql}
-      GROUP BY "currency_code"
+      (
+        SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(COALESCE(i."advanceAmount", 0) + COALESCE(adv."totalAdvanceAdjusted", 0)), 0) AS amount
+        FROM invoices i
+        LEFT JOIN (
+          SELECT "contractId", SUM(COALESCE("advanceAdjusted", 0)) AS "totalAdvanceAdjusted"
+          FROM usage_records GROUP BY "contractId"
+        ) adv ON adv."contractId" = i.id
+        WHERE i."saleType" = 'LEASE'
+          AND i.status NOT IN (${EXCL_STATUS})
+          AND ${VALID_INVOICES}
+          AND CAST(i."createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+          AND i."deletedAt" IS NULL
+          ${bSql}
+        GROUP BY i."currency_code"
+      )
+      UNION ALL
+      (
+        SELECT COALESCE(inv."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(u."monthlyRent" - COALESCE(u."advanceAdjusted", 0)), 0) AS amount
+        FROM usage_records u
+        JOIN invoices inv ON inv.id = u."contractId"
+        WHERE inv."saleType" = 'LEASE'
+          AND u."billingPeriodStart" >= '${dateFrom}'
+          AND u."billingPeriodEnd" <= '${dateTo}'
+          AND inv."deletedAt" IS NULL
+          ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
+        GROUP BY inv."currency_code"
+      )
     `),
     // 4003 Sales Revenue — SALE + PRODUCT_SALE only (SPAREPART_SALE goes to 4007)
     db.query<CcyRow[]>(`
@@ -365,16 +410,51 @@ export async function computeProfitAndLoss(
             EXTRACT(YEAR FROM DATE '${dateTo}')::int * 100 + EXTRACT(MONTH FROM DATE '${dateTo}')::int
         )
     `),
-    // All-time revenue — for retained earnings (no date filter, no type exclusion except CANCELLED)
+    // All-time revenue — for retained earnings (no date filter, no type exclusion except CANCELLED).
+    // RENT/LEASE excluded from the raw totalAmount sum (same reused-invoice/overwrite problem as
+    // 4001/4002) and replaced with the corrected lifetime figure: advance once + all billed
+    // periods' monthlyRent (net of advanceAdjusted) + all exceededCharge — this single number
+    // doesn't split out a separate "usage revenue" bucket the way the period P&L does, since
+    // all-time has no 4005 counterpart to add on top of it.
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
-      FROM invoices inv
-      WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-        AND ${VALID_INVOICES}
-        AND "deletedAt" IS NULL
-        ${bSqlAllInv}
-      GROUP BY "currency_code"
+      (
+        SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
+        FROM invoices inv
+        WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
+          AND ${VALID_INVOICES}
+          AND "saleType" NOT IN ('RENT', 'LEASE')
+          AND "deletedAt" IS NULL
+          ${bSqlAllInv}
+        GROUP BY "currency_code"
+      )
+      UNION ALL
+      (
+        SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(COALESCE(i."advanceAmount", 0) + COALESCE(adv."totalAdvanceAdjusted", 0)), 0) AS amount
+        FROM invoices i
+        LEFT JOIN (
+          SELECT "contractId", SUM(COALESCE("advanceAdjusted", 0)) AS "totalAdvanceAdjusted"
+          FROM usage_records GROUP BY "contractId"
+        ) adv ON adv."contractId" = i.id
+        WHERE i."saleType" IN ('RENT', 'LEASE')
+          AND i.status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
+          AND ${VALID_INVOICES}
+          AND i."deletedAt" IS NULL
+          ${bSqlAllInv.replace('inv."branchId"', 'i."branchId"')}
+        GROUP BY i."currency_code"
+      )
+      UNION ALL
+      (
+        SELECT COALESCE(inv."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(u."monthlyRent" - COALESCE(u."advanceAdjusted", 0) + u."exceededCharge"), 0) AS amount
+        FROM usage_records u
+        JOIN invoices inv ON inv.id = u."contractId"
+        WHERE inv."saleType" IN ('RENT', 'LEASE')
+          AND inv."deletedAt" IS NULL
+          ${bSqlAllInv}
+        GROUP BY inv."currency_code"
+      )
     `),
     // All-time expenses — for retained earnings
     db.query<{ amount: string }[]>(`
@@ -740,16 +820,50 @@ export async function computeBalanceSheet(
       WHERE 1=1 ${bSql('equity_entries')}
       GROUP BY type
     `),
-    // All-time revenue for retained earnings
+    // All-time revenue for retained earnings. The `type NOT IN ('PROFORMA', ...)` filter
+    // excludes RENT/LEASE entirely — those contracts are stored as type=PROFORMA for their
+    // whole lifecycle and never get a type=FINAL invoice generated, so this query used to
+    // recognize precisely zero lifetime revenue from any Rent/Lease contract. Same corrected
+    // methodology as 4001/4002 in computeProfitAndLoss: advance once + all billed periods'
+    // monthlyRent (net of advanceAdjusted) + all exceededCharge, added on separately.
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
-      FROM invoices
-      WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-        AND type NOT IN ('QUOTATION', 'PROFORMA', 'OPENING')
-        AND "deletedAt" IS NULL
-        ${bSql('invoices')}
-      GROUP BY "currency_code"
+      (
+        SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
+        FROM invoices
+        WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
+          AND type NOT IN ('QUOTATION', 'PROFORMA', 'OPENING')
+          AND "deletedAt" IS NULL
+          ${bSql('invoices')}
+        GROUP BY "currency_code"
+      )
+      UNION ALL
+      (
+        SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(COALESCE(i."advanceAmount", 0) + COALESCE(adv."totalAdvanceAdjusted", 0)), 0) AS amount
+        FROM invoices i
+        LEFT JOIN (
+          SELECT "contractId", SUM(COALESCE("advanceAdjusted", 0)) AS "totalAdvanceAdjusted"
+          FROM usage_records GROUP BY "contractId"
+        ) adv ON adv."contractId" = i.id
+        WHERE i."saleType" IN ('RENT', 'LEASE')
+          AND i.status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
+          AND i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')
+          AND i."deletedAt" IS NULL
+          ${bSql('i')}
+        GROUP BY i."currency_code"
+      )
+      UNION ALL
+      (
+        SELECT COALESCE(inv."currency_code", '${baseCurrency}') AS currency_code,
+               COALESCE(SUM(u."monthlyRent" - COALESCE(u."advanceAdjusted", 0) + u."exceededCharge"), 0) AS amount
+        FROM usage_records u
+        JOIN invoices inv ON inv.id = u."contractId"
+        WHERE inv."saleType" IN ('RENT', 'LEASE')
+          AND inv."deletedAt" IS NULL
+          ${bSql('inv')}
+        GROUP BY inv."currency_code"
+      )
     `),
     // All-time expenses for retained earnings
     db.query<{ amount: string }[]>(`
@@ -843,8 +957,31 @@ export async function computeBalanceSheet(
     productInventory = prodInvData.total ?? 0;
   }
 
+  // ── Vendor purchases payable — cross-service ─────────────────────────────────
+  // The Payable page's frontend merges manual_payables with vendor Purchase Orders
+  // (POs), but this Balance Sheet line used to sum only manual_payables — a real PO
+  // with an outstanding balance would show correctly on the Payable page yet never
+  // appear here, permanently drifting the two apart. Mirrors the inventory-value
+  // cross-service pattern above.
+  const purchasePayableData = await internalGet<{
+    currencyGroups: { currencyCode: string; outstanding: number }[];
+  }>(`${invUrl}/purchases/internal/payable-summary${branchQs}`);
+  let vendorPurchasesPayable = 0;
+  if (purchasePayableData === null) {
+    dataWarnings.push(
+      '2001: Inventory service unavailable — outstanding vendor purchases could not be fetched. Accounts Payable will be understated.',
+    );
+  } else {
+    for (const grp of purchasePayableData.currencyGroups ?? []) {
+      const { value, warning } = convertAmt(grp.outstanding, grp.currencyCode, baseCurrency, rates);
+      if (warning) {
+        if (!currencyWarnings.includes(warning)) currencyWarnings.push(warning);
+      } else vendorPurchasesPayable += value;
+    }
+  }
+
   // ── Liabilities ──────────────────────────────────────────────────────────────
-  const accountsPayable = Number(apRows[0]?.amount ?? 0);
+  const accountsPayable = Number(apRows[0]?.amount ?? 0) + vendorPurchasesPayable;
   const accruedExpenses = Number(accruedRows[0]?.amount ?? 0);
 
   const vatCollected = aggByCurrency(vatCollectedRows, baseCurrency, rates, currencyWarnings);

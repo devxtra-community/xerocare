@@ -20,6 +20,11 @@ router.get('/internal/cost-report', (req, res, next) =>
   purchaseController.getPurchaseCostReport(req, res, next),
 );
 
+// Internal endpoint called by Billing service's Balance Sheet for Accounts Payable (2001)
+router.get('/internal/payable-summary', (req, res, next) =>
+  purchaseController.getPayableSummary(req, res, next),
+);
+
 // Internal endpoint: batch existence check for linked_po_id orphan reconciliation
 router.post('/internal/batch-exists', (req, res, next) =>
   purchaseController.batchExistsPurchases(req, res, next),

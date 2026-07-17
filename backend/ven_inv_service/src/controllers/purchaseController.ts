@@ -212,6 +212,44 @@ export class PurchaseController {
     }
   }
 
+  // Internal endpoint called by Billing service's Balance Sheet — outstanding vendor
+  // purchases (total_amount - paid), per currency, for purchases not yet fully paid.
+  // Mirrors getPurchaseCostReport's shape/pattern above.
+  async getPayableSummary(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { branchIds } = req.query as Record<string, string>;
+
+      let branchClause = '';
+      if (branchIds) {
+        const ids = branchIds.split(',').filter((b) => /^[0-9a-f-]{36}$/i.test(b));
+        if (ids.length === 1) branchClause = `AND p.branch_id = '${ids[0]}'`;
+        else if (ids.length > 1)
+          branchClause = `AND p.branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
+      }
+
+      const rows = await Source.query<{ currency_code: string | null; outstanding: string }[]>(`
+        SELECT COALESCE(p.currency_code, 'AED') AS currency_code,
+               COALESCE(SUM(p.total_amount - COALESCE(pay.paid, 0)), 0) AS outstanding
+        FROM purchases p
+        LEFT JOIN (
+          SELECT purchase_id, SUM(amount) AS paid FROM purchase_payments GROUP BY purchase_id
+        ) pay ON pay.purchase_id = p.id
+        WHERE (p.total_amount - COALESCE(pay.paid, 0)) > 0
+          ${branchClause}
+        GROUP BY p.currency_code
+      `);
+
+      const currencyGroups = rows.map((r) => ({
+        currencyCode: r.currency_code ?? 'AED',
+        outstanding: Number(r.outstanding),
+      }));
+
+      return res.json({ success: true, currencyGroups });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   // Internal: billing_service calls this when Finance approves a Manager purchase payment request.
   // Records the PurchasePayment without firing the billing notification callback (avoids circular call).
   async recordPaymentInternal(req: Request, res: Response, next: NextFunction) {

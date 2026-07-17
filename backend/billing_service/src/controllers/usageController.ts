@@ -29,6 +29,14 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       reportedBy,
       remarks,
       items,
+
+      // Optional payment collected for this period at the same time the bill is generated.
+      paymentMode,
+      paymentReferenceNumber,
+      paymentDate,
+      chequeNumber,
+      chequeBankName,
+      chequeDueDate,
     } = payload;
 
     const file = req.file as MulterS3File | undefined;
@@ -36,6 +44,10 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
 
     if (!contractId || !billingPeriodStart || !billingPeriodEnd) {
       throw new AppError('Missing required fields', 400);
+    }
+
+    if (paymentMode && (paymentMode ?? '').toUpperCase() === 'CHEQUE' && !chequeNumber) {
+      throw new AppError('chequeNumber is required when paymentMode is CHEQUE', 400);
     }
 
     // Safety: Ensure counts are numbers (default 0 handled in service/repo if undefined, but explicit is better)
@@ -54,6 +66,13 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       reportedBy: reportedBy || 'EMPLOYEE', // Default if missing
       remarks,
       items: items ? (typeof items === 'string' ? JSON.parse(items) : items) : undefined,
+      paymentMode: paymentMode || undefined,
+      paymentReferenceNumber: paymentReferenceNumber || undefined,
+      paymentDate: paymentDate || undefined,
+      chequeNumber: chequeNumber || undefined,
+      chequeBankName: chequeBankName || undefined,
+      chequeDueDate: chequeDueDate || undefined,
+      recordedBy: req.user?.userId,
     });
 
     return res.status(201).json({
