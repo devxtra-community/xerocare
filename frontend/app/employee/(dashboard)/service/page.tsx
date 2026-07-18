@@ -1971,36 +1971,44 @@ export default function ServiceDashboardPage() {
               No service tickets found matching your selection.
             </div>
           ) : (
-            <div className="overflow-hidden">
-              <Table className="w-full table-fixed">
+            <div className="overflow-x-auto">
+              <Table className="w-full table-fixed min-w-[950px]">
                 <TableHeader className="bg-slate-50/50">
                   <TableRow>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[11%]">
+                    <TableHead
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[9%]' : 'w-[10%]'}`}
+                    >
                       Ticket No
                     </TableHead>
                     <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[20%]' : 'w-[28%]'}`}
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[18%]' : 'w-[24%]'}`}
                     >
                       Brand / Model
                     </TableHead>
                     {user?.role === 'ADMIN' && (
-                      <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[10%]">
+                      <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[9%]">
                         Branch
                       </TableHead>
                     )}
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[11%]">
+                    <TableHead
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[10%]' : 'w-[11%]'}`}
+                    >
                       Context
                     </TableHead>
                     <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[8%]">
                       Job Type
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[10%]">
+                    <TableHead
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[9%]' : 'w-[10%]'}`}
+                    >
                       Visit Date
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[12%]">
+                    <TableHead
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[11%]' : 'w-[11%]'}`}
+                    >
                       Status
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 text-right w-[18%]">
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 text-right w-[26%]">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -2104,254 +2112,258 @@ export default function ServiceDashboardPage() {
                         className="text-right py-2 px-2 actions-cell"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-end gap-1">
-                          {/* HELP DESK / MANAGER ACTIONS */}
-                          {(isHelpDesk || isManagerOrAdmin) &&
-                            (ticket.status === 'OPEN' ||
-                              ticket.status === 'FREE_SERVICE' ||
-                              // Manager may have estimated before assignment;
-                              // a technician can still be assigned mid-flow.
-                              (!ticket.assignedTechnicianId &&
-                                [
-                                  'DIAGNOSED',
-                                  'WAITING_FINANCE_APPROVAL',
-                                  'FINANCE_APPROVED',
-                                  'FINANCE_REJECTED',
-                                  'QUOTED',
-                                  'CUSTOMER_APPROVED',
-                                  'REVISED',
-                                ].includes(ticket.status))) && (
-                              <Button
-                                size="sm"
-                                className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
-                                onClick={() => {
-                                  setSelectedTicket(ticket);
-                                  setShowAssignModal(true);
-                                }}
-                              >
-                                <UserPlus className="size-3.5" />
-                                Assign Tech
-                              </Button>
-                            )}
-
-                          {(isHelpDesk || isManagerOrAdmin) &&
-                            (ticket.status === 'FINANCE_APPROVED' ||
-                              ticket.status === 'QUOTED') && (
-                              <>
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            {/* HELP DESK / MANAGER ACTIONS */}
+                            {(isHelpDesk || isManagerOrAdmin) &&
+                              (ticket.status === 'OPEN' ||
+                                ticket.status === 'FREE_SERVICE' ||
+                                // Manager may have estimated before assignment;
+                                // a technician can still be assigned mid-flow.
+                                (!ticket.assignedTechnicianId &&
+                                  [
+                                    'DIAGNOSED',
+                                    'WAITING_FINANCE_APPROVAL',
+                                    'FINANCE_APPROVED',
+                                    'FINANCE_REJECTED',
+                                    'QUOTED',
+                                    'CUSTOMER_APPROVED',
+                                    'REVISED',
+                                  ].includes(ticket.status))) && (
                                 <Button
                                   size="sm"
-                                  className="bg-green-600 hover:bg-[#14532d] text-white h-7 px-2 rounded-md text-[11px] font-bold"
-                                  onClick={() => handleApproveQuotation(ticket.id)}
+                                  className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    setShowAssignModal(true);
+                                  }}
                                 >
-                                  Approve
+                                  <UserPlus className="size-3.5" />
+                                  Assign Tech
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-7 px-2 rounded-md text-[11px] font-bold"
-                                  onClick={() => handleRejectQuotation(ticket.id)}
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
+                              )}
 
-                          {/* TECHNICIAN / MANAGER ACTIONS — manager may diagnose
+                            {(isHelpDesk || isManagerOrAdmin) &&
+                              (ticket.status === 'FINANCE_APPROVED' ||
+                                ticket.status === 'QUOTED') && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-[#14532d] text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                    onClick={() => handleApproveQuotation(ticket.id)}
+                                  >
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-7 px-2 rounded-md text-[11px] font-bold"
+                                    onClick={() => handleRejectQuotation(ticket.id)}
+                                  >
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+
+                            {/* TECHNICIAN / MANAGER ACTIONS — manager may diagnose
                               before assignment; assigned technician after */}
-                          {((isTechnician && ticket.status === 'ASSIGNED') ||
-                            (isManagerOrAdmin &&
-                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED'))) &&
-                            !ticket.diagnosisStartedAt && (
-                              <Button
-                                size="sm"
-                                className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
-                                onClick={() => handleStartDiagnosis(ticket.id)}
-                              >
-                                <Play className="size-3.5 fill-current" />
-                                Diagnose
-                              </Button>
-                            )}
+                            {((isTechnician && ticket.status === 'ASSIGNED') ||
+                              (isManagerOrAdmin &&
+                                (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED'))) &&
+                              !ticket.diagnosisStartedAt && (
+                                <Button
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                  onClick={() => handleStartDiagnosis(ticket.id)}
+                                >
+                                  <Play className="size-3.5 fill-current" />
+                                  Diagnose
+                                </Button>
+                              )}
 
-                          {(isTechnician || isManagerOrAdmin) &&
-                            (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
-                            ticket.diagnosisStartedAt &&
-                            ticket.diagnosisStartedBy &&
-                            ticket.diagnosisStartedBy !== user?.userId && (
-                              <span
-                                className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md select-none"
-                                title="Diagnosis was started by another user"
-                              >
-                                Opened by{' '}
-                                {ticket.diagnosisStartedBy === ticket.assignedTechnicianId
-                                  ? 'Technician'
-                                  : 'Manager'}
-                              </span>
-                            )}
+                            {(isTechnician || isManagerOrAdmin) &&
+                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
+                              ticket.diagnosisStartedAt &&
+                              ticket.diagnosisStartedBy &&
+                              ticket.diagnosisStartedBy !== user?.userId && (
+                                <span
+                                  className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md select-none"
+                                  title="Diagnosis was started by another user"
+                                >
+                                  Opened by{' '}
+                                  {ticket.diagnosisStartedBy === ticket.assignedTechnicianId
+                                    ? 'Technician'
+                                    : 'Manager'}
+                                </span>
+                              )}
 
-                          {(isTechnician || isManagerOrAdmin) &&
-                            (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
-                            ticket.diagnosisStartedAt && (
-                              <div className="flex items-center gap-1">
-                                <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
+                            {(isTechnician || isManagerOrAdmin) &&
+                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
+                              ticket.diagnosisStartedAt && (
+                                <div className="flex items-center gap-1">
+                                  <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
+                                  <Button
+                                    size="sm"
+                                    className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                    onClick={() => {
+                                      setSelectedTicket(ticket);
+                                      setDiagnosisForm({
+                                        notes: '',
+                                        problemFound: '',
+                                        rootCause: '',
+                                        meterReading: 0,
+                                        labourCost: 0,
+                                        visitChargeAmount: 0,
+                                        visitChargeMethod: 'ADDED_TO_ESTIMATE',
+                                        discountAmount: 0,
+                                        technicianNoteToFinance: '',
+                                        items: [],
+                                      });
+                                      setShowDiagnoseModal(true);
+                                    }}
+                                  >
+                                    Diagnose
+                                  </Button>
+                                </div>
+                              )}
+
+                            {/* ESTIMATE WORKFLOW FOR ALL PARTIES */}
+                            {!isHelpDesk &&
+                              (ticket.status === 'DIAGNOSED' ||
+                                ticket.status === 'WAITING_FINANCE_APPROVAL' ||
+                                ticket.status === 'FINANCE_APPROVED' ||
+                                ticket.status === 'FINANCE_REJECTED' ||
+                                ticket.status === 'CUSTOMER_APPROVED' ||
+                                ticket.status === 'CUSTOMER_REJECTED') && (
+                                <Button
+                                  size="sm"
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                  onClick={() => handleOpenEstimates(ticket)}
+                                >
+                                  Estimates
+                                </Button>
+                              )}
+
+                            {(isTechnician || isManagerOrAdmin) &&
+                              (ticket.status === 'FINANCE_REJECTED' ||
+                                ticket.status === 'REVISED') && (
                                 <Button
                                   size="sm"
                                   className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
                                   onClick={() => {
                                     setSelectedTicket(ticket);
+                                    const laborItem = ticket.items?.find(
+                                      (it) => it.partName === 'Labor Cost / Service Charge',
+                                    );
+                                    const otherItems =
+                                      ticket.items?.filter(
+                                        (it) => it.partName !== 'Labor Cost / Service Charge',
+                                      ) || [];
                                     setDiagnosisForm({
-                                      notes: '',
-                                      problemFound: '',
-                                      rootCause: '',
-                                      meterReading: 0,
-                                      labourCost: 0,
-                                      visitChargeAmount: 0,
-                                      visitChargeMethod: 'ADDED_TO_ESTIMATE',
-                                      discountAmount: 0,
-                                      technicianNoteToFinance: '',
-                                      items: [],
+                                      notes: ticket.diagnosisNotes || '',
+                                      problemFound: ticket.problemFound || '',
+                                      rootCause: ticket.rootCause || '',
+                                      meterReading: ticket.meterReadingAtService || 0,
+                                      labourCost: laborItem ? Number(laborItem.unitPrice) : 0,
+                                      visitChargeAmount: ticket.visitChargeAmount || 0,
+                                      visitChargeMethod:
+                                        (ticket.visitChargeMethod as
+                                          | 'ADDED_TO_ESTIMATE'
+                                          | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
+                                      discountAmount: ticket.discountAmount || 0,
+                                      technicianNoteToFinance: ticket.technicianNoteToFinance || '',
+                                      items: otherItems.map((it) => ({
+                                        itemSource: it.itemSource,
+                                        sparePartId: it.sparePartId || '',
+                                        customPartName: it.customPartName || '',
+                                        customPartBrand: it.customPartBrand || '',
+                                        customPartDescription: it.customPartDescription || '',
+                                        partName: it.partName || '',
+                                        quantity: it.quantity || 1,
+                                        unitPrice: it.unitPrice || 0,
+                                        isFree: !!it.isFree,
+                                      })),
                                     });
                                     setShowDiagnoseModal(true);
                                   }}
                                 >
-                                  Diagnose
+                                  Revise Estimate
                                 </Button>
-                              </div>
-                            )}
+                              )}
 
-                          {/* ESTIMATE WORKFLOW FOR ALL PARTIES */}
-                          {!isHelpDesk &&
-                            (ticket.status === 'DIAGNOSED' ||
-                              ticket.status === 'WAITING_FINANCE_APPROVAL' ||
-                              ticket.status === 'FINANCE_APPROVED' ||
-                              ticket.status === 'FINANCE_REJECTED' ||
-                              ticket.status === 'CUSTOMER_APPROVED' ||
-                              ticket.status === 'CUSTOMER_REJECTED') && (
-                              <Button
-                                size="sm"
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
-                                onClick={() => handleOpenEstimates(ticket)}
-                              >
-                                Estimates
-                              </Button>
-                            )}
-
-                          {(isTechnician || isManagerOrAdmin) &&
-                            (ticket.status === 'FINANCE_REJECTED' ||
-                              ticket.status === 'REVISED') && (
-                              <Button
-                                size="sm"
-                                className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
-                                onClick={() => {
-                                  setSelectedTicket(ticket);
-                                  const laborItem = ticket.items?.find(
-                                    (it) => it.partName === 'Labor Cost / Service Charge',
-                                  );
-                                  const otherItems =
-                                    ticket.items?.filter(
-                                      (it) => it.partName !== 'Labor Cost / Service Charge',
-                                    ) || [];
-                                  setDiagnosisForm({
-                                    notes: ticket.diagnosisNotes || '',
-                                    problemFound: ticket.problemFound || '',
-                                    rootCause: ticket.rootCause || '',
-                                    meterReading: ticket.meterReadingAtService || 0,
-                                    labourCost: laborItem ? Number(laborItem.unitPrice) : 0,
-                                    visitChargeAmount: ticket.visitChargeAmount || 0,
-                                    visitChargeMethod:
-                                      (ticket.visitChargeMethod as
-                                        | 'ADDED_TO_ESTIMATE'
-                                        | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
-                                    discountAmount: ticket.discountAmount || 0,
-                                    technicianNoteToFinance: ticket.technicianNoteToFinance || '',
-                                    items: otherItems.map((it) => ({
-                                      itemSource: it.itemSource,
-                                      sparePartId: it.sparePartId || '',
-                                      customPartName: it.customPartName || '',
-                                      customPartBrand: it.customPartBrand || '',
-                                      customPartDescription: it.customPartDescription || '',
-                                      partName: it.partName || '',
-                                      quantity: it.quantity || 1,
-                                      unitPrice: it.unitPrice || 0,
-                                      isFree: !!it.isFree,
-                                    })),
-                                  });
-                                  setShowDiagnoseModal(true);
-                                }}
-                              >
-                                Revise Estimate
-                              </Button>
-                            )}
-
-                          {((isTechnician && ticket.assignedTechnicianId === user?.userId) ||
-                            isManagerOrAdmin) &&
-                            (ticket.status === 'CUSTOMER_APPROVED' ||
-                              ticket.status === 'FREE_SERVICE') &&
-                            !ticket.repairStartedAt && (
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
-                                onClick={() => handleStartRepair(ticket.id)}
-                              >
-                                <Play className="size-3.5 fill-current" />
-                                Repair
-                              </Button>
-                            )}
-
-                          {(isTechnician || isManagerOrAdmin) &&
-                            ticket.status === 'IN_PROGRESS' &&
-                            ticket.repairStartedAt && (
-                              <div className="flex items-center gap-1">
-                                <ActiveTimer startTime={ticket.repairStartedAt.toString()} />
+                            {((isTechnician && ticket.assignedTechnicianId === user?.userId) ||
+                              isManagerOrAdmin) &&
+                              (ticket.status === 'CUSTOMER_APPROVED' ||
+                                ticket.status === 'FREE_SERVICE') &&
+                              !ticket.repairStartedAt && (
                                 <Button
                                   size="sm"
-                                  className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
-                                  onClick={() => {
-                                    setSelectedTicket(ticket);
-                                    setCompleteForm({
-                                      workPerformed: '',
-                                      resolutionDetails: '',
-                                      meterReading: 0,
-                                      customerRemarks: '',
-                                      technicianRemarks: '',
-                                      customerSignature: 'Customer Signed',
-                                      technicianSignature: 'Technician Signed',
-                                    });
-                                    setCompletionNotes('');
-                                    setShowCompleteModal(true);
-                                  }}
+                                  className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                  onClick={() => handleStartRepair(ticket.id)}
                                 >
-                                  Complete
+                                  <Play className="size-3.5 fill-current" />
+                                  Repair
                                 </Button>
-                              </div>
-                            )}
+                              )}
 
-                          {/* MANAGER/ADMIN ACTIONS */}
-                          {isManagerOrAdmin &&
-                            ticket.status !== 'COMPLETED' &&
-                            ticket.status !== 'CANCELLED' && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="h-7 px-2 rounded-md text-[11px] font-bold"
-                                onClick={() =>
-                                  handleCancelTicketClick(ticket.id, ticket.ticketNumber)
-                                }
-                              >
-                                Cancel
-                              </Button>
-                            )}
+                            {(isTechnician || isManagerOrAdmin) &&
+                              ticket.status === 'IN_PROGRESS' &&
+                              ticket.repairStartedAt && (
+                                <div className="flex items-center gap-1">
+                                  <ActiveTimer startTime={ticket.repairStartedAt.toString()} />
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                    onClick={() => {
+                                      setSelectedTicket(ticket);
+                                      setCompleteForm({
+                                        workPerformed: '',
+                                        resolutionDetails: '',
+                                        meterReading: 0,
+                                        customerRemarks: '',
+                                        technicianRemarks: '',
+                                        customerSignature: 'Customer Signed',
+                                        technicianSignature: 'Technician Signed',
+                                      });
+                                      setCompletionNotes('');
+                                      setShowCompleteModal(true);
+                                    }}
+                                  >
+                                    Complete
+                                  </Button>
+                                </div>
+                              )}
+                          </div>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-blue-600 text-blue-600 hover:bg-blue-50 h-7 px-2 rounded-md text-[11px] font-bold"
-                            onClick={() => {
-                              setSelectedTicket(ticket);
-                              setShowDetailsModal(true);
-                            }}
-                          >
-                            Details
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* MANAGER/ADMIN ACTIONS */}
+                            {isManagerOrAdmin &&
+                              ticket.status !== 'COMPLETED' &&
+                              ticket.status !== 'CANCELLED' && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="h-7 px-2 rounded-md text-[11px] font-bold"
+                                  onClick={() =>
+                                    handleCancelTicketClick(ticket.id, ticket.ticketNumber)
+                                  }
+                                >
+                                  Cancel
+                                </Button>
+                              )}
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-blue-600 text-blue-600 hover:bg-blue-50 h-7 px-2 rounded-md text-[11px] font-bold"
+                              onClick={() => {
+                                setSelectedTicket(ticket);
+                                setShowDetailsModal(true);
+                              }}
+                            >
+                              Details
+                            </Button>
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -5450,6 +5462,75 @@ export default function ServiceDashboardPage() {
               </Button>
             </CardHeader>
             <CardContent className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto">
+              {/* Full-width Ticket Details Section */}
+              <div className="lg:col-span-2 bg-slate-50 rounded-xl border border-slate-100 p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="text-primary size-4" /> Service Ticket Context & Details
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="md:col-span-3">
+                    <span className="text-slate-500 font-medium block">Complaint Registered:</span>
+                    <p className="text-slate-800 mt-1 bg-white p-2.5 rounded-lg border border-slate-200/60 leading-relaxed font-medium">
+                      {selectedTicket.issueDescription || 'No complaint details provided.'}
+                    </p>
+                  </div>
+
+                  {selectedTicket.problemFound && (
+                    <div>
+                      <span className="text-slate-500 font-medium block">Problem Found:</span>
+                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1">
+                        {selectedTicket.problemFound}
+                      </span>
+                    </div>
+                  )}
+
+                  {selectedTicket.rootCause && (
+                    <div>
+                      <span className="text-slate-500 font-medium block">Root Cause:</span>
+                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1">
+                        {selectedTicket.rootCause}
+                      </span>
+                    </div>
+                  )}
+
+                  {selectedTicket.meterReadingAtService !== undefined && (
+                    <div>
+                      <span className="text-slate-500 font-medium block">
+                        Meter Reading (at Service):
+                      </span>
+                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
+                        {selectedTicket.meterReadingAtService}
+                      </span>
+                    </div>
+                  )}
+
+                  {(selectedTicket.diagnosisNotes || selectedTicket.technicianNoteToFinance) && (
+                    <div className="md:col-span-3 space-y-3">
+                      {selectedTicket.diagnosisNotes && (
+                        <div>
+                          <span className="text-slate-500 font-medium block">
+                            Technician Diagnosis Notes:
+                          </span>
+                          <p className="text-slate-700 mt-1 bg-white p-2.5 rounded-lg border border-slate-200/60 whitespace-pre-wrap">
+                            {selectedTicket.diagnosisNotes}
+                          </p>
+                        </div>
+                      )}
+                      {selectedTicket.technicianNoteToFinance && (
+                        <div>
+                          <span className="text-amber-800 font-bold block flex items-center gap-1">
+                            📝 Note to Finance:
+                          </span>
+                          <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded-lg border border-amber-200 font-medium whitespace-pre-wrap font-sans">
+                            {selectedTicket.technicianNoteToFinance}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Left Column: Existing Estimates & Revisions */}
               <div className="space-y-4">
                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">

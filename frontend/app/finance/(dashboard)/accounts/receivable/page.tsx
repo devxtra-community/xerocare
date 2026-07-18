@@ -30,6 +30,8 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { getInvoiceById, Invoice } from '@/lib/invoice';
 import {
   Select,
   SelectContent,
@@ -380,6 +382,7 @@ export default function AccountsReceivablePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [payingFor, setPayingFor] = useState<ManualReceivable | null>(null);
   const [chartsOpen, setChartsOpen] = useState(true);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
   const {
     data: manualRcv = [],
@@ -721,7 +724,23 @@ export default function AccountsReceivablePage() {
                     {r.customerName}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-blue-600 font-bold">
-                    {r.referenceNo}
+                    {r.isInvoice ? (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const inv = await getInvoiceById(r.id);
+                            setViewingInvoice(inv);
+                          } catch {
+                            toast.error('Failed to load invoice details');
+                          }
+                        }}
+                        className="hover:underline text-left font-bold"
+                      >
+                        {r.referenceNo}
+                      </button>
+                    ) : (
+                      r.referenceNo
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
@@ -786,6 +805,13 @@ export default function AccountsReceivablePage() {
           receivable={payingFor}
           accounts={accounts}
           onClose={() => setPayingFor(null)}
+        />
+      )}
+      {viewingInvoice && (
+        <InvoiceDetailsDialog
+          invoice={viewingInvoice}
+          mode="FINANCE"
+          onClose={() => setViewingInvoice(null)}
         />
       )}
     </div>

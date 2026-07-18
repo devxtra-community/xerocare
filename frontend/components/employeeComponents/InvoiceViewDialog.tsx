@@ -10,6 +10,8 @@ import {
   AlertCircle,
   RotateCcw,
   MoveHorizontal,
+  ClipboardList,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -21,6 +23,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
 
 interface InternalConsumable {
   name?: string;
@@ -98,6 +101,27 @@ export function InvoiceViewDialog({
   // Controls whether the return invoice view or original invoice is shown
   const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
   const [showReturnSidebar, setShowReturnSidebar] = useState(false);
+
+  const [ticketDetails, setTicketDetails] = useState<ServiceTicket | null>(null);
+  const [loadingTicket, setLoadingTicket] = useState(false);
+
+  useEffect(() => {
+    if (invoice.serviceTicketId) {
+      setLoadingTicket(true);
+      getServiceTicketById(invoice.serviceTicketId)
+        .then((ticket) => {
+          setTicketDetails(ticket);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch service ticket in view dialog:', err);
+        })
+        .finally(() => {
+          setLoadingTicket(false);
+        });
+    } else {
+      setTicketDetails(null);
+    }
+  }, [invoice.serviceTicketId]);
 
   // Detect if this invoice has a completed return / replacement
   const returnCreditNote = invoice.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
@@ -1555,6 +1579,105 @@ export function InvoiceViewDialog({
                     })}
                 </div>
               )}
+
+            {/* Service Ticket Details Sidebar */}
+            {invoice.serviceTicketId && (
+              <div className="w-full md:w-[350px] shrink-0 border-t md:border-t-0 md:border-l border-slate-100 bg-slate-50/50 p-6 overflow-y-auto max-h-[45vh] md:max-h-full space-y-6">
+                <div className="flex items-center gap-2 text-slate-700 border-b border-slate-200 pb-3">
+                  <ClipboardList className="h-5 w-5 text-violet-600" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">
+                    Service Ticket Context
+                  </h3>
+                </div>
+
+                {loadingTicket ? (
+                  <div className="flex items-center space-x-2 text-xs text-muted-foreground py-4">
+                    <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+                    <span>Loading ticket details...</span>
+                  </div>
+                ) : ticketDetails ? (
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-150 bg-white p-4 shadow-sm space-y-4">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          Ticket Number
+                        </span>
+                        <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 font-mono text-[10px] px-2 py-0.5 rounded border-none">
+                          {ticketDetails.ticketNumber}
+                        </Badge>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          Complaint Registered
+                        </span>
+                        <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 font-medium">
+                          {ticketDetails.issueDescription || 'No complaint details provided.'}
+                        </p>
+                      </div>
+
+                      {ticketDetails.problemFound && (
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                            Problem Found
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 block">
+                            {ticketDetails.problemFound}
+                          </span>
+                        </div>
+                      )}
+
+                      {ticketDetails.rootCause && (
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                            Root Cause
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 block">
+                            {ticketDetails.rootCause}
+                          </span>
+                        </div>
+                      )}
+
+                      {ticketDetails.meterReadingAtService !== undefined &&
+                        ticketDetails.meterReadingAtService !== null && (
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              Meter Reading (at Service)
+                            </span>
+                            <span className="text-xs font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded border border-slate-100 block font-mono">
+                              {ticketDetails.meterReadingAtService}
+                            </span>
+                          </div>
+                        )}
+
+                      {ticketDetails.diagnosisNotes && (
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                            Technician Diagnosis Notes
+                          </span>
+                          <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded border border-slate-100 whitespace-pre-wrap font-medium">
+                            {ticketDetails.diagnosisNotes}
+                          </p>
+                        </div>
+                      )}
+
+                      {ticketDetails.technicianNoteToFinance && (
+                        <div>
+                          <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                            📝 Note to Finance
+                          </span>
+                          <p className="text-xs text-amber-900 leading-relaxed bg-amber-50/50 p-2.5 rounded border border-amber-200/50 whitespace-pre-wrap font-medium">
+                            {ticketDetails.technicianNoteToFinance}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-500 py-4">Failed to load ticket details.</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer Actions */}

@@ -10,6 +10,9 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, SimpleLineChart, HorizontalBarChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
+import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { getInvoiceById, Invoice } from '@/lib/invoice';
+import { toast } from 'sonner';
 
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700',
@@ -29,6 +32,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function ManagerReceivablePage() {
   const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
   const { data: manual = [] } = useQuery({
     queryKey: ['mgr-receivables'],
@@ -204,7 +208,25 @@ export default function ManagerReceivablePage() {
               ) : (
                 filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.referenceNo}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {r.isInvoice ? (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const inv = await getInvoiceById(r.id);
+                              setViewingInvoice(inv);
+                            } catch {
+                              toast.error('Failed to load invoice details');
+                            }
+                          }}
+                          className="hover:underline text-left font-bold text-blue-600"
+                        >
+                          {r.referenceNo}
+                        </button>
+                      ) : (
+                        r.referenceNo
+                      )}
+                    </td>
                     <td className="px-4 py-3">{r.customerName}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {r.type?.replace(/_/g, ' ')}
@@ -237,6 +259,13 @@ export default function ManagerReceivablePage() {
           </table>
         </div>
       </div>
+      {viewingInvoice && (
+        <InvoiceDetailsDialog
+          invoice={viewingInvoice}
+          mode="FINANCE"
+          onClose={() => setViewingInvoice(null)}
+        />
+      )}
     </div>
   );
 }
