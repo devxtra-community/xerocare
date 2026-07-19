@@ -1,7 +1,7 @@
 import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import DashboardHeader from '@/components/DashboardHeader';
-import FinanceSidebar from '@/components/Finance/financeSidebar';
+import RoleAwareSidebar from '@/components/RoleAwareSidebar';
 import ChequeNotificationBell from '@/components/accounts/ChequeNotificationBell';
 import AuthGuard from '@/components/auth-guard';
 
@@ -10,7 +10,7 @@ export default function FinanceLayout({ children }: { children: React.ReactNode 
     <AuthGuard loginUrl="/login">
       <SidebarProvider>
         <div className="flex min-h-screen w-full" suppressHydrationWarning>
-          <FinanceSidebar />
+          <RoleAwareSidebar fallback="finance" />
 
           <SidebarInset
             className="bg-background min-h-screen w-full flex flex-col"

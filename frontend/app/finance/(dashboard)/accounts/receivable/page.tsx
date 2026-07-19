@@ -30,6 +30,8 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { Invoice } from '@/lib/invoice';
 import {
   Select,
   SelectContent,
@@ -381,6 +383,7 @@ export default function AccountsReceivablePage() {
   const [showAdd, setShowAdd] = useState(false);
   const [payingFor, setPayingFor] = useState<ManualReceivable | null>(null);
   const [chartsOpen, setChartsOpen] = useState(true);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
   const {
     data: manualRcv = [],
@@ -800,6 +803,13 @@ export default function AccountsReceivablePage() {
           receivable={payingFor}
           accounts={accounts}
           onClose={() => setPayingFor(null)}
+        />
+      )}
+      {viewingInvoice && (
+        <InvoiceDetailsDialog
+          invoice={viewingInvoice}
+          mode="FINANCE"
+          onClose={() => setViewingInvoice(null)}
         />
       )}
     </div>

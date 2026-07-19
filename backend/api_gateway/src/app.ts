@@ -308,7 +308,7 @@ app.get(
 app.post(
   '/i/service/tickets/:id/send-quotation',
   authMiddleware,
-  requireServiceRole(['FINANCE', 'SERVICE_HELP_DESK']),
+  requireServiceRole(['FINANCE', 'SERVICE_HELP_DESK', 'SERVICE_TECHNICIAN']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(

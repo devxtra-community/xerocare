@@ -57,6 +57,8 @@ export interface ServiceTicket {
   created_at: string;
   updated_at: string;
   diagnosisStartedAt?: string;
+  /** User who claimed the ticket (assigned technician or branch manager). */
+  diagnosisStartedBy?: string | null;
   repairStartedAt?: string;
   items: ServiceTicketItem[];
   visitChargeAmount?: number;

@@ -13,7 +13,6 @@ import {
   FileQuestion,
   RotateCcw,
   Bell,
-  ArrowLeft,
   Award,
   Receipt,
 } from 'lucide-react';
@@ -207,19 +206,6 @@ export default function EmployeeSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
-              {isManager && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    className="py-2.5 rounded-md hover:bg-card/10 text-sidebar-accent-foreground"
-                  >
-                    <a href="/manager/dashboard" className="flex items-center gap-3 px-3">
-                      <ArrowLeft className="h-4 w-4" />
-                      <span className="font-medium">Back to Manager</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               {allowedMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton

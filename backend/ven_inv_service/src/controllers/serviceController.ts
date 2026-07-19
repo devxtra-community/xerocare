@@ -596,16 +596,46 @@ export class ServiceController {
       const { assignedTechnicianId, scheduledVisitDate } = req.body;
       if (!assignedTechnicianId) throw new Error('Technician ID is required');
 
+      const callerRole = req.user?.role;
+      const callerJob = req.user?.employeeJob;
+      const mayAssign =
+        callerRole === 'MANAGER' || callerRole === 'ADMIN' || callerJob === 'SERVICE_HELP_DESK';
+      if (!mayAssign) {
+        throw new AppError(
+          'Only the branch manager, admin, or service help desk can assign technicians',
+          403,
+        );
+      }
+
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Reassignment releases the previous technician's claim (a manager's claim survives).
+      if (
+        ticket.diagnosisStartedBy &&
+        ticket.diagnosisStartedBy === ticket.assignedTechnicianId &&
+        ticket.assignedTechnicianId !== assignedTechnicianId
+      ) {
+        ticket.diagnosisStartedBy = null;
+        ticket.diagnosisStartedAt = null;
+      }
+
       ticket.assignedTechnicianId = assignedTechnicianId;
       if (scheduledVisitDate) {
         ticket.scheduledVisitDate = new Date(scheduledVisitDate);
       }
-      ticket.status = ServiceTicketStatus.ASSIGNED;
+      // The manager may diagnose/estimate before assignment; assigning a
+      // technician afterwards must not regress a ticket already in the
+      // estimate/approval flow back to ASSIGNED.
+      if (
+        ticket.status === ServiceTicketStatus.OPEN ||
+        ticket.status === ServiceTicketStatus.ASSIGNED ||
+        (ticket.status === ServiceTicketStatus.FREE_SERVICE && !ticket.diagnosisCompletedAt)
+      ) {
+        ticket.status = ServiceTicketStatus.ASSIGNED;
+      }
       await ticketRepo.save(ticket);
 
       await this.logActivity(
@@ -640,13 +670,33 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      ticket.diagnosisStartedAt = new Date();
+      // Only the assigned technician or the branch manager/admin may open a ticket.
+      const userId = req.user?.userId;
+      const role = req.user?.role;
+      const isManager = role === 'MANAGER' || role === 'ADMIN';
+      if (!isManager && ticket.assignedTechnicianId !== userId) {
+        throw new AppError(
+          'Only the assigned technician or the branch manager can open this ticket',
+          403,
+        );
+      }
+      // First opener is recorded for audit; the branch manager and the
+      // assigned technician may both work the ticket (manager can estimate
+      // before assignment, technician can estimate after being assigned).
+      if (!ticket.diagnosisStartedAt) {
+        ticket.diagnosisStartedAt = new Date();
+      }
+      if (!ticket.diagnosisStartedBy) {
+        ticket.diagnosisStartedBy = userId || null;
+      }
       await ticketRepo.save(ticket);
 
       await this.logActivity(
         ticket.id,
         'DIAGNOSIS_STARTED',
-        `Technician started diagnosis.`,
+        isManager && ticket.assignedTechnicianId !== userId
+          ? 'Branch manager opened the ticket and started diagnosis.'
+          : 'Technician started diagnosis.',
         req.user?.userId,
       );
 
@@ -678,7 +728,24 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Same rules as start-diagnosis: assigned technician or manager.
+      const diagUserId = req.user?.userId;
+      const diagRole = req.user?.role;
+      const diagIsManager = diagRole === 'MANAGER' || diagRole === 'ADMIN';
+      if (!diagIsManager && ticket.assignedTechnicianId !== diagUserId) {
+        throw new AppError(
+          'Only the assigned technician or the branch manager can diagnose this ticket',
+          403,
+        );
+      }
+      if (!ticket.diagnosisStartedBy) {
+        ticket.diagnosisStartedBy = diagUserId || null;
+      }
+
+      // OPEN is allowed so the branch manager can diagnose and estimate
+      // before a technician is assigned.
       const allowedDiagnoseStatuses: ServiceTicketStatus[] = [
+        ServiceTicketStatus.OPEN,
         ServiceTicketStatus.ASSIGNED,
         ServiceTicketStatus.DIAGNOSED,
         ServiceTicketStatus.FREE_SERVICE,
@@ -3180,12 +3247,15 @@ export class ServiceController {
       startMeterColor: null,
     };
 
+    // Every contract type is invoiced in full at signing (AMC's fixed annual fee; SMA/FSMA's
+    // agreed contract value, separate from their recurring metered usage charges) — so a
+    // contract value is always required, regardless of type.
+    if (!fields.contractValue || fields.contractValue <= 0) {
+      throw new AppError('Contract value must be greater than 0.', 400);
+    }
+
     if (contractType === ServiceContractType.AMC) {
-      const monthlyCharge = numOrNull(body.monthlyCharge);
-      if (monthlyCharge === null || monthlyCharge <= 0) {
-        throw new AppError('AMC contracts require a monthly charge greater than 0.', 400);
-      }
-      fields.monthlyCharge = monthlyCharge;
+      // AMC has no type-specific fields beyond contractValue (checked above).
     } else if (contractType === ServiceContractType.SMA) {
       const copyLimit = numOrNull(body.copyLimit);
       const startMeterReading = numOrNull(body.startMeterReading);
@@ -3299,6 +3369,55 @@ export class ServiceController {
         status: status || 'ACTIVE',
       });
       await contractRepo.save(contract);
+
+      // Every contract (AMC, SMA, FSMA) is invoiced in full for its contractValue at signing,
+      // so Finance can track paid/pending from day one. If an amount was collected at
+      // signing, record it against this same invoice immediately.
+      if (contract.contractValue > 0) {
+        const branchId = req.user?.branchId || req.body.branchId;
+        if (branchId) {
+          try {
+            const token = sign(
+              { userId: 'ven_inv_service', role: 'ADMIN' },
+              ACCESS_SECRET as string,
+              { expiresIn: '1m' },
+            );
+            const initialPayment = req.body.initialPayment;
+            const response = await axios.post(
+              `${BILLING_SERVICE_URL}/invoices/service-contract`,
+              {
+                customerId,
+                branchId,
+                createdBy: req.user?.userId || 'SYSTEM',
+                serviceContractId: contract.id,
+                billType: fields.contractType,
+                description: `${fields.contractType} Service Contract (${start.toLocaleDateString()} – ${end.toLocaleDateString()})`,
+                amount: contract.contractValue,
+                initialPayment:
+                  initialPayment && Number(initialPayment.amount) > 0
+                    ? {
+                        amount: Number(initialPayment.amount),
+                        paymentMode: initialPayment.paymentMode,
+                        paymentDate: initialPayment.paymentDate,
+                        referenceNumber: initialPayment.referenceNumber,
+                        remarks: initialPayment.remarks,
+                      }
+                    : undefined,
+              },
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+            if (response.data?.success) {
+              contract.invoiceId = response.data.data.id;
+              await contractRepo.save(contract);
+            }
+          } catch (billingErr) {
+            logger.error('Failed to create contract invoice in billing service:', billingErr);
+          }
+        } else {
+          logger.error('Cannot create contract invoice: no branchId available.');
+        }
+      }
+
       res.status(201).json({ success: true, data: contract });
     } catch (error) {
       next(error);
@@ -3472,6 +3591,14 @@ export class ServiceController {
         };
       });
 
+      // Only work that finance has approved and the technician has actually finished
+      // should count toward the contract's service history / total cost — a ticket
+      // still awaiting finance approval (or otherwise in progress) isn't a completed
+      // service yet.
+      const completedTicketSummaries = ticketSummaries.filter(
+        (t) => t.status === ServiceTicketStatus.COMPLETED,
+      );
+
       const data = {
         ...contract,
         machine: product
@@ -3486,11 +3613,10 @@ export class ServiceController {
         readings,
         totalBilled,
         serviceHistory: {
-          ticketCount: ticketSummaries.length,
-          completedCount: ticketSummaries.filter((t) => t.status === ServiceTicketStatus.COMPLETED)
-            .length,
-          totalServiceCost: ticketSummaries.reduce((sum, t) => sum + t.totalCost, 0),
-          tickets: ticketSummaries,
+          ticketCount: completedTicketSummaries.length,
+          completedCount: completedTicketSummaries.length,
+          totalServiceCost: completedTicketSummaries.reduce((sum, t) => sum + t.totalCost, 0),
+          tickets: completedTicketSummaries,
         },
       };
 
@@ -3553,6 +3679,12 @@ export class ServiceController {
       const contractRepo = Source.getRepository(ServiceContract);
       const contract = await contractRepo.findOne({ where: { id: id as string } });
       if (!contract) throw new Error('Service Contract not found');
+      if (contract.invoiceId) {
+        throw new AppError(
+          'This contract has already been invoiced and cannot be deleted. Edit it instead.',
+          400,
+        );
+      }
       await contractRepo.remove(contract);
       res.status(200).json({ success: true, message: 'Service Contract deleted successfully' });
     } catch (error) {

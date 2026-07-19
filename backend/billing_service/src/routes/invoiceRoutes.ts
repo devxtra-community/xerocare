@@ -56,6 +56,7 @@ import {
   deleteInvoice,
   getInvoiceAuditLogs,
   createServiceQuotation,
+  createServiceContractInvoice,
   getContractBySerial,
   getCustomerBillingHistory,
   reviseEstimate,
@@ -533,6 +534,12 @@ router.delete(
 router.get('/audit-logs/:id', authMiddleware, getInvoiceAuditLogs);
 
 router.post('/service-quotation', createServiceQuotation);
+router.post(
+  '/service-contract',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
+  createServiceContractInvoice,
+);
 router.get('/contract/serial/:serialNumber', getContractBySerial);
 router.get('/customer/:customerId/history', getCustomerBillingHistory);
 router.get('/machine/:productId/billing-context', getMachineBillingContext);

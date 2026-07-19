@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { In, Not } from 'typeorm';
 import { BillingService } from '../services/billingService';
 import { BillingReportService } from '../services/billingReportService';
 import { NotificationService } from '../services/notificationService';
@@ -1383,41 +1384,60 @@ export const getInvoiceAuditLogs = async (req: Request, res: Response, next: Nex
     const id = req.params.id as string;
     const invoice = await billingService.getInvoiceById(id);
 
-    const userRole = req.headers['x-user-role'] as string;
-    const userBranchId = req.headers['x-user-branch-id'] as string;
-
-    if (userRole !== 'ADMIN' && invoice.branchId !== userBranchId) {
+    // Branch isolation, same rule as getInvoiceById: identity comes from the
+    // verified JWT (req.user), never from spoofable client headers.
+    if (req.user?.role !== 'ADMIN' && invoice.branchId !== req.user?.branchId) {
       throw new AppError('Access denied: Invoice belongs to another branch', 403);
     }
 
-    const logs = [];
+    // Shape matches the client's AuditLog interface: {id, entityId, action,
+    // performedBy, details, createdAt}. createdAt always carries a valid date —
+    // approval columns can be null even when the approver id is set.
+    const logs: Array<{
+      id: string;
+      entityId: string;
+      action: string;
+      performedBy: string;
+      details: string;
+      createdAt: Date;
+    }> = [];
+    const addLog = (
+      action: string,
+      performedBy: string | null | undefined,
+      timestamp: Date | null | undefined,
+      details: string,
+    ) => {
+      logs.push({
+        id: `${invoice.id}-${action}`,
+        entityId: invoice.id,
+        action,
+        performedBy: performedBy || 'Unknown',
+        details,
+        createdAt: timestamp || invoice.updatedAt || invoice.createdAt,
+      });
+    };
 
     // 1. Creation log
-    logs.push({
-      action: 'CREATED',
-      userId: invoice.createdBy,
-      timestamp: invoice.createdAt,
-      remarks: 'Invoice/Contract created.',
-    });
+    addLog('CREATED', invoice.createdBy, invoice.createdAt, 'Invoice/Contract created.');
 
     // 2. Employee approval log
     if (invoice.employeeApprovedBy || invoice.employeeApprovedAt) {
-      logs.push({
-        action: 'EMPLOYEE_APPROVED',
-        userId: invoice.employeeApprovedBy,
-        timestamp: invoice.employeeApprovedAt,
-        remarks: 'Contract approved by employee.',
-      });
+      addLog(
+        'EMPLOYEE_APPROVED',
+        invoice.employeeApprovedBy,
+        invoice.employeeApprovedAt,
+        'Contract approved by employee.',
+      );
     }
 
     // 3. Finance approval log
     if (invoice.financeApprovedBy || invoice.financeApprovedAt) {
-      logs.push({
-        action: 'FINANCE_APPROVED',
-        userId: invoice.financeApprovedBy,
-        timestamp: invoice.financeApprovedAt,
-        remarks: invoice.financeRemarks || 'Quotation/Contract approved by finance.',
-      });
+      addLog(
+        'FINANCE_APPROVED',
+        invoice.financeApprovedBy,
+        invoice.financeApprovedAt,
+        invoice.financeRemarks || 'Quotation/Contract approved by finance.',
+      );
     }
 
     // 4. Finance rejection log (fallback if rejected status is present)
@@ -1426,17 +1446,62 @@ export const getInvoiceAuditLogs = async (req: Request, res: Response, next: Nex
         (invoice.status as string) === 'REJECTED') &&
       invoice.financeRemarks
     ) {
-      logs.push({
-        action: 'FINANCE_REJECTED',
-        userId: 'Finance Team',
-        timestamp: invoice.updatedAt,
-        remarks: invoice.financeRemarks,
-      });
+      addLog('FINANCE_REJECTED', 'Finance Team', invoice.updatedAt, invoice.financeRemarks);
     }
 
     return res.status(200).json({
       success: true,
       data: logs,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createServiceContractInvoice = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      customerId,
+      branchId,
+      createdBy,
+      serviceContractId,
+      billType,
+      description,
+      amount,
+      initialPayment,
+    } = req.body;
+    if (!customerId || !branchId || !serviceContractId || !billType) {
+      throw new AppError('customerId, branchId, serviceContractId and billType are required.', 400);
+    }
+    if (!amount || Number(amount) <= 0) {
+      throw new AppError('amount must be greater than 0.', 400);
+    }
+    const invoice = await billingService.createContractInvoice({
+      customerId,
+      branchId,
+      createdBy: createdBy || 'SYSTEM',
+      serviceContractId,
+      billType,
+      description: description || `${billType} Service Contract`,
+      amount: Number(amount),
+      initialPayment:
+        initialPayment && Number(initialPayment.amount) > 0
+          ? {
+              amount: Number(initialPayment.amount),
+              paymentMode: initialPayment.paymentMode,
+              paymentDate: initialPayment.paymentDate,
+              referenceNumber: initialPayment.referenceNumber,
+              remarks: initialPayment.remarks,
+            }
+          : undefined,
+    });
+    return res.status(201).json({
+      success: true,
+      data: invoice,
     });
   } catch (error) {
     next(error);
@@ -1516,16 +1581,34 @@ export const getCustomerBillingHistory = async (
 ) => {
   try {
     const customerId = req.params.customerId as string;
+    // Only converted documents count as billing history. QUOTATION rows also
+    // carry productAllocations (serials are reserved at quotation time), so
+    // including them would show machines the customer never actually received.
     const invoices = await Source.getRepository(Invoice).find({
-      where: { customerId },
+      where: {
+        customerId,
+        type: Not(InvoiceType.QUOTATION),
+        status: Not(In([InvoiceStatus.CANCELLED, InvoiceStatus.SUPERSEDED, InvoiceStatus.RETAKEN])),
+      },
       relations: ['items', 'productAllocations'],
       order: { createdAt: 'DESC' },
     });
 
-    // Group by billType
+    // Group by billType. billType is only populated for SERVICE estimates and
+    // opening balances; regular deals carry their type in saleType, so falling
+    // back straight to 'SALE' would file RENT/LEASE contracts as purchases.
     const grouped: Record<string, Invoice[]> = {};
     invoices.forEach((inv) => {
-      const type = inv.billType || 'SALE';
+      // A PROFORMA contract awaiting customer confirmation is not billing
+      // history yet — machines are only reserved, not delivered.
+      if (
+        inv.type === InvoiceType.PROFORMA &&
+        inv.contractStatus === ContractStatus.PENDING_CONFIRMATION
+      ) {
+        return;
+      }
+      let type: string = inv.billType || inv.saleType || 'SALE';
+      if (type === 'PRODUCT_SALE' || type === 'SPAREPART_SALE') type = 'SALE';
       if (!grouped[type]) {
         grouped[type] = [];
       }

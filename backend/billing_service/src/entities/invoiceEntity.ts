@@ -367,6 +367,9 @@ export class Invoice {
   @Column({ type: 'uuid', nullable: true })
   serviceTicketId?: string | null;
 
+  @Column({ type: 'uuid', nullable: true })
+  serviceContractId?: string | null;
+
   @Column({ type: 'integer', nullable: true })
   maxCopyLimit?: number | null;
 

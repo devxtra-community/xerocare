@@ -161,6 +161,7 @@ export interface Invoice {
   preferredChequeBankName?: string;
   discountPercent?: number;
   discountAmount?: number;
+  validityDays?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
   // Warranty
@@ -368,6 +369,7 @@ export interface CreateInvoicePayload {
   advanceAmount?: number;
   discountPercent?: number;
   discountAmount?: number;
+  validityDays?: number;
   effectiveFrom?: string;
   effectiveTo?: string;
 

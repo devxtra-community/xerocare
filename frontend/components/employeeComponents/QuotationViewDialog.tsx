@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, ArrowRightLeft, Send, Mail, Phone, Copy } from 'lucide-react';
+import { Loader2, ArrowRightLeft, Send, Mail, Phone, Copy, ClipboardList } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
@@ -82,12 +83,39 @@ export function QuotationViewDialog({
   const [isRequestingExtension, setIsRequestingExtension] = useState(false);
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
+  const [ticketDetails, setTicketDetails] = useState<ServiceTicket | null>(null);
+  const [loadingTicket, setLoadingTicket] = useState(false);
+  const [ticketExpanded, setTicketExpanded] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    if (quotation.serviceTicketId) {
+      setLoadingTicket(true);
+      getServiceTicketById(quotation.serviceTicketId)
+        .then((ticket) => {
+          setTicketDetails(ticket);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch service ticket in quotation view:', err);
+        })
+        .finally(() => {
+          setLoadingTicket(false);
+        });
+    } else {
+      setTicketDetails(null);
+    }
+  }, [quotation.serviceTicketId]);
 
   const returnCreditNote = quotation.creditNotes?.find((cn) => cn.status === 'PRODUCT_REPLACED');
   const isReturnInvoice = !!returnCreditNote;
 
-  const isExpired = quotation.effectiveTo ? new Date() > new Date(quotation.effectiveTo) : false;
+  // Quotation validity lives in expiryDate; effectiveTo is the contract period end
+  // for RENT/LEASE, so it must not be used to decide quotation expiry there.
+  const isExpired = quotation.expiryDate
+    ? new Date() > new Date(quotation.expiryDate)
+    : quotation.effectiveTo && !['RENT', 'LEASE'].includes(quotation.saleType)
+      ? new Date() > new Date(quotation.effectiveTo)
+      : false;
   const isExtensionRequested =
     quotation.status === 'VALIDITY_EXTENSION_REQUESTED' ||
     quotation.status === 'WAITING_FINANCE_APPROVAL';
@@ -1018,6 +1046,116 @@ export function QuotationViewDialog({
               <span className="text-[10px] bg-red-700 px-2 py-0.5 rounded">READ ONLY</span>
             </div>
           )}
+
+          {/* Service Ticket Details Banner */}
+          {quotation.serviceTicketId && (
+            <div className="bg-slate-50 border-b border-slate-200 shrink-0">
+              <div
+                className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                onClick={() => setTicketExpanded(!ticketExpanded)}
+              >
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="text-primary h-4 w-4" />
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Service Ticket Context & Details
+                  </span>
+                  {!ticketExpanded && (
+                    <span className="text-[10px] text-slate-500 font-medium normal-case">
+                      (
+                      {ticketDetails?.issueDescription
+                        ? `Complaint: ${ticketDetails.issueDescription.substring(0, 60)}...`
+                        : 'Click to view'}
+                      )
+                    </span>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-slate-500">
+                  {ticketExpanded ? 'Hide Details' : 'Show Details'}
+                </Button>
+              </div>
+
+              {ticketExpanded && (
+                <div className="p-4 pt-0 border-t border-slate-100 bg-white grid grid-cols-1 md:grid-cols-2 gap-3 text-xs max-h-[250px] overflow-y-auto">
+                  {loadingTicket ? (
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground py-2 md:col-span-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading ticket details...</span>
+                    </div>
+                  ) : ticketDetails ? (
+                    <>
+                      <div className="md:col-span-2">
+                        <span className="text-slate-500 font-medium block">
+                          Complaint Registered:
+                        </span>
+                        <p className="text-slate-800 mt-1 bg-slate-50 p-2.5 rounded border border-slate-200/60 leading-relaxed font-medium">
+                          {ticketDetails.issueDescription || 'No complaint details provided.'}
+                        </p>
+                      </div>
+
+                      {ticketDetails.problemFound && (
+                        <div>
+                          <span className="text-slate-500 font-medium block">Problem Found:</span>
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                            {ticketDetails.problemFound}
+                          </span>
+                        </div>
+                      )}
+
+                      {ticketDetails.rootCause && (
+                        <div>
+                          <span className="text-slate-500 font-medium block">Root Cause:</span>
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                            {ticketDetails.rootCause}
+                          </span>
+                        </div>
+                      )}
+
+                      {ticketDetails.meterReadingAtService !== undefined &&
+                        ticketDetails.meterReadingAtService !== null && (
+                          <div>
+                            <span className="text-slate-500 font-medium block">
+                              Meter Reading (at Service):
+                            </span>
+                            <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/60 block mt-1 font-mono">
+                              {ticketDetails.meterReadingAtService}
+                            </span>
+                          </div>
+                        )}
+
+                      {(ticketDetails.diagnosisNotes || ticketDetails.technicianNoteToFinance) && (
+                        <div className="md:col-span-2 space-y-2">
+                          {ticketDetails.diagnosisNotes && (
+                            <div>
+                              <span className="text-slate-500 font-medium block">
+                                Technician Diagnosis Notes:
+                              </span>
+                              <p className="text-slate-700 mt-1 bg-slate-50 p-2.5 rounded border border-slate-200/60 whitespace-pre-wrap font-medium">
+                                {ticketDetails.diagnosisNotes}
+                              </p>
+                            </div>
+                          )}
+                          {ticketDetails.technicianNoteToFinance && (
+                            <div>
+                              <span className="text-amber-800 font-bold block flex items-center gap-1">
+                                📝 Note to Finance:
+                              </span>
+                              <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded border border-amber-200/60 font-medium whitespace-pre-wrap">
+                                {ticketDetails.technicianNoteToFinance}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-red-500 py-2 md:col-span-2">
+                      Failed to load ticket details.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div id="quotation-print-content" className="flex-1 overflow-y-auto scrollbar-hide">
             {isProductNormal && (
               <ProductNormalQuotation
@@ -1334,6 +1472,116 @@ export function QuotationViewDialog({
                 ⚠️ Retaken by Manager — Editing is Locked
               </span>
               <span className="text-[10px] bg-red-700 px-2 py-0.5 rounded">READ ONLY</span>
+            </div>
+          )}
+
+          {/* Service Ticket Details Banner */}
+          {quotation.serviceTicketId && (
+            <div className="bg-slate-50 border-b border-slate-200 shrink-0">
+              <div
+                className="flex items-center justify-between p-3 cursor-pointer hover:bg-slate-100/80 transition-colors"
+                onClick={() => setTicketExpanded(!ticketExpanded)}
+              >
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="text-primary h-4 w-4" />
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Service Ticket Context & Details
+                  </span>
+                  {!ticketExpanded && (
+                    <span className="text-[10px] text-slate-500 font-medium normal-case">
+                      (
+                      {ticketDetails?.issueDescription
+                        ? `Complaint: ${ticketDetails.issueDescription.substring(0, 60)}...`
+                        : 'Click to view'}
+                      )
+                    </span>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-slate-500">
+                  {ticketExpanded ? 'Hide Details' : 'Show Details'}
+                </Button>
+              </div>
+
+              {ticketExpanded && (
+                <div className="p-4 pt-0 border-t border-slate-100 bg-white grid grid-cols-1 md:grid-cols-2 gap-3 text-xs max-h-[250px] overflow-y-auto">
+                  {loadingTicket ? (
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground py-2 md:col-span-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Loading ticket details...</span>
+                    </div>
+                  ) : ticketDetails ? (
+                    <>
+                      <div className="md:col-span-2">
+                        <span className="text-slate-500 font-medium block">
+                          Complaint Registered:
+                        </span>
+                        <p className="text-slate-800 mt-1 bg-slate-50 p-2.5 rounded border border-slate-200/60 leading-relaxed font-medium">
+                          {ticketDetails.issueDescription || 'No complaint details provided.'}
+                        </p>
+                      </div>
+
+                      {ticketDetails.problemFound && (
+                        <div>
+                          <span className="text-slate-500 font-medium block">Problem Found:</span>
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                            {ticketDetails.problemFound}
+                          </span>
+                        </div>
+                      )}
+
+                      {ticketDetails.rootCause && (
+                        <div>
+                          <span className="text-slate-500 font-medium block">Root Cause:</span>
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                            {ticketDetails.rootCause}
+                          </span>
+                        </div>
+                      )}
+
+                      {ticketDetails.meterReadingAtService !== undefined &&
+                        ticketDetails.meterReadingAtService !== null && (
+                          <div>
+                            <span className="text-slate-500 font-medium block">
+                              Meter Reading (at Service):
+                            </span>
+                            <span className="font-semibold text-slate-800 bg-slate-50 px-2 py-1.5 rounded border border-slate-200/60 block mt-1 font-mono">
+                              {ticketDetails.meterReadingAtService}
+                            </span>
+                          </div>
+                        )}
+
+                      {(ticketDetails.diagnosisNotes || ticketDetails.technicianNoteToFinance) && (
+                        <div className="md:col-span-2 space-y-2">
+                          {ticketDetails.diagnosisNotes && (
+                            <div>
+                              <span className="text-slate-500 font-medium block">
+                                Technician Diagnosis Notes:
+                              </span>
+                              <p className="text-slate-700 mt-1 bg-slate-50 p-2.5 rounded border border-slate-200/60 whitespace-pre-wrap font-medium">
+                                {ticketDetails.diagnosisNotes}
+                              </p>
+                            </div>
+                          )}
+                          {ticketDetails.technicianNoteToFinance && (
+                            <div>
+                              <span className="text-amber-800 font-bold block flex items-center gap-1">
+                                📝 Note to Finance:
+                              </span>
+                              <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded border border-amber-200/60 font-medium whitespace-pre-wrap">
+                                {ticketDetails.technicianNoteToFinance}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-xs text-red-500 py-2 md:col-span-2">
+                      Failed to load ticket details.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <div

@@ -121,6 +121,11 @@ export class ServiceTicket {
   @Column({ type: 'timestamp', nullable: true })
   diagnosisStartedAt?: Date | null;
 
+  // Who claimed the ticket (assigned technician or branch manager). Once set,
+  // only this user may continue the diagnosis/estimate work.
+  @Column({ type: 'uuid', nullable: true })
+  diagnosisStartedBy?: string | null;
+
   @Column({ type: 'timestamp', nullable: true })
   diagnosisCompletedAt?: Date | null;
 

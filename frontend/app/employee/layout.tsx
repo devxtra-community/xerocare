@@ -1,13 +1,13 @@
 import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import EmployeeSidebar from '@/components/employeeComponents/employeeAppsidebar';
+import RoleAwareSidebar from '@/components/RoleAwareSidebar';
 import DashboardHeader from '@/components/DashboardHeader';
 
 export default function EmployeeLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <EmployeeSidebar />
+        <RoleAwareSidebar fallback="employee" />
 
         <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
           <DashboardHeader />

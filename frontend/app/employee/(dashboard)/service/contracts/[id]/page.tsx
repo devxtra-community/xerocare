@@ -8,6 +8,9 @@ import {
   ContractCoverage,
 } from '@/lib/serviceContract';
 import { getCustomerById, Customer } from '@/lib/customer';
+import { recordPayment, getAccountSummary, PaymentSummary } from '@/lib/payment';
+import { getInvoiceById, Invoice } from '@/lib/invoice';
+import { InvoiceViewDialog } from '@/components/employeeComponents/InvoiceViewDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
@@ -18,6 +21,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { getActiveCurrency } from '@/lib/currency';
@@ -66,6 +78,19 @@ export default function ServiceContractDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [payForm, setPayForm] = useState({
+    amount: '',
+    paymentMode: 'CASH' as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
+    paymentDate: new Date().toISOString().split('T')[0],
+    referenceNumber: '',
+    remarks: '',
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<Invoice | null>(null);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -87,6 +112,15 @@ export default function ServiceContractDetailPage() {
           setCustomer(null);
         }
       }
+      if (data.invoiceId) {
+        try {
+          setPaymentSummary(await getAccountSummary(data.invoiceId));
+        } catch {
+          setPaymentSummary(null);
+        }
+      } else {
+        setPaymentSummary(null);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Failed to load contract details.', {
@@ -100,6 +134,64 @@ export default function ServiceContractDetailPage() {
   useEffect(() => {
     fetchDetail();
   }, [fetchDetail]);
+
+  const openPayDialog = () => {
+    setPayForm({
+      amount: '',
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      referenceNumber: '',
+      remarks: '',
+    });
+    setPayDialogOpen(true);
+  };
+
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contract?.invoiceId) return;
+    const amount = Number(payForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error('Enter a payment amount greater than 0.');
+      return;
+    }
+    setSavingPayment(true);
+    try {
+      await recordPayment({
+        invoiceId: contract.invoiceId,
+        amountPaid: amount,
+        paymentMode: payForm.paymentMode,
+        paymentDate: payForm.paymentDate,
+        referenceNumber: payForm.referenceNumber || undefined,
+        remarks: payForm.remarks || undefined,
+      });
+      setPaymentSummary(await getAccountSummary(contract.invoiceId));
+      toast.success('Payment recorded against the contract invoice.');
+      setPayDialogOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to record payment.', {
+        description: getApiErrorMessage(error),
+        duration: 8000,
+      });
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const openInvoice = async () => {
+    if (!contract?.invoiceId) return;
+    setLoadingInvoice(true);
+    try {
+      const inv = await getInvoiceById(contract.invoiceId);
+      setInvoiceData(inv);
+      setInvoiceDialogOpen(true);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load invoice.', { description: getApiErrorMessage(error) });
+    } finally {
+      setLoadingInvoice(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -128,9 +220,9 @@ export default function ServiceContractDetailPage() {
 
   const billingSummary = (() => {
     if (contract.contractType === 'AMC')
-      return `Fixed agreement — ${currency} ${Number(contract.monthlyCharge ?? 0).toFixed(2)}/mo. Meter readings are tracking-only (never charged).`;
+      return `Annual fee — ${currency} ${Number(contract.contractValue ?? 0).toFixed(2)}, invoiced in full at signing and collected as one or more installments. Meter readings are tracking-only (never charged).`;
     if (contract.contractType === 'SMA')
-      return `${Number(contract.copyLimit ?? 0).toLocaleString()} copy limit from meter ${Number(contract.startMeterReading ?? 0).toLocaleString()} — overage at ${currency} ${Number(contract.overagePerCopyRate ?? 0)}/copy${contract.monthlyCharge ? ` + ${currency} ${Number(contract.monthlyCharge).toFixed(2)}/mo base fee` : ''}.`;
+      return `${Number(contract.copyLimit ?? 0).toLocaleString()} copy limit from meter ${Number(contract.startMeterReading ?? 0).toLocaleString()} — excess at ${currency} ${Number(contract.overagePerCopyRate ?? 0)}/copy${contract.monthlyCharge ? ` + ${currency} ${Number(contract.monthlyCharge).toFixed(2)}/mo base fee` : ''}.`;
     return contract.fsmaBillingMode === 'INDIVIDUAL'
       ? `Per-click billing — B&W ${currency} ${Number(contract.ratePerClickBW ?? 0)} · Colour ${currency} ${Number(contract.ratePerClickColor ?? 0)}.`
       : `Per-click billing — combined rate ${currency} ${Number(contract.ratePerClickCombined ?? 0)}/click.`;
@@ -164,7 +256,9 @@ export default function ServiceContractDetailPage() {
       </div>
 
       {/* Top summary tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div
+        className={`grid grid-cols-2 gap-3 ${contract.contractType === 'AMC' ? 'md:grid-cols-4' : 'md:grid-cols-5'}`}
+      >
         <Card className="shadow-sm border-slate-200/80">
           <CardContent className="p-4">
             <span className="block text-[10px] uppercase font-bold text-slate-400">
@@ -196,17 +290,80 @@ export default function ServiceContractDetailPage() {
             </span>
           </CardContent>
         </Card>
+        {contract.contractType !== 'AMC' && (
+          <Card className="shadow-sm border-slate-200/80">
+            <CardContent className="p-4">
+              <span className="block text-[10px] uppercase font-bold text-slate-400">
+                Meter Billing To Date
+              </span>
+              <span className="text-lg font-bold text-emerald-700">
+                {currency} {Number(contract.totalBilled).toFixed(2)}
+              </span>
+              <span className="block text-[10px] text-slate-400">
+                {contract.readings.length} reading{contract.readings.length === 1 ? '' : 's'}
+              </span>
+            </CardContent>
+          </Card>
+        )}
         <Card className="shadow-sm border-slate-200/80">
           <CardContent className="p-4">
-            <span className="block text-[10px] uppercase font-bold text-slate-400">
-              Meter Billing To Date
-            </span>
-            <span className="text-lg font-bold text-emerald-700">
-              {currency} {Number(contract.totalBilled).toFixed(2)}
-            </span>
-            <span className="block text-[10px] text-slate-400">
-              {contract.readings.length} reading{contract.readings.length === 1 ? '' : 's'}
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="block text-[10px] uppercase font-bold text-slate-400">
+                Invoice Status
+              </span>
+              <div className="flex items-center gap-1">
+                {contract.invoiceId && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={openInvoice}
+                    disabled={loadingInvoice}
+                    title="View / download / send invoice"
+                    className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50/50"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {contract.invoiceId && paymentSummary && paymentSummary.pendingBalance > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={openPayDialog}
+                    title="Record an installment payment"
+                    className="h-6 w-6 text-slate-400 hover:text-green-600 hover:bg-green-50/50"
+                  >
+                    <DollarSign className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            {!contract.invoiceId ? (
+              <span className="text-xs font-bold text-slate-400">No invoice raised</span>
+            ) : !paymentSummary ? (
+              <span className="text-xs text-slate-400">Loading…</span>
+            ) : (
+              <>
+                <span
+                  className={`text-lg font-bold ${
+                    paymentSummary.pendingBalance <= 0
+                      ? 'text-emerald-700'
+                      : paymentSummary.totalPaid > 0
+                        ? 'text-amber-700'
+                        : 'text-rose-700'
+                  }`}
+                >
+                  {paymentSummary.pendingBalance <= 0
+                    ? 'PAID'
+                    : paymentSummary.totalPaid > 0
+                      ? 'PARTIAL'
+                      : 'PENDING'}
+                </span>
+                <span className="block text-[10px] text-slate-400">
+                  Paid {currency} {paymentSummary.totalPaid.toFixed(2)} · Balance {currency}{' '}
+                  {paymentSummary.pendingBalance.toFixed(2)}
+                </span>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -455,6 +612,124 @@ export default function ServiceContractDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* AMC INSTALLMENT PAYMENT DIALOG */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
+            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Record Payment
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Recorded against the same invoice raised at signing.
+            </DialogDescription>
+          </DialogHeader>
+
+          {paymentSummary && (
+            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex items-center justify-between">
+              <span className="text-slate-500">
+                Paid {currency} {paymentSummary.totalPaid.toFixed(2)} of {currency}{' '}
+                {paymentSummary.totalAmount.toFixed(2)}
+              </span>
+              <span className="font-bold text-slate-700">
+                Balance {currency} {paymentSummary.pendingBalance.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          <form onSubmit={handleRecordPayment}>
+            <div className="grid grid-cols-2 gap-4 px-6 py-4">
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Amount ({currency}) *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={payForm.amount}
+                  onChange={(e) => setPayForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Payment Mode *</label>
+                <select
+                  value={payForm.paymentMode}
+                  onChange={(e) =>
+                    setPayForm((prev) => ({
+                      ...prev,
+                      paymentMode: e.target.value as typeof prev.paymentMode,
+                    }))
+                  }
+                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-green-500"
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="CREDIT_CARD">Credit Card</option>
+                </select>
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Payment Date *</label>
+                <Input
+                  type="date"
+                  value={payForm.paymentDate}
+                  onChange={(e) => setPayForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Reference Number</label>
+                <Input
+                  value={payForm.referenceNumber}
+                  onChange={(e) =>
+                    setPayForm((prev) => ({ ...prev, referenceNumber: e.target.value }))
+                  }
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="col-span-2 flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Remarks</label>
+                <Input
+                  value={payForm.remarks}
+                  onChange={(e) => setPayForm((prev) => ({ ...prev, remarks: e.target.value }))}
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-white">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPayDialogOpen(false)}
+                className="h-10 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingPayment}
+                className="h-10 px-4 bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm"
+              >
+                {savingPayment ? 'Recording...' : 'Record Payment'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {invoiceDialogOpen && invoiceData && (
+        <InvoiceViewDialog
+          invoice={invoiceData}
+          onClose={() => {
+            setInvoiceDialogOpen(false);
+            setInvoiceData(null);
+          }}
+        />
+      )}
     </div>
   );
 }

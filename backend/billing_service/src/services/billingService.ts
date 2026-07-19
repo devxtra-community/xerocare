@@ -1166,6 +1166,18 @@ export class BillingService {
       );
     }
 
+    if (
+      action === 'accept' &&
+      invoice.type === InvoiceType.QUOTATION &&
+      invoice.expiryDate &&
+      new Date(invoice.expiryDate) < new Date()
+    ) {
+      throw new AppError(
+        'This quotation has expired and can no longer be accepted. Please contact us to renew it.',
+        400,
+      );
+    }
+
     const oldStatus = invoice.status;
     const newStatus =
       action === 'accept' ? InvoiceStatus.CUSTOMER_ACCEPTED : InvoiceStatus.CUSTOMER_REJECTED;
@@ -1394,7 +1406,12 @@ export class BillingService {
     invoice.financeApprovedAt = new Date();
 
     if (payload?.effectiveTo) {
-      invoice.effectiveTo = payload.effectiveTo;
+      // Validity extension: the date extends the quotation's validity window.
+      // effectiveTo is the contract period end for RENT/LEASE — never overwrite it there.
+      invoice.expiryDate = new Date(payload.effectiveTo);
+      if (invoice.saleType !== SaleType.RENT && invoice.saleType !== SaleType.LEASE) {
+        invoice.effectiveTo = payload.effectiveTo;
+      }
     }
 
     if (invoice.billType === 'SERVICE') {
@@ -1517,6 +1534,13 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
+    if (invoice.type !== InvoiceType.QUOTATION) {
+      throw new AppError('Only quotations can request a validity extension', 400);
+    }
+    if (!invoice.expiryDate || new Date(invoice.expiryDate) >= new Date()) {
+      throw new AppError('Quotation is still valid. Extension is only needed after expiry.', 400);
+    }
+
     const oldStatus = invoice.status;
     invoice.status = InvoiceStatus.WAITING_FINANCE_APPROVAL;
     const saved = await this.invoiceRepo.save(invoice);
@@ -1570,7 +1594,7 @@ export class BillingService {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
 
-    if (invoice.effectiveTo && new Date(invoice.effectiveTo) < new Date()) {
+    if (invoice.expiryDate && new Date(invoice.expiryDate) < new Date()) {
       throw new AppError(
         'Quotation validity has expired. Please request a validity extension from Finance.',
         400,
@@ -1727,6 +1751,21 @@ export class BillingService {
               (item.itemType as unknown) === 'SPAREPART'
                 ? product.sku || product.lot_id || 'Part'
                 : product.serial_no || 'Unknown';
+
+            // Idempotency: a retried conversion must not allocate the same unit twice.
+            const existingAllocation = await queryRunner.manager.findOne(ProductAllocation, {
+              where: {
+                contractId: invoice.id,
+                productId: update.productId,
+                status: AllocationStatus.ALLOCATED,
+              },
+            });
+            if (existingAllocation) {
+              logger.info(
+                `[allocateMachines] Allocation already exists for contract ${invoice.id} / product ${update.productId} — skipping duplicate insert.`,
+              );
+              continue;
+            }
 
             // Create basic allocation record without meter readings yet
             await queryRunner.manager.insert(ProductAllocation, {
@@ -4107,6 +4146,77 @@ export class BillingService {
     return savedInvoice;
   }
 
+  /**
+   * Creates the lump-sum invoice for an AMC service contract at signing time, and — if an
+   * initial payment was collected on the spot — records it against that same invoice via the
+   * normal payment path so status (INVOICED/PARTIAL via ledger/PAID) and cashbook posting stay
+   * consistent with every other payment in the system. Later installments reuse this invoiceId
+   * through the existing /invoices/:id/payments or /payments/record endpoints.
+   */
+  async createContractInvoice(payload: {
+    customerId: string;
+    branchId: string;
+    createdBy: string;
+    serviceContractId: string;
+    billType: BillType;
+    description: string;
+    amount: number;
+    initialPayment?: {
+      amount: number;
+      paymentMode: string;
+      paymentDate?: string;
+      referenceNumber?: string;
+      remarks?: string;
+    };
+  }): Promise<Invoice> {
+    const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+    const invoiceRepo = Source.getRepository(Invoice);
+
+    const invoice = invoiceRepo.create({
+      invoiceNumber,
+      customerId: payload.customerId,
+      branchId: payload.branchId,
+      createdBy: payload.createdBy,
+      serviceContractId: payload.serviceContractId,
+      saleType: SaleType.SERVICE,
+      billType: payload.billType,
+      type: InvoiceType.FINAL,
+      status: InvoiceStatus.INVOICED,
+      totalAmount: payload.amount,
+    });
+    const savedInvoice = await invoiceRepo.save(invoice);
+
+    const invoiceItemRepo = Source.getRepository(InvoiceItem);
+    const invoiceItem = new InvoiceItem();
+    invoiceItem.invoice = savedInvoice;
+    invoiceItem.itemType = ItemType.PRODUCT;
+    invoiceItem.description = payload.description;
+    invoiceItem.quantity = 1;
+    invoiceItem.unitPrice = payload.amount;
+    await invoiceItemRepo.save(invoiceItem);
+    delete (invoiceItem as { invoice?: unknown }).invoice;
+    savedInvoice.items = [invoiceItem];
+
+    if (payload.initialPayment && payload.initialPayment.amount > 0) {
+      await this.recordPayment(
+        savedInvoice.id,
+        {
+          paymentMode: payload.initialPayment.paymentMode,
+          amount: payload.initialPayment.amount,
+          transactionDate: payload.initialPayment.paymentDate,
+          referenceNumber: payload.initialPayment.referenceNumber,
+          remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
+          bypassStatusCheck: true,
+        },
+        payload.createdBy,
+      );
+      const withPayment = await this.invoiceRepo.findById(savedInvoice.id);
+      if (withPayment) return withPayment;
+    }
+
+    return savedInvoice;
+  }
+
   async reviseEstimate(
     id: string,
     payload: {
@@ -4243,6 +4353,8 @@ export class BillingService {
     invoice.estimateExpired = false;
     invoice.validityExtensionDays = days;
     invoice.validityExtensionFee = fee;
+    invoice.expiryDate = baseValidUntil;
+    invoice.validityDays = totalDays;
 
     const oldStatus = invoice.status;
     invoice.status = InvoiceStatus.FINANCE_APPROVED;

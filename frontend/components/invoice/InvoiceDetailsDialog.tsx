@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   AlertCircle,
   RotateCcw,
+  ClipboardList,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/format';
@@ -32,6 +33,7 @@ import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
 import { RefreshCw } from 'lucide-react';
 import { InvoiceViewDialog } from '../employeeComponents/InvoiceViewDialog';
 import AuditTimeline from './AuditTimeline';
+import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface InvoiceDetailsDialogProps {
@@ -93,12 +95,33 @@ export function InvoiceDetailsDialog({
     modelId: string;
   } | null>(null);
 
+  const [ticketDetails, setTicketDetails] = React.useState<ServiceTicket | null>(null);
+  const [loadingTicket, setLoadingTicket] = React.useState(false);
+
   const historyRef = React.useRef<HTMLDivElement>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     setCurrentInvoice(invoice);
   }, [invoice]);
+
+  React.useEffect(() => {
+    if (currentInvoice.serviceTicketId) {
+      setLoadingTicket(true);
+      getServiceTicketById(currentInvoice.serviceTicketId)
+        .then((ticket) => {
+          setTicketDetails(ticket);
+        })
+        .catch((err) => {
+          console.error('Failed to fetch service ticket in dialog:', err);
+        })
+        .finally(() => {
+          setLoadingTicket(false);
+        });
+    } else {
+      setTicketDetails(null);
+    }
+  }, [currentInvoice.serviceTicketId]);
 
   React.useEffect(() => {
     const fetchFullDetails = async () => {
@@ -480,6 +503,89 @@ export function InvoiceDetailsDialog({
               </div>
             </div>
           </div>
+
+          {/* Ticket Details Section */}
+          {currentInvoice.serviceTicketId && (
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/50 pb-2">
+                <ClipboardList className="text-primary h-3.5 w-3.5" /> Service Ticket Context &
+                Details
+              </h4>
+
+              {loadingTicket ? (
+                <div className="flex items-center space-x-2 text-xs text-muted-foreground py-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Loading ticket details...</span>
+                </div>
+              ) : ticketDetails ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="md:col-span-2">
+                    <span className="text-slate-500 font-medium block">Complaint Registered:</span>
+                    <p className="text-slate-800 mt-1 bg-white p-2.5 rounded border border-slate-200/60 leading-relaxed font-medium">
+                      {ticketDetails.issueDescription || 'No complaint details provided.'}
+                    </p>
+                  </div>
+
+                  {ticketDetails.problemFound && (
+                    <div>
+                      <span className="text-slate-500 font-medium block">Problem Found:</span>
+                      <span className="font-semibold text-slate-800 bg-white px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                        {ticketDetails.problemFound}
+                      </span>
+                    </div>
+                  )}
+
+                  {ticketDetails.rootCause && (
+                    <div>
+                      <span className="text-slate-500 font-medium block">Root Cause:</span>
+                      <span className="font-semibold text-slate-800 bg-white px-2 py-1.5 rounded border border-slate-200/60 block mt-1">
+                        {ticketDetails.rootCause}
+                      </span>
+                    </div>
+                  )}
+
+                  {ticketDetails.meterReadingAtService !== undefined &&
+                    ticketDetails.meterReadingAtService !== null && (
+                      <div>
+                        <span className="text-slate-500 font-medium block">
+                          Meter Reading (at Service):
+                        </span>
+                        <span className="font-semibold text-slate-800 bg-white px-2 py-1.5 rounded border border-slate-200/60 block mt-1 font-mono">
+                          {ticketDetails.meterReadingAtService}
+                        </span>
+                      </div>
+                    )}
+
+                  {(ticketDetails.diagnosisNotes || ticketDetails.technicianNoteToFinance) && (
+                    <div className="md:col-span-2 space-y-2">
+                      {ticketDetails.diagnosisNotes && (
+                        <div>
+                          <span className="text-slate-500 font-medium block">
+                            Technician Diagnosis Notes:
+                          </span>
+                          <p className="text-slate-700 mt-1 bg-white p-2.5 rounded border border-slate-200/60 whitespace-pre-wrap font-medium">
+                            {ticketDetails.diagnosisNotes}
+                          </p>
+                        </div>
+                      )}
+                      {ticketDetails.technicianNoteToFinance && (
+                        <div>
+                          <span className="text-amber-800 font-bold block flex items-center gap-1">
+                            📝 Note to Finance:
+                          </span>
+                          <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded border border-amber-200/60 font-medium whitespace-pre-wrap">
+                            {ticketDetails.technicianNoteToFinance}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-red-500 py-2">Failed to load ticket details.</div>
+              )}
+            </div>
+          )}
 
           {(currentInvoice.saleType === 'RENT' || currentInvoice.saleType === 'LEASE') &&
             (currentInvoice.startDate ||

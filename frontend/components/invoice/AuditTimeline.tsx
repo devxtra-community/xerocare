@@ -25,6 +25,20 @@ interface AuditTimelineProps {
   entityId: string;
 }
 
+/** Formats a log timestamp without ever throwing on a missing/invalid date. */
+const fmtLogDate = (value?: string | null) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? '—' : format(d, 'MMM d, yyyy HH:mm');
+};
+
+/** Safe epoch for sorting; invalid dates sink to the bottom. */
+const logTime = (value?: string | null) => {
+  if (!value) return 0;
+  const t = new Date(value).getTime();
+  return isNaN(t) ? 0 : t;
+};
+
 export default function AuditTimeline({ entityId }: AuditTimelineProps) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +60,7 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
         setError(null);
         const data = await getAuditLogs(entityId);
         // Sort newest first
-        const sorted = (data || []).sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        );
+        const sorted = (data || []).sort((a, b) => logTime(b.createdAt) - logTime(a.createdAt));
         setLogs(sorted);
       } catch (err) {
         console.error('Error fetching audit logs:', err);
@@ -243,7 +255,7 @@ export default function AuditTimeline({ entityId }: AuditTimelineProps) {
                     </Badge>
                     <span className="text-[10px] text-gray-400 flex items-center gap-1 ml-auto font-medium">
                       <Clock className="h-3 w-3" />
-                      {format(new Date(log.createdAt), 'MMM d, yyyy HH:mm')}
+                      {fmtLogDate(log.createdAt)}
                     </span>
                   </div>
 
