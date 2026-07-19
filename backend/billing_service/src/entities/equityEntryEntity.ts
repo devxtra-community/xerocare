@@ -14,6 +14,7 @@ export type EquityType =
   | 'DIVIDEND'
   | 'PROFIT_TRANSFER'
   | 'LOSS_TRANSFER'
+  | 'OPENING_BALANCE_EQUITY'
   | 'OTHER';
 
 @Entity('equity_entries')

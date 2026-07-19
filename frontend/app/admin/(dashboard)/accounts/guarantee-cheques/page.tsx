@@ -34,6 +34,8 @@ import {
 import { getCustomers, type Customer } from '@/lib/customer';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useExchangeRateMap, convertAmount } from '@/lib/dualCurrency';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -263,7 +265,7 @@ function GuaranteeModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Bank Name *</label>
+            <label className="text-xs font-medium text-muted-foreground">Name of the Bank *</label>
             <Input
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
@@ -526,6 +528,7 @@ function DepositDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: 
 
 function GuaranteeChequesContent() {
   const currency = useBranchCurrency();
+  const rates = useExchangeRateMap(currency);
   const qc = useQueryClient();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
@@ -589,259 +592,299 @@ function GuaranteeChequesContent() {
         <p className="text-sm text-muted-foreground">
           Security &amp; performance cheques held as collateral
         </p>
-        {isSingleBranch && (
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setShowModal(true);
+        <div className="flex items-center gap-2">
+          <ExportPdfButton
+            targetId="admin-guarantee-cheques-pdf"
+            reportTitle="Guarantee Cheques"
+            filters={{
+              Search: search,
+              Status: statusFilter !== 'ALL' ? statusFilter : undefined,
+              Purpose: purposeFilter !== 'ALL' ? purposeFilter : undefined,
+              'Date From': dateFrom,
+              'Date To': dateTo,
             }}
-            className="gap-2 bg-primary text-primary-foreground"
-          >
-            <Plus className="h-4 w-4" /> Add Guarantee Cheque
-          </Button>
-        )}
-      </div>
-
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard
-            title="Currently Held"
-            value={stats.heldCount.toString()}
-            subtitle={formatCurrency(stats.heldAmount, currency)}
           />
-          <StatCard
-            title="Deposited to Bank"
-            value={stats.depositedCount.toString()}
-            subtitle={formatCurrency(stats.depositedAmount, currency)}
-          />
-          <StatCard
-            title="Returned"
-            value={stats.returnedCount.toString()}
-            subtitle={formatCurrency(stats.returnedAmount, currency)}
-          />
-          <StatCard
-            title="Pending Return"
-            value={stats.pendingReturnCount.toString()}
-            subtitle="Contract expired/cancelled"
-          />
-        </div>
-      )}
-
-      {stats && stats.pendingReturnCount > 0 && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 text-sm">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>
-            <strong>{stats.pendingReturnCount}</strong> cheque
-            {stats.pendingReturnCount !== 1 ? 's are' : ' is'} still held but the linked contract
-            has expired or been cancelled.
-          </span>
-        </div>
-      )}
-
-      <div className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-10 bg-muted/50 border-none"
-              placeholder="Search by customer, cheque #, bank…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36 bg-card border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Status</SelectItem>
-                <SelectItem value="RECEIVED">Received</SelectItem>
-                <SelectItem value="DEPOSITED">Deposited</SelectItem>
-                <SelectItem value="RETURNED">Returned</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={purposeFilter} onValueChange={setPurposeFilter}>
-              <SelectTrigger className="w-44 bg-card border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Purposes</SelectItem>
-                <SelectItem value="PERFORMANCE_SECURITY">Performance Security</SelectItem>
-                <SelectItem value="OTHER">Other</SelectItem>
-              </SelectContent>
-            </Select>
-            <button
-              onClick={() => setShowFilters((o) => !o)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-slate-700 px-2 py-1 rounded-lg border border-border bg-card"
+          {isSingleBranch && (
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setShowModal(true);
+              }}
+              className="gap-2 bg-primary text-primary-foreground"
             >
-              Date Range{' '}
-              <ChevronDown
-                className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </div>
+              <Plus className="h-4 w-4" /> Add Guarantee Cheque
+            </Button>
+          )}
         </div>
-        {showFilters && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <input
-              type="date"
-              value={dateTo}
-              min={dateFrom}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
-            />
-            {(dateFrom || dateTo) && (
-              <button
-                onClick={() => {
-                  setDateFrom('');
-                  setDateTo('');
-                }}
-                className="text-xs text-red-500 hover:text-red-700"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div id="admin-guarantee-cheques-pdf" className="space-y-6">
+        {stats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard
+              title="Currently Held"
+              value={stats.heldCount.toString()}
+              subtitle={formatCurrency(stats.heldAmount, stats.currency ?? currency)}
+            />
+            <StatCard
+              title="Deposited to Bank"
+              value={stats.depositedCount.toString()}
+              subtitle={formatCurrency(stats.depositedAmount, stats.currency ?? currency)}
+            />
+            <StatCard
+              title="Returned"
+              value={stats.returnedCount.toString()}
+              subtitle={formatCurrency(stats.returnedAmount, stats.currency ?? currency)}
+            />
+            <StatCard
+              title="Pending Return"
+              value={stats.pendingReturnCount.toString()}
+              subtitle="Contract expired/cancelled"
+            />
           </div>
-        ) : (
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow>
-                {[
-                  'Received',
-                  'Customer',
-                  'Cheque #',
-                  'Bank',
-                  'Purpose',
-                  'Amount',
-                  'Contract',
-                  'Status',
-                  'Actions',
-                ].map((h) => (
-                  <TableHead
-                    key={h}
-                    className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pl-4 first:pl-4"
-                  >
-                    {h}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cheques.length === 0 ? (
+        )}
+
+        {stats && stats.currencyWarnings && stats.currencyWarnings.length > 0 && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              {stats.currencyWarnings.map((w) => (
+                <p key={w}>{w}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {stats && stats.pendingReturnCount > 0 && (
+          <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-700 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>{stats.pendingReturnCount}</strong> cheque
+              {stats.pendingReturnCount !== 1 ? 's are' : ' is'} still held but the linked contract
+              has expired or been cancelled.
+            </span>
+          </div>
+        )}
+
+        <div className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-10 bg-muted/50 border-none"
+                placeholder="Search by customer, cheque #, bank…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-36 bg-card border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  <SelectItem value="RECEIVED">Received</SelectItem>
+                  <SelectItem value="DEPOSITED">Deposited</SelectItem>
+                  <SelectItem value="RETURNED">Returned</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={purposeFilter} onValueChange={setPurposeFilter}>
+                <SelectTrigger className="w-44 bg-card border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Purposes</SelectItem>
+                  <SelectItem value="PERFORMANCE_SECURITY">Performance Security</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <button
+                onClick={() => setShowFilters((o) => !o)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-slate-700 px-2 py-1 rounded-lg border border-border bg-card"
+              >
+                Date Range{' '}
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+          </div>
+          {showFilters && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="bg-muted/40">
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-16">
-                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                      <ShieldCheck className="h-12 w-12 opacity-30" />
-                      <p className="font-medium">No guarantee cheques found</p>
-                    </div>
-                  </TableCell>
+                  {[
+                    'Received',
+                    'Customer',
+                    'Cheque #',
+                    'Bank',
+                    'Purpose',
+                    'Amount',
+                    'Contract',
+                    'Status',
+                    'Actions',
+                  ].map((h) => (
+                    <TableHead
+                      key={h}
+                      className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pl-4 first:pl-4"
+                    >
+                      {h}
+                    </TableHead>
+                  ))}
                 </TableRow>
-              ) : (
-                cheques.map((c) => (
-                  <TableRow key={c.id} className="hover:bg-blue-50/50 transition-colors">
-                    <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
-                      {c.receivedDate?.slice(0, 10)}
-                    </TableCell>
-                    <TableCell>
-                      <p className="text-sm font-medium">{c.customerName}</p>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-blue-600 font-bold">
-                      {c.chequeNumber}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{c.bankName}</TableCell>
-                    <TableCell className="text-xs">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">
-                        {PURPOSE_LABELS[c.purpose] ?? c.purpose}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-slate-700">
-                      {formatCurrency(Number(c.amount), c.currencyCode)}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate">
-                      {c.contractReference ?? <span className="opacity-40">—</span>}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[c.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}
-                      >
-                        {c.status === 'RETURNED' ? (
-                          <CheckCircle2 className="h-3 w-3" />
-                        ) : c.status === 'DEPOSITED' ? (
-                          <Landmark className="h-3 w-3" />
-                        ) : (
-                          <ShieldCheck className="h-3 w-3" />
-                        )}
-                        {c.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="pr-4">
-                      {isSingleBranch && (
-                        <div className="flex items-center gap-1">
-                          {c.status === 'RECEIVED' && (
-                            <>
-                              <button
-                                onClick={() => setDepositing(c)}
-                                className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
-                                title="Deposit to Bank"
-                              >
-                                <Landmark className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => setReturning(c)}
-                                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
-                                title="Mark as Returned"
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => {
-                              setEditing(c);
-                              setShowModal(true);
-                            }}
-                            className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                            title="Edit"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('Delete this guarantee cheque? This cannot be undone.'))
-                                deleteMut.mutate(c.id);
-                            }}
-                            className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      )}
-                      {!isSingleBranch && <span className="text-xs text-gray-400">—</span>}
+              </TableHeader>
+              <TableBody>
+                {cheques.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-16">
+                      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                        <ShieldCheck className="h-12 w-12 opacity-30" />
+                        <p className="font-medium">No guarantee cheques found</p>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
+                ) : (
+                  cheques.map((c) => (
+                    <TableRow key={c.id} className="hover:bg-blue-50/50 transition-colors">
+                      <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
+                        {c.receivedDate?.slice(0, 10)}
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm font-medium">{c.customerName}</p>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                        {c.chequeNumber}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{c.bankName}</TableCell>
+                      <TableCell className="text-xs">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium">
+                          {PURPOSE_LABELS[c.purpose] ?? c.purpose}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-slate-700">
+                        {formatCurrency(Number(c.amount), c.currencyCode)}
+                        {c.currencyCode !== currency &&
+                          (() => {
+                            const converted = convertAmount(
+                              Number(c.amount),
+                              c.currencyCode,
+                              currency,
+                              rates,
+                            );
+                            return converted !== null ? (
+                              <div className="text-[10px] font-normal text-muted-foreground">
+                                ≈ {formatCurrency(converted, currency)}
+                              </div>
+                            ) : null;
+                          })()}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate">
+                        {c.contractReference ?? <span className="opacity-40">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[c.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}
+                        >
+                          {c.status === 'RETURNED' ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : c.status === 'DEPOSITED' ? (
+                            <Landmark className="h-3 w-3" />
+                          ) : (
+                            <ShieldCheck className="h-3 w-3" />
+                          )}
+                          {c.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        {isSingleBranch && (
+                          <div className="flex items-center gap-1">
+                            {c.status === 'RECEIVED' && (
+                              <>
+                                <button
+                                  onClick={() => setDepositing(c)}
+                                  className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                  title="Deposit to Bank"
+                                >
+                                  <Landmark className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setReturning(c)}
+                                  className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                                  title="Mark as Returned"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => {
+                                setEditing(c);
+                                setShowModal(true);
+                              }}
+                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                              title="Edit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm('Delete this guarantee cheque? This cannot be undone.'))
+                                  deleteMut.mutate(c.id);
+                              }}
+                              className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        {!isSingleBranch && <span className="text-xs text-gray-400">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </div>
       </div>
 
       {showModal && (

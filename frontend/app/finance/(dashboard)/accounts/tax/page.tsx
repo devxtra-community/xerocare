@@ -17,6 +17,7 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { fetchBranches, type Branch } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 import * as XLSX from 'xlsx';
 import { TaxLocationFilter } from '@/components/accounts/TaxLocationFilter';
 import { TaxPeriodFilter } from '@/components/accounts/TaxPeriodFilter';
@@ -261,7 +262,7 @@ function OutputTaxTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div id="tax-output-pdf" className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
           label="Bills"
@@ -276,13 +277,19 @@ function OutputTaxTab({
           label="Total Output VAT"
           value={formatCurrency(totals?.totalOutputVat ?? 0, currency)}
         />
-        <div className="flex items-center justify-end col-span-2 sm:col-span-1">
+        <div className="flex items-center justify-end gap-2 col-span-2 sm:col-span-1">
           <button
             onClick={exportExcel}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
           >
             <Download className="h-4 w-4" /> Export Excel
           </button>
+          <ExportPdfButton
+            targetId="tax-output-pdf"
+            reportTitle="Output Tax Report"
+            filenamePrefix="Output_Tax"
+            filters={{ 'Date From': filters.dateFrom, 'Date To': filters.dateTo }}
+          />
         </div>
       </div>
 
@@ -458,7 +465,7 @@ function InputTaxLocalTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div id="tax-input-local-pdf" className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
           label="Bills"
@@ -473,13 +480,19 @@ function InputTaxLocalTab({
           label="Total Input VAT"
           value={formatCurrency(totals?.totalInputVat ?? 0, currency)}
         />
-        <div className="flex items-center justify-end col-span-2 sm:col-span-1">
+        <div className="flex items-center justify-end gap-2 col-span-2 sm:col-span-1">
           <button
             onClick={exportExcel}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
           >
             <Download className="h-4 w-4" /> Export Excel
           </button>
+          <ExportPdfButton
+            targetId="tax-input-local-pdf"
+            reportTitle="Input Tax Report (Local)"
+            filenamePrefix="Input_Tax_Local"
+            filters={{ 'Date From': filters.dateFrom, 'Date To': filters.dateTo }}
+          />
         </div>
       </div>
 
@@ -663,7 +676,7 @@ function InputTaxInternationalTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div id="tax-input-intl-pdf" className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
           label="Bills"
@@ -678,13 +691,19 @@ function InputTaxInternationalTab({
           label="Total Reverse Charge VAT"
           value={formatCurrency(totals?.totalReverseChargeVat ?? 0, currency)}
         />
-        <div className="flex items-center justify-end col-span-2 sm:col-span-1">
+        <div className="flex items-center justify-end gap-2 col-span-2 sm:col-span-1">
           <button
             onClick={exportExcel}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
           >
             <Download className="h-4 w-4" /> Export Excel
           </button>
+          <ExportPdfButton
+            targetId="tax-input-intl-pdf"
+            reportTitle="Input Tax Report (International / Reverse Charge)"
+            filenamePrefix="Input_Tax_International"
+            filters={{ 'Date From': filters.dateFrom, 'Date To': filters.dateTo }}
+          />
         </div>
       </div>
 

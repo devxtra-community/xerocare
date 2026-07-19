@@ -188,6 +188,7 @@ const adminAccountsMenuItems = [
   { title: 'Assets', icon: Landmark, href: '/admin/accounts/assets' },
   { title: 'Equity', icon: Scale, href: '/admin/accounts/equity' },
   { title: 'Depreciation', icon: PieChart, href: '/admin/accounts/depreciation' },
+  { title: 'Exchange Rates', icon: ArrowRightLeft, href: '/admin/accounts/exchange-rates' },
   { title: 'Reports Hub', icon: FileBarChart, href: '/admin/accounts/reports' },
 ];
 

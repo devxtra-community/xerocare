@@ -7,8 +7,21 @@ export interface CustomerBankAccount {
   accountType?: 'Savings Account' | 'Current Account' | 'Business Account';
   routingNumber?: string;
   swiftCode?: string;
+  /** Country-correct bank identifier: IFSC (India), IBAN (ISO 13616 countries),
+   * or a generic bank code elsewhere — see lib/bankCodeType.ts. Field name kept
+   * as `iban` for storage continuity with existing data. */
   iban?: string;
   address?: string;
+  branch?: string;
+  /** ISO2 country of the BANK itself — independent of the customer's own
+   * country field above (a customer may bank in a different country than
+   * they reside/operate in). Defaults to the customer's own country but is
+   * independently changeable. Drives the Bank/Branch dropdowns, the
+   * country-correct code field, and the default currency below. */
+  bankCountry?: string;
+  /** Currency this account is held/paid in — may differ from the branch's local
+   * currency (e.g. a customer paying in USD for a purchase made in a SAR branch). */
+  currency?: string;
   isPrimary?: boolean;
 }
 

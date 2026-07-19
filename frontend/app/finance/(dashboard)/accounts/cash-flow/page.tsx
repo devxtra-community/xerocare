@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 type Period = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'custom';
 
@@ -295,6 +296,12 @@ export default function CashFlowPage() {
           >
             <Download className="h-4 w-4" /> Export Excel
           </Button>
+          <ExportPdfButton
+            targetId="cash-flow-pdf"
+            reportTitle="Cash Flow Statement"
+            filenamePrefix="Cash_Flow"
+            filters={{ Period: `${from} to ${to}` }}
+          />
         </div>
       </div>
 
@@ -313,7 +320,7 @@ export default function CashFlowPage() {
           </button>
         </div>
       ) : (
-        <>
+        <div id="cash-flow-pdf" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
             <StatCard
               title="Net Operating"
@@ -400,7 +407,7 @@ export default function CashFlowPage() {
             balances from live cash & bank account records. Cashbook entries are classified as
             Operating / Investing / Financing by category.
           </p>
-        </>
+        </div>
       )}
     </div>
   );

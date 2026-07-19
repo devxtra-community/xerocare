@@ -32,6 +32,7 @@ import {
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, string> = {
@@ -267,7 +268,7 @@ function AddChequeModal({
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">Bank Name</label>
+              <label className="text-xs font-medium text-gray-600">Name of the Bank</label>
               <input
                 value={form.bankName}
                 onChange={(e) => set('bankName', e.target.value)}
@@ -400,11 +401,13 @@ function ChequeActionModal({
   const needsAccount = action === 'deposit' || action === 'issue';
   const needsDate = action === 'deposit' || action === 'issue';
 
+  const requiresReason = action === 'bounce' || action === 'cancel';
+
   const cfg: Record<ActionType, { label: string; color: string; desc: string }> = {
     deposit: {
       label: 'Deposit to Bank',
       color: 'bg-blue-600 hover:bg-blue-700',
-      desc: 'Mark cheque as deposited. Cash at Bank increases immediately at Deposit.',
+      desc: 'Mark cheque as deposited. Cash at Bank updates once you mark it Cleared — depositing alone does not move the balance.',
     },
     issue: {
       label: 'Issue to Vendor',
@@ -417,20 +420,17 @@ function ChequeActionModal({
       desc:
         cheque.type === 'ISSUED'
           ? 'Bank confirms payment cleared. Cash at Bank decreases now.'
-          : 'Bank confirms cheque cleared. Cash at Bank already moved at Deposit — no additional change.',
+          : 'Bank confirms cheque cleared. Cash at Bank increases now.',
     },
     bounce: {
-      label: 'Mark Bounced',
+      label: 'Mark Returned',
       color: 'bg-red-600 hover:bg-red-700',
-      desc:
-        cheque.type === 'RECEIVED'
-          ? 'Cheque bounced. Cash at Bank will be reversed (funds added at Deposit are returned).'
-          : 'Cheque bounced. No balance change — cash only moves at Clear for issued cheques.',
+      desc: 'Cheque dishonored by the bank before clearing — no cash effect to reverse under the current rule (a legacy cheque deposited under the old rule, if any, will have its cash effect automatically reversed).',
     },
     cancel: {
       label: cheque.type === 'RECEIVED' ? 'Decline Cheque' : 'Cancel Cheque',
       color: 'bg-gray-600 hover:bg-gray-700',
-      desc: 'Cancel this pending cheque.',
+      desc: 'Cancel this pending cheque — only available before Deposit/Issue, so there is no cash effect to reverse.',
     },
   };
 
@@ -447,6 +447,8 @@ function ChequeActionModal({
           onSubmit={(e) => {
             e.preventDefault();
             if (needsAccount && !accountId) return toast.error('Please select a bank account');
+            if (requiresReason && !notes.trim())
+              return toast.error('A reason is required for this action');
             mut.mutate();
           }}
           className="p-6 space-y-4"
@@ -490,12 +492,15 @@ function ChequeActionModal({
             </div>
           )}
           <div>
-            <label className="text-xs font-medium text-gray-600">Notes</label>
+            <label className="text-xs font-medium text-gray-600">
+              {requiresReason ? 'Reason *' : 'Notes'}
+            </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Optional notes…"
+              required={requiresReason}
+              placeholder={requiresReason ? 'Explain why…' : 'Optional notes…'}
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
@@ -509,7 +514,7 @@ function ChequeActionModal({
             </button>
             <button
               type="submit"
-              disabled={mut.isPending}
+              disabled={mut.isPending || (requiresReason && !notes.trim())}
               className={`flex-1 text-white rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-50 ${cfg[action].color}`}
             >
               {mut.isPending ? 'Processing…' : cfg[action].label}
@@ -825,16 +830,28 @@ export default function ChequesPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {activeTab === 'received'
-              ? 'Cheques received from customers — deposited to bank, cleared when bank confirms'
+              ? 'Cheques received from customers — Cash at Bank moves only when bank clears payment'
               : 'Cheques issued to vendors — Cash at Bank moves only when bank clears payment'}
           </p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 shadow-sm"
-        >
-          <Plus className="h-4 w-4" /> Add Cheque
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportPdfButton
+            targetId={activeTab === 'received' ? 'cheques-received-pdf' : 'cheques-issued-pdf'}
+            reportTitle={activeTab === 'received' ? 'Cheques from Customers' : 'Cheques to Vendors'}
+            filters={{
+              Search: search,
+              Status: statusFilter !== 'ALL' ? statusFilter : undefined,
+              'Due From': dateFrom,
+              'Due To': dateTo,
+            }}
+          />
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 shadow-sm"
+          >
+            <Plus className="h-4 w-4" /> Add Cheque
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -871,64 +888,69 @@ export default function ChequesPage() {
         ))}
       </div>
 
-      {/* Stats */}
-      <StatsRow
-        summary={tabSummary}
-        type={activeTab === 'received' ? 'RECEIVED' : 'ISSUED'}
-        currency={currency}
-      />
+      <div
+        id={activeTab === 'received' ? 'cheques-received-pdf' : 'cheques-issued-pdf'}
+        className="space-y-6"
+      >
+        {/* Stats */}
+        <StatsRow
+          summary={tabSummary}
+          type={activeTab === 'received' ? 'RECEIVED' : 'ISSUED'}
+          currency={currency}
+        />
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl border p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        {/* Filters */}
+        <div className="bg-white rounded-xl border p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search cheque #, party, bank, source…"
+                className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="ALL">All Status</option>
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
             <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search cheque #, party, bank, source…"
-              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Due date from"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Due date to"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ALL">All Status</option>
-            {statusOptions.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            title="Due date from"
-          />
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            title="Due date to"
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+          <ChequeTable
+            cheques={cheques}
+            loading={isLoading}
+            currency={currency}
+            onAction={openAction}
+            onView={setViewCheque}
+            emptyLabel={`No ${activeTab === 'received' ? 'received' : 'issued'} cheques found`}
           />
         </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <ChequeTable
-          cheques={cheques}
-          loading={isLoading}
-          currency={currency}
-          onAction={openAction}
-          onView={setViewCheque}
-          emptyLabel={`No ${activeTab === 'received' ? 'received' : 'issued'} cheques found`}
-        />
       </div>
 
       {/* Modals */}

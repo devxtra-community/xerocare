@@ -17,6 +17,8 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       chequeNumber,
       chequeBankName,
       chequeDueDate,
+      currency,
+      exchangeRate,
     } = req.body;
     // @ts-expect-error: req.user is populated by auth middleware
     const recordedBy = req.user?.userId || req.user?.employeeId || 'SYSTEM';
@@ -44,6 +46,8 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       chequeNumber,
       chequeBankName,
       chequeDueDate,
+      currencyCode: currency || undefined,
+      exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
     });
 
     res.status(201).json({

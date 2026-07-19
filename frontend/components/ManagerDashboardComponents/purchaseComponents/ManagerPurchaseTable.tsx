@@ -16,6 +16,7 @@ import { purchaseService, Purchase } from '@/services/purchaseService';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useExchangeRateMap, convertAmount, formatDualCurrency } from '@/lib/dualCurrency';
 import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
 import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 import AddPurchaseDialog from './AddPurchaseDialog';
@@ -31,6 +32,7 @@ import PurchaseStats from './PurchaseStats';
  */
 export default function ManagerPurchaseTable() {
   const currency = useBranchCurrency();
+  const rates = useExchangeRateMap(currency);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [search, setSearch] = useState('');
   const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
@@ -68,14 +70,20 @@ export default function ManagerPurchaseTable() {
       (originFilter === 'ALL' || p.purchaseOrigin === originFilter),
   );
 
-  // Stats calculation
-  const totalCost = purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+  // Stats calculation. totalAmount is recorded in each purchase's own currencyCode (may be
+  // foreign for international purchases), so it must be converted to the branch currency
+  // before summing across purchases — otherwise mixed currencies get added as raw numbers.
+  // paidAmount is not converted: AddPaymentModal always collects it in the branch currency.
+  const toBase = (p: Purchase) =>
+    convertAmount(Number(p.totalAmount), p.currencyCode, currency, rates, p.exchangeRate) ??
+    Number(p.totalAmount);
+  const totalCost = purchases.reduce((sum, p) => sum + toBase(p), 0);
   const domesticSpend = purchases
     .filter((p) => p.purchaseOrigin === PurchaseOrigin.DOMESTIC)
-    .reduce((sum, p) => sum + Number(p.totalAmount), 0);
+    .reduce((sum, p) => sum + toBase(p), 0);
   const internationalSpend = purchases
     .filter((p) => p.purchaseOrigin === PurchaseOrigin.INTERNATIONAL)
-    .reduce((sum, p) => sum + Number(p.totalAmount), 0);
+    .reduce((sum, p) => sum + toBase(p), 0);
   const totalPaid = purchases.reduce((sum, p) => sum + Number(p.paidAmount), 0);
   const totalVendors = new Set(purchases.map((p) => p.vendorId)).size;
   const totalRecords = purchases.length;
@@ -218,13 +226,25 @@ export default function ManagerPurchaseTable() {
                     {p.lot?.lotNumber || p.lotId.slice(0, 8)}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-black text-slate-800 whitespace-nowrap">
-                    {formatCurrency(p.totalAmount, currency)}
+                    {formatDualCurrency(
+                      p.totalAmount,
+                      p.currencyCode || currency,
+                      currency,
+                      rates,
+                      p.exchangeRate,
+                    )}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-bold text-emerald-600 whitespace-nowrap">
                     {formatCurrency(p.paidAmount, currency)}
                   </TableCell>
                   <TableCell className="px-3 py-3 font-bold text-primary whitespace-nowrap">
-                    {formatCurrency(p.remainingAmount, currency)}
+                    {formatDualCurrency(
+                      p.remainingAmount,
+                      p.currencyCode || currency,
+                      currency,
+                      rates,
+                      p.exchangeRate,
+                    )}
                   </TableCell>
                   <TableCell className="px-3 py-3">
                     <span
@@ -298,6 +318,8 @@ export default function ManagerPurchaseTable() {
             purchaseId={selectedPurchase.id}
             totalAmount={selectedPurchase.totalAmount}
             paidAmount={selectedPurchase.paidAmount}
+            purchaseCurrency={selectedPurchase.currencyCode}
+            exchangeRate={selectedPurchase.exchangeRate}
             onSuccess={fetchPurchases}
           />
           <AddCostModal

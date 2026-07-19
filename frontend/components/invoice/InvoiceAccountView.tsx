@@ -22,6 +22,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Plus, Receipt, AlertCircle, Paperclip, FileText } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { getCustomerById, type CustomerBankAccount } from '@/lib/customer';
+import { useExchangeRateMap, convertAmount, formatDualCurrency } from '@/lib/dualCurrency';
+import { currencyOptions } from '@/lib/currencyList';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { toast } from 'sonner';
 
 interface InvoiceAccountViewProps {
@@ -34,6 +38,8 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
   const currency = useBranchCurrency();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const invoiceCurrency = summary?.currency || currency;
+  const rates = useExchangeRateMap(invoiceCurrency);
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -47,6 +53,26 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDueDate, setChequeDueDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Customer bank account + currency (Part 4: pay-from-customer-bank-account,
+  // currency defaults from the selected account but stays overridable)
+  const [customerBankAccounts, setCustomerBankAccounts] = useState<CustomerBankAccount[]>([]);
+  const [selectedBankAccountIdx, setSelectedBankAccountIdx] = useState<string>('');
+  const [paidCurrency, setPaidCurrency] = useState('');
+
+  useEffect(() => {
+    if (!open || !summary?.customerId) {
+      setCustomerBankAccounts([]);
+      return;
+    }
+    getCustomerById(summary.customerId)
+      .then((c) => setCustomerBankAccounts(c.bankAccounts || []))
+      .catch(() => setCustomerBankAccounts([]));
+  }, [open, summary?.customerId]);
+
+  useEffect(() => {
+    if (summary?.currency && !paidCurrency) setPaidCurrency(summary.currency);
+  }, [summary?.currency, paidCurrency]);
 
   const fetchSummary = React.useCallback(async () => {
     try {
@@ -74,7 +100,23 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
       toast.error('Please enter a valid amount');
       return;
     }
-    if (summary && Number(amountPaid) > summary.pendingBalance + 0.01) {
+
+    const isForeignCurrency = paidCurrency && paidCurrency !== invoiceCurrency;
+    let exchangeRate: number | undefined;
+    if (isForeignCurrency) {
+      exchangeRate = rates.get(paidCurrency);
+      if (!exchangeRate) {
+        toast.error(
+          `No exchange rate on file for ${paidCurrency} → ${invoiceCurrency}. Add one under Accounts → Exchange Rates first.`,
+        );
+        return;
+      }
+    }
+    const amountInInvoiceCurrency = isForeignCurrency
+      ? Number(amountPaid) * (exchangeRate as number)
+      : Number(amountPaid);
+
+    if (summary && amountInInvoiceCurrency > summary.pendingBalance + 0.01) {
       toast.error('Amount cannot exceed pending balance');
       return;
     }
@@ -92,6 +134,8 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
         chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
         chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
         chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+        currency: paidCurrency || undefined,
+        exchangeRate,
       });
       toast.success(
         paymentMode === 'CHEQUE'
@@ -106,6 +150,8 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
       setChequeNumber('');
       setChequeBankName('');
       setChequeDueDate('');
+      setSelectedBankAccountIdx('');
+      setPaidCurrency(summary?.currency || invoiceCurrency);
       fetchSummary();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -140,23 +186,34 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-slate-500 uppercase">Total Amount</p>
                 <p className="text-xl font-bold text-slate-800">
-                  {formatCurrency(summary.totalAmount, currency)}
+                  {formatCurrency(summary.totalAmount, invoiceCurrency)}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">Invoice: {summary.invoiceNumber}</p>
               </div>
               <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-green-600 uppercase">Total Paid</p>
                 <p className="text-xl font-bold text-green-700">
-                  {formatCurrency(summary.totalPaid, currency)}
+                  {formatCurrency(summary.totalPaid, invoiceCurrency)}
                 </p>
               </div>
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-orange-600 uppercase">Pending Balance</p>
                 <p className="text-xl font-bold text-orange-700">
-                  {formatCurrency(summary.pendingBalance, currency)}
+                  {formatCurrency(summary.pendingBalance, invoiceCurrency)}
                 </p>
               </div>
             </div>
+
+            {summary.currencyWarnings && summary.currencyWarnings.length > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700 text-xs">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  {summary.currencyWarnings.map((w) => (
+                    <p key={w}>{w}</p>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Action Bar */}
             <div className="flex justify-between items-center bg-card border rounded-lg p-3">
@@ -178,16 +235,50 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500">
-                      Amount Paid ({currency})
+                      Amount Paid ({paidCurrency || invoiceCurrency})
                     </label>
                     <Input
                       type="number"
                       step="0.01"
                       required
-                      max={summary.pendingBalance}
                       value={amountPaid}
                       onChange={(e) => setAmountPaid(e.target.value)}
-                      placeholder={`Max: ${summary.pendingBalance.toFixed(2)}`}
+                      placeholder={
+                        paidCurrency && paidCurrency !== invoiceCurrency
+                          ? 'Enter amount in the currency paid'
+                          : `Max: ${summary.pendingBalance.toFixed(2)}`
+                      }
+                    />
+                    {paidCurrency &&
+                      paidCurrency !== invoiceCurrency &&
+                      Number(amountPaid) > 0 &&
+                      (() => {
+                        const converted = convertAmount(
+                          Number(amountPaid),
+                          paidCurrency,
+                          invoiceCurrency,
+                          rates,
+                        );
+                        return converted !== null ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            ≈ {formatCurrency(converted, invoiceCurrency)}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-red-500">
+                            No exchange rate on file for {paidCurrency} → {invoiceCurrency}
+                          </p>
+                        );
+                      })()}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500">Currency Paid In</label>
+                    <SearchableSelect
+                      options={currencyOptions()}
+                      value={paidCurrency}
+                      onValueChange={setPaidCurrency}
+                      placeholder="Currency"
+                      emptyText="No currency found."
+                      className="h-9 text-sm"
                     />
                   </div>
                   <div className="space-y-2">
@@ -231,6 +322,39 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                     />
                   </div>
                 </div>
+                {(paymentMode === 'BANK_TRANSFER' || paymentMode === 'CHEQUE') &&
+                  customerBankAccounts.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500">
+                        Pay From Customer Bank Account (Optional)
+                      </label>
+                      <Select
+                        value={selectedBankAccountIdx}
+                        onValueChange={(idx) => {
+                          setSelectedBankAccountIdx(idx);
+                          const acc = customerBankAccounts[Number(idx)];
+                          if (acc) {
+                            if (acc.currency) setPaidCurrency(acc.currency);
+                            if (paymentMode === 'CHEQUE' && acc.bankName) {
+                              setChequeBankName(acc.bankName);
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select the customer's saved bank account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customerBankAccounts.map((acc, idx) => (
+                            <SelectItem key={idx} value={String(idx)}>
+                              {acc.bankName} — {acc.currency || 'no currency set'}
+                              {acc.bankCountry ? ` (${acc.bankCountry})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 {/* Cheque-specific fields */}
                 {paymentMode === 'CHEQUE' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -240,7 +364,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                     </p>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500">
-                        Customer&apos;s Bank Name *
+                        Name of the Customer&apos;s Bank *
                       </label>
                       <Input
                         placeholder="e.g., Emirates NBD"
@@ -323,7 +447,13 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                           {new Date(p.paymentDate).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 font-bold text-green-600">
-                          {formatCurrency(p.amountPaid, currency)}
+                          {formatDualCurrency(
+                            p.amountPaid,
+                            p.currencyCode || invoiceCurrency,
+                            invoiceCurrency,
+                            rates,
+                            p.exchangeRateSnapshot,
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold">

@@ -299,8 +299,10 @@ router.patch('/:id', async (req, res, next) => {
   }
 });
 
-// ── POST /:id/deposit — deposit RECEIVED cheque; Cash at Bank increases NOW ────
-// Spec: RECEIVED cheques → Cash at Bank at DEPOSIT (not Clear).
+// ── POST /:id/deposit — deposit RECEIVED cheque; status change ONLY ───────────
+// Symmetric rule (confirmed): both RECEIVED and ISSUED cheques move Cash at Bank
+// only at CLEAR — an uncleared cheque isn't yet confirmed bank funds and could still
+// bounce. Deposit just records which account it'll hit once cleared.
 router.post('/:id/deposit', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
@@ -319,34 +321,11 @@ router.post('/:id/deposit', async (req, res, next) => {
 
     await Source.transaction(async (m) => {
       const chqRepo = m.getRepository(Cheque);
-      const entryRepo = m.getRepository(CashbookEntry);
-      const accountRepo = m.getRepository(CashBankAccount);
 
+      // Record which account will be credited when cleared — no balance movement yet.
       cheque.status = 'DEPOSITED';
       cheque.accountId = accountId;
       cheque.issueDate = depositDate ? new Date(depositDate) : (new Date() as unknown as Date);
-
-      // RECEIVED cheques: Cash at Bank increases at Deposit.
-      const entry = entryRepo.create({
-        referenceNo: `CHQ-DEP-${cheque.chequeNo}-${Date.now()}`,
-        date: depositDate ? new Date(depositDate) : new Date(),
-        accountId,
-        entryType: 'RECEIPT',
-        amount: Number(cheque.amount),
-        category: 'Cheque Deposit',
-        description: `Cheque deposited — ${cheque.partyName} #${cheque.chequeNo}${cheque.sourceLabel ? ` · ${cheque.sourceLabel}` : ''}`,
-        paymentMode: 'Cheque',
-        chequeNo: cheque.chequeNo,
-        notes: notes || undefined,
-        createdBy: userId,
-        branchId,
-        sourceType: 'CHEQUE_DEPOSIT',
-        sourceId: cheque.id,
-      });
-      const savedEntry = await entryRepo.save(entry);
-      cheque.cashbookEntryId = savedEntry.id;
-      await accountRepo.increment({ id: accountId }, 'currentBalance', Number(cheque.amount));
-
       await chqRepo.save(cheque);
       await logHistory(m, cheque.id, 'PENDING', 'DEPOSITED', userId, notes);
     });
@@ -354,7 +333,7 @@ router.post('/:id/deposit', async (req, res, next) => {
     await sendNotification(
       userId,
       'Cheque Deposited',
-      `Cheque #${cheque.chequeNo} from ${cheque.partyName} deposited — Cash at Bank updated.`,
+      `Cheque #${cheque.chequeNo} from ${cheque.partyName} deposited — Cash at Bank updates once it clears.`,
     );
     res.json({ success: true, data: cheque });
   } catch (err) {
@@ -394,9 +373,10 @@ router.post('/:id/issue', async (req, res, next) => {
   }
 });
 
-// ── POST /:id/clear — confirm clearing ───────────────────────────────────────
-// Spec asymmetry: RECEIVED → Cash at Bank moved at DEPOSIT (not here).
-//                 ISSUED   → Cash at Bank moves at CLEAR (here).
+// ── POST /:id/clear — confirm clearing; Cash at Bank moves NOW, both directions ──
+// Symmetric rule (confirmed): RECEIVED → Cash at Bank increases at Clear.
+//                              ISSUED   → Cash at Bank decreases at Clear.
+// Neither Deposit nor Issue moves the balance — only a confirmed Clear does.
 router.post('/:id/clear', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
@@ -417,16 +397,15 @@ router.post('/:id/clear', async (req, res, next) => {
       const entryRepo = m.getRepository(CashbookEntry);
       const accountRepo = m.getRepository(CashBankAccount);
 
-      // Only ISSUED cheques move balance at Clear.
-      // RECEIVED cheques already moved balance at Deposit — nothing more needed.
-      if (cheque.type === 'ISSUED' && cheque.accountId) {
+      if (cheque.accountId) {
+        const isReceived = cheque.type !== 'ISSUED';
         const entry = entryRepo.create({
           referenceNo: `CHQ-CLR-${cheque.chequeNo}-${Date.now()}`,
           date: new Date(),
           accountId: cheque.accountId,
-          entryType: 'PAYMENT',
+          entryType: isReceived ? 'RECEIPT' : 'PAYMENT',
           amount: Number(cheque.amount),
-          category: 'Cheque Payment',
+          category: isReceived ? 'Cheque Deposit' : 'Cheque Payment',
           description: `Cheque cleared — ${cheque.partyName} #${cheque.chequeNo}${cheque.sourceLabel ? ` · ${cheque.sourceLabel}` : ''}`,
           paymentMode: 'Cheque',
           chequeNo: cheque.chequeNo,
@@ -438,11 +417,19 @@ router.post('/:id/clear', async (req, res, next) => {
         });
         const saved = await entryRepo.save(entry);
         cheque.cashbookEntryId = saved.id;
-        await accountRepo.decrement(
-          { id: cheque.accountId },
-          'currentBalance',
-          Number(cheque.amount),
-        );
+        if (isReceived) {
+          await accountRepo.increment(
+            { id: cheque.accountId },
+            'currentBalance',
+            Number(cheque.amount),
+          );
+        } else {
+          await accountRepo.decrement(
+            { id: cheque.accountId },
+            'currentBalance',
+            Number(cheque.amount),
+          );
+        }
       }
 
       cheque.status = 'CLEARED';
@@ -456,12 +443,17 @@ router.post('/:id/clear', async (req, res, next) => {
   }
 });
 
-// ── POST /:id/bounce — cheque bounced (no cash reversal needed: money never moved) ──
+// ── POST /:id/bounce — Returned: deposited/issued cheque dishonored by the bank ──
+// A description/reason is mandatory — no silent status change without an explanation.
 router.post('/:id/bounce', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
     const userId = req.user!.userId;
     const { notes } = req.body;
+
+    if (!notes || !String(notes).trim()) {
+      throw new AppError('A reason is required to mark a cheque as Returned', 400);
+    }
 
     const repo = Source.getRepository(Cheque);
     const cheque = await repo.findOne({ where: { id: req.params.id, branchId } });
@@ -542,12 +534,18 @@ router.post('/:id/bounce', async (req, res, next) => {
   }
 });
 
-// ── POST /:id/cancel — cancel PENDING cheque ─────────────────────────────────
+// ── POST /:id/cancel — Cancelled: manual cancellation before deposit/issue ───────
+// A description/reason is mandatory — no silent status change without an explanation.
+// Only valid pre-deposit/issue, so there is never a prior cash effect to reverse.
 router.post('/:id/cancel', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
     const userId = req.user!.userId;
     const { notes } = req.body;
+
+    if (!notes || !String(notes).trim()) {
+      throw new AppError('A reason is required to cancel a cheque', 400);
+    }
 
     const repo = Source.getRepository(Cheque);
     const cheque = await repo.findOne({ where: { id: req.params.id, branchId } });

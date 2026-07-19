@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/table';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 const EXPENSE_CATEGORIES = [
   'SALARY',
@@ -1189,6 +1190,17 @@ export default function ExpenseManagementPage() {
                   <Button onClick={exportExcel} variant="outline" className="gap-2">
                     <Download className="h-4 w-4" /> Export
                   </Button>
+                  <ExportPdfButton
+                    targetId="expenses-pdf"
+                    reportTitle="Expenses"
+                    filters={{
+                      'Date From': fromDate,
+                      'Date To': toDate,
+                      Search: search,
+                      Category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
+                      Status: statusFilter !== 'ALL' ? statusFilter : undefined,
+                    }}
+                  />
                   <Button
                     onClick={() => {
                       setEditing(null);
@@ -1201,334 +1213,339 @@ export default function ExpenseManagementPage() {
                 </div>
               </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatCard
-                  title="This Period Total"
-                  value={formatCurrency(totalMonth, currency)}
-                  subtitle="All categories"
-                />
-                <StatCard
-                  title="Approved"
-                  value={formatCurrency(approvedTotal, currency)}
-                  subtitle="This period"
-                />
-                <StatCard
-                  title="Pending Approval"
-                  value={pendingCount.toString()}
-                  subtitle="Awaiting review"
-                />
-                <StatCard
-                  title="Entries"
-                  value={expenses.length.toString()}
-                  subtitle="Total records"
-                />
-              </div>
-
-              {/* Charts section */}
-              <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
-                <button
-                  onClick={() => setChartsOpen((o) => !o)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
-                >
-                  <span className="flex items-center gap-2 font-semibold text-gray-800">
-                    <BarChart2 className="h-4 w-4 text-blue-500" />
-                    Analytics & Charts
-                  </span>
-                  {chartsOpen ? (
-                    <ChevronUp className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-gray-400" />
-                  )}
-                </button>
-                {chartsOpen && (
-                  <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                        Monthly Trend (Stacked)
-                      </h4>
-                      <StackedBarChart
-                        data={chartData?.monthlyTrend ?? []}
-                        xKey="month"
-                        keys={chartData?.categories ?? EXPENSE_CATEGORIES}
-                        currency={currency}
-                      />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                        Expense Breakdown
-                      </h4>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <PieChart>
-                          <Pie
-                            data={donutData}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="40%"
-                            cy="50%"
-                            outerRadius={80}
-                            innerRadius={45}
-                            label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
-                          >
-                            {donutData.map((entry) => (
-                              <Cell
-                                key={entry.name}
-                                fill={CATEGORY_COLORS[entry.name] ?? '#94a3b8'}
-                              />
-                            ))}
-                          </Pie>
-                          <Legend
-                            layout="vertical"
-                            align="right"
-                            verticalAlign="middle"
-                            formatter={(v) => (
-                              <span className="text-xs">{v.replace(/_/g, ' ')}</span>
-                            )}
-                          />
-                          <Tooltip formatter={(v: number) => formatCurrency(v, currency)} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                        Status Distribution
-                      </h4>
-                      <SimpleBarChart
-                        data={chartData?.statusDistribution ?? []}
-                        xKey="name"
-                        bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
-                        height={200}
-                        currency={currency}
-                      />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                        Top 6 Months by Spend
-                      </h4>
-                      <SimpleBarChart
-                        data={chartData?.topMonths ?? []}
-                        xKey="month"
-                        bars={[{ key: 'total', color: '#10b981', label: 'Total' }]}
-                        height={200}
-                        currency={currency}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-10 bg-muted/50 border-none"
-                    placeholder="Search description or expense #..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+              <div id="expenses-pdf" className="space-y-6">
+                {/* Stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatCard
+                    title="This Period Total"
+                    value={formatCurrency(totalMonth, currency)}
+                    subtitle="All categories"
+                  />
+                  <StatCard
+                    title="Approved"
+                    value={formatCurrency(approvedTotal, currency)}
+                    subtitle="This period"
+                  />
+                  <StatCard
+                    title="Pending Approval"
+                    value={pendingCount.toString()}
+                    subtitle="Awaiting review"
+                  />
+                  <StatCard
+                    title="Entries"
+                    value={expenses.length.toString()}
+                    subtitle="Total records"
                   />
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                    <SelectTrigger className="w-44 bg-card border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Categories</SelectItem>
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c.replace(/_/g, ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-36 bg-card border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">All Status</SelectItem>
-                      <SelectItem value="PENDING">Pending</SelectItem>
-                      <SelectItem value="APPROVED">Approved</SelectItem>
-                      <SelectItem value="PAID">Paid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
 
-              {/* Table */}
-              <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-                <Table>
-                  <TableHeader className="bg-muted/40">
-                    <TableRow>
-                      <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Date
-                      </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Expense #
-                      </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Category
-                      </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Description
-                      </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Source
-                      </TableHead>
-                      <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Amount
-                      </TableHead>
-                      <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Tax
-                      </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
-                          No expenses found
-                        </TableCell>
-                      </TableRow>
+                {/* Charts section */}
+                <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+                  <button
+                    onClick={() => setChartsOpen((o) => !o)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+                  >
+                    <span className="flex items-center gap-2 font-semibold text-gray-800">
+                      <BarChart2 className="h-4 w-4 text-blue-500" />
+                      Analytics & Charts
+                    </span>
+                    {chartsOpen ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400" />
                     ) : (
-                      filtered.map((row) => (
-                        <TableRow key={row.id} className="hover:bg-blue-50/50 transition-colors">
-                          <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
-                            {row.date?.slice(0, 10)}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-blue-600 font-bold">
-                            {row.expenseNo}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className="px-2 py-0.5 rounded-md text-xs font-semibold"
-                              style={{
-                                background: `${CATEGORY_COLORS[row.category] ?? '#94a3b8'}20`,
-                                color: CATEGORY_COLORS[row.category] ?? '#94a3b8',
-                              }}
+                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                  {chartsOpen && (
+                    <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                          Monthly Trend (Stacked)
+                        </h4>
+                        <StackedBarChart
+                          data={chartData?.monthlyTrend ?? []}
+                          xKey="month"
+                          keys={chartData?.categories ?? EXPENSE_CATEGORIES}
+                          currency={currency}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                          Expense Breakdown
+                        </h4>
+                        <ResponsiveContainer width="100%" height={220}>
+                          <PieChart>
+                            <Pie
+                              data={donutData}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="40%"
+                              cy="50%"
+                              outerRadius={80}
+                              innerRadius={45}
+                              label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                             >
-                              {row.category.replace(/_/g, ' ')}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
-                            {row.description}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
-                                row.source === 'Purchase'
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200'
-                              }`}
-                            >
-                              {row.source}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-red-600">
-                            {formatCurrency(row.amount, row.currency)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {row.taxAmount > 0 ? (
-                              <div className="flex flex-col items-end gap-0.5">
-                                {row.taxLabel && (
-                                  <span
-                                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide ${
-                                      row.taxLabel.toLowerCase().includes('input')
-                                        ? 'bg-green-100 text-green-700'
-                                        : row.taxLabel.toLowerCase().includes('rc') ||
-                                            row.taxLabel.toLowerCase().includes('reverse')
-                                          ? 'bg-orange-100 text-orange-700'
-                                          : 'bg-blue-50 text-blue-600'
-                                    }`}
-                                  >
-                                    {row.taxLabel}
-                                    {row.taxPercent ? ` ${row.taxPercent}%` : ''}
-                                  </span>
-                                )}
-                                <span className="text-xs font-semibold text-slate-700">
-                                  {formatCurrency(row.taxAmount, row.currency)}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[row.status] ?? ''}`}
-                            >
-                              {row.status}
-                            </span>
-                          </TableCell>
-                          <TableCell className="pr-4">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => setViewing(row)}
-                                title="View details & payment proof"
-                                className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
-                              {!row.isPurchase && row._entry && row.status === 'PENDING' && (
-                                <button
-                                  onClick={() => approveMut.mutate(row._entry!.id)}
-                                  title="Approve"
-                                  className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
-                                >
-                                  <CheckCircle className="h-3.5 w-3.5" />
-                                </button>
+                              {donutData.map((entry) => (
+                                <Cell
+                                  key={entry.name}
+                                  fill={CATEGORY_COLORS[entry.name] ?? '#94a3b8'}
+                                />
+                              ))}
+                            </Pie>
+                            <Legend
+                              layout="vertical"
+                              align="right"
+                              verticalAlign="middle"
+                              formatter={(v) => (
+                                <span className="text-xs">{v.replace(/_/g, ' ')}</span>
                               )}
-                              {!row.isPurchase &&
-                                row._entry &&
-                                row.status !== 'PAID' &&
-                                row.status !== 'REJECTED' && (
-                                  <button
-                                    onClick={() => setPaying(row._entry!)}
-                                    title="Mark Paid"
-                                    className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                                  >
-                                    <Wallet className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              {!row.isPurchase && row._entry && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setEditing(row._entry!);
-                                      setShowModal(true);
-                                    }}
-                                    className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                                    title="Edit"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm('Delete this expense?'))
-                                        deleteMut.mutate(row._entry!.id);
-                                    }}
-                                    className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
+                            />
+                            <Tooltip formatter={(v: number) => formatCurrency(v, currency)} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                          Status Distribution
+                        </h4>
+                        <SimpleBarChart
+                          data={chartData?.statusDistribution ?? []}
+                          xKey="name"
+                          bars={[{ key: 'value', color: '#3b82f6', label: 'Amount' }]}
+                          height={200}
+                          currency={currency}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                          Top 6 Months by Spend
+                        </h4>
+                        <SimpleBarChart
+                          data={chartData?.topMonths ?? []}
+                          xKey="month"
+                          bars={[{ key: 'total', color: '#10b981', label: 'Total' }]}
+                          height={200}
+                          currency={currency}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-10 bg-muted/50 border-none"
+                      placeholder="Search description or expense #..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="w-44 bg-card border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Categories</SelectItem>
+                        {EXPENSE_CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c.replace(/_/g, ' ')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-36 bg-card border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All Status</SelectItem>
+                        <SelectItem value="PENDING">Pending</SelectItem>
+                        <SelectItem value="APPROVED">Approved</SelectItem>
+                        <SelectItem value="PAID">Paid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+                  <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow>
+                        <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Date
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Expense #
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Category
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Description
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Source
+                        </TableHead>
+                        <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Amount
+                        </TableHead>
+                        <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Tax
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Status
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={9}
+                            className="text-center py-16 text-muted-foreground"
+                          >
+                            No expenses found
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      ) : (
+                        filtered.map((row) => (
+                          <TableRow key={row.id} className="hover:bg-blue-50/50 transition-colors">
+                            <TableCell className="pl-4 font-mono text-xs text-muted-foreground">
+                              {row.date?.slice(0, 10)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                              {row.expenseNo}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className="px-2 py-0.5 rounded-md text-xs font-semibold"
+                                style={{
+                                  background: `${CATEGORY_COLORS[row.category] ?? '#94a3b8'}20`,
+                                  color: CATEGORY_COLORS[row.category] ?? '#94a3b8',
+                                }}
+                              >
+                                {row.category.replace(/_/g, ' ')}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                              {row.description}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                                  row.source === 'Purchase'
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                {row.source}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-red-600">
+                              {formatCurrency(row.amount, row.currency)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {row.taxAmount > 0 ? (
+                                <div className="flex flex-col items-end gap-0.5">
+                                  {row.taxLabel && (
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide ${
+                                        row.taxLabel.toLowerCase().includes('input')
+                                          ? 'bg-green-100 text-green-700'
+                                          : row.taxLabel.toLowerCase().includes('rc') ||
+                                              row.taxLabel.toLowerCase().includes('reverse')
+                                            ? 'bg-orange-100 text-orange-700'
+                                            : 'bg-blue-50 text-blue-600'
+                                      }`}
+                                    >
+                                      {row.taxLabel}
+                                      {row.taxPercent ? ` ${row.taxPercent}%` : ''}
+                                    </span>
+                                  )}
+                                  <span className="text-xs font-semibold text-slate-700">
+                                    {formatCurrency(row.taxAmount, row.currency)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${STATUS_BADGE[row.status] ?? ''}`}
+                              >
+                                {row.status}
+                              </span>
+                            </TableCell>
+                            <TableCell className="pr-4">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => setViewing(row)}
+                                  title="View details & payment proof"
+                                  className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                                {!row.isPurchase && row._entry && row.status === 'PENDING' && (
+                                  <button
+                                    onClick={() => approveMut.mutate(row._entry!.id)}
+                                    title="Approve"
+                                    className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                  >
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {!row.isPurchase &&
+                                  row._entry &&
+                                  row.status !== 'PAID' &&
+                                  row.status !== 'REJECTED' && (
+                                    <button
+                                      onClick={() => setPaying(row._entry!)}
+                                      title="Mark Paid"
+                                      className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                    >
+                                      <Wallet className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                {!row.isPurchase && row._entry && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditing(row._entry!);
+                                        setShowModal(true);
+                                      }}
+                                      className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                      title="Edit"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        if (confirm('Delete this expense?'))
+                                          deleteMut.mutate(row._entry!.id);
+                                      }}
+                                      className="p-1.5 rounded-md hover:bg-red-50 text-red-500"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
               {showModal && (
                 <ExpenseModal

@@ -38,7 +38,9 @@ export default function EditPurchaseDialog({
 }: EditPurchaseDialogProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<UpdatePurchaseDTO>({});
-  const currencyCode = purchase.branch?.currency_code || 'AED';
+  // These cost fields are stored in the purchase's own currency (inherited from the lot at
+  // creation), which only matches the branch's currency for domestic purchases.
+  const currencyCode = purchase.currencyCode || purchase.branch?.currency_code || 'AED';
 
   useEffect(() => {
     if (open && purchase) {

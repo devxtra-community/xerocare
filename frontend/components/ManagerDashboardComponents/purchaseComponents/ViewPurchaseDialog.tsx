@@ -5,6 +5,7 @@ import { Purchase } from '@/services/purchaseService';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useExchangeRateMap, formatDualCurrency } from '@/lib/dualCurrency';
 import { Button } from '@/components/ui/button';
 import {
   FileText,
@@ -43,7 +44,15 @@ export default function ViewPurchaseDialog({
   purchase,
   onSuccess,
 }: ViewPurchaseDialogProps) {
-  const currency = useBranchCurrency();
+  const branchCurrency = useBranchCurrency();
+  const rates = useExchangeRateMap(branchCurrency);
+  // Purchase amounts (purchaseAmount/totalAmount/costs) are recorded in the purchase's own
+  // currency (currencyCode, inherited from the lot at creation) — this is only the branch
+  // currency for domestic purchases. International purchases may carry a genuinely different
+  // currency, snapshotted alongside exchangeRate at the time of purchase.
+  const currency = purchase.currencyCode || branchCurrency;
+  const dual = (amount: number) =>
+    formatDualCurrency(amount, currency, branchCurrency, rates, purchase.exchangeRate);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   const getStatusStyle = (status: string) => {
@@ -90,9 +99,7 @@ export default function ViewPurchaseDialog({
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Total Lot Amount
               </p>
-              <p className="text-xl font-black text-primary">
-                {formatCurrency(purchase.totalAmount, currency)}
-              </p>
+              <p className="text-xl font-black text-primary">{dual(purchase.totalAmount)}</p>
             </div>
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 italic">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -108,9 +115,7 @@ export default function ViewPurchaseDialog({
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                 Balance Due
               </p>
-              <p className="text-xl font-black text-red-600">
-                {formatCurrency(purchase.remainingAmount, currency)}
-              </p>
+              <p className="text-xl font-black text-red-600">{dual(purchase.remainingAmount)}</p>
             </div>
           </div>
 
@@ -151,7 +156,7 @@ export default function ViewPurchaseDialog({
                     Lot Purchase Amount
                   </span>
                   <span className="text-sm font-bold text-slate-800">
-                    {formatCurrency(purchase.purchaseAmount, currency)}
+                    {dual(purchase.purchaseAmount)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -160,7 +165,7 @@ export default function ViewPurchaseDialog({
                     Additional Costs
                   </span>
                   <span className="text-sm font-bold text-primary">
-                    {formatCurrency(purchase.totalAmount - purchase.purchaseAmount, currency)}
+                    {dual(purchase.totalAmount - purchase.purchaseAmount)}
                   </span>
                 </div>
               </div>
@@ -174,12 +179,27 @@ export default function ViewPurchaseDialog({
               Detailed Costs Breakdown
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <CostItem icon={FileCheck} label="Docs Fee" value={purchase.documentationFee} />
-              <CostItem icon={Users} label="Labour" value={purchase.labourCost} />
-              <CostItem icon={Package} label="Handling" value={purchase.handlingFee} />
-              <CostItem icon={Truck} label="Transport" value={purchase.transportationCost} />
-              <CostItem icon={Globe} label="Shipping" value={purchase.shippingCost} />
-              <CostItem icon={Wrench} label="Groundfield" value={purchase.groundfieldCost} />
+              <CostItem
+                icon={FileCheck}
+                label="Docs Fee"
+                value={purchase.documentationFee}
+                dual={dual}
+              />
+              <CostItem icon={Users} label="Labour" value={purchase.labourCost} dual={dual} />
+              <CostItem icon={Package} label="Handling" value={purchase.handlingFee} dual={dual} />
+              <CostItem
+                icon={Truck}
+                label="Transport"
+                value={purchase.transportationCost}
+                dual={dual}
+              />
+              <CostItem icon={Globe} label="Shipping" value={purchase.shippingCost} dual={dual} />
+              <CostItem
+                icon={Wrench}
+                label="Groundfield"
+                value={purchase.groundfieldCost}
+                dual={dual}
+              />
             </div>
           </div>
 
@@ -219,8 +239,10 @@ export default function ViewPurchaseDialog({
                           {new Date(p.paymentDate).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 text-slate-500">{p.paymentMethod}</td>
+                        {/* Recorded via AddPaymentModal, which collects amounts in the branch's
+                            currency regardless of the purchase's own currency. */}
                         <td className="px-4 py-3 font-black text-slate-800 text-right">
-                          {formatCurrency(p.amount, currency)}
+                          {formatCurrency(p.amount, branchCurrency)}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {p.attachmentUrl ? (
@@ -262,6 +284,8 @@ export default function ViewPurchaseDialog({
           purchaseId={purchase.id}
           totalAmount={purchase.totalAmount}
           paidAmount={purchase.paidAmount}
+          purchaseCurrency={purchase.currencyCode}
+          exchangeRate={purchase.exchangeRate}
           onSuccess={() => {
             if (onSuccess) onSuccess();
             onOpenChange(false);
@@ -278,12 +302,13 @@ function CostItem({
   icon: Icon,
   label,
   value,
+  dual,
 }: {
   icon: LucideIcon;
   label: string;
   value: number;
+  dual: (amount: number) => string;
 }) {
-  const currency = useBranchCurrency();
   return (
     <div className="p-3 rounded-lg bg-slate-50/50 border border-slate-100 italic transition-all hover:bg-white hover:shadow-sm hover:border-slate-200">
       <div className="flex items-center gap-2 mb-1">
@@ -292,7 +317,7 @@ function CostItem({
           {label}
         </span>
       </div>
-      <p className="text-sm font-bold text-slate-700">{formatCurrency(value, currency)}</p>
+      <p className="text-sm font-bold text-slate-700">{dual(value)}</p>
     </div>
   );
 }

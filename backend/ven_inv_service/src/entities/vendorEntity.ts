@@ -91,8 +91,19 @@ export class Vendor {
     accountNumber: string;
     routingNumber?: string;
     swiftCode?: string;
+    /** Country-correct bank identifier: IFSC (India), IBAN (ISO 13616 countries),
+     * or a generic bank code elsewhere. Field name kept as `iban` for storage
+     * continuity with existing data. */
     iban?: string;
     address?: string;
+    branch?: string;
+    /** ISO2 country of the BANK itself — independent of the vendor's own
+     * country field — a vendor may bank in a different country than they
+     * operate in. */
+    bankCountry?: string;
+    /** Currency this account is held/paid in — may differ from the branch's local
+     * currency. */
+    currency?: string;
     isPrimary?: boolean;
   }[];
 

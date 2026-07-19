@@ -17,6 +17,7 @@ import { SecurityDepositMode, Invoice } from '../entities/invoiceEntity';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { logger } from '../config/logger';
 import { postCashbookEntry } from './cashbookService';
+import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
 import { RentType } from '../entities/enums/rentType';
 import { RentPeriod } from '../entities/enums/rentPeriod';
 import { LeaseType } from '../entities/enums/leaseType';
@@ -4608,6 +4609,13 @@ export class BillingService {
        * payments so the cheque reads e.g. "Invoice RC-0012 — Aug 2026", not just "Invoice RC-0012".
        */
       periodLabel?: string;
+      /** Currency this payment was actually made in, when different from the
+       * invoice's own currency (e.g. paid from a foreign-currency customer bank
+       * account). Defaults to the invoice's currency when omitted. */
+      currencyCode?: string;
+      /** Rate to convert currencyCode -> invoice currency, snapshotted at payment
+       * time. Only stored when currencyCode differs from the invoice currency. */
+      exchangeRate?: number;
     },
     userId?: string,
   ): Promise<PaymentTransaction> {
@@ -4654,20 +4662,51 @@ export class BillingService {
     // so they must never count toward invoice settlement.
     const isDepositTxn = (remarks?: string) =>
       (remarks ?? '').trim().toLowerCase() === 'security deposit';
+
+    // A prior payment may have been recorded in a currency other than the
+    // invoice's own (paid from a foreign-currency customer bank account) —
+    // convert each to the invoice's currency using its own snapshotted rate
+    // before summing, rather than adding mismatched currencies raw.
+    const invoiceCurrency = invoice.currencyCode || 'AED';
+    const liveRatesForGuard =
+      priorTxns.some((t) => t.currencyCode && t.currencyCode !== invoiceCurrency) ||
+      (data.currencyCode && data.currencyCode !== invoiceCurrency)
+        ? await loadExchangeRates(Source, invoiceCurrency)
+        : null;
+    const toInvoiceCurrencyForGuard = (amount: number, currencyCode?: string, rate?: number) => {
+      if (!currencyCode || currencyCode === invoiceCurrency) return amount;
+      const rates = rate
+        ? new Map([[currencyCode, rate]])
+        : (liveRatesForGuard as Map<string, number>);
+      return convertAmt(amount, currencyCode, invoiceCurrency, rates).value;
+    };
+
     const paidSoFar =
       priorTxns
         .filter((t) => !isDepositTxn(t.remarks))
-        .reduce((sum, t) => sum + Number(t.amount), 0) +
+        .reduce(
+          (sum, t) =>
+            sum +
+            toInvoiceCurrencyForGuard(Number(t.amount), t.currencyCode, t.exchangeRateSnapshot),
+          0,
+        ) +
       legacyRows
         .filter((p) => !isDepositTxn(p.remarks))
         .reduce((sum, p) => sum + Number(p.amountPaid), 0);
 
+    // This new payment may also be in a foreign currency — convert before comparing.
+    const newPaymentInInvoiceCurrency = toInvoiceCurrencyForGuard(
+      Number(data.amount),
+      data.currencyCode,
+      data.exchangeRate,
+    );
+
     // Overpayment guard (skipped for security deposits, which sit outside the invoice total).
     if (!isSecurityDeposit && Number(invoice.totalAmount) > 0) {
       const pendingBalance = Number(invoice.totalAmount) - paidSoFar;
-      if (Number(data.amount) > pendingBalance + 0.01) {
+      if (newPaymentInInvoiceCurrency > pendingBalance + 0.01) {
         throw new AppError(
-          `Payment amount (${data.amount}) exceeds pending balance (${pendingBalance.toFixed(2)})`,
+          `Payment amount (${newPaymentInInvoiceCurrency.toFixed(2)} ${invoiceCurrency}) exceeds pending balance (${pendingBalance.toFixed(2)} ${invoiceCurrency})`,
           400,
         );
       }
@@ -4685,7 +4724,12 @@ export class BillingService {
       : new Date();
     transaction.recordedBy = userId;
     transaction.remarks = data.remarks || (isSecurityDeposit ? 'Security Deposit' : undefined);
-    transaction.currencyCode = invoice.currencyCode || undefined;
+    const paymentCurrency = data.currencyCode || invoice.currencyCode || undefined;
+    transaction.currencyCode = paymentCurrency;
+    // Only store a rate when the payment currency genuinely differs from the
+    // invoice's own — otherwise there's nothing to convert and no rate applies.
+    transaction.exchangeRateSnapshot =
+      paymentCurrency && paymentCurrency !== invoice.currencyCode ? data.exchangeRate : undefined;
     transaction.receiptUrl = data.receiptUrl;
 
     await transactionRepo.save(transaction);
@@ -4724,8 +4768,14 @@ export class BillingService {
       // incrementing, so ledgers stay correct even for invoices whose earlier
       // payments went through the legacy path. Security deposits are excluded —
       // they are refundable money held aside, not settlement of the invoice.
+      // paidSoFar and newPaymentInInvoiceCurrency (computed above, for the
+      // overpayment guard) are both already converted to the invoice's own
+      // currency — using the raw transaction.amount here instead would silently
+      // mix currencies whenever this payment's currency differs from the
+      // invoice's, corrupting paidAmount/balanceAmount and potentially marking
+      // the invoice PAID after only a fraction of its value was received.
       const round2 = (n: number) => Math.round(n * 100) / 100;
-      ledger.paidAmount = round2(paidSoFar + (isSecurityDeposit ? 0 : Number(transaction.amount)));
+      ledger.paidAmount = round2(paidSoFar + (isSecurityDeposit ? 0 : newPaymentInInvoiceCurrency));
       ledger.balanceAmount = Math.max(
         0,
         round2(Number(ledger.totalAmount) - Number(ledger.paidAmount)),
@@ -4827,10 +4877,16 @@ export class BillingService {
             await chequeRepo.save(cheque);
           }
         } else {
+          // autoResolveAccount picks the branch's own default cash/bank account, which is
+          // always in the branch's currency — same currency as the invoice (invoices are
+          // always created in their branch's currency). newPaymentInInvoiceCurrency is
+          // already converted to that currency; posting the raw transaction.amount instead
+          // would silently add a foreign-currency figure straight into a branch-currency
+          // account balance whenever this payment's currency differs from the invoice's.
           await postCashbookEntry({
             date: toBusinessDate(transaction.transactionDate),
             entryType: 'RECEIPT',
-            amount: Number(transaction.amount),
+            amount: newPaymentInInvoiceCurrency,
             category: 'Customer Payment',
             branchId: invoice.branchId,
             createdBy: userId || '00000000-0000-0000-0000-000000000000',

@@ -6,6 +6,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import healthRouter from './routes/health';
 import { startCustomerConsumer } from './events/consumers/customerUpdatedConsumer';
 import invoiceRouter from './routes/invoiceRoutes';
+import bankReferenceRouter from './routes/bankReferenceRoutes';
 import { getAuditLogs } from './controllers/invoiceController';
 import { getProductHistory } from './controllers/productHistoryController';
 import { httpLogger } from './middleware/httplogger';
@@ -111,6 +112,12 @@ app.use(
   express.urlencoded({ limit: '50mb', extended: true }),
   invoiceRouter,
 );
+
+/**
+ * Bank/Branch Reference Data: shared, cross-cutting reference lookups for customer
+ * and vendor bank-detail forms — not owned by any single domain service.
+ */
+app.use('/bank-reference', express.json(), bankReferenceRouter);
 
 app.get(
   '/b/audit-logs/:entityId',

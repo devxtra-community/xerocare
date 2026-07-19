@@ -29,6 +29,7 @@ import {
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 import StatCard from '@/components/StatCard';
 import {
   DonutChart,
@@ -83,6 +84,13 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
     linkedCashAccountId: entry?.linkedCashAccountId ?? '',
     notes: entry?.notes ?? '',
   });
+  // Every equity movement must have a documented double-entry counterpart. Linking a cash
+  // account is the common case; this confirms non-cash entries (e.g. a non-cash capital
+  // contribution, or a paper transfer between equity types) are a deliberate choice rather
+  // than someone simply skipping the field.
+  const [confirmNonCash, setConfirmNonCash] = useState(
+    !!entry?.linkedCashAccountId === false && !!entry,
+  );
   useEffect(() => {
     if (!entry) {
       setForm((f) => ({ ...f, currency: branchCurrency }));
@@ -95,6 +103,12 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
     e.preventDefault();
     if (!form.description || !form.amount || !form.date) {
       toast.error('Date, description and amount are required');
+      return;
+    }
+    if (!form.linkedCashAccountId && !confirmNonCash) {
+      toast.error(
+        'Confirm this entry has no cash/bank movement, or link a Cash/Bank Account above',
+      );
       return;
     }
     onSave({
@@ -185,7 +199,10 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
             </label>
             <select
               value={form.linkedCashAccountId}
-              onChange={(e) => set('linkedCashAccountId', e.target.value)}
+              onChange={(e) => {
+                set('linkedCashAccountId', e.target.value);
+                if (e.target.value) setConfirmNonCash(false);
+              }}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">— none —</option>
@@ -195,6 +212,21 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                 </option>
               ))}
             </select>
+            {!form.linkedCashAccountId && (
+              <label className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={confirmNonCash}
+                  onChange={(e) => setConfirmNonCash(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  This entry does not involve any cash/bank account movement (e.g. a non-cash
+                  contribution, or a transfer between equity types) — confirm this is intentional.
+                  No cashbook entry will be created.
+                </span>
+              </label>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
@@ -345,12 +377,19 @@ export default function EquityPage() {
             Track owner&apos;s equity, capital movements and financial position
           </p>
         </div>
-        <button
-          onClick={() => setModal('add')}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" /> New Equity Entry
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportPdfButton
+            targetId={`equity-${tab}-pdf`}
+            reportTitle={`Equity — ${tabs.find((t) => t.id === tab)?.label ?? tab}`}
+            filenamePrefix="Equity"
+          />
+          <button
+            onClick={() => setModal('add')}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> New Equity Entry
+          </button>
+        </div>
       </div>
 
       {/* Equity Position Banner */}
@@ -403,7 +442,7 @@ export default function EquityPage() {
 
       {/* ── Overview Tab ── */}
       {tab === 'overview' && (
-        <div className="space-y-6">
+        <div id="equity-overview-pdf" className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard
               title="Share Capital"
@@ -495,7 +534,10 @@ export default function EquityPage() {
 
       {/* ── Entries Tab ── */}
       {tab === 'entries' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div
+          id="equity-entries-pdf"
+          className="bg-white rounded-xl shadow-sm border overflow-hidden"
+        >
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="font-semibold text-gray-800">Equity Entries ({entries.length})</h3>
             <button
@@ -583,7 +625,7 @@ export default function EquityPage() {
 
       {/* ── Statement of Changes Tab ── */}
       {tab === 'statement' && (
-        <div className="space-y-4">
+        <div id="equity-statement-pdf" className="space-y-4">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-gray-700">Year:</label>
             <select
@@ -697,7 +739,7 @@ export default function EquityPage() {
 
       {/* ── Balance Sheet Tab ── */}
       {tab === 'balance' && (
-        <div className="space-y-4">
+        <div id="equity-balance-pdf" className="space-y-4">
           {balanceSheet ? (
             <>
               {/* Balance check banner */}

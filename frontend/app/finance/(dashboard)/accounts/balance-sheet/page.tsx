@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 function BSRow({
   label,
@@ -152,6 +153,11 @@ export default function BalanceSheetPage() {
           >
             <Download className="h-4 w-4" /> Export CSV
           </Button>
+          <ExportPdfButton
+            targetId="balance-sheet-pdf"
+            reportTitle="Balance Sheet"
+            filters={{ 'As Of': asOfDate }}
+          />
         </div>
       </div>
 
@@ -164,7 +170,7 @@ export default function BalanceSheetPage() {
           <p className="text-red-700 font-medium">Failed to load balance sheet. Please refresh.</p>
         </div>
       ) : (
-        <>
+        <div id="balance-sheet-pdf" className="space-y-6">
           {dataWarnings.length > 0 && (
             <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
               <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
@@ -340,7 +346,7 @@ export default function BalanceSheetPage() {
             AR = outstanding invoices (INVOICED status) + manual receivables · VAT payable = tax
             collected on PAID/INVOICED invoices · Equity from equity entries module
           </p>
-        </>
+        </div>
       )}
     </div>
   );

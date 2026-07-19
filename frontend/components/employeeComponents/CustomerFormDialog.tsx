@@ -21,6 +21,9 @@ import { Loader2, User, Mail, Save, MapPin, Plus, Star, Trash } from 'lucide-rea
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { BankBranchSelector } from '@/components/shared/BankBranchSelector';
+import { getBankCodeLabel } from '@/lib/bankCodeType';
+import { currencyOptions, getDefaultCurrencyForCountry } from '@/lib/currencyList';
 
 import { Customer, CreateCustomerData, CustomerBankAccount } from '@/lib/customer';
 import { getCountryDataList } from 'countries-list';
@@ -60,6 +63,9 @@ const BLANK_BANK: CustomerBankAccount = {
   swiftCode: '',
   iban: '',
   address: '',
+  branch: '',
+  bankCountry: '',
+  currency: '',
   isPrimary: false,
 };
 
@@ -190,7 +196,7 @@ export default function CustomerFormDialog({
     if (addingBank && draftHasData) {
       if (!bankDraft.bankName || !bankDraft.accountHolderName || !bankDraft.accountNumber) {
         toast.error(
-          'Please complete the bank account details (Bank Name, Account Holder Name, Account Number) or cancel the bank form before saving',
+          'Please complete the bank account details (Name of the Bank, Account Beneficiary, Account Number) or cancel the bank form before saving',
         );
         return;
       }
@@ -489,7 +495,11 @@ export default function CustomerFormDialog({
                     className="h-7 text-[11px] gap-1 border-blue-200 text-blue-700"
                     onClick={() => {
                       setAddingBank(true);
-                      setBankDraft({ ...BLANK_BANK });
+                      setBankDraft({
+                        ...BLANK_BANK,
+                        bankCountry: formData.country ?? '',
+                        currency: getDefaultCurrencyForCountry(formData.country),
+                      });
                     }}
                   >
                     <Plus className="h-3 w-3" /> Add Bank Account
@@ -525,7 +535,7 @@ export default function CustomerFormDialog({
                         {(acc.swiftCode || acc.iban || acc.address) && (
                           <p className="text-[10px] text-gray-400 mt-0.5">
                             {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
-                            {acc.iban && ` • IBAN: ${acc.iban}`}
+                            {acc.iban && ` • ${getBankCodeLabel(acc.bankCountry)}: ${acc.iban}`}
                             {acc.address && ` • ${acc.address}`}
                           </p>
                         )}
@@ -559,21 +569,42 @@ export default function CustomerFormDialog({
                   <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
                     New Bank Account
                   </p>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      Bank Country *
+                    </label>
+                    <SearchableSelect
+                      options={COUNTRY_OPTIONS}
+                      value={bankDraft.bankCountry || ''}
+                      onValueChange={(v) =>
+                        setBankDraft((d) => ({
+                          ...d,
+                          bankCountry: v,
+                          currency: getDefaultCurrencyForCountry(v),
+                        }))
+                      }
+                      placeholder="Country where this bank is located"
+                      emptyText="No country found."
+                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                    />
+                  </div>
+                  <BankBranchSelector
+                    bankCountryCode={bankDraft.bankCountry}
+                    bankName={bankDraft.bankName}
+                    onBankNameChange={(v) => setBankDraft((d) => ({ ...d, bankName: v }))}
+                    branch={bankDraft.branch}
+                    onBranchChange={(v) => setBankDraft((d) => ({ ...d, branch: v }))}
+                    code={bankDraft.iban}
+                    onCodeChange={(v) => setBankDraft((d) => ({ ...d, iban: v }))}
+                    onIfscVerified={(r) =>
+                      setBankDraft((d) => ({ ...d, address: r.address || d.address }))
+                    }
+                    required
+                  />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-400 uppercase">
-                        Bank Name *
-                      </label>
-                      <Input
-                        placeholder="e.g. QNB"
-                        value={bankDraft.bankName}
-                        onChange={(e) => setBankDraft((d) => ({ ...d, bankName: e.target.value }))}
-                        className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">
-                        Account Holder *
+                        Account Beneficiary *
                       </label>
                       <Input
                         placeholder="Full name on account"
@@ -632,22 +663,26 @@ export default function CustomerFormDialog({
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase">IBAN</label>
-                      <Input
-                        placeholder="IBAN (if applicable)"
-                        value={bankDraft.iban || ''}
-                        onChange={(e) => setBankDraft((d) => ({ ...d, iban: e.target.value }))}
-                        className="h-9 text-sm font-mono rounded-lg bg-card border-none shadow-sm"
-                      />
-                    </div>
-                    <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-400 uppercase">
-                        Address
+                        Bank Address
                       </label>
                       <Input
                         placeholder="Bank address"
                         value={bankDraft.address || ''}
                         onChange={(e) => setBankDraft((d) => ({ ...d, address: e.target.value }))}
+                        className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase">
+                        Currency
+                      </label>
+                      <SearchableSelect
+                        options={currencyOptions()}
+                        value={bankDraft.currency || ''}
+                        onValueChange={(v) => setBankDraft((d) => ({ ...d, currency: v }))}
+                        placeholder="Currency this account is held/paid in"
+                        emptyText="No currency found."
                         className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
                       />
                     </div>

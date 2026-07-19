@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/table';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
@@ -227,15 +228,23 @@ function PaymentModal({
     paidFromAccount: accounts[0]?.id ?? '',
     paymentMode: 'Bank Transfer',
     referenceNo: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDueDate: '',
     notes: '',
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const isCheque = form.paymentMode === 'Cheque';
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: () =>
       recordPayablePayment(payable.id, { ...form, amount: parseFloat(form.amount) }),
     onSuccess: () => {
-      toast.success('Payment recorded');
+      toast.success(
+        isCheque
+          ? 'Cheque recorded (PENDING). Go to Accounts → Cheques to clear when it clears the bank.'
+          : 'Payment recorded',
+      );
       qc.invalidateQueries({ queryKey: ['manual-payables'] });
       qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
       onClose();
@@ -279,21 +288,23 @@ function PaymentModal({
               />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
-            <Select value={form.paidFromAccount} onValueChange={(v) => set('paidFromAccount', v)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isCheque && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
+              <Select value={form.paidFromAccount} onValueChange={(v) => set('paidFromAccount', v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-muted-foreground">Payment Mode</label>
             <Select value={form.paymentMode} onValueChange={(v) => set('paymentMode', v)}>
@@ -309,14 +320,57 @@ function PaymentModal({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Reference #</label>
-            <Input
-              value={form.referenceNo}
-              onChange={(e) => set('referenceNo', e.target.value)}
-              className="mt-1"
-            />
-          </div>
+          {isCheque ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-xs font-semibold text-amber-700">
+                Cheque issued to vendor — bank balance updates when Finance clears it in Accounts →
+                Cheques.
+              </p>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Cheque Number *</label>
+                <Input
+                  required
+                  placeholder="e.g. CHQ-001234"
+                  value={form.chequeNumber}
+                  onChange={(e) => set('chequeNumber', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Name of the Bank *
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. Emirates NBD"
+                    value={form.chequeBankName}
+                    onChange={(e) => set('chequeBankName', e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Due Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.chequeDueDate}
+                    onChange={(e) => set('chequeDueDate', e.target.value)}
+                    className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Reference #</label>
+              <Input
+                value={form.referenceNo}
+                onChange={(e) => set('referenceNo', e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          )}
         </div>
         <div className="flex gap-3 px-6 pb-5">
           <Button variant="outline" onClick={onClose} className="flex-1">
@@ -646,251 +700,266 @@ export default function AccountsPayablePage() {
           <Button onClick={exportExcel} variant="outline" className="gap-2">
             <Download className="h-4 w-4" /> Export
           </Button>
+          <ExportPdfButton
+            targetId="payable-pdf"
+            reportTitle="Accounts Payable"
+            filters={{
+              Search: search,
+              Type: typeFilter !== 'ALL' ? typeFilter.replace(/_/g, ' ') : undefined,
+              Aging: agingFilter !== 'ALL' ? agingFilter : undefined,
+            }}
+          />
           <Button onClick={() => setShowAdd(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Add Payable
           </Button>
         </div>
       </div>
 
-      {/* Aging Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard
-          title="Total Payable"
-          value={formatCurrency(totalPayable, currency)}
-          subtitle="All payables"
-        />
-        {AGING_BUCKETS.map((b) => (
+      <div id="payable-pdf" className="space-y-6">
+        {/* Aging Summary */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
-            key={b}
-            title={b}
-            value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0, currency)}
-            subtitle=""
+            title="Total Payable"
+            value={formatCurrency(totalPayable, currency)}
+            subtitle="All payables"
           />
-        ))}
-      </div>
-
-      {/* Charts section */}
-      <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
-        <button
-          onClick={() => setChartsOpen((o) => !o)}
-          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
-        >
-          <span className="flex items-center gap-2 font-semibold text-gray-800">
-            <BarChart2 className="h-4 w-4 text-amber-500" />
-            AP Analytics
-          </span>
-          {chartsOpen ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
-          )}
-        </button>
-        {chartsOpen && (
-          <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                AP Aging Analysis
-              </h4>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={agingTotals} barSize={40}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="bucket"
-                    tick={{ fontSize: 11 }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    formatter={(v: number) => formatCurrency(v, currency)}
-                    contentStyle={{ borderRadius: '10px', fontSize: '12px' }}
-                  />
-                  <Bar dataKey="total" name="Payable" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Payable by Type
-              </h4>
-              <DonutChart data={payCharts?.byType ?? []} height={200} currency={currency} />
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Top 5 Vendors</h4>
-              <HorizontalBarChart
-                data={payCharts?.topVendors ?? []}
-                height={200}
-                color="#f59e0b"
-                currency={currency}
-              />
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                Monthly Payments
-              </h4>
-              <SimpleBarChart
-                data={payCharts?.monthly ?? []}
-                xKey="month"
-                bars={[
-                  { key: 'payable', color: '#f59e0b', label: 'Payable' },
-                  { key: 'paid', color: '#10b981', label: 'Paid' },
-                ]}
-                height={200}
-                currency={currency}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-10 bg-muted/50 border-none"
-            placeholder="Search payable to or reference..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          {AGING_BUCKETS.map((b) => (
+            <StatCard
+              key={b}
+              title={b}
+              value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0, currency)}
+              subtitle=""
+            />
+          ))}
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-44 bg-card border-border">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Types</SelectItem>
-              {PAYABLE_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t.replace(/_/g, ' ')}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={agingFilter} onValueChange={setAgingFilter}>
-            <SelectTrigger className="w-40 bg-card border-border">
-              <SelectValue placeholder="All Aging" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Aging</SelectItem>
-              {AGING_BUCKETS.map((b) => (
-                <SelectItem key={b} value={b}>
-                  {b}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-        <Table>
-          <TableHeader className="bg-muted/40">
-            <TableRow>
-              <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Payable To
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Ref #
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Type
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Due Date
-              </TableHead>
-              <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Amount
-              </TableHead>
-              <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Paid
-              </TableHead>
-              <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Outstanding
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Aging
-              </TableHead>
-              <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
-                  No payables found
-                </TableCell>
-              </TableRow>
+        {/* Charts section */}
+        <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+          <button
+            onClick={() => setChartsOpen((o) => !o)}
+            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+          >
+            <span className="flex items-center gap-2 font-semibold text-gray-800">
+              <BarChart2 className="h-4 w-4 text-amber-500" />
+              AP Analytics
+            </span>
+            {chartsOpen ? (
+              <ChevronUp className="h-4 w-4 text-gray-400" />
             ) : (
-              filtered.map((p) => (
-                <TableRow key={p.id} className="hover:bg-blue-50/50 transition-colors">
-                  <TableCell className="pl-4 font-medium text-slate-800">{p.payableTo}</TableCell>
-                  <TableCell className="font-mono text-xs text-amber-600 font-bold">
-                    {p.referenceNo}
-                  </TableCell>
-                  <TableCell>
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                      {p.type.replace(/_/g, ' ')}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    <span
-                      className={
-                        p.aging !== 'Current' ? 'text-red-600 font-medium' : 'text-muted-foreground'
-                      }
-                    >
-                      {p.dueDate?.slice(0, 10) ?? '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right text-muted-foreground text-sm">
-                    {formatCurrency(p.amount, p.currency)}
-                  </TableCell>
-                  <TableCell className="text-right text-emerald-600 font-medium text-sm">
-                    {formatCurrency(p.amountPaid, p.currency)}
-                  </TableCell>
-                  <TableCell className="text-right font-bold text-slate-800">
-                    {formatCurrency(p.outstanding ?? 0, p.currency)}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${AGING_COLORS[p.aging] ?? ''}`}
-                    >
-                      {p.aging}
-                    </span>
-                  </TableCell>
-                  <TableCell className="pr-4">
-                    {!p.isPurchase && (p.outstanding ?? 0) > 0 && (
-                      <button
-                        onClick={() => {
-                          if (p.isExpense) {
-                            const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
-                            setPayingForExpense({ ...raw, outstanding: p.outstanding ?? 0 });
-                          } else {
-                            setPayingFor(p as unknown as ManualPayable);
-                          }
-                        }}
-                        className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600"
-                        title="Record Payment"
-                      >
-                        <CreditCard className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            )}
+          </button>
+          {chartsOpen && (
+            <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  AP Aging Analysis
+                </h4>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={agingTotals} barSize={40}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis
+                      dataKey="bucket"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => formatCurrency(v, currency)}
+                      contentStyle={{ borderRadius: '10px', fontSize: '12px' }}
+                    />
+                    <Bar dataKey="total" name="Payable" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  Payable by Type
+                </h4>
+                <DonutChart data={payCharts?.byType ?? []} height={200} currency={currency} />
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  Top 5 Vendors
+                </h4>
+                <HorizontalBarChart
+                  data={payCharts?.topVendors ?? []}
+                  height={200}
+                  color="#f59e0b"
+                  currency={currency}
+                />
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                  Monthly Payments
+                </h4>
+                <SimpleBarChart
+                  data={payCharts?.monthly ?? []}
+                  xKey="month"
+                  bars={[
+                    { key: 'payable', color: '#f59e0b', label: 'Payable' },
+                    { key: 'paid', color: '#10b981', label: 'Paid' },
+                  ]}
+                  height={200}
+                  currency={currency}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-10 bg-muted/50 border-none"
+              placeholder="Search payable to or reference..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-44 bg-card border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                {PAYABLE_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t.replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={agingFilter} onValueChange={setAgingFilter}>
+              <SelectTrigger className="w-40 bg-card border-border">
+                <SelectValue placeholder="All Aging" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Aging</SelectItem>
+                {AGING_BUCKETS.map((b) => (
+                  <SelectItem key={b} value={b}>
+                    {b}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Payable To
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Ref #
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Type
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Due Date
+                </TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Amount
+                </TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Paid
+                </TableHead>
+                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Outstanding
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Aging
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
+                  Actions
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-16 text-muted-foreground">
+                    No payables found
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                filtered.map((p) => (
+                  <TableRow key={p.id} className="hover:bg-blue-50/50 transition-colors">
+                    <TableCell className="pl-4 font-medium text-slate-800">{p.payableTo}</TableCell>
+                    <TableCell className="font-mono text-xs text-amber-600 font-bold">
+                      {p.referenceNo}
+                    </TableCell>
+                    <TableCell>
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                        {p.type.replace(/_/g, ' ')}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <span
+                        className={
+                          p.aging !== 'Current'
+                            ? 'text-red-600 font-medium'
+                            : 'text-muted-foreground'
+                        }
+                      >
+                        {p.dueDate?.slice(0, 10) ?? '—'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground text-sm">
+                      {formatCurrency(p.amount, p.currency)}
+                    </TableCell>
+                    <TableCell className="text-right text-emerald-600 font-medium text-sm">
+                      {formatCurrency(p.amountPaid, p.currency)}
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-slate-800">
+                      {formatCurrency(p.outstanding ?? 0, p.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${AGING_COLORS[p.aging] ?? ''}`}
+                      >
+                        {p.aging}
+                      </span>
+                    </TableCell>
+                    <TableCell className="pr-4">
+                      {!p.isPurchase && (p.outstanding ?? 0) > 0 && (
+                        <button
+                          onClick={() => {
+                            if (p.isExpense) {
+                              const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
+                              setPayingForExpense({ ...raw, outstanding: p.outstanding ?? 0 });
+                            } else {
+                              setPayingFor(p as unknown as ManualPayable);
+                            }
+                          }}
+                          className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600"
+                          title="Record Payment"
+                        >
+                          <CreditCard className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {showAdd && (
