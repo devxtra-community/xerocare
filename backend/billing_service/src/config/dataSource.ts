@@ -227,6 +227,7 @@ async function runPreMigrations() {
         ALTER TABLE invoices 
         ADD COLUMN IF NOT EXISTS "billType" invoices_billtype_enum NULL,
         ADD COLUMN IF NOT EXISTS "serviceTicketId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "serviceContractId" UUID NULL,
         ADD COLUMN IF NOT EXISTS "maxCopyLimit" INTEGER NULL,
         ADD COLUMN IF NOT EXISTS "warrantyType" invoices_warrantytype_enum NOT NULL DEFAULT 'none',
         ADD COLUMN IF NOT EXISTS "warrantyDurationValue" INTEGER NULL,

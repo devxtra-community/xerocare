@@ -78,7 +78,7 @@ const menuItems = [
     href: '/manager/spare-parts',
   },
   {
-    title: 'Sales',
+    title: 'Sales Desk',
     icon: ShoppingCart,
     subItems: [
       {
@@ -87,14 +87,59 @@ const menuItems = [
         href: '/manager/sales',
       },
       {
+        title: 'Direct Sale',
+        icon: ShoppingCart,
+        href: '/employee/sales',
+      },
+      {
+        title: 'Quotations',
+        icon: FileText,
+        href: '/employee/quotations',
+      },
+      {
+        title: 'Orders',
+        icon: ShoppingCart,
+        href: '/employee/orders',
+      },
+      {
         title: 'Templates',
         icon: FileText,
         href: '/manager/sales/templates',
       },
       {
+        title: 'Customers',
+        icon: Users,
+        href: '/employee/customers',
+      },
+      {
+        title: 'Leads',
+        icon: Award,
+        href: '/employee/leads',
+      },
+      {
+        title: 'Rent',
+        icon: FileText,
+        href: '/employee/rent',
+      },
+      {
+        title: 'Lease',
+        icon: FileText,
+        href: '/employee/lease',
+      },
+      {
         title: 'Returns',
         icon: RotateCcw,
         href: '/manager/sales/returns',
+      },
+      {
+        title: 'Service',
+        icon: Settings,
+        href: '/employee/service',
+      },
+      {
+        title: 'Service Contracts',
+        icon: FileText,
+        href: '/employee/service/contracts',
       },
     ],
   },
@@ -125,11 +170,6 @@ const menuItems = [
     ],
   },
   {
-    title: 'Employees',
-    icon: Users,
-    href: '/manager/employees',
-  },
-  {
     title: 'Targets',
     icon: TrendingUp,
     href: '/manager/targets',
@@ -138,6 +178,11 @@ const menuItems = [
     title: 'HR Desk',
     icon: Users,
     subItems: [
+      {
+        title: 'Employees',
+        icon: Users,
+        href: '/manager/employees',
+      },
       {
         title: 'Leave Approvals',
         icon: FileText,
@@ -152,37 +197,6 @@ const menuItems = [
         title: 'Payroll',
         icon: DollarSign,
         href: '/hr/payroll',
-      },
-    ],
-  },
-  {
-    title: 'Sales Desk',
-    icon: ShoppingCart,
-    subItems: [
-      {
-        title: 'Quotations',
-        icon: FileText,
-        href: '/employee/quotations',
-      },
-      {
-        title: 'Orders',
-        icon: ShoppingCart,
-        href: '/employee/orders',
-      },
-      {
-        title: 'Customers',
-        icon: Users,
-        href: '/employee/customers',
-      },
-      {
-        title: 'Leads',
-        icon: Award,
-        href: '/employee/leads',
-      },
-      {
-        title: 'Service',
-        icon: Settings,
-        href: '/employee/service',
       },
     ],
   },
@@ -375,7 +389,7 @@ export default function ManagerSidebar() {
                           <div className="flex items-center gap-3 px-3">
                             <item.icon className="h-4 w-4" />
                             <span className="font-medium">{item.title}</span>
-                            {item.title === 'Sales' && expiryCount > 0 && (
+                            {item.title === 'Sales Desk' && expiryCount > 0 && (
                               <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse ml-2">
                                 {expiryCount}
                               </span>

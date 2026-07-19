@@ -1458,6 +1458,56 @@ export const getInvoiceAuditLogs = async (req: Request, res: Response, next: Nex
   }
 };
 
+export const createServiceContractInvoice = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      customerId,
+      branchId,
+      createdBy,
+      serviceContractId,
+      billType,
+      description,
+      amount,
+      initialPayment,
+    } = req.body;
+    if (!customerId || !branchId || !serviceContractId || !billType) {
+      throw new AppError('customerId, branchId, serviceContractId and billType are required.', 400);
+    }
+    if (!amount || Number(amount) <= 0) {
+      throw new AppError('amount must be greater than 0.', 400);
+    }
+    const invoice = await billingService.createContractInvoice({
+      customerId,
+      branchId,
+      createdBy: createdBy || 'SYSTEM',
+      serviceContractId,
+      billType,
+      description: description || `${billType} Service Contract`,
+      amount: Number(amount),
+      initialPayment:
+        initialPayment && Number(initialPayment.amount) > 0
+          ? {
+              amount: Number(initialPayment.amount),
+              paymentMode: initialPayment.paymentMode,
+              paymentDate: initialPayment.paymentDate,
+              referenceNumber: initialPayment.referenceNumber,
+              remarks: initialPayment.remarks,
+            }
+          : undefined,
+    });
+    return res.status(201).json({
+      success: true,
+      data: invoice,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createServiceQuotation = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {

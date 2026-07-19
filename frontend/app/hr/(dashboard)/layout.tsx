@@ -1,13 +1,13 @@
 import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import HrSidebar from '@/components/HrComponents/HrAppSidebar';
+import RoleAwareSidebar from '@/components/RoleAwareSidebar';
 import DashboardHeader from '@/components/DashboardHeader';
 
 export default function HRLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <HrSidebar />
+        <RoleAwareSidebar fallback="hr" />
 
         <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
           <DashboardHeader />

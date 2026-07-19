@@ -1651,6 +1651,23 @@ function QuotationFormModal({
   }, [quotationType]);
 
   // ── Sale item helpers ────────────────────────────────────────────────────
+  // Prefill the warranty configuration from the product's stored warranty
+  // (e.g. "2 Years" + max pages) unless the user already set one.
+  const applyProductWarrantyDefaults = (pr: Product) => {
+    if (warrantyType !== 'none' || warrantyDurationValue || warrantyCopyLimit) return;
+    const durationMatch = (pr.warranty || '').match(/(\d+)\s*(year|month)/i);
+    const maxPages = pr.warranty_max_pages;
+    if (!durationMatch && !maxPages) return;
+    if (durationMatch) {
+      setWarrantyDurationValue(durationMatch[1]);
+      setWarrantyDurationUnit(
+        durationMatch[2].toLowerCase().startsWith('year') ? 'years' : 'months',
+      );
+    }
+    if (maxPages) setWarrantyCopyLimit(String(maxPages));
+    setWarrantyType(durationMatch && maxPages ? 'both' : durationMatch ? 'duration' : 'copies');
+  };
+
   const addItem = (item: SelectableItem) => {
     let description = '',
       basePrice = 0,
@@ -1746,6 +1763,8 @@ function QuotationFormModal({
       toast.error(`Item is out of stock.`);
       return;
     }
+
+    if (!isSparePart) applyProductWarrantyDefaults(item as Product);
 
     setSaleItems((prev) => [
       ...prev,
@@ -2949,7 +2968,7 @@ function QuotationFormModal({
                                     className="min-h-[60px] text-sm resize-none bg-slate-50/50"
                                   />
                                 </div>
-                                {quotationType === 'SPAREPART_SALE' ? (
+                                {quotationType === 'SPAREPART_SALE' && (
                                   <div className="md:col-span-2 space-y-1">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase">
                                       Quantity
@@ -2962,20 +2981,6 @@ function QuotationFormModal({
                                         updateItem(index, 'quantity', Number(e.target.value))
                                       }
                                       className="h-9 text-sm bg-slate-50/50 text-center font-bold"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="md:col-span-2 space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                      Warranty
-                                    </label>
-                                    <Input
-                                      placeholder="e.g. 1 Year"
-                                      value={item.warranty}
-                                      onChange={(e) =>
-                                        updateItem(index, 'warranty', e.target.value)
-                                      }
-                                      className="h-9 text-sm bg-slate-50/50"
                                     />
                                   </div>
                                 )}
@@ -3013,7 +3018,9 @@ function QuotationFormModal({
                               </div>
                             ) : (
                               <>
-                                <div className="md:col-span-4 space-y-1">
+                                <div
+                                  className={`space-y-1 ${item.itemType === 'SPAREPART' ? 'md:col-span-4' : 'md:col-span-6'}`}
+                                >
                                   <label className="text-[9px] font-bold text-slate-400 uppercase">
                                     Description
                                   </label>
@@ -3027,7 +3034,7 @@ function QuotationFormModal({
                                   />
                                 </div>
 
-                                {item.itemType === 'SPAREPART' ? (
+                                {item.itemType === 'SPAREPART' && (
                                   <div className="md:col-span-2 space-y-1">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase">
                                       Quantity
@@ -3040,20 +3047,6 @@ function QuotationFormModal({
                                         updateItem(index, 'quantity', Number(e.target.value))
                                       }
                                       className="h-9 text-sm bg-slate-50/50 text-center font-bold"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="md:col-span-2 space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase">
-                                      Warranty
-                                    </label>
-                                    <Input
-                                      placeholder="e.g. 1 Year"
-                                      value={item.warranty}
-                                      onChange={(e) =>
-                                        updateItem(index, 'warranty', e.target.value)
-                                      }
-                                      className="h-9 text-sm bg-slate-50/50"
                                     />
                                   </div>
                                 )}

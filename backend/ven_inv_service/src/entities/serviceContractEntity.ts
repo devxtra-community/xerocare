@@ -46,6 +46,11 @@ export class ServiceContract {
   @Column({ type: 'numeric', precision: 12, scale: 2, default: 0 })
   contractValue!: number;
 
+  /** Lump-sum invoice raised in billing_service at signing (AMC). Installment
+   *  payments are recorded against this same invoice as they come in. */
+  @Column({ type: 'uuid', nullable: true })
+  invoiceId!: string | null;
+
   // Coverage is derived from contractType server-side; kept as a column so
   // billing snapshots stay correct if type rules ever change.
   @Column({ type: 'jsonb', nullable: true })

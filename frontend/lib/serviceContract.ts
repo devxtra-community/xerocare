@@ -61,6 +61,8 @@ export interface ServiceContract {
   startDate: string;
   endDate: string;
   contractValue: number;
+  /** AMC lump-sum invoice raised in billing at signing; null until an AMC contract is saved. */
+  invoiceId?: string | null;
   coverageRules: ContractCoverage;
   status: string;
   notes?: string | null;
@@ -117,8 +119,16 @@ export const getServiceContractById = async (id: string): Promise<ServiceContrac
   return response.data.data;
 };
 
+export interface ContractInitialPayment {
+  amount: number;
+  paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD';
+  paymentDate?: string;
+  referenceNumber?: string;
+  remarks?: string;
+}
+
 export const createServiceContract = async (
-  data: Partial<ServiceContract>,
+  data: Partial<ServiceContract> & { initialPayment?: ContractInitialPayment },
 ): Promise<ServiceContract> => {
   const response = await api.post('/i/service/contracts', data);
   return response.data.data;

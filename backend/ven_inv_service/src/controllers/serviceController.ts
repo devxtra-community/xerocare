@@ -3247,12 +3247,15 @@ export class ServiceController {
       startMeterColor: null,
     };
 
+    // Every contract type is invoiced in full at signing (AMC's fixed annual fee; SMA/FSMA's
+    // agreed contract value, separate from their recurring metered usage charges) — so a
+    // contract value is always required, regardless of type.
+    if (!fields.contractValue || fields.contractValue <= 0) {
+      throw new AppError('Contract value must be greater than 0.', 400);
+    }
+
     if (contractType === ServiceContractType.AMC) {
-      const monthlyCharge = numOrNull(body.monthlyCharge);
-      if (monthlyCharge === null || monthlyCharge <= 0) {
-        throw new AppError('AMC contracts require a monthly charge greater than 0.', 400);
-      }
-      fields.monthlyCharge = monthlyCharge;
+      // AMC has no type-specific fields beyond contractValue (checked above).
     } else if (contractType === ServiceContractType.SMA) {
       const copyLimit = numOrNull(body.copyLimit);
       const startMeterReading = numOrNull(body.startMeterReading);
@@ -3366,6 +3369,55 @@ export class ServiceController {
         status: status || 'ACTIVE',
       });
       await contractRepo.save(contract);
+
+      // Every contract (AMC, SMA, FSMA) is invoiced in full for its contractValue at signing,
+      // so Finance can track paid/pending from day one. If an amount was collected at
+      // signing, record it against this same invoice immediately.
+      if (contract.contractValue > 0) {
+        const branchId = req.user?.branchId || req.body.branchId;
+        if (branchId) {
+          try {
+            const token = sign(
+              { userId: 'ven_inv_service', role: 'ADMIN' },
+              ACCESS_SECRET as string,
+              { expiresIn: '1m' },
+            );
+            const initialPayment = req.body.initialPayment;
+            const response = await axios.post(
+              `${BILLING_SERVICE_URL}/invoices/service-contract`,
+              {
+                customerId,
+                branchId,
+                createdBy: req.user?.userId || 'SYSTEM',
+                serviceContractId: contract.id,
+                billType: fields.contractType,
+                description: `${fields.contractType} Service Contract (${start.toLocaleDateString()} – ${end.toLocaleDateString()})`,
+                amount: contract.contractValue,
+                initialPayment:
+                  initialPayment && Number(initialPayment.amount) > 0
+                    ? {
+                        amount: Number(initialPayment.amount),
+                        paymentMode: initialPayment.paymentMode,
+                        paymentDate: initialPayment.paymentDate,
+                        referenceNumber: initialPayment.referenceNumber,
+                        remarks: initialPayment.remarks,
+                      }
+                    : undefined,
+              },
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+            if (response.data?.success) {
+              contract.invoiceId = response.data.data.id;
+              await contractRepo.save(contract);
+            }
+          } catch (billingErr) {
+            logger.error('Failed to create contract invoice in billing service:', billingErr);
+          }
+        } else {
+          logger.error('Cannot create contract invoice: no branchId available.');
+        }
+      }
+
       res.status(201).json({ success: true, data: contract });
     } catch (error) {
       next(error);
@@ -3539,6 +3591,14 @@ export class ServiceController {
         };
       });
 
+      // Only work that finance has approved and the technician has actually finished
+      // should count toward the contract's service history / total cost — a ticket
+      // still awaiting finance approval (or otherwise in progress) isn't a completed
+      // service yet.
+      const completedTicketSummaries = ticketSummaries.filter(
+        (t) => t.status === ServiceTicketStatus.COMPLETED,
+      );
+
       const data = {
         ...contract,
         machine: product
@@ -3553,11 +3613,10 @@ export class ServiceController {
         readings,
         totalBilled,
         serviceHistory: {
-          ticketCount: ticketSummaries.length,
-          completedCount: ticketSummaries.filter((t) => t.status === ServiceTicketStatus.COMPLETED)
-            .length,
-          totalServiceCost: ticketSummaries.reduce((sum, t) => sum + t.totalCost, 0),
-          tickets: ticketSummaries,
+          ticketCount: completedTicketSummaries.length,
+          completedCount: completedTicketSummaries.length,
+          totalServiceCost: completedTicketSummaries.reduce((sum, t) => sum + t.totalCost, 0),
+          tickets: completedTicketSummaries,
         },
       };
 
@@ -3620,6 +3679,12 @@ export class ServiceController {
       const contractRepo = Source.getRepository(ServiceContract);
       const contract = await contractRepo.findOne({ where: { id: id as string } });
       if (!contract) throw new Error('Service Contract not found');
+      if (contract.invoiceId) {
+        throw new AppError(
+          'This contract has already been invoiced and cannot be deleted. Edit it instead.',
+          400,
+        );
+      }
       await contractRepo.remove(contract);
       res.status(200).json({ success: true, message: 'Service Contract deleted successfully' });
     } catch (error) {

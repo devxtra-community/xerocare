@@ -805,7 +805,8 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ADD COLUMN IF NOT EXISTS "ratePerClickCombined" NUMERIC(12,4) NULL,
             ADD COLUMN IF NOT EXISTS "startMeterBW" INTEGER NULL,
             ADD COLUMN IF NOT EXISTS "startMeterColor" INTEGER NULL,
-            ADD COLUMN IF NOT EXISTS notes TEXT NULL;
+            ADD COLUMN IF NOT EXISTS notes TEXT NULL,
+            ADD COLUMN IF NOT EXISTS "invoiceId" UUID NULL;
           `);
 
           // Coverage moved from {labour,consumables,travel} to

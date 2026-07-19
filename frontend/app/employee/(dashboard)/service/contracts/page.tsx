@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { getCustomers, Customer } from '@/lib/customer';
 import { getAllProducts, Product } from '@/lib/product';
+import { getBrands, createBrand, Brand } from '@/lib/brand';
+import { getAllModels, addModel, Model } from '@/lib/model';
 import { CustomerServiceHistory, WarrantyInfo } from '@/lib/serviceTicket';
 import {
   getServiceContracts,
@@ -17,8 +19,12 @@ import {
   ContractCoverage,
   ServiceContractType,
   FsmaBillingMode,
+  ContractInitialPayment,
 } from '@/lib/serviceContract';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { recordPayment, getAccountSummary, PaymentSummary } from '@/lib/payment';
+import { getInvoiceById, Invoice } from '@/lib/invoice';
+import { InvoiceViewDialog } from '@/components/employeeComponents/InvoiceViewDialog';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -54,6 +60,7 @@ import {
   Check,
   X,
   Eye,
+  Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -113,7 +120,7 @@ const COVERAGE_BY_TYPE: Record<ServiceContractType, ContractCoverage> = {
 };
 
 const PLAN_SUMMARY: Record<ServiceContractType, string> = {
-  AMC: 'Fixed monthly fee. Service visits & labour free — spare parts and toner are charged as used.',
+  AMC: 'Fixed annual fee, invoiced in full at signing and paid in one or more installments. Service visits & labour free — spare parts and toner are charged as used.',
   SMA: 'One year + copy limit (whichever first). Visits, labour & spare parts free — toner is charged. Copies beyond the limit are billed at a per-copy rate.',
   FSMA: 'All inclusive (parts, toner, labour). Billed monthly per click — individual B&W/colour rates or one combined rate.',
 };
@@ -185,6 +192,46 @@ export default function ServiceContractsPage() {
   // Form State
   const [formState, setFormState] = useState<ContractFormState>(emptyForm());
 
+  // AMC — amount collected at signing (invoiced immediately, recorded against that invoice)
+  const [initialPaymentForm, setInitialPaymentForm] = useState({
+    amount: '',
+    paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
+    paymentDate: new Date().toISOString().split('T')[0],
+    referenceNumber: '',
+    remarks: '',
+  });
+
+  // AMC — invoice paid/pending status per contract's invoiceId, and the installment payment dialog
+  const [contractPaymentSummaries, setContractPaymentSummaries] = useState<
+    Record<string, PaymentSummary>
+  >({});
+  const [payingContract, setPayingContract] = useState<ServiceContract | null>(null);
+  const [payingForm, setPayingForm] = useState({
+    amount: '',
+    paymentMode: 'CASH' as ContractInitialPayment['paymentMode'],
+    paymentDate: new Date().toISOString().split('T')[0],
+    referenceNumber: '',
+    remarks: '',
+  });
+  const [savingPayment, setSavingPayment] = useState(false);
+
+  // Contract invoice — view / download / email / WhatsApp send
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [loadingInvoiceView, setLoadingInvoiceView] = useState(false);
+
+  const openContractInvoice = async (contract: ServiceContract) => {
+    if (!contract.invoiceId) return;
+    setLoadingInvoiceView(true);
+    try {
+      setViewingInvoice(await getInvoiceById(contract.invoiceId));
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load invoice.', { description: getApiErrorMessage(error) });
+    } finally {
+      setLoadingInvoiceView(false);
+    }
+  };
+
   // Meter reading / monthly billing dialog
   const [billingContract, setBillingContract] = useState<ServiceContract | null>(null);
   const [readings, setReadings] = useState<ContractMeterReading[]>([]);
@@ -209,6 +256,23 @@ export default function ServiceContractsPage() {
     printColour: 'BLACK_WHITE' as 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
     description: '',
   });
+
+  // Brand/model catalog — same "Other Machine" pattern as service ticket raising
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [models, setModels] = useState<Model[]>([]);
+  const [showCreateBrandModal, setShowCreateBrandModal] = useState(false);
+  const [brandForm, setBrandForm] = useState({ name: '', description: '' });
+  const [creatingBrandState, setCreatingBrandState] = useState(false);
+  const [brandError, setBrandError] = useState<string | null>(null);
+  const [showCreateModelModal, setShowCreateModelModal] = useState(false);
+  const [modelForm, setModelForm] = useState({
+    model_no: '',
+    model_name: '',
+    brand_id: '',
+    description: '',
+  });
+  const [creatingModelState, setCreatingModelState] = useState(false);
+  const [modelError, setModelError] = useState<string | null>(null);
 
   const [customerIntel, setCustomerIntel] = useState<CustomerServiceHistory | null>(null);
   const [loadingIntel, setLoadingIntel] = useState(false);
@@ -246,14 +310,35 @@ export default function ServiceContractsPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [contractsData, customersData, productsData] = await Promise.all([
+      const [contractsData, customersData, productsData, brandsRes, modelsRes] = await Promise.all([
         getServiceContracts(),
         getCustomers(),
         getAllProducts({ limit: 1000 }),
+        getBrands().catch(() => ({ success: false, data: [] })),
+        getAllModels({ limit: 1000 }).catch(() => ({ data: [] })),
       ]);
       setContracts(contractsData);
       setCustomers(customersData);
       setProducts(productsData);
+      setBrands(brandsRes.data || []);
+      setModels(modelsRes.data || []);
+
+      // Every contract carries a lump-sum invoice raised at signing — pull its paid/pending status for the list.
+      const contractInvoiceIds = [
+        ...new Set(contractsData.filter((c) => c.invoiceId).map((c) => c.invoiceId as string)),
+      ];
+      if (contractInvoiceIds.length > 0) {
+        const summaries = await Promise.all(
+          contractInvoiceIds.map((invId) => getAccountSummary(invId).catch(() => null)),
+        );
+        const map: Record<string, PaymentSummary> = {};
+        summaries.forEach((s, idx) => {
+          if (s) map[contractInvoiceIds[idx]] = s;
+        });
+        setContractPaymentSummaries(map);
+      } else {
+        setContractPaymentSummaries({});
+      }
     } catch (error) {
       console.error(error);
       toast.error('Failed to load contract and machine details', {
@@ -272,6 +357,13 @@ export default function ServiceContractsPage() {
   const handleOpenCreateModal = () => {
     setEditingContract(null);
     setFormState(emptyForm());
+    setInitialPaymentForm({
+      amount: '',
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      referenceNumber: '',
+      remarks: '',
+    });
     setIsModalOpen(true);
   };
 
@@ -314,8 +406,8 @@ export default function ServiceContractsPage() {
     }
 
     const type = formState.contractType;
-    if (type === 'AMC' && (!formState.monthlyCharge || Number(formState.monthlyCharge) <= 0)) {
-      toast.error('AMC contracts need a monthly charge greater than 0.');
+    if (!formState.contractValue || Number(formState.contractValue) <= 0) {
+      toast.error('Enter a contract value greater than 0 — it is invoiced in full at signing.');
       return;
     }
     if (type === 'SMA') {
@@ -372,13 +464,28 @@ export default function ServiceContractsPage() {
       startMeterColor: numOrUndef(formState.startMeterColor),
     };
 
+    const initialPayment: ContractInitialPayment | undefined =
+      !editingContract && Number(initialPaymentForm.amount) > 0
+        ? {
+            amount: Number(initialPaymentForm.amount),
+            paymentMode: initialPaymentForm.paymentMode,
+            paymentDate: initialPaymentForm.paymentDate,
+            referenceNumber: initialPaymentForm.referenceNumber || undefined,
+            remarks: initialPaymentForm.remarks || undefined,
+          }
+        : undefined;
+
     try {
       if (editingContract) {
         await updateServiceContract(editingContract.id, payload);
         toast.success('Service contract updated successfully.');
       } else {
-        await createServiceContract(payload);
-        toast.success('Service contract registered successfully.');
+        await createServiceContract({ ...payload, initialPayment });
+        toast.success(
+          type === 'AMC'
+            ? 'AMC contract registered and invoice raised.'
+            : 'Service contract registered successfully.',
+        );
       }
       setIsModalOpen(false);
       fetchData();
@@ -388,6 +495,53 @@ export default function ServiceContractsPage() {
         description: getApiErrorMessage(error),
         duration: 8000,
       });
+    }
+  };
+
+  // ── AMC installment payments (against the invoice raised at signing) ──
+  const openPaymentDialog = (contract: ServiceContract) => {
+    setPayingContract(contract);
+    setPayingForm({
+      amount: '',
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      referenceNumber: '',
+      remarks: '',
+    });
+  };
+
+  const handleRecordContractPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payingContract?.invoiceId) return;
+    const amount = Number(payingForm.amount);
+    if (!amount || amount <= 0) {
+      toast.error('Enter a payment amount greater than 0.');
+      return;
+    }
+    setSavingPayment(true);
+    try {
+      await recordPayment({
+        invoiceId: payingContract.invoiceId,
+        amountPaid: amount,
+        paymentMode: payingForm.paymentMode,
+        paymentDate: payingForm.paymentDate,
+        referenceNumber: payingForm.referenceNumber || undefined,
+        remarks: payingForm.remarks || undefined,
+      });
+      const summary = await getAccountSummary(payingContract.invoiceId).catch(() => null);
+      if (summary) {
+        setContractPaymentSummaries((prev) => ({ ...prev, [payingContract.invoiceId!]: summary }));
+      }
+      toast.success('Payment recorded against the AMC invoice.');
+      setPayingContract(null);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to record payment.', {
+        description: getApiErrorMessage(error),
+        duration: 8000,
+      });
+    } finally {
+      setSavingPayment(false);
     }
   };
 
@@ -464,7 +618,7 @@ export default function ServiceContractsPage() {
       amount,
       detail:
         usedToDate > copyLimit
-          ? `${usedToDate.toLocaleString()} / ${copyLimit.toLocaleString()} copies used — ${overageClicks.toLocaleString()} overage clicks this period`
+          ? `${usedToDate.toLocaleString()} / ${copyLimit.toLocaleString()} copies used — ${overageClicks.toLocaleString()} excess clicks this period`
           : `${usedToDate.toLocaleString()} / ${copyLimit.toLocaleString()} copies used — within limit`,
     };
   })();
@@ -513,6 +667,87 @@ export default function ServiceContractsPage() {
       description: '',
     });
     setExternalDialogOpen(true);
+  };
+
+  const handleCreateBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!brandForm.name.trim()) return;
+    try {
+      setCreatingBrandState(true);
+      setBrandError(null);
+      const res = await createBrand({
+        name: brandForm.name.trim(),
+        description: brandForm.description.trim() || undefined,
+      });
+      const resBrands = await getBrands().catch(() => ({ success: false, data: [] }));
+      setBrands(resBrands.data || []);
+
+      const createdBrand = res.data || res;
+      setExternalForm((prev) => ({
+        ...prev,
+        brand: createdBrand.name || brandForm.name.trim(),
+      }));
+
+      setShowCreateBrandModal(false);
+      setBrandForm({ name: '', description: '' });
+      toast.success('Brand created successfully!');
+    } catch (error) {
+      console.error('Failed to create brand:', error);
+      const msg =
+        getApiErrorMessage(error) || 'Failed to create brand. Please check if it already exists.';
+      setBrandError(msg);
+      toast.error(msg);
+    } finally {
+      setCreatingBrandState(false);
+    }
+  };
+
+  const handleOpenCreateModel = () => {
+    const defaultBrand = brands.find((b) => b.name === externalForm.brand);
+    setModelForm({
+      model_no: '',
+      model_name: '',
+      brand_id: defaultBrand ? defaultBrand.id : '',
+      description: '',
+    });
+    setModelError(null);
+    setShowCreateModelModal(true);
+  };
+
+  const handleCreateModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modelForm.model_name.trim() || !modelForm.model_no.trim() || !modelForm.brand_id) {
+      setModelError('Model Name, Model Number, and Brand are required.');
+      return;
+    }
+    try {
+      setCreatingModelState(true);
+      setModelError(null);
+      const created = await addModel({
+        model_name: modelForm.model_name.trim(),
+        model_no: modelForm.model_no.trim(),
+        brand_id: modelForm.brand_id,
+        description: modelForm.description.trim() || modelForm.model_name.trim(),
+      });
+      const resModels = await getAllModels({ limit: 1000 }).catch(() => ({ data: [] }));
+      setModels(resModels.data || []);
+
+      setExternalForm((prev) => ({
+        ...prev,
+        modelName: created.model_name || modelForm.model_name.trim(),
+      }));
+
+      setShowCreateModelModal(false);
+      setModelForm({ model_no: '', model_name: '', brand_id: '', description: '' });
+      toast.success('Model created successfully!');
+    } catch (error) {
+      console.error('Failed to create model:', error);
+      const msg = getApiErrorMessage(error) || 'Failed to create model. Please try again.';
+      setModelError(msg);
+      toast.error(msg);
+    } finally {
+      setCreatingModelState(false);
+    }
   };
 
   const handleSaveExternalMachine = async (e: React.FormEvent) => {
@@ -899,18 +1134,18 @@ export default function ServiceContractsPage() {
         <Table className="w-full table-fixed">
           <TableHeader className="bg-slate-50/80">
             <TableRow>
-              <TableHead className="font-bold text-xs text-slate-600 w-[20%]">Customer</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[25%]">
+              <TableHead className="font-bold text-xs text-slate-600 w-[16%]">Customer</TableHead>
+              <TableHead className="font-bold text-xs text-slate-600 w-[19%]">
                 Machine (Model)
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[10%]">Type</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[12%]">Start Date</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[12%]">End Date</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[10%] text-right">
+              <TableHead className="font-bold text-xs text-slate-600 w-[9%]">Type</TableHead>
+              <TableHead className="font-bold text-xs text-slate-600 w-[10%]">Start Date</TableHead>
+              <TableHead className="font-bold text-xs text-slate-600 w-[10%]">End Date</TableHead>
+              <TableHead className="font-bold text-xs text-slate-600 w-[9%] text-right">
                 Value
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[11%]">Status</TableHead>
-              <TableHead className="font-bold text-xs text-slate-600 w-[10%] text-right">
+              <TableHead className="font-bold text-xs text-slate-600 w-[9%]">Status</TableHead>
+              <TableHead className="font-bold text-xs text-slate-600 w-[18%] text-right">
                 Actions
               </TableHead>
             </TableRow>
@@ -954,9 +1189,7 @@ export default function ServiceContractsPage() {
                           {c.contractType}
                         </span>
                         <span className="text-[9px] text-slate-400 leading-tight">
-                          {c.contractType === 'AMC' &&
-                            c.monthlyCharge != null &&
-                            `${getActiveCurrency()} ${Number(c.monthlyCharge).toFixed(2)}/mo`}
+                          {c.contractType === 'AMC' && 'Annual fee — invoiced at signing'}
                           {c.contractType === 'SMA' &&
                             c.copyLimit != null &&
                             (c.usageSummary?.copiesUsed != null
@@ -976,7 +1209,41 @@ export default function ServiceContractsPage() {
                       {c.endDate ? new Date(c.endDate).toLocaleDateString() : 'N/A'}
                     </TableCell>
                     <TableCell className="text-xs font-bold text-slate-700 text-right py-3">
-                      {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
+                      <div className="flex flex-col items-end gap-1">
+                        <span>
+                          {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
+                        </span>
+                        {c.invoiceId ? (
+                          (() => {
+                            const summary = contractPaymentSummaries[c.invoiceId];
+                            if (!summary) return null;
+                            const paid =
+                              summary.pendingBalance <= 0
+                                ? 'PAID'
+                                : summary.totalPaid > 0
+                                  ? 'PARTIAL'
+                                  : 'PENDING';
+                            const cls =
+                              paid === 'PAID'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : paid === 'PARTIAL'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200';
+                            return (
+                              <span
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${cls}`}
+                                title={`Paid ${getActiveCurrency()} ${summary.totalPaid.toFixed(2)} of ${getActiveCurrency()} ${summary.totalAmount.toFixed(2)}`}
+                              >
+                                {paid}
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border bg-slate-50 text-slate-400 border-slate-200">
+                            NO INVOICE
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="py-3">
                       <span
@@ -988,7 +1255,7 @@ export default function ServiceContractsPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right py-3">
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end gap-1 flex-nowrap">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -998,6 +1265,18 @@ export default function ServiceContractsPage() {
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
+                        {c.invoiceId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openContractInvoice(c)}
+                            disabled={loadingInvoiceView}
+                            title="View / download / send invoice"
+                            className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1007,6 +1286,18 @@ export default function ServiceContractsPage() {
                         >
                           <Gauge className="h-3.5 w-3.5" />
                         </Button>
+                        {c.invoiceId &&
+                          (contractPaymentSummaries[c.invoiceId]?.pendingBalance ?? 1) > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openPaymentDialog(c)}
+                              title="Record an installment payment"
+                              className="h-7 w-7 text-slate-500 hover:text-green-600 hover:bg-green-50/50"
+                            >
+                              <DollarSign className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1015,14 +1306,17 @@ export default function ServiceContractsPage() {
                         >
                           <Edit2 className="h-3.5 w-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(c.id)}
-                          className="h-7 w-7 text-slate-500 hover:text-rose-600 hover:bg-rose-50/50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        {!c.invoiceId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(c.id)}
+                            title="Delete contract"
+                            className="h-7 w-7 text-slate-500 hover:text-rose-600 hover:bg-rose-50/50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1278,7 +1572,7 @@ export default function ServiceContractsPage() {
               <div className="flex flex-col space-y-1">
                 <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
                   <DollarSign className="h-3 w-3" />
-                  Contract Value ({getActiveCurrency()})
+                  Contract Value ({getActiveCurrency()})<span className="text-red-500">*</span>
                 </label>
                 <Input
                   type="number"
@@ -1293,6 +1587,13 @@ export default function ServiceContractsPage() {
                   className="h-10 border-slate-200 focus-visible:ring-blue-500"
                   placeholder="0.00"
                 />
+                <p className="text-[10px] text-slate-400">
+                  {formState.contractType === 'AMC'
+                    ? 'Annual fee — invoiced in full at signing, collected as one or more installments.'
+                    : formState.contractType === 'FSMA'
+                      ? 'Invoiced in full at signing. FSMA per-click usage is billed separately, monthly.'
+                      : 'Invoiced in full at signing. SMA copy-limit excess is billed separately, monthly.'}
+                </p>
               </div>
 
               {/* Plan summary + fixed coverage */}
@@ -1318,24 +1619,89 @@ export default function ServiceContractsPage() {
                 </div>
               </div>
 
-              {/* AMC — fixed monthly fee */}
-              {formState.contractType === 'AMC' && (
-                <div className="flex flex-col space-y-1">
-                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                    <DollarSign className="h-3 w-3" />
-                    Monthly Charge ({getActiveCurrency()}) *
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={formState.monthlyCharge}
-                    onChange={(e) =>
-                      setFormState((prev) => ({ ...prev, monthlyCharge: e.target.value }))
-                    }
-                    className="h-10 border-slate-200 focus-visible:ring-blue-500"
-                    placeholder="e.g. 350.00"
-                  />
+              {/* Every contract is invoiced in full at signing; optional amount collected on the spot */}
+              {!editingContract && (
+                <div className="col-span-2 border border-slate-100 rounded-2xl p-4 bg-emerald-50/30 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Payment Collected at Signing (optional)
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    An invoice for the full contract value is raised automatically. If the customer
+                    is paying now — in full or in part — record it here; it lands on that same
+                    invoice. Leave blank to invoice as pending and collect later.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Amount Paid Now ({getActiveCurrency()})
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        max={formState.contractValue || undefined}
+                        value={initialPaymentForm.amount}
+                        onChange={(e) =>
+                          setInitialPaymentForm((prev) => ({ ...prev, amount: e.target.value }))
+                        }
+                        className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-emerald-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Payment Mode
+                      </label>
+                      <select
+                        value={initialPaymentForm.paymentMode}
+                        onChange={(e) =>
+                          setInitialPaymentForm((prev) => ({
+                            ...prev,
+                            paymentMode: e.target.value as ContractInitialPayment['paymentMode'],
+                          }))
+                        }
+                        className="h-9 px-3 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="CHEQUE">Cheque</option>
+                        <option value="CREDIT_CARD">Credit Card</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Payment Date
+                      </label>
+                      <Input
+                        type="date"
+                        value={initialPaymentForm.paymentDate}
+                        onChange={(e) =>
+                          setInitialPaymentForm((prev) => ({
+                            ...prev,
+                            paymentDate: e.target.value,
+                          }))
+                        }
+                        className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-emerald-500"
+                      />
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Reference Number
+                      </label>
+                      <Input
+                        value={initialPaymentForm.referenceNumber}
+                        onChange={(e) =>
+                          setInitialPaymentForm((prev) => ({
+                            ...prev,
+                            referenceNumber: e.target.value,
+                          }))
+                        }
+                        className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-emerald-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1379,7 +1745,7 @@ export default function ServiceContractsPage() {
                   </div>
                   <div className="flex flex-col space-y-1">
                     <label className="text-xs font-bold text-slate-600">
-                      Overage Rate per Copy ({getActiveCurrency()})
+                      Excess Rate per Copy ({getActiveCurrency()})
                     </label>
                     <Input
                       type="number"
@@ -1680,14 +2046,14 @@ export default function ServiceContractsPage() {
                 <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                   <span className="block text-slate-400 font-semibold uppercase text-[9px]">
                     {billingContract.contractType === 'AMC'
-                      ? 'Monthly Charge'
+                      ? 'Contract Value'
                       : billingContract.contractType === 'SMA'
                         ? 'Copy Limit'
                         : 'Rate'}
                   </span>
                   <span className="font-bold text-slate-800">
                     {billingContract.contractType === 'AMC' &&
-                      `${getActiveCurrency()} ${Number(billingContract.monthlyCharge ?? 0).toFixed(2)}`}
+                      `${getActiveCurrency()} ${Number(billingContract.contractValue ?? 0).toFixed(2)}`}
                     {billingContract.contractType === 'SMA' &&
                       `${Number(billingContract.copyLimit ?? 0).toLocaleString()} copies`}
                     {billingContract.contractType === 'FSMA' &&
@@ -1966,23 +2332,66 @@ export default function ServiceContractsPage() {
             <div className="grid grid-cols-2 gap-4 px-6 py-4">
               <div className="flex flex-col space-y-1">
                 <label className="text-xs font-bold text-slate-600">Brand *</label>
-                <Input
-                  value={externalForm.brand}
-                  onChange={(e) => setExternalForm((prev) => ({ ...prev, brand: e.target.value }))}
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
-                  placeholder="e.g. Canon"
-                />
+                <div className="flex gap-1.5 items-center">
+                  <div className="flex-1 min-w-0">
+                    <SearchableSelect
+                      options={brands.map((b) => ({ value: b.name, label: b.name }))}
+                      value={externalForm.brand}
+                      onValueChange={(val) =>
+                        setExternalForm((prev) => ({ ...prev, brand: val, modelName: '' }))
+                      }
+                      placeholder="Select brand..."
+                      className="h-10 rounded-lg border-slate-200 bg-card text-sm"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setBrandError(null);
+                      setShowCreateBrandModal(true);
+                    }}
+                    className="h-10 w-10 shrink-0 border-slate-200 rounded-lg bg-card hover:bg-slate-50 text-slate-500"
+                  >
+                    <Plus size={16} />
+                  </Button>
+                </div>
               </div>
               <div className="flex flex-col space-y-1">
                 <label className="text-xs font-bold text-slate-600">Model Name *</label>
-                <Input
-                  value={externalForm.modelName}
-                  onChange={(e) =>
-                    setExternalForm((prev) => ({ ...prev, modelName: e.target.value }))
-                  }
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
-                  placeholder="e.g. imageRUNNER 2630i"
-                />
+                <div className="flex gap-1.5 items-center">
+                  <div className="flex-1 min-w-0">
+                    <SearchableSelect
+                      options={models
+                        .filter(
+                          (m) =>
+                            !externalForm.brand ||
+                            m.brandRelation?.name?.toLowerCase() ===
+                              externalForm.brand.toLowerCase(),
+                        )
+                        .map((m) => ({
+                          value: m.model_name,
+                          label: `${m.model_name} (${m.model_no})`,
+                        }))}
+                      value={externalForm.modelName}
+                      onValueChange={(val) =>
+                        setExternalForm((prev) => ({ ...prev, modelName: val }))
+                      }
+                      placeholder="Select model..."
+                      className="h-10 rounded-lg border-slate-200 bg-card text-sm"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleOpenCreateModel}
+                    className="h-10 w-10 shrink-0 border-slate-200 rounded-lg bg-card hover:bg-slate-50 text-slate-500"
+                  >
+                    <Plus size={16} />
+                  </Button>
+                </div>
               </div>
               <div className="flex flex-col space-y-1">
                 <label className="text-xs font-bold text-slate-600">Serial Number *</label>
@@ -2061,6 +2470,294 @@ export default function ServiceContractsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* CREATE BRAND MODAL */}
+      {showCreateBrandModal && (
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-sm bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
+              <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Plus className="text-blue-600" size={16} /> Create Brand
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Add a new hardware brand to the repository list.
+              </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleCreateBrand}>
+              <CardContent className="p-5 space-y-3.5">
+                {brandError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-xl flex items-start gap-2">
+                    <span className="font-medium">{brandError}</span>
+                  </div>
+                )}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Brand Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. Xerox, HP, Canon"
+                    value={brandForm.name}
+                    onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
+                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Description
+                  </label>
+                  <Input
+                    placeholder="Short description of the brand"
+                    value={brandForm.description}
+                    onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
+                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
+                  />
+                </div>
+              </CardContent>
+              <div className="bg-slate-50 border-t border-slate-100 p-3.5 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowCreateBrandModal(false);
+                    setBrandForm({ name: '', description: '' });
+                    setBrandError(null);
+                  }}
+                  className="rounded-xl h-8 text-xs font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={creatingBrandState}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-8 text-xs px-4"
+                >
+                  {creatingBrandState && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Create
+                  Brand
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* CREATE MODEL MODAL */}
+      {showCreateModelModal && (
+        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-sm bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
+              <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Plus className="text-blue-600" size={16} /> Create Model
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Add a new model to the list and link it to a brand.
+              </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleCreateModel}>
+              <CardContent className="p-5 space-y-3.5">
+                {modelError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-xl flex items-start gap-2">
+                    <span className="font-medium">{modelError}</span>
+                  </div>
+                )}
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Brand <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableSelect
+                    options={brands.map((b) => ({ value: b.id, label: b.name }))}
+                    value={modelForm.brand_id}
+                    onValueChange={(val) => setModelForm({ ...modelForm, brand_id: val })}
+                    placeholder="Select brand..."
+                    className="h-9 w-full rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Model Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. VersaLink C405"
+                    value={modelForm.model_name}
+                    onChange={(e) => setModelForm({ ...modelForm, model_name: e.target.value })}
+                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Model Number / Code <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    required
+                    placeholder="e.g. C405-DX"
+                    value={modelForm.model_no}
+                    onChange={(e) => setModelForm({ ...modelForm, model_no: e.target.value })}
+                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Description
+                  </label>
+                  <Input
+                    placeholder="Short description of the model features"
+                    value={modelForm.description}
+                    onChange={(e) => setModelForm({ ...modelForm, description: e.target.value })}
+                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
+                  />
+                </div>
+              </CardContent>
+              <div className="bg-slate-50 border-t border-slate-100 p-3.5 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowCreateModelModal(false);
+                    setModelForm({ model_no: '', model_name: '', brand_id: '', description: '' });
+                    setModelError(null);
+                  }}
+                  className="rounded-xl h-8 text-xs font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={creatingModelState}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-8 text-xs px-4"
+                >
+                  {creatingModelState && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Create
+                  Model
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* AMC INSTALLMENT PAYMENT DIALOG */}
+      <Dialog open={!!payingContract} onOpenChange={(open) => !open && setPayingContract(null)}>
+        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
+            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Record Payment
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Recorded against the same invoice raised at signing — an updated receipt reflecting
+              this payment can be sent from the invoice.
+            </DialogDescription>
+          </DialogHeader>
+
+          {payingContract?.invoiceId && contractPaymentSummaries[payingContract.invoiceId] && (
+            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex items-center justify-between">
+              <span className="text-slate-500">
+                Paid {getActiveCurrency()}{' '}
+                {contractPaymentSummaries[payingContract.invoiceId].totalPaid.toFixed(2)} of{' '}
+                {getActiveCurrency()}{' '}
+                {contractPaymentSummaries[payingContract.invoiceId].totalAmount.toFixed(2)}
+              </span>
+              <span className="font-bold text-slate-700">
+                Balance {getActiveCurrency()}{' '}
+                {contractPaymentSummaries[payingContract.invoiceId].pendingBalance.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          <form onSubmit={handleRecordContractPayment}>
+            <div className="grid grid-cols-2 gap-4 px-6 py-4">
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">
+                  Amount ({getActiveCurrency()}) *
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={payingForm.amount}
+                  onChange={(e) => setPayingForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Payment Mode *</label>
+                <select
+                  value={payingForm.paymentMode}
+                  onChange={(e) =>
+                    setPayingForm((prev) => ({
+                      ...prev,
+                      paymentMode: e.target.value as ContractInitialPayment['paymentMode'],
+                    }))
+                  }
+                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-green-500"
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="CREDIT_CARD">Credit Card</option>
+                </select>
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Payment Date *</label>
+                <Input
+                  type="date"
+                  value={payingForm.paymentDate}
+                  onChange={(e) =>
+                    setPayingForm((prev) => ({ ...prev, paymentDate: e.target.value }))
+                  }
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                />
+              </div>
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Reference Number</label>
+                <Input
+                  value={payingForm.referenceNumber}
+                  onChange={(e) =>
+                    setPayingForm((prev) => ({ ...prev, referenceNumber: e.target.value }))
+                  }
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="col-span-2 flex flex-col space-y-1">
+                <label className="text-xs font-bold text-slate-600">Remarks</label>
+                <Input
+                  value={payingForm.remarks}
+                  onChange={(e) => setPayingForm((prev) => ({ ...prev, remarks: e.target.value }))}
+                  className="h-10 border-slate-200 focus-visible:ring-green-500"
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-white">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPayingContract(null)}
+                className="h-10 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingPayment}
+                className="h-10 px-4 bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm"
+              >
+                {savingPayment ? 'Recording...' : 'Record Payment'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {viewingInvoice && (
+        <InvoiceViewDialog invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} />
+      )}
     </div>
   );
 }

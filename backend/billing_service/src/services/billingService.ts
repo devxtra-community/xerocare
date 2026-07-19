@@ -4145,6 +4145,77 @@ export class BillingService {
     return savedInvoice;
   }
 
+  /**
+   * Creates the lump-sum invoice for an AMC service contract at signing time, and — if an
+   * initial payment was collected on the spot — records it against that same invoice via the
+   * normal payment path so status (INVOICED/PARTIAL via ledger/PAID) and cashbook posting stay
+   * consistent with every other payment in the system. Later installments reuse this invoiceId
+   * through the existing /invoices/:id/payments or /payments/record endpoints.
+   */
+  async createContractInvoice(payload: {
+    customerId: string;
+    branchId: string;
+    createdBy: string;
+    serviceContractId: string;
+    billType: BillType;
+    description: string;
+    amount: number;
+    initialPayment?: {
+      amount: number;
+      paymentMode: string;
+      paymentDate?: string;
+      referenceNumber?: string;
+      remarks?: string;
+    };
+  }): Promise<Invoice> {
+    const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+    const invoiceRepo = Source.getRepository(Invoice);
+
+    const invoice = invoiceRepo.create({
+      invoiceNumber,
+      customerId: payload.customerId,
+      branchId: payload.branchId,
+      createdBy: payload.createdBy,
+      serviceContractId: payload.serviceContractId,
+      saleType: SaleType.SERVICE,
+      billType: payload.billType,
+      type: InvoiceType.FINAL,
+      status: InvoiceStatus.INVOICED,
+      totalAmount: payload.amount,
+    });
+    const savedInvoice = await invoiceRepo.save(invoice);
+
+    const invoiceItemRepo = Source.getRepository(InvoiceItem);
+    const invoiceItem = new InvoiceItem();
+    invoiceItem.invoice = savedInvoice;
+    invoiceItem.itemType = ItemType.PRODUCT;
+    invoiceItem.description = payload.description;
+    invoiceItem.quantity = 1;
+    invoiceItem.unitPrice = payload.amount;
+    await invoiceItemRepo.save(invoiceItem);
+    delete (invoiceItem as { invoice?: unknown }).invoice;
+    savedInvoice.items = [invoiceItem];
+
+    if (payload.initialPayment && payload.initialPayment.amount > 0) {
+      await this.recordPayment(
+        savedInvoice.id,
+        {
+          paymentMode: payload.initialPayment.paymentMode,
+          amount: payload.initialPayment.amount,
+          transactionDate: payload.initialPayment.paymentDate,
+          referenceNumber: payload.initialPayment.referenceNumber,
+          remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
+          bypassStatusCheck: true,
+        },
+        payload.createdBy,
+      );
+      const withPayment = await this.invoiceRepo.findById(savedInvoice.id);
+      if (withPayment) return withPayment;
+    }
+
+    return savedInvoice;
+  }
+
   async reviseEstimate(
     id: string,
     payload: {
