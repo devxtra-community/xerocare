@@ -3527,7 +3527,7 @@ export default function ServiceDashboardPage() {
                         } else if (ctx === 'LEASE_UNDER_WARRANTY') {
                           bannerClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
                           bannerText =
-                            'Lease Under Warranty: Service & coverage remains active within terms.';
+                            'Lease Under Warranty: Service, labour & spare parts covered. Toner/consumables are chargeable.';
                         } else if (ctx === 'LEASE_EXPIRED') {
                           bannerClass = 'bg-red-50 border-red-200 text-red-800';
                           bannerText = `Lease Warranty EXPIRED (Limit hit: ${
@@ -3538,7 +3538,7 @@ export default function ServiceDashboardPage() {
                         } else if (ctx === 'WARRANTY') {
                           bannerClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
                           bannerText =
-                            'Purchased Machine Under Warranty: Repair service & spare parts are fully covered.';
+                            'Purchased Machine Under Warranty: Repair service & spare parts covered. Toner/consumables are chargeable.';
                         } else if (ctx === 'CHARGEABLE') {
                           bannerClass = 'bg-orange-50 border-orange-200 text-orange-800';
                           bannerText =

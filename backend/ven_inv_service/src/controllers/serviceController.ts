@@ -42,6 +42,7 @@ import {
   ContractCoverage,
   FULL_COVERAGE,
   NO_COVERAGE,
+  WARRANTY_COVERAGE,
   coverageForContractType,
   normalizeCoverage,
   coverageAllowsItem,
@@ -831,8 +832,14 @@ export class ServiceController {
       const ticketItems: ServiceTicketItem[] = [];
 
       // Under a contract, "free" is per item category (e.g. SMA covers spare
-      // parts but charges toner). No contract + track A = everything free.
-      const contractCoverage = await this.getTicketContractCoverage(ticket.contractReferenceId);
+      // parts but charges toner). Warranty mirrors SMA (toner chargeable);
+      // RENT + no-contract track A stay fully free.
+      const contractCoverage =
+        (await this.getTicketContractCoverage(ticket.contractReferenceId)) ??
+        (ticket.serviceContext === ServiceContext.WARRANTY ||
+        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
+          ? { ...WARRANTY_COVERAGE }
+          : null);
 
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
@@ -1159,12 +1166,14 @@ export class ServiceController {
           let partName = it.partName || '';
           let sku = it.sku || '';
           let basePrice = Number(it.unitPrice) || 0;
+          let partCategory: string | null = null;
 
           if (it.sparePartId) {
             const part = await sparePartRepo.findOne({ where: { id: String(it.sparePartId) } });
             if (part) {
               partName = part.part_name;
               sku = part.sku;
+              partCategory = part.part_category || null;
               if (basePrice === 0) {
                 basePrice = Number(part.base_price) || 0;
               }
@@ -1174,11 +1183,15 @@ export class ServiceController {
           let isItemFree = !!it.isFree;
           if (
             ticket.serviceContext === ServiceContext.RENT ||
-            ticket.serviceContext === ServiceContext.WARRANTY ||
-            ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
             ticket.serviceContext === ServiceContext.FSMA
           ) {
             isItemFree = true;
+          } else if (
+            ticket.serviceContext === ServiceContext.WARRANTY ||
+            ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
+          ) {
+            // Warranty mirrors SMA: parts free, toner chargeable
+            isItemFree = coverageAllowsItem(WARRANTY_COVERAGE, { partCategory, partName });
           } else if (ticket.serviceContext === ServiceContext.AMC) {
             isItemFree = false;
           }
@@ -1578,8 +1591,14 @@ export class ServiceController {
 
       const sparePartRepo = Source.getRepository(SparePart);
       // Contract decides what stays free per item category: SMA/FSMA cover
-      // parts, AMC does not, and toner is only covered under FSMA.
-      const revisionCoverage = await this.getTicketContractCoverage(ticket.contractReferenceId);
+      // parts, AMC does not, and toner is only covered under FSMA. Warranty
+      // mirrors SMA (toner chargeable).
+      const revisionCoverage =
+        (await this.getTicketContractCoverage(ticket.contractReferenceId)) ??
+        (ticket.serviceContext === ServiceContext.WARRANTY ||
+        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
+          ? { ...WARRANTY_COVERAGE }
+          : null);
       if (items && Array.isArray(items)) {
         for (const it of items) {
           let partName = it.partName || '';
@@ -2341,12 +2360,14 @@ export class ServiceController {
             activeContract.coverageRules || coverageForContractType(activeContract.contractType),
           );
         }
+      } else if (details.serviceContext === ServiceContext.RENT) {
+        coverage = { ...FULL_COVERAGE };
       } else if (
-        details.serviceContext === ServiceContext.RENT ||
         details.serviceContext === ServiceContext.WARRANTY ||
         details.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
       ) {
-        coverage = { ...FULL_COVERAGE };
+        // Warranty mirrors SMA: toner chargeable
+        coverage = { ...WARRANTY_COVERAGE };
       }
 
       res.status(200).json({
@@ -2690,22 +2711,24 @@ export class ServiceController {
         );
       }
 
-      // Warranty/rent contexts cover everything; contract contexts cover per
-      // item category (SMA/AMC charge toner, AMC charges parts too). Labour
-      // is free under all three contract types.
-      const baseFreeContext = [
-        ServiceContext.RENT,
+      // RENT covers everything; warranty mirrors SMA (toner chargeable);
+      // contract contexts cover per item category (SMA/AMC charge toner,
+      // AMC charges parts too). Labour is free under all three contract types.
+      const baseFreeContext = ticket.serviceContext === ServiceContext.RENT;
+      const warrantyContext = [
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
       ].includes(ticket.serviceContext);
       const quoteCoverage: ContractCoverage = baseFreeContext
         ? { ...FULL_COVERAGE }
-        : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
-            ...NO_COVERAGE,
-          });
+        : warrantyContext
+          ? { ...WARRANTY_COVERAGE }
+          : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
+              ...NO_COVERAGE,
+            });
       const partCategories = await this.getPartCategories(ticket.items.map((it) => it.sparePartId));
 
-      const hasContractContext = baseFreeContext || !!ticket.contractReferenceId;
+      const hasContractContext = baseFreeContext || warrantyContext || !!ticket.contractReferenceId;
 
       const items = ticket.items.map((it) => {
         const itemCovered = hasContractContext
@@ -4624,17 +4647,20 @@ For queries contact us at +974 4455 6677`;
 
       // Call billing service to update the invoice. Coverage is per item
       // category under contracts (SMA/AMC charge toner, AMC charges parts).
-      const baseFreeContext = [
-        ServiceContext.RENT,
+      // Warranty mirrors SMA (toner chargeable); RENT stays fully covered.
+      const baseFreeContext = ticket.serviceContext === ServiceContext.RENT;
+      const warrantyContext = [
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
       ].includes(ticket.serviceContext);
       const reviseCoverage: ContractCoverage = baseFreeContext
         ? { ...FULL_COVERAGE }
-        : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
-            ...NO_COVERAGE,
-          });
-      const hasContractContext = baseFreeContext || !!ticket.contractReferenceId;
+        : warrantyContext
+          ? { ...WARRANTY_COVERAGE }
+          : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
+              ...NO_COVERAGE,
+            });
+      const hasContractContext = baseFreeContext || warrantyContext || !!ticket.contractReferenceId;
       const revisePartCategories = await this.getPartCategories(
         items.map((it: ReviseEstimateItem) => it.sparePartId),
       );

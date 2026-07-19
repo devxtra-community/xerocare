@@ -31,6 +31,18 @@ export const NO_COVERAGE: ContractCoverage = {
   travel: false,
 };
 
+/**
+ * Warranty coverage (SALE warranty and lease-under-warranty) mirrors SMA:
+ * labour + visits + spare parts free, toner always chargeable.
+ * RENT machines remain fully covered (they are company-owned).
+ */
+export const WARRANTY_COVERAGE: ContractCoverage = {
+  labour: true,
+  spareParts: true,
+  toner: false,
+  travel: true,
+};
+
 /** Coverage is fixed per contract type — never trust client-provided rules. */
 export const coverageForContractType = (type: ServiceContractType | string): ContractCoverage => {
   switch (type) {
