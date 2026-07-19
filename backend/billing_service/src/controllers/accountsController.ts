@@ -13,6 +13,7 @@ import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { CreditNote } from '../entities/creditNoteEntity';
 import { SaleType } from '../entities/enums/saleType';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
@@ -127,12 +128,36 @@ export const createCashBankAccount = async (req: Request, res: Response, next: N
   try {
     const repo = Source.getRepository(CashBankAccount);
     const branchId = req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId;
+    const openingBalance = Number(req.body.openingBalance ?? 0);
     const account = repo.create({
       ...req.body,
       branchId,
-      currentBalance: req.body.openingBalance ?? 0,
+      currentBalance: openingBalance,
     }) as unknown as CashBankAccount;
     const saved = await repo.save(account);
+
+    // A non-zero opening balance is an asset with no origin unless it's matched by an
+    // equity entry — otherwise the Balance Sheet balances by coincidence, not by
+    // construction. Auto-create the OPENING_BALANCE_EQUITY counterpart so this can never
+    // regress the way the original 8 seeded accounts did (see the one-time true-up script).
+    if (openingBalance > 0) {
+      const equityRepo = Source.getRepository(EquityEntry);
+      const count = await equityRepo.count();
+      const entry = equityRepo.create({
+        entryNo: `EQ-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`,
+        date: new Date().toISOString().slice(0, 10),
+        type: 'OPENING_BALANCE_EQUITY',
+        description: `Opening balance — ${saved.name}`,
+        amount: openingBalance,
+        currency: saved.currency || 'AED',
+        branchId,
+        linkedCashAccountId: saved.id,
+        notes: 'Auto-created at account creation to give the opening balance a documented origin.',
+        createdBy: req.user?.userId ?? req.body.createdBy,
+      }) as unknown as EquityEntry;
+      await equityRepo.save(entry);
+    }
+
     res.status(201).json({ success: true, data: saved });
   } catch (err) {
     next(err);
@@ -1390,6 +1415,7 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     if (!payable) throw new AppError('Payable not found', 404);
 
     let saved!: ManualPayable;
+    let savedPayment!: PayablePayment;
     await Source.transaction(async (em) => {
       const payableRepo = em.getRepository(ManualPayable);
       const paymentRepo = em.getRepository(PayablePayment);
@@ -1399,7 +1425,7 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
         payableId: payable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as PayablePayment;
-      await paymentRepo.save(payment);
+      savedPayment = await paymentRepo.save(payment);
 
       payable.amountPaid = Number(payable.amountPaid) + Number(req.body.amount);
       payable.outstanding = Number(payable.amount) - Number(payable.amountPaid);
@@ -1407,6 +1433,62 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
       else if (Number(payable.amountPaid) > 0) payable.status = 'PARTIAL';
       saved = await payableRepo.save(payable);
     });
+
+    // Mirror the outflow into the cashbook / day book, same as recordReceivablePayment's
+    // mirror on the AR side — a liability decreasing must be matched by a cash decrease
+    // (or, for cheques, a PENDING issued cheque that decreases cash only once cleared,
+    // per the confirmed cheque daybook rule). Best-effort after commit; idempotent on
+    // (sourceType, sourceId).
+    const isChequePay = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
+    try {
+      if (isChequePay) {
+        const chequeRepo = Source.getRepository(Cheque);
+        const chequeNo = req.body.chequeNumber || req.body.referenceNo || `CHQ-PAY-${Date.now()}`;
+        const existing = await chequeRepo.findOne({
+          where: { chequeNo, branchId: payable.branchId },
+        });
+        if (!existing) {
+          const cheque = chequeRepo.create({
+            chequeNo,
+            bankName: req.body.chequeBankName || undefined,
+            partyName: payable.payableTo || 'Vendor',
+            amount: Number(req.body.amount),
+            dueDate: req.body.chequeDueDate
+              ? new Date(req.body.chequeDueDate)
+              : new Date(req.body.paymentDate || Date.now()),
+            issueDate: new Date(req.body.paymentDate || Date.now()),
+            type: 'ISSUED',
+            status: 'PENDING',
+            description: `Vendor payable — ${payable.payableTo || payable.referenceNo}`,
+            branchId: payable.branchId,
+            sourceType: 'PAYABLE',
+            sourceReferenceId: payable.id,
+            sourceLabel: `Payable — ${payable.payableTo || payable.referenceNo}`,
+            createdBy: req.user?.userId ?? SYSTEM_UUID,
+          });
+          await chequeRepo.save(cheque);
+        }
+      } else {
+        await postCashbookEntry({
+          date: req.body.paymentDate || todayInBusinessTz(),
+          entryType: 'PAYMENT',
+          amount: Number(req.body.amount),
+          category: 'Payable Settlement',
+          branchId: payable.branchId,
+          createdBy: req.user?.userId ?? req.body.createdBy ?? SYSTEM_UUID,
+          paymentMode: req.body.paymentMode,
+          accountId: req.body.paidFromAccount,
+          autoResolveAccount: true,
+          description: `Payment against payable ${payable.payableTo || payable.id}`,
+          chequeNo: req.body.referenceNo,
+          notes: req.body.notes,
+          sourceType: 'PAYABLE_PAYMENT',
+          sourceId: savedPayment.id,
+        });
+      }
+    } catch (postErr) {
+      logger.error('Failed to post payable payment to cashbook', postErr);
+    }
 
     res.json({ success: true, data: saved });
   } catch (err) {
@@ -3386,7 +3468,16 @@ export const deleteVatRemittance = async (req: Request, res: Response, next: Nex
 
 // ─── OUTPUT TAX REPORT ────────────────────────────────────────────────────────
 
-const OUTPUT_TAX_STATUSES = ['INVOICED', 'PAID', 'ACTIVE_CONTRACT'];
+// REFUNDED is included so a later refund never rewrites what a historical (potentially
+// already-filed) period's report shows — the original sale's VAT stays exactly as it was
+// in the period it was invoiced. The refund itself shows as a separate, negative reversal
+// row (sourced from credit notes below) dated in the period the refund actually happened,
+// which may be a different period entirely.
+// SENT is included because it's the permanent status of an unpaid or partially-paid
+// Direct Sale (createDirectSale never transitions status to INVOICED) — a Direct Sale's
+// output VAT is due once the sale is made, same as an INVOICED one, and omitting SENT
+// meant every such sale's VAT was invisible to this report and to VAT Payable.
+const OUTPUT_TAX_STATUSES = ['SENT', 'INVOICED', 'PAID', 'ACTIVE_CONTRACT', 'REFUNDED'];
 
 export const getOutputTax = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -3458,13 +3549,100 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       totalInvoice: Number(inv.totalAmount ?? 0) + Number(inv.taxAmount ?? 0),
       currencyCode: inv.currencyCode,
       status: inv.status,
+      isReversal: false,
     }));
+
+    // Credit note reversals — a DIRECT_REFUND on a taxable sale must reduce Output VAT in
+    // the period the REFUND happened, not silently rewrite the period the original sale
+    // was invoiced in (which the REFUNDED status above deliberately no longer excludes).
+    // Dated by updatedAt: the only timestamp available for when approve() flipped the
+    // credit note to COMPLETED, since there's no dedicated completedAt/approvedAt column.
+    const cnQb = Source.getRepository(CreditNote)
+      .createQueryBuilder('cn')
+      .leftJoin(Invoice, 'inv', 'inv.id = cn.invoiceId')
+      .where('cn.type = :type', { type: 'DIRECT_REFUND' })
+      .andWhere('cn.status = :status', { status: 'COMPLETED' })
+      .andWhere('cn.taxAmount > 0')
+      .select([
+        'cn.creditNoteNo AS "creditNoteNo"',
+        'cn.updatedAt AS "reversalDate"',
+        'cn.branchId AS "branchId"',
+        'cn.customerId AS "customerId"',
+        'cn.customerName AS "customerName"',
+        'cn.productAmount AS "productAmount"',
+        'cn.taxPercent AS "taxPercent"',
+        'cn.taxName AS "taxName"',
+        'cn.taxAmount AS "taxAmount"',
+        'inv."currency_code" AS "currencyCode"',
+        'inv."customerVatNumber" AS "customerVatNumber"',
+        'inv."customerCountry" AS "customerCountry"',
+        'inv."customerStateProvince" AS "customerStateProvince"',
+        'inv."customerCity" AS "customerCity"',
+      ]);
+
+    if (branchFilter.length === 1) {
+      cnQb.andWhere('cn.branchId = :bf', { bf: branchFilter[0] });
+    } else if (branchFilter.length > 1) {
+      cnQb.andWhere('cn.branchId IN (:...bf)', { bf: branchFilter });
+    }
+    if (dateFrom) cnQb.andWhere('cn.updatedAt >= :dateFrom', { dateFrom });
+    if (dateTo) {
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      cnQb.andWhere('cn.updatedAt <= :dateTo', { dateTo: end });
+    }
+    if (country) cnQb.andWhere('inv."customerCountry" = :country', { country });
+    if (stateProvince)
+      cnQb.andWhere('inv."customerStateProvince" = :stateProvince', { stateProvince });
+    if (city) cnQb.andWhere('inv."customerCity" = :city', { city });
+
+    const reversalsRaw = await cnQb.getRawMany<{
+      creditNoteNo: string;
+      reversalDate: Date;
+      branchId: string;
+      customerId: string;
+      customerName: string | null;
+      productAmount: string;
+      taxPercent: string | null;
+      taxName: string | null;
+      taxAmount: string;
+      currencyCode: string | null;
+      customerVatNumber: string | null;
+      customerCountry: string | null;
+      customerStateProvince: string | null;
+      customerCity: string | null;
+    }>();
+
+    const reversalRows = reversalsRaw.map((r) => ({
+      invoiceNumber: `Reversal — ${r.creditNoteNo}`,
+      invoiceDate: r.reversalDate,
+      branchId: r.branchId,
+      customerId: r.customerId,
+      customerName: r.customerName,
+      customerVatNumber: r.customerVatNumber,
+      customerCountry: r.customerCountry,
+      customerStateProvince: r.customerStateProvince,
+      customerCity: r.customerCity,
+      taxableAmount: -Number(r.productAmount ?? 0),
+      taxPercent: r.taxPercent != null ? Number(r.taxPercent) : null,
+      taxName: r.taxName,
+      outputVat: -Number(r.taxAmount ?? 0),
+      totalInvoice: -(Number(r.productAmount ?? 0) + Number(r.taxAmount ?? 0)),
+      currencyCode: r.currencyCode,
+      status: 'CREDIT_NOTE_REVERSAL',
+      isReversal: true,
+    }));
+
+    // Reversal rows aren't paginated by the invoice query above (their volume is small
+    // relative to invoices), so they're only attached to page 1 — otherwise they'd
+    // duplicate on every page.
+    const rowsWithReversals = pageNum === 1 ? [...rows, ...reversalRows] : rows;
 
     // Enrich rows where customer snapshot is missing by fetching from CRM service
     const CRM_URL = process.env.CRM_SERVICE_URL ?? 'http://localhost:3005';
     const missingIds = [
       ...new Set(
-        rows
+        rowsWithReversals
           .filter((r) => r.customerId && (!r.customerName || !r.customerCountry))
           .map((r) => r.customerId as string),
       ),
@@ -3503,7 +3681,7 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
         }),
       );
     }
-    const enrichedRows = rows.map((r) => {
+    const enrichedRows = rowsWithReversals.map((r) => {
       const c = r.customerId ? customerCache[r.customerId] : undefined;
       if (!c) return r;
       return {
@@ -3564,10 +3742,11 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
         COALESCE(SUM("totalAmount"), 0) AS taxable_amount,
         COALESCE(SUM("tax_amount"), 0) AS output_vat
       FROM invoices
-      WHERE status IN ('INVOICED', 'PAID', 'ACTIVE_CONTRACT')
+      WHERE status IN (${OUTPUT_TAX_STATUSES.map((s) => `'${s}'`).join(', ')})
         AND "isTemplate" = false
         AND "is_opening_entry" = false
         AND "deletedAt" IS NULL
+        AND "saleType" NOT IN ('RENT', 'LEASE')
         ${bfClause} ${dfClause} ${dtClause} ${cClause} ${spClause} ${cityClause}
       GROUP BY COALESCE("customer_country", 'Unknown'), COALESCE("customer_state_province", 'Unknown'), COALESCE("customer_city", '')
       ORDER BY output_vat DESC
@@ -3607,15 +3786,32 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       }))
       .sort((a, b) => b.outputVat - a.outputVat);
 
-    const totalTaxableAmount = enrichedRows.reduce((s, r) => s + r.taxableAmount, 0);
-    const totalOutputVat = enrichedRows.reduce((s, r) => s + r.outputVat, 0);
+    // totals reflect the full filtered result set (all invoice pages + all reversals),
+    // not just the current page — breakdownRaw is already an unpaginated, full-range
+    // query, so it's the correct base to add the (also unpaginated) reversals onto.
+    const grandTotalTaxableAmount =
+      breakdownRaw.reduce((s, r) => s + Number(r.taxable_amount), 0) +
+      reversalRows.reduce((s, r) => s + r.taxableAmount, 0);
+    const grandTotalOutputVat =
+      breakdownRaw.reduce((s, r) => s + Number(r.output_vat), 0) +
+      reversalRows.reduce((s, r) => s + r.outputVat, 0);
+    const totalRowCount = total + reversalRows.length;
 
     res.json({
       success: true,
       data: {
         rows: enrichedRows,
-        totals: { totalTaxableAmount, totalOutputVat, count: total },
-        pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) },
+        totals: {
+          totalTaxableAmount: +grandTotalTaxableAmount.toFixed(2),
+          totalOutputVat: +grandTotalOutputVat.toFixed(2),
+          count: totalRowCount,
+        },
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: totalRowCount,
+          pages: Math.ceil(total / limitNum),
+        },
         countryBreakdown,
       },
     });

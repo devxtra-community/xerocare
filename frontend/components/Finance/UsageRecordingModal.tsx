@@ -2811,7 +2811,9 @@ export default function UsageRecordingModal({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-slate-600">Bank Name</Label>
+                        <Label className="text-xs font-semibold text-slate-600">
+                          Name of the Bank
+                        </Label>
                         <Input
                           value={chequeBankName}
                           onChange={(e) => setChequeBankName(e.target.value)}

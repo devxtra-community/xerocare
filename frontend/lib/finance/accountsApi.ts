@@ -1444,6 +1444,9 @@ export interface GuaranteeCheque {
 }
 
 export interface GuaranteeStats {
+  /** Reporting currency the amounts below are converted into — the branch's own currency
+   * for a single-branch view, AED fallback for multi-branch/admin views. */
+  currency?: string;
   heldCount: number;
   heldAmount: number;
   returnedCount: number;
@@ -1451,6 +1454,7 @@ export interface GuaranteeStats {
   depositedCount: number;
   depositedAmount: number;
   pendingReturnCount: number;
+  currencyWarnings?: string[];
 }
 
 export interface CustomerContract {

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 type Period = 'today' | 'this_week' | 'this_month' | 'custom';
 
@@ -190,6 +191,12 @@ export default function DayBookPage() {
           >
             <Download className="h-4 w-4" /> Export Excel
           </Button>
+          <ExportPdfButton
+            targetId="day-book-pdf"
+            reportTitle="Day Book"
+            filenamePrefix="Day_Book"
+            filters={{ Period: `${from} to ${to}` }}
+          />
         </div>
       </div>
 
@@ -208,7 +215,7 @@ export default function DayBookPage() {
           </button>
         </div>
       ) : (
-        <>
+        <div id="day-book-pdf" className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             <StatCard
               title="Total Earnings"
@@ -352,7 +359,7 @@ export default function DayBookPage() {
             expenses). Entries are auto-posted from invoice receipts and expense payments, plus any
             manual cashbook entries.
           </p>
-        </>
+        </div>
       )}
     </div>
   );

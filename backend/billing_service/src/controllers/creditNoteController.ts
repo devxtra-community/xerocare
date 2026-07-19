@@ -303,10 +303,13 @@ export class CreditNoteController {
         }
 
         // Create ReturnCredit via repository (B.8: use single consistent path)
+        // Refund the customer what they actually paid — productAmount plus the VAT
+        // charged on it, not just the taxable base. Omitting taxAmount understated
+        // every "Total Returns" report by the VAT portion of each refund.
         await this.returnCreditRepo.createReturnCredit({
           invoiceId: creditNote.invoiceId,
           branchId: creditNote.branchId,
-          amount: creditNote.productAmount,
+          amount: Number(creditNote.productAmount) + Number(creditNote.taxAmount || 0),
           createdBy: req.user?.userId || 'FINANCE',
           note: `Refund for Credit Note ${creditNote.creditNoteNo}. Finance Note: ${financeNote}`,
           returnedItemId:

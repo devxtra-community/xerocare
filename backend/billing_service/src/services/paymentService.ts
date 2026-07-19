@@ -4,6 +4,7 @@ import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { AppError } from '../errors/appError';
 import { BillingService } from './billingService';
+import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
 
 /**
  * Normalized payment record served to the frontend. Merges the current
@@ -21,6 +22,12 @@ export interface PaymentRecord {
   receiptUrl?: string;
   recordedBy?: string;
   createdAt: Date;
+  /** Currency amountPaid is recorded in — may differ from the invoice's own
+   * currency when paid from a foreign-currency customer bank account. */
+  currencyCode?: string;
+  /** Rate to convert currencyCode -> invoice currency, snapshotted at payment
+   * time. Only meaningful when currencyCode differs from the invoice currency. */
+  exchangeRateSnapshot?: number;
 }
 
 export class PaymentService {
@@ -46,6 +53,12 @@ export class PaymentService {
     chequeNumber?: string;
     chequeBankName?: string;
     chequeDueDate?: string;
+    /** Currency amountPaid is in, when different from the invoice's own currency
+     * (e.g. paid from a foreign-currency customer bank account). */
+    currencyCode?: string;
+    /** Rate to convert currencyCode -> invoice currency, required whenever
+     * currencyCode is provided and differs from the invoice currency. */
+    exchangeRate?: number;
   }): Promise<PaymentTransaction> {
     if (data.amountPaid <= 0) {
       throw new AppError('Payment amount must be greater than zero', 400);
@@ -66,6 +79,8 @@ export class PaymentService {
         chequeNumber: data.chequeNumber,
         chequeBankName: data.chequeBankName,
         chequeDueDate: data.chequeDueDate,
+        currencyCode: data.currencyCode,
+        exchangeRate: data.exchangeRate,
       },
       data.recordedBy,
     );
@@ -101,6 +116,8 @@ export class PaymentService {
         receiptUrl: t.receiptUrl,
         recordedBy: t.recordedBy,
         createdAt: t.createdAt,
+        currencyCode: t.currencyCode,
+        exchangeRateSnapshot: t.exchangeRateSnapshot ? Number(t.exchangeRateSnapshot) : undefined,
       })),
     ];
 
@@ -117,24 +134,51 @@ export class PaymentService {
       throw new AppError('Invoice not found', 404);
     }
 
+    const invoiceCurrency = invoice.currencyCode || 'AED';
     const payments = await this.getPaymentsByInvoice(invoiceId);
+
+    // A payment may be recorded in a currency other than the invoice's own (paid
+    // from a foreign-currency customer bank account) — convert each to the
+    // invoice's currency before summing, using the rate snapshotted at payment
+    // time (historical accuracy), falling back to a live rate only for the rare
+    // legacy row with no snapshot. Never silently add mismatched currencies.
+    const liveRates = await loadExchangeRates(Source, invoiceCurrency);
+    const currencyWarnings: string[] = [];
+    const toInvoiceCurrency = (p: PaymentRecord): number => {
+      if (!p.currencyCode || p.currencyCode === invoiceCurrency) return Number(p.amountPaid);
+      const ratesForPayment = p.exchangeRateSnapshot
+        ? new Map([[p.currencyCode, p.exchangeRateSnapshot]])
+        : liveRates;
+      const { value, warning } = convertAmt(
+        Number(p.amountPaid),
+        p.currencyCode,
+        invoiceCurrency,
+        ratesForPayment,
+      );
+      if (warning && !currencyWarnings.includes(warning)) currencyWarnings.push(warning);
+      return value;
+    };
+
     // Security deposits are shown in the ledger list but excluded from settlement
     // totals — they are refundable caution money, not payment against the invoice.
     const totalPaid = payments
       .filter((p) => (p.remarks ?? '').trim().toLowerCase() !== 'security deposit')
-      .reduce((sum, p) => sum + Number(p.amountPaid), 0);
+      .reduce((sum, p) => sum + toInvoiceCurrency(p), 0);
     const totalAmount = Number(invoice.totalAmount || 0);
     const pendingBalance = Math.max(0, Math.round((totalAmount - totalPaid) * 100) / 100);
 
     return {
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
+      customerId: invoice.customerId,
       customerName: invoice.customerName || invoice.customerId,
+      currency: invoiceCurrency,
       totalAmount,
       totalPaid,
       pendingBalance,
       payments,
       status: invoice.status,
+      currencyWarnings,
     };
   }
 }

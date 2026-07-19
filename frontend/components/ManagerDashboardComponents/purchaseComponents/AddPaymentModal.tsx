@@ -16,6 +16,7 @@ import { purchaseService, AddPaymentDto } from '@/services/purchaseService';
 import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
+import { useExchangeRateMap, formatDualCurrency } from '@/lib/dualCurrency';
 import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
 import { createCheque, fetchCashBankAccounts } from '@/lib/finance/accountsApi';
 import { createManagerPurchasePaymentRequest } from '@/lib/employeeExpenses';
@@ -29,6 +30,10 @@ interface AddPaymentModalProps {
   vendorName?: string;
   totalAmount: number;
   paidAmount: number;
+  /** Currency totalAmount/remainingAmount are recorded in (purchase.currencyCode) — may differ
+   * from the branch currency the payment amount below is actually collected in. */
+  purchaseCurrency?: string | null;
+  exchangeRate?: number | null;
   onSuccess: () => void;
 }
 
@@ -40,11 +45,15 @@ export default function AddPaymentModal({
   vendorName,
   totalAmount,
   paidAmount,
+  purchaseCurrency,
+  exchangeRate,
   onSuccess,
 }: AddPaymentModalProps) {
   const remainingAmount = Math.max(0, totalAmount - paidAmount);
   const [loading, setLoading] = useState(false);
   const [currencyCode, setCurrencyCode] = useState('AED');
+  const rates = useExchangeRateMap(currencyCode);
+  const isForeignPurchase = !!purchaseCurrency && purchaseCurrency !== currencyCode;
   const [attachment, setAttachment] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [chequeNumber, setChequeNumber] = useState('');
@@ -229,9 +238,23 @@ export default function AddPaymentModal({
           <div className="mt-2 text-slate-400 text-xs">
             Remaining to pay:{' '}
             <span className="text-white font-bold">
-              {formatCurrency(remainingAmount, currencyCode)}
+              {isForeignPurchase
+                ? formatDualCurrency(
+                    remainingAmount,
+                    purchaseCurrency,
+                    currencyCode,
+                    rates,
+                    exchangeRate,
+                  )
+                : formatCurrency(remainingAmount, currencyCode)}
             </span>
           </div>
+          {isForeignPurchase && (
+            <p className="mt-1.5 text-[11px] text-amber-300">
+              This purchase is recorded in {purchaseCurrency}. Enter the payment amount below in{' '}
+              {currencyCode} — the branch&apos;s currency.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-white">

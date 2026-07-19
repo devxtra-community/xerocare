@@ -194,7 +194,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                   </div>
                   <div>
                     <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                      Location
+                      Vendor Address
                     </p>
                     <p className="text-xs font-semibold text-foreground leading-relaxed">
                       {vendor.address || 'N/A'}

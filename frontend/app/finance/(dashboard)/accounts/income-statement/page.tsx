@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 type Period = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'last_year' | 'custom';
 
@@ -231,6 +232,12 @@ export default function IncomeStatementPage() {
           >
             <Download className="h-4 w-4" /> Export Excel
           </Button>
+          <ExportPdfButton
+            targetId="income-statement-pdf"
+            reportTitle="Income Statement (P&L)"
+            filenamePrefix="Income_Statement"
+            filters={{ Period: dateLabel }}
+          />
         </div>
       </div>
 
@@ -245,7 +252,7 @@ export default function IncomeStatementPage() {
           </p>
         </div>
       ) : (
-        <>
+        <div id="income-statement-pdf" className="space-y-6">
           {/* ── Warnings ── */}
           {dataWarnings.length > 0 && (
             <div className="rounded-xl bg-amber-50 border border-amber-300 p-4 space-y-1">
@@ -390,7 +397,7 @@ export default function IncomeStatementPage() {
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -317,6 +317,15 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS currency_code VARCHAR(3);
       `);
 
+      // --- Exchange rate snapshot on payment_transactions (Part 4: dual-currency
+      // display for payments made from a customer bank account in a currency other
+      // than the invoice's own — rate captured at payment time, same convention as
+      // invoices.exchange_rate_snapshot / purchases.exchange_rate) ---
+      await client.query(`
+        ALTER TABLE payment_transactions
+        ADD COLUMN IF NOT EXISTS exchange_rate_snapshot DECIMAL(18,6);
+      `);
+
       // --- Customer snapshot location columns ---
       await client.query(`
         ALTER TABLE invoices
@@ -408,10 +417,10 @@ async function runPreMigrations() {
             "customerId" UUID NOT NULL,
             "customerName" VARCHAR(255) NULL,
             "branchId" UUID NOT NULL,
-            "productId" UUID NOT NULL,
-            "productName" VARCHAR(255) NOT NULL,
-            "modelName" VARCHAR(255) NOT NULL,
-            brand VARCHAR(255) NOT NULL,
+            "productId" UUID NULL,
+            "productName" VARCHAR(255) NULL,
+            "modelName" VARCHAR(255) NULL,
+            brand VARCHAR(255) NULL,
             "serialNumber" VARCHAR(255) NULL,
             "productAmount" DECIMAL(12,2) NOT NULL,
             type credit_note_type_enum NOT NULL,
@@ -919,6 +928,22 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "replacementQuantity" INTEGER NULL;
     `);
     logger.info('credit_notes spare-part and tax columns ensured.');
+
+    // ─── credit_notes: relax PRODUCT-only NOT NULL constraints ──────────────────
+    // The original CREATE TABLE marked productId/productName/modelName/brand NOT
+    // NULL, but the entity and controller have always treated them as optional
+    // (PRODUCT-only) columns — creditNoteController.create() explicitly leaves
+    // them unset for itemCategory='SPARE_PART'. On any table created before this
+    // fix, that meant every SPARE_PART credit note insert failed outright with a
+    // not-null violation — spare-part returns/refunds were completely unusable.
+    await client.query(`
+      ALTER TABLE credit_notes
+        ALTER COLUMN "productId" DROP NOT NULL,
+        ALTER COLUMN "productName" DROP NOT NULL,
+        ALTER COLUMN "modelName" DROP NOT NULL,
+        ALTER COLUMN "brand" DROP NOT NULL;
+    `);
+    logger.info('credit_notes PRODUCT-only columns relaxed to nullable for SPARE_PART support.');
 
     // ─── Cashbook: reversal tracking + PO orphan flag ─────────────────────────
     await client.query(`

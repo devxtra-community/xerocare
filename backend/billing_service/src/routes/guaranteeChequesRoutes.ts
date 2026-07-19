@@ -9,6 +9,8 @@ import {
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
+import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
+import { getBranchCurrencyInfo } from '../services/billingHelpers';
 
 function genGCRef(): string {
   return `GCQ-${new Date().getFullYear()}-${Date.now().toString().slice(-7)}`;
@@ -27,8 +29,12 @@ router.get('/stats', async (req, res, next) => {
           ? `AND gc.branch_id = '${bf[0]}'`
           : `AND gc.branch_id IN (${bf.map((b) => `'${b}'`).join(',')})`;
 
+    // Cheques may be held in different currencies (currency_code) — group by currency first,
+    // then convert to a single reporting currency, rather than summing raw amounts across
+    // currencies (same double-counting-by-omission risk as any other multi-currency total).
     const rows = await Source.query<
       {
+        currency_code: string;
         held_count: string;
         held_amount: string;
         returned_count: string;
@@ -39,6 +45,7 @@ router.get('/stats', async (req, res, next) => {
       }[]
     >(`
       SELECT
+        gc.currency_code                                                                    AS currency_code,
         COUNT(*) FILTER (WHERE gc.status = 'RECEIVED')                                      AS held_count,
         COALESCE(SUM(gc.amount) FILTER (WHERE gc.status = 'RECEIVED'), 0)                   AS held_amount,
         COUNT(*) FILTER (WHERE gc.status = 'RETURNED')                                      AS returned_count,
@@ -54,19 +61,66 @@ router.get('/stats', async (req, res, next) => {
       LEFT JOIN invoices i ON i.id = gc.contract_invoice_id
       WHERE gc.deleted_at IS NULL
       ${branchClause}
+      GROUP BY gc.currency_code
     `);
 
-    const r = rows[0];
+    // Reporting currency: the branch's own currency for a single-branch view, AED fallback
+    // for multi-branch/admin views — same convention used by getBalanceSheet/getProfitAndLoss.
+    let baseCurrency = 'AED';
+    if (bf.length === 1) {
+      const info = await getBranchCurrencyInfo(bf[0]);
+      baseCurrency = info?.currencyCode ?? 'AED';
+    }
+    const rates = await loadExchangeRates(Source, baseCurrency);
+
+    let heldCount = 0;
+    let heldAmount = 0;
+    let returnedCount = 0;
+    let returnedAmount = 0;
+    let depositedCount = 0;
+    let depositedAmount = 0;
+    let pendingReturnCount = 0;
+    const currencyWarnings: string[] = [];
+
+    for (const r of rows) {
+      heldCount += parseInt(r.held_count, 10);
+      returnedCount += parseInt(r.returned_count, 10);
+      depositedCount += parseInt(r.deposited_count, 10);
+      pendingReturnCount += parseInt(r.pending_return_count, 10);
+
+      const held = convertAmt(parseFloat(r.held_amount), r.currency_code, baseCurrency, rates);
+      const returned = convertAmt(
+        parseFloat(r.returned_amount),
+        r.currency_code,
+        baseCurrency,
+        rates,
+      );
+      const deposited = convertAmt(
+        parseFloat(r.deposited_amount),
+        r.currency_code,
+        baseCurrency,
+        rates,
+      );
+      heldAmount += held.value;
+      returnedAmount += returned.value;
+      depositedAmount += deposited.value;
+      for (const w of [held.warning, returned.warning, deposited.warning]) {
+        if (w && !currencyWarnings.includes(w)) currencyWarnings.push(w);
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        heldCount: parseInt(r.held_count, 10),
-        heldAmount: parseFloat(r.held_amount),
-        returnedCount: parseInt(r.returned_count, 10),
-        returnedAmount: parseFloat(r.returned_amount),
-        depositedCount: parseInt(r.deposited_count, 10),
-        depositedAmount: parseFloat(r.deposited_amount),
-        pendingReturnCount: parseInt(r.pending_return_count, 10),
+        currency: baseCurrency,
+        heldCount,
+        heldAmount,
+        returnedCount,
+        returnedAmount,
+        depositedCount,
+        depositedAmount,
+        pendingReturnCount,
+        currencyWarnings,
       },
     });
   } catch (err) {
@@ -256,23 +310,60 @@ router.post('/:id/return', async (req, res, next) => {
     const { returnedDate } = req.body;
     if (!returnedDate) throw new AppError('returnedDate is required', 400);
 
-    const repo = Source.getRepository(GuaranteeCheque);
-    const qb = repo
-      .createQueryBuilder('gc')
-      .where('gc.id = :id', { id: req.params.id })
-      .andWhere('gc.deletedAt IS NULL');
-    applyBranchQB(qb, 'gc', req.branchFilter ?? []);
+    const userId = req.user!.userId;
 
-    const cheque = await qb.getOne();
-    if (!cheque) throw new AppError('Guarantee cheque not found', 404);
-    if (cheque.status === GuaranteeChequeStatus.RETURNED) {
-      throw new AppError('This guarantee cheque has already been returned', 400);
-    }
+    await Source.transaction(async (em) => {
+      const gcRepo = em.getRepository(GuaranteeCheque);
+      const qb = gcRepo
+        .createQueryBuilder('gc')
+        .where('gc.id = :id', { id: req.params.id })
+        .andWhere('gc.deletedAt IS NULL');
+      applyBranchQB(qb, 'gc', req.branchFilter ?? []);
 
-    cheque.status = GuaranteeChequeStatus.RETURNED;
-    cheque.returnedDate = returnedDate;
-    const updated = await repo.save(cheque);
+      const cheque = await qb.getOne();
+      if (!cheque) throw new AppError('Guarantee cheque not found', 404);
+      if (cheque.status === GuaranteeChequeStatus.RETURNED) {
+        throw new AppError('This guarantee cheque has already been returned', 400);
+      }
 
+      // If this cheque was already DEPOSITED, its amount is currently sitting in the
+      // bank balance. Returning it now must reverse that — otherwise the balance stays
+      // permanently inflated with no corresponding cheque to justify it.
+      if (cheque.status === GuaranteeChequeStatus.DEPOSITED && cheque.depositedToAccountId) {
+        const accountRepo = em.getRepository(CashBankAccount);
+        const entryRepo = em.getRepository(CashbookEntry);
+        const account = await accountRepo.findOne({ where: { id: cheque.depositedToAccountId } });
+        if (account) {
+          await entryRepo.save(
+            entryRepo.create({
+              referenceNo: genGCRef(),
+              date: returnedDate,
+              accountId: account.id,
+              entryType: 'PAYMENT',
+              amount: Number(cheque.amount),
+              category: 'GUARANTEE_CHEQUE_RETURN',
+              description: `Guarantee Cheque returned (previously deposited) — ${cheque.customerName} · #${cheque.chequeNumber} · ${cheque.bankName}`,
+              chequeNo: cheque.chequeNumber,
+              paymentMode: 'Cheque',
+              sourceType: 'GUARANTEE_CHEQUE',
+              sourceId: cheque.id,
+              createdBy: userId,
+              branchId: cheque.branchId,
+            }) as unknown as CashbookEntry,
+          );
+          account.currentBalance = Number(account.currentBalance) - Number(cheque.amount);
+          await accountRepo.save(account);
+        }
+      }
+
+      cheque.status = GuaranteeChequeStatus.RETURNED;
+      cheque.returnedDate = returnedDate;
+      await gcRepo.save(cheque);
+    });
+
+    const updated = await Source.getRepository(GuaranteeCheque).findOne({
+      where: { id: req.params.id },
+    });
     res.json({ success: true, data: updated });
   } catch (err) {
     next(err);

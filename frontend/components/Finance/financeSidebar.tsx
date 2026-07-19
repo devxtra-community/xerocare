@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   ArrowLeft,
   Banknote,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 import {
@@ -96,6 +97,11 @@ export default function FinanceSidebar() {
     { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
     { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
     { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
+    {
+      title: 'Exchange Rates',
+      icon: ArrowLeftRight,
+      href: '/finance/accounts/exchange-rates',
+    },
     { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
   ];
 

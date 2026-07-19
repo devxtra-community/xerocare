@@ -50,6 +50,19 @@ export class PaymentTransaction {
   @Column({ name: 'currency_code', type: 'varchar', length: 3, nullable: true })
   currencyCode?: string;
 
+  /** Rate to convert currencyCode -> the invoice's own currency, captured at
+   * payment time (historical accuracy — same convention as
+   * Invoice.exchangeRateSnapshot / Purchase.exchangeRate). Null when
+   * currencyCode matches the invoice currency (no conversion needed). */
+  @Column({
+    name: 'exchange_rate_snapshot',
+    type: 'decimal',
+    precision: 18,
+    scale: 6,
+    nullable: true,
+  })
+  exchangeRateSnapshot?: number;
+
   @Column({ name: 'receipt_url', type: 'varchar', nullable: true })
   receiptUrl?: string; // Proof of payment (screenshot/PDF) uploaded to R2
 

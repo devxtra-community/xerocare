@@ -28,12 +28,14 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useExchangeRateMap, formatDualCurrency } from '@/lib/dualCurrency';
 import { toast } from 'sonner';
 import AddPaymentModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddPaymentModal';
 import AddCostModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddCostModal';
 
 export default function PurchaseDetailsPage() {
   const currency = useBranchCurrency();
+  const rates = useExchangeRateMap(currency);
   const { id } = useParams();
   const router = useRouter();
   const [purchase, setPurchase] = useState<Purchase | null>(null);
@@ -76,6 +78,12 @@ export default function PurchaseDetailsPage() {
       </div>
     );
   }
+
+  // totalAmount/purchaseAmount/costs are recorded in the purchase's own currency (currencyCode,
+  // inherited from the lot) — only equal to the branch currency for domestic purchases.
+  const purchaseCurrency = purchase.currencyCode || currency;
+  const dual = (amount: number) =>
+    formatDualCurrency(amount, purchaseCurrency, currency, rates, purchase.exchangeRate);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -139,7 +147,7 @@ export default function PurchaseDetailsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <StatCard
               label="Total Lot Value"
-              value={formatCurrency(purchase.totalAmount, currency)}
+              value={dual(purchase.totalAmount)}
               icon={Calculator}
               className="bg-primary text-white"
               valueClass="text-white"
@@ -154,7 +162,7 @@ export default function PurchaseDetailsPage() {
             />
             <StatCard
               label="Balance Due"
-              value={formatCurrency(purchase.remainingAmount, currency)}
+              value={dual(purchase.remainingAmount)}
               icon={TrendingDown}
               className="bg-white border-slate-100 shadow-sm"
               valueClass="text-primary"
@@ -176,17 +184,38 @@ export default function PurchaseDetailsPage() {
             </CardHeader>
             <CardContent className="p-6 bg-white">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                <CostItem icon={FileCheck} label="Base Price" value={purchase.purchaseAmount} />
-                <CostItem icon={Globe} label="Shipping" value={purchase.shippingCost} />
-                <CostItem icon={Users} label="Labour" value={purchase.labourCost} />
-                <CostItem icon={Truck} label="Transport" value={purchase.transportationCost} />
-                <CostItem icon={Package} label="Handling" value={purchase.handlingFee} />
+                <CostItem
+                  icon={FileCheck}
+                  label="Base Price"
+                  value={purchase.purchaseAmount}
+                  dual={dual}
+                />
+                <CostItem icon={Globe} label="Shipping" value={purchase.shippingCost} dual={dual} />
+                <CostItem icon={Users} label="Labour" value={purchase.labourCost} dual={dual} />
+                <CostItem
+                  icon={Truck}
+                  label="Transport"
+                  value={purchase.transportationCost}
+                  dual={dual}
+                />
+                <CostItem
+                  icon={Package}
+                  label="Handling"
+                  value={purchase.handlingFee}
+                  dual={dual}
+                />
                 <CostItem
                   icon={FileCheck}
                   label="Documentation"
                   value={purchase.documentationFee}
+                  dual={dual}
                 />
-                <CostItem icon={Wrench} label="Groundfield" value={purchase.groundfieldCost} />
+                <CostItem
+                  icon={Wrench}
+                  label="Groundfield"
+                  value={purchase.groundfieldCost}
+                  dual={dual}
+                />
               </div>
 
               {purchase.costs && purchase.costs.length > 0 && (
@@ -334,6 +363,8 @@ export default function PurchaseDetailsPage() {
         purchaseId={purchase.id}
         totalAmount={purchase.totalAmount}
         paidAmount={purchase.paidAmount}
+        purchaseCurrency={purchase.currencyCode}
+        exchangeRate={purchase.exchangeRate}
         onSuccess={fetchData}
       />
       <AddCostModal
@@ -389,12 +420,13 @@ function CostItem({
   icon: Icon,
   label,
   value,
+  dual,
 }: {
   icon: LucideIcon;
   label: string;
   value: number;
+  dual: (amount: number) => string;
 }) {
-  const currency = useBranchCurrency();
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-1">
@@ -403,7 +435,7 @@ function CostItem({
           {label}
         </span>
       </div>
-      <p className="text-sm font-black text-slate-700">{formatCurrency(value, currency)}</p>
+      <p className="text-sm font-black text-slate-700">{dual(value)}</p>
     </div>
   );
 }

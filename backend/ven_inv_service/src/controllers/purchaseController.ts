@@ -176,6 +176,8 @@ export class PurchaseController {
           shipping_handling: string;
           import_labour_cost: string;
           customs_duty: string;
+          input_vat_amount: string;
+          reverse_charge_vat_amount: string;
         }[]
       >(
         `
@@ -184,7 +186,9 @@ export class PurchaseController {
           COALESCE(SUM(p.purchase_amount + p.documentation_fee), 0) AS purchase_cost,
           COALESCE(SUM(p.shipping_cost + p.handling_fee + p.transportation_cost + p.groundfield_cost), 0) AS shipping_handling,
           COALESCE(SUM(p.labour_cost), 0) AS import_labour_cost,
-          COALESCE(SUM(p.customs_duty), 0) AS customs_duty
+          COALESCE(SUM(p.customs_duty), 0) AS customs_duty,
+          COALESCE(SUM(p.input_vat_amount) FILTER (WHERE p.vat_claimable IS NOT FALSE), 0) AS input_vat_amount,
+          COALESCE(SUM(p.reverse_charge_vat_amount) FILTER (WHERE p.vat_claimable IS NOT FALSE), 0) AS reverse_charge_vat_amount
         FROM purchases p
         WHERE 1=1
           ${branchClause}
@@ -198,12 +202,17 @@ export class PurchaseController {
       // Billing service will do the currency conversion.
       // We just return the per-currency breakdown plus a flat total for callers
       // that don't need conversion (same-currency branches).
+      // inputVatAmount/reverseChargeVatAmount only include vat_claimable purchases —
+      // non-claimable input VAT (e.g. blocked categories under some jurisdictions'
+      // VAT rules) must never reduce VAT Payable, since it can't actually be reclaimed.
       const currencyGroups = rows.map((r) => ({
         currencyCode: r.currency_code ?? 'AED',
         purchaseCost: Number(r.purchase_cost),
         shippingHandling: Number(r.shipping_handling),
         importLabourCost: Number(r.import_labour_cost),
         customsDuty: Number(r.customs_duty),
+        inputVatAmount: Number(r.input_vat_amount),
+        reverseChargeVatAmount: Number(r.reverse_charge_vat_amount),
       }));
 
       return res.json({ success: true, currencyGroups });

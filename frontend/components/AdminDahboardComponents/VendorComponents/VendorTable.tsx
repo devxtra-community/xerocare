@@ -60,6 +60,10 @@ import { cn } from '@/lib/utils';
 import { Send } from 'lucide-react';
 import RequestProductDialog from '@/components/ManagerDashboardComponents/VendorComponents/RequestProductDialog';
 import { State, City } from 'country-state-city';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { BankBranchSelector } from '@/components/shared/BankBranchSelector';
+import { getBankCodeLabel } from '@/lib/bankCodeType';
+import { currencyOptions, getDefaultCurrencyForCountry } from '@/lib/currencyList';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const countryList = require('country-list');
 
@@ -70,8 +74,20 @@ type BankAccount = {
   accountType?: 'Savings Account' | 'Current Account' | 'Business Account';
   routingNumber?: string;
   swiftCode?: string;
+  /** Country-correct bank identifier: IFSC (India), IBAN (ISO 13616 countries),
+   * or a generic bank code elsewhere — see lib/bankCodeType.ts. Field name kept
+   * as `iban` for storage continuity with existing data. */
   iban?: string;
   address?: string;
+  branch?: string;
+  /** ISO2 country of the BANK itself — independent of the vendor's own
+   * country field (a vendor may bank in a different country than they
+   * operate in). Defaults to the vendor's own country but is independently
+   * changeable. */
+  bankCountry?: string;
+  /** Currency this account is held/paid in — may differ from the branch's local
+   * currency (e.g. a vendor paid in USD for a purchase made in a SAR branch). */
+  currency?: string;
   isPrimary?: boolean;
 };
 
@@ -147,6 +163,10 @@ const COUNTRY_TO_CURRENCY_MAP: Record<string, string> = {
 };
 
 const ALL_COUNTRIES: { code: string; name: string }[] = countryList.getData();
+
+const BANK_COUNTRY_OPTIONS = [...ALL_COUNTRIES]
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .map((c) => ({ value: c.code, label: c.name }));
 
 /** Longest dial code the phone starts with, e.g. "+1-268" before "+1". */
 const findDialCode = (phone: string) =>
@@ -774,6 +794,9 @@ const BLANK_BANK: BankAccount = {
   swiftCode: '',
   iban: '',
   address: '',
+  branch: '',
+  bankCountry: '',
+  currency: '',
   isPrimary: false,
 };
 
@@ -1227,7 +1250,11 @@ function VendorFormModal({
                   className="h-7 text-[11px] gap-1 border-blue-200 text-blue-700"
                   onClick={() => {
                     setAddingBank(true);
-                    setBankDraft({ ...BLANK_BANK });
+                    setBankDraft({
+                      ...BLANK_BANK,
+                      bankCountry: form.countryCode ?? '',
+                      currency: getDefaultCurrencyForCountry(form.countryCode),
+                    });
                   }}
                 >
                   <Plus className="h-3 w-3" /> Add Bank Account
@@ -1267,7 +1294,7 @@ function VendorFormModal({
                       {(acc.swiftCode || acc.iban || acc.address) && (
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
-                          {acc.iban && ` • IBAN: ${acc.iban}`}
+                          {acc.iban && ` • ${getBankCodeLabel(acc.bankCountry)}: ${acc.iban}`}
                           {acc.address && ` • ${acc.address}`}
                         </p>
                       )}
@@ -1302,21 +1329,42 @@ function VendorFormModal({
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
                   New Bank Account
                 </p>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">
+                    Bank Country *
+                  </label>
+                  <SearchableSelect
+                    options={BANK_COUNTRY_OPTIONS}
+                    value={bankDraft.bankCountry || ''}
+                    onValueChange={(v) =>
+                      setBankDraft((d) => ({
+                        ...d,
+                        bankCountry: v,
+                        currency: getDefaultCurrencyForCountry(v),
+                      }))
+                    }
+                    placeholder="Country where this bank is located"
+                    emptyText="No country found."
+                    className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                  />
+                </div>
+                <BankBranchSelector
+                  bankCountryCode={bankDraft.bankCountry}
+                  bankName={bankDraft.bankName}
+                  onBankNameChange={(v) => setBankDraft((d) => ({ ...d, bankName: v }))}
+                  branch={bankDraft.branch}
+                  onBranchChange={(v) => setBankDraft((d) => ({ ...d, branch: v }))}
+                  code={bankDraft.iban}
+                  onCodeChange={(v) => setBankDraft((d) => ({ ...d, iban: v }))}
+                  onIfscVerified={(r) =>
+                    setBankDraft((d) => ({ ...d, address: r.address || d.address }))
+                  }
+                  required
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-gray-400 uppercase">
-                      Bank Name *
-                    </label>
-                    <Input
-                      placeholder="e.g. QNB"
-                      value={bankDraft.bankName}
-                      onChange={(e) => setBankDraft((d) => ({ ...d, bankName: e.target.value }))}
-                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">
-                      Account Holder *
+                      Account Beneficiary *
                     </label>
                     <Input
                       placeholder="Full name on account"
@@ -1375,20 +1423,26 @@ function VendorFormModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">IBAN</label>
-                    <Input
-                      placeholder="IBAN (if applicable)"
-                      value={bankDraft.iban || ''}
-                      onChange={(e) => setBankDraft((d) => ({ ...d, iban: e.target.value }))}
-                      className="h-9 text-sm font-mono rounded-lg bg-card border-none shadow-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">Address</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      Bank Address
+                    </label>
                     <Input
                       placeholder="Bank address"
                       value={bankDraft.address || ''}
                       onChange={(e) => setBankDraft((d) => ({ ...d, address: e.target.value }))}
+                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase">
+                      Currency
+                    </label>
+                    <SearchableSelect
+                      options={currencyOptions()}
+                      value={bankDraft.currency || ''}
+                      onValueChange={(v) => setBankDraft((d) => ({ ...d, currency: v }))}
+                      placeholder="Currency this account is held/paid in"
+                      emptyText="No currency found."
                       className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
                     />
                   </div>
@@ -1468,7 +1522,7 @@ function VendorFormModal({
                     !bankDraft.accountNumber
                   ) {
                     toast.error(
-                      'Please complete the bank account details (Bank Name, Account Holder Name, Account Number) or cancel the bank form before saving',
+                      'Please complete the bank account details (Name of the Bank, Account Beneficiary, Account Number) or cancel the bank form before saving',
                     );
                     return;
                   }

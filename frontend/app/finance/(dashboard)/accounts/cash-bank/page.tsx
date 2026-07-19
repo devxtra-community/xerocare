@@ -37,6 +37,8 @@ import {
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useExchangeRateMap, convertAmount, formatDualCurrency } from '@/lib/dualCurrency';
+import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 import api from '@/lib/api';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -101,12 +103,30 @@ function fmtMoney(amount: number, currency = getActiveCurrency()) {
 function BalanceText({
   amount,
   currency = getActiveCurrency(),
+  branchCurrency,
+  rates,
 }: {
   amount: number;
   currency?: string;
+  /** When provided (and differs from `currency`), a converted "≈ ..." line renders below. */
+  branchCurrency?: string;
+  rates?: Map<string, number>;
 }) {
   const cls = amount < 0 ? 'text-red-600' : amount === 0 ? 'text-slate-400' : 'text-slate-900';
-  return <span className={`font-semibold tabular-nums ${cls}`}>{fmtMoney(amount, currency)}</span>;
+  const converted =
+    branchCurrency && rates && currency !== branchCurrency
+      ? convertAmount(amount, currency, branchCurrency, rates)
+      : null;
+  return (
+    <div>
+      <span className={`font-semibold tabular-nums ${cls}`}>{fmtMoney(amount, currency)}</span>
+      {converted !== null && (
+        <div className="text-[10px] text-slate-400 font-normal tabular-nums">
+          ≈ {fmtMoney(converted, branchCurrency)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Account Modal (Add / Edit) ──────────────────────────────────────────────
@@ -309,7 +329,7 @@ function AccountModal({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium text-slate-700">Bank Name *</label>
+                  <label className="text-sm font-medium text-slate-700">Name of the Bank *</label>
                   <Input
                     className="mt-1"
                     value={form.bankName}
@@ -911,6 +931,8 @@ function TransferModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const branchCurrency = useBranchCurrency();
+  const rates = useExchangeRateMap(branchCurrency);
   const [form, setForm] = useState({
     fromId: '',
     toId: '',
@@ -983,7 +1005,13 @@ function TransferModal({
                   .filter((a) => a.isActive)
                   .map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} — {fmtMoney(Number(a.currentBalance), a.currency)}
+                      {a.name} —{' '}
+                      {formatDualCurrency(
+                        Number(a.currentBalance),
+                        a.currency,
+                        branchCurrency,
+                        rates,
+                      )}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -1334,10 +1362,15 @@ function ReconcileModal({
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="flex-row items-center justify-between gap-2 space-y-0">
           <DialogTitle>Reconcile — {account.name}</DialogTitle>
+          <ExportPdfButton
+            targetId="reconcile-pdf"
+            reportTitle={`Reconciliation — ${account.name}`}
+            filenamePrefix={`Reconciliation_${account.name}`}
+          />
         </DialogHeader>
-        <div className="space-y-4 pt-1">
+        <div id="reconcile-pdf" className="space-y-4 pt-1">
           <div className="rounded-xl border p-4 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-600">Book Balance (system)</span>
@@ -1516,13 +1549,37 @@ export default function CashBankPage() {
   );
   const activeAccounts = useMemo(() => accounts.filter((a) => a.isActive), [accounts]);
 
-  const totalCash = useMemo(
-    () => cashAccounts.reduce((s, a) => s + Number(a.currentBalance), 0),
-    [cashAccounts],
+  const rates = useExchangeRateMap(currency);
+
+  // Accounts may hold different currencies (Part 4) — summing raw balances would silently
+  // mix currencies, so each balance is converted to the branch currency first. An account
+  // whose currency has no exchange rate on file is excluded from the total, not silently
+  // added as if it were the branch currency.
+  const sumConverted = useCallback(
+    (list: CashBankAccount[]) =>
+      list.reduce((acc, a) => {
+        const converted = convertAmount(Number(a.currentBalance), a.currency, currency, rates);
+        return converted === null ? acc : acc + converted;
+      }, 0),
+    [currency, rates],
   );
-  const totalBank = useMemo(
-    () => bankAccounts.reduce((s, a) => s + Number(a.currentBalance), 0),
-    [bankAccounts],
+  const unconvertedCount = useCallback(
+    (list: CashBankAccount[]) =>
+      list.filter(
+        (a) => convertAmount(Number(a.currentBalance), a.currency, currency, rates) === null,
+      ).length,
+    [currency, rates],
+  );
+
+  const totalCash = useMemo(() => sumConverted(cashAccounts), [cashAccounts, sumConverted]);
+  const totalBank = useMemo(() => sumConverted(bankAccounts), [bankAccounts, sumConverted]);
+  const unconvertedCash = useMemo(
+    () => unconvertedCount(cashAccounts),
+    [cashAccounts, unconvertedCount],
+  );
+  const unconvertedBank = useMemo(
+    () => unconvertedCount(bankAccounts),
+    [bankAccounts, unconvertedCount],
   );
 
   const filteredCash = useMemo(
@@ -1590,6 +1647,13 @@ export default function CashBankPage() {
           <p className="text-muted-foreground text-sm">
             {activeAccounts.length} active accounts ·{' '}
             {formatCurrency(totalCash + totalBank, currency)} total
+            {unconvertedCash + unconvertedBank > 0 && (
+              <span className="text-amber-600">
+                {' '}
+                (excludes {unconvertedCash + unconvertedBank} account
+                {unconvertedCash + unconvertedBank !== 1 ? 's' : ''} with no exchange rate on file)
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1647,9 +1711,18 @@ export default function CashBankPage() {
             )}
           </div>
           {tab === 'cashbook' && (
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCashbook}>
-              <Download className="h-3.5 w-3.5" /> Export
-            </Button>
+            <>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCashbook}>
+                <Download className="h-3.5 w-3.5" /> Export
+              </Button>
+              <ExportPdfButton targetId="cashbook-pdf" reportTitle="Cashbook" />
+            </>
+          )}
+          {tab === 'cash' && (
+            <ExportPdfButton targetId="cash-accounts-pdf" reportTitle="Cash in Hand Accounts" />
+          )}
+          {tab === 'bank' && (
+            <ExportPdfButton targetId="bank-accounts-pdf" reportTitle="Cash at Bank Accounts" />
           )}
           {tab === 'transfer' && (
             <Button
@@ -1666,7 +1739,7 @@ export default function CashBankPage() {
         <div className="bg-white">
           {/* ── Cash in Hand ── */}
           {tab === 'cash' && (
-            <>
+            <div id="cash-accounts-pdf">
               <div className="px-4 py-3 bg-emerald-50 border-b flex items-center justify-between">
                 <div>
                   <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">
@@ -1729,7 +1802,12 @@ export default function CashBankPage() {
                             {fmtMoney(Number(a.openingBalance), a.currency)}
                           </td>
                           <td className="px-4 py-3">
-                            <BalanceText amount={Number(a.currentBalance)} currency={a.currency} />
+                            <BalanceText
+                              amount={Number(a.currentBalance)}
+                              currency={a.currency}
+                              branchCurrency={currency}
+                              rates={rates}
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
@@ -1787,12 +1865,12 @@ export default function CashBankPage() {
                   </table>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* ── Cash at Bank ── */}
           {tab === 'bank' && (
-            <>
+            <div id="bank-accounts-pdf">
               <div className="px-4 py-3 bg-blue-50 border-b flex items-center justify-between">
                 <div>
                   <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide">
@@ -1859,7 +1937,12 @@ export default function CashBankPage() {
                             {fmtMoney(Number(a.openingBalance), a.currency)}
                           </td>
                           <td className="px-4 py-3">
-                            <BalanceText amount={Number(a.currentBalance)} currency={a.currency} />
+                            <BalanceText
+                              amount={Number(a.currentBalance)}
+                              currency={a.currency}
+                              branchCurrency={currency}
+                              rates={rates}
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1">
@@ -1924,12 +2007,12 @@ export default function CashBankPage() {
                   </table>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* ── Cashbook ── */}
           {tab === 'cashbook' && (
-            <>
+            <div id="cashbook-pdf">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 border-b bg-slate-50">
                 <StatCard
                   title="Total Receipts"
@@ -2041,7 +2124,7 @@ export default function CashBankPage() {
                   )}
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* ── Transfers ── */}

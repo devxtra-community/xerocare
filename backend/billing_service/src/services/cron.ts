@@ -820,6 +820,57 @@ export function startReminderCronJobs() {
   cron.schedule('0 2 * * *', () => {
     orphanedPoReconciliationJob();
   });
+
+  // 4. Cheque Due Reminder (Daily): Run at 9:00 AM daily
+  cron.schedule('0 9 * * *', () => {
+    chequeDueReminderJob();
+  });
+}
+
+/**
+ * Daily: notifies the branch manager 2 days before a not-yet-cleared cheque's due
+ * date — both Received (from customers) and Issued (to vendors). Fires via the shared
+ * in-app notification system (NotificationPublisher → domain_events → employee_service),
+ * the same path ChequeNotificationBell's live "due soon" list already reads from, so
+ * this doesn't create a second, disconnected notification mechanism. Naturally
+ * idempotent: a cheque's dueDate matches "today + 2 days" on exactly one calendar day,
+ * so re-running this job daily can't double-notify the same cheque.
+ */
+export async function chequeDueReminderJob() {
+  logger.info('[CRON] Running Cheque Due Reminder Job...');
+  try {
+    const { Cheque } = await import('../entities/chequeEntity');
+    const chequeRepo = Source.getRepository(Cheque);
+
+    const target = new Date();
+    target.setDate(target.getDate() + 2);
+    const targetDateStr = target.toISOString().split('T')[0];
+
+    const dueCheques = await chequeRepo
+      .createQueryBuilder('c')
+      .where('c.status IN (:...statuses)', { statuses: ['PENDING', 'DEPOSITED', 'ISSUED'] })
+      .andWhere('CAST(c.dueDate AS DATE) = :targetDate', { targetDate: targetDateStr })
+      .getMany();
+
+    logger.info(`[CRON] Found ${dueCheques.length} cheque(s) due in 2 days.`);
+
+    for (const cheque of dueCheques) {
+      const managerId = await getBranchManagerId(cheque.branchId);
+      if (!managerId) continue;
+
+      const direction = cheque.type === 'ISSUED' ? 'issued to' : 'received from';
+      await NotificationPublisher.publishInAppRequest({
+        recipientId: managerId,
+        title: 'Cheque Due in 2 Days',
+        message: `Cheque #${cheque.chequeNo} (${direction} ${cheque.partyName}, ${Number(cheque.amount).toFixed(2)}) is due on ${targetDateStr} — ${cheque.type === 'ISSUED' ? 'ensure funds are available to clear it' : 'deposit it if you haven’t already'}.`,
+        type: 'INFO',
+        referenceId: cheque.id,
+        referenceType: 'CHEQUE',
+      });
+    }
+  } catch (err) {
+    logger.error('[CRON] Cheque Due Reminder Job failed:', err);
+  }
 }
 
 async function getBranchManagerId(branchId: string): Promise<string | null> {

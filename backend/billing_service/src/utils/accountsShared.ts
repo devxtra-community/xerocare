@@ -388,11 +388,15 @@ export async function computeProfitAndLoss(
         ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
       GROUP BY inv."currency_code"
     `),
-    // Expenses by category — APPROVED or PAID, period-filtered
+    // Expenses by category — APPROVED or PAID, period-filtered. Excludes DEPRECIATION:
+    // postDepreciationJournal() writes a mirror expense_entries row (for audit-trail
+    // visibility in the expense list) alongside the dedicated depreciation_journal_entries
+    // row that 5003 already reads below — counting both here would double the expense.
     db.query<{ category: string; amount: string }[]>(`
       SELECT category, COALESCE(SUM("netAmount"), 0) AS amount
       FROM expense_entries e
       WHERE status IN ('APPROVED', 'PAID')
+        AND category != 'DEPRECIATION'
         AND date BETWEEN '${dateFrom}' AND '${dateTo}'
         ${bSqlExp}
       GROUP BY category
@@ -456,11 +460,13 @@ export async function computeProfitAndLoss(
         GROUP BY inv."currency_code"
       )
     `),
-    // All-time expenses — for retained earnings
+    // All-time expenses — for retained earnings. Excludes DEPRECIATION (see period query
+    // above) — allTimeDepreciation below is the single source of truth for it.
     db.query<{ amount: string }[]>(`
       SELECT COALESCE(SUM("netAmount"), 0) AS amount
       FROM expense_entries ex
       WHERE status IN ('APPROVED', 'PAID')
+        AND category != 'DEPRECIATION'
         ${bSqlAllExp}
     `),
     // All-time depreciation — for retained earnings
@@ -526,17 +532,15 @@ export async function computeProfitAndLoss(
   let crossServiceVendorPurchases = 0;
   let crossServiceShipping = 0;
   let crossServiceImportLabour = 0;
-  let crossServiceCustomsDuty = 0;
   if (!purchaseCostData) {
     dataWarnings.push(
-      '5004/5005/5014/5015: Inventory service unavailable — purchase costs, shipping, import labour and customs duty may be understated (manual expense entries still counted).',
+      '5004/5005/5014: Inventory service unavailable — purchase costs, shipping and import labour may be understated (manual expense entries still counted).',
     );
   } else {
     for (const grp of purchaseCostData.currencyGroups ?? []) {
       const pcResult = convertAmt(grp.purchaseCost, grp.currencyCode, baseCurrency, rates);
       const shResult = convertAmt(grp.shippingHandling, grp.currencyCode, baseCurrency, rates);
       const ilResult = convertAmt(grp.importLabourCost, grp.currencyCode, baseCurrency, rates);
-      const cdResult = convertAmt(grp.customsDuty, grp.currencyCode, baseCurrency, rates);
       if (pcResult.warning) {
         if (!currencyWarnings.includes(pcResult.warning)) currencyWarnings.push(pcResult.warning);
       } else crossServiceVendorPurchases += pcResult.value;
@@ -546,9 +550,8 @@ export async function computeProfitAndLoss(
       if (ilResult.warning) {
         if (!currencyWarnings.includes(ilResult.warning)) currencyWarnings.push(ilResult.warning);
       } else crossServiceImportLabour += ilResult.value;
-      if (cdResult.warning) {
-        if (!currencyWarnings.includes(cdResult.warning)) currencyWarnings.push(cdResult.warning);
-      } else crossServiceCustomsDuty += cdResult.value;
+      // customsDuty from this cross-service response is intentionally not accumulated
+      // here — see the 5015 comment below for why.
     }
   }
 
@@ -563,9 +566,15 @@ export async function computeProfitAndLoss(
   // 5014: purchase-side labour_cost (import/customs-clearance) + manual expense entries IMPORT_LABOUR —
   // kept distinct from 5002 Technician Labour, which is service-ticket labour only.
   const importLabourCost = crossServiceImportLabour + (expMap['IMPORT_LABOUR'] ?? 0);
-  // 5015: purchases.customs_duty + manual expense entries CUSTOMS_DUTY — expensed directly per
-  // business decision (not capitalized into inventory 1006/1009).
-  const customsDuty = crossServiceCustomsDuty + (expMap['CUSTOMS_DUTY'] ?? 0);
+  // 5015: manual expense entries CUSTOMS_DUTY ONLY — expensed directly per business decision
+  // (not capitalized into inventory 1006/1009). purchases.customs_duty is a declared value set
+  // at PO creation with no cash/payable tracking of its own — it is deliberately not pulled in
+  // here, because it was previously double-counted whenever Finance also logged the actual
+  // customs payment as a CUSTOMS_DUTY expense entry (which has real cash/payable backing via
+  // the expense-request approval flow, same as every other manual expense category). The
+  // Purchase Cost / VAT reverse-charge reports (ven_inv_service) read customs_duty directly
+  // from the purchases table and are unaffected by this — they're informational, not P&L.
+  const customsDuty = expMap['CUSTOMS_DUTY'] ?? 0;
 
   const salaryExpense = expMap['SALARY'] ?? 0;
   const travelExpense = expMap['TRAVEL'] ?? 0;
@@ -713,8 +722,19 @@ export async function computeBalanceSheet(
       WHERE "isActive" = true ${bSql('cash_bank_accounts')}
       GROUP BY type, currency
     `),
-    // 1003 Invoice AR — INVOICED invoices minus payments received (both payment
-    // tables: payment_transactions + legacy payment_ledgers)
+    // 1003 Invoice AR — any invoice whose revenue is actually recognized (same
+    // population computeProfitAndLoss uses: status NOT IN excluded-list AND
+    // type='FINAL' or an active/invoiced/paid PROFORMA contract), minus payments
+    // received (both payment tables: payment_transactions + legacy payment_ledgers).
+    //
+    // Previously this only counted status='INVOICED', but createDirectSale() leaves
+    // an unpaid or partially-paid Sale/Product Sale/Spare Part Sale invoice at status
+    // 'SENT' permanently (there is no SENT->INVOICED transition for direct sales), and
+    // an active Rent/Lease contract sits at 'ACTIVE_CONTRACT'. Revenue for both was
+    // already being recognized in the P&L, so excluding them here understated Assets
+    // by their full outstanding balance — a real trial-balance mismatch, not just a
+    // reporting quirk (Balance Sheet Assets = Liabilities + Equity requires this AR
+    // line to track the same population P&L recognizes as revenue).
     db.query<CcyRow[]>(`
       SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM(i."totalAmount" - COALESCE(pt.paid, 0)), 0) AS amount
@@ -730,7 +750,8 @@ export async function computeBalanceSheet(
           GROUP BY "invoiceId"
         ) u GROUP BY invoice_id
       ) pt ON pt.invoice_id = i.id
-      WHERE i.status = 'INVOICED'
+      WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
         AND i."totalAmount" > 0
         AND i."deletedAt" IS NULL
         ${bSql('i')}
@@ -786,12 +807,18 @@ export async function computeBalanceSheet(
       FROM expense_entries
       WHERE status = 'APPROVED' ${bSql('expense_entries')}
     `),
-    // 2003 VAT Payable — output VAT collected from PAID/INVOICED invoices (will subtract remitted below)
+    // 2003 VAT Payable — output VAT collected from invoices whose revenue is actually
+    // recognized (same population as the 1003 Invoice AR fix above and computeProfitAndLoss)
+    // rather than PAID/INVOICED only. VAT becomes due once the sale is made/invoiced, not
+    // only once collected — a status filter that misses 'SENT' (the permanent status of an
+    // unpaid/partial Direct Sale) understated VAT Payable by the exact tax on every such
+    // invoice.
     db.query<CcyRow[]>(`
       SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM(tax_amount), 0) AS amount
       FROM invoices
-      WHERE status IN ('PAID', 'INVOICED')
+      WHERE status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+        AND (type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
         AND tax_amount > 0
         AND "deletedAt" IS NULL
         ${bSql('invoices')}
@@ -815,12 +842,14 @@ export async function computeBalanceSheet(
         ${bSql('invoices')}
       GROUP BY "currency_code"
     `),
-    // Equity entries
-    db.query<{ type: string; amount: string }[]>(`
-      SELECT type, COALESCE(SUM(amount), 0) AS amount
+    // Equity entries — grouped by currency too, so multi-currency entries (e.g. a PKR
+    // opening-balance true-up alongside AED ones) get converted to baseCurrency instead
+    // of being summed as raw numbers regardless of currency.
+    db.query<{ type: string; currency_code: string | null; amount: string }[]>(`
+      SELECT type, COALESCE(currency, '${baseCurrency}') AS currency_code, COALESCE(SUM(amount), 0) AS amount
       FROM equity_entries
       WHERE 1=1 ${bSql('equity_entries')}
-      GROUP BY type
+      GROUP BY type, currency
     `),
     // All-time revenue for retained earnings. The `type NOT IN ('PROFORMA', ...)` filter
     // excludes RENT/LEASE entirely — those contracts are stored as type=PROFORMA for their
@@ -867,11 +896,14 @@ export async function computeBalanceSheet(
         GROUP BY inv."currency_code"
       )
     `),
-    // All-time expenses for retained earnings
+    // All-time expenses for retained earnings. Excludes DEPRECIATION — the dedicated
+    // depreciation_journal_entries-sourced allTimeDepreciation below is the single
+    // source of truth; postDepreciationJournal()'s mirror expense_entries row would
+    // otherwise double the deduction against retained earnings.
     db.query<{ amount: string }[]>(`
       SELECT COALESCE(SUM("netAmount"), 0) AS amount
       FROM expense_entries
-      WHERE status IN ('APPROVED', 'PAID') ${bSql('expense_entries')}
+      WHERE status IN ('APPROVED', 'PAID') AND category != 'DEPRECIATION' ${bSql('expense_entries')}
     `),
     // All-time depreciation for retained earnings
     db.query<{ amount: string }[]>(`
@@ -986,9 +1018,46 @@ export async function computeBalanceSheet(
   const accountsPayable = Number(apRows[0]?.amount ?? 0) + vendorPurchasesPayable;
   const accruedExpenses = Number(accruedRows[0]?.amount ?? 0);
 
+  // Input VAT (Local) + Reverse Charge VAT (International) reclaimable — cross-service,
+  // all-time (no date range: this is a point-in-time balance, same as vatCollected below).
+  // Previously vatPayable only subtracted remittances from Output VAT collected, never
+  // netting the input VAT the business is entitled to reclaim — overstating what's owed
+  // to the tax authority by the full amount of that credit.
+  const vatCreditData = await internalGet<{
+    currencyGroups: {
+      currencyCode: string;
+      inputVatAmount: number;
+      reverseChargeVatAmount: number;
+    }[];
+  }>(`${invUrl}/purchases/internal/cost-report`);
+  let inputVatReclaimable = 0;
+  if (vatCreditData === null) {
+    dataWarnings.push(
+      '2003: Inventory service unavailable — Input/Reverse Charge VAT could not be fetched. VAT Payable will be overstated.',
+    );
+  } else {
+    for (const grp of vatCreditData.currencyGroups ?? []) {
+      const ivResult = convertAmt(grp.inputVatAmount, grp.currencyCode, baseCurrency, rates);
+      const rcResult = convertAmt(
+        grp.reverseChargeVatAmount,
+        grp.currencyCode,
+        baseCurrency,
+        rates,
+      );
+      if (ivResult.warning) {
+        if (!currencyWarnings.includes(ivResult.warning)) currencyWarnings.push(ivResult.warning);
+      } else inputVatReclaimable += ivResult.value;
+      if (rcResult.warning) {
+        if (!currencyWarnings.includes(rcResult.warning)) currencyWarnings.push(rcResult.warning);
+      } else inputVatReclaimable += rcResult.value;
+    }
+  }
+
   const vatCollected = aggByCurrency(vatCollectedRows, baseCurrency, rates, currencyWarnings);
   const vatRemitted = Number(vatRemittedRows[0]?.amount ?? 0);
-  const vatPayable = Math.max(0, vatCollected - vatRemitted);
+  // Net owed to the authority = Output VAT collected − Input VAT credit − Reverse Charge
+  // credit, minus whatever's already been remitted for prior periods.
+  const vatPayable = Math.max(0, vatCollected - inputVatReclaimable - vatRemitted);
 
   const securityDepositsReceived = aggByCurrency(
     secDepReceivedRows,
@@ -1011,9 +1080,26 @@ export async function computeBalanceSheet(
   // ── Equity ───────────────────────────────────────────────────────────────────
   const eqByType: Record<string, number> = {};
   for (const row of equityRows) {
-    eqByType[row.type] = Number(row.amount);
+    const { value, warning } = convertAmt(
+      Number(row.amount),
+      row.currency_code,
+      baseCurrency,
+      rates,
+    );
+    if (warning) {
+      if (!currencyWarnings.includes(warning)) currencyWarnings.push(warning);
+      continue;
+    }
+    eqByType[row.type] = (eqByType[row.type] ?? 0) + value;
   }
-  const ownerCapital = (eqByType['SHARE_CAPITAL'] ?? 0) + (eqByType['OWNER_CONTRIBUTION'] ?? 0);
+  // OPENING_BALANCE_EQUITY entries are what give a cash/bank account's seeded
+  // openingBalance a documented origin in the double-entry system (see
+  // createCashBankAccount) — folded into Owner Capital, same as a real capital
+  // contribution, since that's what an opening balance represents once traced back.
+  const ownerCapital =
+    (eqByType['SHARE_CAPITAL'] ?? 0) +
+    (eqByType['OWNER_CONTRIBUTION'] ?? 0) +
+    (eqByType['OPENING_BALANCE_EQUITY'] ?? 0);
   const reserves = eqByType['RESERVES'] ?? 0;
   const withdrawals = 0;
   const dividends = eqByType['DIVIDEND'] ?? 0;

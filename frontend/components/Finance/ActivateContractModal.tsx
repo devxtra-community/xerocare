@@ -475,7 +475,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                       {depositMode === 'CHEQUE' && (
                         <>
                           <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500">Bank Name</Label>
+                            <Label className="text-xs text-slate-500">Name of the Bank</Label>
                             <Input
                               value={depositChequeBankName}
                               onChange={(e) => setDepositChequeBankName(e.target.value)}
