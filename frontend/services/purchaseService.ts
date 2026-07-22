@@ -21,6 +21,7 @@ export interface PurchaseCost {
   costType: string;
   description?: string;
   costDate: string;
+  attachmentUrl?: string;
 }
 
 export interface Purchase {
@@ -206,9 +207,27 @@ export const purchaseService = {
   },
 
   /**
-   * Adds a cost to a purchase.
+   * Adds a cost to a purchase. Attachment (e.g. the transporter's or customs
+   * broker's receipt) is optional.
    */
-  addCost: async (purchaseId: string, data: AddCostDto): Promise<PurchaseCost> => {
+  addCost: async (
+    purchaseId: string,
+    data: AddCostDto,
+    attachment?: File | null,
+  ): Promise<PurchaseCost> => {
+    if (attachment) {
+      const formData = new FormData();
+      Object.entries(data).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          formData.append(key, String(value));
+        }
+      });
+      formData.append('attachment', attachment);
+      const response = await api.post(`/i/purchases/${purchaseId}/costs`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data.data;
+    }
     const response = await api.post(`/i/purchases/${purchaseId}/costs`, data);
     return response.data.data;
   },

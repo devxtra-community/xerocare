@@ -13,8 +13,13 @@ import {
 
 import { logger } from '../config/logger';
 
+const MAX_EMAIL_RETRIES = 5;
+
 export const startWorker = async () => {
   const channel = await getRabbitChannel();
+
+  // Limit in-flight messages so a retry storm can't hot-loop the worker
+  await channel.prefetch(5);
 
   channel.consume('email_queue', async (msg) => {
     if (!msg) return;
@@ -90,24 +95,47 @@ export const startWorker = async () => {
       logger.error('Email worker failed to process message', err);
 
       const error = err as { code?: string; responseCode?: number };
-      // Handle transient errors (DNS, network) with requeue
+      // Handle transient errors (DNS, network) with a delayed, capped retry.
+      // A plain nack-requeue redelivers instantly and melts the worker when
+      // the SMTP host is unreachable for more than a moment.
       const isTransient =
         error.code === 'EAI_AGAIN' ||
         error.code === 'ECONNRESET' ||
         error.code === 'ETIMEDOUT' ||
         error.code === 'ESOCKET' ||
+        error.code === 'ECONNECTION' ||
+        error.code === 'ENETUNREACH' ||
+        error.code === 'EHOSTUNREACH' ||
         error.responseCode === 421; // SMTP 421: Service busy
 
-      if (isTransient) {
-        logger.info('Transient error detected, requeueing message...', {
-          email: job.email,
-          type: job.type,
-          errorCode: error.code,
-        });
-        // nack(message, allUpTo, requeue)
-        channel.nack(msg, false, true);
+      const retryCount = Number(msg.properties.headers?.['x-retry-count'] || 0);
+
+      if (isTransient && retryCount < MAX_EMAIL_RETRIES) {
+        const delayMs = Math.min(30_000, 1000 * 2 ** retryCount);
+        logger.info(
+          `Transient error, retrying email job in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_EMAIL_RETRIES})`,
+          { email: job.email, type: job.type, errorCode: error.code },
+        );
+        setTimeout(() => {
+          try {
+            channel.sendToQueue('email_queue', msg.content, {
+              persistent: true,
+              headers: { ...(msg.properties.headers || {}), 'x-retry-count': retryCount + 1 },
+            });
+            channel.ack(msg);
+          } catch (republishErr) {
+            logger.error('Failed to requeue email job, nacking instead', republishErr);
+            channel.nack(msg, false, true);
+          }
+        }, delayMs);
       } else {
-        // Fatal error or unknown, ack to prevent infinite loop but it's logged
+        if (isTransient) {
+          logger.error(
+            `Email job dropped after ${MAX_EMAIL_RETRIES} failed attempts (SMTP unreachable)`,
+            { email: job.email, type: job.type, errorCode: error.code },
+          );
+        }
+        // Fatal error, unknown, or retries exhausted: ack to prevent infinite loop
         channel.ack(msg);
       }
     }

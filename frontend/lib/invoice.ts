@@ -172,6 +172,12 @@ export interface Invoice {
   warrantyEmailSent?: boolean;
   warrantyExpiryEmailSent?: boolean;
   notes?: string;
+  // Service estimate fields
+  visitChargeAmount?: number;
+  visitChargeMethod?: 'ADDED_TO_ESTIMATE' | 'SEPARATE' | null;
+  totalDiscountAmount?: number;
+  technicianNoteToFinance?: string | null;
+  revisionCount?: number;
   // Tax / VAT fields (populated from branch tax config at invoice creation)
   taxName?: string; // e.g. "VAT"
   taxPercent?: number; // e.g. 5
@@ -1062,6 +1068,12 @@ export const requestValidityExtension = async (id: string): Promise<Invoice> => 
  */
 export const getPendingServiceEstimates = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices?billType=SERVICE&status=WAITING_FINANCE_APPROVAL');
+  return response.data.data;
+};
+
+/** Finance-approved service estimates — ready to be sent to the customer. */
+export const getApprovedServiceEstimates = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices?billType=SERVICE&status=FINANCE_APPROVED');
   return response.data.data;
 };
 

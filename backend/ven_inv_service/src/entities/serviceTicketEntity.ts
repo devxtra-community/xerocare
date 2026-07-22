@@ -214,6 +214,15 @@ export class ServiceTicket {
   @Column({ name: 'visit_charge_informed', type: 'boolean', default: false })
   visitChargeInformed!: boolean;
 
+  // Pickup & delivery charge when the machine is taken to the workshop
+  // (jobType BRING_TO_CENTRE). Covered (free) under contracts with travel coverage.
+  @Column({ name: 'transport_charge_amount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  transportChargeAmount!: number;
+
+  // Customer site location for ONSITE jobs — the visit charge is priced from it.
+  @Column({ name: 'service_location', type: 'varchar', length: 500, nullable: true })
+  serviceLocation?: string | null;
+
   @OneToMany(() => ServiceTicketItem, (item) => item.ticket, { cascade: true })
   items!: ServiceTicketItem[];
 

@@ -50,6 +50,14 @@ export class ServiceTicketItem {
   @Column({ type: 'text', nullable: true })
   customPartDescription?: string | null;
 
+  // Brand + manufacturer part number: copied from the SparePart for registered
+  // parts, technician-entered for custom parts.
+  @Column({ type: 'varchar', nullable: true })
+  partBrand?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  mpn?: string | null;
+
   @Column()
   partName!: string;
 

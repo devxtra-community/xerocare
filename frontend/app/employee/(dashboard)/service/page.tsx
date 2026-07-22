@@ -317,6 +317,7 @@ export default function ServiceDashboardPage() {
     issueDescription: '',
     jobType: 'ONSITE',
     scheduledVisitDate: '',
+    serviceLocation: '',
   });
 
   const [creationPath, setCreationPath] = useState<'existing' | 'new'>('existing');
@@ -405,6 +406,8 @@ export default function ServiceDashboardPage() {
     labourCost: number;
     visitChargeAmount: number;
     visitChargeMethod: 'ADDED_TO_ESTIMATE' | 'SEPARATE';
+    visitChargeCollected: boolean;
+    transportChargeAmount: number;
     discountAmount: number;
     technicianNoteToFinance: string;
     items: Array<{
@@ -413,6 +416,7 @@ export default function ServiceDashboardPage() {
       customPartName: string;
       customPartBrand: string;
       customPartDescription: string;
+      mpn: string;
       partName: string;
       quantity: number;
       unitPrice: number;
@@ -426,6 +430,8 @@ export default function ServiceDashboardPage() {
     labourCost: 0,
     visitChargeAmount: 0,
     visitChargeMethod: 'ADDED_TO_ESTIMATE',
+    visitChargeCollected: true,
+    transportChargeAmount: 0,
     discountAmount: 0,
     technicianNoteToFinance: '',
     items: [],
@@ -587,6 +593,10 @@ export default function ServiceDashboardPage() {
           jobType: newTicket.jobType,
           scheduledVisitDate:
             newTicket.jobType === 'ONSITE' ? newTicket.scheduledVisitDate : undefined,
+          serviceLocation:
+            newTicket.jobType === 'ONSITE'
+              ? newTicket.serviceLocation.trim() || undefined
+              : undefined,
           issueDescription: newTicket.issueDescription.trim(),
           meterReadingAtCreation:
             !isOtherMachine && meterReadingInput !== '' ? Number(meterReadingInput) : undefined,
@@ -653,6 +663,10 @@ export default function ServiceDashboardPage() {
           jobType: newTicket.jobType,
           scheduledVisitDate:
             newTicket.jobType === 'ONSITE' ? newTicket.scheduledVisitDate : undefined,
+          serviceLocation:
+            newTicket.jobType === 'ONSITE'
+              ? newTicket.serviceLocation.trim() || leadForm.location.trim() || undefined
+              : undefined,
           issueDescription: newTicket.issueDescription.trim(),
         };
 
@@ -796,6 +810,7 @@ export default function ServiceDashboardPage() {
   const handleAssignTechnician = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
+    const isReassignment = !!selectedTicket.assignedTechnicianId;
     try {
       setSubmitting(true);
       await assignTechnician(
@@ -805,9 +820,15 @@ export default function ServiceDashboardPage() {
       );
       setShowAssignModal(false);
       setAssignForm({ technicianId: '' });
+      toastSuccess(
+        isReassignment
+          ? 'Technician changed. The new technician will get target credit once this job is completed.'
+          : 'Technician assigned successfully!',
+      );
       await fetchInitialData();
     } catch (error) {
       console.error('Failed to assign technician:', error);
+      toastError('Failed to assign technician.');
     } finally {
       setSubmitting(false);
     }
@@ -845,20 +866,22 @@ export default function ServiceDashboardPage() {
     e.preventDefault();
     if (!selectedTicket) return;
 
-    // Validate discount amount <= total maxDiscountableAmount across parts
-    let totalMaxDiscount = 0;
-    for (const item of diagnosisForm.items) {
-      if (item.itemSource === 'SPARE_PART' && item.sparePartId) {
-        const part = spareParts.find((p) => p.id === item.sparePartId);
-        if (part) {
-          totalMaxDiscount += (Number(part.maxDiscountableAmount) || 0) * (item.quantity || 1);
-        }
-      }
-    }
-
-    if (Number(diagnosisForm.discountAmount || 0) > totalMaxDiscount) {
+    // Discount applies to the whole estimate: parts + labour + transport +
+    // visit charge (when added to the estimate). It cannot exceed that total.
+    const partsTotal = diagnosisForm.items.reduce(
+      (sum, item) => sum + (item.isFree ? 0 : (item.quantity || 1) * (item.unitPrice || 0)),
+      0,
+    );
+    const estimateTotalBeforeDiscount =
+      partsTotal +
+      (Number(diagnosisForm.labourCost) || 0) +
+      (Number(diagnosisForm.transportChargeAmount) || 0) +
+      (diagnosisForm.visitChargeMethod === 'ADDED_TO_ESTIMATE'
+        ? Number(diagnosisForm.visitChargeAmount) || 0
+        : 0);
+    if (Number(diagnosisForm.discountAmount || 0) > estimateTotalBeforeDiscount) {
       toast.error(
-        `Discount of ${getActiveCurrency()} ${diagnosisForm.discountAmount} exceeds the maximum allowed discount of ${getActiveCurrency()} ${totalMaxDiscount} for the selected parts.`,
+        `Discount of ${getActiveCurrency()} ${diagnosisForm.discountAmount} exceeds the total estimate amount of ${getActiveCurrency()} ${estimateTotalBeforeDiscount.toFixed(2)}.`,
       );
       return;
     }
@@ -883,6 +906,7 @@ export default function ServiceDashboardPage() {
             customPartName: it.customPartName || undefined,
             customPartBrand: it.customPartBrand || undefined,
             customPartDescription: it.customPartDescription || undefined,
+            mpn: it.mpn || undefined,
             partName: it.partName,
             quantity: Number(it.quantity) || 1,
             unitPrice: Number(it.unitPrice) || 0,
@@ -904,6 +928,11 @@ export default function ServiceDashboardPage() {
           labourCost: Number(diagnosisForm.labourCost) || 0,
           visitChargeAmount: Number(diagnosisForm.visitChargeAmount) || 0,
           visitChargeMethod: diagnosisForm.visitChargeMethod,
+          visitChargeCollected:
+            diagnosisForm.visitChargeMethod === 'SEPARATE'
+              ? diagnosisForm.visitChargeCollected
+              : false,
+          transportChargeAmount: Number(diagnosisForm.transportChargeAmount) || 0,
           discountAmount: Number(diagnosisForm.discountAmount) || 0,
           technicianNoteToFinance: diagnosisForm.technicianNoteToFinance || null,
           items: diagnosisForm.items.map((it) => ({
@@ -912,6 +941,7 @@ export default function ServiceDashboardPage() {
             customPartName: it.customPartName || undefined,
             customPartBrand: it.customPartBrand || undefined,
             customPartDescription: it.customPartDescription || undefined,
+            mpn: it.mpn || undefined,
             partName: it.partName,
             quantity: Number(it.quantity) || 1,
             unitPrice: Number(it.unitPrice) || 0,
@@ -929,6 +959,8 @@ export default function ServiceDashboardPage() {
         labourCost: 0,
         visitChargeAmount: 0,
         visitChargeMethod: 'ADDED_TO_ESTIMATE',
+        visitChargeCollected: true,
+        transportChargeAmount: 0,
         discountAmount: 0,
         technicianNoteToFinance: '',
         items: [],
@@ -1370,9 +1402,14 @@ export default function ServiceDashboardPage() {
     try {
       setLoading(true);
       await approveServiceQuotation(ticketId);
+      toastSuccess('Customer approval recorded.');
       await fetchInitialData();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to approve:', error);
+      const err = error as { response?: { data?: { message?: string } } };
+      toastError(
+        err.response?.data?.message || 'Failed to record customer approval. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -1439,6 +1476,7 @@ export default function ServiceDashboardPage() {
       issueDescription: '',
       jobType: 'ONSITE',
       scheduledVisitDate: '',
+      serviceLocation: '',
     });
     setLeadForm({
       name: '',
@@ -1746,6 +1784,7 @@ export default function ServiceDashboardPage() {
           customPartName: '',
           customPartBrand: '',
           customPartDescription: '',
+          mpn: '',
           partName: '',
           quantity: 1,
           unitPrice: 0,
@@ -1821,8 +1860,14 @@ export default function ServiceDashboardPage() {
       case 'DIAGNOSED':
         return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'WAITING_FINANCE_APPROVAL':
+      case 'WAITING_FINANCE_APPROVAL_2':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'ADDITIONAL_ESTIMATE_PENDING':
+        return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'ESTIMATE_RECORDED':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       case 'FINANCE_APPROVED':
+      case 'FINANCE_APPROVED_2':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'QUOTED':
         return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -1949,9 +1994,14 @@ export default function ServiceDashboardPage() {
               <option value="WAITING_FINANCE_APPROVAL">Waiting Finance Approval</option>
               <option value="FINANCE_APPROVED">Finance Approved</option>
               <option value="FINANCE_REJECTED">Finance Rejected</option>
+              <option value="QUOTED">Quote Sent</option>
               <option value="CUSTOMER_APPROVED">Customer Approved</option>
               <option value="CUSTOMER_REJECTED">Customer Rejected</option>
               <option value="IN_PROGRESS">In Progress</option>
+              <option value="ADDITIONAL_ESTIMATE_PENDING">Additional Estimate Pending</option>
+              <option value="WAITING_FINANCE_APPROVAL_2">Add. Work — Waiting Finance</option>
+              <option value="FINANCE_APPROVED_2">Add. Work Approved</option>
+              <option value="ESTIMATE_RECORDED">Estimate Recorded</option>
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
@@ -2114,32 +2164,25 @@ export default function ServiceDashboardPage() {
                       >
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                            {/* HELP DESK / MANAGER ACTIONS */}
+                            {/* HELP DESK / MANAGER ACTIONS — technician can be assigned or
+                                changed any time before the job is done or cancelled (e.g. the
+                                original technician becomes unavailable mid-flow). Whoever ends
+                                up assigned when the ticket completes gets the target credit. */}
                             {(isHelpDesk || isManagerOrAdmin) &&
-                              (ticket.status === 'OPEN' ||
-                                ticket.status === 'FREE_SERVICE' ||
-                                // Manager may have estimated before assignment;
-                                // a technician can still be assigned mid-flow.
-                                (!ticket.assignedTechnicianId &&
-                                  [
-                                    'DIAGNOSED',
-                                    'WAITING_FINANCE_APPROVAL',
-                                    'FINANCE_APPROVED',
-                                    'FINANCE_REJECTED',
-                                    'QUOTED',
-                                    'CUSTOMER_APPROVED',
-                                    'REVISED',
-                                  ].includes(ticket.status))) && (
+                              !['COMPLETED', 'CANCELLED'].includes(ticket.status) && (
                                 <Button
                                   size="sm"
                                   className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
                                   onClick={() => {
                                     setSelectedTicket(ticket);
+                                    setAssignForm({
+                                      technicianId: ticket.assignedTechnicianId || '',
+                                    });
                                     setShowAssignModal(true);
                                   }}
                                 >
                                   <UserPlus className="size-3.5" />
-                                  Assign Tech
+                                  {ticket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
                                 </Button>
                               )}
 
@@ -2215,6 +2258,8 @@ export default function ServiceDashboardPage() {
                                         labourCost: 0,
                                         visitChargeAmount: 0,
                                         visitChargeMethod: 'ADDED_TO_ESTIMATE',
+                                        visitChargeCollected: true,
+                                        transportChargeAmount: 0,
                                         discountAmount: 0,
                                         technicianNoteToFinance: '',
                                         items: [],
@@ -2270,6 +2315,8 @@ export default function ServiceDashboardPage() {
                                         (ticket.visitChargeMethod as
                                           | 'ADDED_TO_ESTIMATE'
                                           | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
+                                      visitChargeCollected: !!ticket.visitChargeCollected,
+                                      transportChargeAmount: ticket.transportChargeAmount || 0,
                                       discountAmount: ticket.discountAmount || 0,
                                       technicianNoteToFinance: ticket.technicianNoteToFinance || '',
                                       items: otherItems.map((it) => ({
@@ -2278,6 +2325,7 @@ export default function ServiceDashboardPage() {
                                         customPartName: it.customPartName || '',
                                         customPartBrand: it.customPartBrand || '',
                                         customPartDescription: it.customPartDescription || '',
+                                        mpn: it.mpn || '',
                                         partName: it.partName || '',
                                         quantity: it.quantity || 1,
                                         unitPrice: it.unitPrice || 0,
@@ -3619,6 +3667,26 @@ export default function ServiceDashboardPage() {
                       )}
                     </div>
 
+                    {/* Site location (only if ONSITE) — visit charge is priced from it */}
+                    {newTicket.jobType === 'ONSITE' && (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                          Site Location (for visit charge)
+                        </label>
+                        <Input
+                          placeholder="e.g. Doha — Industrial Area, Street 24"
+                          value={newTicket.serviceLocation}
+                          onChange={(e) =>
+                            setNewTicket({ ...newTicket, serviceLocation: e.target.value })
+                          }
+                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
+                        />
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                          Visit / estimate charge is decided based on this location.
+                        </p>
+                      </div>
+                    )}
+
                     {/* Issue Description */}
                     <div>
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
@@ -3920,58 +3988,87 @@ export default function ServiceDashboardPage() {
         </div>
       )}
 
-      {/* ASSIGN TECHNICIAN MODAL */}
-      {showAssignModal && selectedTicket && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
-              <CardTitle className="text-base font-bold text-slate-800">
-                Assign Technician
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Select a qualified field technician to assign to this service ticket.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleAssignTechnician}>
-              <CardContent className="p-6 space-y-4">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Technician
-                  </label>
-                  <SearchableSelect
-                    options={technicians.map((t) => ({
-                      value: t.id,
-                      label: `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email,
-                      description: t.email || undefined,
-                    }))}
-                    value={assignForm.technicianId}
-                    onValueChange={(val) => setAssignForm({ ...assignForm, technicianId: val })}
-                    placeholder="Search technician by name or email..."
-                    className="h-9 rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
-                  />
-                </div>
-              </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setShowAssignModal(false)}
-                  className="rounded-xl text-xs font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl"
-                >
-                  {submitting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />} Assign Job
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+      {/* ASSIGN / CHANGE TECHNICIAN MODAL */}
+      {showAssignModal &&
+        selectedTicket &&
+        (() => {
+          const currentTech = technicians.find((t) => t.id === selectedTicket.assignedTechnicianId);
+          const isReassignment = !!selectedTicket.assignedTechnicianId;
+          return (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <Card className="w-full max-w-md bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
+                  <CardTitle className="text-base font-bold text-slate-800">
+                    {isReassignment ? 'Change Technician' : 'Assign Technician'}
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    {isReassignment
+                      ? 'Swap the technician handling this ticket. The new technician gets target credit once the job is completed.'
+                      : 'Select a qualified field technician to assign to this service ticket.'}
+                  </CardDescription>
+                </CardHeader>
+                <form onSubmit={handleAssignTechnician}>
+                  <CardContent className="p-6 space-y-4">
+                    {isReassignment && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-[11px] font-semibold text-amber-800">
+                        Currently assigned to{' '}
+                        <span className="font-bold">
+                          {currentTech
+                            ? `${currentTech.first_name || ''} ${currentTech.last_name || ''}`.trim() ||
+                              currentTech.email
+                            : 'Unknown technician'}
+                        </span>
+                        . Changing this reassigns the job and its target credit to the new
+                        technician.
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        {isReassignment ? 'New Technician' : 'Technician'}
+                      </label>
+                      <SearchableSelect
+                        options={technicians.map((t) => ({
+                          value: t.id,
+                          label: `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email,
+                          description: t.email || undefined,
+                        }))}
+                        value={assignForm.technicianId}
+                        onValueChange={(val) => setAssignForm({ ...assignForm, technicianId: val })}
+                        placeholder="Search technician by name or email..."
+                        className="h-9 rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
+                      />
+                    </div>
+                  </CardContent>
+                  <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setShowAssignModal(false);
+                        setAssignForm({ technicianId: '' });
+                      }}
+                      className="rounded-xl text-xs font-bold"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={
+                        submitting ||
+                        !assignForm.technicianId ||
+                        assignForm.technicianId === selectedTicket.assignedTechnicianId
+                      }
+                      className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl"
+                    >
+                      {submitting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                      {isReassignment ? 'Change Job' : 'Assign Job'}
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+            </div>
+          );
+        })()}
 
       {/* DIAGNOSE TICKET MODAL */}
       {showDiagnoseModal && selectedTicket && (
@@ -4133,13 +4230,23 @@ export default function ServiceDashboardPage() {
                               options={spareParts.map((sp) => ({
                                 value: sp.id,
                                 label: `${sp.part_name} (${sp.sku})`,
-                                description: `Base Price: ${getActiveCurrency()} ${sp.base_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                                description: `${sp.brand ? `Brand: ${sp.brand} · ` : ''}${sp.mpn ? `MPN: ${sp.mpn} · ` : ''}Base Price: ${getActiveCurrency()} ${sp.base_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
                               }))}
                               value={item.sparePartId}
                               onValueChange={(val) => updateDiagnosisItem(idx, 'sparePartId', val)}
                               placeholder="Search spare part..."
                               className="h-8 rounded-lg border-slate-200 bg-white text-[11px] font-medium text-slate-700 w-full"
                             />
+                            {item.sparePartId &&
+                              (() => {
+                                const sp = spareParts.find((p) => p.id === item.sparePartId);
+                                if (!sp) return null;
+                                return (
+                                  <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                                    Brand: {sp.brand || '—'} · Mfg. Part No: {sp.mpn || '—'}
+                                  </p>
+                                );
+                              })()}
                           </div>
                         ) : (
                           <div className="sm:col-span-2">
@@ -4161,7 +4268,7 @@ export default function ServiceDashboardPage() {
                       </div>
 
                       {item.itemSource === 'CUSTOM' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 block mb-1">
                               Brand
@@ -4172,6 +4279,17 @@ export default function ServiceDashboardPage() {
                               onChange={(e) =>
                                 updateDiagnosisItem(idx, 'customPartBrand', e.target.value)
                               }
+                              className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                              Mfg. Part Number
+                            </label>
+                            <Input
+                              placeholder="e.g. CB435A"
+                              value={item.mpn}
+                              onChange={(e) => updateDiagnosisItem(idx, 'mpn', e.target.value)}
                               className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
                             />
                           </div>
@@ -4255,94 +4373,197 @@ export default function ServiceDashboardPage() {
                       Estimate & Pricing Details
                     </h4>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Visit Charge ({getActiveCurrency()})
-                        </label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={diagnosisForm.visitChargeAmount || ''}
-                          onChange={(e) =>
-                            setDiagnosisForm({
-                              ...diagnosisForm,
-                              visitChargeAmount: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Visit Charge Method
-                        </label>
-                        <select
-                          value={diagnosisForm.visitChargeMethod}
-                          onChange={(e) =>
-                            setDiagnosisForm({
-                              ...diagnosisForm,
-                              visitChargeMethod: e.target.value as 'ADDED_TO_ESTIMATE' | 'SEPARATE',
-                            })
-                          }
-                          className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent animate-none"
-                        >
-                          <option value="ADDED_TO_ESTIMATE">Add to Estimate</option>
-                          <option value="SEPARATE">Separate Cash On-Site</option>
-                        </select>
-                      </div>
-                    </div>
+                    {(() => {
+                      const travelCovered = [
+                        'AMC',
+                        'SMA',
+                        'FSMA',
+                        'RENT',
+                        'WARRANTY',
+                        'LEASE_UNDER_WARRANTY',
+                      ].includes(selectedTicket.serviceContext);
+                      return (
+                        <>
+                          {travelCovered && (
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-[11px] font-bold text-emerald-700">
+                              Visit &amp; transportation charges are FREE — this machine is covered
+                              by {selectedTicket.serviceContext.replace(/_/g, ' ')}.
+                            </div>
+                          )}
+                          {!travelCovered && selectedTicket.serviceLocation && (
+                            <div className="bg-sky-50 border border-sky-100 rounded-xl p-3 text-[11px] font-semibold text-sky-800">
+                              📍 Site location:{' '}
+                              <span className="font-bold">{selectedTicket.serviceLocation}</span> —
+                              price the visit charge based on this.
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Visit Charge ({getActiveCurrency()})
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                disabled={travelCovered}
+                                value={travelCovered ? '' : diagnosisForm.visitChargeAmount || ''}
+                                placeholder={travelCovered ? 'FREE (covered)' : ''}
+                                onChange={(e) =>
+                                  setDiagnosisForm({
+                                    ...diagnosisForm,
+                                    visitChargeAmount: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl disabled:opacity-60"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Visit Charge Method
+                              </label>
+                              <select
+                                value={diagnosisForm.visitChargeMethod}
+                                disabled={travelCovered}
+                                onChange={(e) =>
+                                  setDiagnosisForm({
+                                    ...diagnosisForm,
+                                    visitChargeMethod: e.target.value as
+                                      | 'ADDED_TO_ESTIMATE'
+                                      | 'SEPARATE',
+                                  })
+                                }
+                                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent animate-none disabled:opacity-60"
+                              >
+                                <option value="ADDED_TO_ESTIMATE">
+                                  Add to Estimate (collect after work)
+                                </option>
+                                <option value="SEPARATE">Separate Cash On-Site</option>
+                              </select>
+                            </div>
+                          </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Discount ({getActiveCurrency()})
-                        </label>
-                        <Input
-                          type="number"
-                          min={0}
-                          value={diagnosisForm.discountAmount || ''}
-                          onChange={(e) =>
-                            setDiagnosisForm({
-                              ...diagnosisForm,
-                              discountAmount: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
-                        />
-                      </div>
-                      <div>
-                        {/* Live Calculation display */}
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                          Grand Service Estimate Total
-                        </label>
-                        <div className="h-9 px-3 flex items-center justify-between bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl text-xs font-bold">
-                          <span>{getActiveCurrency()}</span>
-                          <span>
-                            {(() => {
-                              const partsTotal = diagnosisForm.items.reduce(
-                                (sum, item) =>
-                                  sum + (item.isFree ? 0 : item.quantity * item.unitPrice),
-                                0,
-                              );
-                              const laborTotal = diagnosisForm.labourCost || 0;
-                              const visitChargeToAdd =
-                                diagnosisForm.visitChargeMethod === 'ADDED_TO_ESTIMATE'
-                                  ? diagnosisForm.visitChargeAmount || 0
-                                  : 0;
-                              const totalEstimate = Math.max(
-                                0,
-                                partsTotal +
-                                  laborTotal +
-                                  visitChargeToAdd -
-                                  (diagnosisForm.discountAmount || 0),
-                              );
-                              return totalEstimate.toFixed(2);
-                            })()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                          {!travelCovered &&
+                            diagnosisForm.visitChargeMethod === 'SEPARATE' &&
+                            (diagnosisForm.visitChargeAmount || 0) > 0 && (
+                              <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                <input
+                                  type="checkbox"
+                                  id="visit-charge-collected"
+                                  checked={diagnosisForm.visitChargeCollected}
+                                  onChange={(e) =>
+                                    setDiagnosisForm({
+                                      ...diagnosisForm,
+                                      visitChargeCollected: e.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                />
+                                <label
+                                  htmlFor="visit-charge-collected"
+                                  className="text-[11px] font-bold text-amber-800"
+                                >
+                                  Cash collected on-site — post {getActiveCurrency()}{' '}
+                                  {Number(diagnosisForm.visitChargeAmount || 0).toFixed(2)} to
+                                  accounts now
+                                </label>
+                              </div>
+                            )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Transportation / Pickup Charge ({getActiveCurrency()})
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                disabled={travelCovered}
+                                value={
+                                  travelCovered ? '' : diagnosisForm.transportChargeAmount || ''
+                                }
+                                placeholder={
+                                  travelCovered
+                                    ? 'FREE (covered)'
+                                    : selectedTicket.jobType === 'BRING_TO_CENTRE'
+                                      ? 'Machine taken to workshop — enter charge'
+                                      : 'Only if machine is taken to workshop'
+                                }
+                                onChange={(e) =>
+                                  setDiagnosisForm({
+                                    ...diagnosisForm,
+                                    transportChargeAmount: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl disabled:opacity-60"
+                              />
+                              {selectedTicket.jobType === 'BRING_TO_CENTRE' && !travelCovered && (
+                                <p className="mt-1 text-[10px] font-semibold text-amber-600">
+                                  This ticket is marked Bring-to-Centre — remember the pickup &
+                                  delivery cost.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                Discount ({getActiveCurrency()})
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={diagnosisForm.discountAmount || ''}
+                                onChange={(e) =>
+                                  setDiagnosisForm({
+                                    ...diagnosisForm,
+                                    discountAmount: parseFloat(e.target.value) || 0,
+                                  })
+                                }
+                                className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                              />
+                              <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                                Applied on the total estimate amount.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div>
+                            {/* Live Calculation display */}
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                              Grand Service Estimate Total
+                            </label>
+                            <div className="h-9 px-3 flex items-center justify-between bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl text-xs font-bold">
+                              <span>{getActiveCurrency()}</span>
+                              <span>
+                                {(() => {
+                                  const partsTotal = diagnosisForm.items.reduce(
+                                    (sum, item) =>
+                                      sum + (item.isFree ? 0 : item.quantity * item.unitPrice),
+                                    0,
+                                  );
+                                  const laborTotal = diagnosisForm.labourCost || 0;
+                                  const transportTotal = travelCovered
+                                    ? 0
+                                    : diagnosisForm.transportChargeAmount || 0;
+                                  const visitChargeToAdd =
+                                    !travelCovered &&
+                                    diagnosisForm.visitChargeMethod === 'ADDED_TO_ESTIMATE'
+                                      ? diagnosisForm.visitChargeAmount || 0
+                                      : 0;
+                                  const totalEstimate = Math.max(
+                                    0,
+                                    partsTotal +
+                                      laborTotal +
+                                      transportTotal +
+                                      visitChargeToAdd -
+                                      (diagnosisForm.discountAmount || 0),
+                                  );
+                                  return totalEstimate.toFixed(2);
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
 
                     {/* Technician Note to Finance */}
                     <div>
@@ -5030,19 +5251,21 @@ export default function ServiceDashboardPage() {
                         </Button>
                       )}
 
-                      {isHelpDesk &&
-                        (selectedTicket.status === 'OPEN' ||
-                          selectedTicket.status === 'FREE_SERVICE') && (
+                      {(isHelpDesk || isManagerOrAdmin) &&
+                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) && (
                           <Button
                             size="sm"
                             className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
                             onClick={() => {
+                              setAssignForm({
+                                technicianId: selectedTicket.assignedTechnicianId || '',
+                              });
                               setShowDetailsModal(false);
                               setShowAssignModal(true);
                             }}
                           >
                             <UserPlus className="size-3.5" />
-                            Assign Tech
+                            {selectedTicket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
                           </Button>
                         )}
 
@@ -5080,6 +5303,8 @@ export default function ServiceDashboardPage() {
                                   labourCost: 0,
                                   visitChargeAmount: 0,
                                   visitChargeMethod: 'ADDED_TO_ESTIMATE',
+                                  visitChargeCollected: true,
+                                  transportChargeAmount: 0,
                                   discountAmount: 0,
                                   technicianNoteToFinance: '',
                                   items: [],

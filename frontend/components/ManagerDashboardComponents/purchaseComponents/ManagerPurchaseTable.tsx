@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, Eye, Edit, CreditCard, Banknote } from 'lucide-react';
@@ -23,7 +24,6 @@ import AddPurchaseDialog from './AddPurchaseDialog';
 import EditPurchaseDialog from './EditPurchaseDialog';
 import AddPaymentModal from './AddPaymentModal';
 import AddCostModal from './AddCostModal';
-import ViewPurchaseDialog from './ViewPurchaseDialog';
 import PurchaseStats from './PurchaseStats';
 
 /**
@@ -31,6 +31,7 @@ import PurchaseStats from './PurchaseStats';
  * Transitions to dedicated Details Page for full financial tracking.
  */
 export default function ManagerPurchaseTable() {
+  const router = useRouter();
   const currency = useBranchCurrency();
   const rates = useExchangeRateMap(currency);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -41,7 +42,6 @@ export default function ManagerPurchaseTable() {
   // Dialog states
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
@@ -94,8 +94,7 @@ export default function ManagerPurchaseTable() {
   };
 
   const handleView = (purchase: Purchase) => {
-    setSelectedPurchase(purchase);
-    setViewOpen(true);
+    router.push(`/manager/purchases/${purchase.id}`);
   };
 
   const handleRecordPayment = (purchase: Purchase) => {
@@ -184,8 +183,8 @@ export default function ManagerPurchaseTable() {
                 'Order ID',
                 'Lot Reference',
                 'Total Value',
-                'Paid Amount',
-                'Balance',
+                'Paid to Vendor',
+                'Vendor Balance',
                 'Status',
                 'Origin',
                 'Action',
@@ -316,7 +315,7 @@ export default function ManagerPurchaseTable() {
             open={paymentOpen}
             onOpenChange={setPaymentOpen}
             purchaseId={selectedPurchase.id}
-            totalAmount={selectedPurchase.totalAmount}
+            payableAmount={selectedPurchase.purchaseAmount}
             paidAmount={selectedPurchase.paidAmount}
             purchaseCurrency={selectedPurchase.currencyCode}
             exchangeRate={selectedPurchase.exchangeRate}
@@ -326,12 +325,6 @@ export default function ManagerPurchaseTable() {
             open={costOpen}
             onOpenChange={setCostOpen}
             purchaseId={selectedPurchase.id}
-            onSuccess={fetchPurchases}
-          />
-          <ViewPurchaseDialog
-            open={viewOpen}
-            onOpenChange={setViewOpen}
-            purchase={selectedPurchase}
             onSuccess={fetchPurchases}
           />
         </>

@@ -28,6 +28,9 @@ import {
   Bell,
   ArrowRightLeft,
   Receipt,
+  Key,
+  Home,
+  Tag,
 } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
@@ -205,6 +208,26 @@ const menuItems = [
     icon: Wallet,
     subItems: [
       {
+        title: 'Rent Collections',
+        icon: Key,
+        href: '/finance/rent',
+      },
+      {
+        title: 'Lease Collections',
+        icon: Home,
+        href: '/finance/lease',
+      },
+      {
+        title: 'Sale Collections',
+        icon: Tag,
+        href: '/finance/sale',
+      },
+      {
+        title: 'Orders',
+        icon: ShoppingCart,
+        href: '/finance/orders',
+      },
+      {
         title: 'Quotation Approvals',
         icon: FileText,
         href: '/finance/quotations',
@@ -212,12 +235,12 @@ const menuItems = [
       {
         title: 'Receivables (AR)',
         icon: ReceiptText,
-        href: '/finance/ar',
+        href: '/finance/accounts/receivable',
       },
       {
         title: 'Payables (AP)',
         icon: CreditCard,
-        href: '/finance/ap',
+        href: '/finance/accounts/payable',
       },
       {
         title: 'Service Estimates',

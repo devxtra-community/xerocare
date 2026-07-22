@@ -2,6 +2,7 @@ import { EntityManager, FindOptionsWhere } from 'typeorm';
 import { Source } from '../config/db';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
+import { LotDocument, LotDocumentType } from '../entities/lotDocumentEntity';
 import { Purchase } from '../entities/purchaseEntity';
 import { SparePart } from '../entities/sparePartEntity';
 import { Vendor } from '../entities/vendorEntity';
@@ -379,6 +380,7 @@ export class LotRepository {
             },
             sparePart: true,
           },
+          documents: true,
         },
         order: {
           createdAt: 'DESC',
@@ -410,7 +412,9 @@ export class LotRepository {
             },
           },
         },
+        documents: true,
       },
+      order: { documents: { createdAt: 'DESC' } },
     });
   }
 
@@ -576,5 +580,49 @@ export class LotRepository {
         },
       })) as Lot;
     });
+  }
+
+  /**
+   * Attaches a shipping/customs document (already uploaded to R2) to a lot.
+   */
+  async addLotDocument(
+    lotId: string,
+    data: {
+      documentType: LotDocumentType;
+      documentName: string;
+      notes?: string;
+      fileUrl: string;
+      fileName: string;
+      mimeType?: string;
+      fileSize?: number;
+      uploadedBy?: string;
+    },
+  ): Promise<LotDocument> {
+    const lot = await this.repo.findOne({ where: { id: lotId } });
+    if (!lot) throw new AppError('Lot not found', 404);
+
+    const docRepo = this.repo.manager.getRepository(LotDocument);
+    const doc = docRepo.create({ lotId, ...data });
+    return docRepo.save(doc);
+  }
+
+  /**
+   * Retrieves all documents attached to a lot, newest first.
+   */
+  async getLotDocuments(lotId: string): Promise<LotDocument[]> {
+    const docRepo = this.repo.manager.getRepository(LotDocument);
+    return docRepo.find({ where: { lotId }, order: { createdAt: 'DESC' } });
+  }
+
+  /**
+   * Removes a document record. Admin-only in the service layer — these
+   * files back compliance/retention requirements and should not be casually
+   * deleted by branch staff.
+   */
+  async deleteLotDocument(lotId: string, documentId: string): Promise<void> {
+    const docRepo = this.repo.manager.getRepository(LotDocument);
+    const doc = await docRepo.findOne({ where: { id: documentId, lotId } });
+    if (!doc) throw new AppError('Document not found', 404);
+    await docRepo.remove(doc);
   }
 }

@@ -36,6 +36,7 @@ export class PurchaseCostRepository {
       cost.description = data.description;
       cost.costDate = data.costDate || new Date();
       cost.createdBy = data.createdBy;
+      cost.attachmentUrl = data.attachmentUrl;
 
       const savedCost = await manager.save(PurchaseCost, cost);
 

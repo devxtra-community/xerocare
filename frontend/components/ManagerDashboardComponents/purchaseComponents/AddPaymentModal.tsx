@@ -28,7 +28,11 @@ interface AddPaymentModalProps {
   purchaseId: string;
   purchaseRef?: string; // PO number or description for cheque source label
   vendorName?: string;
-  totalAmount: number;
+  /** Vendor payable amount (purchase.purchaseAmount) — the goods invoice total.
+   * Additional lot costs (shipping, handling, documentation, ...) are spend with
+   * other parties and are never payable through the vendor, so they must not be
+   * included here. */
+  payableAmount: number;
   paidAmount: number;
   /** Currency totalAmount/remainingAmount are recorded in (purchase.currencyCode) — may differ
    * from the branch currency the payment amount below is actually collected in. */
@@ -43,13 +47,13 @@ export default function AddPaymentModal({
   purchaseId,
   purchaseRef,
   vendorName,
-  totalAmount,
+  payableAmount,
   paidAmount,
   purchaseCurrency,
   exchangeRate,
   onSuccess,
 }: AddPaymentModalProps) {
-  const remainingAmount = Math.max(0, totalAmount - paidAmount);
+  const remainingAmount = Math.max(0, payableAmount - paidAmount);
   const [loading, setLoading] = useState(false);
   const [currencyCode, setCurrencyCode] = useState('AED');
   const rates = useExchangeRateMap(currencyCode);

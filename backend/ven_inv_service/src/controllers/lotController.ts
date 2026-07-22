@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { LotService } from '../services/lotService';
 import { AppError } from '../errors/appError';
 import { LotStatus } from '../entities/lotEntity';
+import { LotDocumentType } from '../entities/lotDocumentEntity';
 
 const lotService = new LotService();
 import { getRabbitChannel } from '../config/rabbitmq';
@@ -283,6 +284,95 @@ export const confirmLotReceived = async (req: Request, res: Response, next: Next
 
     const confirmedLot = await lotService.confirmLotReceived(id, branchId);
     res.status(200).json({ success: true, data: confirmedLot });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /lots/:id/documents
+ * Uploads a shipping/customs document (bill of lading, customs declaration,
+ * etc.) and attaches it to the lot. Stored in R2 — retained indefinitely.
+ */
+export const uploadLotDocument = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const lot = await lotService.getLotById(id);
+    if (!isAdmin && lot.branch_id !== req.user?.branchId) {
+      throw new AppError('Access denied: Lot belongs to another branch', 403);
+    }
+
+    const file = req.file as unknown as
+      | { location?: string; originalname?: string; mimetype?: string; size?: number }
+      | undefined;
+    if (!file?.location) {
+      throw new AppError('No file uploaded', 400);
+    }
+
+    const documentType = Object.values(LotDocumentType).includes(req.body.documentType)
+      ? (req.body.documentType as LotDocumentType)
+      : LotDocumentType.OTHER;
+
+    const documentName = String(req.body.documentName || '').trim();
+    if (!documentName) {
+      throw new AppError('Document name is required', 400);
+    }
+
+    const document = await lotService.addLotDocument(id, {
+      documentType,
+      documentName,
+      notes: req.body.notes ? String(req.body.notes).trim() : undefined,
+      fileUrl: file.location,
+      fileName: file.originalname || 'document',
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      uploadedBy: req.user?.userId,
+    });
+
+    res.status(201).json({ success: true, data: document });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /lots/:id/documents
+ * Lists shipping/customs documents attached to a lot.
+ */
+export const getLotDocuments = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const lot = await lotService.getLotById(id);
+    if (!isAdmin && lot.branch_id !== req.user?.branchId) {
+      throw new AppError('Access denied: Lot belongs to another branch', 403);
+    }
+
+    const documents = await lotService.getLotDocuments(id);
+    res.status(200).json({ success: true, data: documents });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * DELETE /lots/:id/documents/:documentId
+ * Removes a document record. Admin-only — these files back compliance and
+ * retention requirements and should not be casually deleted by branch staff.
+ */
+export const deleteLotDocument = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (req.user?.role !== 'ADMIN') {
+      throw new AppError('Only admins can delete lot documents', 403);
+    }
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const documentId = Array.isArray(req.params.documentId)
+      ? req.params.documentId[0]
+      : req.params.documentId;
+
+    await lotService.deleteLotDocument(id, documentId);
+    res.status(200).json({ success: true, message: 'Document deleted' });
   } catch (err) {
     next(err);
   }

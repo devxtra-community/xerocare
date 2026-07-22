@@ -1521,6 +1521,7 @@ export const createServiceQuotation = async (req: Request, res: Response, next: 
       visitChargeAmount,
       visitChargeMethod,
       totalDiscountAmount,
+      discountAmount,
       technicianNoteToFinance,
     } = req.body;
     const invoice = await billingService.createServiceQuotation({
@@ -1533,13 +1534,52 @@ export const createServiceQuotation = async (req: Request, res: Response, next: 
       status,
       visitChargeAmount,
       visitChargeMethod,
-      totalDiscountAmount,
+      // ven_inv_service sends the field as discountAmount — accept both spellings.
+      totalDiscountAmount: totalDiscountAmount ?? discountAmount,
       technicianNoteToFinance,
     });
     return res.status(201).json({
       success: true,
       data: invoice,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const waiveEstimateLabour = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { reason } = req.body;
+    const invoice = await billingService.waiveEstimateLabour(
+      id,
+      req.user?.userId || 'SYSTEM',
+      reason || 'Customer approved within estimate validity',
+    );
+    return res.status(200).json({ success: true, data: invoice });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const recordServiceVisitCharge = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { serviceTicketId, ticketNumber, customerId, branchId, amount, collectedBy } = req.body;
+    if (!serviceTicketId || !branchId) {
+      return res.status(400).json({
+        success: false,
+        message: 'serviceTicketId and branchId are required',
+      });
+    }
+    const invoice = await billingService.recordServiceVisitCharge({
+      serviceTicketId,
+      ticketNumber,
+      customerId,
+      branchId,
+      amount: Number(amount) || 0,
+      collectedBy: collectedBy || req.user?.userId || 'SYSTEM',
+    });
+    return res.status(201).json({ success: true, data: invoice });
   } catch (error) {
     next(error);
   }

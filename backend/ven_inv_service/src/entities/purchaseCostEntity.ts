@@ -40,6 +40,11 @@ export class PurchaseCost {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  // Receipt/invoice for this cost (e.g. the transporter's or customs broker's
+  // bill), stored in R2. Optional — costs can be recorded without proof.
+  @Column({ name: 'attachment_url', type: 'varchar', length: 500, nullable: true })
+  attachmentUrl?: string;
+
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy?: string;
 

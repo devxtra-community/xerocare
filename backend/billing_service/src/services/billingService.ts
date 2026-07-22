@@ -4147,6 +4147,112 @@ export class BillingService {
   }
 
   /**
+   * Waives the labour line on a service estimate. Business rule: the visit /
+   * estimate-creation charge collected up-front already pays for the labour of
+   * making the estimate, so a customer who approves within the validity window
+   * is not charged labour again. Idempotent — a second call finds labour at 0.
+   */
+  async waiveEstimateLabour(id: string, userId: string, reason: string): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Estimate not found', 404);
+    if (invoice.billType !== BillType.SERVICE) {
+      throw new AppError('Only service estimates can have labour waived', 400);
+    }
+
+    const itemRepo = Source.getRepository(InvoiceItem);
+    const items = await itemRepo.find({ where: { invoice: { id: invoice.id } } });
+    const labour = items.find((it) =>
+      (it.description || '').startsWith('Labor Cost / Service Charge'),
+    );
+    const labourAmount = labour ? Number(labour.unitPrice || 0) * (labour.quantity || 1) : 0;
+    if (!labour || labourAmount <= 0) return invoice;
+
+    labour.unitPrice = 0;
+    labour.description = 'Labor Cost / Service Charge (waived — approved within validity)';
+    await itemRepo.save(labour);
+
+    invoice.totalAmount = Math.max(0, Number(invoice.totalAmount) - labourAmount);
+    const saved = await this.invoiceRepo.save(invoice);
+
+    await logAudit(
+      invoice.id,
+      'STATUS_CHANGE',
+      userId || 'SYSTEM',
+      `Labour charge of ${labourAmount} waived: ${reason}`,
+    );
+    return saved;
+  }
+
+  /**
+   * Records a service visit charge collected separately in cash on-site
+   * (visitChargeMethod SEPARATE). Creates a small PAID service invoice and pushes
+   * the receipt through the normal recordPayment path, so it lands in the
+   * cashbook / day book, moves the branch cash balance, and shows up in earnings
+   * exactly like every other receipt. Idempotent per ticket via a notes marker.
+   */
+  async recordServiceVisitCharge(payload: {
+    serviceTicketId: string;
+    ticketNumber?: string | null;
+    customerId?: string | null;
+    branchId: string;
+    amount: number;
+    collectedBy: string;
+  }): Promise<Invoice> {
+    const amount = Number(payload.amount) || 0;
+    if (amount <= 0) throw new AppError('Visit charge amount must be greater than zero', 400);
+
+    const invoiceRepo = Source.getRepository(Invoice);
+    const marker = `VISIT_CHARGE_ONSITE:${payload.serviceTicketId}`;
+
+    const existing = await invoiceRepo.findOne({
+      where: { serviceTicketId: payload.serviceTicketId, notes: marker },
+    });
+    if (existing) return existing;
+
+    const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+    const label = `Service Visit Charge — Ticket ${payload.ticketNumber || payload.serviceTicketId}`;
+
+    const invoice = invoiceRepo.create({
+      invoiceNumber,
+      customerId: payload.customerId || undefined,
+      branchId: payload.branchId,
+      createdBy: payload.collectedBy,
+      serviceTicketId: payload.serviceTicketId,
+      saleType: SaleType.SERVICE,
+      billType: BillType.SERVICE,
+      status: InvoiceStatus.INVOICED,
+      totalAmount: amount,
+      notes: marker,
+    });
+    const savedInvoice = await invoiceRepo.save(invoice);
+
+    const invoiceItemRepo = Source.getRepository(InvoiceItem);
+    const invoiceItem = new InvoiceItem();
+    invoiceItem.invoice = savedInvoice;
+    invoiceItem.itemType = ItemType.PRODUCT;
+    invoiceItem.description = label;
+    invoiceItem.quantity = 1;
+    invoiceItem.unitPrice = amount;
+    await invoiceItemRepo.save(invoiceItem);
+    delete (invoiceItem as { invoice?: unknown }).invoice;
+    savedInvoice.items = [invoiceItem];
+
+    await this.recordPayment(
+      savedInvoice.id,
+      {
+        paymentMode: 'CASH',
+        amount,
+        remarks: `${label} — collected on-site by technician`,
+        bypassStatusCheck: true,
+      },
+      payload.collectedBy,
+    );
+
+    const withPayment = await this.invoiceRepo.findById(savedInvoice.id);
+    return withPayment || savedInvoice;
+  }
+
+  /**
    * Creates the lump-sum invoice for an AMC service contract at signing time, and — if an
    * initial payment was collected on the spot — records it against that same invoice via the
    * normal payment path so status (INVOICED/PARTIAL via ledger/PAID) and cashbook posting stay

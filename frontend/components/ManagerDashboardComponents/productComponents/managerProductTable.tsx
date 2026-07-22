@@ -46,16 +46,21 @@ export default function ManagerProduct() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await productService.getAllProducts({ page, limit, search });
+      const [res, inStockRes, rentedRes, soldRes] = await Promise.all([
+        productService.getAllProducts({ page, limit, search }),
+        productService.getAllProducts({ limit: 1, search, status: 'AVAILABLE' }),
+        productService.getAllProducts({ limit: 1, search, status: 'RENTED' }),
+        productService.getAllProducts({ limit: 1, search, status: 'SOLD' }),
+      ]);
       setProducts(res.data);
       setTotal(res.total);
 
-      // Total count from API, others remain naive based on current page
+      // Counts sourced from each status's own total, not just the current page
       setStats({
         total: res.total,
-        inStock: res.data.filter((p) => p.product_status === 'AVAILABLE').length,
-        rented: res.data.filter((p) => p.product_status === 'RENTED').length,
-        sold: res.data.filter((p) => p.product_status === 'SOLD').length,
+        inStock: inStockRes.total,
+        rented: rentedRes.total,
+        sold: soldRes.total,
       });
     } catch {
       toast.error('Failed to fetch products');

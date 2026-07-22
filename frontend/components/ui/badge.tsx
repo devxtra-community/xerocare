@@ -29,6 +29,35 @@ export const STATUS_MAP = {
     className:
       'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400',
   },
+  WAITING_FINANCE_APPROVAL: {
+    label: 'Waiting Finance Approval',
+    className:
+      'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400',
+  },
+  WAITING_FINANCE_APPROVAL_2: {
+    label: 'Add. Work — Waiting Finance',
+    className:
+      'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400',
+  },
+  FINANCE_APPROVED_2: {
+    label: 'Add. Work Approved',
+    className: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400',
+  },
+  ESTIMATE_RECORDED: {
+    label: 'Estimate Recorded',
+    className:
+      'bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400',
+  },
+  ADDITIONAL_ESTIMATE_PENDING: {
+    label: 'Additional Estimate Pending',
+    className:
+      'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
+  },
+  REVISED: {
+    label: 'Estimate Revised',
+    className:
+      'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400',
+  },
   FINANCE_APPROVED: {
     label: 'Finance Approved',
     className: 'bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400',

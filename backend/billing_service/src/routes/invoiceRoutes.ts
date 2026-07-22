@@ -56,6 +56,8 @@ import {
   deleteInvoice,
   getInvoiceAuditLogs,
   createServiceQuotation,
+  recordServiceVisitCharge,
+  waiveEstimateLabour,
   createServiceContractInvoice,
   getContractBySerial,
   getCustomerBillingHistory,
@@ -534,6 +536,8 @@ router.delete(
 router.get('/audit-logs/:id', authMiddleware, getInvoiceAuditLogs);
 
 router.post('/service-quotation', createServiceQuotation);
+router.post('/service-visit-charge', recordServiceVisitCharge);
+router.post('/:id/waive-labour', waiveEstimateLabour);
 router.post(
   '/service-contract',
   authMiddleware,

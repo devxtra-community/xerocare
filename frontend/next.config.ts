@@ -40,6 +40,10 @@ const nextConfig: NextConfig = {
         source: '/health/:path*',
         destination: 'http://localhost:3001/health/:path*',
       },
+      {
+        source: '/bank-reference/:path*',
+        destination: 'http://localhost:3001/bank-reference/:path*',
+      },
     ];
   },
 };

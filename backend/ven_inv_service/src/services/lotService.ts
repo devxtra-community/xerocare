@@ -1,5 +1,6 @@
 import { Lot } from '../entities/lotEntity';
 import { LotItemType } from '../entities/lotItemEntity';
+import { LotDocument, LotDocumentType } from '../entities/lotDocumentEntity';
 import { AppError } from '../errors/appError';
 import { EntityManager } from 'typeorm';
 import { LotRepository } from '../repositories/lotRepository';
@@ -133,6 +134,40 @@ export class LotService {
    */
   async confirmLotReceived(lotId: string, branchId?: string): Promise<Lot> {
     return await this.lotRepository.confirmLotReceived(lotId, branchId);
+  }
+
+  /**
+   * Attaches an uploaded shipping/customs document to a lot.
+   */
+  async addLotDocument(
+    lotId: string,
+    data: {
+      documentType: LotDocumentType;
+      documentName: string;
+      notes?: string;
+      fileUrl: string;
+      fileName: string;
+      mimeType?: string;
+      fileSize?: number;
+      uploadedBy?: string;
+    },
+  ): Promise<LotDocument> {
+    return this.lotRepository.addLotDocument(lotId, data);
+  }
+
+  /**
+   * Retrieves all documents attached to a lot.
+   */
+  async getLotDocuments(lotId: string): Promise<LotDocument[]> {
+    return this.lotRepository.getLotDocuments(lotId);
+  }
+
+  /**
+   * Deletes a document from a lot. Callers must enforce admin-only access —
+   * these records back compliance/retention requirements.
+   */
+  async deleteLotDocument(lotId: string, documentId: string): Promise<void> {
+    return this.lotRepository.deleteLotDocument(lotId, documentId);
   }
 
   /**

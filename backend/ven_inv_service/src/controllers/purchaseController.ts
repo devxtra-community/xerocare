@@ -97,9 +97,12 @@ export class PurchaseController {
       const branchId = req.user?.branchId;
       if (!branchId) throw new AppError('Branch ID is required', 400);
 
+      const attachmentFile = req.file as unknown as { location?: string } | undefined;
+
       const costData = {
         ...req.body,
         createdBy: req.user?.userId,
+        attachmentUrl: attachmentFile?.location,
       };
 
       const cost = await purchaseService.addCost(id, costData, branchId);

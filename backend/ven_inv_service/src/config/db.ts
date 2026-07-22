@@ -15,6 +15,7 @@ import { VendorRequest } from '../entities/vendorRequestEntity';
 import { Brand } from '../entities/brandEntity';
 import { Lot } from '../entities/lotEntity';
 import { LotItem } from '../entities/lotItemEntity';
+import { LotDocument } from '../entities/lotDocumentEntity';
 
 import { logger } from './logger';
 
@@ -63,6 +64,7 @@ export const Source = new DataSource({
     Brand,
     Lot,
     LotItem,
+    LotDocument,
     Rfq,
     RfqItem,
     RfqVendor,
@@ -655,6 +657,10 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_informed BOOLEAN DEFAULT FALSE;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS transport_charge_amount DECIMAL(10,2) DEFAULT 0;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS service_location VARCHAR(500);
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "partBrand" VARCHAR(255) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS mpn VARCHAR(255) NULL;
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
@@ -977,6 +983,12 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ALTER TABLE purchase_payments ADD COLUMN IF NOT EXISTS attachment_url VARCHAR(500);
           `);
           logger.info('Guaranteed purchase_payments.attachment_url column exists.');
+
+          // --- Receipt/invoice attachment on additional lot costs (transport, customs, ...) ---
+          await Source.query(`
+            ALTER TABLE purchase_costs ADD COLUMN IF NOT EXISTS attachment_url VARCHAR(500);
+          `);
+          logger.info('Guaranteed purchase_costs.attachment_url column exists.');
         } catch (stockTransferErr) {
           logger.error('Failed to create stock_transfers schema:', stockTransferErr);
         }
@@ -1035,6 +1047,35 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ADD COLUMN IF NOT EXISTS meter_reading_at_creation INT NULL;
         `);
         logger.info('Guaranteed service_tickets.meter_reading_at_creation column exists.');
+
+        // ─── Lot shipping/customs documents (bill of lading, customs
+        // declaration, etc.) — retained indefinitely for compliance ─────────
+        await Source.query(`
+          DO $$ BEGIN
+            CREATE TYPE lot_documents_document_type_enum AS ENUM (
+              'BILL_OF_LADING', 'CUSTOMS_DECLARATION', 'COMMERCIAL_INVOICE',
+              'PACKING_LIST', 'INSURANCE_CERTIFICATE', 'OTHER'
+            );
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+          CREATE TABLE IF NOT EXISTS lot_documents (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            lot_id UUID NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+            document_type lot_documents_document_type_enum NOT NULL DEFAULT 'OTHER',
+            document_name VARCHAR(255) NOT NULL DEFAULT 'Untitled document',
+            notes TEXT NULL,
+            file_url VARCHAR(1000) NOT NULL,
+            file_name VARCHAR(500) NOT NULL,
+            mime_type VARCHAR(150) NULL,
+            file_size INT NULL,
+            uploaded_by UUID NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_lot_documents_lot_id ON lot_documents (lot_id);
+          ALTER TABLE lot_documents ADD COLUMN IF NOT EXISTS document_name VARCHAR(255) NOT NULL DEFAULT 'Untitled document';
+          ALTER TABLE lot_documents ADD COLUMN IF NOT EXISTS notes TEXT NULL;
+        `);
+        logger.info('Guaranteed lot_documents table exists.');
       }
       return Source;
     } catch (error: unknown) {

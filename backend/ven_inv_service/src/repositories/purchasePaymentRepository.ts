@@ -36,14 +36,20 @@ export class PurchasePaymentRepository {
         where: { purchaseId },
       });
 
+      // Vendor payments settle the goods invoice (purchaseAmount) only — additional
+      // costs (documentation, labour, handling, transportation, shipping,
+      // groundfield) are money spent with other parties (freight forwarders,
+      // customs brokers, ...) and are tracked separately via PurchaseCost. They
+      // are never owed to — or payable through — the vendor, so they must not
+      // inflate what a vendor payment is allowed to cover.
       const alreadyPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const remaining = Number(purchase.totalAmount) - alreadyPaid;
+      const remaining = Number(purchase.purchaseAmount) - alreadyPaid;
 
-      // 4. Validate does not exceed remaining amount (Optional: some systems allow overpayment, but prompt says "must not exceed remaining amount")
+      // 4. Validate does not exceed remaining vendor-payable amount
       if (Number(data.amount) > remaining + 0.01) {
         // 0.01 for rounding safety
         throw new AppError(
-          `Payment amount ${data.amount} exceeds remaining payable amount ${remaining}`,
+          `Payment amount ${data.amount} exceeds remaining vendor payable amount ${remaining}`,
           400,
         );
       }

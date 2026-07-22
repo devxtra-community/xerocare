@@ -15,6 +15,39 @@ export enum LotStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum LotDocumentType {
+  BILL_OF_LADING = 'BILL_OF_LADING',
+  CUSTOMS_DECLARATION = 'CUSTOMS_DECLARATION',
+  COMMERCIAL_INVOICE = 'COMMERCIAL_INVOICE',
+  PACKING_LIST = 'PACKING_LIST',
+  INSURANCE_CERTIFICATE = 'INSURANCE_CERTIFICATE',
+  OTHER = 'OTHER',
+}
+
+export const LOT_DOCUMENT_TYPE_LABELS: Record<LotDocumentType, string> = {
+  [LotDocumentType.BILL_OF_LADING]: 'Bill of Lading',
+  [LotDocumentType.CUSTOMS_DECLARATION]: 'Customs Declaration',
+  [LotDocumentType.COMMERCIAL_INVOICE]: 'Commercial Invoice',
+  [LotDocumentType.PACKING_LIST]: 'Packing List',
+  [LotDocumentType.INSURANCE_CERTIFICATE]: 'Insurance Certificate',
+  [LotDocumentType.OTHER]: 'Other',
+};
+
+export interface LotDocument {
+  id: string;
+  lotId: string;
+  documentType: LotDocumentType;
+  /** User-given label, e.g. "Bill of Lading - Container XYZ4521". */
+  documentName: string;
+  notes?: string;
+  fileUrl: string;
+  fileName: string;
+  mimeType?: string;
+  fileSize?: number;
+  uploadedBy?: string;
+  createdAt: string;
+}
+
 export interface Vendor {
   id: string;
   name: string;
@@ -68,6 +101,7 @@ export interface Lot {
   warehouseId?: string;
   warehouse_id?: string;
   items: LotItem[];
+  documents?: LotDocument[];
   createdAt: string;
   updatedAt: string;
 }
@@ -203,5 +237,41 @@ export const lotService = {
       responseType: 'arraybuffer',
     });
     return response.data;
+  },
+
+  /**
+   * Uploads a shipping/customs document (bill of lading, customs
+   * declaration, etc.) and attaches it to the lot. Some jurisdictions
+   * require these kept on file for years — stored durably, not deleted
+   * except by an admin correcting a mistake.
+   */
+  uploadLotDocument: async (
+    lotId: string,
+    file: File,
+    documentType: LotDocumentType,
+    documentName: string,
+    notes?: string,
+  ): Promise<LotDocument> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('documentType', documentType);
+    formData.append('documentName', documentName);
+    if (notes) formData.append('notes', notes);
+    const response = await api.post<ApiResponse<LotDocument>>(
+      `/i/lots/${lotId}/documents`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data.data;
+  },
+
+  getLotDocuments: async (lotId: string): Promise<LotDocument[]> => {
+    const response = await api.get<ApiResponse<LotDocument[]>>(`/i/lots/${lotId}/documents`);
+    return response.data.data;
+  },
+
+  /** Admin-only: removes a document record. */
+  deleteLotDocument: async (lotId: string, documentId: string): Promise<void> => {
+    await api.delete(`/i/lots/${lotId}/documents/${documentId}`);
   },
 };

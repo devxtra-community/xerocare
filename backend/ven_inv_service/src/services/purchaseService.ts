@@ -17,11 +17,19 @@ export class PurchaseService {
   private costRepo = new PurchaseCostRepository();
 
   private enrichPurchase(purchase: Purchase) {
+    // Vendor payments settle the goods invoice (purchaseAmount) only.
+    // totalAmount = purchaseAmount + additional costs (documentation, labour,
+    // handling, transportation, shipping, groundfield) — those costs are
+    // money already spent with other parties (freight forwarders, customs
+    // brokers, ...), not a debt owed to the vendor, so they must not inflate
+    // "how much is still owed to the vendor". Paying the vendor's
+    // purchaseAmount in full is a fully-PAID purchase even if totalAmount is
+    // higher.
     const paidAmount = purchase.payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-    const remainingAmount = Number(purchase.totalAmount) - paidAmount;
+    const remainingAmount = Math.max(0, Number(purchase.purchaseAmount) - paidAmount);
 
     let status = PurchaseStatus.UNPAID;
-    if (paidAmount >= Number(purchase.totalAmount)) {
+    if (paidAmount >= Number(purchase.purchaseAmount)) {
       status = PurchaseStatus.PAID;
     } else if (paidAmount > 0) {
       status = PurchaseStatus.PARTIAL;

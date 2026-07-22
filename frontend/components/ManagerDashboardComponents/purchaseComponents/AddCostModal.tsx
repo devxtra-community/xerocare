@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,20 @@ import {
 import { purchaseService, AddCostDto } from '@/services/purchaseService';
 import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
-import { Calendar, FileText, Banknote } from 'lucide-react';
+import { Calendar, FileText, Banknote, Paperclip, X } from 'lucide-react';
 
 import { getActiveCurrency } from '@/lib/currency';
+
+const COST_TYPE_OPTIONS = [
+  'Labour',
+  'Handling',
+  'Shipping',
+  'Documentation',
+  'Transportation',
+  'Groundfield',
+  'Other',
+];
+
 interface AddCostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +44,9 @@ export default function AddCostModal({
 }: AddCostModalProps) {
   const [loading, setLoading] = useState(false);
   const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
+  const [customCostType, setCustomCostType] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<AddCostDto>({
     amount: 0,
     costType: 'Other',
@@ -45,8 +59,27 @@ export default function AddCostModal({
       getMyBranch()
         .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
         .catch(() => setCurrencyCode(getActiveCurrency()));
+    } else {
+      setCustomCostType('');
+      setAttachment(null);
     }
   }, [open]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isAllowed = file.type.startsWith('image/') || file.type === 'application/pdf';
+    if (!isAllowed) {
+      toast.error('Only images or PDF attachments are allowed');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File must be under 10MB');
+      return;
+    }
+    setAttachment(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +91,21 @@ export default function AddCostModal({
       return;
     }
 
+    const isOther = formData.costType === 'Other';
+    if (isOther && !customCostType.trim()) {
+      toast.error('Enter a name for this cost type');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await purchaseService.addCost(purchaseId, formData);
+      const payload: AddCostDto = {
+        ...formData,
+        // Store the custom label directly as the cost type — "Other" is a
+        // placeholder category, not something anyone wants to see saved.
+        costType: isOther ? customCostType.trim() : formData.costType,
+      };
+      await purchaseService.addCost(purchaseId, payload, attachment);
       toast.success('Cost recorded successfully');
       onSuccess();
       onOpenChange(false);
@@ -134,15 +180,7 @@ export default function AddCostModal({
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
-                {[
-                  'Labour',
-                  'Handling',
-                  'Shipping',
-                  'Documentation',
-                  'Transportation',
-                  'Groundfield',
-                  'Other',
-                ].map((m) => (
+                {COST_TYPE_OPTIONS.map((m) => (
                   <SelectItem key={m} value={m} className="text-xs">
                     {m}
                   </SelectItem>
@@ -150,6 +188,22 @@ export default function AddCostModal({
               </SelectContent>
             </Select>
           </div>
+
+          {formData.costType === 'Other' && (
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase">
+                Custom Cost Type *
+              </Label>
+              <Input
+                required
+                placeholder="e.g. Crane Rental, Warehouse Fee..."
+                className="h-10 text-xs border-slate-200"
+                value={customCostType}
+                onChange={(e) => setCustomCostType(e.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
@@ -161,6 +215,43 @@ export default function AddCostModal({
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <Paperclip size={12} /> Attachment (optional)
+            </Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {attachment ? (
+              <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
+                <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachment(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                  title="Remove attachment"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
+              >
+                Attach receipt image or PDF
+              </button>
+            )}
           </div>
 
           <div className="pt-4 flex gap-3">

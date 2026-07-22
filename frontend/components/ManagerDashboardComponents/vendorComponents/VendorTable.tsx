@@ -371,21 +371,41 @@ function CountrySubFields({
   form: VendorFormData;
   setForm: React.Dispatch<React.SetStateAction<VendorFormData>>;
 }) {
-  if (!form.countryCode || form.countryCode === '') return null;
+  const countryCode = form.countryCode;
 
-  const states = State.getStatesOfCountry(form.countryCode);
+  const states = React.useMemo(
+    () => (countryCode ? State.getStatesOfCountry(countryCode) : []),
+    [countryCode],
+  );
+  const selectedState = React.useMemo(
+    () => states.find((s) => s.name === form.stateProvince),
+    [states, form.stateProvince],
+  );
+  const cities = React.useMemo(() => {
+    if (!countryCode) return [];
+    const raw = selectedState
+      ? City.getCitiesOfState(countryCode, selectedState.isoCode)
+      : (City.getCitiesOfCountry(countryCode) ?? []);
+    const seen = new Set<string>();
+    const deduped: typeof raw = [];
+    for (const c of raw) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      deduped.push(c);
+    }
+    return deduped;
+  }, [countryCode, selectedState]);
+
+  if (!countryCode || countryCode === '') return null;
+
   const stateLabel =
-    form.countryCode === 'AE'
+    countryCode === 'AE'
       ? 'Emirate'
-      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(form.countryCode)
+      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(countryCode)
         ? 'State'
-        : form.countryCode === 'CA'
+        : countryCode === 'CA'
           ? 'Province'
           : 'Region / Province';
-  const selectedState = states.find((s) => s.name === form.stateProvince);
-  const cities = selectedState
-    ? City.getCitiesOfState(form.countryCode, selectedState.isoCode)
-    : (City.getCitiesOfCountry(form.countryCode) ?? []);
 
   return (
     <>
@@ -435,13 +455,11 @@ function CountrySubFields({
               <SelectValue placeholder="Select city" />
             </SelectTrigger>
             <SelectContent className="rounded-xl max-h-64">
-              {cities
-                .filter((c, i, arr) => arr.findIndex((x) => x.name === c.name) === i)
-                .map((c, idx) => (
-                  <SelectItem key={`${c.stateCode ?? ''}-${c.name}-${idx}`} value={c.name}>
-                    {c.name}
-                  </SelectItem>
-                ))}
+              {cities.map((c, idx) => (
+                <SelectItem key={`${c.stateCode ?? ''}-${c.name}-${idx}`} value={c.name}>
+                  {c.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         ) : (

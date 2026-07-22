@@ -26,6 +26,10 @@ export interface ServiceTicketItem {
   customPartName?: string;
   customPartBrand?: string;
   customPartDescription?: string;
+  /** Brand of the part (from spare part record, or technician-entered for custom parts). */
+  partBrand?: string | null;
+  /** Manufacturer part number. */
+  mpn?: string | null;
   partName: string;
   quantity: number;
   unitPrice: number;
@@ -49,6 +53,8 @@ export interface ServiceTicket {
   jobType: string;
   status: string;
   scheduledVisitDate?: string;
+  /** Customer site location for ONSITE jobs — visit charge is priced from it. */
+  serviceLocation?: string | null;
   assignedTechnicianId?: string;
   diagnosisNotes?: string;
   serviceQuotationId?: string;
@@ -63,6 +69,8 @@ export interface ServiceTicket {
   items: ServiceTicketItem[];
   visitChargeAmount?: number;
   visitChargeMethod?: string | null;
+  visitChargeCollected?: boolean;
+  transportChargeAmount?: number;
   discountAmount?: number;
   technicianNoteToFinance?: string | null;
   additionalEstimateCount?: number;
@@ -114,6 +122,8 @@ export const diagnoseServiceTicket = async (
     labourCost?: number;
     visitChargeAmount?: number;
     visitChargeMethod?: string | null;
+    visitChargeCollected?: boolean;
+    transportChargeAmount?: number;
     discountAmount?: number;
     technicianNoteToFinance?: string | null;
     items: Partial<ServiceTicketItem>[];

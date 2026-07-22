@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
@@ -14,7 +15,6 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
 import { PurchaseOrigin } from '@/lib/purchaseOrigin';
 import AddLotDialog from './AddLotDialog';
-import LotDetailsDialog from './LotDetailsDialog';
 
 /**
  * Manager Lot Management Page.
@@ -23,11 +23,11 @@ import LotDetailsDialog from './LotDetailsDialog';
  */
 export default function ManagerLotTable() {
   const currency = useBranchCurrency();
+  const router = useRouter();
   const [lots, setLots] = useState<Lot[]>([]);
   const [search, setSearch] = useState('');
   const [originFilter, setOriginFilter] = useState<'ALL' | PurchaseOrigin>('ALL');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [selectedLot, setSelectedLot] = useState<Lot | null>(null);
 
   const { page, limit, total, setPage, setLimit, setTotal } = usePagination(10);
   const [loading, setLoading] = useState(true);
@@ -173,7 +173,7 @@ export default function ManagerLotTable() {
                 <div className="text-right">
                   <button
                     className="text-primary hover:underline font-medium text-[13px]"
-                    onClick={() => setSelectedLot(lot)}
+                    onClick={() => router.push(`/manager/lots/${lot.id}`)}
                   >
                     View Details
                   </button>
@@ -204,14 +204,6 @@ export default function ManagerLotTable() {
             loadLots();
             setAddDialogOpen(false);
           }}
-        />
-      )}
-
-      {selectedLot && (
-        <LotDetailsDialog
-          lot={selectedLot}
-          onClose={() => setSelectedLot(null)}
-          onSuccess={loadLots}
         />
       )}
     </div>

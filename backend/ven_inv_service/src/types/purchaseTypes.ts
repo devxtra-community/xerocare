@@ -35,6 +35,7 @@ export interface AddCostDto {
   description?: string;
   costDate?: Date;
   createdBy?: string;
+  attachmentUrl?: string;
 }
 
 export enum PurchaseStatus {

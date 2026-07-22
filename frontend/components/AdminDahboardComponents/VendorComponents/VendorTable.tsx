@@ -18,6 +18,10 @@ import {
   Star,
   ChevronsUpDown,
   Check,
+  User,
+  MapPin,
+  Landmark,
+  Settings,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -815,6 +819,8 @@ function VendorFormModal({
 }) {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [countryOpen, setCountryOpen] = React.useState(false);
+  const [countryQuery, setCountryQuery] = React.useState('');
+  const deferredCountryQuery = React.useDeferredValue(countryQuery);
   const [addingBank, setAddingBank] = React.useState(false);
   const [bankDraft, setBankDraft] = React.useState<BankAccount>({ ...BLANK_BANK });
   const [branches, setBranches] = React.useState<Branch[]>([]);
@@ -924,6 +930,47 @@ function VendorFormModal({
     }));
   };
 
+  const countryCode = form.countryCode;
+  const states = React.useMemo(
+    () => (countryCode ? State.getStatesOfCountry(countryCode) : []),
+    [countryCode],
+  );
+  const selectedState = React.useMemo(
+    () => states.find((s) => s.name === form.stateProvince),
+    [states, form.stateProvince],
+  );
+  const cities = React.useMemo(() => {
+    if (!countryCode) return [];
+    const raw = selectedState
+      ? City.getCitiesOfState(countryCode, selectedState.isoCode)
+      : (City.getCitiesOfCountry(countryCode) ?? []);
+    const seen = new Set<string>();
+    const deduped: typeof raw = [];
+    for (const c of raw) {
+      if (seen.has(c.name)) continue;
+      seen.add(c.name);
+      deduped.push(c);
+    }
+    return deduped;
+  }, [countryCode, selectedState]);
+  const stateLabel = countryCode
+    ? countryCode === 'AE'
+      ? 'Emirate'
+      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(countryCode)
+        ? 'State'
+        : countryCode === 'CA'
+          ? 'Province'
+          : 'Region / Province'
+    : '';
+
+  const filteredCountries = React.useMemo(() => {
+    const q = deferredCountryQuery.trim().toLowerCase();
+    if (!q) return ALL_COUNTRIES;
+    return ALL_COUNTRIES.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q),
+    );
+  }, [deferredCountryQuery]);
+
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -933,306 +980,339 @@ function VendorFormModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 pt-4">
-          {/* Basic Info */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Vendor Name
-              </label>
-              <Input
-                placeholder="Enter vendor name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
+        <div className="space-y-7 pt-4">
+          {/* ── Basic Information ─────────────────────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+              <User size={14} className="text-primary" />
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
+                Basic Information
+              </h4>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Contact Person
-              </label>
-              <Input
-                placeholder="Contact person"
-                value={form.contactPerson}
-                onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Type
-              </label>
-              <Select
-                value={form.type}
-                onValueChange={(v) => setForm({ ...form, type: v as VendorFormData['type'] })}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Supplier">Supplier</SelectItem>
-                  <SelectItem value="Distributor">Distributor</SelectItem>
-                  <SelectItem value="Service">Service</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Email
-              </label>
-              <Input
-                placeholder="Email address"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            {/* Country combobox */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Country
-              </label>
-              <Popover open={countryOpen} onOpenChange={setCountryOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full h-11 rounded-xl bg-card border-none shadow-sm justify-between font-normal text-sm"
-                  >
-                    {form.countryCode
-                      ? `${form.countryCode} — ${form.countryName}`
-                      : 'Select country...'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[320px] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search country..." />
-                    <CommandEmpty>No country found.</CommandEmpty>
-                    <CommandList>
-                      <CommandGroup>
-                        {ALL_COUNTRIES.map((c) => (
-                          <CommandItem
-                            key={c.code}
-                            value={`${c.code} ${c.name}`}
-                            onSelect={() => handleCountrySelect(c.code, c.name)}
-                            className="cursor-pointer"
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4 shrink-0',
-                                form.countryCode === c.code ? 'opacity-100' : 'opacity-0',
-                              )}
-                            />
-                            <span className="font-mono text-xs text-gray-400 w-8 shrink-0">
-                              {c.code}
-                            </span>
-                            <span className="truncate">{c.name}</span>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* State / Province / Emirate */}
-            {form.countryCode &&
-              (() => {
-                const states = State.getStatesOfCountry(form.countryCode);
-                const stateLabel =
-                  form.countryCode === 'AE'
-                    ? 'Emirate'
-                    : ['US', 'IN', 'AU', 'MX', 'BR'].includes(form.countryCode)
-                      ? 'State'
-                      : form.countryCode === 'CA'
-                        ? 'Province'
-                        : 'Region / Province';
-                const selectedState = states.find((s) => s.name === form.stateProvince);
-                const cities = selectedState
-                  ? City.getCitiesOfState(form.countryCode, selectedState.isoCode)
-                  : (City.getCitiesOfCountry(form.countryCode) ?? []);
-                return (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                        {stateLabel}
-                      </label>
-                      {states.length > 0 ? (
-                        <Select
-                          value={form.stateProvince ?? ''}
-                          onValueChange={(v) =>
-                            setForm((f) => ({ ...f, stateProvince: v, city: undefined }))
-                          }
-                        >
-                          <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                            <SelectValue placeholder={`Select ${stateLabel}`} />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl max-h-64">
-                            {states.map((s) => (
-                              <SelectItem key={s.isoCode} value={s.name}>
-                                {s.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          placeholder={`Enter ${stateLabel}`}
-                          value={form.stateProvince ?? ''}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              stateProvince: e.target.value || undefined,
-                              city: undefined,
-                            }))
-                          }
-                          className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                        />
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                        City
-                      </label>
-                      {cities.length > 0 ? (
-                        <Select
-                          value={form.city ?? ''}
-                          onValueChange={(v) => setForm((f) => ({ ...f, city: v }))}
-                        >
-                          <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                            <SelectValue placeholder="Select city" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl max-h-64">
-                            {cities
-                              .filter((c, i, arr) => arr.findIndex((x) => x.name === c.name) === i)
-                              .map((c, idx) => (
-                                <SelectItem
-                                  key={`${c.stateCode ?? ''}-${c.name}-${idx}`}
-                                  value={c.name}
-                                >
-                                  {c.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          placeholder="Enter city"
-                          value={form.city ?? ''}
-                          onChange={(e) =>
-                            setForm((f) => ({ ...f, city: e.target.value || undefined }))
-                          }
-                          className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                        />
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
-
-            {/* VAT Number */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                VAT Number
-              </label>
-              <input
-                type="text"
-                placeholder="Tax registration / VAT No."
-                value={form.vatNumber ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, vatNumber: e.target.value || undefined }))}
-                className="w-full h-11 rounded-xl bg-card shadow-sm border-0 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-
-            {/* Phone with dial-code prefix */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Phone
-              </label>
-              <div className="flex h-11 rounded-xl bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
-                <div className="flex items-center px-3 bg-blue-50 border-r border-blue-100 text-xs font-mono font-bold text-blue-600 whitespace-nowrap shrink-0 min-w-[52px] justify-center">
-                  {form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
-                    ? COUNTRY_DIAL_CODES[form.countryCode]
-                    : '+--'}
-                </div>
-                <input
-                  type="tel"
-                  placeholder={
-                    form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
-                      ? 'number'
-                      : 'select country first'
-                  }
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="flex-1 h-full px-3 bg-transparent text-sm outline-none placeholder:text-gray-300"
-                />
-              </div>
-            </div>
-
-            {/* Currency (auto-filled, manually overridable) */}
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Currency{' '}
-                <span className="text-blue-400 normal-case font-normal">(auto from country)</span>
-              </label>
-              <Input
-                placeholder="e.g. QAR, USD, INR"
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                maxLength={10}
-                className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 font-mono"
-              />
-            </div>
-
-            {/* Branch (admin only — managers' vendors are pinned to their own branch) */}
-            {isAdmin && (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               <div className="col-span-2 space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Branch
+                  Vendor Name
+                </label>
+                <Input
+                  placeholder="Enter vendor name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Contact Person
+                </label>
+                <Input
+                  placeholder="Contact person"
+                  value={form.contactPerson}
+                  onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Type
                 </label>
                 <Select
-                  value={form.branchId ?? 'UNASSIGNED'}
-                  onValueChange={(v) =>
-                    setForm({ ...form, branchId: v === 'UNASSIGNED' ? undefined : v })
-                  }
+                  value={form.type}
+                  onValueChange={(v) => setForm({ ...form, type: v as VendorFormData['type'] })}
                 >
                   <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
-                    <SelectValue placeholder="Select branch" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UNASSIGNED">Unassigned (admin only)</SelectItem>
-                    {branches.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="Supplier">Supplier</SelectItem>
+                    <SelectItem value="Distributor">Distributor</SelectItem>
+                    <SelectItem value="Service">Service</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Status
-              </label>
-              <Select
-                value={form.status}
-                onValueChange={(v) => setForm({ ...form, status: v as VendorFormData['status'] })}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="On Hold">On Hold</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Email
+                </label>
+                <Input
+                  placeholder="Email address"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
+              </div>
+
+              {/* Phone with dial-code prefix */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Phone
+                </label>
+                <div className="flex h-11 rounded-xl bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
+                  <div className="flex items-center px-3 bg-blue-50 border-r border-blue-100 text-xs font-mono font-bold text-blue-600 whitespace-nowrap shrink-0 min-w-[52px] justify-center">
+                    {form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
+                      ? COUNTRY_DIAL_CODES[form.countryCode]
+                      : '+--'}
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder={
+                      form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
+                        ? 'number'
+                        : 'select country first'
+                    }
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    className="flex-1 h-full px-3 bg-transparent text-sm outline-none placeholder:text-gray-300"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Location ──────────────────────────────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+              <MapPin size={14} className="text-primary" />
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">Location</h4>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+              {/* Country combobox */}
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Country
+                </label>
+                <Popover
+                  open={countryOpen}
+                  onOpenChange={(val) => {
+                    setCountryOpen(val);
+                    if (!val) setCountryQuery('');
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full h-11 rounded-xl bg-card border-none shadow-sm justify-between font-normal text-sm"
+                    >
+                      {form.countryCode
+                        ? `${form.countryCode} — ${form.countryName}`
+                        : 'Select country...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search country..."
+                        value={countryQuery}
+                        onValueChange={setCountryQuery}
+                      />
+                      <CommandEmpty>No country found.</CommandEmpty>
+                      <CommandList>
+                        <CommandGroup>
+                          {filteredCountries.slice(0, 100).map((c) => (
+                            <CommandItem
+                              key={c.code}
+                              value={`${c.code} ${c.name}`}
+                              onSelect={() => handleCountrySelect(c.code, c.name)}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  'mr-2 h-4 w-4 shrink-0',
+                                  form.countryCode === c.code ? 'opacity-100' : 'opacity-0',
+                                )}
+                              />
+                              <span className="font-mono text-xs text-gray-400 w-8 shrink-0">
+                                {c.code}
+                              </span>
+                              <span className="truncate">{c.name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* State / Province / Emirate */}
+              {countryCode && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      {stateLabel}
+                    </label>
+                    {states.length > 0 ? (
+                      <Select
+                        value={form.stateProvince ?? ''}
+                        onValueChange={(v) =>
+                          setForm((f) => ({ ...f, stateProvince: v, city: undefined }))
+                        }
+                      >
+                        <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                          <SelectValue placeholder={`Select ${stateLabel}`} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl max-h-64">
+                          {states.map((s) => (
+                            <SelectItem key={s.isoCode} value={s.name}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder={`Enter ${stateLabel}`}
+                        value={form.stateProvince ?? ''}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            stateProvince: e.target.value || undefined,
+                            city: undefined,
+                          }))
+                        }
+                        className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      City
+                    </label>
+                    {cities.length > 0 ? (
+                      <Select
+                        value={form.city ?? ''}
+                        onValueChange={(v) => setForm((f) => ({ ...f, city: v }))}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                          <SelectValue placeholder="Select city" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl max-h-64">
+                          {cities.map((c, idx) => (
+                            <SelectItem
+                              key={`${c.stateCode ?? ''}-${c.name}-${idx}`}
+                              value={c.name}
+                            >
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        placeholder="Enter city"
+                        value={form.city ?? ''}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, city: e.target.value || undefined }))
+                        }
+                        className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                      />
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* ── Currency & Tax ────────────────────────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+              <Landmark size={14} className="text-primary" />
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
+                Currency & Tax
+              </h4>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+              {/* Currency (auto-filled, manually overridable) */}
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Currency{' '}
+                  <span className="text-blue-400 normal-case font-normal">(auto from country)</span>
+                </label>
+                <Input
+                  placeholder="e.g. QAR, USD, INR"
+                  value={form.currency}
+                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                  maxLength={10}
+                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 font-mono"
+                />
+              </div>
+
+              {/* VAT Number — directly under Currency */}
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  VAT Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="Tax registration / VAT No."
+                  value={form.vatNumber ?? ''}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, vatNumber: e.target.value || undefined }))
+                  }
+                  className="w-full h-11 rounded-xl bg-card shadow-sm border-0 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Account Settings ──────────────────────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+              <Settings size={14} className="text-primary" />
+              <h4 className="text-xs font-bold text-primary uppercase tracking-wider">
+                Account Settings
+              </h4>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+              {/* Branch (admin only — managers' vendors are pinned to their own branch) */}
+              {isAdmin && (
+                <div className={isAdmin ? 'space-y-2' : 'col-span-2 space-y-2'}>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Branch
+                  </label>
+                  <Select
+                    value={form.branchId ?? 'UNASSIGNED'}
+                    onValueChange={(v) =>
+                      setForm({ ...form, branchId: v === 'UNASSIGNED' ? undefined : v })
+                    }
+                  >
+                    <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UNASSIGNED">Unassigned (admin only)</SelectItem>
+                      {branches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className={isAdmin ? 'space-y-2' : 'col-span-2 space-y-2'}>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Status
+                </label>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) => setForm({ ...form, status: v as VendorFormData['status'] })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="On Hold">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

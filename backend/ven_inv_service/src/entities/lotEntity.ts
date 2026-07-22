@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Vendor } from './vendorEntity';
 import { LotItem } from './lotItemEntity';
+import { LotDocument } from './lotDocumentEntity';
 import { Warehouse } from './warehouseEntity';
 import { PurchaseOrigin } from './enums/purchaseOrigin';
 
@@ -97,6 +98,11 @@ export class Lot {
 
   @OneToMany(() => LotItem, (lotItem) => lotItem.lot, { cascade: true })
   items!: LotItem[];
+
+  // Shipping/customs paperwork (bill of lading, customs declaration, etc.).
+  // Never cascade-deleted from the app side — retained for compliance.
+  @OneToMany(() => LotDocument, (doc) => doc.lot)
+  documents!: LotDocument[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

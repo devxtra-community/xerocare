@@ -161,7 +161,7 @@ export default function PurchaseDetailsPage() {
               valueClass="text-slate-800"
             />
             <StatCard
-              label="Balance Due"
+              label="Vendor Balance Due"
               value={dual(purchase.remainingAmount)}
               icon={TrendingDown}
               className="bg-white border-slate-100 shadow-sm"
@@ -361,7 +361,7 @@ export default function PurchaseDetailsPage() {
         open={paymentModalOpen}
         onOpenChange={setPaymentModalOpen}
         purchaseId={purchase.id}
-        totalAmount={purchase.totalAmount}
+        payableAmount={purchase.purchaseAmount}
         paidAmount={purchase.paidAmount}
         purchaseCurrency={purchase.currencyCode}
         exchangeRate={purchase.exchangeRate}

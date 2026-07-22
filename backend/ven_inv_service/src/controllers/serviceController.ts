@@ -78,6 +78,8 @@ interface ReviseEstimateItem {
   sku?: string;
   partName?: string;
   description?: string;
+  customPartBrand?: string;
+  mpn?: string;
   quantity: number;
   unitPrice: number;
   isFree?: boolean;
@@ -488,6 +490,7 @@ export class ServiceController {
         scheduledVisitDate,
         ticketType,
         meterReadingAtCreation,
+        serviceLocation,
       } = req.body;
 
       const reportedMeterReading =
@@ -561,6 +564,7 @@ export class ServiceController {
         linkedInvoiceId,
         ticketType: ticketType || 'COMPLAINT',
         meterReadingAtCreation: reportedMeterReading ?? null,
+        serviceLocation: serviceLocation || null,
       });
 
       await ticketRepo.save(ticket);
@@ -613,6 +617,20 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      if (
+        ticket.status === ServiceTicketStatus.COMPLETED ||
+        ticket.status === ServiceTicketStatus.CANCELLED
+      ) {
+        throw new AppError(
+          `Cannot change technician on a ${ticket.status.toLowerCase()} ticket`,
+          400,
+        );
+      }
+
+      const previousTechnicianId = ticket.assignedTechnicianId;
+      const isReassignment =
+        !!previousTechnicianId && previousTechnicianId !== assignedTechnicianId;
+
       // Reassignment releases the previous technician's claim (a manager's claim survives).
       if (
         ticket.diagnosisStartedBy &&
@@ -639,16 +657,33 @@ export class ServiceController {
       }
       await ticketRepo.save(ticket);
 
+      // Target credit for this job (see billing_service's employee-targets
+      // achievement-summary query) follows whichever technician is assigned
+      // when the ticket reaches COMPLETED — so a mid-flow reassignment simply
+      // transfers the eventual credit to the new technician, no separate bookkeeping needed.
       await this.logActivity(
         ticket.id,
         'ASSIGNMENT',
-        `Technician assigned to ticket. Status updated to ASSIGNED.`,
+        isReassignment
+          ? `Technician changed. Job (and its eventual target credit) reassigned to a new technician.`
+          : `Technician assigned to ticket.`,
         req.user?.userId,
       );
 
+      if (isReassignment && previousTechnicianId) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: previousTechnicianId,
+          title: 'Reassigned from Service Job',
+          message: `Ticket ${ticket.ticketNumber} has been reassigned to another technician.`,
+          type: 'INFO',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
+      }
+
       await NotificationPublisher.publishInAppRequest({
         recipientId: assignedTechnicianId,
-        title: 'New Service Job Assigned',
+        title: isReassignment ? 'Service Job Reassigned to You' : 'New Service Job Assigned',
         message: `You have been assigned to service ticket ${ticket.ticketNumber}. Scheduled visit: ${ticket.scheduledVisitDate?.toLocaleDateString() || 'N/A'}.`,
         type: 'TASK',
         referenceId: ticket.id,
@@ -721,6 +756,8 @@ export class ServiceController {
         labourCost,
         visitChargeAmount,
         visitChargeMethod,
+        visitChargeCollected,
+        transportChargeAmount,
         discountAmount,
         technicianNoteToFinance,
       } = req.body;
@@ -769,31 +806,21 @@ export class ServiceController {
 
       const isFreeContext = ticket.track === 'A';
 
-      // Validate discount <= total maxDiscountableAmount across parts
-      if (!isFreeContext) {
-        let totalMaxDiscount = 0;
-        const sparePartRepo = Source.getRepository(SparePart);
-        if (items && Array.isArray(items)) {
-          for (const itemData of items) {
-            if (itemData.itemSource === ServiceItemSource.SPARE_PART && itemData.sparePartId) {
-              const part = await sparePartRepo.findOne({
-                where: { id: String(itemData.sparePartId) },
-              });
-              if (part) {
-                totalMaxDiscount +=
-                  (Number(part.maxDiscountableAmount) || 0) * (itemData.quantity || 1);
-              }
-            }
-          }
-        }
-
-        if (Number(discountAmount || 0) > totalMaxDiscount) {
-          throw new AppError(
-            `Discount of QAR ${discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
-            400,
-          );
-        }
-      }
+      // Visit + transportation are free whenever the machine is covered by a
+      // service contract (AMC/SMA/FSMA — all include travel), by warranty, or is
+      // a company-owned RENT machine. Only uncovered machines pay these charges.
+      const travelCoveredContext = [
+        ServiceContext.AMC,
+        ServiceContext.SMA,
+        ServiceContext.FSMA,
+        ServiceContext.RENT,
+        ServiceContext.WARRANTY,
+        ServiceContext.LEASE_UNDER_WARRANTY,
+      ].includes(ticket.serviceContext);
+      const effectiveVisitCharge = travelCoveredContext ? 0 : Number(visitChargeAmount) || 0;
+      const effectiveTransportCharge = travelCoveredContext
+        ? 0
+        : Number(transportChargeAmount) || 0;
 
       ticket.diagnosisCompletedAt = new Date();
       if (ticket.diagnosisStartedAt) {
@@ -811,8 +838,10 @@ export class ServiceController {
         ticket.status = ServiceTicketStatus.FREE_SERVICE;
       } else {
         ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
-        ticket.visitChargeAmount = Number(visitChargeAmount) || 0;
+        ticket.visitChargeAmount = effectiveVisitCharge;
         ticket.visitChargeMethod = visitChargeMethod || null;
+        ticket.transportChargeAmount = effectiveTransportCharge;
+        ticket.discountAmount = Number(discountAmount) || 0;
       }
 
       await ticketRepo.save(ticket);
@@ -849,6 +878,8 @@ export class ServiceController {
           let barcodeId = itemData.barcodeId || null;
           let unitPrice = Number(itemData.unitPrice) || 0;
           let partCategory: string | null = null;
+          let partBrand = itemData.customPartBrand || null;
+          let mpn = itemData.mpn || null;
 
           if (itemData.itemSource === ServiceItemSource.SPARE_PART && itemData.sparePartId) {
             const part = await sparePartRepo.findOne({
@@ -860,6 +891,8 @@ export class ServiceController {
               barcodeId = part.barcode_id || null;
               unitPrice = Number(part.base_price) || 0;
               partCategory = part.part_category || null;
+              partBrand = part.brand || null;
+              mpn = part.mpn || null;
 
               // Check stock warnings
               if (part.quantity <= 5) {
@@ -893,6 +926,8 @@ export class ServiceController {
             customPartName: itemData.customPartName || null,
             customPartBrand: itemData.customPartBrand || null,
             customPartDescription: itemData.customPartDescription || null,
+            partBrand,
+            mpn,
             partName,
             quantity: itemData.quantity || 1,
             unitPrice: finalPrice,
@@ -984,11 +1019,35 @@ export class ServiceController {
           ? 0
           : inputLabour;
 
-      if (!isFreeContext && ((ticketItems && ticketItems.length > 0) || finalLabourCost > 0)) {
+      if (
+        !isFreeContext &&
+        ((ticketItems && ticketItems.length > 0) ||
+          finalLabourCost > 0 ||
+          effectiveVisitCharge > 0 ||
+          effectiveTransportCharge > 0)
+      ) {
+        // Discount applies to the whole estimate (parts + labour + transport +
+        // visit charge when added to the estimate) — cap it there.
+        const billablePartsTotal = ticketItems.reduce(
+          (sum, it) => sum + (Number(it.totalPrice) || 0),
+          0,
+        );
+        const estimateGrandTotal =
+          billablePartsTotal +
+          finalLabourCost +
+          effectiveTransportCharge +
+          (visitChargeMethod === 'ADDED_TO_ESTIMATE' ? effectiveVisitCharge : 0);
+        if (Number(discountAmount || 0) > estimateGrandTotal) {
+          throw new AppError(
+            `Discount of QAR ${discountAmount} exceeds the total estimate amount of QAR ${estimateGrandTotal}.`,
+            400,
+          );
+        }
+
         const estimateRepo = Source.getRepository(ServiceEstimate);
         const estItemRepo = Source.getRepository(ServiceEstimateItem);
 
-        let totalCost = finalLabourCost;
+        let totalCost = finalLabourCost + effectiveTransportCharge;
         const estItemsToSave: ServiceEstimateItem[] = [];
 
         const estimate = estimateRepo.create({
@@ -1033,9 +1092,12 @@ export class ServiceController {
           req.user?.userId,
         );
 
-        // Generate billing invoice for Track B
+        // Generate billing invoice for Track B. Brand + MPN travel in the
+        // description so finance sees exactly which part is being quoted.
         const billingItems = ticketItems.map((item) => ({
-          description: item.partName,
+          description: `${item.partName}${item.partBrand ? ` — ${item.partBrand}` : ''}${
+            item.mpn ? ` [MPN: ${item.mpn}]` : ''
+          }`,
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice) || 0,
           isFree: item.isFree,
@@ -1047,6 +1109,15 @@ export class ServiceController {
           unitPrice: Number(finalLabourCost) || 0,
           isFree: false,
         });
+
+        if (effectiveTransportCharge > 0) {
+          billingItems.push({
+            description: 'Transportation / Pickup & Delivery',
+            quantity: 1,
+            unitPrice: effectiveTransportCharge,
+            isFree: false,
+          });
+        }
 
         try {
           const token = sign(
@@ -1065,7 +1136,7 @@ export class ServiceController {
               createdBy: req.user?.userId || 'SYSTEM',
               serviceTicketId: ticket.id,
               items: billingItems,
-              visitChargeAmount: Number(visitChargeAmount) || 0,
+              visitChargeAmount: effectiveVisitCharge,
               visitChargeMethod: visitChargeMethod || null,
               discountAmount: Number(discountAmount) || 0,
               technicianNoteToFinance: technicianNoteToFinance || null,
@@ -1086,6 +1157,50 @@ export class ServiceController {
           }
         } catch (billingErr) {
           logger.error('Failed to post estimate to billing service:', billingErr);
+        }
+      }
+
+      // Visit charge collected separately in cash on-site: post the receipt to
+      // billing immediately so it shows up in the cashbook / day book and earnings
+      // without waiting for the estimate to be paid.
+      if (
+        !isFreeContext &&
+        visitChargeMethod === 'SEPARATE' &&
+        effectiveVisitCharge > 0 &&
+        visitChargeCollected &&
+        !ticket.visitChargeCollected
+      ) {
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+          await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/service-visit-charge`,
+            {
+              serviceTicketId: ticket.id,
+              ticketNumber: ticket.ticketNumber,
+              customerId: ticket.customerId,
+              branchId: ticket.branchId,
+              amount: effectiveVisitCharge,
+              collectedBy: req.user?.userId || 'SYSTEM',
+            },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          ticket.visitChargeCollected = true;
+          ticket.visitChargeCollectedAt = new Date();
+          await ticketRepo.save(ticket);
+          await this.logActivity(
+            ticket.id,
+            'VISIT_CHARGE_COLLECTED',
+            `Visit charge of ${effectiveVisitCharge} collected in cash on-site and posted to accounts.`,
+            req.user?.userId,
+          );
+        } catch (err) {
+          logger.error('Failed to post on-site visit charge receipt to billing:', err);
         }
       }
 
@@ -3102,6 +3217,76 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Validity rules: the up-front visit/estimate charge pays for the labour
+      // of making the estimate — a customer approving within the 1-month
+      // validity is not charged labour again. Approving after expiry keeps
+      // labour billed. Covered machines (contract/warranty) can't expire into
+      // charges — finance must extend the validity instead.
+      const approvalTravelCovered = [
+        ServiceContext.AMC,
+        ServiceContext.SMA,
+        ServiceContext.FSMA,
+        ServiceContext.RENT,
+        ServiceContext.WARRANTY,
+        ServiceContext.LEASE_UNDER_WARRANTY,
+      ].includes(ticket.serviceContext);
+
+      if (ticket.serviceQuotationId) {
+        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+          expiresIn: '1m',
+        });
+        let estimateExpired = false;
+        let invoiceFetched = false;
+        try {
+          const invRes = await axios.get(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+          const invoice = invRes.data?.data;
+          invoiceFetched = !!invoice;
+          if (invoice?.estimateValidUntil) {
+            estimateExpired = new Date() > new Date(invoice.estimateValidUntil);
+          }
+        } catch (err) {
+          logger.error('Failed to fetch estimate for validity check:', err);
+        }
+
+        if (estimateExpired && approvalTravelCovered) {
+          throw new AppError(
+            'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
+            400,
+          );
+        }
+
+        if (invoiceFetched && !estimateExpired && !approvalTravelCovered) {
+          // Timely approval — waive the labour line on the billing estimate.
+          try {
+            await axios.post(
+              `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
+              { reason: `Customer approved ticket ${ticket.ticketNumber} within validity` },
+              { headers: { Authorization: `Bearer ${token}` } },
+            );
+            await this.logActivity(
+              ticket.id,
+              'LABOUR_WAIVED',
+              'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
+              req.user?.userId,
+            );
+          } catch (err) {
+            logger.error('Failed to waive labour on billing estimate:', err);
+          }
+        }
+
+        if (estimateExpired && !approvalTravelCovered) {
+          await this.logActivity(
+            ticket.id,
+            'LABOUR_CHARGED',
+            'Customer approved after estimate validity expired — labour cost remains chargeable.',
+            req.user?.userId,
+          );
+        }
+      }
+
       ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
 
       if (ticket.leadId) {
@@ -3122,6 +3307,26 @@ export class ServiceController {
       }
 
       await ticketRepo.save(ticket);
+
+      // Keep the billing estimate in sync so finance sees the same state.
+      if (ticket.serviceQuotationId) {
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+          await axios.put(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/status`,
+            { status: 'CUSTOMER_ACCEPTED' },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+        } catch (err) {
+          logger.error('Failed to sync CUSTOMER_ACCEPTED status to billing invoice:', err);
+        }
+      }
 
       if (ticket.assignedTechnicianId) {
         await NotificationPublisher.publishInAppRequest({
@@ -3155,6 +3360,26 @@ export class ServiceController {
 
       ticket.status = ServiceTicketStatus.CUSTOMER_REJECTED;
       await ticketRepo.save(ticket);
+
+      // Keep the billing estimate in sync so finance sees the same state.
+      if (ticket.serviceQuotationId) {
+        try {
+          const token = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            {
+              expiresIn: '1m',
+            },
+          );
+          await axios.put(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/status`,
+            { status: 'CUSTOMER_REJECTED' },
+            { headers: { Authorization: `Bearer ${token}` } },
+          );
+        } catch (err) {
+          logger.error('Failed to sync CUSTOMER_REJECTED status to billing invoice:', err);
+        }
+      }
 
       const managerIds = await this.getBranchManagerAndAdmins(ticket.branchId);
       for (const mId of managerIds) {
@@ -4557,25 +4782,6 @@ For queries contact us at +974 4455 6677`;
         }
       }
 
-      // Validate discount <= total maxDiscountableAmount across parts
-      let totalMaxDiscount = 0;
-      const sparePartRepo = Source.getRepository(SparePart);
-      for (const item of items) {
-        if (item.sparePartId) {
-          const part = await sparePartRepo.findOne({ where: { id: item.sparePartId } });
-          if (part) {
-            totalMaxDiscount += (Number(part.maxDiscountableAmount) || 0) * (item.quantity || 1);
-          }
-        }
-      }
-
-      if (Number(discountAmount || 0) > totalMaxDiscount) {
-        throw new AppError(
-          `Discount of QAR ${discountAmount} exceeds the maximum allowed discount of QAR ${totalMaxDiscount} for the selected parts.`,
-          400,
-        );
-      }
-
       const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
         expiresIn: '1m',
       });
@@ -4612,42 +4818,9 @@ For queries contact us at +974 4455 6677`;
       });
       await revisionRepo.save(newRevision);
 
-      // Update service ticket items in local db
-      const ticketItemRepo = Source.getRepository(ServiceTicketItem);
-      await ticketItemRepo.delete({ ticketId: ticket.id });
-
-      const newTicketItems = items.map((it: ReviseEstimateItem) => {
-        return ticketItemRepo.create({
-          ticketId: ticket.id,
-          itemSource: it.itemSource || ServiceItemSource.SPARE_PART,
-          sparePartId: it.sparePartId || null,
-          sku: it.sku || null,
-          partName: it.partName || it.description || 'Spare Part',
-          quantity: it.quantity,
-          unitPrice: Number(it.unitPrice) || 0,
-          totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
-          isFree: !!it.isFree,
-        });
-      });
-      await ticketItemRepo.save(newTicketItems);
-
-      // Update ticket fields
-      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
-      ticket.visitChargeAmount = Number(visitChargeAmount) || 0;
-      ticket.visitChargeMethod = visitChargeMethod || null;
-      await ticketRepo.save(ticket);
-
-      // Log activity
-      await this.logActivity(
-        ticket.id,
-        'ESTIMATE_REVISED',
-        `Estimate revised by technician. Revision number: ${newRevision.revisionNumber}. Reason: ${technicianNoteToFinance}`,
-        userId,
-      );
-
-      // Call billing service to update the invoice. Coverage is per item
-      // category under contracts (SMA/AMC charge toner, AMC charges parts).
-      // Warranty mirrors SMA (toner chargeable); RENT stays fully covered.
+      // Coverage is per item category under contracts (SMA/AMC charge toner,
+      // AMC charges parts). Warranty mirrors SMA (toner chargeable); RENT stays
+      // fully covered. Computed BEFORE any mutation so validation can reject early.
       const baseFreeContext = ticket.serviceContext === ServiceContext.RENT;
       const warrantyContext = [
         ServiceContext.WARRANTY,
@@ -4665,6 +4838,18 @@ For queries contact us at +974 4455 6677`;
         items.map((it: ReviseEstimateItem) => it.sparePartId),
       );
 
+      // Brand + MPN for registered parts come from the spare part record.
+      const revisePartIds = items
+        .map((it: ReviseEstimateItem) => it.sparePartId)
+        .filter((pid): pid is string => !!pid);
+      const revisePartsById = new Map<string, SparePart>();
+      if (revisePartIds.length > 0) {
+        const parts = await Source.getRepository(SparePart).find({
+          where: { id: In(revisePartIds) },
+        });
+        parts.forEach((p) => revisePartsById.set(p.id, p));
+      }
+
       const billingItems = items.map((it: ReviseEstimateItem) => {
         const covered = hasContractContext
           ? coverageAllowsItem(reviseCoverage, {
@@ -4673,17 +4858,79 @@ For queries contact us at +974 4455 6677`;
             })
           : false;
         const isFree = covered || !!it.isFree;
+        const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
+        const brand = part?.brand || it.customPartBrand || null;
+        const mpn = part?.mpn || it.mpn || null;
+        const baseDescription = it.partName || it.description || 'Spare Part';
         return {
-          description: it.partName || it.description || 'Spare Part',
+          description: `${baseDescription}${brand ? ` — ${brand}` : ''}${
+            mpn ? ` [MPN: ${mpn}]` : ''
+          }`,
           quantity: it.quantity,
           unitPrice: isFree ? 0 : Number(it.unitPrice) || 0,
           isFree,
         };
       });
 
+      // Travel-covered contexts never pay a visit charge, revisions included.
+      const reviseEffectiveVisitCharge =
+        hasContractContext && reviseCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
+
+      // Discount is capped by the whole estimate total, not per-part limits.
+      const reviseItemsTotal = billingItems.reduce(
+        (sum, it) => sum + (it.isFree ? 0 : it.quantity * it.unitPrice),
+        0,
+      );
+      const reviseGrandTotal =
+        reviseItemsTotal +
+        (visitChargeMethod === 'ADDED_TO_ESTIMATE' ? reviseEffectiveVisitCharge : 0);
+      if (Number(discountAmount || 0) > reviseGrandTotal) {
+        throw new AppError(
+          `Discount of QAR ${discountAmount} exceeds the total estimate amount of QAR ${reviseGrandTotal}.`,
+          400,
+        );
+      }
+
+      // Update service ticket items in local db
+      const ticketItemRepo = Source.getRepository(ServiceTicketItem);
+      await ticketItemRepo.delete({ ticketId: ticket.id });
+
+      const newTicketItems = items.map((it: ReviseEstimateItem) => {
+        const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
+        return ticketItemRepo.create({
+          ticketId: ticket.id,
+          itemSource: it.itemSource || ServiceItemSource.SPARE_PART,
+          sparePartId: it.sparePartId || null,
+          sku: it.sku || null,
+          partName: it.partName || it.description || 'Spare Part',
+          partBrand: part?.brand || it.customPartBrand || null,
+          mpn: part?.mpn || it.mpn || null,
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice) || 0,
+          totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+          isFree: !!it.isFree,
+        });
+      });
+      await ticketItemRepo.save(newTicketItems);
+
+      // Update ticket fields
+      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+      ticket.visitChargeAmount = reviseEffectiveVisitCharge;
+      ticket.visitChargeMethod = visitChargeMethod || null;
+      ticket.discountAmount = Number(discountAmount) || 0;
+      await ticketRepo.save(ticket);
+
+      // Log activity
+      await this.logActivity(
+        ticket.id,
+        'ESTIMATE_REVISED',
+        `Estimate revised by technician. Revision number: ${newRevision.revisionNumber}. Reason: ${technicianNoteToFinance}`,
+        userId,
+      );
+
       const billingPayload = {
         items: billingItems,
-        visitChargeAmount: Number(visitChargeAmount) || 0,
+        visitChargeAmount: reviseEffectiveVisitCharge,
         visitChargeMethod: visitChargeMethod || null,
         discountAmount: Number(discountAmount) || 0,
         technicianNoteToFinance,

@@ -21,10 +21,11 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle, XCircle, Search, ClipboardList, Eye } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Search, ClipboardList, Eye, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getPendingServiceEstimates,
+  getApprovedServiceEstimates,
   financeApproveQuotation,
   financeRejectInvoice,
   Invoice,
@@ -33,6 +34,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
+import SendDocumentModal from '@/components/SendDocumentModal';
 
 export default function FinanceServiceEstimatesPage() {
   const currency = useBranchCurrency();
@@ -51,11 +53,29 @@ export default function FinanceServiceEstimatesPage() {
   const [ticketDetails, setTicketDetails] = useState<ServiceTicket | null>(null);
   const [loadingTicket, setLoadingTicket] = useState(false);
 
+  // Approved estimates — ready to be sent to the customer
+  const [approvedEstimates, setApprovedEstimates] = useState<Invoice[]>([]);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTicket, setShareTicket] = useState<ServiceTicket | null>(null);
+  const [shareCustomer, setShareCustomer] = useState<{
+    name: string;
+    email: string;
+    phone: string;
+  }>({ name: 'Customer', email: '', phone: '' });
+
   const fetchEstimates = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const data = await getPendingServiceEstimates();
-      setEstimates(data || []);
+      const [pending, approved] = await Promise.all([
+        getPendingServiceEstimates(),
+        getApprovedServiceEstimates().catch(() => []),
+      ]);
+      setEstimates(pending || []);
+      setApprovedEstimates(
+        (approved || []).filter(
+          (inv) => inv.billType === 'SERVICE' && inv.status === 'FINANCE_APPROVED',
+        ),
+      );
     } catch (error) {
       console.error(error);
       if (!silent) toast.error('Failed to load service estimates.');
@@ -63,6 +83,26 @@ export default function FinanceServiceEstimatesPage() {
       if (!silent) setLoading(false);
     }
   }, []);
+
+  const openShare = async (inv: Invoice) => {
+    if (!inv.serviceTicketId) {
+      toast.error('This estimate has no linked service ticket.');
+      return;
+    }
+    try {
+      const ticket = await getServiceTicketById(inv.serviceTicketId);
+      setShareTicket(ticket);
+      setShareCustomer({
+        name: inv.customerName || 'Customer',
+        email: inv.customerEmail || '',
+        phone: inv.customerPhone || '',
+      });
+      setShareOpen(true);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load the service ticket for sending.');
+    }
+  };
 
   useEffect(() => {
     fetchEstimates();
@@ -287,56 +327,177 @@ export default function FinanceServiceEstimatesPage() {
         </div>
       </div>
 
+      {/* Approved estimates — ready to send to the customer */}
+      {approvedEstimates.length > 0 && (
+        <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-emerald-100">
+          <div className="px-4 pt-4 pb-2 flex items-center gap-2">
+            <Send className="h-4 w-4 text-emerald-600" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Approved — Ready to Send</h3>
+              <p className="text-xs text-muted-foreground">
+                Finance-approved estimates waiting to be shared with the customer.
+              </p>
+            </div>
+          </div>
+          <div className="overflow-x-auto p-2">
+            <Table className="w-full">
+              <TableHeader className="bg-emerald-50/40 border-b border-emerald-100">
+                <TableRow>
+                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                    ESTIMATE NUMBER
+                  </TableHead>
+                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                    CUSTOMER
+                  </TableHead>
+                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                    TOTAL AMOUNT
+                  </TableHead>
+                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
+                    APPROVED
+                  </TableHead>
+                  <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase text-center">
+                    ACTIONS
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {approvedEstimates.map((inv) => (
+                  <TableRow key={inv.id} className="hover:bg-emerald-50/30 transition-colors">
+                    <TableCell className="font-semibold text-blue-600 text-xs font-mono">
+                      {inv.invoiceNumber}
+                    </TableCell>
+                    <TableCell className="font-bold text-slate-700 text-xs">
+                      {inv.customerName || 'Walk-in'}
+                    </TableCell>
+                    <TableCell className="font-semibold text-foreground text-xs">
+                      {formatCurrency(inv.totalAmount, currency)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {inv.financeApprovedAt
+                        ? new Date(inv.financeApprovedAt).toLocaleDateString()
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50 rounded-lg"
+                          title="View Details"
+                          onClick={() => setDetailTarget(inv)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold"
+                          onClick={() => openShare(inv)}
+                        >
+                          <Send className="h-3.5 w-3.5" /> Send to Customer
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
+      {/* Send estimate to customer */}
+      {shareTicket && (
+        <SendDocumentModal
+          open={shareOpen}
+          onOpenChange={(v) => {
+            setShareOpen(v);
+            if (!v) setShareTicket(null);
+          }}
+          ticketId={shareTicket.id}
+          ticketNumber={shareTicket.ticketNumber}
+          docType="quotation"
+          initialEmail={shareCustomer.email}
+          initialPhone={shareCustomer.phone}
+          customerName={shareCustomer.name}
+        />
+      )}
+
       {/* Detail View Dialog */}
       {detailTarget && (
         <Dialog open onOpenChange={(v) => !v && setDetailTarget(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex justify-between items-center pr-4">
-                <span>Estimate Details</span>
-                <span className="font-mono text-sm text-blue-600">
-                  {detailTarget.invoiceNumber}
-                </span>
-              </DialogTitle>
-              <DialogDescription>
-                Review details, items, labor costs and parts included in this estimate.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 my-2">
-              <div className="grid grid-cols-2 gap-4 text-xs">
+          <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden rounded-2xl max-h-[92vh] flex flex-col">
+            {/* Header band */}
+            <DialogHeader className="shrink-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 space-y-2">
+              <div className="flex items-start justify-between gap-3 pr-8">
                 <div>
-                  <span className="text-muted-foreground block">Customer:</span>
-                  <span className="font-bold text-slate-800">
-                    {detailTarget.customerName || 'Walk-in'}
-                  </span>
+                  <DialogTitle className="text-white text-lg font-bold tracking-tight">
+                    Service Estimate Review
+                  </DialogTitle>
+                  <DialogDescription className="text-slate-400 text-xs mt-0.5">
+                    Items, charges and technician context for this estimate.
+                  </DialogDescription>
                 </div>
-                <div>
-                  <span className="text-muted-foreground block">Technician:</span>
-                  <span className="font-bold text-slate-800">
-                    {detailTarget.employeeName || '—'}
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className="font-mono text-xs font-bold text-sky-300 bg-sky-500/10 border border-sky-400/20 px-2.5 py-1 rounded-lg">
+                    {detailTarget.invoiceNumber}
                   </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Service Ticket ID:</span>
-                  <span className="font-mono text-slate-800">
-                    {detailTarget.serviceTicketId || '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Date Created:</span>
-                  <span className="font-medium text-slate-800">
-                    {new Date(detailTarget.createdAt).toLocaleString()}
-                  </span>
+                  {(detailTarget.revisionCount || 0) > 0 && (
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                      Revision {detailTarget.revisionCount}
+                    </span>
+                  )}
                 </div>
               </div>
+              {/* Party strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {[
+                  { label: 'Customer', value: detailTarget.customerName || 'Walk-in' },
+                  { label: 'Technician', value: detailTarget.employeeName || '—' },
+                  {
+                    label: 'Ticket',
+                    value: ticketDetails?.ticketNumber
+                      ? ticketDetails.ticketNumber
+                      : detailTarget.serviceTicketId
+                        ? `${detailTarget.serviceTicketId.substring(0, 8)}…`
+                        : '—',
+                    mono: true,
+                  },
+                  {
+                    label: 'Created',
+                    value: new Date(detailTarget.createdAt).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    }),
+                  },
+                ].map((f) => (
+                  <div
+                    key={f.label}
+                    className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5"
+                  >
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                      {f.label}
+                    </span>
+                    <span
+                      className={`block text-[11px] font-semibold text-slate-100 truncate ${
+                        f.mono ? 'font-mono' : ''
+                      }`}
+                      title={f.value}
+                    >
+                      {f.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </DialogHeader>
 
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 bg-slate-50/60">
               {/* Ticket Details Section */}
               {detailTarget.serviceTicketId && (
-                <div className="mt-4 p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                    <ClipboardList className="text-primary h-3.5 w-3.5" /> Service Ticket Context &
-                    Details
+                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <ClipboardList className="text-primary h-3.5 w-3.5" /> Service Ticket Context
                   </h4>
 
                   {loadingTicket ? (
@@ -345,20 +506,22 @@ export default function FinanceServiceEstimatesPage() {
                       <span>Loading ticket details...</span>
                     </div>
                   ) : ticketDetails ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                      <div className="md:col-span-2">
-                        <span className="text-slate-500 font-medium block">
-                          Complaint Registered:
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                      <div className="md:col-span-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          Complaint Registered
                         </span>
-                        <p className="text-slate-800 mt-1 bg-white p-2 rounded border border-slate-200/60 leading-relaxed font-medium">
+                        <p className="text-slate-800 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed font-medium">
                           {ticketDetails.issueDescription || 'No complaint details provided.'}
                         </p>
                       </div>
 
                       {ticketDetails.problemFound && (
                         <div>
-                          <span className="text-slate-500 font-medium block">Problem Found:</span>
-                          <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            Problem Found
+                          </span>
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 block">
                             {ticketDetails.problemFound}
                           </span>
                         </div>
@@ -366,8 +529,10 @@ export default function FinanceServiceEstimatesPage() {
 
                       {ticketDetails.rootCause && (
                         <div>
-                          <span className="text-slate-500 font-medium block">Root Cause:</span>
-                          <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            Root Cause
+                          </span>
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 block">
                             {ticketDetails.rootCause}
                           </span>
                         </div>
@@ -375,37 +540,35 @@ export default function FinanceServiceEstimatesPage() {
 
                       {ticketDetails.meterReadingAtService !== undefined && (
                         <div>
-                          <span className="text-slate-500 font-medium block">
-                            Meter Reading (at Service):
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            Meter Reading
                           </span>
-                          <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
-                            {ticketDetails.meterReadingAtService}
+                          <span className="font-semibold text-slate-800 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 block font-mono">
+                            {Number(ticketDetails.meterReadingAtService).toLocaleString()}
                           </span>
                         </div>
                       )}
 
-                      {(ticketDetails.diagnosisNotes || ticketDetails.technicianNoteToFinance) && (
-                        <div className="md:col-span-2 space-y-2">
-                          {ticketDetails.diagnosisNotes && (
-                            <div>
-                              <span className="text-slate-500 font-medium block">
-                                Technician Diagnosis Notes:
-                              </span>
-                              <p className="text-slate-700 mt-1 bg-white p-2 rounded border border-slate-200/60 whitespace-pre-wrap font-medium">
-                                {ticketDetails.diagnosisNotes}
-                              </p>
-                            </div>
-                          )}
-                          {ticketDetails.technicianNoteToFinance && (
-                            <div>
-                              <span className="text-amber-800 font-bold block flex items-center gap-1">
-                                📝 Note to Finance:
-                              </span>
-                              <p className="text-amber-900 mt-1 bg-amber-50/50 p-2.5 rounded border border-amber-200/60 font-medium whitespace-pre-wrap">
-                                {ticketDetails.technicianNoteToFinance}
-                              </p>
-                            </div>
-                          )}
+                      {ticketDetails.diagnosisNotes && (
+                        <div className="md:col-span-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            Technician Diagnosis Notes
+                          </span>
+                          <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap font-medium">
+                            {ticketDetails.diagnosisNotes}
+                          </p>
+                        </div>
+                      )}
+                      {(ticketDetails.technicianNoteToFinance ||
+                        detailTarget.technicianNoteToFinance) && (
+                        <div className="md:col-span-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block mb-1">
+                            📝 Note to Finance
+                          </span>
+                          <p className="text-amber-900 bg-amber-50 p-2.5 rounded-lg border border-amber-200/70 font-medium whitespace-pre-wrap">
+                            {ticketDetails.technicianNoteToFinance ||
+                              detailTarget.technicianNoteToFinance}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -415,82 +578,194 @@ export default function FinanceServiceEstimatesPage() {
                 </div>
               )}
 
-              <div className="border border-slate-100 rounded-xl overflow-hidden mt-4">
-                <Table className="w-full text-xs">
-                  <TableHeader className="bg-slate-50">
-                    <TableRow>
-                      <TableHead>Item / Description</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {detailTarget.items && detailTarget.items.length > 0 ? (
-                      detailTarget.items.map((item, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell className="font-medium">{item.description}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[9px] uppercase">
-                              {item.itemType || 'Product'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">{item.quantity || 0}</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(item.unitPrice || 0, currency)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium">
-                            {formatCurrency((item.unitPrice || 0) * (item.quantity || 0), currency)}
+              {/* Items */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="px-4 pt-3.5 pb-2">
+                  <h4 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Estimate Items
+                  </h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table className="w-full text-xs">
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          Item / Description
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">
+                          Qty
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">
+                          Unit Price
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">
+                          Total
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detailTarget.items && detailTarget.items.length > 0 ? (
+                        detailTarget.items.map((item, idx) => {
+                          const lineTotal = (item.unitPrice || 0) * (item.quantity || 0);
+                          const isFoc = (item.unitPrice || 0) === 0;
+                          return (
+                            <TableRow key={idx} className="hover:bg-slate-50/60">
+                              <TableCell className="font-medium text-slate-800 max-w-[320px]">
+                                <span className="block truncate" title={item.description}>
+                                  {item.description}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center font-semibold text-slate-600">
+                                {item.quantity || 0}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-slate-600">
+                                {isFoc ? (
+                                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                                    FOC
+                                  </Badge>
+                                ) : (
+                                  formatCurrency(item.unitPrice || 0, currency)
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-semibold text-slate-800">
+                                {formatCurrency(lineTotal, currency)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                            No items in this estimate.
                           </TableCell>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
-                          No items in this estimate.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex justify-end pr-4 pt-2">
-                <div className="text-right space-y-1">
-                  <span className="text-xs text-muted-foreground block">Grand Total:</span>
-                  <span className="text-lg font-bold text-primary">
-                    {formatCurrency(detailTarget.totalAmount, currency)}
-                  </span>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
+
+                {/* Totals breakdown */}
+                {(() => {
+                  const itemsSubtotal = (detailTarget.items || []).reduce(
+                    (sum, it) => sum + (it.unitPrice || 0) * (it.quantity || 0),
+                    0,
+                  );
+                  const visitCharge =
+                    Number(detailTarget.visitChargeAmount) ||
+                    Number(ticketDetails?.visitChargeAmount) ||
+                    0;
+                  const visitAdded =
+                    (detailTarget.visitChargeMethod || ticketDetails?.visitChargeMethod) ===
+                    'ADDED_TO_ESTIMATE';
+                  // Older estimates lost the discount on the invoice — fall back to
+                  // the amount recorded on the service ticket itself.
+                  const discount =
+                    Number(detailTarget.totalDiscountAmount) ||
+                    Number(ticketDetails?.discountAmount) ||
+                    0;
+                  return (
+                    <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+                      <div className="ml-auto w-full sm:w-72 space-y-1.5 text-xs">
+                        <div className="flex justify-between text-slate-500 font-medium">
+                          <span>Items Subtotal</span>
+                          <span className="font-mono">
+                            {formatCurrency(itemsSubtotal, currency)}
+                          </span>
+                        </div>
+                        {visitCharge > 0 && (
+                          <div className="flex justify-between text-slate-500 font-medium">
+                            <span className="flex items-center gap-1.5">
+                              Visit Charge
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                                  visitAdded
+                                    ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                }`}
+                              >
+                                {visitAdded ? 'In Estimate' : 'Cash On-Site'}
+                              </span>
+                            </span>
+                            <span className="font-mono">
+                              {visitAdded
+                                ? formatCurrency(visitCharge, currency)
+                                : `(${formatCurrency(visitCharge, currency)})`}
+                            </span>
+                          </div>
+                        )}
+                        {discount > 0 && (
+                          <div className="flex justify-between text-rose-600 font-semibold">
+                            <span>Discount</span>
+                            <span className="font-mono">
+                              − {formatCurrency(discount, currency)}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-slate-200">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                            Grand Total
+                          </span>
+                          <span className="text-lg font-extrabold text-primary font-mono">
+                            {formatCurrency(detailTarget.totalAmount, currency)}
+                          </span>
+                        </div>
+                        {visitCharge > 0 && !visitAdded && (
+                          <p className="text-[10px] text-amber-700 font-medium leading-snug pt-1">
+                            Visit charge is collected separately in cash on-site and is not part of
+                            this total.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setDetailTarget(null)}>
+            {/* Sticky footer */}
+            <DialogFooter className="shrink-0 gap-2 border-t border-slate-100 bg-white px-6 py-4">
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setDetailTarget(null)}
+              >
                 Close
               </Button>
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
-                onClick={() => {
-                  handleApprove(detailTarget);
-                  setDetailTarget(null);
-                }}
-                disabled={actionLoading}
-              >
-                <CheckCircle size={14} /> Approve
-              </Button>
-              <Button
-                variant="destructive"
-                className="gap-1.5"
-                onClick={() => {
-                  openReject(detailTarget);
-                  setDetailTarget(null);
-                }}
-                disabled={actionLoading}
-              >
-                <XCircle size={14} /> Reject
-              </Button>
+              {detailTarget.status === 'WAITING_FINANCE_APPROVAL' ? (
+                <>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white gap-1.5 rounded-xl"
+                    onClick={() => {
+                      handleApprove(detailTarget);
+                      setDetailTarget(null);
+                    }}
+                    disabled={actionLoading}
+                  >
+                    <CheckCircle size={14} /> Approve
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="gap-1.5 rounded-xl"
+                    onClick={() => {
+                      openReject(detailTarget);
+                      setDetailTarget(null);
+                    }}
+                    disabled={actionLoading}
+                  >
+                    <XCircle size={14} /> Reject
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 rounded-xl"
+                  onClick={() => {
+                    setDetailTarget(null);
+                    openShare(detailTarget);
+                  }}
+                >
+                  <Send size={14} /> Send to Customer
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

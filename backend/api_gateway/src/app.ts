@@ -320,7 +320,7 @@ app.post(
 app.post(
   '/i/service/tickets/:id/cancel',
   authMiddleware,
-  requireServiceRole([], false), // Only ADMIN and MANAGER allowed
+  requireServiceRole([]), // Only ADMIN and MANAGER allowed
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(
