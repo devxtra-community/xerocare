@@ -66,6 +66,8 @@ export interface ServiceTicket {
   /** User who claimed the ticket (assigned technician or branch manager). */
   diagnosisStartedBy?: string | null;
   repairStartedAt?: string;
+  repairPausedAt?: string | null;
+  repairPausedDurationMinutes?: number;
   items: ServiceTicketItem[];
   visitChargeAmount?: number;
   visitChargeMethod?: string | null;
@@ -123,6 +125,8 @@ export const diagnoseServiceTicket = async (
     visitChargeAmount?: number;
     visitChargeMethod?: string | null;
     visitChargeCollected?: boolean;
+    visitChargePaymentMode?: string;
+    visitChargeAccountId?: string;
     transportChargeAmount?: number;
     discountAmount?: number;
     technicianNoteToFinance?: string | null;
@@ -152,8 +156,24 @@ export const approveServiceQuotation = async (id: string): Promise<ServiceTicket
   return response.data.data;
 };
 
-export const rejectServiceQuotation = async (id: string): Promise<ServiceTicket> => {
-  const response = await api.post(`/i/service/tickets/${id}/customer-reject`);
+export const rejectServiceQuotation = async (
+  id: string,
+  body: {
+    collectVisitCharge?: boolean;
+    paymentMode?: string;
+    accountId?: string;
+    reason: string;
+    discountAmount?: number;
+  },
+): Promise<ServiceTicket> => {
+  const response = await api.post(`/i/service/tickets/${id}/customer-reject`, body);
+  return response.data.data;
+};
+
+export const fetchServiceCashBankAccounts = async (
+  branchId: string,
+): Promise<{ id: string; name: string; type: string }[]> => {
+  const response = await api.get('/i/service/accounts/cash-bank', { params: { branchId } });
   return response.data.data;
 };
 
@@ -232,6 +252,16 @@ export const startRepair = async (id: string): Promise<ServiceTicket> => {
   return response.data.data;
 };
 
+export const pauseRepair = async (id: string): Promise<ServiceTicket> => {
+  const response = await api.post(`/i/service/tickets/${id}/pause-repair`);
+  return response.data.data;
+};
+
+export const resumeRepair = async (id: string): Promise<ServiceTicket> => {
+  const response = await api.post(`/i/service/tickets/${id}/resume-repair`);
+  return response.data.data;
+};
+
 export interface ServiceEstimateItem {
   id?: string;
   itemSource: 'SPARE_PART' | 'CUSTOM';
@@ -250,6 +280,9 @@ export interface ServiceEstimate {
   ticketId: string;
   labourCost: number;
   partsCost?: number;
+  visitChargeAmount?: number;
+  transportChargeAmount?: number;
+  discountAmount?: number;
   totalCost: number;
   status: string;
   version: number;
@@ -324,8 +357,17 @@ export const approveEstimateCustomer = async (estimateId: string): Promise<Servi
   return response.data.data;
 };
 
-export const rejectEstimateCustomer = async (estimateId: string): Promise<ServiceEstimate> => {
-  const response = await api.post(`/i/service/estimates/${estimateId}/reject-customer`);
+export const rejectEstimateCustomer = async (
+  estimateId: string,
+  body: {
+    collectVisitCharge?: boolean;
+    paymentMode?: string;
+    accountId?: string;
+    reason: string;
+    discountAmount?: number;
+  },
+): Promise<ServiceEstimate> => {
+  const response = await api.post(`/i/service/estimates/${estimateId}/reject-customer`, body);
   return response.data.data;
 };
 
@@ -474,6 +516,7 @@ export interface MachineHistoryResponse {
     totalLabourSpend: number;
     totalLifetimeCost: number;
   } | null;
+  currentMeterReading: number | null;
   tickets: ServiceTicket[];
   partLogs: {
     id: string;

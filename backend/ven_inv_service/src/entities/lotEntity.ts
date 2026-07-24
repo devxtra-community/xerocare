@@ -14,6 +14,8 @@ import { LotItem } from './lotItemEntity';
 import { LotDocument } from './lotDocumentEntity';
 import { Warehouse } from './warehouseEntity';
 import { PurchaseOrigin } from './enums/purchaseOrigin';
+import { TransportMode } from './enums/transportMode';
+import { ShipmentStatus } from './enums/shipmentStatus';
 
 export enum LotStatus {
   PENDING = 'PENDING',
@@ -58,6 +60,35 @@ export class Lot {
   })
   @Index()
   purchaseOrigin?: PurchaseOrigin;
+
+  // -------------
+  // Shipment / logistics info — how the goods are physically moving from the
+  // vendor to the warehouse. Independent of `status`, which tracks warehouse
+  // receiving. All nullable: unknown until the vendor books the shipment.
+
+  @Column({ name: 'transport_mode', type: 'enum', enum: TransportMode, nullable: true })
+  transportMode?: TransportMode;
+
+  @Column({ name: 'carrier_name', type: 'varchar', length: 150, nullable: true })
+  carrierName?: string;
+
+  @Column({ name: 'dispatch_date', type: 'date', nullable: true })
+  dispatchDate?: Date;
+
+  @Column({ name: 'estimated_arrival', type: 'date', nullable: true })
+  estimatedArrival?: Date;
+
+  @Column({ name: 'actual_arrival', type: 'date', nullable: true })
+  actualArrival?: Date;
+
+  @Column({ name: 'shipment_status', type: 'enum', enum: ShipmentStatus, nullable: true })
+  shipmentStatus?: ShipmentStatus;
+
+  // Mode-specific fields (vessel/voyage/container/BL# for SEA, airline/flight/AWB#
+  // for AIR, vehicle/driver/LR# for ROAD, ...). Shape depends on transportMode —
+  // see MODE_DETAIL_FIELDS. Validated/whitelisted at the controller, not the DB.
+  @Column({ name: 'shipment_details', type: 'jsonb', nullable: true })
+  shipmentDetails?: Record<string, string>;
 
   // -------------
 

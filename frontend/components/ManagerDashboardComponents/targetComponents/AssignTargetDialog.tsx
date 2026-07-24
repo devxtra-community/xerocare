@@ -10,13 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Autocomplete, AutocompleteOption } from '@/components/ui/autocomplete';
 import {
   Table,
   TableBody,
@@ -171,6 +165,13 @@ export default function AssignTargetDialog({
   const previewLevels = [50, 80, 100, 120];
   const amountNum = Number(targetAmount) || 0;
 
+  const employeeOptions: AutocompleteOption[] = employees.map((emp) => ({
+    value: emp.id,
+    label: `${emp.first_name} ${emp.last_name}`,
+    description:
+      EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] || emp.employee_job || undefined,
+  }));
+
   return (
     <Dialog
       open={open}
@@ -192,24 +193,13 @@ export default function AssignTargetDialog({
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               Employee
             </label>
-            <Select value={employeeId} onValueChange={setEmployeeId}>
-              <SelectTrigger className="h-10 rounded-lg bg-muted/50 border-none shadow-sm">
-                <SelectValue placeholder="Choose an employee..." />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl max-h-[300px]">
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name} —{' '}
-                    {EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] || emp.employee_job}
-                  </SelectItem>
-                ))}
-                {employees.length === 0 && (
-                  <div className="p-4 text-center text-xs text-muted-foreground italic">
-                    No eligible employees found
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+            <Autocomplete
+              options={employeeOptions}
+              value={employeeId}
+              onValueChange={setEmployeeId}
+              placeholder="Search employee..."
+              emptyText="No eligible employees found"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

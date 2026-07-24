@@ -262,10 +262,14 @@ export default function ServiceContractDetailPage() {
         <Card className="shadow-sm border-slate-200/80">
           <CardContent className="p-4">
             <span className="block text-[10px] uppercase font-bold text-slate-400">
-              Contract Value
+              {contract.contractType === 'FSMA' ? 'Per-Click Rate' : 'Contract Value'}
             </span>
             <span className="text-lg font-bold text-slate-800">
-              {currency} {Number(contract.contractValue).toFixed(2)}
+              {contract.contractType === 'FSMA'
+                ? contract.fsmaBillingMode === 'INDIVIDUAL'
+                  ? `B&W ${Number(contract.ratePerClickBW ?? 0)} · Col ${Number(contract.ratePerClickColor ?? 0)}`
+                  : `${currency} ${Number(contract.ratePerClickCombined ?? 0)}/click`
+                : `${currency} ${Number(contract.contractValue).toFixed(2)}`}
             </span>
           </CardContent>
         </Card>

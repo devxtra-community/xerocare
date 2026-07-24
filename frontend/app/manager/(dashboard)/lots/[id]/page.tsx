@@ -47,6 +47,9 @@ import {
   LotDocument,
   LotDocumentType,
   LOT_DOCUMENT_TYPE_LABELS,
+  LotDocumentCategory,
+  LOT_DOCUMENT_CATEGORY_LABELS,
+  LOT_DOCUMENT_TYPE_CATEGORY,
 } from '@/lib/lot';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
@@ -65,6 +68,7 @@ import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
 import AddPaymentModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddPaymentModal';
 import AddPurchaseDialog from '@/components/ManagerDashboardComponents/purchaseComponents/AddPurchaseDialog';
 import AddCostModal from '@/components/ManagerDashboardComponents/purchaseComponents/AddCostModal';
+import ShipmentInfoCard from '@/components/ManagerDashboardComponents/lotComponents/ShipmentInfoCard';
 import api from '@/lib/api';
 import { getUserFromToken } from '@/lib/auth';
 
@@ -670,6 +674,9 @@ export default function LotDetailPage() {
           </div>
         </div>
 
+        {/* Shipment Info — how the goods are physically moving from vendor to warehouse */}
+        <ShipmentInfoCard lot={lot} onUpdated={setLot} />
+
         {/* Lot Items — full width */}
         <Card className="p-0 overflow-hidden border-none shadow-sm">
           <CardHeader className="p-4 bg-slate-50 border-b flex-row items-center justify-between space-y-0">
@@ -1019,7 +1026,7 @@ export default function LotDetailPage() {
                 </Button>
               </form>
 
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {loadingDocuments ? (
                   <p className="text-[11px] text-slate-400 italic py-2 text-center">
                     Loading documents...
@@ -1029,46 +1036,61 @@ export default function LotDetailPage() {
                     No shipping documents attached yet.
                   </p>
                 ) : (
-                  documents.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs space-y-1"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <a
-                          href={doc.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-start gap-2 min-w-0 hover:text-primary"
-                        >
-                          <Paperclip size={12} className="shrink-0 text-slate-400 mt-0.5" />
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-semibold truncate">{doc.documentName}</span>
-                            <span className="text-[10px] text-slate-400">
-                              {LOT_DOCUMENT_TYPE_LABELS[doc.documentType]} ·{' '}
-                              {format(new Date(doc.createdAt), 'MMM d, yyyy')}
-                            </span>
-                          </div>
-                        </a>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 shrink-0 text-slate-400 hover:text-red-600"
-                            title="Delete document"
-                            onClick={() => handleDeleteDocument(doc.id)}
-                          >
-                            <Trash2 size={12} />
-                          </Button>
-                        )}
-                      </div>
-                      {doc.notes && (
-                        <p className="text-[11px] text-slate-500 pl-[18px] leading-snug">
-                          {doc.notes}
+                  Object.values(LotDocumentCategory)
+                    .map((category) => ({
+                      category,
+                      docs: documents.filter(
+                        (doc) => LOT_DOCUMENT_TYPE_CATEGORY[doc.documentType] === category,
+                      ),
+                    }))
+                    .filter(({ docs }) => docs.length > 0)
+                    .map(({ category, docs }) => (
+                      <div key={category} className="space-y-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          {LOT_DOCUMENT_CATEGORY_LABELS[category]}
                         </p>
-                      )}
-                    </div>
-                  ))
+                        {docs.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs space-y-1"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start gap-2 min-w-0 hover:text-primary"
+                              >
+                                <Paperclip size={12} className="shrink-0 text-slate-400 mt-0.5" />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-semibold truncate">{doc.documentName}</span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {LOT_DOCUMENT_TYPE_LABELS[doc.documentType]} ·{' '}
+                                    {format(new Date(doc.createdAt), 'MMM d, yyyy')}
+                                  </span>
+                                </div>
+                              </a>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0 text-slate-400 hover:text-red-600"
+                                  title="Delete document"
+                                  onClick={() => handleDeleteDocument(doc.id)}
+                                >
+                                  <Trash2 size={12} />
+                                </Button>
+                              )}
+                            </div>
+                            {doc.notes && (
+                              <p className="text-[11px] text-slate-500 pl-[18px] leading-snug">
+                                {doc.notes}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))
                 )}
               </div>
             </CardContent>

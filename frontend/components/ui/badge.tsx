@@ -154,8 +154,9 @@ export function Badge({ className, variant, status, context, children, ...props 
     };
     return (
       <div
+        title={config.label}
         className={cn(
-          'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors',
+          'inline-flex items-center max-w-full truncate rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors',
           config.className,
           className,
         )}
@@ -177,8 +178,9 @@ export function Badge({ className, variant, status, context, children, ...props 
     };
     return (
       <div
+        title={config.label}
         className={cn(
-          'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors',
+          'inline-flex items-center max-w-full truncate rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors',
           config.className,
           className,
         )}

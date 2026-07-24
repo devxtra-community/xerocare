@@ -135,6 +135,16 @@ export class ServiceTicket {
   @Column({ type: 'timestamp', nullable: true })
   repairCompletedAt?: Date | null;
 
+  // Non-null while the repair is currently paused. Cleared on resume, at
+  // which point the elapsed pause interval is folded into repairPausedDurationMinutes.
+  @Column({ type: 'timestamp', nullable: true, name: 'repair_paused_at' })
+  repairPausedAt?: Date | null;
+
+  // Accumulated paused time across every pause/resume cycle for this repair,
+  // netted out of repairDuration on completion.
+  @Column({ type: 'integer', nullable: true, name: 'repair_paused_duration_minutes', default: 0 })
+  repairPausedDurationMinutes?: number | null;
+
   @Column({ type: 'integer', nullable: true })
   diagnosisDuration?: number | null; // in minutes
 

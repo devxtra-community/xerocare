@@ -10,6 +10,7 @@ import { getBrands, createBrand, Brand } from '@/lib/brand';
 import { getAllModels, addModel, Model } from '@/lib/model';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Modal } from '@/components/ui/Modal';
 import { DetailDialog } from '@/components/ui/DetailDialog';
 import { useToast } from '@/components/ui/ToastProvider';
 import SendDocumentModal from '@/components/SendDocumentModal';
@@ -32,6 +33,8 @@ import {
   CustomerServiceHistory,
   startDiagnosis,
   startRepair,
+  pauseRepair,
+  resumeRepair,
   getTicketEstimates,
   createServiceEstimate,
   submitEstimateForApproval,
@@ -54,8 +57,22 @@ import {
   ServiceTicketItem,
   ConsumableYieldHistory,
   WarrantyInfo,
+  fetchServiceCashBankAccounts,
 } from '@/lib/serviceTicket';
 import { ServiceContract, getServiceContracts } from '@/lib/serviceContract';
+import {
+  getStatusColor,
+  ServiceTicketHistoryPanel,
+  BillingHistoryPanel,
+} from '@/components/employeeComponents/CustomerHistoryPanels';
+import {
+  MachineAllocation,
+  getRentedMachines as getRentedMachinesShared,
+  getLeasedMachines as getLeasedMachinesShared,
+  getPurchasedMachines as getPurchasedMachinesShared,
+  getExternalMachines as getExternalMachinesShared,
+  getContractMachines as getContractMachinesShared,
+} from '@/lib/machineAllocations';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -75,7 +92,6 @@ import {
   Plus,
   Wrench,
   History,
-  Briefcase,
   Search,
   DollarSign,
   Calendar,
@@ -87,6 +103,12 @@ import {
   Activity,
   CheckCircle2,
   AlertTriangle,
+  XCircle,
+  Ban,
+  Eye,
+  Calculator,
+  Pencil,
+  Pause,
 } from 'lucide-react';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -97,79 +119,23 @@ interface AuthUser {
   branchId?: string;
 }
 
-interface HistoryItem {
-  id: string;
-  productId?: string;
-  modelId?: string;
-  serialNumber?: string;
-  description?: string;
-}
-
-interface HistoryAllocation {
-  id: string;
-  productId?: string;
-  modelId?: string;
-  serialNumber?: string;
-  currentBwA4?: number;
-  currentBwA3?: number;
-  currentColorA4?: number;
-  currentColorA3?: number;
-  warrantyInfo?: WarrantyInfo;
-}
-
-interface HistoryInvoice {
-  id: string;
-  invoiceNumber?: string;
-  effectiveFrom?: string;
-  effectiveTo?: string;
-  monthlyRent?: number;
-  contractStatus?: string;
-  leaseTenureMonths?: number;
-  maxCopyLimit?: number;
-  createdAt?: string;
-  productAllocations?: HistoryAllocation[];
-  items?: HistoryItem[];
-  totalAmount?: number;
-  status?: string;
-}
-
-interface MachineAllocation {
-  id: string;
-  modelName: string;
-  serialNumber: string;
-  effectiveFrom?: string;
-  effectiveTo?: string;
-  monthlyRent?: number;
-  contractStatus?: string;
-  contractReferenceId?: string;
-  invoiceNumber?: string;
-  type: string;
-  expiredFirst?: string;
-  brandName?: string;
-  isUnderWarranty?: boolean;
-  remainingTime?: string;
-  remainingCopies?: string;
-  purchaseDate?: string;
-  contractType?: string;
-  meterReading?: number;
-  warrantyInfo?: WarrantyInfo;
-}
-
 // Local-timezone YYYY-MM-DD, for <input type="date"> min and validation.
 const todayLocalISO = () => new Date().toLocaleDateString('en-CA');
+
+function formatElapsed(diffMs: number): string {
+  const diff = Math.max(0, diffMs);
+  const hrs = Math.floor(diff / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${hrs > 0 ? `${hrs}:` : ''}${pad(mins)}:${pad(secs)}`;
+}
 
 function ActiveTimer({ startTime }: { startTime: string }) {
   const [elapsed, setElapsed] = useState('');
   useEffect(() => {
     const start = new Date(startTime).getTime();
-    const update = () => {
-      const diff = Math.max(0, Date.now() - start);
-      const hrs = Math.floor(diff / 3600000);
-      const mins = Math.floor((diff % 3600000) / 60000);
-      const secs = Math.floor((diff % 60000) / 1000);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      setElapsed(`${hrs > 0 ? `${hrs}:` : ''}${pad(mins)}:${pad(secs)}`);
-    };
+    const update = () => setElapsed(formatElapsed(Date.now() - start));
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
@@ -183,9 +149,31 @@ function ActiveTimer({ startTime }: { startTime: string }) {
   );
 }
 
+/** Frozen elapsed-so-far display while a repair is paused — no ticking. */
+function PausedTimer({
+  startTime,
+  pausedAt,
+  pausedDurationMinutes,
+}: {
+  startTime: string;
+  pausedAt: string;
+  pausedDurationMinutes?: number;
+}) {
+  const start = new Date(startTime).getTime();
+  const paused = new Date(pausedAt).getTime();
+  const elapsedMs = paused - start - (pausedDurationMinutes || 0) * 60000;
+  return (
+    <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-md font-mono text-[11px] font-bold shadow-sm">
+      <span className="w-2 h-2 rounded-full bg-amber-500 block"></span>
+      <span>Paused · {formatElapsed(elapsedMs)}</span>
+    </div>
+  );
+}
+
 interface VisitLog {
   ticketNumber: string;
   serviceContext: string;
+  status: string;
   date: string;
   meterReading: number;
   cost: number;
@@ -196,6 +184,7 @@ interface MachineLifetimeCostUI {
   totalSparePartsCost: number;
   totalLabourCost: number;
   totalLifetimeCost: number;
+  currentMeterReading: number | null;
   visitLogs: VisitLog[];
 }
 
@@ -275,6 +264,23 @@ export default function ServiceDashboardPage() {
     confirmText?: string;
     onConfirm: () => void | Promise<void>;
   } | null>(null);
+
+  // Reject-with-visit-charge-collection modal state
+  const [rejectVCModal, setRejectVCModal] = useState<
+    | { kind: 'quotation'; ticketId: string; amount: number; eligible: boolean }
+    | { kind: 'estimate'; estimateId: string; amount: number; eligible: boolean }
+    | null
+  >(null);
+  const [rejectCollect, setRejectCollect] = useState(true);
+  const [rejectPaymentMode, setRejectPaymentMode] = useState('');
+  const [rejectAccountId, setRejectAccountId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectDiscountAmount, setRejectDiscountAmount] = useState('');
+  const isVisitChargeCollectionEligible = (t: ServiceTicket) =>
+    t.serviceContext === 'CHARGEABLE' &&
+    Number(t.visitChargeAmount || 0) > 0 &&
+    t.visitChargeMethod === 'ADDED_TO_ESTIMATE' &&
+    !t.visitChargeCollected;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [associatedLeadName, setAssociatedLeadName] = useState('');
   const [leadForm, setLeadForm] = useState({
@@ -394,6 +400,18 @@ export default function ServiceDashboardPage() {
   // show no contract coverage in the machine registry.
   const [customerActiveContracts, setCustomerActiveContracts] = useState<ServiceContract[]>([]);
 
+  const [cashBankAccounts, setCashBankAccounts] = useState<
+    { id: string; name: string; type: string }[]
+  >([]);
+  const loadCashBankAccounts = async (branchId: string | undefined) => {
+    if (!branchId) return;
+    try {
+      setCashBankAccounts(await fetchServiceCashBankAccounts(branchId));
+    } catch (err) {
+      console.error('Failed to load cash/bank accounts:', err);
+    }
+  };
+
   const [assignForm, setAssignForm] = useState({
     technicianId: '',
   });
@@ -407,6 +425,8 @@ export default function ServiceDashboardPage() {
     visitChargeAmount: number;
     visitChargeMethod: 'ADDED_TO_ESTIMATE' | 'SEPARATE';
     visitChargeCollected: boolean;
+    visitChargePaymentMode: string;
+    visitChargeAccountId: string;
     transportChargeAmount: number;
     discountAmount: number;
     technicianNoteToFinance: string;
@@ -431,6 +451,8 @@ export default function ServiceDashboardPage() {
     visitChargeAmount: 0,
     visitChargeMethod: 'ADDED_TO_ESTIMATE',
     visitChargeCollected: true,
+    visitChargePaymentMode: '',
+    visitChargeAccountId: '',
     transportChargeAmount: 0,
     discountAmount: 0,
     technicianNoteToFinance: '',
@@ -862,6 +884,34 @@ export default function ServiceDashboardPage() {
     }
   };
 
+  const handlePauseRepair = async (ticketId: string) => {
+    try {
+      setLoading(true);
+      await pauseRepair(ticketId);
+      await fetchInitialData();
+      toastSuccess('Repair paused.');
+    } catch (error) {
+      console.error('Failed to pause repair:', error);
+      toastError('Failed to pause repair.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResumeRepair = async (ticketId: string) => {
+    try {
+      setLoading(true);
+      await resumeRepair(ticketId);
+      await fetchInitialData();
+      toastSuccess('Repair resumed.');
+    } catch (error) {
+      console.error('Failed to resume repair:', error);
+      toastError('Failed to resume repair.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDiagnose = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
@@ -893,6 +943,19 @@ export default function ServiceDashboardPage() {
       (selectedTicket.additionalEstimateCount && selectedTicket.additionalEstimateCount > 0);
     if (isRevision && !diagnosisForm.technicianNoteToFinance?.trim()) {
       toast.error('Technician note to finance is required explaining the reason for revision.');
+      return;
+    }
+
+    const isSeparateVisitChargeCollection =
+      diagnosisForm.visitChargeMethod === 'SEPARATE' &&
+      Number(diagnosisForm.visitChargeAmount) > 0 &&
+      diagnosisForm.visitChargeCollected;
+    if (
+      isSeparateVisitChargeCollection &&
+      (!diagnosisForm.visitChargePaymentMode ||
+        (diagnosisForm.visitChargePaymentMode !== 'CHEQUE' && !diagnosisForm.visitChargeAccountId))
+    ) {
+      toast.error('Select a payment mode and account before posting the visit charge to accounts.');
       return;
     }
 
@@ -932,6 +995,12 @@ export default function ServiceDashboardPage() {
             diagnosisForm.visitChargeMethod === 'SEPARATE'
               ? diagnosisForm.visitChargeCollected
               : false,
+          visitChargePaymentMode: isSeparateVisitChargeCollection
+            ? diagnosisForm.visitChargePaymentMode
+            : undefined,
+          visitChargeAccountId: isSeparateVisitChargeCollection
+            ? diagnosisForm.visitChargeAccountId
+            : undefined,
           transportChargeAmount: Number(diagnosisForm.transportChargeAmount) || 0,
           discountAmount: Number(diagnosisForm.discountAmount) || 0,
           technicianNoteToFinance: diagnosisForm.technicianNoteToFinance || null,
@@ -960,6 +1029,8 @@ export default function ServiceDashboardPage() {
         visitChargeAmount: 0,
         visitChargeMethod: 'ADDED_TO_ESTIMATE',
         visitChargeCollected: true,
+        visitChargePaymentMode: '',
+        visitChargeAccountId: '',
         transportChargeAmount: 0,
         discountAmount: 0,
         technicianNoteToFinance: '',
@@ -1102,6 +1173,7 @@ export default function ServiceDashboardPage() {
         totalSparePartsCost: Number(data.history?.totalPartsSpend) || 0,
         totalLabourCost: Number(data.history?.totalLabourSpend) || 0,
         totalLifetimeCost: Number(data.history?.totalLifetimeCost) || 0,
+        currentMeterReading: data.currentMeterReading ?? null,
         visitLogs: (data.tickets || []).map((t: ServiceTicket) => {
           let ticketCost = 0;
           t.items?.forEach((item: ServiceTicketItem) => {
@@ -1110,8 +1182,9 @@ export default function ServiceDashboardPage() {
           return {
             ticketNumber: t.ticketNumber,
             serviceContext: t.serviceContext,
+            status: t.status,
             date: t.completedAt || t.created_at,
-            meterReading: 0,
+            meterReading: t.meterReadingAtService || t.meterReadingAtCreation || 0,
             cost: ticketCost,
           };
         }),
@@ -1225,13 +1298,26 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleRejectCustomer = async (estimateId: string) => {
+  const handleRejectCustomer = async (
+    estimateId: string,
+    body: {
+      collectVisitCharge?: boolean;
+      paymentMode?: string;
+      accountId?: string;
+      reason: string;
+      discountAmount?: number;
+    },
+  ) => {
     try {
       setSubmitting(true);
-      await rejectEstimateCustomer(estimateId);
+      await rejectEstimateCustomer(estimateId, body);
       if (selectedTicket) await fetchEstimates(selectedTicket.id);
       await fetchInitialData();
-      toastSuccess('Customer rejected the estimate.');
+      toastSuccess(
+        body.discountAmount
+          ? `Discount of ${body.discountAmount} offered instead of rejection.`
+          : 'Customer rejected the estimate.',
+      );
     } catch (err) {
       console.error(err);
       toastError('Failed to reject estimate.');
@@ -1415,13 +1501,28 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleRejectQuotation = async (ticketId: string) => {
+  const handleRejectQuotation = async (
+    ticketId: string,
+    body: {
+      collectVisitCharge?: boolean;
+      paymentMode?: string;
+      accountId?: string;
+      reason: string;
+      discountAmount?: number;
+    },
+  ) => {
     try {
       setLoading(true);
-      await rejectServiceQuotation(ticketId);
+      await rejectServiceQuotation(ticketId, body);
       await fetchInitialData();
+      toastSuccess(
+        body.discountAmount
+          ? `Discount of ${body.discountAmount} offered instead of rejection.`
+          : 'Customer rejected the quotation.',
+      );
     } catch (error) {
       console.error('Failed to reject:', error);
+      toastError('Failed to reject quotation.');
     } finally {
       setLoading(false);
     }
@@ -1493,285 +1594,16 @@ export default function ServiceDashboardPage() {
     setMeterReadingInput('');
   };
 
-  const getRentedMachines = (): MachineAllocation[] => {
-    if (!modalIntelData?.billingHistory?.RENT) return [];
-    const list: MachineAllocation[] = [];
-    modalIntelData.billingHistory.RENT.forEach((invObj) => {
-      const inv = invObj as HistoryInvoice;
-      const allocations = inv.productAllocations || [];
-      if (allocations.length > 0) {
-        allocations.forEach((alloc) => {
-          const matchedModel = models.find((m) => m.id === alloc.modelId);
-          list.push({
-            id: alloc.productId || alloc.id,
-            modelName: matchedModel
-              ? matchedModel.model_name
-              : inv.items?.find((i) => i.modelId === alloc.modelId)?.description ||
-                'Rented Printer',
-            serialNumber: alloc.serialNumber || 'N/A',
-            effectiveFrom: inv.effectiveFrom,
-            effectiveTo: inv.effectiveTo,
-            monthlyRent: inv.monthlyRent || 0,
-            contractStatus: inv.contractStatus || 'ACTIVE',
-            contractReferenceId: inv.id,
-            invoiceNumber: inv.invoiceNumber,
-            type: 'RENT',
-          });
-        });
-      } else {
-        (inv.items || []).forEach((item) => {
-          if (item.serialNumber || item.modelId) {
-            const matchedModel = models.find((m) => m.id === item.modelId);
-            list.push({
-              id: item.productId || item.id,
-              modelName: matchedModel
-                ? matchedModel.model_name
-                : item.description || 'Rented Printer',
-              serialNumber: item.serialNumber || 'N/A',
-              effectiveFrom: inv.effectiveFrom,
-              effectiveTo: inv.effectiveTo,
-              monthlyRent: inv.monthlyRent || 0,
-              contractStatus: inv.contractStatus || 'ACTIVE',
-              contractReferenceId: inv.id,
-              invoiceNumber: inv.invoiceNumber,
-              type: 'RENT',
-            });
-          }
-        });
-      }
-    });
-    return list;
-  };
-
-  /**
-   * Derives display fields from the server-computed warrantyInfo
-   * (single source of truth — no client-side warranty math).
-   */
-  const warrantyDisplayFields = (w?: WarrantyInfo) => {
-    if (!w) {
-      return {
-        isUnderWarranty: false,
-        remainingTime: 'N/A',
-        remainingCopies: 'N/A',
-        expiredFirst: '',
-        effectiveTo: undefined as string | undefined,
-      };
-    }
-    let remainingTime = 'N/A';
-    if (w.warrantyEndDate) {
-      const currentDate = new Date();
-      const diffMs = new Date(w.warrantyEndDate).getTime() - currentDate.getTime();
-      const diffMonths = Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 30));
-      remainingTime = diffMonths > 0 ? `${diffMonths} months left` : 'Expired';
-    }
-    return {
-      isUnderWarranty: w.isUnderWarranty,
-      remainingTime,
-      remainingCopies:
-        w.copiesRemaining != null ? `${w.copiesRemaining.toLocaleString()} copies left` : 'N/A',
-      expiredFirst: w.expiredBy || '',
-      effectiveTo: w.warrantyEndDate
-        ? new Date(w.warrantyEndDate).toISOString().split('T')[0]
-        : undefined,
-    };
-  };
-
-  const getLeasedMachines = (): MachineAllocation[] => {
-    if (!modalIntelData?.billingHistory?.LEASE) return [];
-    const list: MachineAllocation[] = [];
-    modalIntelData.billingHistory.LEASE.forEach((invObj) => {
-      const inv = invObj as HistoryInvoice;
-      const allocations = inv.productAllocations || [];
-      if (allocations.length > 0) {
-        allocations.forEach((alloc) => {
-          const matchedModel = models.find((m) => m.id === alloc.modelId);
-          const w = warrantyDisplayFields(alloc.warrantyInfo);
-          list.push({
-            id: alloc.productId || alloc.id,
-            modelName: matchedModel
-              ? matchedModel.model_name
-              : inv.items?.find((i) => i.modelId === alloc.modelId)?.description ||
-                'Leased Printer',
-            serialNumber: alloc.serialNumber || 'N/A',
-            effectiveFrom: inv.effectiveFrom,
-            effectiveTo: w.effectiveTo,
-            isUnderWarranty: w.isUnderWarranty,
-            remainingTime: w.remainingTime,
-            remainingCopies: w.remainingCopies,
-            expiredFirst: w.expiredFirst,
-            warrantyInfo: alloc.warrantyInfo,
-            contractReferenceId: inv.id,
-            invoiceNumber: inv.invoiceNumber,
-            type: 'LEASE',
-          });
-        });
-      } else {
-        (inv.items || []).forEach((item) => {
-          if (item.serialNumber || item.modelId) {
-            const matchedModel = models.find((m) => m.id === item.modelId);
-            const start = new Date(inv.effectiveFrom || '');
-            const tenureMonths = inv.leaseTenureMonths || 0;
-            const expiryDate = new Date(start.setMonth(start.getMonth() + tenureMonths));
-            const currentDate = new Date();
-            const isTimeValid = currentDate <= expiryDate;
-
-            const maxCopies = inv.maxCopyLimit || 0;
-            const isUnderWarranty = isTimeValid;
-            const expiredFirst = !isTimeValid ? 'TIME' : '';
-            const diffTime = expiryDate.getTime() - currentDate.getTime();
-            const diffMonths = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 30));
-            const remainingTimeStr = diffMonths > 0 ? `${diffMonths} months left` : 'Expired';
-
-            list.push({
-              id: item.productId || item.id,
-              modelName: matchedModel
-                ? matchedModel.model_name
-                : item.description || 'Leased Printer',
-              serialNumber: item.serialNumber || 'N/A',
-              effectiveFrom: inv.effectiveFrom,
-              effectiveTo: expiryDate.toISOString().split('T')[0],
-              isUnderWarranty,
-              remainingTime: remainingTimeStr,
-              remainingCopies: maxCopies > 0 ? `${maxCopies.toLocaleString()} copies max` : 'N/A',
-              expiredFirst,
-              contractReferenceId: inv.id,
-              invoiceNumber: inv.invoiceNumber,
-              type: 'LEASE',
-            });
-          }
-        });
-      }
-    });
-    return list;
-  };
-
-  const getPurchasedMachines = (): MachineAllocation[] => {
-    if (!modalIntelData?.billingHistory?.SALE) return [];
-    const list: MachineAllocation[] = [];
-    modalIntelData.billingHistory.SALE.forEach((invObj) => {
-      const inv = invObj as HistoryInvoice;
-      const allocations = inv.productAllocations || [];
-      if (allocations.length > 0) {
-        allocations.forEach((alloc) => {
-          const matchedModel = models.find((m) => m.id === alloc.modelId);
-          const w = warrantyDisplayFields(alloc.warrantyInfo);
-          list.push({
-            id: alloc.productId || alloc.id,
-            modelName: matchedModel
-              ? matchedModel.model_name
-              : inv.items?.find((i) => i.modelId === alloc.modelId)?.description ||
-                'Purchased Printer',
-            serialNumber: alloc.serialNumber || 'N/A',
-            purchaseDate: inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A',
-            invoiceNumber: inv.invoiceNumber,
-            contractReferenceId: inv.id,
-            isUnderWarranty: w.isUnderWarranty,
-            remainingTime: w.remainingTime,
-            remainingCopies: w.remainingCopies,
-            expiredFirst: w.expiredFirst,
-            effectiveTo: w.effectiveTo,
-            warrantyInfo: alloc.warrantyInfo,
-            type: 'SALE',
-          });
-        });
-      } else {
-        (inv.items || []).forEach((item) => {
-          if (item.serialNumber || item.modelId) {
-            const matchedModel = models.find((m) => m.id === item.modelId);
-            list.push({
-              id: item.productId || item.id,
-              modelName: matchedModel
-                ? matchedModel.model_name
-                : item.description || 'Purchased Printer',
-              serialNumber: item.serialNumber || 'N/A',
-              purchaseDate: inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : 'N/A',
-              invoiceNumber: inv.invoiceNumber,
-              contractReferenceId: inv.id,
-              type: 'SALE',
-            });
-          }
-        });
-      }
-    });
-    return list;
-  };
-
-  const getExternalMachines = (): MachineAllocation[] => {
-    if (!modalIntelData?.assignedProducts) return [];
-    const list: MachineAllocation[] = [];
-    modalIntelData.assignedProducts.forEach((prod) => {
-      if (prod.ownership === 'EXTERNAL') {
-        // AMC/SMA/FSMA contracts live in their own table, not in billing
-        // history — overlay them so coverage is visible before selection.
-        const contract = customerActiveContracts.find(
-          (c) =>
-            c.productId === prod.id ||
-            (!!c.machine?.serialNumber && c.machine.serialNumber === prod.serial_no),
-        );
-        list.push({
-          id: prod.id,
-          modelName: prod.name,
-          serialNumber: prod.serial_no,
-          brandName: prod.brand,
-          type: 'EXTERNAL',
-          meterReading: prod.meter_reading || 0,
-          contractType: contract?.contractType,
-          contractReferenceId: contract?.id,
-          effectiveTo: contract?.endDate,
-        });
-      }
-    });
-    return list;
-  };
-
-  const getContractMachines = (): MachineAllocation[] => {
-    const list: MachineAllocation[] = [];
-    const contractTypes = ['AMC', 'FSMA', 'SMA'];
-    contractTypes.forEach((cType) => {
-      const invs = modalIntelData?.billingHistory?.[cType] || [];
-      invs.forEach((invObj) => {
-        const inv = invObj as HistoryInvoice;
-        const allocations = inv.productAllocations || [];
-        if (allocations.length > 0) {
-          allocations.forEach((alloc) => {
-            const matchedModel = models.find((m) => m.id === alloc.modelId);
-            list.push({
-              id: alloc.productId || alloc.id,
-              modelName: matchedModel
-                ? matchedModel.model_name
-                : inv.items?.find((i) => i.modelId === alloc.modelId)?.description ||
-                  `${cType} Printer`,
-              serialNumber: alloc.serialNumber || 'N/A',
-              contractType: cType,
-              effectiveTo: inv.effectiveTo,
-              contractReferenceId: inv.id,
-              invoiceNumber: inv.invoiceNumber,
-              type: cType,
-            });
-          });
-        } else {
-          (inv.items || []).forEach((item) => {
-            if (item.serialNumber || item.modelId) {
-              const matchedModel = models.find((m) => m.id === item.modelId);
-              list.push({
-                id: item.productId || item.id,
-                modelName: matchedModel
-                  ? matchedModel.model_name
-                  : item.description || `${cType} Printer`,
-                serialNumber: item.serialNumber || 'N/A',
-                contractType: cType,
-                effectiveTo: inv.effectiveTo,
-                contractReferenceId: inv.id,
-                invoiceNumber: inv.invoiceNumber,
-                type: cType,
-              });
-            }
-          });
-        }
-      });
-    });
-    return list;
-  };
+  const getRentedMachines = (): MachineAllocation[] =>
+    getRentedMachinesShared(modalIntelData, models);
+  const getLeasedMachines = (): MachineAllocation[] =>
+    getLeasedMachinesShared(modalIntelData, models);
+  const getPurchasedMachines = (): MachineAllocation[] =>
+    getPurchasedMachinesShared(modalIntelData, models);
+  const getExternalMachines = (): MachineAllocation[] =>
+    getExternalMachinesShared(modalIntelData, customerActiveContracts);
+  const getContractMachines = (): MachineAllocation[] =>
+    getContractMachinesShared(modalIntelData, models);
 
   const addDiagnosisItem = () => {
     setDiagnosisForm((prev) => ({
@@ -1849,49 +1681,11 @@ export default function ServiceDashboardPage() {
     return parts.filter(Boolean).join(' - ') || 'Device';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'OPEN':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'FREE_SERVICE':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'ASSIGNED':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'DIAGNOSED':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'WAITING_FINANCE_APPROVAL':
-      case 'WAITING_FINANCE_APPROVAL_2':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'ADDITIONAL_ESTIMATE_PENDING':
-        return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'ESTIMATE_RECORDED':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'FINANCE_APPROVED':
-      case 'FINANCE_APPROVED_2':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'QUOTED':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'FINANCE_REJECTED':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'CUSTOMER_APPROVED':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'CUSTOMER_REJECTED':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'IN_PROGRESS':
-        return 'bg-sky-100 text-sky-800 border-sky-200';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'CANCELLED':
-        return 'bg-slate-100 text-slate-800 border-slate-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   const isHelpDesk = user?.employeeJob === 'SERVICE_HELP_DESK';
   const isTechnician = user?.employeeJob === 'SERVICE_TECHNICIAN';
   const isManagerOrAdmin = user?.role === 'MANAGER' || user?.role === 'ADMIN';
   const canManageFinance = user?.role === 'FINANCE' || isManagerOrAdmin;
+  const rejectHasDiscount = Number(rejectDiscountAmount) > 0;
 
   return (
     <div className="bg-slate-50 min-h-full p-4 sm:p-6 space-y-6">
@@ -2022,58 +1816,49 @@ export default function ServiceDashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table className="w-full table-fixed min-w-[950px]">
+              <Table className="w-full table-fixed">
                 <TableHeader className="bg-slate-50/50">
                   <TableRow>
                     <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[9%]' : 'w-[10%]'}`}
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[8%]' : 'w-[9%]'}`}
                     >
                       Ticket No
                     </TableHead>
                     <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[18%]' : 'w-[24%]'}`}
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[18%]' : 'w-[22%]'}`}
                     >
                       Brand / Model
                     </TableHead>
                     {user?.role === 'ADMIN' && (
-                      <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[9%]">
+                      <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[8%]">
                         Branch
                       </TableHead>
                     )}
                     <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[10%]' : 'w-[11%]'}`}
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[8%]' : 'w-[10%]'}`}
                     >
                       Context
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[8%]">
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[6%]">
                       Job Type
                     </TableHead>
                     <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[9%]' : 'w-[10%]'}`}
+                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[8%]' : 'w-[9%]'}`}
                     >
                       Visit Date
                     </TableHead>
-                    <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[11%]' : 'w-[11%]'}`}
-                    >
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[16%]">
                       Status
                     </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 text-right w-[26%]">
+                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-1 text-left w-[28%]">
                       Actions
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTickets.map((ticket) => (
-                    <TableRow
-                      key={ticket.id}
-                      onClick={() => {
-                        setSelectedTicket(ticket);
-                        setShowDetailsModal(true);
-                      }}
-                      className="hover:bg-slate-50 cursor-pointer transition-colors"
-                    >
-                      <TableCell className="py-2 px-2 font-mono text-xs font-bold text-blue-600 truncate">
+                    <TableRow key={ticket.id} className="hover:bg-slate-50 transition-colors">
+                      <TableCell className="py-2 pl-2 pr-4 font-mono text-xs font-bold text-blue-600 truncate">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2124,13 +1909,13 @@ export default function ServiceDashboardPage() {
                           ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
                           : 'Unscheduled'}
                       </TableCell>
-                      <TableCell className="py-2 px-2">
-                        <div className="flex items-center gap-1.5">
+                      <TableCell className="py-2 px-2 overflow-hidden">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <Badge status={ticket.status} />
                           {ticket.status === 'COMPLETED' && (
                             <button
                               title="Share Completion Bill"
-                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setShareTicket(ticket);
@@ -2145,7 +1930,7 @@ export default function ServiceDashboardPage() {
                             ticket.status === 'CUSTOMER_APPROVED') && (
                             <button
                               title="Share Service Quotation"
-                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setShareTicket(ticket);
@@ -2159,10 +1944,10 @@ export default function ServiceDashboardPage() {
                         </div>
                       </TableCell>
                       <TableCell
-                        className="text-right py-2 px-2 actions-cell"
+                        className="text-right py-2 px-1 actions-cell"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <div className="flex flex-col items-end gap-1.5">
                           <div className="flex items-center justify-end gap-1.5 flex-wrap">
                             {/* HELP DESK / MANAGER ACTIONS — technician can be assigned or
                                 changed any time before the job is done or cancelled (e.g. the
@@ -2172,7 +1957,8 @@ export default function ServiceDashboardPage() {
                               !['COMPLETED', 'CANCELLED'].includes(ticket.status) && (
                                 <Button
                                   size="sm"
-                                  className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                  variant="outline"
+                                  className="border-slate-200 text-slate-600 hover:bg-slate-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => {
                                     setSelectedTicket(ticket);
                                     setAssignForm({
@@ -2192,17 +1978,33 @@ export default function ServiceDashboardPage() {
                                 <>
                                   <Button
                                     size="sm"
-                                    className="bg-green-600 hover:bg-[#14532d] text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                     onClick={() => handleApproveQuotation(ticket.id)}
                                   >
+                                    <CheckCircle2 className="size-3.5" />
                                     Approve
                                   </Button>
                                   <Button
                                     size="sm"
-                                    variant="destructive"
-                                    className="h-7 px-2 rounded-md text-[11px] font-bold"
-                                    onClick={() => handleRejectQuotation(ticket.id)}
+                                    variant="outline"
+                                    className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                    onClick={() => {
+                                      const eligible = isVisitChargeCollectionEligible(ticket);
+                                      setRejectCollect(eligible);
+                                      setRejectPaymentMode('');
+                                      setRejectAccountId('');
+                                      setRejectReason('');
+                                      setRejectDiscountAmount('');
+                                      if (eligible) loadCashBankAccounts(ticket.branchId);
+                                      setRejectVCModal({
+                                        kind: 'quotation',
+                                        ticketId: ticket.id,
+                                        amount: Number(ticket.visitChargeAmount) || 0,
+                                        eligible,
+                                      });
+                                    }}
                                   >
+                                    <XCircle className="size-3.5" />
                                     Reject
                                   </Button>
                                 </>
@@ -2216,7 +2018,7 @@ export default function ServiceDashboardPage() {
                               !ticket.diagnosisStartedAt && (
                                 <Button
                                   size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => handleStartDiagnosis(ticket.id)}
                                 >
                                   <Play className="size-3.5 fill-current" />
@@ -2247,9 +2049,10 @@ export default function ServiceDashboardPage() {
                                   <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
                                   <Button
                                     size="sm"
-                                    className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                    className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                     onClick={() => {
                                       setSelectedTicket(ticket);
+                                      loadCashBankAccounts(ticket.branchId);
                                       setDiagnosisForm({
                                         notes: '',
                                         problemFound: '',
@@ -2259,6 +2062,8 @@ export default function ServiceDashboardPage() {
                                         visitChargeAmount: 0,
                                         visitChargeMethod: 'ADDED_TO_ESTIMATE',
                                         visitChargeCollected: true,
+                                        visitChargePaymentMode: '',
+                                        visitChargeAccountId: '',
                                         transportChargeAmount: 0,
                                         discountAmount: 0,
                                         technicianNoteToFinance: '',
@@ -2282,9 +2087,11 @@ export default function ServiceDashboardPage() {
                                 ticket.status === 'CUSTOMER_REJECTED') && (
                                 <Button
                                   size="sm"
-                                  className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                  variant="outline"
+                                  className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => handleOpenEstimates(ticket)}
                                 >
+                                  <Calculator className="size-3.5" />
                                   Estimates
                                 </Button>
                               )}
@@ -2294,9 +2101,11 @@ export default function ServiceDashboardPage() {
                                 ticket.status === 'REVISED') && (
                                 <Button
                                   size="sm"
-                                  className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                  variant="outline"
+                                  className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => {
                                     setSelectedTicket(ticket);
+                                    loadCashBankAccounts(ticket.branchId);
                                     const laborItem = ticket.items?.find(
                                       (it) => it.partName === 'Labor Cost / Service Charge',
                                     );
@@ -2316,6 +2125,8 @@ export default function ServiceDashboardPage() {
                                           | 'ADDED_TO_ESTIMATE'
                                           | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
                                       visitChargeCollected: !!ticket.visitChargeCollected,
+                                      visitChargePaymentMode: '',
+                                      visitChargeAccountId: '',
                                       transportChargeAmount: ticket.transportChargeAmount || 0,
                                       discountAmount: ticket.discountAmount || 0,
                                       technicianNoteToFinance: ticket.technicianNoteToFinance || '',
@@ -2335,6 +2146,7 @@ export default function ServiceDashboardPage() {
                                     setShowDiagnoseModal(true);
                                   }}
                                 >
+                                  <Pencil className="size-3.5" />
                                   Revise Estimate
                                 </Button>
                               )}
@@ -2346,7 +2158,7 @@ export default function ServiceDashboardPage() {
                               !ticket.repairStartedAt && (
                                 <Button
                                   size="sm"
-                                  className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold gap-1"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() => handleStartRepair(ticket.id)}
                                 >
                                   <Play className="size-3.5 fill-current" />
@@ -2356,12 +2168,22 @@ export default function ServiceDashboardPage() {
 
                             {(isTechnician || isManagerOrAdmin) &&
                               ticket.status === 'IN_PROGRESS' &&
-                              ticket.repairStartedAt && (
+                              ticket.repairStartedAt &&
+                              !ticket.repairPausedAt && (
                                 <div className="flex items-center gap-1">
                                   <ActiveTimer startTime={ticket.repairStartedAt.toString()} />
                                   <Button
                                     size="sm"
-                                    className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 rounded-md text-[11px] font-bold"
+                                    variant="outline"
+                                    className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                    onClick={() => handlePauseRepair(ticket.id)}
+                                  >
+                                    <Pause className="size-3.5" />
+                                    Pause
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                     onClick={() => {
                                       setSelectedTicket(ticket);
                                       setCompleteForm({
@@ -2377,7 +2199,29 @@ export default function ServiceDashboardPage() {
                                       setShowCompleteModal(true);
                                     }}
                                   >
+                                    <CheckCircle2 className="size-3.5" />
                                     Complete
+                                  </Button>
+                                </div>
+                              )}
+
+                            {(isTechnician || isManagerOrAdmin) &&
+                              ticket.status === 'IN_PROGRESS' &&
+                              ticket.repairStartedAt &&
+                              ticket.repairPausedAt && (
+                                <div className="flex items-center gap-1">
+                                  <PausedTimer
+                                    startTime={ticket.repairStartedAt.toString()}
+                                    pausedAt={ticket.repairPausedAt.toString()}
+                                    pausedDurationMinutes={ticket.repairPausedDurationMinutes}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                    onClick={() => handleResumeRepair(ticket.id)}
+                                  >
+                                    <Play className="size-3.5 fill-current" />
+                                    Resume
                                   </Button>
                                 </div>
                               )}
@@ -2390,25 +2234,27 @@ export default function ServiceDashboardPage() {
                               ticket.status !== 'CANCELLED' && (
                                 <Button
                                   size="sm"
-                                  variant="destructive"
-                                  className="h-7 px-2 rounded-md text-[11px] font-bold"
+                                  variant="outline"
+                                  className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                                   onClick={() =>
                                     handleCancelTicketClick(ticket.id, ticket.ticketNumber)
                                   }
                                 >
+                                  <Ban className="size-3.5" />
                                   Cancel
                                 </Button>
                               )}
 
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="border-blue-600 text-blue-600 hover:bg-blue-50 h-7 px-2 rounded-md text-[11px] font-bold"
+                              variant="ghost"
+                              className="text-slate-500 hover:bg-slate-100 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
                               onClick={() => {
                                 setSelectedTicket(ticket);
                                 setShowDetailsModal(true);
                               }}
                             >
+                              <Eye className="size-3.5" />
                               Details
                             </Button>
                           </div>
@@ -4135,7 +3981,7 @@ export default function ServiceDashboardPage() {
                       required
                       min={0}
                       placeholder="Enter current page count"
-                      value={diagnosisForm.meterReading || ''}
+                      value={diagnosisForm.meterReading ?? 0}
                       onChange={(e) =>
                         setDiagnosisForm({
                           ...diagnosisForm,
@@ -4173,7 +4019,7 @@ export default function ServiceDashboardPage() {
                       required
                       min={0}
                       placeholder="Enter labor/service charge"
-                      value={diagnosisForm.labourCost || ''}
+                      value={diagnosisForm.labourCost ?? 0}
                       onChange={(e) =>
                         setDiagnosisForm({
                           ...diagnosisForm,
@@ -4445,28 +4291,82 @@ export default function ServiceDashboardPage() {
                           {!travelCovered &&
                             diagnosisForm.visitChargeMethod === 'SEPARATE' &&
                             (diagnosisForm.visitChargeAmount || 0) > 0 && (
-                              <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
-                                <input
-                                  type="checkbox"
-                                  id="visit-charge-collected"
-                                  checked={diagnosisForm.visitChargeCollected}
-                                  onChange={(e) =>
-                                    setDiagnosisForm({
-                                      ...diagnosisForm,
-                                      visitChargeCollected: e.target.checked,
-                                    })
-                                  }
-                                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                />
-                                <label
-                                  htmlFor="visit-charge-collected"
-                                  className="text-[11px] font-bold text-amber-800"
-                                >
-                                  Cash collected on-site — post {getActiveCurrency()}{' '}
-                                  {Number(diagnosisForm.visitChargeAmount || 0).toFixed(2)} to
-                                  accounts now
-                                </label>
-                              </div>
+                              <>
+                                <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
+                                  <input
+                                    type="checkbox"
+                                    id="visit-charge-collected"
+                                    checked={diagnosisForm.visitChargeCollected}
+                                    onChange={(e) =>
+                                      setDiagnosisForm({
+                                        ...diagnosisForm,
+                                        visitChargeCollected: e.target.checked,
+                                      })
+                                    }
+                                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                  />
+                                  <label
+                                    htmlFor="visit-charge-collected"
+                                    className="text-[11px] font-bold text-amber-800"
+                                  >
+                                    Cash collected on-site — post {getActiveCurrency()}{' '}
+                                    {Number(diagnosisForm.visitChargeAmount || 0).toFixed(2)} to
+                                    accounts now
+                                  </label>
+                                </div>
+
+                                {diagnosisForm.visitChargeCollected && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                        Payment Mode
+                                      </label>
+                                      <select
+                                        value={diagnosisForm.visitChargePaymentMode}
+                                        onChange={(e) =>
+                                          setDiagnosisForm({
+                                            ...diagnosisForm,
+                                            visitChargePaymentMode: e.target.value,
+                                            visitChargeAccountId: '',
+                                          })
+                                        }
+                                        className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                                      >
+                                        <option value="">Select mode...</option>
+                                        <option value="CASH">Cash</option>
+                                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                                        <option value="CHEQUE">Cheque</option>
+                                        <option value="CREDIT_CARD">Credit Card</option>
+                                      </select>
+                                    </div>
+                                    {diagnosisForm.visitChargePaymentMode &&
+                                      diagnosisForm.visitChargePaymentMode !== 'CHEQUE' && (
+                                        <div>
+                                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                            Deposit To Account
+                                          </label>
+                                          <select
+                                            value={diagnosisForm.visitChargeAccountId}
+                                            onChange={(e) =>
+                                              setDiagnosisForm({
+                                                ...diagnosisForm,
+                                                visitChargeAccountId: e.target.value,
+                                              })
+                                            }
+                                            className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                                          >
+                                            <option value="">Select account...</option>
+                                            {cashBankAccounts.map((a) => (
+                                              <option key={a.id} value={a.id}>
+                                                {a.name} ({a.type})
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      )}
+                                  </div>
+                                )}
+                              </>
                             )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4828,101 +4728,11 @@ export default function ServiceDashboardPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Service History */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <Briefcase size={14} className="text-blue-500" /> Service Ticket History
-                    </h3>
-                    {intelData?.tickets?.length === 0 ? (
-                      <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        No service tickets logged for this customer.
-                      </p>
-                    ) : (
-                      <div className="space-y-3">
-                        {intelData?.tickets?.map((t: ServiceTicket) => (
-                          <div
-                            key={t.id}
-                            className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-2"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono text-xs font-bold text-blue-600">
-                                {t.ticketNumber}
-                              </span>
-                              <Badge
-                                className={`text-[9px] font-bold px-1.5 py-0.5 ${getStatusColor(t.status)}`}
-                              >
-                                {t.status}
-                              </Badge>
-                            </div>
-                            <p className="text-[11px] text-slate-700 font-bold">
-                              {t.productName || t.productModel} (Model)
-                            </p>
-                            <p className="text-[11px] text-slate-500 font-medium">
-                              {t.issueDescription}
-                            </p>
-                            {t.completionNotes && (
-                              <div className="bg-white p-2 rounded border border-slate-100 text-[10px] text-slate-500 font-medium">
-                                <span className="font-bold text-slate-700">Completion:</span>{' '}
-                                {t.completionNotes}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Billing / Contract History */}
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <DollarSign size={14} className="text-emerald-500" /> Contract & Invoice
-                      History (Grouped)
-                    </h3>
-                    {!intelData?.billingHistory ||
-                    Object.keys(intelData.billingHistory).length === 0 ? (
-                      <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        No billing history / contracts found.
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {Object.entries(intelData.billingHistory).map(([billType, invoices]) => (
-                          <div key={billType} className="space-y-2">
-                            <h4 className="text-[11px] font-bold text-slate-600 border-b border-slate-100 pb-1">
-                              {billType}
-                            </h4>
-                            <div className="space-y-2">
-                              {invoices.map((invObj) => {
-                                const inv = invObj as HistoryInvoice;
-                                return (
-                                  <div
-                                    key={inv.id}
-                                    className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-center justify-between text-xs"
-                                  >
-                                    <div>
-                                      <div className="font-bold text-slate-700">
-                                        {inv.invoiceNumber}
-                                      </div>
-                                      <div className="text-[10px] text-slate-400">
-                                        Total: ${Number(inv.totalAmount || 0).toLocaleString()}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <Badge
-                                        variant="outline"
-                                        className="text-[9px] font-bold uppercase border-slate-200 text-slate-600 bg-white shadow-none"
-                                      >
-                                        {inv.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <ServiceTicketHistoryPanel tickets={intelData?.tickets} />
+                  <BillingHistoryPanel
+                    billingHistory={intelData?.billingHistory}
+                    tickets={intelData?.tickets}
+                  />
                 </div>
               )}
             </CardContent>
@@ -5063,7 +4873,7 @@ export default function ServiceDashboardPage() {
                         </div>
                         <div className="space-y-0.5 min-w-0">
                           <a
-                            href={`/employee/customer?id=${customer?.id}`}
+                            href={`/employee/customers/${customer?.id}`}
                             onClick={(e) => e.stopPropagation()}
                             className="text-blue-600 hover:text-blue-800 hover:underline font-bold text-xs block truncate"
                           >
@@ -5295,6 +5105,7 @@ export default function ServiceDashboardPage() {
                               className="bg-amber-600 hover:bg-amber-700 text-white h-8 px-3 rounded-lg font-bold"
                               onClick={() => {
                                 setShowDetailsModal(false);
+                                loadCashBankAccounts(selectedTicket.branchId);
                                 setDiagnosisForm({
                                   notes: '',
                                   problemFound: '',
@@ -5304,6 +5115,8 @@ export default function ServiceDashboardPage() {
                                   visitChargeAmount: 0,
                                   visitChargeMethod: 'ADDED_TO_ESTIMATE',
                                   visitChargeCollected: true,
+                                  visitChargePaymentMode: '',
+                                  visitChargeAccountId: '',
                                   transportChargeAmount: 0,
                                   discountAmount: 0,
                                   technicianNoteToFinance: '',
@@ -5357,9 +5170,19 @@ export default function ServiceDashboardPage() {
 
                       {isTechnician &&
                         selectedTicket.status === 'IN_PROGRESS' &&
-                        selectedTicket.repairStartedAt && (
+                        selectedTicket.repairStartedAt &&
+                        !selectedTicket.repairPausedAt && (
                           <div className="flex items-center gap-1.5">
                             <ActiveTimer startTime={selectedTicket.repairStartedAt.toString()} />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-amber-200 text-amber-600 hover:bg-amber-50 h-8 px-3 rounded-lg font-bold gap-1"
+                              onClick={() => handlePauseRepair(selectedTicket.id)}
+                            >
+                              <Pause className="size-3.5" />
+                              Pause
+                            </Button>
                             <Button
                               size="sm"
                               className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold"
@@ -5379,6 +5202,27 @@ export default function ServiceDashboardPage() {
                               }}
                             >
                               Complete Job
+                            </Button>
+                          </div>
+                        )}
+
+                      {isTechnician &&
+                        selectedTicket.status === 'IN_PROGRESS' &&
+                        selectedTicket.repairStartedAt &&
+                        selectedTicket.repairPausedAt && (
+                          <div className="flex items-center gap-1.5">
+                            <PausedTimer
+                              startTime={selectedTicket.repairStartedAt.toString()}
+                              pausedAt={selectedTicket.repairPausedAt.toString()}
+                              pausedDurationMinutes={selectedTicket.repairPausedDurationMinutes}
+                            />
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
+                              onClick={() => handleResumeRepair(selectedTicket.id)}
+                            >
+                              <Play className="size-3.5 fill-current" />
+                              Resume
                             </Button>
                           </div>
                         )}
@@ -5718,6 +5562,17 @@ export default function ServiceDashboardPage() {
                     </div>
                   )}
 
+                  {selectedTicket.meterReadingAtCreation !== undefined && (
+                    <div>
+                      <span className="text-slate-500 font-medium block">
+                        Meter Reading (at Ticket Creation):
+                      </span>
+                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
+                        {selectedTicket.meterReadingAtCreation}
+                      </span>
+                    </div>
+                  )}
+
                   {selectedTicket.meterReadingAtService !== undefined && (
                     <div>
                       <span className="text-slate-500 font-medium block">
@@ -5867,10 +5722,35 @@ export default function ServiceDashboardPage() {
                           <p>
                             Parts/Items Cost:{' '}
                             <span className="font-semibold text-slate-800">
-                              {getActiveCurrency()}{' '}
-                              {Number(est.partsCost ?? est.totalCost - est.labourCost).toFixed(2)}
+                              {getActiveCurrency()} {Number(est.partsCost || 0).toFixed(2)}
                             </span>
                           </p>
+                          {Number(est.transportChargeAmount || 0) > 0 && (
+                            <p>
+                              Transportation Charge:{' '}
+                              <span className="font-semibold text-slate-800">
+                                {getActiveCurrency()}{' '}
+                                {Number(est.transportChargeAmount || 0).toFixed(2)}
+                              </span>
+                            </p>
+                          )}
+                          {Number(est.visitChargeAmount || 0) > 0 && (
+                            <p>
+                              Visit Charge:{' '}
+                              <span className="font-semibold text-slate-800">
+                                {getActiveCurrency()}{' '}
+                                {Number(est.visitChargeAmount || 0).toFixed(2)}
+                              </span>
+                            </p>
+                          )}
+                          {Number(est.discountAmount || 0) > 0 && (
+                            <p>
+                              Discount:{' '}
+                              <span className="font-semibold text-red-600">
+                                -{getActiveCurrency()} {Number(est.discountAmount || 0).toFixed(2)}
+                              </span>
+                            </p>
+                          )}
                           <p>
                             Total Cost:{' '}
                             <span className="font-bold text-slate-900 text-sm">
@@ -5958,7 +5838,25 @@ export default function ServiceDashboardPage() {
                                 size="sm"
                                 variant="destructive"
                                 className="text-[11px] h-8 px-3 rounded-lg"
-                                onClick={() => handleRejectCustomer(est.id)}
+                                onClick={() => {
+                                  const eligible = !!(
+                                    selectedTicket &&
+                                    isVisitChargeCollectionEligible(selectedTicket)
+                                  );
+                                  setRejectCollect(eligible);
+                                  setRejectPaymentMode('');
+                                  setRejectAccountId('');
+                                  setRejectReason('');
+                                  setRejectDiscountAmount('');
+                                  if (eligible && selectedTicket)
+                                    loadCashBankAccounts(selectedTicket.branchId);
+                                  setRejectVCModal({
+                                    kind: 'estimate',
+                                    estimateId: est.id,
+                                    amount: Number(selectedTicket?.visitChargeAmount) || 0,
+                                    eligible,
+                                  });
+                                }}
                               >
                                 Reject (Customer)
                               </Button>
@@ -6309,13 +6207,23 @@ export default function ServiceDashboardPage() {
               ) : (
                 <div className="space-y-6">
                   {/* KPI Cards Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                         Total Repair Visits
                       </span>
                       <span className="text-xl font-black text-slate-800">
                         {machineCostData?.totalServiceVisits || 0}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center bg-emerald-50/50 border-emerald-100">
+                      <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block mb-1">
+                        Current Meter Reading
+                      </span>
+                      <span className="text-xl font-black text-emerald-900 font-mono">
+                        {machineCostData?.currentMeterReading != null
+                          ? machineCostData.currentMeterReading
+                          : 'N/A'}
                       </span>
                     </div>
                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 shadow-sm text-center">
@@ -6408,6 +6316,11 @@ export default function ServiceDashboardPage() {
                                     {new Date(log.date).toLocaleDateString()}
                                   </span>
                                 </div>
+                                <Badge
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 ${getStatusColor(log.status)}`}
+                                >
+                                  {log.status}
+                                </Badge>
                                 <p className="text-xs text-slate-600">
                                   Meter Reading:{' '}
                                   <span className="font-semibold">{log.meterReading || 'N/A'}</span>
@@ -6570,6 +6483,137 @@ export default function ServiceDashboardPage() {
           setConfirmOpen(false);
         }}
       />
+
+      <Modal
+        isOpen={!!rejectVCModal}
+        onClose={() => setRejectVCModal(null)}
+        maxWidth="sm"
+        title="Reject Estimate"
+      >
+        {rejectVCModal && (
+          <div className="space-y-3">
+            {rejectVCModal.eligible && !rejectHasDiscount && (
+              <>
+                <p className="text-sm text-gray-600">
+                  This ticket has an outstanding visit charge of {getActiveCurrency()}{' '}
+                  {rejectVCModal.amount.toFixed(2)} that was set to be added to the estimate. Since
+                  the customer is rejecting, you can collect it now.
+                </p>
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rejectCollect}
+                    onChange={(e) => setRejectCollect(e.target.checked)}
+                  />
+                  Collect visit charge now
+                </label>
+                {rejectCollect && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <select
+                      value={rejectPaymentMode}
+                      onChange={(e) => {
+                        setRejectPaymentMode(e.target.value);
+                        setRejectAccountId('');
+                      }}
+                      className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                    >
+                      <option value="">Select mode...</option>
+                      <option value="CASH">Cash</option>
+                      <option value="BANK_TRANSFER">Bank Transfer</option>
+                      <option value="CHEQUE">Cheque</option>
+                      <option value="CREDIT_CARD">Credit Card</option>
+                    </select>
+                    {rejectPaymentMode && rejectPaymentMode !== 'CHEQUE' && (
+                      <select
+                        value={rejectAccountId}
+                        onChange={(e) => setRejectAccountId(e.target.value)}
+                        className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                      >
+                        <option value="">Select account...</option>
+                        {cashBankAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name} ({a.type})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div>
+              <label className="text-sm font-medium block mb-1">Reason for rejection</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Why is the customer rejecting the estimate?"
+                rows={2}
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-1">
+                Offer a discount instead (optional)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={rejectDiscountAmount}
+                onChange={(e) => setRejectDiscountAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                If the customer wants a lower price, enter a discount here instead of rejecting — it
+                applies immediately and the customer can approve/reject the new total.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setRejectVCModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant={rejectHasDiscount ? 'default' : 'destructive'}
+                disabled={
+                  !rejectReason.trim() ||
+                  (!rejectHasDiscount &&
+                    rejectVCModal.eligible &&
+                    rejectCollect &&
+                    (!rejectPaymentMode || (rejectPaymentMode !== 'CHEQUE' && !rejectAccountId)))
+                }
+                onClick={async () => {
+                  const visitChargeBody =
+                    !rejectHasDiscount && rejectVCModal.eligible && rejectCollect
+                      ? {
+                          collectVisitCharge: true,
+                          paymentMode: rejectPaymentMode,
+                          accountId: rejectPaymentMode === 'CHEQUE' ? undefined : rejectAccountId,
+                        }
+                      : { collectVisitCharge: false };
+                  const body = {
+                    ...visitChargeBody,
+                    reason: rejectReason.trim(),
+                    ...(rejectHasDiscount ? { discountAmount: Number(rejectDiscountAmount) } : {}),
+                  };
+                  const modal = rejectVCModal;
+                  if (modal.kind === 'quotation') {
+                    await handleRejectQuotation(modal.ticketId, body);
+                  } else {
+                    await handleRejectCustomer(modal.estimateId, body);
+                  }
+                  setRejectVCModal(null);
+                }}
+              >
+                {rejectHasDiscount ? 'Offer Discount' : 'Reject Ticket'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

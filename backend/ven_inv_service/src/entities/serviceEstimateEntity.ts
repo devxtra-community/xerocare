@@ -38,6 +38,18 @@ export class ServiceEstimate {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   totalCost!: number;
 
+  @Column({ name: 'parts_cost', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  partsCost!: number;
+
+  @Column({ name: 'visit_charge_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  visitChargeAmount!: number;
+
+  @Column({ name: 'transport_charge_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  transportChargeAmount!: number;
+
+  @Column({ name: 'discount_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  discountAmount!: number;
+
   @Column({
     type: 'varchar',
     default: ServiceEstimateStatus.DRAFT,

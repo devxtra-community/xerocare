@@ -62,6 +62,7 @@ import {
   getContractBySerial,
   getCustomerBillingHistory,
   reviseEstimate,
+  applyDiscount,
   financeExtendValidity,
   reassignCustomer,
   recordPayment,
@@ -556,6 +557,7 @@ router.get('/machine/:productId/history-data', getMachineHistoryData);
 router.get('/allocations/active-rent', getActiveRentAllocations);
 
 router.patch('/:id/revise-estimate', authMiddleware, reviseEstimate);
+router.patch('/:id/apply-discount', authMiddleware, applyDiscount);
 router.post('/:id/finance-extend-validity', authMiddleware, financeExtendValidity);
 
 export default router;

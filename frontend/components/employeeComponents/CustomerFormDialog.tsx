@@ -20,13 +20,13 @@ import {
 import { Loader2, User, Mail, Save, MapPin, Plus, Star, Trash } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { BankBranchSelector } from '@/components/shared/BankBranchSelector';
 import { getBankCodeLabel } from '@/lib/bankCodeType';
 import { currencyOptions, getDefaultCurrencyForCountry } from '@/lib/currencyList';
 
 import { Customer, CreateCustomerData, CustomerBankAccount } from '@/lib/customer';
-import { getCountryDataList } from 'countries-list';
+import { ALL_COUNTRIES, isoToFlag, COUNTRY_OPTIONS } from '@/lib/countryOptions';
 import { State, City } from 'country-state-city';
 
 interface CustomerFormDialogProps {
@@ -35,18 +35,6 @@ interface CustomerFormDialogProps {
   customer: Customer | null | undefined;
   onSubmit: (customerData: Partial<CreateCustomerData>) => Promise<void>;
 }
-
-const ALL_COUNTRIES = getCountryDataList();
-
-const isoToFlag = (iso2: string) =>
-  iso2.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(0x1f1e6 + ch.charCodeAt(0) - 65));
-
-const COUNTRY_OPTIONS: SearchableSelectOption[] = [...ALL_COUNTRIES]
-  .sort((a, b) => a.name.localeCompare(b.name))
-  .map((c) => ({
-    value: c.iso2,
-    label: `${isoToFlag(c.iso2)} ${c.name} (${c.iso2})`,
-  }));
 
 const dialCodeForCountry = (iso2?: string | null) => {
   if (!iso2) return undefined;
@@ -98,7 +86,7 @@ export default function CustomerFormDialog({
         name: customer.name,
         email: customer.email,
         phone: customer.phone,
-        address: customer.address || '',
+        address: customer.address || customer.location || '',
         status: customer.isActive ? 'ACTIVE' : 'INACTIVE',
         vatNumber: customer.vatNumber ?? undefined,
         country: customer.country ?? undefined,

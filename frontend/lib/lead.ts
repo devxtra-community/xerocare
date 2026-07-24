@@ -65,7 +65,7 @@ export const createLead = async (data: CreateLeadData): Promise<Lead> => {
 
 export const convertLead = async (
   id: string,
-  payload?: { name?: string; email?: string; phone?: string },
+  payload?: { name?: string; email?: string; phone?: string; address?: string; country?: string },
 ): Promise<string> => {
   const response = await api.post<ConvertLeadResponse>(`/c/leads/${id}/convert`, payload);
   return response.data.data.customerId;

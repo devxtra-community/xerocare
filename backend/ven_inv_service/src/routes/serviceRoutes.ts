@@ -54,6 +54,8 @@ router.post(
   controller.approveRevisionCustomer,
 );
 router.post('/tickets/:id/start-repair', controller.startRepair);
+router.post('/tickets/:id/pause-repair', controller.pauseRepair);
+router.post('/tickets/:id/resume-repair', controller.resumeRepair);
 router.post('/tickets/:id/quote', controller.submitQuotation);
 router.patch('/tickets/:id/quotation-link', controller.patchQuotationLink);
 router.patch(
@@ -79,6 +81,7 @@ router.post('/tickets/:id/send-quotation', controller.sendQuotation);
 router.post('/tickets/:id/send-completion-bill', controller.sendCompletionBill);
 router.post('/tickets/:id/cancel', controller.cancelTicket);
 router.get('/technicians', controller.getTechnicians);
+router.get('/accounts/cash-bank', controller.listCashBankAccounts);
 router.get('/technicians/:technicianId/performance', controller.getTechnicianPerformance);
 router.get('/customers/:customerId/history', controller.getCustomerHistory);
 router.get('/machines/:serialNumber/lifetime-cost', controller.getMachineLifetimeCost);

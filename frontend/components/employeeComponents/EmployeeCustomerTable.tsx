@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Edit, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Search, Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,7 @@ import { toast } from 'sonner';
  * Features search, filtering, and actions to add/edit/delete customers.
  */
 export default function EmployeeCustomerTable() {
+  const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,6 +122,7 @@ export default function EmployeeCustomerTable() {
         vatNumber: data.vatNumber,
         country: data.country,
         stateProvince: data.stateProvince,
+        city: data.city,
         bankName: data.bankName,
         bankAccountNumber: data.bankAccountNumber,
         bankAccounts: data.bankAccounts,
@@ -267,6 +270,15 @@ export default function EmployeeCustomerTable() {
                     </TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50"
+                          onClick={() => router.push(`/employee/customers/${customer.id}`)}
+                          title="View Customer"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

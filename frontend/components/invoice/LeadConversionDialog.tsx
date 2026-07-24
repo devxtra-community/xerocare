@@ -12,6 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { COUNTRY_OPTIONS } from '@/lib/countryOptions';
 import { convertLead, Lead } from '@/lib/lead';
 import { toast } from 'sonner';
 
@@ -37,6 +39,8 @@ export function LeadConversionDialog({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('');
+  const [address, setAddress] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isNameMissing = !lead?.name;
@@ -54,11 +58,15 @@ export function LeadConversionDialog({
         name?: string;
         email?: string;
         phone?: string;
+        address?: string;
+        country?: string;
       }
       const payload: ConversionPayload = {};
       if (isNameMissing || name) payload.name = name || lead.name;
       if (email) payload.email = email;
       if (phone) payload.phone = phone;
+      if (country) payload.country = country;
+      if (address) payload.address = address;
 
       // Simple validation
       if (!payload.name && !lead.name) {
@@ -170,6 +178,27 @@ export function LeadConversionDialog({
               placeholder="+1 234 567 890"
               readOnly={!!lead.phone}
               className={lead.phone ? 'bg-slate-100' : ''}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="country">Country</Label>
+            <SearchableSelect
+              options={COUNTRY_OPTIONS}
+              value={country}
+              onValueChange={setCountry}
+              placeholder="Select country (optional)"
+              emptyText="No country found."
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="address">Address</Label>
+            <Input
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Street, building, city (optional)"
             />
           </div>
           {isContactMissing && (

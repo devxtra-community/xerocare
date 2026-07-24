@@ -1,4 +1,6 @@
 import { LotItemType } from '../entities/lotItemEntity';
+import { TransportMode } from '../entities/enums/transportMode';
+import { ShipmentStatus } from '../entities/enums/shipmentStatus';
 
 export interface CreateLotItemDto {
   itemType: LotItemType;
@@ -24,6 +26,24 @@ export interface CreateLotDto {
   branchId?: string;
   warehouseId?: string;
   createdBy?: string;
+  // Shipment info is usually unknown at creation (booking happens after PO),
+  // so all of it is optional here — set later via updateLotShipment.
+  transportMode?: TransportMode;
+  carrierName?: string;
+  dispatchDate?: string;
+  estimatedArrival?: string;
+  shipmentStatus?: ShipmentStatus;
+  shipmentDetails?: Record<string, string>;
+}
+
+export interface UpdateLotShipmentDto {
+  transportMode?: TransportMode;
+  carrierName?: string;
+  dispatchDate?: string;
+  estimatedArrival?: string;
+  actualArrival?: string;
+  shipmentStatus?: ShipmentStatus;
+  shipmentDetails?: Record<string, string>;
 }
 
 export interface ExcelLotItemRow {

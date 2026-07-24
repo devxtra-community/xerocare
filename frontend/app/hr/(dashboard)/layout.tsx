@@ -2,12 +2,15 @@ import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import RoleAwareSidebar from '@/components/RoleAwareSidebar';
 import DashboardHeader from '@/components/DashboardHeader';
+import { getServerUser } from '@/lib/server-auth';
 
-export default function HRLayout({ children }: { children: React.ReactNode }) {
+export default async function HRLayout({ children }: { children: React.ReactNode }) {
+  const user = await getServerUser();
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <RoleAwareSidebar fallback="hr" />
+        <RoleAwareSidebar fallback="hr" initialIsManager={user?.role === 'MANAGER'} />
 
         <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
           <DashboardHeader />

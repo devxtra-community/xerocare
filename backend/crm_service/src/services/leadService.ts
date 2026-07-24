@@ -103,6 +103,8 @@ export class LeadService {
     const phone = payload.phone || lead.phone;
     // For location, we might receive it in the payload during conversion
     const location = (payload as { location?: string }).location || lead.location;
+    const address = payload.address;
+    const country = payload.country;
 
     if (!name) throw new AppError('Lead name is required', 400);
     if (!location || location.trim() === '') {
@@ -114,6 +116,8 @@ export class LeadService {
       email,
       phone,
       location,
+      address,
+      country,
       isActive: true,
       branch_id: lead.branch_id,
     };

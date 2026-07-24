@@ -9,7 +9,7 @@ import { Vendor } from '../entities/vendorEntity';
 import { Branch } from '../entities/branchEntity';
 import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
 import { AppError } from '../errors/appError';
-import { CreateLotDto } from '../types/lotTypes';
+import { CreateLotDto, UpdateLotShipmentDto } from '../types/lotTypes';
 import { Model } from '../entities/modelEntity';
 import { logger } from '../config/logger';
 import { generateSku } from '../utils/skuGenerator';
@@ -40,6 +40,12 @@ export class LotRepository {
       lot.branch_id = data.branchId;
       lot.warehouse_id = data.warehouseId;
       lot.createdBy = data.createdBy;
+      lot.transportMode = data.transportMode;
+      lot.carrierName = data.carrierName;
+      lot.dispatchDate = data.dispatchDate ? new Date(data.dispatchDate) : undefined;
+      lot.estimatedArrival = data.estimatedArrival ? new Date(data.estimatedArrival) : undefined;
+      lot.shipmentStatus = data.shipmentStatus;
+      lot.shipmentDetails = data.shipmentDetails;
 
       const savedLot = await manager.save(Lot, lot);
 
@@ -580,6 +586,39 @@ export class LotRepository {
         },
       })) as Lot;
     });
+  }
+
+  /**
+   * Updates a lot's shipment/logistics info (transport mode, carrier, dates,
+   * shipment status, mode-specific details). Independent of the receiving
+   * workflow — can be called any number of times as the shipment progresses.
+   */
+  async updateShipment(lotId: string, data: UpdateLotShipmentDto, branchId?: string): Promise<Lot> {
+    const lot = await this.repo.findOne({
+      where: { id: lotId, ...(branchId ? { branch_id: branchId } : {}) },
+    });
+    if (!lot) throw new AppError('Lot not found', 404);
+
+    if (data.transportMode !== undefined) lot.transportMode = data.transportMode;
+    if (data.carrierName !== undefined) lot.carrierName = data.carrierName;
+    if (data.dispatchDate !== undefined) lot.dispatchDate = new Date(data.dispatchDate);
+    if (data.estimatedArrival !== undefined) lot.estimatedArrival = new Date(data.estimatedArrival);
+    if (data.actualArrival !== undefined) lot.actualArrival = new Date(data.actualArrival);
+    if (data.shipmentStatus !== undefined) lot.shipmentStatus = data.shipmentStatus;
+    if (data.shipmentDetails !== undefined) lot.shipmentDetails = data.shipmentDetails;
+
+    await this.repo.save(lot);
+
+    return (await this.repo.findOne({
+      where: { id: lotId },
+      relations: {
+        vendor: true,
+        items: {
+          model: { brandRelation: true },
+          sparePart: { model: { brandRelation: true } },
+        },
+      },
+    })) as Lot;
   }
 
   /**

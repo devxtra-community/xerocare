@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getCustomers, Customer } from '@/lib/customer';
+import { getCustomers, createCustomer, Customer, CreateCustomerData } from '@/lib/customer';
+import CustomerFormDialog from '@/components/employeeComponents/CustomerFormDialog';
 import { getAllProducts, Product } from '@/lib/product';
 import { getBrands, createBrand, Brand } from '@/lib/brand';
 import { getAllModels, addModel, Model } from '@/lib/model';
@@ -75,6 +76,7 @@ interface CustomerMachine {
   contractExpiry?: string;
   underWarranty?: boolean;
   warrantyInfo?: WarrantyInfo;
+  meterReading?: number | null;
 }
 
 interface BillingHistoryInvoice {
@@ -180,6 +182,7 @@ export default function ServiceContractsPage() {
   const router = useRouter();
   const [contracts, setContracts] = useState<ServiceContract[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -350,6 +353,36 @@ export default function ServiceContractsPage() {
     }
   };
 
+  const handleCreateCustomer = async (data: Partial<CreateCustomerData>) => {
+    try {
+      const payload: CreateCustomerData = {
+        name: data.name!,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        status: data.status,
+        vatNumber: data.vatNumber,
+        country: data.country,
+        stateProvince: data.stateProvince,
+        city: data.city,
+        bankName: data.bankName,
+        bankAccountNumber: data.bankAccountNumber,
+        bankAccounts: data.bankAccounts,
+        totalPurchase: 0,
+        source: 'DIRECT',
+      };
+      const newCustomer = await createCustomer(payload);
+      toast.success('Customer created successfully');
+      setCustomers((prev) => [...prev, newCustomer]);
+      setFormState((prev) => ({ ...prev, customerId: newCustomer.id, productId: '' }));
+    } catch (error) {
+      console.error(error);
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create customer');
+      throw error;
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -406,7 +439,7 @@ export default function ServiceContractsPage() {
     }
 
     const type = formState.contractType;
-    if (!formState.contractValue || Number(formState.contractValue) <= 0) {
+    if (type !== 'FSMA' && (!formState.contractValue || Number(formState.contractValue) <= 0)) {
       toast.error('Enter a contract value greater than 0 — it is invoiced in full at signing.');
       return;
     }
@@ -449,7 +482,7 @@ export default function ServiceContractsPage() {
       contractType: type,
       startDate: formState.startDate,
       endDate: formState.endDate,
-      contractValue: Number(formState.contractValue) || 0,
+      contractValue: type === 'FSMA' ? 0 : Number(formState.contractValue) || 0,
       status: formState.status,
       notes: formState.notes || null,
       monthlyCharge: numOrUndef(formState.monthlyCharge),
@@ -956,6 +989,18 @@ export default function ServiceContractsPage() {
       }
     });
 
+    // 6. Overlay the machine's canonical meter reading — kept up to date by
+    // ticket creation, technician diagnosis, and contract meter recording
+    // (whichever of those happened most recently), so this single lookup
+    // reflects "previous service or service contract data" without having
+    // to re-derive it from each billing-history shape above.
+    list.forEach((m) => {
+      const prod = products.find((p) => p.id === m.id);
+      if (prod && prod.meter_reading != null) {
+        m.meterReading = prod.meter_reading;
+      }
+    });
+
     return list;
   };
 
@@ -1210,10 +1255,14 @@ export default function ServiceContractsPage() {
                     </TableCell>
                     <TableCell className="text-xs font-bold text-slate-700 text-right py-3">
                       <div className="flex flex-col items-end gap-1">
-                        <span>
-                          {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
-                        </span>
-                        {c.invoiceId ? (
+                        {c.contractType === 'FSMA' ? (
+                          <span className="text-slate-400 font-medium">Per-click billing</span>
+                        ) : (
+                          <span>
+                            {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
+                          </span>
+                        )}
+                        {c.contractType === 'FSMA' ? null : c.invoiceId ? (
                           (() => {
                             const summary = contractPaymentSummaries[c.invoiceId];
                             if (!summary) return null;
@@ -1345,9 +1394,20 @@ export default function ServiceContractsPage() {
             <div className="grid grid-cols-2 gap-4 overflow-y-auto px-6 py-4">
               {/* Customer Selection — fixed for the contract's lifetime once created */}
               <div className="col-span-2 flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">
-                  {editingContract ? 'Customer' : 'Select Customer'}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-600">
+                    {editingContract ? 'Customer' : 'Select Customer'}
+                  </label>
+                  {!editingContract && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCustomer(true)}
+                      className="text-[11px] font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      + New Customer
+                    </button>
+                  )}
+                </div>
                 {editingContract ? (
                   <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
                     <span className="text-xs font-semibold text-slate-700">
@@ -1433,11 +1493,17 @@ export default function ServiceContractsPage() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-500 mt-1">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] text-slate-500 mt-1">
                             <div>
                               Serial:{' '}
                               <span className="font-mono text-slate-700 font-semibold">
                                 {m.serialNumber}
+                              </span>
+                            </div>
+                            <div>
+                              Meter:{' '}
+                              <span className="font-mono text-slate-700 font-semibold">
+                                {m.meterReading != null ? m.meterReading.toLocaleString() : 'N/A'}
                               </span>
                             </div>
                             <div>
@@ -1568,33 +1634,47 @@ export default function ServiceContractsPage() {
                 </select>
               </div>
 
-              {/* Contract Value */}
-              <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                  <DollarSign className="h-3 w-3" />
-                  Contract Value ({getActiveCurrency()})<span className="text-red-500">*</span>
-                </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formState.contractValue}
-                  onChange={(e) =>
-                    setFormState((prev) => ({
-                      ...prev,
-                      contractValue: Number(e.target.value) || 0,
-                    }))
-                  }
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500"
-                  placeholder="0.00"
-                />
-                <p className="text-[10px] text-slate-400">
-                  {formState.contractType === 'AMC'
-                    ? 'Annual fee — invoiced in full at signing, collected as one or more installments.'
-                    : formState.contractType === 'FSMA'
-                      ? 'Invoiced in full at signing. FSMA per-click usage is billed separately, monthly.'
+              {/* Contract Value — FSMA has no upfront value, it's pure pay-per-click */}
+              {formState.contractType === 'FSMA' ? (
+                <div className="flex flex-col space-y-1">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    Billing
+                  </label>
+                  <div className="h-10 flex items-center px-3 border border-slate-100 rounded-lg bg-slate-50 text-xs text-slate-500">
+                    No upfront value
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    FSMA has no contract value — the entire charge comes from monthly per-click
+                    meter readings, set below.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col space-y-1">
+                  <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    Contract Value ({getActiveCurrency()})<span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formState.contractValue}
+                    onChange={(e) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        contractValue: Number(e.target.value) || 0,
+                      }))
+                    }
+                    className="h-10 border-slate-200 focus-visible:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    {formState.contractType === 'AMC'
+                      ? 'Annual fee — invoiced in full at signing, collected as one or more installments.'
                       : 'Invoiced in full at signing. SMA copy-limit excess is billed separately, monthly.'}
-                </p>
-              </div>
+                  </p>
+                </div>
+              )}
 
               {/* Plan summary + fixed coverage */}
               <div className="col-span-2 p-3 bg-blue-50/40 border border-blue-100 rounded-xl space-y-2">
@@ -2758,6 +2838,13 @@ export default function ServiceContractsPage() {
       {viewingInvoice && (
         <InvoiceViewDialog invoice={viewingInvoice} onClose={() => setViewingInvoice(null)} />
       )}
+
+      <CustomerFormDialog
+        open={showAddCustomer}
+        onOpenChange={setShowAddCustomer}
+        customer={null}
+        onSubmit={handleCreateCustomer}
+      />
     </div>
   );
 }

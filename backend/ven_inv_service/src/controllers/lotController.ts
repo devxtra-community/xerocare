@@ -3,6 +3,8 @@ import { LotService } from '../services/lotService';
 import { AppError } from '../errors/appError';
 import { LotStatus } from '../entities/lotEntity';
 import { LotDocumentType } from '../entities/lotDocumentEntity';
+import { TransportMode, MODE_DETAIL_FIELDS } from '../entities/enums/transportMode';
+import { ShipmentStatus } from '../entities/enums/shipmentStatus';
 
 const lotService = new LotService();
 import { getRabbitChannel } from '../config/rabbitmq';
@@ -284,6 +286,76 @@ export const confirmLotReceived = async (req: Request, res: Response, next: Next
 
     const confirmedLot = await lotService.confirmLotReceived(id, branchId);
     res.status(200).json({ success: true, data: confirmedLot });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PATCH /lots/:id/shipment
+ * Updates a lot's shipment/logistics info (transport mode, carrier, dates,
+ * shipment status, mode-specific details). Callable repeatedly as the
+ * shipment progresses — independent of the receiving workflow.
+ */
+export const updateLotShipment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? undefined : req.user?.branchId;
+
+    const existingLot = await lotService.getLotById(id);
+    if (!isAdmin && existingLot.branch_id !== req.user?.branchId) {
+      throw new AppError('Access denied: Lot belongs to another branch', 403);
+    }
+
+    const body = req.body ?? {};
+    const update: {
+      transportMode?: TransportMode;
+      carrierName?: string;
+      dispatchDate?: string;
+      estimatedArrival?: string;
+      actualArrival?: string;
+      shipmentStatus?: ShipmentStatus;
+      shipmentDetails?: Record<string, string>;
+    } = {};
+
+    if (body.transportMode !== undefined) {
+      if (!Object.values(TransportMode).includes(body.transportMode)) {
+        throw new AppError('Invalid transport mode', 400);
+      }
+      update.transportMode = body.transportMode as TransportMode;
+    }
+
+    if (body.shipmentStatus !== undefined) {
+      if (!Object.values(ShipmentStatus).includes(body.shipmentStatus)) {
+        throw new AppError('Invalid shipment status', 400);
+      }
+      update.shipmentStatus = body.shipmentStatus as ShipmentStatus;
+    }
+
+    if (body.carrierName !== undefined) update.carrierName = String(body.carrierName).trim();
+    if (body.dispatchDate !== undefined) update.dispatchDate = body.dispatchDate;
+    if (body.estimatedArrival !== undefined) update.estimatedArrival = body.estimatedArrival;
+    if (body.actualArrival !== undefined) update.actualArrival = body.actualArrival;
+
+    if (body.shipmentDetails !== undefined) {
+      const effectiveMode = update.transportMode ?? existingLot.transportMode;
+      if (!effectiveMode) {
+        throw new AppError('Set transport mode before shipment details', 400);
+      }
+      const allowedKeys = MODE_DETAIL_FIELDS[effectiveMode];
+      const details: Record<string, string> = {};
+      for (const key of allowedKeys) {
+        const value = body.shipmentDetails[key];
+        if (typeof value === 'string' && value.trim()) {
+          details[key] = value.trim();
+        }
+      }
+      update.shipmentDetails = details;
+    }
+
+    const updatedLot = await lotService.updateShipment(id, update, branchId);
+    res.status(200).json({ success: true, data: updatedLot });
   } catch (err) {
     next(err);
   }

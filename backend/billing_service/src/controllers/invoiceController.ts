@@ -1564,7 +1564,17 @@ export const waiveEstimateLabour = async (req: Request, res: Response, next: Nex
 
 export const recordServiceVisitCharge = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { serviceTicketId, ticketNumber, customerId, branchId, amount, collectedBy } = req.body;
+    const {
+      serviceTicketId,
+      ticketNumber,
+      customerId,
+      branchId,
+      amount,
+      collectedBy,
+      paymentMode,
+      accountId,
+      remarks,
+    } = req.body;
     if (!serviceTicketId || !branchId) {
       return res.status(400).json({
         success: false,
@@ -1578,6 +1588,9 @@ export const recordServiceVisitCharge = async (req: Request, res: Response, next
       branchId,
       amount: Number(amount) || 0,
       collectedBy: collectedBy || req.user?.userId || 'SYSTEM',
+      paymentMode,
+      accountId,
+      remarks,
     });
     return res.status(201).json({ success: true, data: invoice });
   } catch (error) {
@@ -1681,6 +1694,22 @@ export const reviseEstimate = async (req: Request, res: Response, next: NextFunc
       success: true,
       data: result,
       message: 'Estimate revised and submitted to finance successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const applyDiscount = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { discountAmount } = req.body;
+
+    const result = await billingService.applyDiscount(id, Number(discountAmount) || 0);
+
+    return res.status(200).json({
+      success: true,
+      data: result,
     });
   } catch (error) {
     next(error);

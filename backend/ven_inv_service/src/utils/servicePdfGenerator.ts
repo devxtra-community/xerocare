@@ -218,24 +218,43 @@ export async function generateServiceQuotationPdf(
 
       const labourVal = Number(estimate.labourCost) || 0;
       const totalVal = Number(estimate.totalCost) || 0;
+      const visitVal = Number(estimate.visitChargeAmount) || 0;
+      const transportVal = Number(estimate.transportChargeAmount) || 0;
+      const discountVal = Number(estimate.discountAmount) || 0;
+
+      const summaryLines: Array<[string, number]> = [
+        ['Parts & Consumables:', partsTotal],
+        ['Labour / Service Charge:', labourVal],
+      ];
+      if (transportVal > 0) summaryLines.push(['Transportation Charge:', transportVal]);
+      if (visitVal > 0) summaryLines.push(['Visit Charge:', visitVal]);
+      if (discountVal > 0) summaryLines.push(['Discount:', -discountVal]);
+
+      const boxHeight = summaryLines.length * 16 + 30;
 
       y += 10;
-      doc.rect(300, y, 255, 65).fill('#fafafa');
-      doc.rect(300, y, 255, 65).stroke('#cbd5e1');
+      doc.rect(300, y, 255, boxHeight).fill('#fafafa');
+      doc.rect(300, y, 255, boxHeight).stroke('#cbd5e1');
 
+      doc.fillColor('#475569').fontSize(9);
+      summaryLines.forEach(([label, value], idx) => {
+        const lineY = y + 8 + idx * 16;
+        doc.font('Helvetica-Bold').text(label, 310, lineY);
+        doc
+          .font('Helvetica')
+          .text(`${value < 0 ? '-' : ''}QAR ${Math.abs(value).toFixed(2)}`, 450, lineY, {
+            align: 'right',
+            width: 95,
+          });
+      });
+
+      const totalY = y + 8 + summaryLines.length * 16 + 4;
       doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold');
-      doc.text('Parts & Consumables:', 310, y + 8);
-      doc.text('Labour / Service Charge:', 310, y + 24);
-      doc.text('TOTAL ESTIMATE:', 310, y + 44);
-
-      doc.font('Helvetica');
-      doc.text(`QAR ${partsTotal.toFixed(2)}`, 450, y + 8, { align: 'right', width: 95 });
-      doc.text(`QAR ${labourVal.toFixed(2)}`, 450, y + 24, { align: 'right', width: 95 });
-
+      doc.text('TOTAL ESTIMATE:', 310, totalY);
       doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10);
-      doc.text(`QAR ${totalVal.toFixed(2)}`, 450, y + 44, { align: 'right', width: 95 });
+      doc.text(`QAR ${totalVal.toFixed(2)}`, 450, totalY, { align: 'right', width: 95 });
 
-      y += 85;
+      y += boxHeight + 20;
 
       // Footer Terms
       doc.fillColor('#64748b').fontSize(8).font('Helvetica-Oblique');

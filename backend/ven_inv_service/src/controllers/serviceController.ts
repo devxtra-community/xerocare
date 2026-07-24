@@ -757,6 +757,8 @@ export class ServiceController {
         visitChargeAmount,
         visitChargeMethod,
         visitChargeCollected,
+        visitChargePaymentMode,
+        visitChargeAccountId,
         transportChargeAmount,
         discountAmount,
         technicianNoteToFinance,
@@ -792,13 +794,14 @@ export class ServiceController {
         throw new AppError(`Cannot diagnose ticket with current status: ${ticket.status}`, 400);
       }
 
+      let diagnosisProduct: Product | null = null;
       if (meterReading !== undefined && meterReading !== null && ticket.productId) {
-        const product = await Source.getRepository(Product).findOne({
+        diagnosisProduct = await Source.getRepository(Product).findOne({
           where: { id: ticket.productId },
         });
-        if (product?.meter_reading && meterReading < product.meter_reading) {
+        if (diagnosisProduct?.meter_reading && meterReading < diagnosisProduct.meter_reading) {
           throw new AppError(
-            `Meter reading ${meterReading} cannot be less than the current reading ${product.meter_reading}`,
+            `Meter reading ${meterReading} cannot be less than the current reading ${diagnosisProduct.meter_reading}`,
             400,
           );
         }
@@ -821,6 +824,23 @@ export class ServiceController {
       const effectiveTransportCharge = travelCoveredContext
         ? 0
         : Number(transportChargeAmount) || 0;
+
+      // Fail fast before any mutation below: this whole handler isn't
+      // transactional, so a validation error thrown after ticket/estimate
+      // writes have already landed would leave a half-committed state.
+      if (
+        !isFreeContext &&
+        visitChargeMethod === 'SEPARATE' &&
+        effectiveVisitCharge > 0 &&
+        visitChargeCollected &&
+        !ticket.visitChargeCollected &&
+        (!visitChargePaymentMode || (visitChargePaymentMode !== 'CHEQUE' && !visitChargeAccountId))
+      ) {
+        throw new AppError(
+          'Payment mode (and account, unless paying by cheque) are required to post the visit charge.',
+          400,
+        );
+      }
 
       ticket.diagnosisCompletedAt = new Date();
       if (ticket.diagnosisStartedAt) {
@@ -845,6 +865,15 @@ export class ServiceController {
       }
 
       await ticketRepo.save(ticket);
+
+      // Sync the machine's canonical meter reading at diagnosis time — this is
+      // a physical read of the machine, independent of whatever finance/
+      // customer later decide about the estimate, so it's never gated on
+      // approval status.
+      if (diagnosisProduct && meterReading !== undefined && meterReading !== null) {
+        diagnosisProduct.meter_reading = Number(meterReading);
+        await Source.getRepository(Product).save(diagnosisProduct);
+      }
 
       // Save Diagnosis Report
       const diagnosisRepo = Source.getRepository(ServiceDiagnosis);
@@ -1047,7 +1076,10 @@ export class ServiceController {
         const estimateRepo = Source.getRepository(ServiceEstimate);
         const estItemRepo = Source.getRepository(ServiceEstimateItem);
 
-        let totalCost = finalLabourCost + effectiveTransportCharge;
+        let totalCost =
+          finalLabourCost +
+          effectiveTransportCharge +
+          (visitChargeMethod === 'ADDED_TO_ESTIMATE' ? effectiveVisitCharge : 0);
         const estItemsToSave: ServiceEstimateItem[] = [];
 
         const estimate = estimateRepo.create({
@@ -1081,7 +1113,12 @@ export class ServiceController {
           estItemsToSave.push(estItem);
         }
 
-        estimate.totalCost = totalCost;
+        estimate.totalCost = Math.max(0, totalCost - (Number(discountAmount) || 0));
+        estimate.partsCost = billablePartsTotal;
+        estimate.visitChargeAmount =
+          visitChargeMethod === 'ADDED_TO_ESTIMATE' ? effectiveVisitCharge : 0;
+        estimate.transportChargeAmount = effectiveTransportCharge;
+        estimate.discountAmount = Number(discountAmount) || 0;
         estimate.items = estItemsToSave;
         await estimateRepo.save(estimate);
 
@@ -1187,6 +1224,8 @@ export class ServiceController {
               branchId: ticket.branchId,
               amount: effectiveVisitCharge,
               collectedBy: req.user?.userId || 'SYSTEM',
+              paymentMode: visitChargePaymentMode,
+              accountId: visitChargeAccountId,
             },
             { headers: { Authorization: `Bearer ${token}` } },
           );
@@ -1644,19 +1683,76 @@ export class ServiceController {
       const estimate = await estimateRepo.findOne({ where: { id: String(estimateId) } });
       if (!estimate) throw new Error('Estimate not found');
 
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+
+      const { collectVisitCharge, paymentMode, accountId, reason, discountAmount } = req.body ?? {};
+
+      if (!reason || !String(reason).trim()) {
+        throw new AppError('A reason is required, whether rejecting or offering a discount', 400);
+      }
+
+      // Staff offering a discount to retain the customer instead of an
+      // outright rejection: apply it immediately (no finance re-approval —
+      // this is a save-the-sale negotiation, not a technician re-diagnosis),
+      // leave the estimate/ticket status untouched so the customer can still
+      // Approve/Reject against the new lower total.
+      const discountToApply = Number(discountAmount) || 0;
+      if (discountToApply > 0) {
+        if (discountToApply > Number(estimate.totalCost)) {
+          throw new AppError(
+            `Discount of QAR ${discountToApply} exceeds the current estimate total of QAR ${estimate.totalCost}.`,
+            400,
+          );
+        }
+        estimate.discountAmount = (Number(estimate.discountAmount) || 0) + discountToApply;
+        estimate.totalCost = Math.max(0, Number(estimate.totalCost) - discountToApply);
+        await estimateRepo.save(estimate);
+
+        if (ticket) {
+          ticket.discountAmount = (Number(ticket.discountAmount) || 0) + discountToApply;
+          await ticketRepo.save(ticket);
+          await this.syncInvoiceDiscount(ticket, discountToApply);
+          await this.logActivity(
+            ticket.id,
+            'ESTIMATE_DISCOUNT_OFFERED',
+            `Staff offered a QAR ${discountToApply} discount instead of rejection. Reason: ${reason}. New total: QAR ${estimate.totalCost}.`,
+            req.user?.userId,
+          );
+        }
+
+        return res.status(200).json({ success: true, data: estimate });
+      }
+
+      if (ticket) {
+        this.assertVisitChargeCollectionInputValid(ticket, {
+          collectVisitCharge,
+          paymentMode,
+          accountId,
+        });
+      }
+
       estimate.status = ServiceEstimateStatus.REJECTED;
       await estimateRepo.save(estimate);
 
-      const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
       if (ticket) {
         ticket.status = ServiceTicketStatus.CUSTOMER_REJECTED;
         await ticketRepo.save(ticket);
 
+        try {
+          await this.collectVisitChargeOnRejection(
+            ticket,
+            { collectVisitCharge, paymentMode, accountId },
+            req.user?.userId,
+          );
+        } catch (err) {
+          logger.error('Failed to collect visit charge at estimate rejection:', err);
+        }
+
         await this.logActivity(
           ticket.id,
           'ESTIMATE_CUSTOMER_REJECTED',
-          `Estimate rejected by Customer.`,
+          `Estimate rejected by Customer. Reason: ${reason}`,
           req.user?.userId,
         );
       }
@@ -1923,6 +2019,88 @@ export class ServiceController {
   };
 
   /**
+   * POST /service/tickets/:id/pause-repair
+   */
+  pauseRepair = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      const isManager = req.user?.role === 'MANAGER' || req.user?.role === 'ADMIN';
+      if (!isManager && ticket.assignedTechnicianId !== req.user?.userId) {
+        throw new AppError(
+          'Only the assigned technician or the branch manager can pause this repair',
+          403,
+        );
+      }
+
+      if (ticket.status !== ServiceTicketStatus.IN_PROGRESS || !ticket.repairStartedAt) {
+        throw new AppError('Repair is not currently running', 400);
+      }
+      if (ticket.repairPausedAt) {
+        throw new AppError('Repair is already paused', 400);
+      }
+
+      ticket.repairPausedAt = new Date();
+      await ticketRepo.save(ticket);
+
+      await this.logActivity(
+        ticket.id,
+        'REPAIR_PAUSED',
+        `Technician paused repair work.`,
+        req.user?.userId,
+      );
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/tickets/:id/resume-repair
+   */
+  resumeRepair = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      const isManager = req.user?.role === 'MANAGER' || req.user?.role === 'ADMIN';
+      if (!isManager && ticket.assignedTechnicianId !== req.user?.userId) {
+        throw new AppError(
+          'Only the assigned technician or the branch manager can resume this repair',
+          403,
+        );
+      }
+
+      if (!ticket.repairPausedAt) {
+        throw new AppError('Repair is not paused', 400);
+      }
+
+      const pausedMinutes = Math.round((Date.now() - ticket.repairPausedAt.getTime()) / 60000);
+      ticket.repairPausedDurationMinutes =
+        (ticket.repairPausedDurationMinutes || 0) + pausedMinutes;
+      ticket.repairPausedAt = null;
+      await ticketRepo.save(ticket);
+
+      await this.logActivity(
+        ticket.id,
+        'REPAIR_RESUMED',
+        `Technician resumed repair work.`,
+        req.user?.userId,
+      );
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * POST /service/tickets/:id/complete
    */
   completeService = async (req: Request, res: Response, next: NextFunction) => {
@@ -1953,6 +2131,9 @@ export class ServiceController {
       if (!allowedCompleteStatuses.includes(ticket.status)) {
         throw new AppError(`Cannot complete ticket with current status: ${ticket.status}`, 400);
       }
+      if (ticket.repairPausedAt) {
+        throw new AppError('Resume the repair before completing the job.', 400);
+      }
 
       if (meterReading !== undefined && meterReading !== null) {
         const previousReading = ticket.meterReadingAtService ?? 0;
@@ -1966,9 +2147,10 @@ export class ServiceController {
 
       ticket.repairCompletedAt = new Date();
       if (ticket.repairStartedAt) {
-        ticket.repairDuration = Math.round(
+        const rawMinutes = Math.round(
           (ticket.repairCompletedAt.getTime() - ticket.repairStartedAt.getTime()) / 60000,
         );
+        ticket.repairDuration = Math.max(0, rawMinutes - (ticket.repairPausedDurationMinutes || 0));
       }
       ticket.status = ServiceTicketStatus.COMPLETED;
       ticket.completedAt = new Date();
@@ -2316,6 +2498,31 @@ export class ServiceController {
   };
 
   /**
+   * GET /service/accounts/cash-bank?branchId=...
+   *
+   * Proxies billing_service's cash-bank account list for technician/helpdesk
+   * roles that aren't in ACCOUNTS_ALLOWED_ROLES (ADMIN/FINANCE/MANAGER) there —
+   * used to populate the "which account did this land in" picker when a visit
+   * charge is collected on-site or at estimate rejection.
+   */
+  listCashBankAccounts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const branchId = req.query.branchId as string;
+      if (!branchId) throw new AppError('branchId is required', 400);
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+      const response = await axios.get(`${BILLING_SERVICE_URL}/accounts/cash-bank`, {
+        params: { branchId },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      res.status(200).json({ success: true, data: response.data?.data || [] });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * GET /service/customers/:customerId/history
    */
   /**
@@ -2616,7 +2823,12 @@ export class ServiceController {
             ticketRevenue += Number(item.totalPrice) || 0;
           }
         }
-        totalRevenue += ticketRevenue;
+        if (ticket.visitChargeMethod === 'ADDED_TO_ESTIMATE') {
+          ticketRevenue += Number(ticket.visitChargeAmount) || 0;
+        }
+        ticketRevenue += Number(ticket.transportChargeAmount) || 0;
+        ticketRevenue -= Number(ticket.discountAmount) || 0;
+        totalRevenue += Math.max(0, ticketRevenue);
       }
 
       const netServiceMargin = totalRevenue - (totalPartsCost + totalLaborCost);
@@ -3351,6 +3563,90 @@ export class ServiceController {
   /**
    * POST /service/tickets/:id/customer-reject
    */
+  // The visit charge is owed the moment the technician does the site visit and
+  // diagnosis — if the customer later rejects the estimate, that charge is still
+  // earned and must be collected, not silently dropped. Only applies when it was
+  // deferred onto the estimate (SEPARATE was already collected on-site at diagnosis
+  // time) and only for chargeable (no warranty/contract) tickets.
+  private isVisitChargeCollectionEligible(ticket: ServiceTicket): boolean {
+    return (
+      ticket.serviceContext === ServiceContext.CHARGEABLE &&
+      Number(ticket.visitChargeAmount) > 0 &&
+      ticket.visitChargeMethod === 'ADDED_TO_ESTIMATE' &&
+      !ticket.visitChargeCollected
+    );
+  }
+
+  private assertVisitChargeCollectionInputValid(
+    ticket: ServiceTicket,
+    body: { collectVisitCharge?: boolean; paymentMode?: string; accountId?: string },
+  ): void {
+    if (!body.collectVisitCharge || !this.isVisitChargeCollectionEligible(ticket)) return;
+    if (!body.paymentMode || (body.paymentMode !== 'CHEQUE' && !body.accountId)) {
+      throw new AppError(
+        'paymentMode (and accountId, unless paying by cheque) are required to collect the visit charge.',
+        400,
+      );
+    }
+  }
+
+  private async collectVisitChargeOnRejection(
+    ticket: ServiceTicket,
+    body: { collectVisitCharge?: boolean; paymentMode?: string; accountId?: string },
+    userId?: string,
+  ): Promise<void> {
+    if (!body.collectVisitCharge || !this.isVisitChargeCollectionEligible(ticket)) return;
+    const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+      expiresIn: '1m',
+    });
+    await axios.post(
+      `${BILLING_SERVICE_URL}/invoices/service-visit-charge`,
+      {
+        serviceTicketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        customerId: ticket.customerId,
+        branchId: ticket.branchId,
+        amount: Number(ticket.visitChargeAmount),
+        collectedBy: userId || 'SYSTEM',
+        paymentMode: body.paymentMode,
+        accountId: body.accountId,
+        remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected at estimate rejection`,
+      },
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    ticket.visitChargeCollected = true;
+    ticket.visitChargeCollectedAt = new Date();
+    await Source.getRepository(ServiceTicket).save(ticket);
+    await this.logActivity(
+      ticket.id,
+      'VISIT_CHARGE_COLLECTED',
+      `Visit charge of ${ticket.visitChargeAmount} collected at estimate rejection and posted to accounts.`,
+      userId,
+    );
+  }
+
+  /**
+   * Applies an incremental discount to the linked billing Invoice without
+   * touching its status — this is a status-preserving sibling of the
+   * technician "revise estimate" flow, used when staff offer an on-the-spot
+   * discount to save a sale instead of the customer rejecting outright.
+   */
+  private async syncInvoiceDiscount(ticket: ServiceTicket, discountDelta: number): Promise<void> {
+    if (!ticket.serviceQuotationId || discountDelta <= 0) return;
+    try {
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+      await axios.patch(
+        `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/apply-discount`,
+        { discountAmount: discountDelta },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+    } catch (err) {
+      logger.error('Failed to sync discount to billing invoice:', err);
+    }
+  }
+
   customerReject = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id as string;
@@ -3358,8 +3654,71 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      const { collectVisitCharge, paymentMode, accountId, reason, discountAmount } = req.body ?? {};
+
+      if (!reason || !String(reason).trim()) {
+        throw new AppError('A reason is required, whether rejecting or offering a discount', 400);
+      }
+
+      const discountToApply = Number(discountAmount) || 0;
+      if (discountToApply > 0) {
+        const estimateRepo = Source.getRepository(ServiceEstimate);
+        const estimate = await estimateRepo.findOne({
+          where: { ticketId: ticket.id },
+          order: { created_at: 'DESC' },
+        });
+        if (estimate) {
+          if (discountToApply > Number(estimate.totalCost)) {
+            throw new AppError(
+              `Discount of QAR ${discountToApply} exceeds the current estimate total of QAR ${estimate.totalCost}.`,
+              400,
+            );
+          }
+          estimate.discountAmount = (Number(estimate.discountAmount) || 0) + discountToApply;
+          estimate.totalCost = Math.max(0, Number(estimate.totalCost) - discountToApply);
+          await estimateRepo.save(estimate);
+        }
+
+        ticket.discountAmount = (Number(ticket.discountAmount) || 0) + discountToApply;
+        await ticketRepo.save(ticket);
+        await this.syncInvoiceDiscount(ticket, discountToApply);
+        await this.logActivity(
+          ticket.id,
+          'ESTIMATE_DISCOUNT_OFFERED',
+          `Staff offered a QAR ${discountToApply} discount instead of rejection. Reason: ${reason}.${
+            estimate ? ` New total: QAR ${estimate.totalCost}.` : ''
+          }`,
+          req.user?.userId,
+        );
+
+        return res.status(200).json({ success: true, data: ticket });
+      }
+
+      this.assertVisitChargeCollectionInputValid(ticket, {
+        collectVisitCharge,
+        paymentMode,
+        accountId,
+      });
+
       ticket.status = ServiceTicketStatus.CUSTOMER_REJECTED;
       await ticketRepo.save(ticket);
+
+      try {
+        await this.collectVisitChargeOnRejection(
+          ticket,
+          { collectVisitCharge, paymentMode, accountId },
+          req.user?.userId,
+        );
+      } catch (err) {
+        logger.error('Failed to collect visit charge at customer rejection:', err);
+      }
+
+      await this.logActivity(
+        ticket.id,
+        'CUSTOMER_REJECTED',
+        `Customer rejected the quotation. Reason: ${reason}`,
+        req.user?.userId,
+      );
 
       // Keep the billing estimate in sync so finance sees the same state.
       if (ticket.serviceQuotationId) {
@@ -3495,11 +3854,17 @@ export class ServiceController {
       startMeterColor: null,
     };
 
-    // Every contract type is invoiced in full at signing (AMC's fixed annual fee; SMA/FSMA's
-    // agreed contract value, separate from their recurring metered usage charges) — so a
-    // contract value is always required, regardless of type.
-    if (!fields.contractValue || fields.contractValue <= 0) {
-      throw new AppError('Contract value must be greater than 0.', 400);
+    // AMC (fixed annual fee) and SMA (agreed contract value, separate from
+    // overage billing) are invoiced in full at signing, so both require a
+    // contract value. FSMA is pure pay-per-click — its entire charge comes
+    // from monthly meter readings (recordContractMeterReading), so it has no
+    // upfront contract value at all.
+    if (contractType !== ServiceContractType.FSMA) {
+      if (!fields.contractValue || fields.contractValue <= 0) {
+        throw new AppError('Contract value must be greater than 0.', 400);
+      }
+    } else {
+      fields.contractValue = 0;
     }
 
     if (contractType === ServiceContractType.AMC) {
@@ -4329,6 +4694,8 @@ export class ServiceController {
       const historyRepo = Source.getRepository(MachineServiceHistory);
       const history = await historyRepo.findOne({ where: { productId: productId } });
 
+      const product = await Source.getRepository(Product).findOne({ where: { id: productId } });
+
       const tickets = await ticketRepo.find({
         where: { productId: productId },
         relations: ['items'],
@@ -4347,10 +4714,32 @@ export class ServiceController {
         order: { installedDate: 'DESC' },
       });
 
+      // Self-healing: Product.meter_reading only reflects diagnoses that ran
+      // after the write-path existed there. Fall back to the highest reading
+      // ever recorded across all tickets for this machine so older tickets
+      // (diagnosed before that write existed) don't show a stale value.
+      const readingCandidates = [
+        Number(product?.meter_reading) || 0,
+        ...tickets.map((t) =>
+          Math.max(Number(t.meterReadingAtService) || 0, Number(t.meterReadingAtCreation) || 0),
+        ),
+      ];
+      const currentMeterReading = readingCandidates.length ? Math.max(...readingCandidates) : null;
+
+      if (
+        product &&
+        currentMeterReading &&
+        currentMeterReading > (Number(product.meter_reading) || 0)
+      ) {
+        product.meter_reading = currentMeterReading;
+        await Source.getRepository(Product).save(product);
+      }
+
       res.status(200).json({
         success: true,
         data: {
           history: history || null,
+          currentMeterReading: currentMeterReading || null,
           tickets,
           partLogs,
           yields,

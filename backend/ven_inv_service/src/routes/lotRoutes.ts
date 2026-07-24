@@ -11,6 +11,7 @@ import {
   checkLotNumber,
   updateReceivingQuantities,
   confirmLotReceived,
+  updateLotShipment,
   uploadLotDocument,
   getLotDocuments,
   deleteLotDocument,
@@ -36,6 +37,8 @@ router.get('/:id/export-spareparts', downloadLotSparePartsExcel);
 // Lot receiving workflow
 router.patch('/:id/receive', updateReceivingQuantities);
 router.post('/:id/confirm', confirmLotReceived);
+// Shipment/logistics info — separate from the receiving workflow above.
+router.patch('/:id/shipment', updateLotShipment);
 
 // Shipping/customs document attachments (bill of lading, customs declaration, etc.)
 router.post('/:id/documents', uploadLotDocuments.single('file'), uploadLotDocument);

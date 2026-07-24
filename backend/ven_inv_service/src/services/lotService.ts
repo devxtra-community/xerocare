@@ -5,7 +5,7 @@ import { AppError } from '../errors/appError';
 import { EntityManager } from 'typeorm';
 import { LotRepository } from '../repositories/lotRepository';
 import { ExcelHandler } from '../utils/excelHandler';
-import { CreateLotDto } from '../types/lotTypes';
+import { CreateLotDto, UpdateLotShipmentDto } from '../types/lotTypes';
 
 export class LotService {
   private lotRepository: LotRepository;
@@ -134,6 +134,14 @@ export class LotService {
    */
   async confirmLotReceived(lotId: string, branchId?: string): Promise<Lot> {
     return await this.lotRepository.confirmLotReceived(lotId, branchId);
+  }
+
+  /**
+   * Updates a lot's shipment/logistics info. Can be called repeatedly as the
+   * shipment progresses (booked → dispatched → in transit → arrived).
+   */
+  async updateShipment(lotId: string, data: UpdateLotShipmentDto, branchId?: string): Promise<Lot> {
+    return await this.lotRepository.updateShipment(lotId, data, branchId);
   }
 
   /**

@@ -16,9 +16,11 @@ function requireAdmin(req: Request) {
 
 // ─── EXCHANGE RATES ───────────────────────────────────────────────────────────
 
+// Read-only — any authenticated role may fetch rates (needed for dual-currency
+// display on manager pages, e.g. international purchase lists). Setting a rate
+// stays admin-only below.
 export const getExchangeRates = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    requireAdmin(req);
     const rates = await Source.getRepository(ExchangeRate).find({ order: { createdAt: 'DESC' } });
     res.json({ success: true, data: rates });
   } catch (err) {

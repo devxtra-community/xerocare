@@ -138,10 +138,16 @@ const menuItems = [
  * Sidebar navigation for the employee application.
  * Dynamically filters menu items based on the employee's assigned job role and permissions.
  */
-export default function EmployeeSidebar() {
+export default function EmployeeSidebar({
+  initialEmployeeJob = null,
+}: {
+  initialEmployeeJob?: EmployeeJob | null;
+}) {
   const router = useRouter();
   const pathname = usePathname();
-  const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(null);
+  const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(
+    initialEmployeeJob,
+  );
   const [isManager, setIsManager] = useState(false);
 
   // Get user from JWT token on client-side only

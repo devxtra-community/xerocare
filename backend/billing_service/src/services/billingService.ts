@@ -4197,6 +4197,12 @@ export class BillingService {
     branchId: string;
     amount: number;
     collectedBy: string;
+    /** Defaults to 'CASH' when omitted. */
+    paymentMode?: string;
+    /** Explicit cash/bank account to post to. Omitted = auto-resolve from paymentMode. */
+    accountId?: string;
+    /** Overrides the default "collected on-site by technician" audit text. */
+    remarks?: string;
   }): Promise<Invoice> {
     const amount = Number(payload.amount) || 0;
     if (amount <= 0) throw new AppError('Visit charge amount must be greater than zero', 400);
@@ -4240,9 +4246,10 @@ export class BillingService {
     await this.recordPayment(
       savedInvoice.id,
       {
-        paymentMode: 'CASH',
+        paymentMode: payload.paymentMode || 'CASH',
+        accountId: payload.accountId,
         amount,
-        remarks: `${label} — collected on-site by technician`,
+        remarks: payload.remarks || `${label} — collected on-site by technician`,
         bypassStatusCheck: true,
       },
       payload.collectedBy,
@@ -4428,6 +4435,48 @@ export class BillingService {
     }
 
     return saved;
+  }
+
+  /**
+   * Applies an incremental discount to a service estimate WITHOUT touching
+   * its approval status — used when staff offer an on-the-spot discount to
+   * save a sale instead of the customer rejecting outright. Unlike
+   * reviseEstimate, this never resets the invoice back to finance approval.
+   */
+  async applyDiscount(id: string, discountDelta: number): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Quotation not found', 404);
+
+    if (invoice.billType !== BillType.SERVICE) {
+      throw new AppError('Only service quotations support this operation', 400);
+    }
+
+    if (
+      invoice.status === InvoiceStatus.CUSTOMER_ACCEPTED ||
+      invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
+      invoice.status === InvoiceStatus.PAID
+    ) {
+      throw new AppError(
+        'Cannot discount an estimate that has already been approved by the customer',
+        400,
+      );
+    }
+
+    const delta = Number(discountDelta) || 0;
+    if (delta <= 0) {
+      throw new AppError('discountAmount must be greater than zero', 400);
+    }
+    if (delta > Number(invoice.totalAmount)) {
+      throw new AppError(
+        `Discount of QAR ${delta} exceeds the current total of QAR ${invoice.totalAmount}.`,
+        400,
+      );
+    }
+
+    invoice.totalDiscountAmount = (Number(invoice.totalDiscountAmount) || 0) + delta;
+    invoice.totalAmount = Math.max(0, Number(invoice.totalAmount) - delta);
+
+    return this.invoiceRepo.save(invoice);
   }
 
   async financeExtendValidity(
@@ -4693,6 +4742,9 @@ export class BillingService {
       paymentMode: string;
       referenceNumber?: string;
       amount: number;
+      /** Explicit cash/bank account to post the receipt to. Omitted = auto-resolve
+       *  from paymentMode (unchanged behavior for every existing caller). */
+      accountId?: string;
       transactionDate?: string | Date;
       remarks?: string;
       isSecurityDeposit?: boolean;
@@ -4997,6 +5049,7 @@ export class BillingService {
             branchId: invoice.branchId,
             createdBy: userId || '00000000-0000-0000-0000-000000000000',
             paymentMode: transaction.paymentMode,
+            accountId: data.accountId,
             autoResolveAccount: true,
             linkedInvoiceId: invoiceId,
             description: `Receipt for invoice ${invoice.invoiceNumber}`,

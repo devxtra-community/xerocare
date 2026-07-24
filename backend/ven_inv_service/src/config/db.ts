@@ -260,6 +260,32 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed purchase_origin columns exist on rfqs, lots, purchases.');
 
+        // --- Shipment/logistics columns on lots (lotEntity.ts transportMode,
+        // carrierName, dispatchDate, estimatedArrival, actualArrival,
+        // shipmentStatus, shipmentDetails) — added to the entity without a
+        // matching migration, so getAllProducts (which joins lot) 500'd on
+        // "column Product__Product_lot.transport_mode does not exist". ---
+        await Source.query(`
+          DO $$ BEGIN
+            CREATE TYPE lots_transport_mode_enum AS ENUM
+              ('SEA', 'AIR', 'ROAD', 'RAIL', 'COURIER', 'PICKUP', 'OTHER');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+          DO $$ BEGIN
+            CREATE TYPE lots_shipment_status_enum AS ENUM
+              ('PENDING_DISPATCH', 'IN_TRANSIT', 'CUSTOMS_CLEARANCE', 'ARRIVED', 'RELEASED');
+          EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+          ALTER TABLE lots
+          ADD COLUMN IF NOT EXISTS transport_mode lots_transport_mode_enum,
+          ADD COLUMN IF NOT EXISTS carrier_name VARCHAR(150),
+          ADD COLUMN IF NOT EXISTS dispatch_date DATE,
+          ADD COLUMN IF NOT EXISTS estimated_arrival DATE,
+          ADD COLUMN IF NOT EXISTS actual_arrival DATE,
+          ADD COLUMN IF NOT EXISTS shipment_status lots_shipment_status_enum,
+          ADD COLUMN IF NOT EXISTS shipment_details JSONB;
+        `);
+        logger.info('Guaranteed shipment/logistics columns exist on lots.');
+
         // --- Currency columns on service_estimates ---
         await Source.query(`
           ALTER TABLE service_estimates
@@ -267,6 +293,19 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS exchange_rate_snapshot DECIMAL(18,6);
         `);
         logger.info('Guaranteed service_estimates currency columns exist.');
+
+        // --- Visit charge / discount breakdown on service_estimates ---
+        // totalCost already folds these in; these columns let the UI/PDFs show
+        // the same breakdown the technician entered instead of guessing
+        // (partsCost) from totalCost - labourCost.
+        await Source.query(`
+          ALTER TABLE service_estimates
+          ADD COLUMN IF NOT EXISTS parts_cost DECIMAL(12,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS visit_charge_amount DECIMAL(12,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS transport_charge_amount DECIMAL(12,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(12,2) DEFAULT 0;
+        `);
+        logger.info('Guaranteed service_estimates visit charge/discount breakdown columns exist.');
         // Ensure tax_rate and max_discount_amount exist on spare_parts table
         await Source.query(`
           ALTER TABLE spare_parts 
@@ -641,6 +680,8 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS ticket_type VARCHAR(30) DEFAULT 'COMPLAINT';
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS estimate_sent_to_finance BOOLEAN DEFAULT FALSE;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS repair_started_at TIMESTAMP;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS repair_paused_at TIMESTAMP;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS repair_paused_duration_minutes INTEGER DEFAULT 0;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS problem_found TEXT;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS root_cause TEXT;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS work_performed TEXT;
