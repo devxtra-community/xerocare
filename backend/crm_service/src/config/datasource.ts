@@ -27,6 +27,17 @@ async function runPreMigrations(): Promise<void> {
   const client = new Client({ connectionString: process.env.CRM_DATABASE_URL });
   try {
     await client.connect();
+
+    // Fresh database (no customers table yet): skip the legacy fixes. The schema is
+    // created from entities via Source.synchronize() in connectWithRetry, after which
+    // pre-migrations run again to apply the raw-SQL extras. ADD COLUMN IF NOT EXISTS
+    // only guards the column, so running these against a missing table throws 42P01.
+    const freshCheck = await client.query(`SELECT to_regclass('public.customers') AS tbl;`);
+    if (!freshCheck.rows[0].tbl) {
+      logger.info('Fresh database detected (no customers table) — skipping pre-migrations.');
+      return;
+    }
+
     // ─── customers: city column (3-tier location hierarchy) ──────────────────
     await client.query(`
       ALTER TABLE customers
@@ -80,6 +91,9 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.info('Fresh database — creating schema from entities via synchronize...');
           await Source.synchronize();
           logger.info('Schema created from entities.');
+          // The first runPreMigrations() call bailed out because the table did not
+          // exist yet; now that it does, apply the raw-SQL extras.
+          await runPreMigrations();
         } else {
           // Existing database: additive columns for older deployments.
           await Source.query(

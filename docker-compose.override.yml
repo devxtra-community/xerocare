@@ -1,0 +1,36 @@
+# Local development overrides. Docker Compose merges this on top of
+# docker-compose.yml automatically, so `docker compose up` picks it up
+# with no extra flags. Not used by docker-compose-deploy.yml.
+services:
+  xerocare-app:
+    ports:
+      - '3000:3000' # Frontend (Next.js)
+      - '3001:3001' # API Gateway
+      - '3002:3002' # Employee Service
+      - '3003:3003' # Vendor/Inventory Service
+      - '3004:3004' # Billing Service
+      - '3005:3005' # CRM Service
+
+  # The datastores below are published on shifted host ports so they don't
+  # collide with the Postgres/Redis/RabbitMQ/Mongo already running natively
+  # on this machine. Only the host side moves — inside the compose network
+  # the services still talk to each other on the standard ports, which is
+  # what the URLs in .env point at.
+  postgres:
+    ports:
+      - '5433:5432'
+
+  mongodb:
+    ports:
+      - '27018:27017'
+    # Without this, WiredTiger claims 50% of (host RAM - 1 GB) for its cache.
+    command: ['mongod', '--wiredTigerCacheSizeGB', '0.5']
+
+  redis:
+    ports:
+      - '6380:6379'
+
+  rabbitmq:
+    ports:
+      - '5673:5672'
+      - '15672:15672' # Management UI

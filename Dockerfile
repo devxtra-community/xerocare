@@ -6,13 +6,32 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # libc6-compat is required at runtime for native modules (bcrypt, etc.)
 RUN apk add --no-cache libc6-compat
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Pin pnpm rather than tracking `latest`: pnpm 11 requires Node >= 22.13
+# (it imports node:sqlite), so `latest` breaks this Node 20 base the moment
+# a new major ships. 10.26 matches the version used locally and reads the
+# lockfileVersion 9.0 in pnpm-lock.yaml.
+RUN corepack enable && corepack prepare pnpm@10.26.0 --activate
 
 # ============================================================
 # Stage 2 – deps: install all workspace dependencies
 # ============================================================
 FROM base AS deps
 WORKDIR /app
+
+# ven_inv_service depends on canvas, which publishes no prebuilt binary for
+# musl/Alpine — node-gyp compiles it from source and needs the Cairo/Pango
+# headers plus a C++ toolchain. These stay in the deps/builder stages only;
+# the runner installs the much smaller shared libraries instead.
+RUN apk add --no-cache \
+      build-base \
+      python3 \
+      pkgconfig \
+      cairo-dev \
+      pango-dev \
+      jpeg-dev \
+      giflib-dev \
+      librsvg-dev \
+      pixman-dev
 
 # Copy workspace manifest files first (better layer caching)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
@@ -47,6 +66,10 @@ RUN pnpm -r build
 # ============================================================
 FROM base AS runner
 WORKDIR /app
+
+# Shared libraries the compiled canvas addon links against at runtime.
+# Only the .so files are needed here, not the -dev headers.
+RUN apk add --no-cache cairo pango jpeg giflib librsvg pixman
 
 # Install pm2 globally for process management
 RUN npm install -g pm2
