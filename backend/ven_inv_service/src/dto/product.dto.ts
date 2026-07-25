@@ -22,6 +22,7 @@ export interface AddProductDTO {
   hs_code?: string;
   warranty?: string;
   consumables?: { partName: string; description: string; yield: string; price: string }[];
+  created_by?: string;
 }
 
 export interface BulkProductRow {

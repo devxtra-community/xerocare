@@ -8,6 +8,7 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   Index,
   BeforeInsert,
 } from 'typeorm';
@@ -23,7 +24,10 @@ export class SparePart {
   @Index()
   id!: string;
 
-  @Column({ name: 'item_code', nullable: false, unique: true })
+  // Enforced by a partial unique index (uq_spare_parts_item_code_active) scoped
+  // to deleted_at IS NULL, not a plain column constraint — see productEntity.ts
+  // serial_no for why (soft-deleting must not permanently block SKU reuse).
+  @Column({ name: 'item_code', nullable: false })
   @Index()
   sku!: string;
 
@@ -141,7 +145,7 @@ export class SparePart {
   @Column({ nullable: true })
   image_url?: string;
 
-  @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true, unique: true })
+  @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true })
   barcode_id?: string;
 
   @BeforeInsert()
@@ -156,4 +160,13 @@ export class SparePart {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at!: Date;
+
+  @Column({ name: 'created_by', type: 'uuid', nullable: true })
+  created_by?: string | null;
+
+  @Column({ name: 'updated_by', type: 'uuid', nullable: true })
+  updated_by?: string | null;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  deleted_at?: Date | null;
 }

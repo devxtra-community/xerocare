@@ -111,6 +111,7 @@ export class BillingService {
             ? Number(contract.monthlyLeaseAmount || 0)
             : Number(contract.monthlyRent || 0),
       discountPercent: Number(contract.discountPercent || 0),
+      a3Multiplier: Number(contract.a3Multiplier ?? 2),
       pricingItems: contract.items, // Items from contract
       usage: {
         bwA4: payload.bwA4Count,
@@ -133,6 +134,7 @@ export class BillingService {
           rentType: contract.rentType,
           monthlyRent: 0,
           discountPercent: Number(contract.discountPercent || 0),
+          a3Multiplier: Number(contract.a3Multiplier ?? 2),
           pricingItems: contract.items,
           usage: {
             bwA4: payload.bwA4Count,
@@ -443,6 +445,9 @@ export class BillingService {
     advanceAmount?: number;
     discountPercent?: number;
     discountAmount?: number;
+    /** A3 page multiplier for effective click count (e.g. 2 clicks per A3 page).
+     *  Defaults to 2 on the entity when omitted — existing behavior unchanged. */
+    a3Multiplier?: number;
     effectiveFrom: string; // From UI usually string
     effectiveTo?: string;
     totalAmount?: number;
@@ -650,6 +655,7 @@ export class BillingService {
       monthlyRent: payload.monthlyRent ? Number(payload.monthlyRent) : undefined,
       advanceAmount: Number(payload.advanceAmount || 0), // STRICT FIX: Ensure number
       discountPercent: payload.discountPercent ? Number(payload.discountPercent) : undefined,
+      a3Multiplier: payload.a3Multiplier ? Number(payload.a3Multiplier) : undefined,
       effectiveFrom: payload.effectiveFrom ? new Date(payload.effectiveFrom) : new Date(),
       effectiveTo: payload.effectiveTo ? new Date(payload.effectiveTo) : undefined,
       billingCycleInDays:
@@ -1767,22 +1773,38 @@ export class BillingService {
               continue;
             }
 
-            // Create basic allocation record without meter readings yet
-            await queryRunner.manager.insert(ProductAllocation, {
-              contractId: invoice.id,
-              modelId: item.modelId,
-              productId: update.productId,
-              serialNumber: serialNo,
-              status: AllocationStatus.ALLOCATED,
-              initialBwA4: 0,
-              initialBwA3: 0,
-              initialColorA4: 0,
-              initialColorA3: 0,
-              currentBwA4: 0,
-              currentBwA3: 0,
-              currentColorA4: 0,
-              currentColorA3: 0,
-            });
+            // Create basic allocation record without meter readings yet.
+            // uniq_product_allocation_active (partial unique index on
+            // productId WHERE status='ALLOCATED') is what actually prevents
+            // two concurrent requests from both allocating the same physical
+            // machine to different contracts — the app-level checks above
+            // only catch a retry of the *same* contract, not a race between
+            // two different ones.
+            try {
+              await queryRunner.manager.insert(ProductAllocation, {
+                contractId: invoice.id,
+                modelId: item.modelId,
+                productId: update.productId,
+                serialNumber: serialNo,
+                status: AllocationStatus.ALLOCATED,
+                initialBwA4: 0,
+                initialBwA3: 0,
+                initialColorA4: 0,
+                initialColorA3: 0,
+                currentBwA4: 0,
+                currentBwA3: 0,
+                currentColorA4: 0,
+                currentColorA3: 0,
+              });
+            } catch (insertErr) {
+              if ((insertErr as { code?: string }).code === '23505') {
+                throw new AppError(
+                  `Machine ${serialNo} was just allocated to another contract. Please choose a different machine.`,
+                  409,
+                );
+              }
+              throw insertErr;
+            }
           }
         }
       }

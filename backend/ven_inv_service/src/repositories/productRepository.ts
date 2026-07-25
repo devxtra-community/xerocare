@@ -74,10 +74,11 @@ export class ProductRepository {
   }
 
   /**
-   * Deletes a product.
+   * Soft-deletes a product — historical records (tickets, invoices, service
+   * history) that reference this id keep resolving instead of orphaning.
    */
   async deleteProduct(id: string) {
-    return this.repo.delete(id);
+    return this.repo.softDelete(id);
   }
 
   /**

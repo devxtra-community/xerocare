@@ -4,6 +4,8 @@ import {
   Column,
   ManyToOne,
   CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
   JoinColumn,
   Index,
   Check,
@@ -87,7 +89,10 @@ export class Product {
   @JoinColumn({ name: 'lot_id' })
   lot?: Lot;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
+  // Enforced by a partial unique index (uq_products_serial_no_active) scoped to
+  // deleted_at IS NULL, not a plain column constraint — otherwise soft-deleting
+  // a product would permanently block re-adding one with the same serial.
+  @Column({ type: 'varchar', length: 255 })
   serial_no!: string;
 
   @Column({ type: 'varchar', length: 255 })
@@ -156,7 +161,8 @@ export class Product {
   @Column({ type: 'varchar', length: 255, nullable: true })
   warranty?: string;
 
-  @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true, unique: true })
+  // Same partial-unique reasoning as serial_no above (uq_products_barcode_id_active).
+  @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true })
   barcode_id?: string;
 
   @Column({
@@ -200,4 +206,16 @@ export class Product {
 
   @CreateDateColumn()
   created_at!: Date;
+
+  @UpdateDateColumn()
+  updated_at!: Date;
+
+  @Column({ name: 'created_by', type: 'uuid', nullable: true })
+  created_by?: string | null;
+
+  @Column({ name: 'updated_by', type: 'uuid', nullable: true })
+  updated_by?: string | null;
+
+  @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
+  deleted_at?: Date | null;
 }

@@ -1,9 +1,22 @@
+import { In } from 'typeorm';
 import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
 import { Source } from '../config/db';
 
 export class WarehouseRepository {
   private get repo() {
     return Source.getRepository(Warehouse);
+  }
+
+  /**
+   * Batch-fetches warehouses by id, keyed by id, for bulk-import lookups.
+   */
+  async findByIds(ids: string[]): Promise<Map<string, Warehouse>> {
+    if (ids.length === 0) return new Map();
+    const warehouses = await this.repo.find({
+      where: { id: In(ids) },
+      relations: ['branch'],
+    });
+    return new Map(warehouses.map((w) => [w.id, w]));
   }
 
   /**

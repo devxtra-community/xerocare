@@ -72,6 +72,7 @@ import {
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { internalServiceAuth } from '../middlewares/internalServiceAuth';
 import { requireRole } from '../middlewares/roleMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
 import { requireJob, EmployeeJob } from '../middlewares/jobMiddleware';
@@ -545,16 +546,16 @@ router.post(
   requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
   createServiceContractInvoice,
 );
-router.get('/contract/serial/:serialNumber', getContractBySerial);
-router.get('/customer/:customerId/history', getCustomerBillingHistory);
-router.get('/machine/:productId/billing-context', getMachineBillingContext);
-router.get('/machine/:productId/history-data', getMachineHistoryData);
+router.get('/contract/serial/:serialNumber', internalServiceAuth, getContractBySerial);
+router.get('/customer/:customerId/history', authMiddleware, getCustomerBillingHistory);
+router.get('/machine/:productId/billing-context', internalServiceAuth, getMachineBillingContext);
+router.get('/machine/:productId/history-data', authMiddleware, getMachineHistoryData);
 
 /**
  * Internal service-to-service: active rent machine allocations across all
  * contracts (used by ven_inv_service's preventative-maintenance scheduler).
  */
-router.get('/allocations/active-rent', getActiveRentAllocations);
+router.get('/allocations/active-rent', internalServiceAuth, getActiveRentAllocations);
 
 router.patch('/:id/revise-estimate', authMiddleware, reviseEstimate);
 router.patch('/:id/apply-discount', authMiddleware, applyDiscount);

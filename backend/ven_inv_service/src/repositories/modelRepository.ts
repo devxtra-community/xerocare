@@ -1,4 +1,4 @@
-import { Brackets } from 'typeorm';
+import { Brackets, In } from 'typeorm';
 import { Source } from '../config/db';
 import { Model } from '../entities/modelEntity';
 
@@ -17,6 +17,15 @@ export class ModelRepository {
       where: { id: model.id },
       relations: ['brandRelation'],
     });
+  }
+
+  /**
+   * Batch-fetches models by id, keyed by id, for bulk-import lookups.
+   */
+  async findByIds(ids: string[]): Promise<Map<string, Model>> {
+    if (ids.length === 0) return new Map();
+    const models = await this.repo.find({ where: { id: In(ids) } });
+    return new Map(models.map((m) => [m.id, m]));
   }
 
   /**

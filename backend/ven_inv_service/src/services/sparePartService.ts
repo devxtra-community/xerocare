@@ -62,7 +62,7 @@ export class SparePartService {
   /**
    * Adds a single spare part, validating model and tracking lot usage.
    */
-  async addSingleSparePart(data: BulkUploadRow, branchId: string) {
+  async addSingleSparePart(data: BulkUploadRow, branchId: string, createdBy?: string) {
     // In bulk upload, sku might be missing as it's generated
     const sku = data.sku?.trim().toUpperCase();
 
@@ -192,6 +192,7 @@ export class SparePartService {
       yield: data.yield,
       maxDiscountableAmount: data.maxDiscountableAmount || 0,
       max_discount_amount: data.maxDiscountableAmount || 0,
+      created_by: createdBy,
     });
 
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);

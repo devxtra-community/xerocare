@@ -83,4 +83,10 @@ export class Customer {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @Column({ name: 'created_by', type: 'uuid', nullable: true })
+  createdBy?: string | null;
+
+  @Column({ name: 'updated_by', type: 'uuid', nullable: true })
+  updatedBy?: string | null;
 }

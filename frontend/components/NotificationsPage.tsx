@@ -118,6 +118,13 @@ export default function NotificationsPage({ role }: { role: string }) {
       case 'CONTRACT':
         router.push(`/${role}/sales`);
         break;
+      case 'SERVICE_CONTRACT':
+        // Service contracts only have a detail page under /employee — but
+        // managers are already permitted there (see middleware.ts, they keep
+        // their own sidebar while browsing it), so this is intentionally not
+        // `/${role}/...` like the other cases.
+        router.push(`/employee/service/contracts/${refId}`);
+        break;
       case 'SERVICE_TICKET':
       case 'SERVICE':
         router.push(`/${role}/service`);

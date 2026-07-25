@@ -54,6 +54,16 @@ export class ContractMeterReading {
   @Column({ type: 'uuid', nullable: true })
   recordedBy!: string | null;
 
+  /** Set once this reading's amountCharged has been folded into a generated
+   *  monthly bill (see billingInvoiceId) — readings can be recorded any time
+   *  ("casually"), but only unbilled ones get swept into the next bill. */
+  @Column({ type: 'timestamp', nullable: true })
+  billedAt!: Date | null;
+
+  /** billing_service Invoice id this reading's charge was billed under. */
+  @Column({ type: 'uuid', nullable: true })
+  billingInvoiceId!: string | null;
+
   @CreateDateColumn()
   created_at!: Date;
 }

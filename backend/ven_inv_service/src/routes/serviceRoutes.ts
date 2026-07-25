@@ -24,6 +24,7 @@ router.put('/contracts/:id', controller.updateContract);
 router.delete('/contracts/:id', controller.deleteContract);
 router.post('/contracts/:id/meter-readings', controller.recordContractMeterReading);
 router.get('/contracts/:id/meter-readings', controller.getContractMeterReadings);
+router.get('/contracts/:id/bills', controller.getContractBills);
 router.post('/external-machines', controller.registerExternalMachine);
 router.post('/tickets/:id/assign', controller.assignTechnician);
 router.post('/tickets/:id/start-diagnosis', controller.startDiagnosis);

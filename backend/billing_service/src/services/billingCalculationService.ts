@@ -7,6 +7,9 @@ interface CalculationInput {
   monthlyRent: number;
   discountPercent: number;
   pricingItems: InvoiceItem[];
+  /** Effective clicks charged per A3 page. Defaults to 2 (industry-standard
+   *  A3 = 2x A4) when not set on the contract. */
+  a3Multiplier?: number;
   usage: {
     bwA4: number;
     bwA3: number;
@@ -32,8 +35,9 @@ export class BillingCalculationService {
    * Calculates the billing amount based on rent type and usage.
    */
   calculate(input: CalculationInput): CalculationResult {
-    const effectiveBw = input.usage.bwA4 + input.usage.bwA3 * 2;
-    const effectiveColor = input.usage.colorA4 + input.usage.colorA3 * 2;
+    const a3Multiplier = input.a3Multiplier ?? 2;
+    const effectiveBw = input.usage.bwA4 + input.usage.bwA3 * a3Multiplier;
+    const effectiveColor = input.usage.colorA4 + input.usage.colorA3 * a3Multiplier;
     const totalUsage = effectiveBw + effectiveColor;
 
     let grossAmount = 0;
@@ -95,8 +99,7 @@ export class BillingCalculationService {
         const excess = Math.max(0, bwUsage + (input.usage.extraBwA4 || 0) - rule.bwIncludedLimit);
         if (excess > 0) {
           if (rule.bwSlabRanges && rule.bwSlabRanges.length > 0) {
-            const rate = this.findSlabRate(excess, rule.bwSlabRanges);
-            excessAmount += excess * rate;
+            excessAmount += this.calculateSlabAmount(excess, rule.bwSlabRanges);
           } else if (rule.bwExcessRate !== undefined) {
             excessAmount += excess * Number(rule.bwExcessRate);
           }
@@ -110,8 +113,7 @@ export class BillingCalculationService {
         );
         if (excess > 0) {
           if (rule.colorSlabRanges && rule.colorSlabRanges.length > 0) {
-            const rate = this.findSlabRate(excess, rule.colorSlabRanges);
-            excessAmount += excess * rate;
+            excessAmount += this.calculateSlabAmount(excess, rule.colorSlabRanges);
           } else if (rule.colorExcessRate !== undefined) {
             excessAmount += excess * Number(rule.colorExcessRate);
           }
@@ -142,8 +144,7 @@ export class BillingCalculationService {
         );
         if (excess > 0) {
           if (rule.comboSlabRanges && rule.comboSlabRanges.length > 0) {
-            const rate = this.findSlabRate(excess, rule.comboSlabRanges);
-            excessAmount += excess * rate;
+            excessAmount += this.calculateSlabAmount(excess, rule.comboSlabRanges);
           } else if (rule.combinedExcessRate !== undefined) {
             excessAmount += excess * Number(rule.combinedExcessRate);
           }
@@ -169,16 +170,14 @@ export class BillingCalculationService {
     for (const rule of rules) {
       // B&W Slabs
       if (rule.bwSlabRanges) {
-        const rate = this.findSlabRate(effectiveBw, rule.bwSlabRanges);
-        amount += effectiveBw * rate;
+        amount += this.calculateSlabAmount(effectiveBw, rule.bwSlabRanges);
       } else if (rule.bwExcessRate) {
         amount += effectiveBw * Number(rule.bwExcessRate);
       }
 
       // Color Slabs
       if (rule.colorSlabRanges) {
-        const rate = this.findSlabRate(effectiveColor, rule.colorSlabRanges);
-        amount += effectiveColor * rate;
+        amount += this.calculateSlabAmount(effectiveColor, rule.colorSlabRanges);
       }
     }
     return amount;
@@ -197,18 +196,41 @@ export class BillingCalculationService {
       totalUsage + (input.usage.extraBwA4 || 0) + (input.usage.extraColorA4 || 0);
     for (const rule of rules) {
       if (rule.comboSlabRanges) {
-        const rate = this.findSlabRate(effectiveTotal, rule.comboSlabRanges);
-        amount += effectiveTotal * rate;
+        amount += this.calculateSlabAmount(effectiveTotal, rule.comboSlabRanges);
       }
     }
     return amount;
   }
 
-  private findSlabRate(
+  /**
+   * Prices `count` units across progressive tier brackets — each bracket only
+   * covers its own range (0-10k @ tier1, 10k-20k @ tier2, ...), not a single
+   * flat rate for the whole count. Volume beyond the top bracket's `to` bills
+   * at the top bracket's rate rather than falling through to $0.
+   */
+  private calculateSlabAmount(
     count: number,
     slabs: Array<{ from: number; to: number; rate: number }>,
   ): number {
-    const match = slabs.find((s) => count >= s.from && count <= s.to);
-    return match ? Number(match.rate) : 0;
+    if (count <= 0 || !slabs || slabs.length === 0) return 0;
+
+    const sorted = [...slabs].sort((a, b) => a.from - b.from);
+    let total = 0;
+    let remaining = count;
+
+    for (const slab of sorted) {
+      if (remaining <= 0) break;
+      const capacity = slab.to - slab.from + 1;
+      const applicable = Math.min(remaining, capacity);
+      total += applicable * Number(slab.rate);
+      remaining -= applicable;
+    }
+
+    if (remaining > 0) {
+      const topRate = Number(sorted[sorted.length - 1].rate);
+      total += remaining * topRate;
+    }
+
+    return total;
   }
 }

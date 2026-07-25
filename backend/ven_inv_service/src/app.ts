@@ -120,6 +120,10 @@ const startServer = async () => {
       await import('./services/preventativeMaintenanceJob');
     startPreventativeMaintenanceScheduler();
 
+    // Start FSMA Monthly Billing Scheduler
+    const { startFsmaBillingScheduler } = await import('./services/fsmaBillingJob');
+    startFsmaBillingScheduler();
+
     const PORT = process.env.PORT;
 
     // Start listening for requests from our staff

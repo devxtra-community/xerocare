@@ -184,6 +184,12 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   discountPercent?: number;
 
+  /** A3 page multiplier for effective click count in usage billing (e.g. 2
+   *  clicks per A3 page). Contract-level so custom terms (1.5x, 2.5x, dedicated
+   *  A3 meter) don't require a code change. */
+  @Column({ name: 'a3_multiplier', type: 'decimal', precision: 4, scale: 2, default: 2.0 })
+  a3Multiplier!: number;
+
   @Column({ type: 'date', nullable: true })
   effectiveFrom!: Date;
 

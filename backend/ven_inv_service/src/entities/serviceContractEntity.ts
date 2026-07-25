@@ -30,6 +30,11 @@ export class ServiceContract {
   @Column({ type: 'uuid' })
   customerId!: string;
 
+  /** Branch that signed the contract — resolved from the creating employee at
+   *  signing time. Drives who gets notified when a monthly FSMA bill is due. */
+  @Column({ type: 'uuid', nullable: true })
+  branchId!: string | null;
+
   @Column({
     type: 'enum',
     enum: ServiceContractType,
@@ -99,6 +104,13 @@ export class ServiceContract {
 
   @Column({ type: 'integer', nullable: true })
   startMeterColor!: number | null;
+
+  /** Next date the monthly billing job should generate an invoice for this
+   *  FSMA contract — one day before the monthly anniversary of startDate,
+   *  advanced by exactly one month after each run. Null for AMC/SMA, which
+   *  don't have recurring per-click invoicing. */
+  @Column({ type: 'date', nullable: true })
+  nextBillingDate!: Date | null;
 
   @Column({ type: 'text', nullable: true })
   notes!: string | null;

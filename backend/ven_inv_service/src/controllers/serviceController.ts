@@ -6,6 +6,7 @@ import { IsNull, FindOptionsWhere, In, Between } from 'typeorm';
 import {
   generateServiceQuotationPdf,
   generateServiceCompletionBillPdf,
+  generateServiceReportPdf,
   PdfPerson,
 } from '../utils/servicePdfGenerator';
 import { sendServicePdfEmail } from '../utils/emailService';
@@ -53,6 +54,7 @@ import axios from 'axios';
 import { sign } from 'jsonwebtoken';
 import { logger } from '../config/logger';
 import { BILLING_ENDPOINTS, CRM_ENDPOINTS } from '../constants/serviceUrls';
+import { firstFsmaBillingDate } from '../utils/dateMath';
 import {
   getFinanceEmployeesByBranch,
   getCustomerName,
@@ -320,6 +322,7 @@ export class ServiceController {
       try {
         const billingRes = await axios.get(
           `${BILLING_SERVICE_URL}/invoices/machine/${productId}/billing-context?serialNumber=${encodeURIComponent(serialNumber)}`,
+          { headers: { 'x-internal-service': 'ven-inv' } },
         );
         if (billingRes.data && billingRes.data.success) {
           const billingData = billingRes.data.data;
@@ -2143,6 +2146,16 @@ export class ServiceController {
             400,
           );
         }
+        ticket.meterReadingAtService = Number(meterReading);
+        if (ticket.productId) {
+          const completionProduct = await Source.getRepository(Product).findOne({
+            where: { id: ticket.productId },
+          });
+          if (completionProduct) {
+            completionProduct.meter_reading = Number(meterReading);
+            await Source.getRepository(Product).save(completionProduct);
+          }
+        }
       }
 
       ticket.repairCompletedAt = new Date();
@@ -2188,13 +2201,18 @@ export class ServiceController {
         relations: ['items'],
       });
 
-      let totalPartsCost = 0;
-      let totalConsumablesCost = 0;
+      // What the customer was actually billed for parts/consumables (used for the
+      // customer/UI-facing Machine History stat) — distinct from purchaseCost below,
+      // which is the internal cost basis used only for ServicePartUsageLog/margin tracking.
+      let totalPartsBilled = 0;
 
       const itemsToInspect = estimate ? estimate.items : ticket.items;
       const usageLogRepo = Source.getRepository(ServicePartUsageLog);
 
       for (const item of itemsToInspect) {
+        totalPartsBilled +=
+          Number(item.totalPrice) || (Number(item.unitPrice) || 0) * (item.quantity || 1);
+
         let purchaseCost = 0;
         if (item.sparePartId) {
           const partDetails = await sparePartRepo.findOne({
@@ -2203,11 +2221,6 @@ export class ServiceController {
           if (partDetails) {
             purchaseCost = Number(partDetails.purchase_price) || 0;
             const itemCost = purchaseCost * item.quantity;
-            if (this.isConsumable(partDetails.part_name, partDetails.sku)) {
-              totalConsumablesCost += itemCost;
-            } else {
-              totalPartsCost += itemCost;
-            }
 
             // Yield page calculation for consumables if replaced
             let yieldPages = 0;
@@ -2287,8 +2300,7 @@ export class ServiceController {
         }
         historyRecord.lastServiceDate = new Date();
         historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
-        historyRecord.totalPartsSpend =
-          Number(historyRecord.totalPartsSpend) + totalPartsCost + totalConsumablesCost;
+        historyRecord.totalPartsSpend = Number(historyRecord.totalPartsSpend) + totalPartsBilled;
         historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
         historyRecord.totalLifetimeCost =
           Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
@@ -2300,9 +2312,9 @@ export class ServiceController {
           totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
           lastServiceDate: new Date(),
           nextScheduledMaintenanceDate,
-          totalPartsSpend: totalPartsCost + totalConsumablesCost,
+          totalPartsSpend: totalPartsBilled,
           totalLabourSpend: labourCost,
-          totalLifetimeCost: totalPartsCost + totalConsumablesCost + labourCost,
+          totalLifetimeCost: totalPartsBilled + labourCost,
         });
       }
       await historyRepo.save(historyRecord);
@@ -3501,6 +3513,25 @@ export class ServiceController {
 
       ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
 
+      // Keep the estimate's own status in sync with the ticket — the estimate-level
+      // approval path (approveEstimateCustomer) already does this; this ticket-level
+      // path must too, or every downstream read that filters on
+      // estimate.status === CUSTOMER_APPROVED (labour cost at completion, COGS report,
+      // finance dashboards) silently misses tickets approved from this button.
+      try {
+        const estimateRepo = Source.getRepository(ServiceEstimate);
+        const latestEstimate = await estimateRepo.findOne({
+          where: { ticketId: ticket.id },
+          order: { created_at: 'DESC' },
+        });
+        if (latestEstimate && latestEstimate.status !== ServiceEstimateStatus.CUSTOMER_APPROVED) {
+          latestEstimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
+          await estimateRepo.save(latestEstimate);
+        }
+      } catch (err) {
+        logger.error('Failed to sync estimate status on customer approval:', err);
+      }
+
       if (ticket.leadId) {
         try {
           const convertRes = await axios.post(
@@ -3973,6 +4004,8 @@ export class ServiceController {
         );
       }
 
+      const branchId = req.user?.branchId || req.body.branchId || null;
+
       const contract = contractRepo.create({
         ...fields,
         customerId,
@@ -3980,6 +4013,11 @@ export class ServiceController {
         startDate: start,
         endDate: end,
         status: status || 'ACTIVE',
+        branchId,
+        // FSMA is pure pay-per-click: schedule the first automatic monthly
+        // bill for one day before the signing-date anniversary next month.
+        nextBillingDate:
+          fields.contractType === ServiceContractType.FSMA ? firstFsmaBillingDate(start) : null,
       });
       await contractRepo.save(contract);
 
@@ -3987,7 +4025,6 @@ export class ServiceController {
       // so Finance can track paid/pending from day one. If an amount was collected at
       // signing, record it against this same invoice immediately.
       if (contract.contractValue > 0) {
-        const branchId = req.user?.branchId || req.body.branchId;
         if (branchId) {
           try {
             const token = sign(
@@ -4212,8 +4249,11 @@ export class ServiceController {
         (t) => t.status === ServiceTicketStatus.COMPLETED,
       );
 
+      const customer = await this.fetchCustomerDetails(contract.customerId);
+
       const data = {
         ...contract,
+        customer,
         machine: product
           ? {
               modelName: product.model?.model_name || product.name,
@@ -4275,6 +4315,15 @@ export class ServiceController {
         throw new AppError('endDate must be after startDate.', 400);
       }
       if (status) contract.status = status;
+
+      // Keep the monthly billing schedule in sync with type/startDate edits.
+      if (contract.contractType === ServiceContractType.FSMA) {
+        if (!contract.nextBillingDate || startDate) {
+          contract.nextBillingDate = firstFsmaBillingDate(new Date(contract.startDate));
+        }
+      } else {
+        contract.nextBillingDate = null;
+      }
 
       await contractRepo.save(contract);
       res.status(200).json({ success: true, data: contract });
@@ -4499,6 +4548,68 @@ export class ServiceController {
   };
 
   /**
+   * GET /service/contracts/:id/bills
+   *
+   * Lists the monthly bills the FSMA billing job has generated for this
+   * contract — one row per billing_service Invoice, grouped from the
+   * ContractMeterReading rows it swept up (see fsmaBillingJob.ts).
+   */
+  getContractBills = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const contractRepo = Source.getRepository(ServiceContract);
+      const contract = await contractRepo.findOne({ where: { id: id as string } });
+      if (!contract) throw new AppError('Service Contract not found', 404);
+
+      const groups = await Source.getRepository(ContractMeterReading)
+        .createQueryBuilder('r')
+        .select('r.billingInvoiceId', 'invoiceId')
+        .addSelect('SUM(r.amountCharged)', 'amount')
+        .addSelect('MIN(r.readingDate)', 'periodStart')
+        .addSelect('MAX(r.readingDate)', 'periodEnd')
+        .addSelect('MAX(r.billedAt)', 'billedAt')
+        .where('r.contractId = :contractId', { contractId: contract.id })
+        .andWhere('r.billingInvoiceId IS NOT NULL')
+        .groupBy('r.billingInvoiceId')
+        .orderBy('MAX(r.billedAt)', 'DESC')
+        .getRawMany();
+
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+
+      const bills = await Promise.all(
+        groups.map(async (g) => {
+          let invoice: Record<string, unknown> | null = null;
+          try {
+            const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/${g.invoiceId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            invoice = response.data?.data || null;
+          } catch (err) {
+            logger.error(`Failed to fetch FSMA bill invoice ${g.invoiceId}:`, err);
+          }
+          return {
+            invoiceId: g.invoiceId as string,
+            amount: Math.round(Number(g.amount) * 100) / 100,
+            periodStart: g.periodStart,
+            periodEnd: g.periodEnd,
+            billedAt: g.billedAt,
+            invoiceNumber: invoice?.invoiceNumber ?? null,
+            status: invoice?.status ?? null,
+            emailSentAt: invoice?.emailSentAt ?? null,
+            totalAmount: invoice?.totalAmount ?? null,
+          };
+        }),
+      );
+
+      res.status(200).json({ success: true, data: bills });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * GET /service/tickets/:id/report
    */
   generateReportPDF = async (req: Request, res: Response, next: NextFunction) => {
@@ -4514,159 +4625,33 @@ export class ServiceController {
       const reportRepo = Source.getRepository(ServiceReport);
       const report = await reportRepo.findOne({ where: { ticketId: ticket.id } });
 
-      const { default: PDFDocument } = await import('pdfkit');
-      const doc = new PDFDocument({ margin: 50 });
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        relations: ['items'],
+        order: { created_at: 'DESC' },
+      });
+
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+      const technician = await this.fetchEmployeeDetails(ticket.assignedTechnicianId);
+
+      const pdfBuffer = await generateServiceReportPdf(
+        ticket,
+        report,
+        estimate,
+        customer,
+        branch,
+        technician,
+      );
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
         'Content-Disposition',
         `attachment; filename=Service_Report_${ticket.ticketNumber}.pdf`,
       );
-
-      doc.pipe(res);
-
-      // Draw Professional Header
-      doc.rect(0, 0, 612, 100).fill('#0f172a');
-      doc.fillColor('#ffffff').fontSize(24).font('Helvetica-Bold').text('XEROCARE ERP', 50, 30);
-      doc.fontSize(12).font('Helvetica').text('Official Service & Maintenance Report', 50, 60);
-
-      // Reset color
-      doc.fillColor('#334155');
-
-      // Ticket Summary Box
-      doc.font('Helvetica-Bold').fontSize(14).text('Ticket Summary', 50, 120);
-      doc.moveTo(50, 140).lineTo(562, 140).stroke('#cbd5e1');
-
-      doc.font('Helvetica-Bold').fontSize(10);
-      doc.text('Ticket Number:', 50, 155);
-      doc.text('Service Context:', 50, 175);
-      doc.text('Customer ID:', 50, 195);
-      doc.text('Serial Number:', 50, 215);
-
-      doc.text('Technician:', 320, 155);
-      doc.text('Status:', 320, 175);
-      doc.text('Scheduled Visit:', 320, 195);
-      doc.text('Completed At:', 320, 215);
-
-      doc.font('Helvetica');
-      doc.text(ticket.ticketNumber || '', 150, 155);
-      doc.text(ticket.serviceContext || '', 150, 175);
-      doc.text(ticket.customerId || 'N/A', 150, 195);
-      doc.text(ticket.serialNumber || '', 150, 215);
-
-      doc.text(ticket.assignedTechnicianId || 'Unassigned', 420, 155);
-      doc.text(ticket.status || '', 420, 175);
-      doc.text(
-        ticket.scheduledVisitDate
-          ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
-          : 'N/A',
-        420,
-        195,
-      );
-      doc.text(
-        ticket.completedAt ? new Date(ticket.completedAt).toLocaleDateString() : 'N/A',
-        420,
-        215,
-      );
-
-      // Diagnosis & Resolution Box
-      doc.font('Helvetica-Bold').fontSize(14).text('Diagnosis & Work Details', 50, 250);
-      doc.moveTo(50, 270).lineTo(562, 270).stroke('#cbd5e1');
-
-      doc.font('Helvetica-Bold').fontSize(10);
-      doc.text('Problem Found:', 50, 285);
-      doc
-        .font('Helvetica')
-        .text(ticket.problemFound || report?.workPerformed || 'N/A', 150, 285, { width: 400 });
-
-      doc.font('Helvetica-Bold').text('Root Cause:', 50, 315);
-      doc.font('Helvetica').text(ticket.rootCause || 'N/A', 150, 315, { width: 400 });
-
-      doc.font('Helvetica-Bold').text('Resolution/Work:', 50, 345);
-      doc
-        .font('Helvetica')
-        .text(report?.resolutionDetails || ticket.completionNotes || 'N/A', 150, 345, {
-          width: 400,
-        });
-
-      doc.font('Helvetica-Bold').text('Meter Reading:', 50, 375);
-      doc
-        .font('Helvetica')
-        .text(String(report?.meterReading || ticket.meterReadingAtService || 0), 150, 375);
-
-      // Parts Consumed Table
-      let currentY = 410;
-      doc.font('Helvetica-Bold').fontSize(14).text('Parts & Consumables Consumed', 50, currentY);
-      currentY += 20;
-      doc.moveTo(50, currentY).lineTo(562, currentY).stroke('#cbd5e1');
-      currentY += 15;
-
-      doc.font('Helvetica-Bold').fontSize(10);
-      doc.text('Part Name / SKU', 50, currentY);
-      doc.text('Quantity', 320, currentY);
-      doc.text('Unit Price', 420, currentY);
-      doc.text('Total Price', 500, currentY);
-      currentY += 15;
-
-      doc.font('Helvetica');
-      const itemsToRender = ticket.items || [];
-      if (itemsToRender.length === 0) {
-        doc.text('No parts or consumables were replaced.', 50, currentY);
-        currentY += 20;
-      } else {
-        itemsToRender.forEach((item) => {
-          doc.text(`${item.partName} (SKU: ${item.sku || 'N/A'})`, 50, currentY, { width: 250 });
-          doc.text(String(item.quantity), 320, currentY);
-          doc.text(`QAR ${Number(item.unitPrice).toFixed(2)}`, 420, currentY);
-          doc.text(`QAR ${Number(item.totalPrice).toFixed(2)}`, 500, currentY);
-          currentY += 20;
-        });
-      }
-
-      currentY += 10;
-      // Signatures & Remarks Box
-      doc.font('Helvetica-Bold').fontSize(14).text('Signatures & Remarks', 50, currentY);
-      currentY += 20;
-      doc.moveTo(50, currentY).lineTo(562, currentY).stroke('#cbd5e1');
-      currentY += 15;
-
-      doc.font('Helvetica-Bold').text('Customer Remarks:', 50, currentY);
-      doc
-        .font('Helvetica')
-        .text(report?.customerRemarks || 'No remarks provided.', 50, currentY + 15, { width: 230 });
-
-      doc.font('Helvetica-Bold').text('Technician Remarks:', 320, currentY);
-      doc
-        .font('Helvetica')
-        .text(report?.technicianRemarks || 'No remarks provided.', 320, currentY + 15, {
-          width: 230,
-        });
-
-      currentY += 80;
-
-      doc.font('Helvetica-Bold').text('Customer Signature:', 50, currentY);
-      if (report?.customerSignature) {
-        doc.font('Helvetica').text('[Signed digitally]', 50, currentY + 15);
-      } else {
-        doc.font('Helvetica').text('___________________________', 50, currentY + 15);
-      }
-
-      doc.font('Helvetica-Bold').text('Technician Signature:', 320, currentY);
-      if (report?.technicianSignature) {
-        doc.font('Helvetica').text('[Signed digitally]', 320, currentY + 15);
-      } else {
-        doc.font('Helvetica').text('___________________________', 320, currentY + 15);
-      }
-
-      // Footer
-      doc
-        .fontSize(8)
-        .fillColor('#64748b')
-        .text('Xerocare ERP — Service Workflow Management. All rights reserved.', 50, 720, {
-          align: 'center',
-        });
-
-      doc.end();
+      return res.end(pdfBuffer);
     } catch (error) {
       next(error);
     }
@@ -4858,7 +4843,7 @@ export class ServiceController {
     try {
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) }, relations: ['items'] });
       if (!ticket) {
         return res.status(404).json({ success: false, message: 'Service ticket not found' });
       }
@@ -4870,9 +4855,17 @@ export class ServiceController {
         });
       }
 
-      // Fetch parts usage logs
-      const usageLogRepo = Source.getRepository(ServicePartUsageLog);
-      const usageLogs = await usageLogRepo.find({ where: { ticketId: ticket.id } });
+      // Fetch the approved estimate (real billed labour/visit/transport/discount)
+      // and the completion service report (real work-performed/resolution text) —
+      // both needed so the printed bill reflects what was actually approved/typed.
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        relations: ['items'],
+        order: { created_at: 'DESC' },
+      });
+      const reportRepo = Source.getRepository(ServiceReport);
+      const report = await reportRepo.findOne({ where: { ticketId: ticket.id } });
 
       // Fetch customer details
       const customer = await this.fetchCustomerDetails(ticket.customerId);
@@ -4886,7 +4879,8 @@ export class ServiceController {
 
       const pdfBuffer = await generateServiceCompletionBillPdf(
         ticket,
-        usageLogs,
+        estimate,
+        report,
         customer,
         branch,
         technician,
@@ -5034,7 +5028,7 @@ For queries contact us at +974 4455 6677`;
       const { sendToPhone, sendToEmail } = req.body;
 
       const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) }, relations: ['items'] });
       if (!ticket) {
         return res.status(404).json({ success: false, message: 'Service ticket not found' });
       }
@@ -5046,8 +5040,14 @@ For queries contact us at +974 4455 6677`;
         });
       }
 
-      const usageLogRepo = Source.getRepository(ServicePartUsageLog);
-      const usageLogs = await usageLogRepo.find({ where: { ticketId: ticket.id } });
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        relations: ['items'],
+        order: { created_at: 'DESC' },
+      });
+      const reportRepo = Source.getRepository(ServiceReport);
+      const report = await reportRepo.findOne({ where: { ticketId: ticket.id } });
 
       const customer = await this.fetchCustomerDetails(ticket.customerId);
       const branchRepo = Source.getRepository(Branch);
@@ -5056,7 +5056,8 @@ For queries contact us at +974 4455 6677`;
 
       const pdfBuffer = await generateServiceCompletionBillPdf(
         ticket,
-        usageLogs,
+        estimate,
+        report,
         customer,
         branch,
         technician,

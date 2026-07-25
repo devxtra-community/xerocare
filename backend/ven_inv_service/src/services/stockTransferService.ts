@@ -70,7 +70,7 @@ export class StockTransferService {
     try {
       const resp = await fetch(
         `${BILLING_SERVICE_URL}/invoices/machine/${productId}/billing-context`,
-        { headers: { 'Content-Type': 'application/json' } },
+        { headers: { 'Content-Type': 'application/json', 'x-internal-service': 'ven-inv' } },
       );
       if (!resp.ok) return; // billing service unavailable — allow optimistically
 
@@ -354,7 +354,13 @@ export class StockTransferService {
               `Assign exactly ${approvedQty} serial number(s) for each approved machine line.`,
             );
           }
-          const products = await manager.find(Product, { where: { id: In(assigned) } });
+          // Pessimistic lock: without it, two concurrent approvals can both
+          // read the same machine as AVAILABLE before either commits it.
+          const products = await manager
+            .createQueryBuilder(Product, 'p')
+            .setLock('pessimistic_write')
+            .where('p.id IN (:...ids)', { ids: assigned })
+            .getMany();
           if (products.length !== assigned.length) {
             throw new Error('One or more assigned machines were not found.');
           }
@@ -377,7 +383,12 @@ export class StockTransferService {
           }
           item.assigned_product_ids = assigned;
         } else if (item.spare_part_id) {
-          const part = await manager.findOne(SparePart, { where: { id: item.spare_part_id } });
+          // Same race as machines above: lock the row before checking/reserving.
+          const part = await manager
+            .createQueryBuilder(SparePart, 'sp')
+            .setLock('pessimistic_write')
+            .where('sp.id = :id', { id: item.spare_part_id })
+            .getOne();
           if (!part) throw new Error('Spare part not found.');
           const available = part.quantity - part.reserved_quantity;
           if (available < approvedQty) {

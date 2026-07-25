@@ -51,12 +51,21 @@ export interface ContractServiceHistory {
   tickets: ContractTicketSummary[];
 }
 
+export interface ContractCustomerInfo {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+}
+
 export interface ServiceContract {
   id: string;
   productId: string;
   customerId: string;
+  branchId?: string | null;
   /** Machine details resolved server-side (works for external machines too). */
   machine?: ContractMachineInfo | null;
+  customer?: ContractCustomerInfo | null;
   contractType: ServiceContractType;
   startDate: string;
   endDate: string;
@@ -80,6 +89,8 @@ export interface ServiceContract {
   startMeterBW?: number | null;
   startMeterColor?: number | null;
   usageSummary?: ContractUsageSummary;
+  /** FSMA only — next date the monthly billing job will generate a bill. */
+  nextBillingDate?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -197,4 +208,30 @@ export const getContractMeterReadings = async (
 }> => {
   const response = await api.get(`/i/service/contracts/${contractId}/meter-readings`);
   return response.data.data;
+};
+
+/** One monthly bill the FSMA billing job generated for a contract. */
+export interface ContractBill {
+  invoiceId: string;
+  amount: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+  billedAt: string | null;
+  invoiceNumber: string | null;
+  status: string | null;
+  emailSentAt: string | null;
+  totalAmount: number | null;
+}
+
+export const getContractBills = async (contractId: string): Promise<ContractBill[]> => {
+  const response = await api.get(`/i/service/contracts/${contractId}/bills`);
+  return response.data.data;
+};
+
+/** Emails an already-generated bill (or any invoice) to the customer. */
+export const sendInvoiceEmail = async (
+  invoiceId: string,
+  data: { recipient: string; subject: string; body: string },
+): Promise<void> => {
+  await api.post(`/b/invoices/${invoiceId}/notify/email`, data);
 };

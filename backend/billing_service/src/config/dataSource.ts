@@ -294,6 +294,25 @@ async function runPreMigrations() {
         logger.debug(`Skipped adding OPENING to invoices_type_enum: ${(err as Error).message}`);
       }
 
+      // Prevents the same physical machine being ALLOCATED to two contracts at
+      // once under concurrent allocateMachines calls (app-level checks only
+      // guard against a retry of the *same* contract). Isolated in its own
+      // try/catch since it will fail to create if pre-existing prod data
+      // already has duplicate active allocations for one productId — that
+      // needs a manual data cleanup, not a boot-time crash.
+      try {
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS "uniq_product_allocation_active"
+            ON product_allocations ("productId")
+            WHERE "productId" IS NOT NULL AND status = 'ALLOCATED';
+        `);
+      } catch (err) {
+        logger.warn(
+          `Could not create uniq_product_allocation_active index — likely pre-existing duplicate ` +
+            `ALLOCATED rows for the same productId need manual cleanup first: ${(err as Error).message}`,
+        );
+      }
+
       // Add columns to invoices table
       await client.query(`
         ALTER TABLE invoices
@@ -332,6 +351,12 @@ async function runPreMigrations() {
         ALTER TABLE invoices
         ADD COLUMN IF NOT EXISTS customer_country VARCHAR(100) NULL,
         ADD COLUMN IF NOT EXISTS customer_state_province VARCHAR(100) NULL;
+      `);
+
+      // --- A3 click multiplier (contract-configurable, was hardcoded *2) ---
+      await client.query(`
+        ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS a3_multiplier DECIMAL(4,2) NOT NULL DEFAULT 2.00;
       `);
 
       // --- Quotation validity + service estimate columns ---

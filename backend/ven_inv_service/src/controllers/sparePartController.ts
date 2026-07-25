@@ -40,7 +40,7 @@ export const addSparePart = async (req: Request, res: Response) => {
     if (!branchId)
       return res.status(400).json({ success: false, message: 'User branch context missing' });
 
-    const result = await service.addSingleSparePart(req.body, branchId);
+    const result = await service.addSingleSparePart(req.body, branchId, req.user?.userId);
     res.status(201).json({ success: true, message: 'Spare part added successfully', data: result });
   } catch (error: unknown) {
     logger.error('Error in addSparePart:', error);
@@ -130,7 +130,7 @@ export const updateSparePart = async (req: Request, res: Response) => {
         .json({ success: false, message: 'Access denied: Spare part belongs to another branch' });
     }
 
-    const result = await service.updateSparePart(id, req.body);
+    const result = await service.updateSparePart(id, { ...req.body, updated_by: req.user?.userId });
     res.status(200).json(result);
   } catch (error: unknown) {
     logger.error('Error in updateSparePart:', error);

@@ -33,6 +33,14 @@ async function runPreMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL;
     `);
     logger.info('CRM pre-migration: customers.city column ensured.');
+
+    // ─── customers: audit trail columns ───────────────────────────────────
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS created_by UUID NULL,
+        ADD COLUMN IF NOT EXISTS updated_by UUID NULL;
+    `);
+    logger.info('CRM pre-migration: customers audit columns ensured.');
   } catch (err) {
     logger.error('CRM pre-migration failed:', err);
     throw err;

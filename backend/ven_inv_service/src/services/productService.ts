@@ -48,9 +48,21 @@ export class ProductService {
   /**
    * Creates multiple products in bulk, reporting successes and failures.
    */
-  async bulkCreateProducts(rows: BulkProductRow[]) {
+  async bulkCreateProducts(rows: BulkProductRow[], createdBy?: string) {
     const success: string[] = [];
     const failed: { row: number; error: string }[] = [];
+
+    // Batch-fetch every model/warehouse referenced across the whole sheet up
+    // front instead of one lookup per row (was 2 queries x N rows).
+    const modelIds = [...new Set(rows.map((r) => r.model_no).filter(Boolean))];
+    const warehouseIds = [...new Set(rows.map((r) => r.warehouse_id).filter(Boolean))];
+    const [modelsById, warehousesById] = await Promise.all([
+      this.model.findByIds(modelIds),
+      this.warehouse.findByIds(warehouseIds),
+    ]);
+
+    const touchedModelIds = new Set<string>();
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
@@ -61,17 +73,20 @@ export class ProductService {
         const maxDiscount = row.max_discount_amount ?? 0;
         this.validateDiscount(row.sale_price, maxDiscount);
 
-        const modelDetails = await this.model.findbyid(row.model_no);
+        const modelDetails = modelsById.get(row.model_no);
         if (!modelDetails) {
           throw new AppError('model not found', 404);
         }
-        const warehouseDetails = await this.warehouse.findById(row.warehouse_id);
+        const warehouseDetails = warehousesById.get(row.warehouse_id);
         if (!warehouseDetails) {
           throw new AppError('warehouse not found ', 404);
         }
 
         if (row.lot_id) {
-          // Guard: inventory cannot be created before lot is received
+          // Guard: inventory cannot be created before lot is received.
+          // Sequential per-row (not batched) — validateAndTrackUsage accumulates
+          // usage against the lot's remaining quantity, so row N's validity can
+          // depend on rows before it consuming from the same lot/model.
           const lot = await this.lotService.getLotById(row.lot_id);
           if (lot.status !== LotStatus.RECEIVED) {
             throw new AppError(
@@ -109,13 +124,11 @@ export class ProductService {
           consumables: row.consumables,
           imageUrl: row.imageUrl,
           features: row.features,
+          created_by: createdBy,
         });
 
-        await this.model.syncModelQuantities(modelDetails.id);
-
         await deleteCached(`product:${product.id}`);
-
-        await this.modelService.syncToRedis(modelDetails.id);
+        touchedModelIds.add(modelDetails.id);
 
         success.push(row.serial_no);
       } catch (error: unknown) {
@@ -134,6 +147,14 @@ export class ProductService {
         }
       }
     }
+
+    // Recompute aggregate quantities once per distinct model touched, instead
+    // of once per row (models are commonly repeated across a bulk sheet).
+    for (const modelId of touchedModelIds) {
+      await this.model.syncModelQuantities(modelId);
+      await this.modelService.syncToRedis(modelId);
+    }
+
     return { success, failed };
   }
 
@@ -192,6 +213,7 @@ export class ProductService {
         hs_code: data.hs_code,
         warranty: data.warranty,
         consumables: data.consumables,
+        created_by: data.created_by,
       });
 
       await this.model.syncModelQuantities(modelDetails.id);

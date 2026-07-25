@@ -853,7 +853,18 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ADD COLUMN IF NOT EXISTS "startMeterBW" INTEGER NULL,
             ADD COLUMN IF NOT EXISTS "startMeterColor" INTEGER NULL,
             ADD COLUMN IF NOT EXISTS notes TEXT NULL,
-            ADD COLUMN IF NOT EXISTS "invoiceId" UUID NULL;
+            ADD COLUMN IF NOT EXISTS "invoiceId" UUID NULL,
+            ADD COLUMN IF NOT EXISTS "branchId" UUID NULL,
+            ADD COLUMN IF NOT EXISTS "nextBillingDate" DATE NULL;
+          `);
+
+          // Backfill the billing schedule for FSMA contracts that existed
+          // before the monthly billing job was introduced (new contracts get
+          // this set at signing — see createContract).
+          await Source.query(`
+            UPDATE service_contracts
+            SET "nextBillingDate" = (date_trunc('day', "startDate") + interval '1 month' - interval '1 day')::date
+            WHERE "contractType" = 'FSMA' AND "nextBillingDate" IS NULL;
           `);
 
           // Coverage moved from {labour,consumables,travel} to
@@ -888,6 +899,15 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
               ON contract_meter_readings ("contractId");
           `);
           logger.info('Guaranteed contract_meter_readings table exists.');
+
+          // Monthly FSMA billing sweep: distinguishes readings already folded
+          // into a generated bill from ones still pending the next cycle.
+          await Source.query(`
+            ALTER TABLE contract_meter_readings
+            ADD COLUMN IF NOT EXISTS "billedAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "billingInvoiceId" UUID NULL;
+          `);
+          logger.info('Guaranteed contract_meter_readings billing-sweep columns exist.');
 
           // Toner vs spare part classification (SMA/AMC charge toner).
           await Source.query(`
@@ -1001,6 +1021,80 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             ALTER TABLE products
             ADD COLUMN IF NOT EXISTS transfer_status VARCHAR(20) DEFAULT 'NONE';
           `);
+          // --- Audit trail: who created/last touched a machine or spare part ---
+          await Source.query(`
+            ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT now(),
+            ADD COLUMN IF NOT EXISTS created_by UUID NULL,
+            ADD COLUMN IF NOT EXISTS updated_by UUID NULL;
+          `);
+          await Source.query(`
+            ALTER TABLE spare_parts
+            ADD COLUMN IF NOT EXISTS created_by UUID NULL,
+            ADD COLUMN IF NOT EXISTS updated_by UUID NULL;
+          `);
+          await Source.query(`
+            ALTER TABLE vendors
+            ADD COLUMN IF NOT EXISTS created_by UUID NULL,
+            ADD COLUMN IF NOT EXISTS updated_by UUID NULL;
+          `);
+          logger.info('Guaranteed products/spare_parts/vendors audit columns exist.');
+
+          // --- Soft delete for products & spare parts (was hard DELETE, orphaning
+          // historical service/invoice records that reference the id). The old
+          // plain UNIQUE constraints on serial_no/item_code/barcode_id are replaced
+          // with partial unique indexes scoped to non-deleted rows, otherwise a
+          // soft-deleted row would permanently block re-adding the same serial. ---
+          try {
+            await Source.query(`
+              ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL;
+              ALTER TABLE spare_parts ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL;
+
+              ALTER TABLE products DROP CONSTRAINT IF EXISTS products_barcode_id_unique;
+              ALTER TABLE spare_parts DROP CONSTRAINT IF EXISTS spare_parts_barcode_id_unique;
+
+              DO $$
+              DECLARE c RECORD;
+              BEGIN
+                FOR c IN
+                  SELECT con.conname
+                  FROM pg_constraint con
+                  JOIN pg_attribute att
+                    ON att.attrelid = con.conrelid AND att.attnum = ANY(con.conkey)
+                  WHERE con.conrelid = 'products'::regclass
+                    AND con.contype = 'u' AND att.attname = 'serial_no'
+                LOOP
+                  EXECUTE format('ALTER TABLE products DROP CONSTRAINT %I', c.conname);
+                END LOOP;
+                FOR c IN
+                  SELECT con.conname
+                  FROM pg_constraint con
+                  JOIN pg_attribute att
+                    ON att.attrelid = con.conrelid AND att.attnum = ANY(con.conkey)
+                  WHERE con.conrelid = 'spare_parts'::regclass
+                    AND con.contype = 'u' AND att.attname = 'item_code'
+                LOOP
+                  EXECUTE format('ALTER TABLE spare_parts DROP CONSTRAINT %I', c.conname);
+                END LOOP;
+              END $$;
+
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_products_serial_no_active
+                ON products (serial_no) WHERE deleted_at IS NULL;
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_products_barcode_id_active
+                ON products (barcode_id) WHERE deleted_at IS NULL AND barcode_id IS NOT NULL;
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_spare_parts_item_code_active
+                ON spare_parts (item_code) WHERE deleted_at IS NULL;
+              CREATE UNIQUE INDEX IF NOT EXISTS uq_spare_parts_barcode_id_active
+                ON spare_parts (barcode_id) WHERE deleted_at IS NULL AND barcode_id IS NOT NULL;
+            `);
+            logger.info(
+              'Guaranteed products/spare_parts soft-delete column and partial unique indexes.',
+            );
+          } catch (err) {
+            logger.warn(
+              `Could not fully migrate products/spare_parts to soft-delete uniqueness: ${(err as Error).message}`,
+            );
+          }
           // Lots double as the receiving vehicle for transfers: vendor optional, origin flagged.
           await Source.query(`
             ALTER TABLE lots ALTER COLUMN vendor_id DROP NOT NULL;

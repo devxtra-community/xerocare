@@ -66,10 +66,11 @@ export class SparePartRepository {
   }
 
   /**
-   * Deletes spare part master data.
+   * Soft-deletes spare part master data — historical lot/service records that
+   * reference this id keep resolving instead of orphaning.
    */
   async deleteMaster(id: string) {
-    return this.masterRepo.delete(id);
+    return this.masterRepo.softDelete(id);
   }
 
   /**

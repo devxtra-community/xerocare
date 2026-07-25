@@ -14,7 +14,10 @@ export class VendorController {
       const isAdmin = req.user?.role === 'ADMIN';
       const ownerBranchId = isAdmin ? (req.body.branchId ?? null) : req.user?.branchId;
 
-      const vendor = await this.vendorService.createVendor(req.body, ownerBranchId);
+      const vendor = await this.vendorService.createVendor(
+        { ...req.body, createdBy: req.user?.userId },
+        ownerBranchId,
+      );
 
       return res.status(201).json({
         success: true,
@@ -82,7 +85,10 @@ export class VendorController {
         delete req.body.branchId;
       }
 
-      const vendor = await this.vendorService.updateVendor(req.params.id as string, req.body);
+      const vendor = await this.vendorService.updateVendor(req.params.id as string, {
+        ...req.body,
+        updatedBy: req.user?.userId,
+      });
 
       return res.json({
         success: true,

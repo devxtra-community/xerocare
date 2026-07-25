@@ -6,6 +6,9 @@ import {
   getServiceContractById,
   ServiceContractDetail,
   ContractCoverage,
+  getContractBills,
+  sendInvoiceEmail,
+  ContractBill,
 } from '@/lib/serviceContract';
 import { getCustomerById, Customer } from '@/lib/customer';
 import { recordPayment, getAccountSummary, PaymentSummary } from '@/lib/payment';
@@ -44,6 +47,8 @@ import {
   Check,
   X,
   DollarSign,
+  Send,
+  Eye,
 } from 'lucide-react';
 
 const COVERAGE_LABELS: Array<{ key: keyof ContractCoverage; label: string }> = [
@@ -92,6 +97,12 @@ export default function ServiceContractDetailPage() {
   const [invoiceData, setInvoiceData] = useState<Invoice | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
 
+  const [bills, setBills] = useState<ContractBill[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [sendBillTarget, setSendBillTarget] = useState<ContractBill | null>(null);
+  const [sendBillForm, setSendBillForm] = useState({ recipient: '', subject: '', body: '' });
+  const [sendingBill, setSendingBill] = useState(false);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(Date.now());
@@ -120,6 +131,18 @@ export default function ServiceContractDetailPage() {
         }
       } else {
         setPaymentSummary(null);
+      }
+      if (data.contractType === 'FSMA') {
+        setLoadingBills(true);
+        try {
+          setBills(await getContractBills(contractId));
+        } catch {
+          setBills([]);
+        } finally {
+          setLoadingBills(false);
+        }
+      } else {
+        setBills([]);
       }
     } catch (error) {
       console.error(error);
@@ -178,11 +201,12 @@ export default function ServiceContractDetailPage() {
     }
   };
 
-  const openInvoice = async () => {
-    if (!contract?.invoiceId) return;
+  const openInvoice = async (invoiceId?: string | null) => {
+    const targetId = invoiceId || contract?.invoiceId;
+    if (!targetId) return;
     setLoadingInvoice(true);
     try {
-      const inv = await getInvoiceById(contract.invoiceId);
+      const inv = await getInvoiceById(targetId);
       setInvoiceData(inv);
       setInvoiceDialogOpen(true);
     } catch (error) {
@@ -190,6 +214,37 @@ export default function ServiceContractDetailPage() {
       toast.error('Failed to load invoice.', { description: getApiErrorMessage(error) });
     } finally {
       setLoadingInvoice(false);
+    }
+  };
+
+  const openSendBillDialog = (bill: ContractBill) => {
+    setSendBillTarget(bill);
+    setSendBillForm({
+      recipient: customer?.email || '',
+      subject: `FSMA Monthly Bill${bill.invoiceNumber ? ` — ${bill.invoiceNumber}` : ''}`,
+      body: `Dear ${customer?.name || 'Customer'},\n\nPlease find your FSMA monthly bill for the period ${fmtDate(
+        bill.periodStart,
+      )} to ${fmtDate(bill.periodEnd)}.\n\nAmount due: ${currency} ${bill.amount.toFixed(2)}\n\nThank you for your business.`,
+    });
+  };
+
+  const handleSendBill = async () => {
+    if (!sendBillTarget) return;
+    if (!sendBillForm.recipient.trim()) {
+      toast.error('Enter a recipient email address.');
+      return;
+    }
+    setSendingBill(true);
+    try {
+      await sendInvoiceEmail(sendBillTarget.invoiceId, sendBillForm);
+      toast.success('Bill emailed to the customer.');
+      setSendBillTarget(null);
+      setBills(await getContractBills(contractId));
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to send bill.', { description: getApiErrorMessage(error) });
+    } finally {
+      setSendingBill(false);
     }
   };
 
@@ -320,7 +375,7 @@ export default function ServiceContractDetailPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={openInvoice}
+                    onClick={() => openInvoice()}
                     disabled={loadingInvoice}
                     title="View / download / send invoice"
                     className="h-6 w-6 text-slate-400 hover:text-blue-600 hover:bg-blue-50/50"
@@ -616,6 +671,157 @@ export default function ServiceContractDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Monthly bills — FSMA only. Generated automatically once a month by
+          the billing sweep; casual readings in between accrue unbilled. */}
+      {contract.contractType === 'FSMA' && (
+        <Card className="shadow-sm border-slate-200/80">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+              <FileText className="h-3.5 w-3.5 text-blue-600" /> Monthly Bills ({bills.length})
+            </CardTitle>
+            {contract.nextBillingDate && (
+              <p className="text-[11px] text-slate-400">
+                Next bill due {fmtDate(contract.nextBillingDate)}.
+              </p>
+            )}
+          </CardHeader>
+          <CardContent>
+            {loadingBills ? (
+              <p className="text-xs text-slate-400 py-4 text-center animate-pulse">
+                Loading bills...
+              </p>
+            ) : bills.length === 0 ? (
+              <p className="text-xs text-slate-400 py-4 text-center">
+                No bills generated yet — the monthly billing sweep raises one automatically.
+              </p>
+            ) : (
+              <div className="border border-slate-100 rounded-lg overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50/80">
+                    <TableRow>
+                      <TableHead className="text-[10px] font-bold text-slate-500">
+                        Invoice
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-slate-500">Period</TableHead>
+                      <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                        Amount
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold text-slate-500">Status</TableHead>
+                      <TableHead className="text-[10px] font-bold text-slate-500">Sent</TableHead>
+                      <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bills.map((b) => (
+                      <TableRow key={b.invoiceId}>
+                        <TableCell className="text-xs font-mono py-2">
+                          {b.invoiceNumber || '—'}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500 py-2">
+                          {fmtDate(b.periodStart)} – {fmtDate(b.periodEnd)}
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-2">
+                          {currency} {b.amount.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${getStatusBadgeClass(
+                              b.status || '',
+                            )}`}
+                          >
+                            {b.status || 'UNKNOWN'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500 py-2">
+                          {b.emailSentAt ? fmtDate(b.emailSentAt) : '—'}
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-[10px]"
+                              onClick={() => openInvoice(b.invoiceId)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" /> View
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 px-2 text-[10px] bg-blue-600 hover:bg-blue-700"
+                              onClick={() => openSendBillDialog(b)}
+                            >
+                              <Send className="h-3 w-3 mr-1" />
+                              {b.emailSentAt ? 'Resend' : 'Send to Customer'}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SEND BILL TO CUSTOMER DIALOG */}
+      <Dialog open={!!sendBillTarget} onOpenChange={(open) => !open && setSendBillTarget(null)}>
+        <DialogContent className="max-w-md w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
+            <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Send className="h-5 w-5 text-blue-600" />
+              Send Bill to Customer
+            </DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Review before sending — this emails the customer directly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-4 space-y-3">
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Recipient</label>
+              <Input
+                type="email"
+                value={sendBillForm.recipient}
+                onChange={(e) =>
+                  setSendBillForm((prev) => ({ ...prev, recipient: e.target.value }))
+                }
+                placeholder="customer@email.com"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Subject</label>
+              <Input
+                value={sendBillForm.subject}
+                onChange={(e) => setSendBillForm((prev) => ({ ...prev, subject: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-1">Message</label>
+              <textarea
+                className="w-full min-h-[140px] px-3 py-2 text-xs border border-slate-200 rounded-lg resize-y"
+                value={sendBillForm.body}
+                onChange={(e) => setSendBillForm((prev) => ({ ...prev, body: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="px-6 pb-6">
+            <Button variant="outline" onClick={() => setSendBillTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={sendingBill}
+              onClick={handleSendBill}
+            >
+              {sendingBill ? 'Sending...' : 'Send'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* AMC INSTALLMENT PAYMENT DIALOG */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>

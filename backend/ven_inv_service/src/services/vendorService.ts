@@ -29,6 +29,8 @@ interface CreateVendorDTO {
   countryCode?: string;
   countryName?: string;
   bankAccounts?: BankAccountDTO[];
+  createdBy?: string;
+  updatedBy?: string;
 }
 
 interface RequestProductsDTO {

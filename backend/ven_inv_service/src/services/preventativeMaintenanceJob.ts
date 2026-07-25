@@ -27,7 +27,7 @@ interface RentAllocation {
 // so they're fetched over HTTP rather than queried directly from here.
 async function fetchActiveRentAllocations(): Promise<RentAllocation[]> {
   const resp = await fetch(`${BILLING_SERVICE_URL}/invoices/allocations/active-rent`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-internal-service': 'ven-inv' },
   });
   if (!resp.ok) {
     throw new Error(`billing_service returned ${resp.status} for active-rent allocations`);

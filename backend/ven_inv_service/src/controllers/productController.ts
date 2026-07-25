@@ -22,7 +22,7 @@ export const bulkCreateProducts = async (req: Request, res: Response) => {
     if (!Array.isArray(rows) || rows.length === 0) {
       throw new AppError('Invalid data', 400);
     }
-    const result = await service.bulkCreateProducts(rows as BulkProductRow[]);
+    const result = await service.bulkCreateProducts(rows as BulkProductRow[], req.user?.userId);
     return res.status(201).json({
       success: true,
       inserted: result.success.length,
@@ -125,6 +125,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       hs_code,
       warranty,
       consumables: parsedConsumables,
+      created_by: req.user?.userId,
     });
     res
       .status(200)
@@ -195,7 +196,7 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
       throw new AppError('Invalid product id', 400);
     }
 
-    const payload = { ...req.body };
+    const payload = { ...req.body, updated_by: req.user?.userId };
 
     if (payload.sale_price !== undefined && payload.sale_price !== '')
       payload.sale_price = Number(payload.sale_price);

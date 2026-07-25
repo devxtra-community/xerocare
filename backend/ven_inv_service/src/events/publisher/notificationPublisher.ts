@@ -17,6 +17,7 @@ export class NotificationPublisher {
       | 'CONTRACT'
       | 'SERVICE'
       | 'SERVICE_TICKET'
+      | 'SERVICE_CONTRACT'
       | 'STOCK_TRANSFER';
   }) {
     try {

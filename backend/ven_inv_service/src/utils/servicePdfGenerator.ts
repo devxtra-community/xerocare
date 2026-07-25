@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { ServiceTicket } from '../entities/serviceTicketEntity';
 import { ServiceEstimate } from '../entities/serviceEstimateEntity';
-import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
+import { ServiceReport } from '../entities/serviceReportEntity';
 
 export interface PdfPerson {
   firstName?: string;
@@ -284,9 +284,288 @@ export async function generateServiceQuotationPdf(
   });
 }
 
+export async function generateServiceReportPdf(
+  ticket: ServiceTicket,
+  report: ServiceReport | null,
+  estimate: ServiceEstimate | null,
+  customer: PdfPerson | null | undefined,
+  branch: PdfBranch | null | undefined,
+  technician: PdfPerson | null | undefined,
+): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      // Draw Color Header Band
+      doc.rect(0, 0, 595, 90).fill('#1e293b');
+
+      doc.fillColor('#ffffff').fontSize(22).font('Helvetica-Bold').text('XEROCARE', 40, 25);
+      doc.fontSize(8).font('Helvetica').text('TECHNICAL SERVICES', 41, 52);
+
+      doc
+        .fillColor('#e2e8f0')
+        .fontSize(9)
+        .font('Helvetica-Bold')
+        .text(branch?.name || 'Xerocare HQ', 350, 20, { align: 'right', width: 205 });
+      doc.font('Helvetica').fontSize(8);
+      doc.text(`Phone: ${branch?.phone || '+974 4455 6677'}`, 350, 35, {
+        align: 'right',
+        width: 205,
+      });
+      doc.text(`Email: ${branch?.email || 'support@xerocare.com'}`, 350, 47, {
+        align: 'right',
+        width: 205,
+      });
+      doc.text(`Location: ${branch?.location || branch?.address || 'Doha, Qatar'}`, 350, 59, {
+        align: 'right',
+        width: 205,
+      });
+
+      // Document Title
+      doc.fillColor('#1e293b').fontSize(16).font('Helvetica-Bold').text('SERVICE REPORT', 40, 110);
+      doc.moveTo(40, 130).lineTo(555, 130).stroke('#cbd5e1');
+
+      doc.fillColor('#334155').fontSize(9).font('Helvetica-Bold');
+      doc.text('Ticket No:', 40, 140);
+      doc.text('Serial No:', 40, 155);
+      doc.text('Date:', 300, 140);
+      doc.text('Completed:', 300, 155);
+
+      const reportDate = new Date().toLocaleDateString('en-GB');
+      doc.font('Helvetica');
+      doc.text(ticket.ticketNumber, 120, 140);
+      doc.text(ticket.serialNumber || 'N/A', 120, 155);
+      doc.text(reportDate, 380, 140);
+      doc.text(
+        ticket.completedAt ? new Date(ticket.completedAt).toLocaleDateString('en-GB') : 'N/A',
+        380,
+        155,
+      );
+
+      // Section: Customer & Machine Details
+      doc.rect(40, 180, 515, 95).fill('#f8fafc');
+      doc.rect(40, 180, 515, 95).stroke('#e2e8f0');
+
+      doc
+        .fillColor('#475569')
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('CUSTOMER DETAILS', 55, 190);
+      doc.fontSize(9).font('Helvetica');
+      const customerName = customer
+        ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+        : 'Valued Customer';
+      doc.text(`Name: ${customerName}`, 55, 210);
+      doc.text(`Phone: ${customer?.phone || 'N/A'}`, 55, 225);
+      doc.text(`Email: ${customer?.email || 'N/A'}`, 55, 240);
+      doc.text(`Location: ${customer?.address || customer?.location || 'N/A'}`, 55, 255);
+
+      doc
+        .fillColor('#475569')
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('MACHINE DETAILS', 310, 190);
+      doc.fontSize(9).font('Helvetica');
+      doc.text(`Brand: ${ticket.productBrand || 'N/A'}`, 310, 210);
+      doc.text(`Model: ${ticket.productModel || 'N/A'}`, 310, 225);
+      const techName = technician
+        ? `${technician.firstName || ''} ${technician.lastName || ''}`.trim()
+        : 'Unassigned';
+      doc.text(`Technician: ${techName}`, 310, 240);
+      doc.text(
+        `Meter Reading: ${report?.meterReading || ticket.meterReadingAtService || 0}`,
+        310,
+        255,
+      );
+
+      const isChargeable = ticket.serviceContext === 'CHARGEABLE';
+      doc.rect(470, 190, 75, 18).fill(isChargeable ? '#fee2e2' : '#dcfce7');
+      doc
+        .fillColor(isChargeable ? '#991b1b' : '#166534')
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text(isChargeable ? 'CHARGEABLE' : 'FOC', 470, 195, { align: 'center', width: 75 });
+
+      // Section: Diagnosis & Work Details
+      doc
+        .fillColor('#1e293b')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('DIAGNOSIS & WORK DETAILS', 40, 295);
+      doc.moveTo(40, 310).lineTo(555, 310).stroke('#cbd5e1');
+      doc.fillColor('#334155').fontSize(9);
+      doc.font('Helvetica-Bold').text('Problem Found: ', 40, 320);
+      doc
+        .font('Helvetica')
+        .text(ticket.problemFound || report?.workPerformed || 'N/A', 130, 320, { width: 425 });
+      doc.font('Helvetica-Bold').text('Root Cause: ', 40, 335);
+      doc.font('Helvetica').text(ticket.rootCause || 'N/A', 130, 335, { width: 425 });
+      doc.font('Helvetica-Bold').text('Resolution/Work: ', 40, 350);
+      doc
+        .font('Helvetica')
+        .text(report?.resolutionDetails || ticket.completionNotes || 'N/A', 130, 350, {
+          width: 425,
+        });
+
+      // Section: Parts & Consumables Table
+      let y = 390;
+      doc
+        .fillColor('#1e293b')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('PARTS & CONSUMABLES CONSUMED', 40, y);
+      doc
+        .moveTo(40, y + 15)
+        .lineTo(555, y + 15)
+        .stroke('#cbd5e1');
+      y += 25;
+
+      doc.rect(40, y, 515, 20).fill('#f1f5f9');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica-Bold');
+      doc.text('Part Name / SKU', 50, y + 6, { width: 230 });
+      doc.text('Qty', 290, y + 6, { width: 40, align: 'right' });
+      doc.text('Unit Price', 340, y + 6, { width: 80, align: 'right' });
+      doc.text('Total', 430, y + 6, { width: 80, align: 'right' });
+      doc.text('FOC', 520, y + 6, { width: 30, align: 'center' });
+      y += 20;
+
+      doc.font('Helvetica').fontSize(9).fillColor('#334155');
+      const ticketItems = ticket.items || [];
+      let partsTotal = 0;
+      if (ticketItems.length === 0) {
+        doc.text('No parts or consumables were replaced.', 50, y + 6);
+        doc
+          .moveTo(40, y + 20)
+          .lineTo(555, y + 20)
+          .stroke('#e2e8f0');
+        y += 20;
+      } else {
+        for (const item of ticketItems) {
+          doc.text(`${item.partName}${item.sku ? ` (SKU: ${item.sku})` : ''}`, 50, y + 6, {
+            width: 230,
+          });
+          doc.text(String(item.quantity), 290, y + 6, { width: 40, align: 'right' });
+          const uPrice = Number(item.unitPrice) || 0;
+          const tPrice = Number(item.totalPrice) || 0;
+          if (!item.isFree) partsTotal += tPrice;
+          doc.text(`QAR ${uPrice.toFixed(2)}`, 340, y + 6, { width: 80, align: 'right' });
+          doc.text(`QAR ${tPrice.toFixed(2)}`, 430, y + 6, { width: 80, align: 'right' });
+          doc.text(item.isFree ? 'YES' : 'NO', 520, y + 6, { width: 30, align: 'center' });
+          doc
+            .moveTo(40, y + 20)
+            .lineTo(555, y + 20)
+            .stroke('#e2e8f0');
+          y += 20;
+        }
+      }
+
+      // Section: Cost Summary (boxed, matching the Service Estimate's pricing summary)
+      const labourVal = Number(estimate?.labourCost) || 0;
+      const visitVal = Number(estimate?.visitChargeAmount) || 0;
+      const transportVal = Number(estimate?.transportChargeAmount) || 0;
+      const discountVal = Number(estimate?.discountAmount) || 0;
+      const totalVal = estimate ? Number(estimate.totalCost) || 0 : partsTotal + labourVal;
+
+      const summaryLines: Array<[string, number]> = [
+        ['Parts & Consumables:', partsTotal],
+        ['Labour / Service Charge:', labourVal],
+      ];
+      if (transportVal > 0) summaryLines.push(['Transportation Charge:', transportVal]);
+      if (visitVal > 0) summaryLines.push(['Visit Charge:', visitVal]);
+      if (discountVal > 0) summaryLines.push(['Discount:', -discountVal]);
+
+      const boxHeight = summaryLines.length * 16 + 30;
+      y += 10;
+      doc.rect(300, y, 255, boxHeight).fill('#fafafa');
+      doc.rect(300, y, 255, boxHeight).stroke('#cbd5e1');
+
+      doc.fillColor('#475569').fontSize(9);
+      summaryLines.forEach(([label, value], idx) => {
+        const lineY = y + 8 + idx * 16;
+        doc.font('Helvetica-Bold').text(label, 310, lineY);
+        doc
+          .font('Helvetica')
+          .text(`${value < 0 ? '-' : ''}QAR ${Math.abs(value).toFixed(2)}`, 450, lineY, {
+            align: 'right',
+            width: 95,
+          });
+      });
+
+      const totalY = y + 8 + summaryLines.length * 16 + 4;
+      doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold');
+      doc.text(isChargeable ? 'TOTAL BILLED:' : 'TOTAL (FOC):', 310, totalY);
+      doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10);
+      doc.text(`QAR ${(isChargeable ? totalVal : 0).toFixed(2)}`, 450, totalY, {
+        align: 'right',
+        width: 95,
+      });
+
+      y += boxHeight + 20;
+
+      // Signatures & Remarks
+      doc
+        .fillColor('#1e293b')
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text('SIGNATURES & REMARKS', 40, y);
+      doc
+        .moveTo(40, y + 15)
+        .lineTo(555, y + 15)
+        .stroke('#cbd5e1');
+      y += 25;
+
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#334155').text('Customer Remarks:', 40, y);
+      doc
+        .font('Helvetica')
+        .text(report?.customerRemarks || 'No remarks provided.', 40, y + 15, { width: 230 });
+      doc.font('Helvetica-Bold').text('Technician Remarks:', 300, y);
+      doc
+        .font('Helvetica')
+        .text(report?.technicianRemarks || 'No remarks provided.', 300, y + 15, { width: 230 });
+
+      y += 80;
+      doc.font('Helvetica-Bold').text('Customer Signature:', 40, y);
+      doc
+        .font('Helvetica')
+        .text(
+          report?.customerSignature ? '[Signed digitally]' : '___________________________',
+          40,
+          y + 15,
+        );
+      doc.font('Helvetica-Bold').text('Technician Signature:', 300, y);
+      doc
+        .font('Helvetica')
+        .text(
+          report?.technicianSignature ? '[Signed digitally]' : '___________________________',
+          300,
+          y + 15,
+        );
+
+      y += 45;
+      doc
+        .fillColor('#64748b')
+        .fontSize(8)
+        .font('Helvetica-Oblique')
+        .text('Xerocare ERP — Service Workflow Management. All rights reserved.', 40, y, {
+          align: 'center',
+          width: 515,
+        });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 export async function generateServiceCompletionBillPdf(
   ticket: ServiceTicket,
-  items: ServicePartUsageLog[],
+  estimate: ServiceEstimate | null,
+  report: ServiceReport | null,
   customer: PdfPerson | null | undefined,
   branch: PdfBranch | null | undefined,
   technician: PdfPerson | null | undefined,
@@ -426,7 +705,7 @@ export async function generateServiceCompletionBillPdf(
         .fillColor('#334155')
         .fontSize(9)
         .font('Helvetica')
-        .text(ticket.workPerformed || 'N/A', 40, 450, { width: 515 });
+        .text(report?.workPerformed || 'N/A', 40, 450, { width: 515 });
 
       doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('RESOLUTION', 40, 485);
       doc.moveTo(40, 500).lineTo(555, 500).stroke('#cbd5e1');
@@ -434,7 +713,7 @@ export async function generateServiceCompletionBillPdf(
         .fillColor('#334155')
         .fontSize(9)
         .font('Helvetica')
-        .text(ticket.resolutionDetails || 'N/A', 40, 510, { width: 515 });
+        .text(report?.resolutionDetails || 'N/A', 40, 510, { width: 515 });
 
       // Page Break or Dynamic position check
       let y = 540;
@@ -463,8 +742,9 @@ export async function generateServiceCompletionBillPdf(
       doc.font('Helvetica').fontSize(9).fillColor('#334155');
 
       let partsTotal = 0;
+      const billedItems = estimate ? estimate.items || [] : ticket.items || [];
 
-      if (items.length === 0) {
+      if (billedItems.length === 0) {
         doc.text('No parts or consumables used.', 50, y + 6);
         doc
           .moveTo(40, y + 20)
@@ -472,22 +752,17 @@ export async function generateServiceCompletionBillPdf(
           .stroke('#e2e8f0');
         y += 20;
       } else {
-        for (const item of items) {
+        for (const item of billedItems) {
           doc.text(item.partName || 'Spare Part', 50, y + 6, { width: 230 });
-          doc.text(item.quantityUsed.toString(), 290, y + 6, { width: 40, align: 'right' });
+          doc.text(String(item.quantity), 290, y + 6, { width: 40, align: 'right' });
 
-          // Note: In completion bill, if chargeable, show the selling price or if FOC, show 0.00
-          const uPrice =
-            isChargeable && !item.isFree ? Number(item.totalCost) / Number(item.quantityUsed) : 0;
-          const tPrice = isChargeable && !item.isFree ? Number(item.totalCost) : 0;
-
-          if (!item.isFree && isChargeable) {
-            partsTotal += tPrice;
-          }
+          const uPrice = Number(item.unitPrice) || 0;
+          const tPrice = Number(item.totalPrice) || 0;
+          if (!item.isFree) partsTotal += tPrice;
 
           doc.text(`QAR ${uPrice.toFixed(2)}`, 340, y + 6, { width: 80, align: 'right' });
           doc.text(`QAR ${tPrice.toFixed(2)}`, 430, y + 6, { width: 80, align: 'right' });
-          doc.text(item.isFree || !isChargeable ? 'YES' : 'NO', 520, y + 6, {
+          doc.text(item.isFree ? 'YES' : 'NO', 520, y + 6, {
             width: 30,
             align: 'center',
           });
@@ -500,43 +775,56 @@ export async function generateServiceCompletionBillPdf(
         }
       }
 
-      // Section: Pricing Summary
-      // Note: We need the labour cost. If chargeable, it should match the estimate.
-      // Since estimate might not be passed, we can query it or pass it.
-      // If we don't have it, we use 0 or we can calculate it. Let's see if we can look up the labour cost.
-      // Let's assume the calling route passes a calculated labourCost or we fall back.
-      // Let's compute based on the ticket's context.
-      const labourVal = isChargeable
-        ? ticket.repairDuration
-          ? Math.ceil(ticket.repairDuration / 60) * 50
-          : 50
-        : 0; // fallback or estimation
-      const totalVal = partsTotal + labourVal;
+      // Section: Pricing Summary — sourced from the approved estimate, matching
+      // the Service Estimate PDF's own summary box exactly (not an invented figure).
+      const labourVal = Number(estimate?.labourCost) || 0;
+      const visitVal = Number(estimate?.visitChargeAmount) || 0;
+      const transportVal = Number(estimate?.transportChargeAmount) || 0;
+      const discountVal = Number(estimate?.discountAmount) || 0;
+      const totalVal = estimate ? Number(estimate.totalCost) || 0 : partsTotal + labourVal;
 
+      const summaryLines: Array<[string, number]> = [
+        ['Parts & Consumables:', partsTotal],
+        ['Labour / Service Charge:', labourVal],
+      ];
+      if (transportVal > 0) summaryLines.push(['Transportation Charge:', transportVal]);
+      if (visitVal > 0) summaryLines.push(['Visit Charge:', visitVal]);
+      if (discountVal > 0) summaryLines.push(['Discount:', -discountVal]);
+
+      const boxHeight = summaryLines.length * 16 + 30;
       y += 10;
-      doc.rect(300, y, 255, 75).fill('#fafafa');
-      doc.rect(300, y, 255, 75).stroke('#cbd5e1');
+      doc.rect(300, y, 255, boxHeight).fill('#fafafa');
+      doc.rect(300, y, 255, boxHeight).stroke('#cbd5e1');
 
+      doc.fillColor('#475569').fontSize(9);
+      summaryLines.forEach(([label, value], idx) => {
+        const lineY = y + 8 + idx * 16;
+        doc.font('Helvetica-Bold').text(label, 310, lineY);
+        doc
+          .font('Helvetica')
+          .text(`${value < 0 ? '-' : ''}QAR ${Math.abs(value).toFixed(2)}`, 450, lineY, {
+            align: 'right',
+            width: 95,
+          });
+      });
+
+      const totalY = y + 8 + summaryLines.length * 16 + 4;
       doc.fillColor('#475569').fontSize(9).font('Helvetica-Bold');
-      doc.text('Parts & Consumables:', 310, y + 8);
-      doc.text('Labour / Service Charge:', 310, y + 24);
-      doc.text('TOTAL BILLED:', 310, y + 44);
-
-      doc.font('Helvetica');
-      doc.text(`QAR ${partsTotal.toFixed(2)}`, 450, y + 8, { align: 'right', width: 95 });
-      doc.text(`QAR ${labourVal.toFixed(2)}`, 450, y + 24, { align: 'right', width: 95 });
-
+      doc.text('TOTAL BILLED:', 310, totalY);
       doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(10);
-      doc.text(`QAR ${totalVal.toFixed(2)}`, 450, y + 44, { align: 'right', width: 95 });
+      doc.text(`QAR ${(isChargeable ? totalVal : 0).toFixed(2)}`, 450, totalY, {
+        align: 'right',
+        width: 95,
+      });
 
       if (!isChargeable) {
         doc.fillColor('#166534').fontSize(8).font('Helvetica-Bold');
-        doc.text(`All charges covered under ${ticket.serviceContext} contract.`, 310, y + 60, {
+        doc.text(`All charges covered under ${ticket.serviceContext} contract.`, 310, totalY + 16, {
           width: 235,
         });
       }
 
-      y += 95;
+      y += boxHeight + 20;
 
       // Technician Notes
       doc.fillColor('#0f172a').fontSize(11).font('Helvetica-Bold').text('TECHNICIAN NOTES', 40, y);

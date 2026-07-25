@@ -17,7 +17,7 @@ export class CustomerController {
    */
   createCustomer = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = { ...req.body };
+      const data = { ...req.body, createdBy: req.user?.userId };
       if (req.user?.role !== 'ADMIN') {
         data.branch_id = req.user?.branchId;
       }
@@ -97,7 +97,10 @@ export class CustomerController {
         throw new AppError('Access denied: You cannot update a customer from another office', 403);
       }
 
-      const updatedCustomer = await this.customerService.updateCustomer(id, req.body);
+      const updatedCustomer = await this.customerService.updateCustomer(id, {
+        ...req.body,
+        updatedBy: req.user?.userId,
+      });
       res.status(200).json({
         success: true,
         data: updatedCustomer,
