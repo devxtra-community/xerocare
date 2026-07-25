@@ -183,6 +183,10 @@ export interface Invoice {
   taxPercent?: number; // e.g. 5
   taxAmount?: number; // computed: subTotal * taxPercent / 100
   taxRegistrationNumber?: string;
+  /** Snapshot of the customer's VAT status at invoice-creation time —
+   * 'REGISTERED' | 'UNREGISTERED_STANDARD' | 'EXEMPT'. EXEMPT means tax was
+   * forced to zero and the document must show "VAT Exempt" (never the reason). */
+  customerVatStatus?: string | null;
   createdAt: string;
   employeeName: string;
   branchName: string;
@@ -586,6 +590,8 @@ export const activateContractInvoice = async (
       receivedDate?: string;
       chequeBankName?: string;
       chequeDueDate?: string;
+      /** The date physically written on the cheque — independent of chequeDueDate. */
+      chequeDate?: string;
     };
     itemUpdates?: {
       id: string;

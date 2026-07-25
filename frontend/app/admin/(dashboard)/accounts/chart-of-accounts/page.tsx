@@ -3,16 +3,39 @@
 import React, { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, Plus, FileText } from 'lucide-react';
 import {
   getChartOfAccounts,
   type AccountBalance,
   type ChartOfAccountsResponse,
+  type CustomAccountBalance,
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
+import { getUserFromToken } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import AddAccountDialog from '@/components/accounts/AddAccountDialog';
+import ManualJournalDialog from '@/components/accounts/ManualJournalDialog';
+import CustomAccountRows from '@/components/accounts/CustomAccountRows';
+import {
+  DrilldownTree,
+  RevenueDetailModal,
+  buildRevenueTree,
+  type DrilldownNode,
+} from '@/components/accounts/RevenueDrilldown';
+import { buildExpensesTree } from '@/components/accounts/ExpensesDrilldown';
+import { buildLiabilitiesTree } from '@/components/accounts/LiabilitiesDrilldown';
+import { buildEquityTree } from '@/components/accounts/EquityDrilldown';
+import { buildAssetsTree } from '@/components/accounts/AssetsDrilldown';
+import {
+  LineItemDetailDispatcher,
+  type DrilldownSection,
+} from '@/components/accounts/LineItemDetailDispatcher';
+import { fetchRevenueBreakdown } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { buildChartOfAccountsStatement } from '@/lib/finance/statementBuilders';
+import StatementDialog from '@/components/shared/StatementDialog';
 
 function currentYearFrom() {
   return `${new Date().getFullYear()}-01-01`;
@@ -115,6 +138,17 @@ function ChartOfAccountsContent() {
   const [openSections, setOpenSections] = useState(
     new Set(['assets', 'liabilities', 'equity', 'income', 'expenses']),
   );
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [journalFor, setJournalFor] = useState<CustomAccountBalance | null>(null);
+  const [viewingNode, setViewingNode] = useState<DrilldownNode | null>(null);
+  const [viewingLineItem, setViewingLineItem] = useState<{
+    section: DrilldownSection;
+    node: DrilldownNode;
+  } | null>(null);
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'FINANCE';
 
   const queryParams = branchIds
     ? { periodFrom, periodTo, branchIds: [branchIds] }
@@ -126,6 +160,31 @@ function ChartOfAccountsContent() {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  const { data: revenueBreakdown } = useQuery({
+    queryKey: ['admin-revenue-breakdown', branchIds, periodFrom, periodTo],
+    queryFn: () =>
+      fetchRevenueBreakdown({ periodFrom, periodTo, branchId: branchIds || undefined }),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const revenueTree = revenueBreakdown ? buildRevenueTree(revenueBreakdown) : null;
+
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => fetchBranches(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const toggle = (key: string) => {
     setOpenSections((prev) => {
@@ -153,6 +212,10 @@ function ChartOfAccountsContent() {
   if (!data) return null;
 
   const { assets, liabilities, equity, income, expenses, summary } = data;
+  const assetsTree = buildAssetsTree(assets);
+  const expensesTree = buildExpensesTree(expenses);
+  const liabilitiesTree = buildLiabilitiesTree(liabilities.currentLiabilities);
+  const equityTree = buildEquityTree(equity);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -160,16 +223,33 @@ function ChartOfAccountsContent() {
         <div>
           <p className="text-muted-foreground text-sm">Live balances as of {data.asOfDate}</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => refetch()}
-          disabled={isFetching}
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setShowStatement(true)}
+          >
+            <FileText className="h-4 w-4" />
+            Generate Statement
+          </Button>
+          {canManage && (
+            <Button size="sm" className="gap-2" onClick={() => setShowAddAccount(true)}>
+              <Plus className="h-4 w-4" />
+              Add Account
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-card rounded-2xl border border-slate-100 shadow-sm p-4">
@@ -232,13 +312,21 @@ function ChartOfAccountsContent() {
             <div className="px-5 py-2 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Current Assets
             </div>
-            <Row ab={assets.currentAssets.cashInHand} />
-            <Row ab={assets.currentAssets.cashAtBank} />
-            <Row ab={assets.currentAssets.accountsReceivable} />
-            <Row ab={assets.currentAssets.securityDepositsReceivable} />
-            <Row ab={assets.currentAssets.prepaidExpenses} />
-            <Row ab={assets.currentAssets.sparePartsInventory} />
-            <Row ab={assets.currentAssets.productInventory} />
+            {assetsTree
+              .filter((n) => n.key !== 'EQUIPMENT_ASSETS')
+              .map((n) => (
+                <DrilldownTree
+                  key={n.key}
+                  node={n}
+                  currency={currency}
+                  onView={(node) => setViewingLineItem({ section: 'ASSET', node })}
+                />
+              ))}
+            <CustomAccountRows
+              accounts={assets.currentAssets.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
+            />
             <SubTotal
               label="Total Current Assets"
               value={assets.currentAssets.totalCurrentAssets}
@@ -249,14 +337,21 @@ function ChartOfAccountsContent() {
             </div>
             <Row ab={assets.nonCurrentAssets.equipmentGrossCost} />
             <Row ab={assets.nonCurrentAssets.accumulatedDepreciation} negative />
-            <div className="grid grid-cols-12 px-5 py-2.5 text-sm">
-              <span className="col-span-6 font-medium text-slate-600 pl-4">
-                Equipment Net Book Value
-              </span>
-              <span className="col-span-6 text-right font-semibold tabular-nums text-slate-700">
-                {formatCurrency(assets.nonCurrentAssets.equipmentNBV, currency)}
-              </span>
-            </div>
+            {assetsTree
+              .filter((n) => n.key === 'EQUIPMENT_ASSETS')
+              .map((n) => (
+                <DrilldownTree
+                  key={n.key}
+                  node={{ ...n, label: 'Equipment Net Book Value' }}
+                  currency={currency}
+                  onView={(node) => setViewingLineItem({ section: 'ASSET', node })}
+                />
+              ))}
+            <CustomAccountRows
+              accounts={assets.nonCurrentAssets.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
+            />
             <SubTotal
               label="Total Non-Current Assets"
               value={assets.nonCurrentAssets.totalNonCurrentAssets}
@@ -280,16 +375,28 @@ function ChartOfAccountsContent() {
             <div className="px-5 py-2 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Current Liabilities
             </div>
-            <Row ab={liabilities.currentLiabilities.accountsPayable} />
-            <Row ab={liabilities.currentLiabilities.accruedExpenses} />
-            <Row ab={liabilities.currentLiabilities.vatPayable} />
-            <Row ab={liabilities.currentLiabilities.securityDepositsReceived} />
-            <Row ab={liabilities.currentLiabilities.deferredRevenue} />
-            <Row ab={liabilities.currentLiabilities.salaryPayable} />
+            {liabilitiesTree.map((n) => (
+              <DrilldownTree
+                key={n.key}
+                node={n}
+                currency={currency}
+                onView={(node) => setViewingLineItem({ section: 'LIABILITY', node })}
+              />
+            ))}
+            <CustomAccountRows
+              accounts={liabilities.currentLiabilities.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
+            />
             <SubTotal
               label="Total Current Liabilities"
               value={liabilities.currentLiabilities.totalCurrentLiabilities}
               currency={currency}
+            />
+            <CustomAccountRows
+              accounts={liabilities.nonCurrentLiabilities.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
             />
             <SubTotal
               label="TOTAL LIABILITIES"
@@ -310,11 +417,19 @@ function ChartOfAccountsContent() {
         />
         {openSections.has('equity') && (
           <div className="divide-y divide-border">
-            <Row ab={equity.ownerCapital} />
-            <Row ab={equity.retainedEarnings} />
-            <Row ab={equity.reserves} />
-            <Row ab={equity.lessWithdrawals} negative />
-            <Row ab={equity.lessDividends} negative />
+            {equityTree.map((n) => (
+              <DrilldownTree
+                key={n.key}
+                node={n}
+                currency={currency}
+                onView={(node) => setViewingLineItem({ section: 'EQUITY', node })}
+              />
+            ))}
+            <CustomAccountRows
+              accounts={equity.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
+            />
             <SubTotal label="TOTAL EQUITY" value={equity.totalEquity} currency={currency} />
           </div>
         )}
@@ -333,13 +448,43 @@ function ChartOfAccountsContent() {
             <div className="px-5 py-2 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Period: {data.periodFrom} → {data.periodTo}
             </div>
-            <Row ab={income.rentalRevenue} />
-            <Row ab={income.leaseRevenue} />
-            <Row ab={income.salesRevenue} />
+            {revenueTree && (
+              <>
+                <DrilldownTree
+                  node={revenueTree.sale}
+                  currency={currency}
+                  onView={setViewingNode}
+                />
+                <DrilldownTree
+                  node={revenueTree.rent}
+                  currency={currency}
+                  onView={setViewingNode}
+                />
+                <DrilldownTree
+                  node={revenueTree.lease}
+                  currency={currency}
+                  onView={setViewingNode}
+                />
+              </>
+            )}
             <Row ab={income.serviceRevenue} />
             <Row ab={income.usageRevenue} />
             <Row ab={income.amcSmaRevenue} />
-            <Row ab={income.sparePartSales} />
+            <DrilldownTree
+              node={{
+                key: 'OTHER_INCOME',
+                label: income.otherIncome.name,
+                amount: income.otherIncome.balance,
+                viewable: true,
+              }}
+              currency={currency}
+              onView={(node) => setViewingLineItem({ section: 'INCOME', node })}
+            />
+            <CustomAccountRows
+              accounts={income.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
+            />
             <SubTotal label="TOTAL INCOME" value={income.totalIncome} currency={currency} />
           </div>
         )}
@@ -358,21 +503,19 @@ function ChartOfAccountsContent() {
             <div className="px-5 py-2 bg-muted/30 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Period: {data.periodFrom} → {data.periodTo}
             </div>
-            <Row ab={expenses.costOfParts} />
-            <Row ab={expenses.labourCost} />
-            <Row ab={expenses.depreciation} />
-            <Row ab={expenses.vendorPurchases} />
-            <Row ab={expenses.shippingHandling} />
-            <Row ab={expenses.salaryExpense} />
-            <Row ab={expenses.travelExpense} />
-            <Row ab={expenses.rentExpense} />
-            <Row ab={expenses.utilitiesExpense} />
-            <Row ab={expenses.marketingExpense} />
-            <Row ab={expenses.maintenanceExpense} />
-            <Row ab={expenses.insuranceExpense} />
-            <Row ab={expenses.importLabourCost} />
-            <Row ab={expenses.customsDuty} />
-            <Row ab={expenses.otherExpenses} />
+            {expensesTree.map((n) => (
+              <DrilldownTree
+                key={n.key}
+                node={n}
+                currency={currency}
+                onView={(node) => setViewingLineItem({ section: 'EXPENSE', node })}
+              />
+            ))}
+            <CustomAccountRows
+              accounts={expenses.custom}
+              canManage={canManage}
+              onPostJournal={setJournalFor}
+            />
             <SubTotal label="TOTAL EXPENSES" value={expenses.totalExpenses} currency={currency} />
           </div>
         )}
@@ -416,6 +559,63 @@ function ChartOfAccountsContent() {
           </div>
         </div>
       </div>
+
+      {showAddAccount && (
+        <AddAccountDialog
+          onClose={() => setShowAddAccount(false)}
+          onCreated={() => {
+            setShowAddAccount(false);
+            refetch();
+          }}
+        />
+      )}
+      {journalFor && (
+        <ManualJournalDialog
+          account={{
+            id: journalFor.id,
+            accountNumber: journalFor.code,
+            accountName: journalFor.name,
+          }}
+          onClose={() => setJournalFor(null)}
+          onPosted={() => {
+            setJournalFor(null);
+            refetch();
+          }}
+        />
+      )}
+      {viewingNode && (
+        <RevenueDetailModal
+          node={viewingNode}
+          periodFrom={periodFrom}
+          periodTo={periodTo}
+          branchId={branchIds || undefined}
+          isAdmin
+          branches={branches}
+          onClose={() => setViewingNode(null)}
+        />
+      )}
+      {viewingLineItem && (
+        <LineItemDetailDispatcher
+          section={viewingLineItem.section}
+          node={viewingLineItem.node}
+          periodFrom={periodFrom}
+          periodTo={periodTo}
+          branchId={branchIds || undefined}
+          isAdmin
+          branches={branches}
+          cashBankPagePath="/admin/accounts/cash-bank"
+          assetsPagePath="/admin/accounts/assets"
+          onClose={() => setViewingLineItem(null)}
+        />
+      )}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={buildChartOfAccountsStatement(data, currency)}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }

@@ -60,6 +60,8 @@ export class UsageService {
     chequeNumber?: string;
     chequeBankName?: string;
     chequeDueDate?: string;
+    /** The date physically written on the cheque — independent of chequeDueDate. */
+    chequeDate?: string;
     recordedBy?: string;
   }) {
     // 1. Fetch Contract
@@ -695,6 +697,7 @@ export class UsageService {
       chequeNumber?: string;
       chequeBankName?: string;
       chequeDueDate?: string;
+      chequeDate?: string;
       recordedBy?: string;
     },
   ) {
@@ -722,6 +725,7 @@ export class UsageService {
         chequeNumber: payload.chequeNumber,
         chequeBankName: payload.chequeBankName,
         chequeDueDate: payload.chequeDueDate,
+        chequeDate: payload.chequeDate,
         periodLabel: this.formatPeriodLabel(billingPeriodStart, billingPeriodEnd),
       },
       payload.recordedBy,

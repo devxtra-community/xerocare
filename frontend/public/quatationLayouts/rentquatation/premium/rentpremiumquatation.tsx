@@ -56,6 +56,9 @@ export interface RentPremiumQuotationProps {
   totals: {
     subTotal: number;
     tax: number;
+    /** Not currently rendered by this layout (no VAT line exists here) — kept
+     * for prop-shape parity with the other Rent layouts. */
+    taxName?: string;
     total: number;
   };
 }

@@ -14,6 +14,7 @@ import {
   BarChart2,
   CheckCircle,
   AlertTriangle,
+  FileText,
 } from 'lucide-react';
 import {
   fetchEquityEntries,
@@ -27,9 +28,11 @@ import {
   type EquityEntry,
   type EquityType,
 } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
+import StatementDialog, { type StatementData } from '@/components/shared/StatementDialog';
 import StatCard from '@/components/StatCard';
 import {
   DonutChart,
@@ -45,6 +48,7 @@ const EQUITY_TYPES: EquityType[] = [
   'RESERVES',
   'OWNER_CONTRIBUTION',
   'DIVIDEND',
+  'WITHDRAWAL',
   'PROFIT_TRANSFER',
   'LOSS_TRANSFER',
   'OTHER',
@@ -56,6 +60,7 @@ const TYPE_BADGE: Record<string, string> = {
   RESERVES: 'bg-purple-100 text-purple-700',
   OWNER_CONTRIBUTION: 'bg-amber-100 text-amber-700',
   DIVIDEND: 'bg-red-100 text-red-700',
+  WITHDRAWAL: 'bg-rose-100 text-rose-700',
   PROFIT_TRANSFER: 'bg-cyan-100 text-cyan-700',
   LOSS_TRANSFER: 'bg-orange-100 text-orange-700',
   OTHER: 'bg-gray-100 text-gray-700',
@@ -267,6 +272,21 @@ export default function EquityPage() {
   const [tab, setTab] = useState<'overview' | 'entries' | 'statement' | 'balance'>('overview');
   const [modal, setModal] = useState<null | 'add' | EquityEntry>(null);
   const [stmtYear, setStmtYear] = useState(String(new Date().getFullYear()));
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branches.find((b) => b.id === currentUser?.branchId) ?? branches[0];
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const { data: entries = [], isLoading: loadingEntries } = useQuery({
     queryKey: ['equity-entries'],
@@ -365,6 +385,97 @@ export default function EquityPage() {
     { id: 'balance', label: 'Balance Sheet', icon: Scale },
   ] as const;
 
+  // Generate Statement — shape depends on the active tab: the real running-balance
+  // Statement of Changes in Equity on that tab, a plain snapshot everywhere else.
+  const buildStatementData = (): StatementData => {
+    if (tab === 'statement' && statement) {
+      return {
+        kind: 'running-balance',
+        title: 'Statement of Changes in Equity',
+        subjectName: `Financial Year ${statement.year}`,
+        periodFrom: `${statement.year}-01-01`,
+        periodTo: `${statement.year}-12-31`,
+        currency,
+        openingBalance: statement.opening.total,
+        closingBalance: statement.closing.total,
+        balanceLabel: 'Closing Equity',
+        rows: statement.movements.map((m) => ({
+          date: m.date,
+          reference: m.type,
+          description: m.description,
+          debit: m.total >= 0 ? m.total : undefined,
+          credit: m.total < 0 ? -m.total : undefined,
+        })),
+      };
+    }
+    if (tab === 'balance' && balanceSheet) {
+      return {
+        kind: 'snapshot',
+        title: 'Equity — Balance Sheet Position',
+        asOfDate: new Date().toISOString().slice(0, 10),
+        sections: [
+          {
+            title: 'Balance Sheet Summary',
+            rows: [
+              { label: 'Total Assets', value: formatCurrency(summary?.totalAssets ?? 0, currency) },
+              {
+                label: 'Total Liabilities',
+                value: formatCurrency(balanceSheet.liabilities.total, currency),
+              },
+              { label: 'Net Equity', value: formatCurrency(summary?.netEquity ?? 0, currency) },
+            ],
+          },
+        ],
+      };
+    }
+    if (tab === 'entries') {
+      return {
+        kind: 'snapshot',
+        title: 'Equity Entries',
+        sections: [
+          {
+            title: 'Entries',
+            rows: entries.map((e) => ({
+              code: e.date?.slice(0, 10) ?? '',
+              label: `${e.entryNo} — ${e.type.replace(/_/g, ' ')} — ${e.description}`,
+              value: formatCurrency(e.amount, e.currency),
+            })),
+            total: {
+              label: 'Net Total',
+              value: formatCurrency(
+                entries.reduce((s, e) => s + e.amount, 0),
+                currency,
+              ),
+            },
+          },
+        ],
+      };
+    }
+    // overview
+    return {
+      kind: 'snapshot',
+      title: 'Equity — Overview',
+      asOfDate: new Date().toISOString().slice(0, 10),
+      sections: [
+        {
+          title: 'Composition',
+          rows: compositionData.map((d) => ({
+            label: d.name,
+            value: formatCurrency(d.value, currency),
+          })),
+        },
+      ],
+      summary: [
+        {
+          label: 'Net Equity Position',
+          value: formatCurrency(summary?.netEquity ?? 0, currency),
+          bold: true,
+        },
+        { label: 'Total Assets', value: formatCurrency(summary?.totalAssets ?? 0, currency) },
+      ],
+    };
+  };
+
   return (
     <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header */}
@@ -378,11 +489,12 @@ export default function EquityPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportPdfButton
-            targetId={`equity-${tab}-pdf`}
-            reportTitle={`Equity — ${tabs.find((t) => t.id === tab)?.label ?? tab}`}
-            filenamePrefix="Equity"
-          />
+          <button
+            onClick={() => setShowStatement(true)}
+            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          >
+            <FileText className="h-4 w-4" /> Generate Statement
+          </button>
           <button
             onClick={() => setModal('add')}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
@@ -442,7 +554,7 @@ export default function EquityPage() {
 
       {/* ── Overview Tab ── */}
       {tab === 'overview' && (
-        <div id="equity-overview-pdf" className="space-y-6">
+        <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard
               title="Share Capital"
@@ -534,10 +646,7 @@ export default function EquityPage() {
 
       {/* ── Entries Tab ── */}
       {tab === 'entries' && (
-        <div
-          id="equity-entries-pdf"
-          className="bg-white rounded-xl shadow-sm border overflow-hidden"
-        >
+        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="font-semibold text-gray-800">Equity Entries ({entries.length})</h3>
             <button
@@ -625,7 +734,7 @@ export default function EquityPage() {
 
       {/* ── Statement of Changes Tab ── */}
       {tab === 'statement' && (
-        <div id="equity-statement-pdf" className="space-y-4">
+        <div className="space-y-4">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-gray-700">Year:</label>
             <select
@@ -739,7 +848,7 @@ export default function EquityPage() {
 
       {/* ── Balance Sheet Tab ── */}
       {tab === 'balance' && (
-        <div id="equity-balance-pdf" className="space-y-4">
+        <div className="space-y-4">
           {balanceSheet ? (
             <>
               {/* Balance check banner */}
@@ -902,6 +1011,15 @@ export default function EquityPage() {
           onClose={() => setModal(null)}
           onSave={handleSave}
           saving={isSaving}
+        />
+      )}
+
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={buildStatementData()}
+          branch={branchInfo}
         />
       )}
     </div>

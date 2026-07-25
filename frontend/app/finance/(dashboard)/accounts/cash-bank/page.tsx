@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
-  Download,
   RefreshCw,
   ArrowLeftRight,
   Banknote,
@@ -18,6 +17,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   X,
+  FileText,
 } from 'lucide-react';
 import {
   fetchCashBankAccounts,
@@ -31,14 +31,15 @@ import {
   reconcileAccount,
   getReconciliations,
   fetchCashbookEntries,
+  fetchAccountStatement,
   type CashBankAccount,
   type CashBankTransactionEntry,
 } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useExchangeRateMap, convertAmount, formatDualCurrency } from '@/lib/dualCurrency';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 import api from '@/lib/api';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -53,12 +54,37 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import StatementDialog, {
+  type RunningBalanceStatementData,
+  type SnapshotStatementData,
+} from '@/components/shared/StatementDialog';
+import type { BranchInfo } from '@/components/shared/documentTemplate';
 
 import { getActiveCurrency } from '@/lib/currency';
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const today = new Date().toISOString().slice(0, 10);
+
+async function loadAccountStatement(
+  accountId: string,
+  periodFrom?: string,
+  periodTo?: string,
+): Promise<RunningBalanceStatementData> {
+  const stmt = await fetchAccountStatement({ accountId, periodFrom, periodTo });
+  return {
+    kind: 'running-balance',
+    title: `${stmt.accountType === 'BANK' ? 'Bank' : 'Cash'} Account Statement`,
+    subjectName: stmt.accountName,
+    subjectMeta: `Current Balance: ${formatCurrency(stmt.currentBalance, stmt.currency)}`,
+    periodFrom: stmt.periodFrom,
+    periodTo: stmt.periodTo,
+    currency: stmt.currency,
+    openingBalance: stmt.openingBalance,
+    closingBalance: stmt.closingBalance,
+    rows: stmt.rows,
+    balanceLabel: 'Closing Balance',
+  };
+}
 
 const CASH_SOURCES = [
   'CASH_RECEIVED_FROM_CUSTOMER',
@@ -1127,11 +1153,21 @@ function TransferModal({
 
 // ─── Transaction History Drawer ───────────────────────────────────────────────
 
-function HistoryDrawer({ account, onClose }: { account: CashBankAccount; onClose: () => void }) {
+function HistoryDrawer({
+  account,
+  branchInfo,
+  onClose,
+}: {
+  account: CashBankAccount;
+  branchInfo: BranchInfo;
+  onClose: () => void;
+}) {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [page, setPage] = useState(1);
+  const [statementData, setStatementData] = useState<RunningBalanceStatementData | null>(null);
+  const [generatingStatement, setGeneratingStatement] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['cb-txns', account.id, fromDate, toDate, typeFilter, page],
@@ -1148,21 +1184,17 @@ function HistoryDrawer({ account, onClose }: { account: CashBankAccount; onClose
 
   const entries: CashBankTransactionEntry[] = data?.entries ?? [];
 
-  const exportExcel = () => {
-    const rows = entries.map((e) => ({
-      Date: String(e.date).slice(0, 10),
-      Ref: e.referenceNo,
-      Type: e.entryType,
-      Category: e.category,
-      Description: e.description,
-      Debit: e.entryType === 'PAYMENT' ? Number(e.amount) : 0,
-      Credit: e.entryType === 'RECEIPT' ? Number(e.amount) : 0,
-      'Running Balance': e.runningBalance,
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, account.name.slice(0, 30));
-    XLSX.writeFile(wb, `${account.name.replace(/\s+/g, '_')}_history.xlsx`);
+  const generateStatement = async () => {
+    setGeneratingStatement(true);
+    try {
+      setStatementData(
+        await loadAccountStatement(account.id, fromDate || undefined, toDate || undefined),
+      );
+    } catch {
+      toast.error('Failed to generate statement');
+    } finally {
+      setGeneratingStatement(false);
+    }
   };
 
   return (
@@ -1219,8 +1251,15 @@ function HistoryDrawer({ account, onClose }: { account: CashBankAccount; onClose
               <SelectItem value="PAYMENT">Payments</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" className="gap-1.5 ml-auto" onClick={exportExcel}>
-            <Download className="h-3.5 w-3.5" /> Excel
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 ml-auto"
+            onClick={generateStatement}
+            disabled={generatingStatement}
+          >
+            <FileText className="h-3.5 w-3.5" />{' '}
+            {generatingStatement ? 'Generating…' : 'Generate Statement'}
           </Button>
         </div>
 
@@ -1310,6 +1349,14 @@ function HistoryDrawer({ account, onClose }: { account: CashBankAccount; onClose
           </div>
         )}
       </SheetContent>
+      {statementData && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setStatementData(null)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </Sheet>
   );
 }
@@ -1318,10 +1365,12 @@ function HistoryDrawer({ account, onClose }: { account: CashBankAccount; onClose
 
 function ReconcileModal({
   account,
+  branchInfo,
   onClose,
   onSaved,
 }: {
   account: CashBankAccount;
+  branchInfo: BranchInfo;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -1331,6 +1380,7 @@ function ReconcileModal({
     statementBalance: '',
     notes: '',
   });
+  const [showStatement, setShowStatement] = useState(false);
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   const bookBalance = Number(account.currentBalance);
@@ -1342,6 +1392,34 @@ function ReconcileModal({
     queryKey: ['reconciliations', account.id],
     queryFn: () => getReconciliations(account.id),
   });
+
+  const reconciliationStatement: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: `Reconciliation — ${account.name}`,
+    asOfDate: form.reconciliationDate,
+    sections: [
+      {
+        title: 'Current Reconciliation',
+        rows: [
+          { label: 'Book Balance (system)', value: formatCurrency(bookBalance, account.currency) },
+          { label: 'Statement Balance', value: formatCurrency(stmtBalance, account.currency) },
+          { label: 'Difference', value: formatCurrency(difference, account.currency) },
+          { label: 'Status', value: isBalanced ? 'Balanced' : 'Out of balance' },
+        ],
+      },
+      ...(history.length > 0
+        ? [
+            {
+              title: 'Reconciliation History',
+              rows: history.map((h) => ({
+                label: `${String(h.reconciliationDate).slice(0, 10)} — Statement ${String(h.statementDate).slice(0, 10)}`,
+                value: formatCurrency(Number(h.statementBalance), account.currency),
+              })),
+            },
+          ]
+        : []),
+    ],
+  };
 
   const mut = useMutation({
     mutationFn: () =>
@@ -1364,13 +1442,16 @@ function ReconcileModal({
       <DialogContent className="max-w-lg">
         <DialogHeader className="flex-row items-center justify-between gap-2 space-y-0">
           <DialogTitle>Reconcile — {account.name}</DialogTitle>
-          <ExportPdfButton
-            targetId="reconcile-pdf"
-            reportTitle={`Reconciliation — ${account.name}`}
-            filenamePrefix={`Reconciliation_${account.name}`}
-          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setShowStatement(true)}
+          >
+            <FileText className="h-3.5 w-3.5" /> Generate Statement
+          </Button>
         </DialogHeader>
-        <div id="reconcile-pdf" className="space-y-4 pt-1">
+        <div className="space-y-4 pt-1">
           <div className="rounded-xl border p-4 space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-600">Book Balance (system)</span>
@@ -1484,7 +1565,64 @@ function ReconcileModal({
           </div>
         </div>
       </DialogContent>
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={reconciliationStatement}
+          branch={branchInfo}
+        />
+      )}
     </Dialog>
+  );
+}
+
+function SelectAccountModal({
+  accounts,
+  onClose,
+  onSelect,
+}: {
+  accounts: CashBankAccount[];
+  onClose: () => void;
+  onSelect: (accountId: string) => void;
+}) {
+  const [chosen, setChosen] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-bold text-slate-800">Select Account</h2>
+          <button onClick={onClose}>
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            A statement needs one specific account — choose which account this statement is for.
+          </p>
+          <Select value={chosen} onValueChange={setChosen}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose an account" />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name} ({a.type})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={() => chosen && onSelect(chosen)} disabled={!chosen} className="flex-1">
+            Generate Statement
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1506,7 +1644,24 @@ export default function CashBankPage() {
   const [tab, setTab] = useState<ActiveTab>('cash');
   const [modal, setModal] = useState<ModalState>(null);
   const [search, setSearch] = useState('');
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [statementData, setStatementData] = useState<RunningBalanceStatementData | null>(null);
+  const [generatingStatement, setGeneratingStatement] = useState(false);
   const qc = useQueryClient();
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branches.find((b) => b.id === currentUser?.branchId) ?? branches[0];
+  const branchInfo: BranchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const refetchAll = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['fin-cash-bank'] });
@@ -1615,20 +1770,27 @@ export default function CashBankPage() {
     [cashbookEntries],
   );
 
-  const exportCashbook = () => {
-    const rows = filteredCashbook.map((e) => ({
-      Date: String(e.date).slice(0, 10),
-      Ref: e.referenceNo,
-      Type: e.entryType,
-      Account: e.account?.name ?? '—',
-      Category: e.category,
-      Description: e.description,
-      Debit: e.entryType === 'PAYMENT' ? Number(e.amount) : 0,
-      Credit: e.entryType === 'RECEIPT' ? Number(e.amount) : 0,
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Cashbook');
-    XLSX.writeFile(wb, `Cashbook_${today}.xlsx`);
+  const [pickerAccounts, setPickerAccounts] = useState<CashBankAccount[]>([]);
+
+  const generateStatementForAccount = async (accountId: string) => {
+    setShowAccountPicker(false);
+    setGeneratingStatement(true);
+    try {
+      setStatementData(await loadAccountStatement(accountId));
+    } catch {
+      toast.error('Failed to generate statement');
+    } finally {
+      setGeneratingStatement(false);
+    }
+  };
+
+  const handleGenerateStatementClick = (candidates: CashBankAccount[]) => {
+    if (candidates.length === 1) {
+      generateStatementForAccount(candidates[0].id);
+      return;
+    }
+    setPickerAccounts(candidates);
+    setShowAccountPicker(true);
   };
 
   const TABS: { id: ActiveTab; label: string; icon: React.ReactNode }[] = [
@@ -1711,18 +1873,40 @@ export default function CashBankPage() {
             )}
           </div>
           {tab === 'cashbook' && (
-            <>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCashbook}>
-                <Download className="h-3.5 w-3.5" /> Export
-              </Button>
-              <ExportPdfButton targetId="cashbook-pdf" reportTitle="Cashbook" />
-            </>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={generatingStatement}
+              onClick={() => handleGenerateStatementClick(activeAccounts)}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {generatingStatement ? 'Generating…' : 'Generate Statement'}
+            </Button>
           )}
           {tab === 'cash' && (
-            <ExportPdfButton targetId="cash-accounts-pdf" reportTitle="Cash in Hand Accounts" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={generatingStatement}
+              onClick={() => handleGenerateStatementClick(filteredCash)}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {generatingStatement ? 'Generating…' : 'Generate Statement'}
+            </Button>
           )}
           {tab === 'bank' && (
-            <ExportPdfButton targetId="bank-accounts-pdf" reportTitle="Cash at Bank Accounts" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={generatingStatement}
+              onClick={() => handleGenerateStatementClick(filteredBank)}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {generatingStatement ? 'Generating…' : 'Generate Statement'}
+            </Button>
           )}
           {tab === 'transfer' && (
             <Button
@@ -2238,13 +2422,33 @@ export default function CashBankPage() {
         />
       )}
       {modal?.kind === 'history' && (
-        <HistoryDrawer account={modal.account} onClose={() => setModal(null)} />
+        <HistoryDrawer
+          account={modal.account}
+          branchInfo={branchInfo}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal?.kind === 'reconcile' && (
         <ReconcileModal
           account={modal.account}
+          branchInfo={branchInfo}
           onClose={() => setModal(null)}
           onSaved={refetchAll}
+        />
+      )}
+      {showAccountPicker && (
+        <SelectAccountModal
+          accounts={pickerAccounts}
+          onClose={() => setShowAccountPicker(false)}
+          onSelect={generateStatementForAccount}
+        />
+      )}
+      {statementData && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setStatementData(null)}
+          data={statementData}
+          branch={branchInfo}
         />
       )}
     </div>

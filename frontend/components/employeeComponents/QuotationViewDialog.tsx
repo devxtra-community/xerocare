@@ -603,11 +603,20 @@ export function QuotationViewDialog({
     isLeaseStandard ||
     isLeasePremium;
 
+  // A customer-status exemption (government/embassy/charity/etc. — see
+  // CustomerVatStatus) is a separate, independent reason for zero VAT from the
+  // Rent/Lease sale-type exemption — both can apply to the same quotation
+  // without conflicting, since this only ever forces tax further toward zero.
+  const isCustomerExempt = quotation.customerVatStatus === 'EXEMPT';
+  const vatLabel = isCustomerExempt ? 'VAT Exempt' : quotation.taxName || 'VAT';
+
   // ── Resolve VAT/tax rate ──────────────────────────────────────────────────
-  // Priority: snapshotted taxPercent on the quotation record (set at creation time)
+  // Priority: EXEMPT customer (always 0, never overridden by a fallback)
+  //           → snapshotted taxPercent on the quotation record (set at creation time)
   //           → live product metadata tax_rate (fallback for legacy records)
-  const resolvedTaxPercent =
-    quotation.taxPercent != null
+  const resolvedTaxPercent = isCustomerExempt
+    ? 0
+    : quotation.taxPercent != null
       ? Number(quotation.taxPercent)
       : Number(enrichedItems[0]?.metadata?.tax_rate || 0);
 
@@ -735,7 +744,7 @@ export function QuotationViewDialog({
     discountTotal: finalDiscountTotal,
     vatTotal: finalVatTotal,
     vatPercent: resolvedTaxPercent,
-    vatName: quotation.taxName || 'VAT',
+    vatName: vatLabel,
     total: finalTotalAmount,
     payment: finalTotalAmount,
     balanceDue: finalTotalAmount,
@@ -1232,6 +1241,7 @@ export function QuotationViewDialog({
                 totals={{
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
+                  taxName: vatLabel,
                   total: rentTotalAmount,
                 }}
               />
@@ -1245,6 +1255,7 @@ export function QuotationViewDialog({
                 totals={{
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
+                  taxName: vatLabel,
                   total: rentTotalAmount,
                 }}
               />
@@ -1258,6 +1269,7 @@ export function QuotationViewDialog({
                 totals={{
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
+                  taxName: vatLabel,
                   total: rentTotalAmount,
                 }}
               />
@@ -1271,6 +1283,7 @@ export function QuotationViewDialog({
                 totals={{
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
+                  taxName: vatLabel,
                   total: leaseTotalAmount,
                 }}
               />
@@ -1284,6 +1297,7 @@ export function QuotationViewDialog({
                 totals={{
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
+                  taxName: vatLabel,
                   total: leaseTotalAmount,
                 }}
               />
@@ -1297,6 +1311,7 @@ export function QuotationViewDialog({
                 totals={{
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
+                  taxName: vatLabel,
                   total: leaseTotalAmount,
                 }}
               />

@@ -35,6 +35,8 @@ import {
   Receipt,
   Banknote,
   BookMarked,
+  Coins,
+  SplitSquareHorizontal,
 } from 'lucide-react';
 
 import {
@@ -176,10 +178,12 @@ const adminAccountsMenuItems = [
   { title: 'Cheques', icon: FileCheck, href: '/admin/accounts/cheques' },
   { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/admin/accounts/guarantee-cheques' },
   { title: 'Expenses', icon: DollarSign, href: '/admin/accounts/expenses' },
+  { title: 'Income', icon: Coins, href: '/admin/accounts/income' },
   { title: 'Receivables', icon: ReceiptText, href: '/admin/accounts/receivable' },
   { title: 'Payables', icon: CreditCard, href: '/admin/accounts/payable' },
   { title: 'Profit & Loss', icon: TrendingUp, href: '/admin/accounts/profit-loss' },
   { title: 'Income Statement', icon: LineChart, href: '/admin/accounts/income-statement' },
+  { title: 'Segmented P&L', icon: SplitSquareHorizontal, href: '/admin/accounts/segmented-pnl' },
   { title: 'Balance Sheet', icon: BookMarked, href: '/admin/accounts/balance-sheet' },
   { title: 'Cash Flow', icon: Banknote, href: '/admin/accounts/cash-flow' },
   { title: 'General Ledger', icon: BookText, href: '/admin/accounts/general-ledger' },

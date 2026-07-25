@@ -52,6 +52,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDueDate, setChequeDueDate] = useState('');
+  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
   const [submitting, setSubmitting] = useState(false);
 
   // Customer bank account + currency (Part 4: pay-from-customer-bank-account,
@@ -134,6 +135,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
         chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
         chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
         chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+        chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
         currency: paidCurrency || undefined,
         exchangeRate,
       });
@@ -150,6 +152,7 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
       setChequeNumber('');
       setChequeBankName('');
       setChequeDueDate('');
+      setChequeDate(new Date().toISOString().split('T')[0]);
       setSelectedBankAccountIdx('');
       setPaidCurrency(summary?.currency || invoiceCurrency);
       fetchSummary();
@@ -371,6 +374,17 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
                         required
                         value={chequeBankName}
                         onChange={(e) => setChequeBankName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500">
+                        Cheque Date * <span className="font-normal">(date on the cheque)</span>
+                      </label>
+                      <Input
+                        type="date"
+                        required
+                        value={chequeDate}
+                        onChange={(e) => setChequeDate(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">

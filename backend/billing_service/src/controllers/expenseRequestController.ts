@@ -4,6 +4,7 @@ import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity
 import { ExpenseEntry } from '../entities/expenseEntryEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { CashbookEntry } from '../entities/cashbookEntryEntity';
+import { requireCashAccount } from '../services/cashbookService';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { sign } from 'jsonwebtoken';
@@ -458,14 +459,13 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
           if (notes) request.notes = notes;
           await manager.save(EmployeeExpenseRequest, request);
 
-          const accountRepo = manager.getRepository(CashBankAccount);
-          const account = await accountRepo.findOne({ where: { id: accountId } });
-          if (!account) {
-            throw new AppError(
-              `Cash/Bank account ${accountId} not found — approval aborted. The account may have been removed. Ask the Manager to resubmit with a valid account.`,
-              400,
-            );
-          }
+          // Also verifies the account belongs to this branch — the previous plain
+          // findOne({ id }) would accept an id from a different branch too.
+          const account = await requireCashAccount(manager, {
+            branchId: request.branchId,
+            paymentMode: request.paymentMode,
+            explicitAccountId: accountId,
+          });
           account.currentBalance = Number(account.currentBalance) - Number(request.amount);
           await manager.save(CashBankAccount, account);
 
@@ -561,12 +561,14 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
 
       // 4. If paying immediately: deduct from account + create cashbook entry
       if (payImmediately) {
-        const accountRepo = manager.getRepository(CashBankAccount);
-        const account = await accountRepo.findOne({ where: { id: paid_from_account } });
-        if (account) {
-          account.currentBalance = Number(account.currentBalance) - Number(request.amount);
-          await manager.save(CashBankAccount, account);
-        }
+        // Used to skip the deduction and still mark the request/entry PAID when the
+        // account wasn't found — now blocks the whole approval instead.
+        const account = await requireCashAccount(manager, {
+          branchId: request.branchId,
+          explicitAccountId: paid_from_account,
+        });
+        account.currentBalance = Number(account.currentBalance) - Number(request.amount);
+        await manager.save(CashBankAccount, account);
 
         const cbEntry = manager.create(CashbookEntry, {
           referenceNo: cbRefNo,
@@ -730,6 +732,20 @@ export const createManagerPurchasePaymentRequest = async (
     const managerName = empInfo?.name || 'Branch Manager';
     const empBranchId = empInfo?.branchId || branchId || '';
     const branchName = empInfo?.branchName || 'Unknown Branch';
+
+    // Block before touching ven_inv at all: cash doesn't move until Finance approves
+    // (that step already validates the account), but a Manager could otherwise submit
+    // a request naming no real account for a branch with none configured — the
+    // PurchasePayment would still get recorded (outstanding reduces) for a request
+    // that can never actually be approved. Cheque doesn't need this — it never enters
+    // the approval queue at all (see the paymentMethod branch below).
+    if (paymentMethod !== 'Cheque') {
+      await requireCashAccount(Source, {
+        branchId: empBranchId,
+        paymentMode: paymentMethod,
+        explicitAccountId: paidFromAccountId,
+      });
+    }
 
     // Payment proof uploaded by the Manager (multipart `proof` field → R2).
     const proofFile = req.file as { key?: string } | undefined;
@@ -917,6 +933,22 @@ export const createExpenseRequestFromPurchasePayment = async (
     const employeeName = empInfo?.name || 'Branch Manager';
     const branchName = empInfo?.branchName || 'Unknown Branch';
 
+    // Block before writing anything: this call represents cash already spent (Finance
+    // recording a direct purchase payment) — validate the destination account exists
+    // for this branch before the request row (and the ven_inv PurchasePayment that
+    // triggered this call) is left standing with no real cash movement behind it.
+    // Resolved here (once) and reused below, rather than a second lookup that
+    // silently skipped the deduction whenever paidFromAccountId wasn't given at all.
+    const resolvedAccount =
+      paymentMethod !== 'Cheque'
+        ? await requireCashAccount(Source, {
+            branchId,
+            paymentMode: paymentMethod,
+            explicitAccountId: paidFromAccountId,
+            actionLabel: 'recording a vendor purchase payment',
+          })
+        : null;
+
     const requestNo = await generateRequestNo();
     const repo = Source.getRepository(EmployeeExpenseRequest);
 
@@ -949,53 +981,46 @@ export const createExpenseRequestFromPurchasePayment = async (
     const saved = await repo.save(request);
 
     // Immediately deduct from cash/bank account (bypasses MANAGER read-only restriction
-    // since this is a server-to-server internal call with no parseBranchFilter middleware)
-    if (paidFromAccountId && paymentMethod !== 'Cheque') {
-      try {
-        // Generate cashbook ref BEFORE transaction (pool max=1 constraint)
-        const cbYear = new Date().getFullYear();
-        const cbCount = await Source.getRepository(CashbookEntry)
-          .createQueryBuilder('c')
-          .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
-          .getCount();
-        const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+    // since this is a server-to-server internal call with no parseBranchFilter middleware).
+    // No longer best-effort — resolvedAccount was already validated to exist above, so
+    // this only fails on a genuine, unexpected error, which now correctly propagates
+    // instead of being logged as "non-critical" while the caller's notification (below)
+    // goes on to claim the amount was deducted.
+    if (resolvedAccount) {
+      const cbYear = new Date().getFullYear();
+      const cbCount = await Source.getRepository(CashbookEntry)
+        .createQueryBuilder('c')
+        .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+        .getCount();
+      const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
 
-        await Source.transaction(async (manager) => {
-          const accountRepo = manager.getRepository(CashBankAccount);
-          const account = await accountRepo.findOne({ where: { id: paidFromAccountId } });
-          if (account) {
-            account.currentBalance = Number(account.currentBalance) - parseFloat(String(amount));
-            await manager.save(CashBankAccount, account);
-          } else {
-            logger.warn(
-              `[ExpenseRequest] Account ${paidFromAccountId} not found — balance not deducted`,
-            );
-          }
+      await Source.transaction(async (manager) => {
+        const accountRepo = manager.getRepository(CashBankAccount);
+        const account = await accountRepo.findOneOrFail({ where: { id: resolvedAccount.id } });
+        account.currentBalance = Number(account.currentBalance) - parseFloat(String(amount));
+        await manager.save(CashBankAccount, account);
 
-          const cbEntry = manager.create(CashbookEntry, {
-            referenceNo: cbRefNo,
-            date: date ? new Date(date) : new Date(),
-            accountId: paidFromAccountId,
-            entryType: 'PAYMENT',
-            amount: parseFloat(String(amount)),
-            category: 'Vendor Purchase',
-            description: `Vendor payment: ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
-            paymentMode: paymentMethod || 'Cash',
-            notes: `Auto-deducted from purchase payment. Ref: ${purchaseRef || 'N/A'}.`,
-            createdBy: employeeId,
-            branchId,
-          });
-          await manager.save(CashbookEntry, cbEntry);
+        const cbEntry = manager.create(CashbookEntry, {
+          referenceNo: cbRefNo,
+          date: date ? new Date(date) : new Date(),
+          accountId: account.id,
+          entryType: 'PAYMENT',
+          amount: parseFloat(String(amount)),
+          category: 'Vendor Purchase',
+          description: `Vendor payment: ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+          paymentMode: paymentMethod || 'Cash',
+          notes: `Auto-deducted from purchase payment. Ref: ${purchaseRef || 'N/A'}.`,
+          createdBy: employeeId,
+          branchId,
         });
+        await manager.save(CashbookEntry, cbEntry);
+      });
 
-        logger.info('[ExpenseRequest] Balance deducted immediately for purchase payment', {
-          paidFromAccountId,
-          amount,
-          purchaseRef,
-        });
-      } catch (deductErr) {
-        logger.warn('[ExpenseRequest] Account deduction failed (non-critical):', deductErr);
-      }
+      logger.info('[ExpenseRequest] Balance deducted immediately for purchase payment', {
+        accountId: resolvedAccount.id,
+        amount,
+        purchaseRef,
+      });
     }
 
     const fmIds = await findFinanceManagersOfBranch(branchId);
@@ -1129,21 +1154,20 @@ export const payExpenseRequest = async (req: Request, res: Response, next: NextF
           });
         }
 
-        const accountRepo = manager.getRepository(CashBankAccount);
-        const account = await accountRepo.findOne({ where: { id: paid_from_account } });
-        if (account) {
-          account.currentBalance = Number(account.currentBalance) - Number(request.amount);
-          await manager.save(CashBankAccount, account);
-        } else {
-          logger.warn(
-            `[payExpenseRequest] Account ${paid_from_account} not found — balance not deducted`,
-          );
-        }
+        // Used to skip the deduction and still mark the request/entry PAID when the
+        // account wasn't found — now blocks the whole payment instead.
+        const account = await requireCashAccount(manager, {
+          branchId: request.branchId,
+          paymentMode: payment_mode,
+          explicitAccountId: paid_from_account,
+        });
+        account.currentBalance = Number(account.currentBalance) - Number(request.amount);
+        await manager.save(CashBankAccount, account);
 
         const cbEntry = manager.create(CashbookEntry, {
           referenceNo: cbRefNo,
           date: new Date(),
-          accountId: paid_from_account,
+          accountId: account.id,
           entryType: 'PAYMENT',
           amount: request.amount,
           category: 'Expense',

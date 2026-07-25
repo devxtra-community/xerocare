@@ -5,6 +5,7 @@ import { Product, ProductStatus } from '../entities/productEntity';
 import { ModelRepository } from '../repositories/modelRepository';
 import { ModelService } from '../services/modelService';
 import { ProcessedInvoiceItem } from '../entities/processedInvoiceItemEntity';
+import { deleteCached } from '../utils/cacheUtil';
 
 const EXCHANGE = 'domain_events';
 const QUEUE = 'inventory.product.allocate.queue';
@@ -93,6 +94,7 @@ export async function startProductAllocationConsumer() {
           await queryRunner.manager.save(ProcessedInvoiceItem, { invoiceItemId });
 
           await queryRunner.commitTransaction();
+          await deleteCached(`product:${product.id}`);
 
           logger.info('Product status updated to SOLD for allocation (Idempotent)', {
             serialNumber,
@@ -130,6 +132,7 @@ export async function startProductAllocationConsumer() {
 
         product.product_status = ProductStatus.SOLD;
         await productRepo.save(product);
+        await deleteCached(`product:${product.id}`);
 
         logger.info('Product status updated to SOLD for allocation (Legacy)', {
           serialNumber,

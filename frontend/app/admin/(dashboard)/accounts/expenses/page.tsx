@@ -3,14 +3,16 @@
 import React, { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Search, Download } from 'lucide-react';
+import { Search, FileText } from 'lucide-react';
 import { fetchExpenseEntries, fetchExpenseCharts } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, StackedBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
-import * as XLSX from 'xlsx';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
@@ -25,6 +27,23 @@ function ExpensesContent() {
   const branchIds = searchParams.get('branchIds') ?? '';
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('ALL');
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const params: Record<string, string> = {};
   if (branchIds) params.branchIds = branchIds;
@@ -55,20 +74,24 @@ function ExpensesContent() {
   const total = filtered.reduce((s, e) => s + Number(e.amount), 0);
   const pending = filtered.filter((e) => e.status === 'PENDING').length;
 
-  const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      filtered.map((e) => ({
-        'Expense #': e.expenseNo,
-        Date: e.date,
-        Category: e.category,
-        Description: e.description,
-        Amount: e.amount,
-        Status: e.status,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
-    XLSX.writeFile(wb, 'consolidated_expenses.xlsx');
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Expenses — Consolidated',
+    filters: {
+      Search: search || undefined,
+      Category: catFilter !== 'ALL' ? catFilter : undefined,
+    },
+    sections: [
+      {
+        title: 'Expense Entries',
+        rows: filtered.map((e) => ({
+          code: e.date?.slice(0, 10) ?? '',
+          label: `${e.expenseNo} — ${e.category.replace(/_/g, ' ')} — ${e.description}`,
+          value: formatCurrency(e.amount, currency),
+        })),
+        total: { label: 'Total', value: formatCurrency(total, currency) },
+      },
+    ],
   };
 
   return (
@@ -79,10 +102,10 @@ function ExpensesContent() {
           <p className="text-sm text-gray-500">All branches</p>
         </div>
         <button
-          onClick={exportExcel}
+          onClick={() => setShowStatement(true)}
           className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
         >
-          <Download className="h-4 w-4" /> Export
+          <FileText className="h-4 w-4" /> Generate Statement
         </button>
       </div>
 
@@ -190,6 +213,14 @@ function ExpensesContent() {
           </div>
         )}
       </div>
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }

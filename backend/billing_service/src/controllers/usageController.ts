@@ -37,6 +37,7 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       chequeNumber,
       chequeBankName,
       chequeDueDate,
+      chequeDate,
     } = payload;
 
     const file = req.file as MulterS3File | undefined;
@@ -72,6 +73,7 @@ export const createUsageRecord = async (req: Request, res: Response, next: NextF
       chequeNumber: chequeNumber || undefined,
       chequeBankName: chequeBankName || undefined,
       chequeDueDate: chequeDueDate || undefined,
+      chequeDate: chequeDate || undefined,
       recordedBy: req.user?.userId,
     });
 

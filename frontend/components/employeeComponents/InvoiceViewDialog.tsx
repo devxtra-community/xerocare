@@ -437,11 +437,21 @@ export function InvoiceViewDialog({
 
   const useTemplate = true; // Use the new layouts for everything where possible
 
+  // A customer-status exemption (government/embassy/charity/etc. — see
+  // CustomerVatStatus) is a separate, independent reason for zero VAT from the
+  // Rent/Lease sale-type exemption — both can apply to the same invoice without
+  // conflicting, since this only ever forces tax further toward zero, never away
+  // from it.
+  const isCustomerExempt = invoice.customerVatStatus === 'EXEMPT';
+  const vatLabel = isCustomerExempt ? 'VAT Exempt' : invoice.taxName || 'VAT';
+
   // ── Resolve VAT/tax rate ──────────────────────────────────────────────────
-  // Priority: snapshotted taxPercent on the invoice (set at creation from branch tax config)
+  // Priority: EXEMPT customer (always 0, never overridden by a fallback)
+  //           → snapshotted taxPercent on the invoice (set at creation from branch tax config)
   //           → live product metadata tax_rate (fallback for legacy records)
-  const resolvedTaxPercent =
-    invoice.taxPercent != null
+  const resolvedTaxPercent = isCustomerExempt
+    ? 0
+    : invoice.taxPercent != null
       ? Number(invoice.taxPercent)
       : Number(enrichedItems[0]?.metadata?.tax_rate || 0);
 
@@ -546,7 +556,7 @@ export function InvoiceViewDialog({
     discountTotal: finalDiscountTotal,
     vatTotal: finalVatTotal,
     vatPercent: resolvedTaxPercent,
-    vatName: invoice.taxName || 'VAT',
+    vatName: vatLabel,
     total: finalTotalAmount,
     payment: finalTotalAmount,
     balanceDue: finalTotalAmount,
@@ -852,6 +862,7 @@ export function InvoiceViewDialog({
                       totals={{
                         subTotal: rentSubTotal,
                         tax: rentTaxAmount,
+                        taxName: vatLabel,
                         total: rentTotalAmount,
                       }}
                     />
@@ -865,6 +876,7 @@ export function InvoiceViewDialog({
                       totals={{
                         subTotal: rentSubTotal,
                         tax: rentTaxAmount,
+                        taxName: vatLabel,
                         total: rentTotalAmount,
                       }}
                     />
@@ -878,6 +890,7 @@ export function InvoiceViewDialog({
                       totals={{
                         subTotal: rentSubTotal,
                         tax: rentTaxAmount,
+                        taxName: vatLabel,
                         total: rentTotalAmount,
                       }}
                     />
@@ -892,6 +905,7 @@ export function InvoiceViewDialog({
                       totals={{
                         subTotal: leaseSubTotal,
                         tax: leaseTaxAmount,
+                        taxName: vatLabel,
                         total: leaseTotalAmount,
                       }}
                     />
@@ -905,6 +919,7 @@ export function InvoiceViewDialog({
                       totals={{
                         subTotal: leaseSubTotal,
                         tax: leaseTaxAmount,
+                        taxName: vatLabel,
                         total: leaseTotalAmount,
                       }}
                     />
@@ -918,6 +933,7 @@ export function InvoiceViewDialog({
                       totals={{
                         subTotal: leaseSubTotal,
                         tax: leaseTaxAmount,
+                        taxName: vatLabel,
                         total: leaseTotalAmount,
                       }}
                     />

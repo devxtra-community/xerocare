@@ -3,8 +3,10 @@
 import React, { Suspense, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Download, RefreshCw } from 'lucide-react';
+import { RefreshCw, FileText } from 'lucide-react';
 import { fetchCashbookEntries, fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
@@ -16,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import * as XLSX from 'xlsx';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 
 type Period = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'custom';
 
@@ -135,6 +137,23 @@ function CashFlowContent() {
   const [period, setPeriod] = useState<Period>('this_month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const { from, to } = useMemo(
     () => getDateRange(period, customFrom, customTo),
@@ -218,33 +237,43 @@ function CashFlowContent() {
   const netChange = netOperating + netInvesting + netFinancing;
   const closingBalance = openingBalance + netChange;
 
-  const exportExcel = () => {
-    const rows: (string | number)[][] = [
-      ['CASH FLOW STATEMENT', '', `${from} to ${to}`],
-      [],
-      ['OPERATING ACTIVITIES'],
-      ['Cash receipts from customers / operations', opReceipts],
-      ['Cash payments to vendors / operations', -opPayments],
-      ['NET CASH FROM OPERATIONS', netOperating],
-      [],
-      ['INVESTING ACTIVITIES'],
-      ['Cash receipts from investing', invReceipts],
-      ['Cash payments for investing', -invPayments],
-      ['NET CASH FROM INVESTING', netInvesting],
-      [],
-      ['FINANCING ACTIVITIES'],
-      ['Cash receipts from financing', finReceipts],
-      ['Cash payments for financing', -finPayments],
-      ['NET CASH FROM FINANCING', netFinancing],
-      [],
-      ['NET CHANGE IN CASH', netChange],
-      ['Opening Cash Balance (all accounts)', openingBalance],
-      ['Closing Cash Balance (all accounts)', closingBalance],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Cash Flow');
-    XLSX.writeFile(wb, `Cash_Flow_${from}_${to}.xlsx`);
+  const fmt = (n: number) => formatCurrency(n, currency);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Cash Flow Statement',
+    periodFrom: from,
+    periodTo: to,
+    sections: [
+      {
+        title: 'Operating Activities',
+        rows: [
+          { label: 'Cash receipts from customers / operations', value: fmt(opReceipts) },
+          { label: 'Cash payments to vendors / operations', value: fmt(-opPayments) },
+        ],
+        total: { label: 'Net Cash from Operations', value: fmt(netOperating) },
+      },
+      {
+        title: 'Investing Activities',
+        rows: [
+          { label: 'Cash receipts from investing', value: fmt(invReceipts) },
+          { label: 'Cash payments for investing', value: fmt(-invPayments) },
+        ],
+        total: { label: 'Net Cash from Investing', value: fmt(netInvesting) },
+      },
+      {
+        title: 'Financing Activities',
+        rows: [
+          { label: 'Cash receipts from financing', value: fmt(finReceipts) },
+          { label: 'Cash payments for financing', value: fmt(-finPayments) },
+        ],
+        total: { label: 'Net Cash from Financing', value: fmt(netFinancing) },
+      },
+    ],
+    summary: [
+      { label: 'Net Change in Cash', value: fmt(netChange) },
+      { label: 'Opening Cash Balance (all accounts)', value: fmt(openingBalance) },
+      { label: 'Closing Cash Balance (all accounts)', value: fmt(closingBalance), bold: true },
+    ],
   };
 
   return (
@@ -294,10 +323,10 @@ function CashFlowContent() {
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
           </Button>
           <Button
-            onClick={exportExcel}
+            onClick={() => setShowStatement(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
           >
-            <Download className="h-4 w-4" /> Export Excel
+            <FileText className="h-4 w-4" /> Generate Statement
           </Button>
         </div>
       </div>
@@ -405,6 +434,14 @@ function CashFlowContent() {
             Operating / Investing / Financing by category.
           </p>
         </>
+      )}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
       )}
     </div>
   );

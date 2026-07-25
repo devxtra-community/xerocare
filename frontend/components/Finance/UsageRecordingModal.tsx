@@ -175,6 +175,7 @@ export default function UsageRecordingModal({
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDueDate, setChequeDueDate] = useState('');
+  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
 
   const isSimplifiedLease = contract?.saleType === 'LEASE' && contract?.leaseType !== 'FSM';
 
@@ -1014,6 +1015,7 @@ export default function UsageRecordingModal({
     if (collectPayment && paymentMode === 'CHEQUE') {
       if (!chequeNumber) errors.push('Cheque number is required for cheque payments');
       if (!chequeBankName) errors.push('Cheque bank name is required for cheque payments');
+      if (!chequeDate) errors.push('Cheque date is required for cheque payments');
       if (!chequeDueDate) errors.push('Cheque due date is required for cheque payments');
     }
 
@@ -1172,6 +1174,7 @@ export default function UsageRecordingModal({
             payload.append('chequeNumber', chequeNumber);
             payload.append('chequeBankName', chequeBankName);
             payload.append('chequeDueDate', chequeDueDate);
+            payload.append('chequeDate', chequeDate);
           } else if (paymentReferenceNumber) {
             payload.append('paymentReferenceNumber', paymentReferenceNumber);
           }
@@ -2818,6 +2821,16 @@ export default function UsageRecordingModal({
                           value={chequeBankName}
                           onChange={(e) => setChequeBankName(e.target.value)}
                           placeholder="e.g. Emirates NBD"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-slate-600">
+                          Cheque Date <span className="font-normal">(on the cheque)</span>
+                        </Label>
+                        <Input
+                          type="date"
+                          value={chequeDate}
+                          onChange={(e) => setChequeDate(e.target.value)}
                         />
                       </div>
                       <div className="space-y-2">

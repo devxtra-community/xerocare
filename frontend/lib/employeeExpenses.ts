@@ -75,6 +75,8 @@ export const getMyExpenseRequests = (filters?: {
   category?: string;
   from?: string;
   to?: string;
+  /** ADMIN role only — server ignores this for other roles (branch-scoped by JWT instead). */
+  branchId?: string;
 }): Promise<ExpenseRequest[]> => api.get(BASE, { params: filters }).then((r) => r.data.data);
 
 export const getExpenseRequest = (id: string): Promise<ExpenseRequest> =>

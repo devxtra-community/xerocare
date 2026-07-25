@@ -3,14 +3,32 @@
 import React, { Suspense, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Search, Download } from 'lucide-react';
-import { fetchCashBankAccounts, fetchCashbookEntries } from '@/lib/finance/accountsApi';
+import { Search, FileText } from 'lucide-react';
+import {
+  fetchCashBankAccounts,
+  fetchCashbookEntries,
+  fetchAccountStatement,
+  type CashBankAccount,
+} from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { getUserFromToken } from '@/lib/auth';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
-import * as XLSX from 'xlsx';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from 'sonner';
+import StatementDialog, {
+  type RunningBalanceStatementData,
+} from '@/components/shared/StatementDialog';
 
 const TYPE_BADGE: Record<string, string> = {
   CASH: 'bg-emerald-100 text-emerald-700',
@@ -22,6 +40,55 @@ const TXN_BADGE: Record<string, string> = {
   PAYMENT: 'bg-red-100 text-red-700',
 };
 
+function SelectAccountModal({
+  accounts,
+  onClose,
+  onSelect,
+}: {
+  accounts: CashBankAccount[];
+  onClose: () => void;
+  onSelect: (accountId: string) => void;
+}) {
+  const [chosen, setChosen] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="font-bold text-gray-900">Select Account</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ×
+          </button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <p className="text-sm text-gray-500">
+            A statement needs one specific account — choose which account this statement is for.
+          </p>
+          <Select value={chosen} onValueChange={setChosen}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose an account" />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name} ({a.type})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={() => chosen && onSelect(chosen)} disabled={!chosen} className="flex-1">
+            Generate Statement
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CashBankContent() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
@@ -29,6 +96,27 @@ function CashBankContent() {
   const [activeTab, setActiveTab] = useState<'accounts' | 'cashbook'>('accounts');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [showAccountPicker, setShowAccountPicker] = useState(false);
+  const [statementData, setStatementData] = useState<RunningBalanceStatementData | null>(null);
+  const [generatingStatement, setGeneratingStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = useMemo(() => {
+    if (branchIds && !branchIds.includes(',')) return branches.find((b) => b.id === branchIds);
+    if (currentUser?.branchId) return branches.find((b) => b.id === currentUser.branchId);
+    return branches[0];
+  }, [branches, branchIds, currentUser?.branchId]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const params: Record<string, string> = {};
   if (branchIds) params.branchIds = branchIds;
@@ -76,25 +164,38 @@ function CashBankContent() {
     .filter((e) => e.entryType === 'PAYMENT')
     .reduce((s, e) => s + Number(e.amount), 0);
 
-  const exportExcel = () => {
-    const data =
-      activeTab === 'accounts'
-        ? filteredAccounts.map((a) => ({
-            Name: a.name,
-            Type: a.type,
-            'Account No': a.accountNumber,
-            Balance: a.currentBalance,
-          }))
-        : filteredCashbook.map((e) => ({
-            Ref: e.referenceNo,
-            Date: e.date,
-            Type: e.entryType,
-            Description: e.description,
-            Amount: e.amount,
-          }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Cash & Bank');
-    XLSX.writeFile(wb, 'consolidated_cash_bank.xlsx');
+  const generateStatementForAccount = async (accountId: string) => {
+    setShowAccountPicker(false);
+    setGeneratingStatement(true);
+    try {
+      const stmt = await fetchAccountStatement({ accountId });
+      setStatementData({
+        kind: 'running-balance',
+        title: `${stmt.accountType === 'BANK' ? 'Bank' : 'Cash'} Account Statement`,
+        subjectName: stmt.accountName,
+        subjectMeta: `Current Balance: ${formatCurrency(stmt.currentBalance, stmt.currency)}`,
+        periodFrom: stmt.periodFrom,
+        periodTo: stmt.periodTo,
+        currency: stmt.currency,
+        openingBalance: stmt.openingBalance,
+        closingBalance: stmt.closingBalance,
+        rows: stmt.rows,
+        balanceLabel: 'Closing Balance',
+      });
+    } catch {
+      toast.error('Failed to generate statement');
+    } finally {
+      setGeneratingStatement(false);
+    }
+  };
+
+  const handleGenerateStatementClick = () => {
+    const candidates = activeTab === 'accounts' ? filteredAccounts : accounts;
+    if (candidates.length === 1) {
+      generateStatementForAccount(candidates[0].id);
+      return;
+    }
+    setShowAccountPicker(true);
   };
 
   return (
@@ -105,10 +206,12 @@ function CashBankContent() {
           <p className="text-sm text-gray-500">All branches</p>
         </div>
         <button
-          onClick={exportExcel}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          onClick={handleGenerateStatementClick}
+          disabled={generatingStatement}
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-50"
         >
-          <Download className="h-4 w-4" /> Export
+          <FileText className="h-4 w-4" />{' '}
+          {generatingStatement ? 'Generating…' : 'Generate Statement'}
         </button>
       </div>
 
@@ -294,6 +397,21 @@ function CashBankContent() {
           </div>
         )}
       </div>
+      {showAccountPicker && (
+        <SelectAccountModal
+          accounts={activeTab === 'accounts' ? filteredAccounts : accounts}
+          onClose={() => setShowAccountPicker(false)}
+          onSelect={generateStatementForAccount}
+        />
+      )}
+      {statementData && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setStatementData(null)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }

@@ -139,6 +139,7 @@ export function QuotationConversionFlow({
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDueDate, setChequeDueDate] = useState('');
+  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
   const paymentDate = new Date().toISOString().split('T')[0];
   const [remarks, setRemarks] = useState('');
 
@@ -223,6 +224,7 @@ export function QuotationConversionFlow({
           chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
           chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
           chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+          chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
         });
       }
 
@@ -507,6 +509,18 @@ export function QuotationConversionFlow({
                           value={chequeBankName}
                           onChange={(e) => setChequeBankName(e.target.value)}
                           placeholder="e.g., Emirates NBD"
+                          required
+                          className="h-10 border-slate-200 font-bold text-xs"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Cheque Date *
+                        </Label>
+                        <Input
+                          type="date"
+                          value={chequeDate}
+                          onChange={(e) => setChequeDate(e.target.value)}
                           required
                           className="h-10 border-slate-200 font-bold text-xs"
                         />

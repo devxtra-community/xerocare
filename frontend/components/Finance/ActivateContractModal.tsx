@@ -73,6 +73,9 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
   const [depositRef, setDepositRef] = useState('');
   const [depositChequeBankName, setDepositChequeBankName] = useState('');
   const [depositChequeDueDate, setDepositChequeDueDate] = useState('');
+  const [depositChequeDate, setDepositChequeDate] = useState(
+    new Date().toISOString().split('T')[0],
+  );
 
   // Meter Readings
   const rentalItems =
@@ -303,6 +306,7 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
           ...(depositMode === 'CHEQUE' && {
             chequeBankName: depositChequeBankName || undefined,
             chequeDueDate: depositChequeDueDate || undefined,
+            chequeDate: depositChequeDate || undefined,
           }),
         };
       }
@@ -480,6 +484,17 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                               value={depositChequeBankName}
                               onChange={(e) => setDepositChequeBankName(e.target.value)}
                               placeholder="e.g. QNB, HSBC..."
+                              className="bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-slate-500">
+                              Cheque Date <span className="font-normal">(on the cheque)</span>
+                            </Label>
+                            <Input
+                              type="date"
+                              value={depositChequeDate}
+                              onChange={(e) => setDepositChequeDate(e.target.value)}
                               className="bg-white"
                             />
                           </div>

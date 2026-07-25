@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
-  Download,
   Plus,
   Search,
   Filter,
@@ -13,6 +12,8 @@ import {
   BarChart2,
   ChevronDown,
   ChevronUp,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import {
   fetchManualReceivables,
@@ -20,18 +21,19 @@ import {
   recordReceivablePayment,
   fetchCashBankAccounts,
   fetchReceivableCharts,
+  fetchAccountsReceivableTransactions,
+  fetchCustomerStatement,
   type ManualReceivable,
 } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
 import { SimpleLineChart, DonutChart, HorizontalBarChart } from '@/components/accounts/charts';
-import { fetchARInvoices, agingBucket, type InvoiceSummary } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
-import { Invoice } from '@/lib/invoice';
+import { ReceivableDetailModal } from '@/components/accounts/ReceivablePayableDetail';
 import {
   Select,
   SelectContent,
@@ -47,9 +49,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
+import StatementDialog, {
+  type RunningBalanceStatementData,
+} from '@/components/shared/StatementDialog';
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
@@ -61,6 +64,7 @@ const AGING_COLORS: Record<string, string> = {
 };
 
 const RECEIVABLE_TYPES = ['CUSTOMER_INVOICE', 'SECURITY_DEPOSIT', 'ADVANCE_PAYMENT', 'OTHER'];
+const RECEIVABLE_STATUSES = ['OUTSTANDING', 'PENDING', 'PARTIAL', 'OVERDUE', 'PAID', 'WRITTEN_OFF'];
 const today = new Date().toISOString().slice(0, 10);
 
 function AddReceivableModal({
@@ -223,6 +227,7 @@ function PaymentModal({
     chequeNumber: '',
     chequeBankName: '',
     chequeDueDate: '',
+    chequeDate: today,
     notes: '',
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -340,6 +345,16 @@ function PaymentModal({
                   />
                 </div>
                 <div>
+                  <label className="text-xs font-medium text-muted-foreground">Cheque Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={form.chequeDate}
+                    onChange={(e) => set('chequeDate', e.target.value)}
+                    className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+                  />
+                </div>
+                <div>
                   <label className="text-xs font-medium text-muted-foreground">Due Date *</label>
                   <input
                     type="date"
@@ -375,15 +390,93 @@ function PaymentModal({
   );
 }
 
+function SelectCustomerModal({
+  customers,
+  onClose,
+  onSelect,
+}: {
+  customers: string[];
+  onClose: () => void;
+  onSelect: (customerName: string) => void;
+}) {
+  const [chosen, setChosen] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="font-bold text-slate-800">Select Customer</h2>
+          <button onClick={onClose}>
+            <X className="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            A Customer Statement of Account needs a specific customer — choose who this statement is
+            for.
+          </p>
+          <Select value={chosen} onValueChange={setChosen}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose a customer" />
+            </SelectTrigger>
+            <SelectContent>
+              {customers.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={() => chosen && onSelect(chosen)} disabled={!chosen} className="flex-1">
+            Generate Statement
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AccountsReceivablePage() {
   const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [agingFilter, setAgingFilter] = useState('ALL');
+  const [sourceFilter, setSourceFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [payingFor, setPayingFor] = useState<ManualReceivable | null>(null);
   const [chartsOpen, setChartsOpen] = useState(true);
-  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [viewingRow, setViewingRow] = useState<{ type: 'INVOICE' | 'MANUAL'; id: string } | null>(
+    null,
+  );
+  const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [statementData, setStatementData] = useState<RunningBalanceStatementData | null>(null);
+  const [generatingStatement, setGeneratingStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = useMemo(() => {
+    if (!currentUser?.branchId) return branches[0];
+    return branches.find((b) => b.id === currentUser.branchId) ?? branches[0];
+  }, [branches, currentUser?.branchId]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const {
     data: manualRcv = [],
@@ -396,9 +489,16 @@ export default function AccountsReceivablePage() {
     staleTime: 30_000,
   });
 
-  const { data: invoices = [] } = useQuery<InvoiceSummary[]>({
-    queryKey: ['ar-invoices'],
-    queryFn: () => fetchARInvoices(),
+  // Correctly-filtered invoice-based AR — same population that backs Chart of
+  // Accounts 1003 (excludes DRAFT/CANCELLED/EXPIRED/RETAKEN/SUPERSEDED etc.),
+  // unlike the raw invoice list which had no such filtering. includeSettled shows
+  // the full AR history here (fully-paid invoices included, with real PAID status
+  // and $0 outstanding) rather than just what's currently owed — the Total
+  // Outstanding / aging stat cards below still sum only the outstanding side, so
+  // that headline figure keeps its normal "what's currently owed" meaning.
+  const { data: arInvoices = [] } = useQuery({
+    queryKey: ['ar-invoice-transactions'],
+    queryFn: () => fetchAccountsReceivableTransactions({ includeSettled: true }),
     staleTime: 60_000,
   });
 
@@ -419,40 +519,72 @@ export default function AccountsReceivablePage() {
     staleTime: 120_000,
   });
 
-  // Merge invoice AR + manual receivables into unified view
+  // Merge invoice AR + manual receivables into unified view. Manual receivables
+  // linked to an invoice (linkedInvoiceId) are excluded here — that invoice's own
+  // outstanding balance already covers it, so including both would double-count.
   const allReceivables = useMemo(() => {
-    const fromInvoices = invoices.map((inv) => ({
+    const fromInvoices = arInvoices.map((inv) => ({
       id: inv.id,
       referenceNo: inv.invoiceNumber,
       type: inv.saleType,
       customerName: inv.customerName,
       amount: inv.totalAmount,
-      currency: inv.currency,
-      issueDate: inv.createdAt,
-      dueDate: inv.dueDate ?? inv.createdAt,
-      amountPaid: inv.paidAmount ?? 0,
-      outstanding: inv.totalAmount - (inv.paidAmount ?? 0),
+      currency: inv.currencyCode,
+      issueDate: inv.date,
+      dueDate: null as string | null,
+      amountPaid: inv.paid,
+      outstanding: inv.amount,
       status: inv.status,
       branchId: inv.branchId,
-      aging: inv.dueDate ? agingBucket(inv.dueDate) : 'Current',
+      aging: inv.aging,
       isInvoice: true,
+      source: 'Invoice' as const,
     }));
-    const fromManual = manualRcv.map((r) => ({ ...r, isInvoice: false }));
+    const fromManual = manualRcv
+      .filter((r) => !r.linkedInvoiceId)
+      .map((r) => ({ ...r, isInvoice: false, source: 'Manual Entry' as const }));
     return [...fromInvoices, ...fromManual];
-  }, [invoices, manualRcv]);
+  }, [arInvoices, manualRcv]);
 
   const filtered = useMemo(
     () =>
       allReceivables.filter((r) => {
         const matchType = typeFilter === 'ALL' || r.type === typeFilter;
         const matchAging = agingFilter === 'ALL' || r.aging === agingFilter;
+        const matchSource = sourceFilter === 'ALL' || r.source === sourceFilter;
+        const matchStatus = statusFilter === 'ALL' || r.status === statusFilter;
         const matchSearch =
           !search ||
           r.customerName?.toLowerCase().includes(search.toLowerCase()) ||
           r.referenceNo?.toLowerCase().includes(search.toLowerCase());
-        return matchType && matchAging && matchSearch;
+        const matchAmountMin = !amountMin || (r.outstanding ?? 0) >= Number(amountMin);
+        const matchAmountMax = !amountMax || (r.outstanding ?? 0) <= Number(amountMax);
+        const matchDateFrom = !dateFrom || (r.issueDate?.slice(0, 10) ?? '') >= dateFrom;
+        const matchDateTo = !dateTo || (r.issueDate?.slice(0, 10) ?? '') <= dateTo;
+        return (
+          matchType &&
+          matchAging &&
+          matchSource &&
+          matchStatus &&
+          matchSearch &&
+          matchAmountMin &&
+          matchAmountMax &&
+          matchDateFrom &&
+          matchDateTo
+        );
       }),
-    [allReceivables, typeFilter, agingFilter, search],
+    [
+      allReceivables,
+      typeFilter,
+      agingFilter,
+      sourceFilter,
+      statusFilter,
+      search,
+      amountMin,
+      amountMax,
+      dateFrom,
+      dateTo,
+    ],
   );
 
   const totalOutstanding = allReceivables.reduce((s, r) => s + (r.outstanding ?? 0), 0);
@@ -462,24 +594,49 @@ export default function AccountsReceivablePage() {
       .filter((r) => r.aging === b)
       .reduce((s, r) => s + (r.outstanding ?? 0), 0),
   }));
-  const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      filtered.map((r) => ({
-        'Ref #': r.referenceNo,
-        Customer: r.customerName,
-        Type: r.type,
-        'Issue Date': r.issueDate?.slice(0, 10),
-        'Due Date': r.dueDate?.slice(0, 10),
-        Amount: r.amount,
-        Paid: r.amountPaid,
-        Outstanding: r.outstanding,
-        Aging: r.aging,
-        Status: r.status,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Receivables');
-    XLSX.writeFile(wb, `Receivables_${today}.xlsx`);
+  const customerNames = useMemo(
+    () =>
+      [...new Set(allReceivables.map((r) => r.customerName).filter(Boolean))].sort() as string[],
+    [allReceivables],
+  );
+
+  const generateCustomerStatement = async (customerName: string) => {
+    setShowCustomerPicker(false);
+    setGeneratingStatement(true);
+    try {
+      const stmt = await fetchCustomerStatement({
+        customerName,
+        periodFrom: dateFrom || undefined,
+        periodTo: dateTo || undefined,
+      });
+      setStatementData({
+        kind: 'running-balance',
+        title: 'Customer Statement of Account',
+        subjectName: stmt.customerName,
+        periodFrom: stmt.periodFrom,
+        periodTo: stmt.periodTo,
+        currency: stmt.currency,
+        openingBalance: stmt.openingBalance,
+        closingBalance: stmt.closingBalance,
+        rows: stmt.rows,
+        balanceLabel: 'Closing Balance (Amount Owed)',
+      });
+    } catch {
+      toast.error('Failed to generate statement');
+    } finally {
+      setGeneratingStatement(false);
+    }
+  };
+
+  const handleGenerateStatementClick = () => {
+    // A single customer already isolated by search/filter — generate directly
+    // rather than making the user re-pick someone already unambiguous on screen.
+    const uniqueVisible = [...new Set(filtered.map((r) => r.customerName).filter(Boolean))];
+    if (uniqueVisible.length === 1) {
+      generateCustomerStatement(uniqueVisible[0] as string);
+      return;
+    }
+    setShowCustomerPicker(true);
   };
 
   if (isLoading) {
@@ -517,25 +674,22 @@ export default function AccountsReceivablePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button onClick={exportExcel} variant="outline" className="gap-2">
-            <Download className="h-4 w-4" /> Export
+          <Button
+            onClick={handleGenerateStatementClick}
+            variant="outline"
+            className="gap-2"
+            disabled={generatingStatement}
+          >
+            <FileText className="h-4 w-4" />
+            {generatingStatement ? 'Generating…' : 'Generate Statement'}
           </Button>
-          <ExportPdfButton
-            targetId="receivable-pdf"
-            reportTitle="Accounts Receivable"
-            filters={{
-              Search: search,
-              Type: typeFilter !== 'ALL' ? typeFilter.replace(/_/g, ' ') : undefined,
-              Aging: agingFilter !== 'ALL' ? agingFilter : undefined,
-            }}
-          />
           <Button onClick={() => setShowAdd(true)} className="gap-2">
             <Plus className="h-4 w-4" /> Add Receivable
           </Button>
         </div>
       </div>
 
-      <div id="receivable-pdf" className="space-y-6">
+      <div className="space-y-6">
         {/* Aging Summary */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard
@@ -640,48 +794,171 @@ export default function AccountsReceivablePage() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 bg-card p-4 rounded-xl border border-slate-100 shadow-sm">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-10 bg-muted/50 border-none"
-              placeholder="Search customer or reference..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-10 bg-muted/50 border-none"
+                placeholder="Search customer or reference..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
+              <Filter className="h-3.5 w-3.5" /> Filters
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-40 bg-card border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Types</SelectItem>
-                {RECEIVABLE_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t.replace(/_/g, ' ')}
-                  </SelectItem>
-                ))}
-                <SelectItem value="RENT">RENT</SelectItem>
-                <SelectItem value="LEASE">LEASE</SelectItem>
-                <SelectItem value="SALE">SALE</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={agingFilter} onValueChange={setAgingFilter}>
-              <SelectTrigger className="w-40 bg-card border-border">
-                <SelectValue placeholder="All Aging" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Aging</SelectItem>
-                {AGING_BUCKETS.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Type
+              </label>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full bg-card border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Types</SelectItem>
+                  {RECEIVABLE_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="RENT">RENT</SelectItem>
+                  <SelectItem value="LEASE">LEASE</SelectItem>
+                  <SelectItem value="SALE">SALE</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Aging
+              </label>
+              <Select value={agingFilter} onValueChange={setAgingFilter}>
+                <SelectTrigger className="w-full bg-card border-border">
+                  <SelectValue placeholder="All Aging" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Aging</SelectItem>
+                  {AGING_BUCKETS.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Source
+              </label>
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-full bg-card border-border">
+                  <SelectValue placeholder="All Sources" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Sources</SelectItem>
+                  <SelectItem value="Invoice">Invoice</SelectItem>
+                  <SelectItem value="Manual Entry">Manual Entry</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Status
+              </label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full bg-card border-border">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  {RECEIVABLE_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Issue Date From
+              </label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full h-9 px-3 rounded-md border border-border text-sm bg-card"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Issue Date To
+              </label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full h-9 px-3 rounded-md border border-border text-sm bg-card"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Min Outstanding
+              </label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={amountMin}
+                onChange={(e) => setAmountMin(e.target.value)}
+                className="w-full bg-card border-border"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Max Outstanding
+              </label>
+              <Input
+                type="number"
+                placeholder="Any"
+                value={amountMax}
+                onChange={(e) => setAmountMax(e.target.value)}
+                className="w-full bg-card border-border"
+              />
+            </div>
           </div>
+
+          {(typeFilter !== 'ALL' ||
+            agingFilter !== 'ALL' ||
+            sourceFilter !== 'ALL' ||
+            statusFilter !== 'ALL' ||
+            search ||
+            dateFrom ||
+            dateTo ||
+            amountMin ||
+            amountMax) && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setSearch('');
+                  setTypeFilter('ALL');
+                  setAgingFilter('ALL');
+                  setSourceFilter('ALL');
+                  setStatusFilter('ALL');
+                  setDateFrom('');
+                  setDateTo('');
+                  setAmountMin('');
+                  setAmountMax('');
+                }}
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Table */}
@@ -694,6 +971,9 @@ export default function AccountsReceivablePage() {
                 </TableHead>
                 <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Ref #
+                </TableHead>
+                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Source
                 </TableHead>
                 <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                   Type
@@ -724,7 +1004,7 @@ export default function AccountsReceivablePage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-16 text-muted-foreground">
                     No receivables found
                   </TableCell>
                 </TableRow>
@@ -736,6 +1016,17 @@ export default function AccountsReceivablePage() {
                     </TableCell>
                     <TableCell className="font-mono text-xs text-blue-600 font-bold">
                       {r.referenceNo}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                          r.source === 'Invoice'
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {r.source}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
@@ -773,15 +1064,26 @@ export default function AccountsReceivablePage() {
                       </span>
                     </TableCell>
                     <TableCell className="pr-4">
-                      {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={() => setPayingFor(r as ManualReceivable)}
-                          className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
-                          title="Record Payment"
+                          onClick={() =>
+                            setViewingRow({ type: r.isInvoice ? 'INVOICE' : 'MANUAL', id: r.id })
+                          }
+                          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                          title="View full details"
                         >
-                          <CreditCard className="h-3.5 w-3.5" />
+                          <Eye className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                        {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
+                          <button
+                            onClick={() => setPayingFor(r as ManualReceivable)}
+                            className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                            title="Record Payment"
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -805,11 +1107,26 @@ export default function AccountsReceivablePage() {
           onClose={() => setPayingFor(null)}
         />
       )}
-      {viewingInvoice && (
-        <InvoiceDetailsDialog
-          invoice={viewingInvoice}
-          mode="FINANCE"
-          onClose={() => setViewingInvoice(null)}
+      {viewingRow && (
+        <ReceivableDetailModal
+          sourceType={viewingRow.type}
+          id={viewingRow.id}
+          onClose={() => setViewingRow(null)}
+        />
+      )}
+      {showCustomerPicker && (
+        <SelectCustomerModal
+          customers={customerNames}
+          onClose={() => setShowCustomerPicker(false)}
+          onSelect={generateCustomerStatement}
+        />
+      )}
+      {statementData && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setStatementData(null)}
+          data={statementData}
+          branch={branchInfo}
         />
       )}
     </div>

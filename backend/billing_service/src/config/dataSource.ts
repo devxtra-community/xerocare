@@ -42,6 +42,9 @@ import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
 import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { GuaranteeCheque } from '../entities/guaranteeChequeEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
+import { ChartOfAccount } from '../entities/chartOfAccountEntity';
+import { IncomeEntry } from '../entities/incomeEntryEntity';
+import { ManualJournalEntry } from '../entities/manualJournalEntryEntity';
 
 export const Source = new DataSource({
   type: 'postgres',
@@ -88,6 +91,9 @@ export const Source = new DataSource({
     CountryTaxRule,
     GuaranteeCheque,
     VatRemittance,
+    ChartOfAccount,
+    IncomeEntry,
+    ManualJournalEntry,
   ],
   poolSize: 1,
   extra: {
@@ -558,6 +564,11 @@ async function runPreMigrations() {
         "updatedAt" TIMESTAMP DEFAULT NOW()
       );
 
+      ALTER TABLE expense_entries
+        ADD COLUMN IF NOT EXISTS "isPrepayment" BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "coveredPeriodStart" DATE,
+        ADD COLUMN IF NOT EXISTS "coveredPeriodEnd" DATE;
+
       CREATE TABLE IF NOT EXISTS depreciation_brand_rules (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         "brandId" UUID NOT NULL UNIQUE,
@@ -670,6 +681,7 @@ async function runPreMigrations() {
         "amountPaid" DECIMAL(12,2) DEFAULT 0,
         outstanding DECIMAL(12,2),
         status VARCHAR DEFAULT 'PENDING',
+        "linkedPurchaseId" UUID,
         "branchId" UUID NOT NULL,
         notes TEXT,
         "createdBy" UUID NOT NULL,
@@ -733,6 +745,116 @@ async function runPreMigrations() {
         "createdAt" TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    // chart_of_accounts: real, structured account registry. The ~42 system accounts
+    // (1001-5015) are seeded below and drive Balance Sheet / P&L exactly as before —
+    // custom accounts (added by ADMIN/FINANCE via the UI) extend the same structure.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chart_of_accounts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "accountNumber" VARCHAR UNIQUE NOT NULL,
+        "accountName" VARCHAR NOT NULL,
+        category VARCHAR NOT NULL,
+        "accountGroup" VARCHAR NOT NULL,
+        "parentAccountId" UUID REFERENCES chart_of_accounts(id),
+        "sourceType" VARCHAR NOT NULL,
+        "isSystemDefault" BOOLEAN NOT NULL DEFAULT false,
+        "linkedCashBankAccountId" UUID REFERENCES cash_bank_accounts(id),
+        "categoryKey" VARCHAR,
+        "isActive" BOOLEAN NOT NULL DEFAULT true,
+        "createdBy" UUID,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS income_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "incomeNo" VARCHAR UNIQUE NOT NULL,
+        date DATE NOT NULL,
+        category VARCHAR NOT NULL,
+        "subCategory" VARCHAR,
+        description TEXT NOT NULL,
+        "branchId" UUID NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        "vatAmount" DECIMAL(12,2) DEFAULT 0,
+        "netAmount" DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'AED',
+        status VARCHAR DEFAULT 'PENDING',
+        "receivedTo" UUID REFERENCES cash_bank_accounts(id),
+        "receivedDate" DATE,
+        "receivedMode" VARCHAR,
+        "referenceNo" VARCHAR,
+        "approvedBy" UUID,
+        "receiptUrl" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS manual_journal_entries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "entryNo" VARCHAR UNIQUE NOT NULL,
+        date DATE NOT NULL,
+        "chartOfAccountId" UUID NOT NULL REFERENCES chart_of_accounts(id),
+        amount DECIMAL(14,2) NOT NULL,
+        description TEXT NOT NULL,
+        "branchId" UUID NOT NULL,
+        "referenceNo" VARCHAR,
+        notes TEXT,
+        "createdBy" UUID NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      INSERT INTO chart_of_accounts
+        ("accountNumber", "accountName", category, "accountGroup", "sourceType", "isSystemDefault", "isActive")
+      VALUES
+        ('1001', 'Cash in Hand', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1002', 'Cash at Bank', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1003', 'Accounts Receivable', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1004', 'Security Deposits Receivable', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1005', 'Prepaid Expenses', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1006', 'Spare Parts Inventory', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1007', 'Equipment Gross Cost', 'ASSET', 'NON_CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1008', 'Accumulated Depreciation', 'ASSET', 'NON_CURRENT_ASSET', 'SYSTEM', true, true),
+        ('1009', 'Product Inventory', 'ASSET', 'CURRENT_ASSET', 'SYSTEM', true, true),
+        ('2001', 'Accounts Payable', 'LIABILITY', 'CURRENT_LIABILITY', 'SYSTEM', true, true),
+        ('2002', 'Accrued Expenses', 'LIABILITY', 'CURRENT_LIABILITY', 'SYSTEM', true, true),
+        ('2003', 'VAT Payable', 'LIABILITY', 'CURRENT_LIABILITY', 'SYSTEM', true, true),
+        ('2004', 'Security Deposits Received', 'LIABILITY', 'CURRENT_LIABILITY', 'SYSTEM', true, true),
+        ('2005', 'Deferred Revenue', 'LIABILITY', 'CURRENT_LIABILITY', 'SYSTEM', true, true),
+        ('2006', 'Salary Payable', 'LIABILITY', 'CURRENT_LIABILITY', 'SYSTEM', true, true),
+        ('3001', 'Owner''s Capital', 'EQUITY', 'EQUITY', 'SYSTEM', true, true),
+        ('3002', 'Retained Earnings', 'EQUITY', 'EQUITY', 'SYSTEM', true, true),
+        ('3003', 'Reserves', 'EQUITY', 'EQUITY', 'SYSTEM', true, true),
+        ('3004', 'Less: Withdrawals', 'EQUITY', 'EQUITY', 'SYSTEM', true, true),
+        ('3005', 'Less: Dividends', 'EQUITY', 'EQUITY', 'SYSTEM', true, true),
+        ('4001', 'Rental Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4002', 'Lease Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4003', 'Sales Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4004', 'Service Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4005', 'Usage / Copy Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4006', 'AMC / SMA Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4007', 'Spare Part Sales', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4008', 'Other Income', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('5001', 'Cost of Parts', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5002', 'Labour Cost', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5003', 'Depreciation Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5004', 'Vendor Purchases', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5005', 'Shipping & Handling', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5006', 'Salary Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5007', 'Travel Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5008', 'Rent Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5009', 'Utilities Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5010', 'Marketing Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5011', 'Maintenance Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5012', 'Insurance Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5013', 'Other Expenses', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5014', 'Import / Purchase Labour Cost', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
+        ('5015', 'Customs Duty', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true)
+      ON CONFLICT ("accountNumber") DO NOTHING;
+    `);
+    logger.info('Chart of accounts module tables created/verified.');
     logger.info('Finance accounts module tables created/verified.');
 
     // ─── Employee Expense Requests ─────────────────────────────────────────────
@@ -844,7 +966,10 @@ async function runPreMigrations() {
         party_name VARCHAR NOT NULL,
         amount DECIMAL(12,2) NOT NULL,
         due_date DATE NOT NULL,
+        cheque_date DATE,
         issue_date DATE,
+        deposit_date DATE,
+        cleared_date DATE,
         type VARCHAR NOT NULL DEFAULT 'RECEIVED',
         status VARCHAR NOT NULL DEFAULT 'PENDING',
         description TEXT,
@@ -878,6 +1003,36 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(100) NULL;
     `);
     logger.info('Cheque source tracing columns applied.');
+
+    // ─── Cheques: cheque_date / deposit_date / cleared_date ────────────────────
+    // issue_date used to be silently reused for THREE different meanings depending
+    // on lifecycle stage (cheque date at creation, deposit date at Deposit, issue-to-
+    // vendor date at Issue) — losing the original cheque date the moment a RECEIVED
+    // cheque was deposited. These are now distinct columns; the routes below stop
+    // overwriting issue_date at Deposit.
+    await client.query(`
+      ALTER TABLE cheques
+        ADD COLUMN IF NOT EXISTS cheque_date DATE NULL,
+        ADD COLUMN IF NOT EXISTS deposit_date DATE NULL,
+        ADD COLUMN IF NOT EXISTS cleared_date DATE NULL;
+    `);
+    // Best-effort backfill for pre-existing rows:
+    //  - PENDING cheques never had issue_date overwritten yet, so it still holds
+    //    whatever was captured at creation — safe to treat as cheque_date.
+    //  - RECEIVED cheques already DEPOSITED/CLEARED/BOUNCED had issue_date
+    //    overwritten with the deposit date by the old /deposit handler — recover
+    //    that into deposit_date. Their true original cheque_date is unrecoverable
+    //    and is left NULL (frontend shows "—").
+    await client.query(`
+      UPDATE cheques SET cheque_date = issue_date
+      WHERE cheque_date IS NULL AND issue_date IS NOT NULL AND status = 'PENDING';
+    `);
+    await client.query(`
+      UPDATE cheques SET deposit_date = issue_date
+      WHERE deposit_date IS NULL AND issue_date IS NOT NULL
+        AND type = 'RECEIVED' AND status IN ('DEPOSITED', 'CLEARED', 'BOUNCED');
+    `);
+    logger.info('Cheque cheque_date/deposit_date/cleared_date columns applied.');
 
     // ─── Tax Report: customer snapshot columns on invoices ─────────────────────
     await client.query(`
@@ -1169,6 +1324,23 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "preferredPaymentMode" VARCHAR(20) NULL,
         ADD COLUMN IF NOT EXISTS "preferredChequeBankName" VARCHAR(150) NULL;
     `);
+
+    // ─── Manual payable → Purchase Order linkage (mirrors manual_receivables'
+    // "linkedInvoiceId") — lets the Payable page/CoA aggregates exclude a manual
+    // payable that duplicates a PO's own tracked outstanding balance.
+    await client.query(`
+      ALTER TABLE manual_payables
+        ADD COLUMN IF NOT EXISTS "linkedPurchaseId" UUID NULL;
+    `);
+
+    // ─── Customer VAT exemption: snapshot of the customer's VAT status at
+    // invoice-creation/assignment time, permanent regardless of later customer
+    // edits — see invoiceEntity.ts's customerVatStatus doc comment.
+    await client.query(`
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS customer_vat_status VARCHAR(30) NULL;
+    `);
+    logger.info('Invoice customer_vat_status column applied.');
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

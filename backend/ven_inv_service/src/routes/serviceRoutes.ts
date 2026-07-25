@@ -97,4 +97,8 @@ router.get('/machine/:productId/history', controller.getMachineHistory);
 // Internal endpoint for Billing service — returns COGS and labour aggregates
 router.get('/internal/cogs-report', controller.getCogsReport);
 
+// Internal endpoint for Billing service — same COGS/labour cost, grouped by
+// the service ticket's productId, for Segmented P&L per-machine direct cost.
+router.get('/internal/cogs-report-by-product', controller.getCogsReportByProduct);
+
 export default router;

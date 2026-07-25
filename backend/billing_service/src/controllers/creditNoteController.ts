@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { EntityManager } from 'typeorm';
 import { Source } from '../config/dataSource';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { CreditNoteStatus } from '../entities/enums/creditNoteStatus';
@@ -8,10 +9,41 @@ import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent'
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
+import { InvoiceItem } from '../entities/invoiceItemEntity';
+import { CreditNoteType } from '../entities/enums/creditNoteType';
 
 export class CreditNoteController {
   private repository = Source.getRepository(CreditNote);
   private returnCreditRepo = new ReturnCreditRepository();
+
+  // ── Shared helper: has the full quantity sold on this invoice line now been
+  // returned, counting this credit note plus any earlier completed DIRECT_REFUNDs
+  // against the same invoice+spare part? Only then should the invoice itself be
+  // marked REFUNDED — a partial return must leave it as-is (the enum has no
+  // PARTIALLY_REFUNDED state; better to under-signal than to falsely mark a
+  // still-mostly-valid sale as fully refunded).
+  private async isFullyReturned(manager: EntityManager, creditNote: CreditNote): Promise<boolean> {
+    const items = await manager.find(InvoiceItem, {
+      where: { invoice: { id: creditNote.invoiceId }, sparePartId: creditNote.sparePartId },
+    });
+    const totalSoldQty = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0);
+    if (totalSoldQty <= 0) return true; // no line-item data to compare against — don't block the refund
+
+    const priorReturns = await manager.find(CreditNote, {
+      where: {
+        invoiceId: creditNote.invoiceId,
+        sparePartId: creditNote.sparePartId,
+        type: CreditNoteType.DIRECT_REFUND,
+        status: CreditNoteStatus.COMPLETED,
+      },
+    });
+    const priorReturnedQty = priorReturns
+      .filter((cn) => cn.id !== creditNote.id)
+      .reduce((sum, cn) => sum + (cn.quantity ?? 0), 0);
+    const totalReturnedQty = priorReturnedQty + (creditNote.quantity ?? 1);
+
+    return totalReturnedQty >= totalSoldQty;
+  }
 
   // ── Shared helper: call inventory service with admin JWT ──────────────────
   private async callInventoryService(path: string, body: object): Promise<void> {
@@ -257,8 +289,21 @@ export class CreditNoteController {
    * Finance Approval.
    * For DIRECT_REFUND: immediately completes — creates ReturnCredit, updates inventory, closes invoice.
    * For REPLACEMENT / CREDIT_EXCHANGE: moves to APPROVED; inventory updated when Sales calls complete().
+   *
+   * All DATABASE writes (credit note, ReturnCredit, invoice status) happen inside a single
+   * transaction so they commit or roll back together — previously the credit note's own save
+   * was the LAST step, after those other writes had already committed, so a failure there
+   * (e.g. an invalid damageReason value) left a permanently orphaned credit note stuck at
+   * PENDING_APPROVAL with an invoice already marked REFUNDED and a ReturnCredit already on
+   * the books. External side effects (RabbitMQ product-status event, inventory REST call)
+   * are not part of the DB transaction — they fire only after it commits, and are treated as
+   * best-effort/non-fatal (consistent with callInventoryService's existing error handling),
+   * so a downstream outage there can't roll back a refund the DB has already correctly recorded.
    */
   approve = async (req: Request, res: Response, next: NextFunction) => {
+    const queryRunner = Source.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
       const { id } = req.params;
       const { financeNote, damageReason, paymentMode } = req.body; // B.1: paymentMode now persisted
@@ -267,7 +312,9 @@ export class CreditNoteController {
         throw new AppError('Finance note and damage reason are required', 400);
       }
 
-      const creditNote = await this.repository.findOne({ where: { id: id as string } });
+      const creditNote = await queryRunner.manager.findOne(CreditNote, {
+        where: { id: id as string },
+      });
       if (!creditNote) throw new AppError('Credit Note not found', 404);
       if (creditNote.status !== CreditNoteStatus.PENDING_APPROVAL) {
         throw new AppError('Invalid status for approval', 400);
@@ -279,53 +326,83 @@ export class CreditNoteController {
 
       const inventoryStatus: 'DAMAGED' | 'RETURNED' =
         damageReason === 'Damaged Product' ? 'DAMAGED' : 'RETURNED';
+      let postCommitInventorySideEffect: (() => Promise<void>) | null = null;
 
       if (creditNote.type === 'DIRECT_REFUND') {
         creditNote.status = CreditNoteStatus.COMPLETED;
 
         if (creditNote.itemCategory === 'PRODUCT') {
           // Mark product unit as DAMAGED or RETURNED via RabbitMQ (B.7: branchId now passed)
-          await emitProductStatusUpdate({
-            productId: creditNote.productId!,
-            billType: inventoryStatus,
-            invoiceId: creditNote.invoiceId,
-            approvedBy: req.user?.userId || 'FINANCE',
-            approvedAt: new Date(),
-            branchId: creditNote.branchId,
-          });
+          postCommitInventorySideEffect = () =>
+            emitProductStatusUpdate({
+              productId: creditNote.productId!,
+              billType: inventoryStatus,
+              invoiceId: creditNote.invoiceId,
+              approvedBy: req.user?.userId || 'FINANCE',
+              approvedAt: new Date(),
+              branchId: creditNote.branchId,
+            });
         } else {
           // SPARE_PART: increment quantity via inventory REST (all returns → available stock)
-          await this.callInventoryService('/inventory/returns/process', {
-            itemType: 'SPARE_PART',
-            itemId: creditNote.sparePartId,
-            quantity: creditNote.quantity || 1,
-          });
+          postCommitInventorySideEffect = () =>
+            this.callInventoryService('/inventory/returns/process', {
+              itemType: 'SPARE_PART',
+              itemId: creditNote.sparePartId,
+              quantity: creditNote.quantity || 1,
+            });
         }
 
         // Create ReturnCredit via repository (B.8: use single consistent path)
         // Refund the customer what they actually paid — productAmount plus the VAT
         // charged on it, not just the taxable base. Omitting taxAmount understated
         // every "Total Returns" report by the VAT portion of each refund.
-        await this.returnCreditRepo.createReturnCredit({
-          invoiceId: creditNote.invoiceId,
-          branchId: creditNote.branchId,
-          amount: Number(creditNote.productAmount) + Number(creditNote.taxAmount || 0),
-          createdBy: req.user?.userId || 'FINANCE',
-          note: `Refund for Credit Note ${creditNote.creditNoteNo}. Finance Note: ${financeNote}`,
-          returnedItemId:
-            creditNote.itemCategory === 'PRODUCT' ? creditNote.productId : creditNote.sparePartId,
-          returnedItemType: creditNote.itemCategory as 'PRODUCT' | 'SPARE_PART',
-        });
+        await this.returnCreditRepo.createReturnCredit(
+          {
+            invoiceId: creditNote.invoiceId,
+            branchId: creditNote.branchId,
+            amount: Number(creditNote.productAmount) + Number(creditNote.taxAmount || 0),
+            createdBy: req.user?.userId || 'FINANCE',
+            note: `Refund for Credit Note ${creditNote.creditNoteNo}. Finance Note: ${financeNote}`,
+            returnedItemId:
+              creditNote.itemCategory === 'PRODUCT' ? creditNote.productId : creditNote.sparePartId,
+            returnedItemType: creditNote.itemCategory as 'PRODUCT' | 'SPARE_PART',
+          },
+          queryRunner.manager,
+        );
 
-        // Close originating invoice
-        const invoiceRepo = Source.getRepository(Invoice);
-        await invoiceRepo.update(creditNote.invoiceId, { status: InvoiceStatus.REFUNDED });
+        // Close originating invoice — but only if this (plus any earlier completed
+        // DIRECT_REFUNDs against the same line) covers the FULL quantity sold.
+        // A partial spare-part return (e.g. 2 of 5 units) must not mark the whole
+        // invoice REFUNDED — the other 3 units are still validly sold to the
+        // customer. PRODUCT credit notes are always for the single serialized
+        // unit the invoice covers, so they always fully close the invoice.
+        const invoiceFullyCovered =
+          creditNote.itemCategory === 'PRODUCT'
+            ? true
+            : await this.isFullyReturned(queryRunner.manager, creditNote);
+        if (invoiceFullyCovered) {
+          await queryRunner.manager.update(Invoice, creditNote.invoiceId, {
+            status: InvoiceStatus.REFUNDED,
+          });
+        }
       } else {
         // REPLACEMENT or CREDIT_EXCHANGE: Finance approval only — inventory updated later in complete()
         creditNote.status = CreditNoteStatus.APPROVED;
       }
 
-      await this.repository.save(creditNote);
+      await queryRunner.manager.save(creditNote);
+      await queryRunner.commitTransaction();
+
+      if (postCommitInventorySideEffect) {
+        try {
+          await postCommitInventorySideEffect();
+        } catch (sideEffectErr) {
+          logger.error(
+            `Credit Note ${creditNote.creditNoteNo} approved and refund recorded, but the inventory status update failed`,
+            sideEffectErr,
+          );
+        }
+      }
 
       return res.status(200).json({
         success: true,
@@ -333,7 +410,13 @@ export class CreditNoteController {
         message: creditNote.type === 'DIRECT_REFUND' ? 'Refund Completed' : 'Credit Note Approved',
       });
     } catch (error) {
+      // Guard against rolling back a transaction that already committed — e.g. if
+      // the post-commit inventory side effect's own try/catch didn't fully contain
+      // an error, or the response serialization itself throws after commit.
+      if (queryRunner.isTransactionActive) await queryRunner.rollbackTransaction();
       next(error);
+    } finally {
+      await queryRunner.release();
     }
   };
 

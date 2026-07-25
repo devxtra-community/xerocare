@@ -1,4 +1,4 @@
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { ReturnCredit } from '../entities/returnCreditEntity';
 import { Source } from '../config/dataSource';
 
@@ -9,9 +9,12 @@ export class ReturnCreditRepository {
     this.repo = Source.getRepository(ReturnCredit);
   }
 
-  async createReturnCredit(data: Partial<ReturnCredit>) {
-    const rc = this.repo.create(data);
-    return this.repo.save(rc);
+  // Optional `manager` lets this write participate in a caller-owned transaction
+  // (e.g. CreditNoteController.approve) instead of committing on its own connection.
+  async createReturnCredit(data: Partial<ReturnCredit>, manager?: EntityManager) {
+    const repo = manager ? manager.getRepository(ReturnCredit) : this.repo;
+    const rc = repo.create(data);
+    return repo.save(rc);
   }
 
   async getReturnTotalsByBranch(branchId?: string, year?: number) {

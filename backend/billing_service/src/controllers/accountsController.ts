@@ -64,7 +64,7 @@ async function internalFetchJSON<T>(
     return null;
   }
 }
-import { postCashbookEntry } from '../services/cashbookService';
+import { postCashbookEntry, requireCashAccount } from '../services/cashbookService';
 import { logger } from '../config/logger';
 import { nowInBusinessTz, todayInBusinessTz } from '../utils/businessDate';
 
@@ -542,41 +542,43 @@ export const getDayBook = async (req: Request, res: Response, next: NextFunction
 
 // ─── EXPENSE ENTRIES ──────────────────────────────────────────────────────────
 
-// Posts a PAID expense into the cashbook (day book) as a PAYMENT. Best-effort + idempotent.
+// Posts a PAID expense into the cashbook (day book) as a PAYMENT. Idempotent — but no
+// longer "best effort": a posting failure (most commonly, no matching Cash/Bank
+// account for the branch) now throws instead of being logged and swallowed, which
+// used to let an expense sit marked PAID with no real cash movement behind it.
 async function postExpensePayment(expense: ExpenseEntry, userId?: string): Promise<void> {
-  try {
-    await postCashbookEntry({
-      date: expense.paymentDate ?? expense.date,
-      entryType: 'PAYMENT',
-      amount: Number(expense.netAmount),
-      category: expense.category,
-      branchId: expense.branchId,
-      createdBy: userId ?? expense.createdBy ?? SYSTEM_UUID,
-      paymentMode: expense.paymentMode,
-      accountId: expense.paidFrom,
-      autoResolveAccount: true,
-      linkedExpenseId: expense.id,
-      description: expense.description,
-      chequeNo: expense.referenceNo,
-      notes: expense.notes,
-      sourceType: 'EXPENSE',
-      sourceId: expense.id,
-    });
-  } catch (err) {
-    logger.error('Failed to post expense payment to cashbook', err);
-  }
+  await postCashbookEntry({
+    date: expense.paymentDate ?? expense.date,
+    entryType: 'PAYMENT',
+    amount: Number(expense.netAmount),
+    category: expense.category,
+    branchId: expense.branchId,
+    createdBy: userId ?? expense.createdBy ?? SYSTEM_UUID,
+    paymentMode: expense.paymentMode,
+    accountId: expense.paidFrom,
+    autoResolveAccount: true,
+    linkedExpenseId: expense.id,
+    description: expense.description,
+    chequeNo: expense.referenceNo,
+    notes: expense.notes,
+    sourceType: 'EXPENSE',
+    sourceId: expense.id,
+  });
 }
 
 export const getExpenseEntries = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(ExpenseEntry);
-    const { category, status, fromDate, toDate } = req.query;
+    const { category, status, fromDate, toDate, isPrepayment } = req.query;
     const qb = repo.createQueryBuilder('e');
     applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     if (category) qb.andWhere('e.category = :category', { category });
     if (status) qb.andWhere('e.status = :status', { status });
     if (fromDate) qb.andWhere('e.date >= :fromDate', { fromDate });
     if (toDate) qb.andWhere('e.date <= :toDate', { toDate });
+    if (isPrepayment !== undefined) {
+      qb.andWhere('e.isPrepayment = :isPrepayment', { isPrepayment: isPrepayment === 'true' });
+    }
     qb.orderBy('e.date', 'DESC');
     const entries = await qb.getMany();
     res.json({ success: true, data: entries });
@@ -597,6 +599,18 @@ export const createExpenseEntry = async (req: Request, res: Response, next: Next
       branchId: req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId,
       createdBy: req.user?.userId ?? req.body.createdBy,
     }) as unknown as ExpenseEntry;
+
+    // Validate before saving anything: creating an entry already marked PAID with no
+    // real account behind it used to succeed silently (the day-book posting below was
+    // best-effort). CHEQUE doesn't touch cash until cleared, so it's exempt.
+    if (entry.status === 'PAID' && (entry.paymentMode ?? '').trim().toLowerCase() !== 'cheque') {
+      await requireCashAccount(Source, {
+        branchId: entry.branchId,
+        paymentMode: entry.paymentMode,
+        explicitAccountId: entry.paidFrom,
+      });
+    }
+
     const saved = await repo.save(entry);
     // If created already-paid, mirror it into the day book.
     if (saved.status === 'PAID') {
@@ -616,6 +630,21 @@ export const updateExpenseEntry = async (req: Request, res: Response, next: Next
     if (!entry) throw new AppError('Expense not found', 404);
     const wasPaid = entry.status === 'PAID';
     Object.assign(entry, req.body);
+
+    // Same pre-flight validation as createExpenseEntry, for the same reason — only on
+    // the transition into PAID (an already-PAID entry being edited isn't re-posting).
+    if (
+      entry.status === 'PAID' &&
+      !wasPaid &&
+      (entry.paymentMode ?? '').trim().toLowerCase() !== 'cheque'
+    ) {
+      await requireCashAccount(Source, {
+        branchId: entry.branchId,
+        paymentMode: entry.paymentMode,
+        explicitAccountId: entry.paidFrom,
+      });
+    }
+
     const saved = await repo.save(entry);
     // Post to the day book only on the transition into PAID (idempotent guard also protects).
     if (saved.status === 'PAID' && !wasPaid) {
@@ -657,6 +686,18 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
     };
 
     const isCheque = (paymentMode ?? '').trim().toLowerCase() === 'cheque';
+
+    // Block before writing anything: the expense used to be marked PAID and saved
+    // regardless of whether the account below actually existed — the balance
+    // deduction further down only logged a warning and skipped itself on a missing
+    // account, leaving the expense showing paid with no real cash movement.
+    if (!isCheque) {
+      await requireCashAccount(Source, {
+        branchId: entry.branchId,
+        paymentMode,
+        explicitAccountId: paidFrom ?? entry.paidFrom,
+      });
+    }
 
     entry.status = 'PAID';
     entry.paidFrom = paidFrom ?? entry.paidFrom;
@@ -708,22 +749,17 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
       const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
 
       await Source.transaction(async (manager) => {
-        if (saved.paidFrom) {
-          const accountRepo = manager.getRepository(CashBankAccount);
-          const account = await accountRepo.findOne({ where: { id: saved.paidFrom } });
-          if (account) {
-            account.currentBalance = Number(account.currentBalance) - Number(saved.netAmount);
-            await manager.save(CashBankAccount, account);
-          } else {
-            logger.warn(
-              `[payExpenseEntry] Account ${saved.paidFrom} not found — balance not deducted`,
-            );
-          }
-        }
+        const account = await requireCashAccount(manager, {
+          branchId: saved.branchId,
+          paymentMode: saved.paymentMode ?? undefined,
+          explicitAccountId: saved.paidFrom ?? undefined,
+        });
+        account.currentBalance = Number(account.currentBalance) - Number(saved.netAmount);
+        await manager.save(CashBankAccount, account);
         const cbEntry = manager.create(CashbookEntry, {
           referenceNo: cbRefNo,
           date: saved.paymentDate ?? saved.date,
-          accountId: saved.paidFrom ?? undefined,
+          accountId: account.id,
           entryType: 'PAYMENT' as const,
           amount: Number(saved.netAmount),
           category: saved.category,
@@ -1299,6 +1335,9 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
             dueDate: req.body.chequeDueDate
               ? new Date(req.body.chequeDueDate)
               : new Date(req.body.paymentDate || Date.now()),
+            chequeDate: req.body.chequeDate
+              ? new Date(req.body.chequeDate)
+              : new Date(req.body.paymentDate || Date.now()),
             issueDate: new Date(req.body.paymentDate || Date.now()),
             type: 'RECEIVED',
             status: 'PENDING',
@@ -1798,6 +1837,11 @@ export const getBalanceSheet = async (req: Request, res: Response, next: NextFun
           securityDepositsReceivable: +bs.securityDepositsReceivable.toFixed(2),
           sparePartsInventory: +bs.sparePartsInventory.toFixed(2),
           inventoryUnavailable: bs.inventoryUnavailable,
+          custom: bs.customAssets.map((c) => ({
+            name: c.accountName,
+            code: c.accountNumber,
+            amount: +c.amount.toFixed(2),
+          })),
           total: +bs.totalAssets.toFixed(2),
         },
         liabilities: {
@@ -1805,6 +1849,11 @@ export const getBalanceSheet = async (req: Request, res: Response, next: NextFun
           accruedExpenses: +bs.accruedExpenses.toFixed(2),
           vatPayable: +bs.vatPayable.toFixed(2),
           securityDepositsReceived: +bs.securityDepositsReceived.toFixed(2),
+          custom: bs.customLiabilities.map((c) => ({
+            name: c.accountName,
+            code: c.accountNumber,
+            amount: +c.amount.toFixed(2),
+          })),
           total: +bs.totalLiabilities.toFixed(2),
         },
         equity: {
@@ -1812,6 +1861,11 @@ export const getBalanceSheet = async (req: Request, res: Response, next: NextFun
           retainedEarnings: +bs.retainedEarnings.toFixed(2),
           reserves: +bs.reserves.toFixed(2),
           dividends: +bs.dividends.toFixed(2),
+          custom: bs.customEquity.map((c) => ({
+            name: c.accountName,
+            code: c.accountNumber,
+            amount: +c.amount.toFixed(2),
+          })),
           total: +bs.totalEquity.toFixed(2),
         },
         totalAssets: +bs.totalAssets.toFixed(2),
@@ -1889,12 +1943,71 @@ export const getReceivableCharts = async (req: Request, res: Response, next: Nex
     const monthlyPaid: Record<string, number> = {};
 
     for (const r of rows) {
+      // Manual receivables linked to an invoice are the invoice's own AR — counted
+      // once below via the invoice query, never here (same guard as the main
+      // Receivable page and the 1003 balance-sheet aggregate).
+      if (r.linkedInvoiceId) continue;
       typeMap[r.type] = (typeMap[r.type] ?? 0) + Number(r.amount);
       if (r.customerName)
         customerMap[r.customerName] = (customerMap[r.customerName] ?? 0) + Number(r.amount);
       const month = String(r.issueDate).slice(0, 7);
       monthlyIssued[month] = (monthlyIssued[month] ?? 0) + Number(r.amount);
       monthlyPaid[month] = (monthlyPaid[month] ?? 0) + Number(r.amountPaid ?? 0);
+    }
+
+    // Invoice-based AR — was previously missing entirely from this endpoint, so the
+    // AR Analytics charts looked empty for any branch whose receivables are mostly
+    // invoice-driven (the norm) rather than manual entries (the exception). Same
+    // EXCL_STATUS/VALID_INVOICES population as the 1003 balance-sheet figure and the
+    // Receivable page's own accounts-receivable line-item endpoint, but unfiltered by
+    // outstanding balance here — a fully-collected invoice still belongs on the
+    // collection-rate trend and the by-type/top-customer totals.
+    const branchFilter = (req.branchFilter ?? []).filter((b) => /^[0-9a-f-]{36}$/i.test(b));
+    const branchClause =
+      branchFilter.length === 1
+        ? `AND i."branchId" = '${branchFilter[0]}'`
+        : branchFilter.length > 1
+          ? `AND i."branchId" IN (${branchFilter.map((b) => `'${b}'`).join(',')})`
+          : '';
+    const invoiceRows = await Source.query<
+      {
+        saleType: string;
+        customer_name: string | null;
+        createdAt: string;
+        totalAmount: string;
+        paid: string;
+      }[]
+    >(`
+      SELECT i."saleType", i.customer_name, TO_CHAR(i."createdAt", 'YYYY-MM-DD') AS "createdAt",
+             i."totalAmount", COALESCE(pt.paid, 0) AS paid
+      FROM invoices i
+      LEFT JOIN (
+        SELECT invoice_id, SUM(paid) AS paid FROM (
+          SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
+          FROM payment_transactions
+          GROUP BY "invoice_id"
+          UNION ALL
+          SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS paid
+          FROM payment_ledgers
+          GROUP BY "invoiceId"
+        ) u GROUP BY invoice_id
+      ) pt ON pt.invoice_id = i.id
+      WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
+        AND i."totalAmount" > 0
+        AND i."deletedAt" IS NULL
+        ${branchClause}
+    `);
+
+    for (const inv of invoiceRows) {
+      const issued = Number(inv.totalAmount);
+      const paid = Math.min(Number(inv.paid), issued);
+      typeMap[inv.saleType] = (typeMap[inv.saleType] ?? 0) + issued;
+      if (inv.customer_name)
+        customerMap[inv.customer_name] = (customerMap[inv.customer_name] ?? 0) + issued;
+      const month = inv.createdAt.slice(0, 7);
+      monthlyIssued[month] = (monthlyIssued[month] ?? 0) + issued;
+      monthlyPaid[month] = (monthlyPaid[month] ?? 0) + paid;
     }
 
     const collectionRate = Object.keys({ ...monthlyIssued, ...monthlyPaid })
@@ -1932,6 +2045,10 @@ export const getPayableCharts = async (req: Request, res: Response, next: NextFu
     const monthlyData: Record<string, { payable: number; paid: number }> = {};
 
     for (const p of rows) {
+      // Manual payables linked to a PO are the PO's own AP — counted once below via
+      // the purchases call, never here (same guard as the 2001 balance-sheet
+      // aggregate and the Payable page's own merge).
+      if (p.linkedPurchaseId) continue;
       typeMap[p.type] = (typeMap[p.type] ?? 0) + Number(p.amount);
       vendorMap[p.payableTo] = (vendorMap[p.payableTo] ?? 0) + Number(p.amount);
       const month = String(p.issueDate).slice(0, 7);
@@ -1942,40 +2059,46 @@ export const getPayableCharts = async (req: Request, res: Response, next: NextFu
       monthlyData[month].paid += Number(p.amountPaid ?? 0) || 0;
     }
 
-    // Also pull purchase orders from inventory service to include in monthly chart
-    try {
-      const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
-      const purchaseRes = await fetch(`${INV_URL}/purchases`);
-      if (purchaseRes.ok) {
-        const purchaseJson = (await purchaseRes.json()) as {
-          success: boolean;
-          data: Array<{
-            id: string;
-            totalAmount: number;
-            paidAmount?: number;
-            createdAt: string;
-            vendor?: { name: string };
-            purchaseOrigin?: string;
-          }>;
-        };
-        const purchases = purchaseJson?.data ?? [];
-        for (const p of purchases) {
-          const month = String(p.createdAt).slice(0, 7);
-          if (!month || month === 'undefined') continue;
-          if (!monthlyData[month]) monthlyData[month] = { payable: 0, paid: 0 };
-          monthlyData[month].payable += Number(p.totalAmount) || 0;
-          monthlyData[month].paid += Number(p.paidAmount ?? 0) || 0;
+    // Also pull purchase orders from inventory service to include in monthly chart.
+    // Was previously an unauthenticated fetch() to a route behind authMiddleware —
+    // always 401'd and silently swallowed by the catch below, so this block has
+    // never actually run. Fixed to use the same self-signed internal-service token
+    // pattern already used elsewhere in this file (internalFetchJSON). Since that
+    // token carries role=ADMIN (needed to pass ven_inv's own auth check), it would
+    // otherwise see every branch's purchases regardless of who's asking — pass the
+    // real caller's branch through explicitly to keep this scoped like the rest of
+    // the chart. Left unscoped only when the caller has 0 or multiple branches in
+    // view (e.g. an admin looking at "all branches"), matching how cross-branch
+    // aggregates elsewhere in this codebase already behave.
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+    const chartBranchFilter = req.branchFilter ?? [];
+    const branchQs =
+      chartBranchFilter.length === 1 ? `?branchId=${encodeURIComponent(chartBranchFilter[0])}` : '';
+    const purchaseJson = await internalFetchJSON<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        totalAmount: number;
+        paidAmount?: number;
+        createdAt: string;
+        vendor?: { name: string };
+        purchaseOrigin?: string;
+      }>;
+    }>(`${INV_URL}/purchases${branchQs}`);
+    const purchases = purchaseJson?.data ?? [];
+    for (const p of purchases) {
+      const month = String(p.createdAt).slice(0, 7);
+      if (!month || month === 'undefined') continue;
+      if (!monthlyData[month]) monthlyData[month] = { payable: 0, paid: 0 };
+      monthlyData[month].payable += Number(p.totalAmount) || 0;
+      monthlyData[month].paid += Number(p.paidAmount ?? 0) || 0;
 
-          // Also add to vendor map
-          const vendor = p.vendor?.name ?? 'Unknown Vendor';
-          vendorMap[vendor] = (vendorMap[vendor] ?? 0) + Number(p.totalAmount);
+      // Also add to vendor map
+      const vendor = p.vendor?.name ?? 'Unknown Vendor';
+      vendorMap[vendor] = (vendorMap[vendor] ?? 0) + Number(p.totalAmount);
 
-          // Purchases are VENDOR_INVOICE type
-          typeMap['VENDOR_INVOICE'] = (typeMap['VENDOR_INVOICE'] ?? 0) + Number(p.totalAmount);
-        }
-      }
-    } catch {
-      // If inventory service is unavailable, proceed with manual payables only
+      // Purchases are VENDOR_INVOICE type
+      typeMap['VENDOR_INVOICE'] = (typeMap['VENDOR_INVOICE'] ?? 0) + Number(p.totalAmount);
     }
 
     const byType = Object.entries(typeMap).map(([name, value]) => ({ name, value }));
@@ -2195,7 +2318,13 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       AMC_SMA: pl.amcSmaRevenue,
       SPAREPART_SALE: pl.sparePartSalesRevenue,
       USAGE: pl.usageRevenue,
+      OTHER: pl.otherIncome,
     };
+    // Custom (non-system) income accounts — named individually rather than folded
+    // into OTHER, since they're already excluded from otherIncome upstream.
+    for (const c of pl.customIncome) {
+      if (c.amount !== 0) revenueByType[c.accountName] = c.amount;
+    }
 
     // Only include expense lines that are non-zero
     const allExpByCategory: Record<string, number> = {
@@ -2215,6 +2344,10 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       CUSTOMS_DUTY: pl.customsDuty,
       OTHER: pl.otherExpenses,
     };
+    // Custom (non-system) expense accounts — same reasoning as revenueByType above.
+    for (const c of pl.customExpenses) {
+      if (c.amount !== 0) allExpByCategory[c.accountName] = c.amount;
+    }
     const expByCategory = Object.fromEntries(
       Object.entries(allExpByCategory).filter(([, v]) => v !== 0),
     );
@@ -3116,14 +3249,20 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       accruedExpenses,
       vatPayable,
       securityDepositsReceived,
-      deferredRevenue,
+      deferredRevenueMemo,
       salaryPayable,
       ownerCapital,
       retainedEarnings,
       reserves,
       withdrawals,
       dividends,
+      customAssets,
+      customLiabilities,
+      customEquity,
+      totalCurrentAssets,
+      totalNonCurrentAssets,
       totalAssets,
+      totalCurrentLiabilities,
       totalLiabilities,
       totalEquity,
       totalLiabilitiesAndEquity,
@@ -3155,7 +3294,11 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       insuranceExpense,
       importLabourCost,
       customsDuty,
+      otherIncome,
       otherExpenses,
+      customIncome,
+      customExpenses,
+      totalRevenue: totalIncome,
       totalExpenses,
       grossProfit,
       netProfit,
@@ -3163,30 +3306,16 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       dataWarnings: plDataWarnings,
     } = pl;
 
-    const totalCurrentAssets =
-      cashInHand +
-      cashAtBank +
-      accountsReceivable +
-      securityDepositsReceivable +
-      prepaidExpenses +
-      sparePartsInventory +
-      productInventory;
-    const totalNonCurrentAssets = equipmentNBV;
-    const totalCurrentLiabilities =
-      accountsPayable +
-      accruedExpenses +
-      vatPayable +
-      securityDepositsReceived +
-      deferredRevenue +
-      salaryPayable;
-    const totalIncome =
-      rentalRevenue +
-      leaseRevenue +
-      salesRevenue +
-      serviceRevenue +
-      amcSmaRevenue +
-      usageRevenue +
-      sparePartSalesRevenue;
+    // Custom (non-system) accounts, shaped for display. parentAccountId (a real
+    // chart_of_accounts id — null for Main Accounts) lets the frontend nest a
+    // sub-account under its parent the same way it nests 1001-01 under 1001.
+    const shapeCustom = (accounts: typeof customAssets) =>
+      accounts.map((a) => ({
+        ...makeAccountBalance(a.accountNumber, a.accountName, a.amount, currency),
+        id: a.id,
+        parentAccountId: a.parentAccountId,
+        sourceType: a.sourceType,
+      }));
 
     const allWarnings = [
       ...bsCurrencyWarnings,
@@ -3244,6 +3373,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
               productInventory,
               currency,
             ),
+            custom: shapeCustom(customAssets.filter((a) => a.accountGroup === 'CURRENT_ASSET')),
             totalCurrentAssets: +totalCurrentAssets.toFixed(2),
           },
           nonCurrentAssets: {
@@ -3260,6 +3390,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
               currency,
             ),
             equipmentNBV: +equipmentNBV.toFixed(2),
+            custom: shapeCustom(customAssets.filter((a) => a.accountGroup === 'NON_CURRENT_ASSET')),
             totalNonCurrentAssets: +totalNonCurrentAssets.toFixed(2),
           },
           totalAssets: +totalAssets.toFixed(2),
@@ -3286,16 +3417,29 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
               securityDepositsReceived,
               currency,
             ),
-            deferredRevenue: makeAccountBalance(
-              '2005',
-              'Deferred Revenue',
-              deferredRevenue,
-              currency,
-            ),
+            deferredRevenue: {
+              ...makeAccountBalance(
+                '2005',
+                'Deferred Revenue (Memo)',
+                deferredRevenueMemo,
+                currency,
+              ),
+              isMemo: true,
+              memoNote:
+                'Unearned advance on active Rent/Lease contracts — informational only, excluded from Total Liabilities since the advance is already recognized as revenue at signing.',
+            },
             salaryPayable: makeAccountBalance('2006', 'Salary Payable', salaryPayable, currency),
+            custom: shapeCustom(
+              customLiabilities.filter((a) => a.accountGroup === 'CURRENT_LIABILITY'),
+            ),
             totalCurrentLiabilities: +totalCurrentLiabilities.toFixed(2),
           },
-          nonCurrentLiabilities: { totalNonCurrentLiabilities: 0 },
+          nonCurrentLiabilities: {
+            custom: shapeCustom(
+              customLiabilities.filter((a) => a.accountGroup === 'NON_CURRENT_LIABILITY'),
+            ),
+            totalNonCurrentLiabilities: 0,
+          },
           totalLiabilities: +totalLiabilities.toFixed(2),
         },
 
@@ -3310,6 +3454,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
           reserves: makeAccountBalance('3003', 'Reserves', reserves, currency),
           lessWithdrawals: makeAccountBalance('3004', 'Less: Withdrawals', withdrawals, currency),
           lessDividends: makeAccountBalance('3005', 'Less: Dividends', dividends, currency),
+          custom: shapeCustom(customEquity),
           totalEquity: +totalEquity.toFixed(2),
         },
 
@@ -3326,6 +3471,8 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             sparePartSalesRevenue,
             currency,
           ),
+          otherIncome: makeAccountBalance('4008', 'Other Income', otherIncome, currency),
+          custom: shapeCustom(customIncome),
           totalIncome: +totalIncome.toFixed(2),
         },
 
@@ -3385,6 +3532,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             currency,
           ),
           customsDuty: makeAccountBalance('5015', 'Customs Duty', customsDuty, currency),
+          custom: shapeCustom(customExpenses),
           totalExpenses: +totalExpenses.toFixed(2),
         },
 
@@ -3542,14 +3690,26 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       customerCountry: inv.customerCountry ?? null,
       customerStateProvince: inv.customerStateProvince ?? null,
       customerCity: inv.customerCity ?? null,
-      taxableAmount: Number(inv.totalAmount ?? 0),
+      // inv.totalAmount is already tax-inclusive (grossAmount + taxAmount) — the
+      // taxable base is totalAmount minus the tax on it, and totalInvoice is just
+      // totalAmount itself. Previously this used totalAmount as-is for the base and
+      // added taxAmount again on top for the total, double-counting VAT in both
+      // displayed figures even though outputVat (the actual liability) was correct.
+      taxableAmount: Number(inv.totalAmount ?? 0) - Number(inv.taxAmount ?? 0),
       taxPercent: inv.taxPercent,
       taxName: inv.taxName,
       outputVat: Number(inv.taxAmount ?? 0),
-      totalInvoice: Number(inv.totalAmount ?? 0) + Number(inv.taxAmount ?? 0),
+      totalInvoice: Number(inv.totalAmount ?? 0),
       currencyCode: inv.currencyCode,
       status: inv.status,
       isReversal: false,
+      // A distinct reportable VAT category — required in most real VAT regimes
+      // even at zero value, unlike Rent/Lease which is genuinely outside VAT
+      // scope and omitted from this report entirely (see the saleType filter
+      // above). Sourced from the invoice's own permanent snapshot, not a live
+      // customer lookup, so this can't retroactively change if the customer's
+      // VAT status is edited later.
+      isExempt: inv.customerVatStatus === 'EXEMPT',
     }));
 
     // Credit note reversals — a DIRECT_REFUND on a taxable sale must reduce Output VAT in
@@ -3574,10 +3734,11 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
         'cn.taxName AS "taxName"',
         'cn.taxAmount AS "taxAmount"',
         'inv."currency_code" AS "currencyCode"',
-        'inv."customerVatNumber" AS "customerVatNumber"',
-        'inv."customerCountry" AS "customerCountry"',
-        'inv."customerStateProvince" AS "customerStateProvince"',
-        'inv."customerCity" AS "customerCity"',
+        'inv."customer_vat_number" AS "customerVatNumber"',
+        'inv."customer_country" AS "customerCountry"',
+        'inv."customer_state_province" AS "customerStateProvince"',
+        'inv."customer_city" AS "customerCity"',
+        'inv."customer_vat_status" AS "customerVatStatus"',
       ]);
 
     if (branchFilter.length === 1) {
@@ -3591,10 +3752,10 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       end.setHours(23, 59, 59, 999);
       cnQb.andWhere('cn.updatedAt <= :dateTo', { dateTo: end });
     }
-    if (country) cnQb.andWhere('inv."customerCountry" = :country', { country });
+    if (country) cnQb.andWhere('inv."customer_country" = :country', { country });
     if (stateProvince)
-      cnQb.andWhere('inv."customerStateProvince" = :stateProvince', { stateProvince });
-    if (city) cnQb.andWhere('inv."customerCity" = :city', { city });
+      cnQb.andWhere('inv."customer_state_province" = :stateProvince', { stateProvince });
+    if (city) cnQb.andWhere('inv."customer_city" = :city', { city });
 
     const reversalsRaw = await cnQb.getRawMany<{
       creditNoteNo: string;
@@ -3611,6 +3772,7 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       customerCountry: string | null;
       customerStateProvince: string | null;
       customerCity: string | null;
+      customerVatStatus: string | null;
     }>();
 
     const reversalRows = reversalsRaw.map((r) => ({
@@ -3627,6 +3789,7 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       taxPercent: r.taxPercent != null ? Number(r.taxPercent) : null,
       taxName: r.taxName,
       outputVat: -Number(r.taxAmount ?? 0),
+      isExempt: r.customerVatStatus === 'EXEMPT',
       totalInvoice: -(Number(r.productAmount ?? 0) + Number(r.taxAmount ?? 0)),
       currencyCode: r.currencyCode,
       status: 'CREDIT_NOTE_REVERSAL',
@@ -3754,6 +3917,33 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       bfParams,
     );
 
+    // Exempt-customer supplies — a distinct reportable VAT category in most real
+    // regimes, unlike Rent/Lease (genuinely out of VAT scope, already excluded by
+    // the saleType filter above). Reuses the exact same filter clauses/params as
+    // the country breakdown, plus one static extra condition (EXEMPT is a fixed
+    // enum value, not user input, so no new placeholder is needed).
+    const [exemptTotalsRaw] = await Source.query<
+      { invoice_count: string; taxable_amount: string }[]
+    >(
+      `
+      SELECT
+        COUNT(*) AS invoice_count,
+        COALESCE(SUM("totalAmount"), 0) AS taxable_amount
+      FROM invoices
+      WHERE status IN (${OUTPUT_TAX_STATUSES.map((s) => `'${s}'`).join(', ')})
+        AND "isTemplate" = false
+        AND "is_opening_entry" = false
+        AND "deletedAt" IS NULL
+        AND "saleType" NOT IN ('RENT', 'LEASE')
+        AND "customer_vat_status" = 'EXEMPT'
+        ${bfClause} ${dfClause} ${dtClause} ${cClause} ${spClause} ${cityClause}
+    `,
+      bfParams,
+    );
+    const exemptReversalTaxable = reversalRows
+      .filter((r) => r.isExempt)
+      .reduce((s, r) => s + r.taxableAmount, 0);
+
     // Collapse state rows under each country
     const cMap: Record<
       string,
@@ -3797,14 +3987,25 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       reversalRows.reduce((s, r) => s + r.outputVat, 0);
     const totalRowCount = total + reversalRows.length;
 
+    const exemptTaxableAmount =
+      Number(exemptTotalsRaw?.taxable_amount ?? 0) + exemptReversalTaxable;
+    const exemptCount = Number(exemptTotalsRaw?.invoice_count ?? 0);
+
     res.json({
       success: true,
       data: {
         rows: enrichedRows,
         totals: {
+          // Unchanged meaning/value — every qualifying invoice combined (Exempt
+          // supplies included, at their real 0.00 VAT — never silently omitted).
           totalTaxableAmount: +grandTotalTaxableAmount.toFixed(2),
           totalOutputVat: +grandTotalOutputVat.toFixed(2),
           count: totalRowCount,
+          // Distinct Exempt-customer category, alongside (not replacing) the
+          // combined totals above — required for VAT-compliance reporting.
+          standardTaxableAmount: +(grandTotalTaxableAmount - exemptTaxableAmount).toFixed(2),
+          exemptCount,
+          exemptTaxableAmount: +exemptTaxableAmount.toFixed(2),
         },
         pagination: {
           page: pageNum,

@@ -31,6 +31,8 @@ import {
   ShieldCheck,
   Banknote,
   ArrowLeftRight,
+  Coins,
+  Layers,
 } from 'lucide-react';
 
 import {
@@ -80,6 +82,7 @@ export default function FinanceSidebar() {
     { title: 'General Ledger', icon: BookMarked, href: '/finance/accounts/general-ledger' },
     { title: 'Cash & Bank', icon: Landmark, href: '/finance/accounts/cash-bank' },
     { title: 'Income Statement', icon: TrendingUp, href: '/finance/accounts/income-statement' },
+    { title: 'Segmented P&L', icon: Layers, href: '/finance/accounts/segmented-pnl' },
     { title: 'Balance Sheet', icon: Scale, href: '/finance/accounts/balance-sheet' },
     { title: 'Cash Flow', icon: Waves, href: '/finance/accounts/cash-flow' },
     { title: 'Day Book', icon: CalendarDays, href: '/finance/accounts/day-book' },
@@ -88,6 +91,7 @@ export default function FinanceSidebar() {
     { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
     { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
     { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
+    { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
     { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
     { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
     { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },

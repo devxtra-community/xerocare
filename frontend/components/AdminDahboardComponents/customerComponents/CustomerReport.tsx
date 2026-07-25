@@ -26,7 +26,12 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import StatCard from '@/components/StatCard';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { getCustomers, Customer } from '@/lib/customer';
+import {
+  getCustomers,
+  Customer,
+  CUSTOMER_VAT_STATUS_LABELS,
+  CUSTOMER_EXEMPTION_REASON_LABELS,
+} from '@/lib/customer';
 import { getBranches, Branch } from '@/lib/branch';
 import { getAllProducts, Product } from '@/lib/product';
 import { getInvoices, Invoice } from '@/lib/invoice';
@@ -579,6 +584,35 @@ export default function CustomerReport() {
                           {selectedCustomer.address || 'N/A'}
                         </span>
                       </div>
+                      <div className="grid grid-cols-3 text-sm">
+                        <span className="text-slate-400 font-medium">VAT Status:</span>
+                        <span className="col-span-2 text-slate-700 font-semibold">
+                          {selectedCustomer.vatStatus
+                            ? CUSTOMER_VAT_STATUS_LABELS[selectedCustomer.vatStatus]
+                            : CUSTOMER_VAT_STATUS_LABELS.UNREGISTERED_STANDARD}
+                          {selectedCustomer.vatStatus === 'REGISTERED' &&
+                            selectedCustomer.vatNumber && (
+                              <span className="text-slate-400 font-normal">
+                                {' '}
+                                ({selectedCustomer.vatNumber})
+                              </span>
+                            )}
+                        </span>
+                      </div>
+                      {/* Internal-only — never shown on customer-facing documents. */}
+                      {selectedCustomer.vatStatus === 'EXEMPT' && (
+                        <div className="grid grid-cols-3 text-sm">
+                          <span className="text-slate-400 font-medium">Exemption Reason:</span>
+                          <span className="col-span-2 text-amber-700 font-semibold">
+                            {selectedCustomer.exemptionReason
+                              ? CUSTOMER_EXEMPTION_REASON_LABELS[selectedCustomer.exemptionReason]
+                              : 'Not specified'}
+                            <span className="block text-[10px] text-slate-400 font-normal mt-0.5">
+                              Internal use only — not shown to the customer
+                            </span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

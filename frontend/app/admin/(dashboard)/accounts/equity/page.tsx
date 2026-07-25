@@ -1,20 +1,22 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Download } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import {
   fetchEquitySummary,
   fetchEquityEntries,
   fetchEquityCharts,
 } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
-import * as XLSX from 'xlsx';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 
 const TYPE_COLORS: Record<string, string> = {
   SHARE_CAPITAL: 'bg-blue-100 text-blue-700',
@@ -31,6 +33,23 @@ function EquityContent() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const params: Record<string, string> = {};
   if (branchIds) params.branchIds = branchIds;
@@ -52,20 +71,30 @@ function EquityContent() {
       }>,
   });
 
-  const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      entries.map((e) => ({
-        'Entry No': e.entryNo,
-        Date: e.date,
-        Type: e.type,
-        Description: e.description,
-        Amount: e.amount,
-        Currency: e.currency,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Equity');
-    XLSX.writeFile(wb, 'consolidated_equity.xlsx');
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Equity — Consolidated',
+    sections: [
+      {
+        title: 'Equity Entries',
+        rows: entries.map((e) => ({
+          code: String(e.date).slice(0, 10),
+          label: `${e.entryNo} — ${e.type.replace(/_/g, ' ')} — ${e.description}`,
+          value: formatCurrency(e.amount, e.currency),
+        })),
+        total: {
+          label: 'Net Total',
+          value: formatCurrency(
+            entries.reduce((s, e) => s + Number(e.amount), 0),
+            currency,
+          ),
+        },
+      },
+    ],
+    summary: [
+      { label: 'Net Equity', value: formatCurrency(summary?.netEquity ?? 0, currency), bold: true },
+      { label: 'Total Assets', value: formatCurrency(summary?.totalAssets ?? 0, currency) },
+    ],
   };
 
   return (
@@ -76,10 +105,10 @@ function EquityContent() {
           <p className="text-sm text-gray-500">All branches in AED</p>
         </div>
         <button
-          onClick={exportExcel}
+          onClick={() => setShowStatement(true)}
           className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
         >
-          <Download className="h-4 w-4" /> Export
+          <FileText className="h-4 w-4" /> Generate Statement
         </button>
       </div>
 
@@ -179,6 +208,14 @@ function EquityContent() {
           </table>
         </div>
       </div>
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }

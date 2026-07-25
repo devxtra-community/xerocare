@@ -282,6 +282,15 @@ export class Invoice {
   @Column({ name: 'customer_vat_number', type: 'varchar', length: 50, nullable: true })
   customerVatNumber?: string | null;
 
+  // Snapshot of the customer's CustomerVatStatus at the time this invoice was
+  // created/customer-assigned — 'REGISTERED' | 'UNREGISTERED_STANDARD' | 'EXEMPT'.
+  // Kept as a permanent snapshot (like customerVatNumber above) rather than a live
+  // lookup so an invoice's own VAT-exempt reporting status can't retroactively
+  // change if the customer's status is edited later. Used both for document
+  // rendering ("VAT Exempt" label) and Output Tax report categorization.
+  @Column({ name: 'customer_vat_status', type: 'varchar', length: 30, nullable: true })
+  customerVatStatus?: string | null;
+
   @Column({ name: 'customer_country', type: 'varchar', length: 2, nullable: true })
   customerCountry?: string | null;
 

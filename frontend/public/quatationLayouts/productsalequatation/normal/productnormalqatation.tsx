@@ -62,6 +62,9 @@ export interface ProductNormalQuotationProps {
   /** Totals */
   totals?: {
     subTotal: number;
+    /** Total discount across all line items — this layout has no separate
+     * discount row, so subTotal is shown net of this rather than gross. */
+    discountTotal?: number;
     vatTotal: number;
     vatPercent?: number;
     vatName?: string;
@@ -594,7 +597,13 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
       >
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal (Before VAT)', value: totals.subTotal },
+            {
+              label: 'Subtotal (Before VAT)',
+              // Net of discount — this layout has no separate discount row, and VAT
+              // below is already computed on the discounted amount, so the subtotal
+              // shown here must match that same base or the two figures won't reconcile.
+              value: totals.subTotal - (totals.discountTotal || 0),
+            },
             {
               label: totals.vatPercent
                 ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`

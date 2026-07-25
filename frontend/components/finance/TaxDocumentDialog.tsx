@@ -13,16 +13,21 @@ import type {
   InputTaxLocalRow,
   InputTaxInternationalRow,
 } from '@/lib/finance/accountsApi';
+import {
+  ACCENT,
+  TEXT_MUTED,
+  TEXT_LIGHT,
+  docStyle,
+  thStyle,
+  tdStyle,
+  DocHeader,
+  DocFooter,
+  TotalsBlock,
+  generateDocPdf,
+  type BranchInfo,
+} from '@/components/shared/documentTemplate';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface BranchInfo {
-  name: string;
-  address?: string;
-  tax_registration_number?: string;
-  country?: string;
-  currency?: string;
-}
 
 type DialogData =
   | { type: 'output'; row: OutputTaxRow }
@@ -35,46 +40,6 @@ interface TaxDocumentDialogProps {
   data: DialogData;
   branch: BranchInfo;
 }
-
-// ─── Design Tokens (Normal Quotation style) ───────────────────────────────────
-
-const ACCENT = '#000000';
-const TEXT_MUTED = '#555555';
-const TEXT_LIGHT = '#888888';
-const LOGO_SRC =
-  '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png';
-
-// ─── Shared Styles ────────────────────────────────────────────────────────────
-
-const docStyle: React.CSSProperties = {
-  fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
-  fontSize: 13,
-  color: '#1a1a1a',
-  background: '#ffffff',
-  padding: '50px 48px',
-  width: '100%',
-  boxSizing: 'border-box',
-};
-
-const thStyle = (align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
-  padding: '10px 10px',
-  textAlign: align,
-  fontWeight: 300,
-  fontSize: 11,
-  letterSpacing: 0.5,
-  textTransform: 'uppercase',
-  color: ACCENT,
-  borderTop: `1px solid ${ACCENT}`,
-  borderBottom: `1px solid ${ACCENT}`,
-});
-
-const tdStyle = (align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
-  padding: '12px 10px',
-  textAlign: align,
-  fontSize: 12,
-  borderBottom: '1px solid #eee',
-  verticalAlign: 'top',
-});
 
 // ─── Utility Components ───────────────────────────────────────────────────────
 
@@ -105,143 +70,6 @@ const fmtDate = (d?: string | null) =>
   d
     ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : '—';
-
-// ─── Shared Doc Header ────────────────────────────────────────────────────────
-
-function DocHeader({
-  branch,
-  title,
-  subtitle,
-}: {
-  branch: BranchInfo;
-  title: string;
-  subtitle?: string;
-}) {
-  return (
-    <>
-      {/* Centered document title */}
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div
-          style={{
-            fontSize: 20,
-            fontWeight: 300,
-            color: ACCENT,
-            textTransform: 'uppercase',
-            letterSpacing: 2,
-          }}
-        >
-          {title}
-        </div>
-        {subtitle && (
-          <div style={{ fontSize: 11, color: TEXT_MUTED, fontStyle: 'italic', marginTop: 4 }}>
-            {subtitle}
-          </div>
-        )}
-      </div>
-
-      {/* Company info (left) + Logo (right) */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: 32,
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 17, fontWeight: 300, color: ACCENT, marginBottom: 6 }}>
-            {branch.name}
-          </div>
-          <div style={{ fontSize: 12, color: '#333', lineHeight: 1.6 }}>
-            {branch.address && <div>{branch.address}</div>}
-            {branch.tax_registration_number && <div>TRN: {branch.tax_registration_number}</div>}
-            {branch.country && <div>{branch.country}</div>}
-          </div>
-        </div>
-        <div
-          style={{
-            width: 160,
-            height: 75,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <img
-            src={LOGO_SRC}
-            alt="Xerocare"
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-          />
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ─── Shared Doc Footer ────────────────────────────────────────────────────────
-
-function DocFooter({ branch }: { branch: BranchInfo }) {
-  return (
-    <div
-      style={{
-        borderTop: `1px solid ${ACCENT}`,
-        paddingTop: 14,
-        marginTop: 40,
-        display: 'flex',
-        justifyContent: 'space-between',
-        fontSize: 11,
-        color: '#666',
-      }}
-    >
-      <div>www.xerocare.com</div>
-      <div>{branch.address ?? 'Doha, Qatar'}</div>
-      <div>mail@xerocare.com | +974 7071 7282</div>
-    </div>
-  );
-}
-
-// ─── Totals Block ─────────────────────────────────────────────────────────────
-
-function TotalsBlock({ rows }: { rows: { label: string; value: string; bold?: boolean }[] }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-      <div style={{ width: 280 }}>
-        {rows.map((row, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '8px 0',
-              borderBottom: row.bold ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
-            }}
-          >
-            <span
-              style={{
-                fontSize: 12,
-                textTransform: 'uppercase',
-                color: row.bold ? ACCENT : '#000',
-                fontWeight: 300,
-              }}
-            >
-              {row.label}
-            </span>
-            <span
-              style={{
-                fontSize: row.bold ? 14 : 12,
-                color: row.bold ? ACCENT : '#000',
-                fontWeight: 300,
-              }}
-            >
-              {row.value}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ─── Document Layouts ─────────────────────────────────────────────────────────
 
@@ -686,53 +514,7 @@ export default function TaxDocumentDialog({
   const generatePdf = async () => {
     const element = printRef.current;
     if (!element) throw new Error('Document not found');
-
-    const { toPng } = await import('html-to-image');
-    const { jsPDF } = await import('jspdf');
-
-    const TARGET_WIDTH = 900;
-    const orig = element.getAttribute('style') || '';
-    element.setAttribute(
-      'style',
-      `${orig}; width:${TARGET_WIDTH}px !important; max-width:${TARGET_WIDTH}px !important; overflow:visible !important;`,
-    );
-    await new Promise<void>((r) => setTimeout(r, 120));
-
-    let dataUrl: string;
-    try {
-      dataUrl = await toPng(element, {
-        quality: 1,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        width: TARGET_WIDTH,
-      });
-    } finally {
-      element.setAttribute('style', orig);
-    }
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(dataUrl);
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const pdfH = pdf.internal.pageSize.getHeight();
-    const totalH = pdfW * (imgProps.height / imgProps.width);
-    let rem = totalH;
-    let pos = 0;
-    while (rem > 0) {
-      pdf.addImage(
-        dataUrl,
-        'PNG',
-        0,
-        pos === 0 ? 0 : -(totalH - rem),
-        pdfW,
-        totalH,
-        undefined,
-        'FAST',
-      );
-      rem -= pdfH;
-      pos += pdfH;
-      if (rem > 0) pdf.addPage();
-    }
-    return pdf;
+    return generateDocPdf(element);
   };
 
   const handleDownload = async () => {

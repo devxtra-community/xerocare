@@ -4,6 +4,7 @@ import { logger } from '../config/logger';
 import { ProductRepository } from '../repositories/productRepository';
 import { ModelRepository } from '../repositories/modelRepository';
 import { ModelService } from '../services/modelService';
+import { deleteCached } from '../utils/cacheUtil';
 
 /**
  * RabbitMQ Config
@@ -146,6 +147,11 @@ export async function startProductStatusConsumer() {
       product.customer_id = targetCustomerId;
       product.ownership = targetOwnership;
       await productRepo.addProduct(product);
+      // Read-through cache (productService.findById, 1h TTL) is never written
+      // to by this worker — without invalidating it here, GET /products/:id
+      // serves a stale status/ownership for up to 1h after Sale/Rent/Lease/
+      // Return/Damage transitions, including ones driven by credit notes.
+      await deleteCached(`product:${productId}`);
 
       logger.info('Product status updated successfully', {
         productId,

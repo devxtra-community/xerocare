@@ -45,6 +45,9 @@ export class ManualPayable {
   @Column({ default: 'PENDING' })
   status!: string; // PENDING | PARTIAL | PAID | OVERDUE
 
+  @Column({ type: 'uuid', nullable: true })
+  linkedPurchaseId?: string;
+
   @Column()
   branchId!: string;
 

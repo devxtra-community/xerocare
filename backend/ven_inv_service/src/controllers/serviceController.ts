@@ -65,6 +65,7 @@ import {
   copiesUsedFromCounters,
   WarrantyEvaluation,
 } from '../helpers/warrantyHelper';
+import { deleteCached } from '../utils/cacheUtil';
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET;
 if (!ACCESS_SECRET) {
@@ -180,6 +181,7 @@ export class ServiceController {
     part.quantity -= quantity;
     part.reserved_quantity += quantity;
     await sparePartRepo.save(part);
+    await deleteCached(`sparepart:${part.id}`);
 
     const reservation = reservationRepo.create({
       ticketId,
@@ -206,6 +208,7 @@ export class ServiceController {
         part.quantity += res.reservedQuantity;
         part.reserved_quantity = Math.max(0, part.reserved_quantity - res.reservedQuantity);
         await sparePartRepo.save(part);
+        await deleteCached(`sparepart:${part.id}`);
       }
       res.status = 'RELEASED';
       await reservationRepo.save(res);
@@ -3003,6 +3006,7 @@ export class ServiceController {
       part.quantity -= qty;
       part.damaged_quantity += qty;
       await sparePartRepo.save(part);
+      await deleteCached(`sparepart:${part.id}`);
 
       res.status(200).json({ success: true, data: part });
     } catch (error) {
@@ -5448,6 +5452,86 @@ For queries contact us at +974 4455 6677`;
         Number(labourRows[0]?.amount ?? 0) + Number(labourRevRows[0]?.amount ?? 0);
 
       return res.json({ success: true, cogsAmount, labourAmount });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // Same population/query shape as getCogsReport above (spare parts consumed +
+  // labour from CUSTOMER_APPROVED/COMPLETED tickets), but grouped by the
+  // ticket's productId instead of summed branch-wide — used by billing_service's
+  // Segmented P&L to attribute service/labour cost to the specific machine a
+  // Rent/Lease contract has allocated, not just the branch total.
+  getCogsReportByProduct = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { productIds, dateFrom, dateTo } = req.query as Record<string, string>;
+      const db = Source;
+
+      const ids = (productIds ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+      if (ids.length === 0) {
+        return res.json({ success: true, data: [] });
+      }
+
+      const dateFromEstClause = dateFrom ? `AND e.created_at::date >= '${dateFrom}'` : '';
+      const dateToEstClause = dateTo ? `AND e.created_at::date <= '${dateTo}'` : '';
+      const dateFromRevClause = dateFrom ? `AND r.created_at::date >= '${dateFrom}'` : '';
+      const dateToRevClause = dateTo ? `AND r.created_at::date <= '${dateTo}'` : '';
+
+      const rows = await db.query<{ productId: string; amount: string }[]>(
+        `
+        SELECT combined."productId", COALESCE(SUM(combined.amount), 0) AS amount FROM (
+          SELECT t."productId" AS "productId", sei."totalPrice" AS amount
+          FROM service_estimate_items sei
+          JOIN service_estimates e ON sei."estimateId" = e.id
+          JOIN service_tickets t ON e."ticketId" = t.id
+          WHERE sei."itemSource" = 'SPARE_PART'
+            AND sei."isApproved" = true
+            AND e.status IN ('CUSTOMER_APPROVED')
+            AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
+            AND t."productId" = ANY($1::uuid[])
+            ${dateFromEstClause}
+            ${dateToEstClause}
+          UNION ALL
+          SELECT t."productId" AS "productId", sei."totalPrice" AS amount
+          FROM service_estimate_items sei
+          JOIN service_estimate_revisions r ON sei."revisionId" = r.id
+          JOIN service_tickets t ON r.ticket_id = t.id
+          WHERE sei."itemSource" = 'SPARE_PART'
+            AND sei."isApproved" = true
+            AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
+            AND t."productId" = ANY($1::uuid[])
+            ${dateFromRevClause}
+            ${dateToRevClause}
+          UNION ALL
+          SELECT t."productId" AS "productId", e."labourCost" AS amount
+          FROM service_estimates e
+          JOIN service_tickets t ON e."ticketId" = t.id
+          WHERE e.status = 'CUSTOMER_APPROVED'
+            AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
+            AND t."productId" = ANY($1::uuid[])
+            ${dateFromEstClause}
+            ${dateToEstClause}
+          UNION ALL
+          SELECT t."productId" AS "productId", r."labourCost" AS amount
+          FROM service_estimate_revisions r
+          JOIN service_tickets t ON r.ticket_id = t.id
+          WHERE t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
+            AND t."productId" = ANY($1::uuid[])
+            ${dateFromRevClause}
+            ${dateToRevClause}
+        ) combined
+        GROUP BY combined."productId"
+        `,
+        [ids],
+      );
+
+      return res.json({
+        success: true,
+        data: rows.map((r) => ({ productId: r.productId, amount: Number(r.amount) })),
+      });
     } catch (error) {
       next(error);
     }

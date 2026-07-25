@@ -76,6 +76,8 @@ export interface LeasePremiumQuotationProps {
   totals: {
     subTotal: number;
     tax: number;
+    /** Overrides the default "VAT Amount" label — e.g. "VAT Exempt". */
+    taxName?: string;
     total: number;
   };
 }
@@ -1017,7 +1019,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 color: TEXT_MUTED,
               }}
             >
-              <span>VAT Amount</span>
+              <span>{totals.taxName || 'VAT Amount'}</span>
               <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
                 {getActiveCurrency()} {fmt(totals.tax)}
               </span>

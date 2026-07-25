@@ -46,6 +46,9 @@ export const recordPayment = async (data: {
   chequeNumber?: string;
   chequeBankName?: string;
   chequeDueDate?: string;
+  /** The date physically written on the cheque — independent of chequeDueDate
+   * (a post-dated cheque has chequeDate earlier than chequeDueDate). */
+  chequeDate?: string;
   /** Currency this payment is made in, when different from the invoice's own
    * currency (e.g. paid from a foreign-currency customer bank account). */
   currency?: string;
@@ -66,6 +69,7 @@ export const recordPayment = async (data: {
   if (data.chequeNumber) form.append('chequeNumber', data.chequeNumber);
   if (data.chequeBankName) form.append('chequeBankName', data.chequeBankName);
   if (data.chequeDueDate) form.append('chequeDueDate', data.chequeDueDate);
+  if (data.chequeDate) form.append('chequeDate', data.chequeDate);
   if (data.currency) form.append('currency', data.currency);
   if (data.exchangeRate) form.append('exchangeRate', String(data.exchangeRate));
 

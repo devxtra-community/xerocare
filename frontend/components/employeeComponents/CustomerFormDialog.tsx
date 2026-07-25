@@ -25,7 +25,15 @@ import { BankBranchSelector } from '@/components/shared/BankBranchSelector';
 import { getBankCodeLabel } from '@/lib/bankCodeType';
 import { currencyOptions, getDefaultCurrencyForCountry } from '@/lib/currencyList';
 
-import { Customer, CreateCustomerData, CustomerBankAccount } from '@/lib/customer';
+import {
+  Customer,
+  CreateCustomerData,
+  CustomerBankAccount,
+  CustomerVatStatus,
+  CustomerExemptionReason,
+  CUSTOMER_VAT_STATUS_LABELS,
+  CUSTOMER_EXEMPTION_REASON_LABELS,
+} from '@/lib/customer';
 import { ALL_COUNTRIES, isoToFlag, COUNTRY_OPTIONS } from '@/lib/countryOptions';
 import { State, City } from 'country-state-city';
 
@@ -76,6 +84,7 @@ export default function CustomerFormDialog({
     address: '',
     status: 'ACTIVE',
     stateProvince: '',
+    vatStatus: 'UNREGISTERED_STANDARD',
   });
 
   useEffect(() => {
@@ -89,6 +98,8 @@ export default function CustomerFormDialog({
         address: customer.address || customer.location || '',
         status: customer.isActive ? 'ACTIVE' : 'INACTIVE',
         vatNumber: customer.vatNumber ?? undefined,
+        vatStatus: customer.vatStatus ?? 'UNREGISTERED_STANDARD',
+        exemptionReason: customer.exemptionReason ?? undefined,
         country: customer.country ?? undefined,
         stateProvince: customer.stateProvince ?? undefined,
         city: customer.city ?? undefined,
@@ -134,6 +145,7 @@ export default function CustomerFormDialog({
         address: '',
         status: 'ACTIVE',
         stateProvince: '',
+        vatStatus: 'UNREGISTERED_STANDARD',
       });
       setBankAccounts([]);
       setParsedDial(null);
@@ -192,6 +204,11 @@ export default function CustomerFormDialog({
         ? bankAccounts.map((a) => ({ ...a, isPrimary: false }))
         : [...bankAccounts];
       finalBankAccounts = [...existingAccounts, { ...bankDraft }];
+    }
+
+    if (formData.vatStatus === 'EXEMPT' && !formData.exemptionReason) {
+      toast.error('Please select an Exemption Reason for a VAT-exempt customer');
+      return;
     }
 
     setLoading(true);
@@ -431,15 +448,34 @@ export default function CustomerFormDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                  VAT Number
+                  VAT Status
                 </Label>
-                <Input
-                  name="vatNumber"
-                  value={formData.vatNumber ?? ''}
-                  onChange={handleChange}
-                  placeholder="Tax registration / VAT No."
-                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
+                <Select
+                  value={formData.vatStatus ?? 'UNREGISTERED_STANDARD'}
+                  onValueChange={(val) => {
+                    const nextStatus = val as CustomerVatStatus;
+                    setFormData((prev) => ({
+                      ...prev,
+                      vatStatus: nextStatus,
+                      // A VAT number only makes sense when Registered; an exemption
+                      // reason only when Exempt — clear the other field on switch so
+                      // stale data can't linger from a prior selection.
+                      vatNumber: nextStatus === 'REGISTERED' ? prev.vatNumber : '',
+                      exemptionReason: nextStatus === 'EXEMPT' ? prev.exemptionReason : undefined,
+                    }));
+                  }}
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-xl">
+                    {(Object.keys(CUSTOMER_VAT_STATUS_LABELS) as CustomerVatStatus[]).map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {CUSTOMER_VAT_STATUS_LABELS[s]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
@@ -468,6 +504,51 @@ export default function CustomerFormDialog({
                 </Select>
               </div>
             </div>
+
+            {formData.vatStatus === 'REGISTERED' && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  VAT Number
+                </Label>
+                <Input
+                  name="vatNumber"
+                  value={formData.vatNumber ?? ''}
+                  onChange={handleChange}
+                  placeholder="Tax registration / VAT No."
+                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                />
+              </div>
+            )}
+
+            {formData.vatStatus === 'EXEMPT' && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Exemption Reason <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.exemptionReason ?? ''}
+                  onValueChange={(val) =>
+                    handleSelectChange('exemptionReason', val as CustomerExemptionReason)
+                  }
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue placeholder="Select the reason for VAT exemption" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-xl">
+                    {(
+                      Object.keys(CUSTOMER_EXEMPTION_REASON_LABELS) as CustomerExemptionReason[]
+                    ).map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {CUSTOMER_EXEMPTION_REASON_LABELS[r]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground pl-1">
+                  Internal use only — never shown on customer-facing quotations or invoices.
+                </p>
+              </div>
+            )}
 
             {/* Bank Accounts Section */}
             <div className="space-y-3">

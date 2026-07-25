@@ -7,6 +7,35 @@ import {
   Index,
 } from 'typeorm';
 
+// Not a real 'no VAT number' == 'exempt' assumption — see customerEntity.ts's
+// vatStatus doc comment. REGISTERED/UNREGISTERED_STANDARD both charge standard
+// VAT normally; only EXEMPT (a specific legal status) zeroes it.
+export enum CustomerVatStatus {
+  REGISTERED = 'REGISTERED',
+  UNREGISTERED_STANDARD = 'UNREGISTERED_STANDARD',
+  EXEMPT = 'EXEMPT',
+}
+
+export enum CustomerExemptionReason {
+  GOVERNMENT_ORGANIZATION = 'GOVERNMENT_ORGANIZATION',
+  EMBASSY_OR_DIPLOMATIC_MISSION = 'EMBASSY_OR_DIPLOMATIC_MISSION',
+  INTERNATIONAL_ORGANIZATION = 'INTERNATIONAL_ORGANIZATION',
+  CHARITY_OR_NON_PROFIT = 'CHARITY_OR_NON_PROFIT',
+  EDUCATIONAL_OR_HEALTHCARE_INSTITUTION = 'EDUCATIONAL_OR_HEALTHCARE_INSTITUTION',
+  VALID_VAT_EXEMPTION_CERTIFICATE = 'VALID_VAT_EXEMPTION_CERTIFICATE',
+}
+
+export const CUSTOMER_EXEMPTION_REASON_LABELS: Record<CustomerExemptionReason, string> = {
+  [CustomerExemptionReason.GOVERNMENT_ORGANIZATION]: 'Government Organization',
+  [CustomerExemptionReason.EMBASSY_OR_DIPLOMATIC_MISSION]: 'Embassy or Diplomatic Mission',
+  [CustomerExemptionReason.INTERNATIONAL_ORGANIZATION]: 'International Organization',
+  [CustomerExemptionReason.CHARITY_OR_NON_PROFIT]: 'Charity or Non-Profit Organization',
+  [CustomerExemptionReason.EDUCATIONAL_OR_HEALTHCARE_INSTITUTION]:
+    'Educational or Healthcare Institution',
+  [CustomerExemptionReason.VALID_VAT_EXEMPTION_CERTIFICATE]:
+    'Customer with a Valid VAT Exemption Certificate',
+};
+
 @Entity('customers')
 export class Customer {
   @PrimaryGeneratedColumn('uuid')
@@ -31,6 +60,23 @@ export class Customer {
 
   @Column({ name: 'vat_number', type: 'varchar', length: 50, nullable: true })
   vatNumber?: string | null;
+
+  // Default UNREGISTERED_STANDARD (not REGISTERED, not EXEMPT) so adding this column
+  // never silently changes tax behavior for any pre-existing customer — standard VAT
+  // still applies unless a customer is explicitly marked EXEMPT.
+  @Column({
+    name: 'vat_status',
+    type: 'varchar',
+    length: 30,
+    default: CustomerVatStatus.UNREGISTERED_STANDARD,
+  })
+  vatStatus!: CustomerVatStatus;
+
+  // Internal-only — see Invoice/Quotation rendering: this must never be surfaced on
+  // any customer-facing document, only in internal profile/audit views. Required
+  // (validated in customerService.ts) when vatStatus === EXEMPT, null otherwise.
+  @Column({ name: 'exemption_reason', type: 'varchar', length: 60, nullable: true })
+  exemptionReason?: CustomerExemptionReason | null;
 
   @Column({ name: 'country', type: 'varchar', length: 2, nullable: true })
   country?: string | null;

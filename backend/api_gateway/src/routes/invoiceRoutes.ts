@@ -448,7 +448,7 @@ router.delete('/:id', requireRole(UserRole.MANAGER, UserRole.ADMIN), deleteInvoi
  */
 router.get(
   '/audit-logs/:entityId',
-  requireRole(UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
+  requireRole(UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
   getAuditLogs,
 );
 
