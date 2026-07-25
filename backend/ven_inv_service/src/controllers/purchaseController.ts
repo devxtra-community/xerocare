@@ -8,7 +8,12 @@ export class PurchaseController {
     try {
       const branchId = req.user?.branchId;
       const isAdmin = req.user?.role === 'ADMIN';
-      const filteredBranchId = isAdmin ? undefined : branchId;
+      // Explicit ?branchId= always wins — used by billing_service's internal
+      // cross-service calls (e.g. Payable charts), which self-sign an ADMIN token
+      // to reach this route but still need to stay scoped to one real branch rather
+      // than getting every branch's purchases back.
+      const queryBranchId = req.query.branchId as string | undefined;
+      const filteredBranchId = queryBranchId || (isAdmin ? undefined : branchId);
 
       const purchases = await purchaseService.getAllPurchases(filteredBranchId);
       res.status(200).json({ success: true, data: purchases });

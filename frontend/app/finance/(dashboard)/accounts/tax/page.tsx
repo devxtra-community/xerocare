@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, RefreshCw, FileText } from 'lucide-react';
+import { RefreshCw, FileText } from 'lucide-react';
 import {
   getOutputTax,
   getInputTaxLocal,
@@ -17,8 +17,8 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { fetchBranches, type Branch } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
-import * as XLSX from 'xlsx';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
+import type { BranchInfo } from '@/components/shared/documentTemplate';
 import { TaxLocationFilter } from '@/components/accounts/TaxLocationFilter';
 import { TaxPeriodFilter } from '@/components/accounts/TaxPeriodFilter';
 import { getTaxPeriodRange, type TaxPeriod } from '@/lib/finance/taxReportPeriod';
@@ -219,14 +219,17 @@ function OutputTaxTab({
   filters,
   periodReady,
   onGenerate,
+  branchInfo,
 }: {
   filters: TaxReportFilters;
   branches: Branch[];
   periodReady: boolean;
   onGenerate: (type: 'output', row: OutputTaxRow) => void;
+  branchInfo: BranchInfo;
 }) {
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
+  const [showStatement, setShowStatement] = useState(false);
   const query = useQuery({
     queryKey: ['tax-output', filters, page],
     queryFn: () => getOutputTax({ ...filters, page, limit: 50 }),
@@ -236,34 +239,49 @@ function OutputTaxTab({
 
   const { rows = [], totals, pagination, countryBreakdown = [] } = query.data ?? {};
 
-  const exportExcel = () => {
-    if (!rows.length) return;
-    const ws = XLSX.utils.json_to_sheet(
-      rows.map((r) => ({
-        'Invoice No': r.invoiceNumber,
-        Date: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
-        'Customer Name': r.customerName ?? '',
-        'Customer VAT No': r.customerVatNumber ?? '',
-        Country: r.customerCountry ?? '',
-        'State / Emirate': r.customerStateProvince ?? '',
-        City: r.customerCity ?? '',
-        'Taxable Amount': r.taxableAmount,
-        'Tax %': r.taxPercent ?? '',
-        'Tax Name': r.taxName ?? '',
-        'Output VAT': r.outputVat,
-        'Total Invoice': r.totalInvoice,
-        Currency: r.currencyCode ?? '',
-        Status: r.status,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Output Tax');
-    XLSX.writeFile(wb, `Output_Tax_${filters.dateFrom ?? ''}_${filters.dateTo ?? ''}.xlsx`);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Output Tax Report',
+    periodFrom: filters.dateFrom,
+    periodTo: filters.dateTo,
+    sections: [
+      {
+        title: 'Output Tax — Invoices',
+        rows: rows.map((r) => ({
+          code: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
+          label: `${r.invoiceNumber} — ${r.customerName ?? 'Unknown Customer'}`,
+          value: formatCurrency(r.outputVat, r.currencyCode ?? currency),
+        })),
+      },
+    ],
+    summary: [
+      { label: 'Bills', value: String(totals?.count ?? 0) },
+      {
+        label: 'Standard-Rated Taxable Amount',
+        value: formatCurrency(
+          totals?.standardTaxableAmount ?? totals?.totalTaxableAmount ?? 0,
+          currency,
+        ),
+      },
+      {
+        label: 'Exempt Supplies',
+        value: `${totals?.exemptCount ?? 0} bill(s), ${formatCurrency(totals?.exemptTaxableAmount ?? 0, currency)}`,
+      },
+      {
+        label: 'Total Taxable Amount',
+        value: formatCurrency(totals?.totalTaxableAmount ?? 0, currency),
+      },
+      {
+        label: 'Total Output VAT',
+        value: formatCurrency(totals?.totalOutputVat ?? 0, currency),
+        bold: true,
+      },
+    ],
   };
 
   return (
-    <div id="tax-output-pdf" className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <SummaryCard
           label="Bills"
           value={String(totals?.count ?? 0)}
@@ -277,19 +295,19 @@ function OutputTaxTab({
           label="Total Output VAT"
           value={formatCurrency(totals?.totalOutputVat ?? 0, currency)}
         />
+        <SummaryCard
+          label="Exempt Supplies"
+          value={formatCurrency(totals?.exemptTaxableAmount ?? 0, currency)}
+          sub={`${totals?.exemptCount ?? 0} bill(s) — zero-rated, reported separately`}
+        />
         <div className="flex items-center justify-end gap-2 col-span-2 sm:col-span-1">
           <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
+            onClick={() => setShowStatement(true)}
+            disabled={!rows.length}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            <Download className="h-4 w-4" /> Export Excel
+            <FileText className="h-4 w-4" /> Generate Statement
           </button>
-          <ExportPdfButton
-            targetId="tax-output-pdf"
-            reportTitle="Output Tax Report"
-            filenamePrefix="Output_Tax"
-            filters={{ 'Date From': filters.dateFrom, 'Date To': filters.dateTo }}
-          />
         </div>
       </div>
 
@@ -358,7 +376,10 @@ function OutputTaxTab({
                   </TableRow>
                 ) : (
                   rows.map((r: OutputTaxRow, i) => (
-                    <TableRow key={i} className="hover:bg-blue-50/40">
+                    <TableRow
+                      key={i}
+                      className={`hover:bg-blue-50/40 ${r.isExempt ? 'bg-amber-50/40' : ''}`}
+                    >
                       <TableCell className="pl-4 font-mono text-xs">{r.invoiceNumber}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '—'}
@@ -378,7 +399,15 @@ function OutputTaxTab({
                         {formatCurrency(r.taxableAmount, r.currencyCode)}
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">
-                        {r.taxPercent != null ? `${r.taxPercent}%` : '—'}
+                        {r.isExempt ? (
+                          <span className="px-1.5 py-0.5 rounded border border-amber-200 bg-amber-50 text-amber-700 text-[10px] font-semibold">
+                            Exempt
+                          </span>
+                        ) : r.taxPercent != null ? (
+                          `${r.taxPercent}%`
+                        ) : (
+                          '—'
+                        )}
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold text-emerald-700">
                         {formatCurrency(r.outputVat, r.currencyCode)}
@@ -412,6 +441,14 @@ function OutputTaxTab({
           </>
         )}
       </div>
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }
@@ -420,14 +457,17 @@ function InputTaxLocalTab({
   filters,
   periodReady,
   onGenerate,
+  branchInfo,
 }: {
   filters: TaxReportFilters;
   branches: Branch[];
   periodReady: boolean;
   onGenerate: (type: 'local', row: InputTaxLocalRow) => void;
+  branchInfo: BranchInfo;
 }) {
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
+  const [showStatement, setShowStatement] = useState(false);
   const query = useQuery({
     queryKey: ['tax-input-local', filters, page],
     queryFn: () => getInputTaxLocal({ ...filters, page, limit: 50 }),
@@ -437,35 +477,37 @@ function InputTaxLocalTab({
 
   const { rows = [], totals, pagination } = query.data ?? {};
 
-  const exportExcel = () => {
-    if (!rows.length) return;
-    const ws = XLSX.utils.json_to_sheet(
-      rows.map((r) => ({
-        Date: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
-        Branch: r.branch,
-        Vendor: r.vendorName,
-        'Vendor VAT No': r.vendorVatNumber ?? '',
-        Country: r.vendorCountry ?? '',
-        'State / Emirate': r.vendorStateProvince ?? '',
-        City: r.vendorCity ?? '',
-        Category: r.purchaseCategory ?? '',
-        'Taxable Amount': r.taxableAmount ?? '',
-        'Tax %': r.taxPercent ?? '',
-        'Tax Name': r.taxName ?? '',
-        'Input VAT': r.inputVatAmount ?? '',
-        'Total Amount': r.totalAmount,
-        Currency: r.currencyCode ?? '',
-        'VAT Claimable': r.vatClaimable ? 'Yes' : 'No',
-        'Tax Status': r.taxStatus,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Input Tax Local');
-    XLSX.writeFile(wb, `Input_Tax_Local_${filters.dateFrom ?? ''}_${filters.dateTo ?? ''}.xlsx`);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Input Tax Report (Local)',
+    periodFrom: filters.dateFrom,
+    periodTo: filters.dateTo,
+    sections: [
+      {
+        title: 'Input Tax — Local Purchases',
+        rows: rows.map((r) => ({
+          code: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
+          label: `${r.vendorName} — ${r.purchaseCategory ?? ''}`,
+          value: formatCurrency(r.inputVatAmount ?? 0, r.currencyCode ?? currency),
+        })),
+      },
+    ],
+    summary: [
+      { label: 'Bills', value: String(totals?.count ?? 0) },
+      {
+        label: 'Total Taxable Amount',
+        value: formatCurrency(totals?.totalTaxableAmount ?? 0, currency),
+      },
+      {
+        label: 'Total Input VAT',
+        value: formatCurrency(totals?.totalInputVat ?? 0, currency),
+        bold: true,
+      },
+    ],
   };
 
   return (
-    <div id="tax-input-local-pdf" className="space-y-4">
+    <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
           label="Bills"
@@ -482,17 +524,12 @@ function InputTaxLocalTab({
         />
         <div className="flex items-center justify-end gap-2 col-span-2 sm:col-span-1">
           <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
+            onClick={() => setShowStatement(true)}
+            disabled={!rows.length}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            <Download className="h-4 w-4" /> Export Excel
+            <FileText className="h-4 w-4" /> Generate Statement
           </button>
-          <ExportPdfButton
-            targetId="tax-input-local-pdf"
-            reportTitle="Input Tax Report (Local)"
-            filenamePrefix="Input_Tax_Local"
-            filters={{ 'Date From': filters.dateFrom, 'Date To': filters.dateTo }}
-          />
         </div>
       </div>
 
@@ -619,6 +656,14 @@ function InputTaxLocalTab({
           </>
         )}
       </div>
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }
@@ -627,14 +672,17 @@ function InputTaxInternationalTab({
   filters,
   periodReady,
   onGenerate,
+  branchInfo,
 }: {
   filters: TaxReportFilters;
   branches: Branch[];
   periodReady: boolean;
   onGenerate: (type: 'international', row: InputTaxInternationalRow) => void;
+  branchInfo: BranchInfo;
 }) {
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
+  const [showStatement, setShowStatement] = useState(false);
   const query = useQuery({
     queryKey: ['tax-input-intl', filters, page],
     queryFn: () => getInputTaxInternational({ ...filters, page, limit: 50 }),
@@ -644,39 +692,37 @@ function InputTaxInternationalTab({
 
   const { rows = [], totals, pagination } = query.data ?? {};
 
-  const exportExcel = () => {
-    if (!rows.length) return;
-    const ws = XLSX.utils.json_to_sheet(
-      rows.map((r) => ({
-        'Import Invoice No': r.importInvoiceNo ?? '',
-        Date: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
-        Branch: r.branch,
-        Supplier: r.supplierName,
-        'Supplier Country': r.supplierCountry ?? '',
-        'Supplier State': r.supplierStateProvince ?? '',
-        'Supplier City': r.supplierCity ?? '',
-        'Supplier VAT No': r.supplierVatNumber ?? '',
-        'Goods/Service': r.goodsOrService ?? '',
-        'Taxable Amount': r.taxableAmount ?? '',
-        'Reverse Charge VAT': r.importVatReverseCharge ?? '',
-        'Tax %': r.taxPercent ?? '',
-        'Customs Entry No': r.customsEntryNo ?? '',
-        'Customs Duty': r.customsDuty ?? '',
-        'Shipping Cost': r.shippingCost ?? '',
-        'Labour Cost': r.labourCost ?? '',
-        Currency: r.currencyCode ?? '',
-        'Exchange Rate': r.exchangeRate ?? '',
-        'VAT Claimable': r.vatClaimable ? 'Yes' : 'No',
-        'Tax Status': r.taxStatus,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Input Tax International');
-    XLSX.writeFile(wb, `Input_Tax_Intl_${filters.dateFrom ?? ''}_${filters.dateTo ?? ''}.xlsx`);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Input Tax Report (International / Reverse Charge)',
+    periodFrom: filters.dateFrom,
+    periodTo: filters.dateTo,
+    sections: [
+      {
+        title: 'Input Tax — International Purchases',
+        rows: rows.map((r) => ({
+          code: r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString() : '',
+          label: `${r.supplierName} — ${r.goodsOrService ?? ''}`,
+          value: formatCurrency(r.importVatReverseCharge ?? 0, r.currencyCode ?? currency),
+        })),
+      },
+    ],
+    summary: [
+      { label: 'Bills', value: String(totals?.count ?? 0) },
+      {
+        label: 'Total Taxable Amount',
+        value: formatCurrency(totals?.totalTaxableAmount ?? 0, currency),
+      },
+      {
+        label: 'Total Reverse Charge VAT',
+        value: formatCurrency(totals?.totalReverseChargeVat ?? 0, currency),
+        bold: true,
+      },
+    ],
   };
 
   return (
-    <div id="tax-input-intl-pdf" className="space-y-4">
+    <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryCard
           label="Bills"
@@ -693,17 +739,12 @@ function InputTaxInternationalTab({
         />
         <div className="flex items-center justify-end gap-2 col-span-2 sm:col-span-1">
           <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium"
+            onClick={() => setShowStatement(true)}
+            disabled={!rows.length}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            <Download className="h-4 w-4" /> Export Excel
+            <FileText className="h-4 w-4" /> Generate Statement
           </button>
-          <ExportPdfButton
-            targetId="tax-input-intl-pdf"
-            reportTitle="Input Tax Report (International / Reverse Charge)"
-            filenamePrefix="Input_Tax_International"
-            filters={{ 'Date From': filters.dateFrom, 'Date To': filters.dateTo }}
-          />
         </div>
       </div>
 
@@ -856,6 +897,14 @@ function InputTaxInternationalTab({
           </>
         )}
       </div>
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }
@@ -975,6 +1024,7 @@ export default function TaxReportPage() {
           branches={branches}
           periodReady={periodReady}
           onGenerate={(type, row) => setDocDialog({ type, row })}
+          branchInfo={branchInfo}
         />
       )}
       {activeTab === 'local' && (
@@ -983,6 +1033,7 @@ export default function TaxReportPage() {
           branches={branches}
           periodReady={periodReady}
           onGenerate={(type, row) => setDocDialog({ type, row })}
+          branchInfo={branchInfo}
         />
       )}
       {activeTab === 'international' && (
@@ -991,6 +1042,7 @@ export default function TaxReportPage() {
           branches={branches}
           periodReady={periodReady}
           onGenerate={(type, row) => setDocDialog({ type, row })}
+          branchInfo={branchInfo}
         />
       )}
 

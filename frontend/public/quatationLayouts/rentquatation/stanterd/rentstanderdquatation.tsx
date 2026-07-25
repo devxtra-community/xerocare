@@ -65,6 +65,8 @@ export interface RentStandardQuotationProps {
   totals?: {
     subTotal: number;
     tax: number;
+    /** Overrides the default "VAT Amount" label — e.g. "VAT Exempt". */
+    taxName?: string;
     total: number;
   };
 }
@@ -875,7 +877,9 @@ const RentStandardQuotation: React.FC<RentStandardQuotationProps> = ({
               fontSize: '12px',
             }}
           >
-            <span style={{ fontWeight: '400', color: '#333' }}>VAT Amount</span>
+            <span style={{ fontWeight: '400', color: '#333' }}>
+              {totals.taxName || 'VAT Amount'}
+            </span>
             <span style={{ fontWeight: '400' }}>
               {getActiveCurrency()} {fmt(totals.tax)}
             </span>

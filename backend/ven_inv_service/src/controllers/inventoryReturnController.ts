@@ -3,6 +3,7 @@ import { InventoryReturnService } from '../services/inventoryReturnService';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
 import { SparePart } from '../entities/sparePartEntity';
+import { deleteCached } from '../utils/cacheUtil';
 
 const returnService = new InventoryReturnService();
 
@@ -36,6 +37,7 @@ export const allocateSparePart = async (req: Request, res: Response, next: NextF
 
     part.quantity -= quantity;
     await repo.save(part);
+    await deleteCached(`sparepart:${id}`);
 
     res.json({
       success: true,

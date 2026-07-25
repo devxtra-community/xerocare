@@ -91,6 +91,30 @@ export const listSpareParts = async (req: Request, res: Response) => {
 };
 
 /**
+ * Internal batch fetch — mirrors productController.ts's POST /products/batch.
+ * Used by billing_service to look up the exact spare parts referenced by
+ * invoice_items.sparePartId, for Segmented P&L cost matching.
+ */
+export const getSparePartsBatch = async (req: Request, res: Response) => {
+  try {
+    const { sparePartIds } = req.body as { sparePartIds?: string[] };
+    if (!Array.isArray(sparePartIds) || sparePartIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    const rows = await Source.query(
+      `SELECT id, item_code, part_name, brand, purchase_price
+       FROM spare_parts
+       WHERE id = ANY($1::uuid[])`,
+      [sparePartIds],
+    );
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    logger.error('Error in getSparePartsBatch:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+/**
  * Gets a single spare part by ID.
  */
 export const getSparePartById = async (req: Request, res: Response) => {

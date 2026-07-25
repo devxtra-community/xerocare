@@ -17,6 +17,7 @@ import { NotificationPublisher } from '../events/publisher/notificationPublisher
 import { generateSku } from '../utils/skuGenerator';
 import { getExchangeRate } from '../utils/exchangeRate';
 import { logger } from '../config/logger';
+import { deleteCached } from '../utils/cacheUtil';
 
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://billing_service:4004';
 
@@ -330,6 +331,7 @@ export class StockTransferService {
     const lineByItem = new Map(lines?.map((l) => [l.item_id, l]) ?? []);
     const sourceWhIds = await this.getBranchWarehouseIds(transfer.source_branch_id);
 
+    const touchedSparePartIds = new Set<string>();
     const result = await Source.transaction(async (manager) => {
       let approvedCount = 0;
 
@@ -388,6 +390,7 @@ export class StockTransferService {
           // Reserve on the part row — same mechanism the service module uses.
           part.reserved_quantity += approvedQty;
           await manager.save(SparePart, part);
+          touchedSparePartIds.add(part.id);
           item.source_warehouse_id = part.warehouse_id ?? undefined;
         }
 
@@ -410,6 +413,7 @@ export class StockTransferService {
       transfer.approved_by_id = userId;
       return manager.save(StockTransfer, transfer);
     });
+    for (const id of touchedSparePartIds) await deleteCached(`sparepart:${id}`);
 
     // Notify the requester with a per-line breakdown of what changed.
     const summary = items
@@ -605,6 +609,7 @@ export class StockTransferService {
     items: StockTransferItem[],
     userId: string,
   ): Promise<StockTransfer> {
+    const touchedSparePartIds = new Set<string>();
     const result = await Source.transaction(async (manager) => {
       for (const item of items) {
         if (item.item_type === TransferItemType.PRODUCT && item.product_id) {
@@ -630,6 +635,7 @@ export class StockTransferService {
           }
           part.quantity -= item.requested_qty;
           await manager.save(SparePart, part);
+          touchedSparePartIds.add(part.id);
           item.dispatched_qty = item.requested_qty;
         }
         item.approved_qty = item.requested_qty;
@@ -643,6 +649,7 @@ export class StockTransferService {
       transfer.dispatched_at = new Date();
       return manager.save(StockTransfer, transfer);
     });
+    for (const id of touchedSparePartIds) await deleteCached(`sparepart:${id}`);
     return result;
   }
 
@@ -650,6 +657,7 @@ export class StockTransferService {
     transfer: StockTransfer,
     items: StockTransferItem[],
   ): Promise<StockTransfer> {
+    const touchedSparePartIds = new Set<string>();
     const result = await Source.transaction(async (manager) => {
       for (const item of items) {
         if (item.item_status !== TransferItemStatus.APPROVED) continue;
@@ -669,6 +677,7 @@ export class StockTransferService {
           part.quantity -= qty;
           part.reserved_quantity = Math.max(0, part.reserved_quantity - qty);
           await manager.save(SparePart, part);
+          touchedSparePartIds.add(part.id);
           item.dispatched_qty = qty;
         }
         await manager.save(StockTransferItem, item);
@@ -678,6 +687,7 @@ export class StockTransferService {
       transfer.dispatched_at = new Date();
       return manager.save(StockTransfer, transfer);
     });
+    for (const id of touchedSparePartIds) await deleteCached(`sparepart:${id}`);
 
     await this.notify(
       transfer.requested_by_id,
@@ -749,6 +759,11 @@ export class StockTransferService {
         );
         destPart.quantity += qty;
         await manager.save(SparePart, destPart);
+        // Best-effort: completeFromLot doesn't own the transaction boundary (the
+        // manager is passed in by the caller), so this can race a caller-side
+        // rollback in the rare failure case — acceptable, since the alternative
+        // (status quo) is guaranteed staleness on every successful transfer.
+        await deleteCached(`sparepart:${destPart.id}`);
       }
 
       item.received_qty = qty;

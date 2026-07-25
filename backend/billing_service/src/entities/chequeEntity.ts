@@ -26,8 +26,25 @@ export class Cheque {
   @Column({ name: 'due_date', type: 'date' })
   dueDate!: Date;
 
+  // The date physically written on the cheque — captured once at creation and never
+  // overwritten by later lifecycle actions (unlike the legacy issueDate column, which
+  // used to be silently reused for deposit/issue dates too). May differ from dueDate
+  // for a post-dated cheque.
+  @Column({ name: 'cheque_date', type: 'date', nullable: true })
+  chequeDate?: Date;
+
   @Column({ name: 'issue_date', type: 'date', nullable: true })
   issueDate?: Date;
+
+  // Set when a RECEIVED cheque is deposited (Part 2) — previously this overwrote
+  // issueDate, losing the original cheque date.
+  @Column({ name: 'deposit_date', type: 'date', nullable: true })
+  depositDate?: Date;
+
+  // Set when a cheque is marked Cleared — the actual date cash was confirmed
+  // received/paid, editable at the time of clearing (defaults to today).
+  @Column({ name: 'cleared_date', type: 'date', nullable: true })
+  clearedDate?: Date;
 
   @Column({ name: 'type', default: 'RECEIVED' })
   type!: string; // RECEIVED | ISSUED

@@ -25,6 +25,31 @@ export interface CustomerBankAccount {
   isPrimary?: boolean;
 }
 
+export type CustomerVatStatus = 'REGISTERED' | 'UNREGISTERED_STANDARD' | 'EXEMPT';
+
+export type CustomerExemptionReason =
+  | 'GOVERNMENT_ORGANIZATION'
+  | 'EMBASSY_OR_DIPLOMATIC_MISSION'
+  | 'INTERNATIONAL_ORGANIZATION'
+  | 'CHARITY_OR_NON_PROFIT'
+  | 'EDUCATIONAL_OR_HEALTHCARE_INSTITUTION'
+  | 'VALID_VAT_EXEMPTION_CERTIFICATE';
+
+export const CUSTOMER_EXEMPTION_REASON_LABELS: Record<CustomerExemptionReason, string> = {
+  GOVERNMENT_ORGANIZATION: 'Government Organization',
+  EMBASSY_OR_DIPLOMATIC_MISSION: 'Embassy or Diplomatic Mission',
+  INTERNATIONAL_ORGANIZATION: 'International Organization',
+  CHARITY_OR_NON_PROFIT: 'Charity or Non-Profit Organization',
+  EDUCATIONAL_OR_HEALTHCARE_INSTITUTION: 'Educational or Healthcare Institution',
+  VALID_VAT_EXEMPTION_CERTIFICATE: 'Customer with a Valid VAT Exemption Certificate',
+};
+
+export const CUSTOMER_VAT_STATUS_LABELS: Record<CustomerVatStatus, string> = {
+  REGISTERED: 'Registered',
+  UNREGISTERED_STANDARD: 'Unregistered (Standard VAT applies)',
+  EXEMPT: 'Unregistered — Exempt',
+};
+
 export interface Customer {
   id: string;
   name: string;
@@ -34,6 +59,12 @@ export interface Customer {
   branch_id?: string;
   location?: string;
   vatNumber?: string | null;
+  /** Defaults to UNREGISTERED_STANDARD server-side — standard VAT applies unless
+   * explicitly EXEMPT. Only EXEMPT zeroes tax on this customer's invoices. */
+  vatStatus?: CustomerVatStatus;
+  /** Internal-only (see exemptionReason on Invoice docs) — required when
+   * vatStatus is EXEMPT, never shown on a customer-facing document. */
+  exemptionReason?: CustomerExemptionReason | null;
   country?: string | null;
   stateProvince?: string | null;
   city?: string | null;
@@ -99,6 +130,8 @@ export interface CreateCustomerData {
   totalPurchase?: number;
   status?: 'ACTIVE' | 'INACTIVE';
   vatNumber?: string;
+  vatStatus?: CustomerVatStatus;
+  exemptionReason?: CustomerExemptionReason | null;
   country?: string;
   stateProvince?: string;
   city?: string;

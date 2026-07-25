@@ -9,6 +9,7 @@ import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { requireCashAccount } from '../services/cashbookService';
 import { logger } from '../config/logger';
 
 const router = Router();
@@ -85,6 +86,34 @@ async function enrichChequesWithInvoiceDetails<T extends Cheque>(
   });
 }
 
+/**
+ * Attach the reason for the most recent BOUNCED/CANCELLED status change (Part 3.3) —
+ * so Finance can see why without opening the full history. No-op for cheques not in
+ * a terminal-with-reason state.
+ */
+async function enrichChequesWithTerminalReason<T extends Cheque>(
+  cheques: T[],
+): Promise<(T & { reason?: string | null })[]> {
+  const terminalIds = cheques
+    .filter((c) => c.status === 'BOUNCED' || c.status === 'CANCELLED')
+    .map((c) => c.id);
+  if (terminalIds.length === 0) return cheques;
+
+  const rows = await Source.getRepository(ChequeStatusHistory)
+    .createQueryBuilder('h')
+    .where('h.chequeId IN (:...ids)', { ids: terminalIds })
+    .andWhere('h.toStatus IN (:...statuses)', { statuses: ['BOUNCED', 'CANCELLED'] })
+    .orderBy('h.changedAt', 'DESC')
+    .getMany();
+
+  const reasonByChequeId = new Map<string, string | null>();
+  for (const row of rows) {
+    if (!reasonByChequeId.has(row.chequeId)) reasonByChequeId.set(row.chequeId, row.notes ?? null);
+  }
+
+  return cheques.map((c) => ({ ...c, reason: reasonByChequeId.get(c.id) ?? null }));
+}
+
 /** Resolve branchIds filter — admin may pass ?branchIds=id1,id2; non-admin locked to own branch. */
 function resolveBranchFilter(req: import('express').Request): string[] {
   const isAdmin = req.user?.role === 'ADMIN';
@@ -124,7 +153,8 @@ router.get('/', async (req, res, next) => {
     if (dateTo) qb.andWhere('c.dueDate <= :dateTo', { dateTo });
 
     const cheques = await qb.getMany();
-    const enriched = await enrichChequesWithInvoiceDetails(cheques);
+    const withInvoiceDetails = await enrichChequesWithInvoiceDetails(cheques);
+    const enriched = await enrichChequesWithTerminalReason(withInvoiceDetails);
     res.json({ success: true, data: enriched });
   } catch (err) {
     next(err);
@@ -202,7 +232,8 @@ router.get('/:id', async (req, res, next) => {
       order: { changedAt: 'ASC' },
     });
 
-    const [enriched] = await enrichChequesWithInvoiceDetails([cheque]);
+    const [withInvoiceDetails] = await enrichChequesWithInvoiceDetails([cheque]);
+    const [enriched] = await enrichChequesWithTerminalReason([withInvoiceDetails]);
     res.json({ success: true, data: { ...enriched, history } });
   } catch (err) {
     next(err);
@@ -220,6 +251,7 @@ router.post('/', async (req, res, next) => {
       partyName,
       amount,
       dueDate,
+      chequeDate,
       issueDate,
       type,
       description,
@@ -247,6 +279,10 @@ router.post('/', async (req, res, next) => {
       partyName,
       amount: Number(amount),
       dueDate,
+      // Cheque Date defaults to Due Date only when truly omitted (legacy callers that
+      // don't yet send it) — the date physically written on the cheque, independent of
+      // Due Date so a post-dated cheque (chequeDate < dueDate) is captured correctly.
+      chequeDate: chequeDate || dueDate,
       issueDate: issueDate || undefined,
       type: type || 'RECEIVED',
       status: 'PENDING',
@@ -280,14 +316,24 @@ router.patch('/:id', async (req, res, next) => {
     if (!cheque) throw new AppError('Cheque not found', 404);
     if (cheque.status !== 'PENDING') throw new AppError('Only PENDING cheques can be edited', 400);
 
-    const { chequeNo, bankName, partyName, amount, dueDate, issueDate, description, accountId } =
-      req.body;
+    const {
+      chequeNo,
+      bankName,
+      partyName,
+      amount,
+      dueDate,
+      chequeDate,
+      issueDate,
+      description,
+      accountId,
+    } = req.body;
 
     if (chequeNo !== undefined) cheque.chequeNo = chequeNo;
     if (bankName !== undefined) cheque.bankName = bankName;
     if (partyName !== undefined) cheque.partyName = partyName;
     if (amount !== undefined) cheque.amount = Number(amount);
     if (dueDate !== undefined) cheque.dueDate = dueDate;
+    if (chequeDate !== undefined) cheque.chequeDate = chequeDate;
     if (issueDate !== undefined) cheque.issueDate = issueDate;
     if (description !== undefined) cheque.description = description;
     if (accountId !== undefined) cheque.accountId = accountId;
@@ -319,13 +365,23 @@ router.post('/:id/deposit', async (req, res, next) => {
     if (cheque.status !== 'PENDING')
       throw new AppError('Only PENDING cheques can be deposited', 400);
 
+    // The account must be real, belong to this branch, and be a BANK account — a
+    // stale/foreign/wrong-type id must never be silently accepted here, since it's
+    // this very id that /clear later trusts blindly to move Cash at Bank.
+    await requireCashAccount(Source, {
+      branchId,
+      explicitAccountId: accountId,
+      requiredType: 'BANK',
+      actionLabel: 'depositing/clearing cheques',
+    });
+
     await Source.transaction(async (m) => {
       const chqRepo = m.getRepository(Cheque);
 
       // Record which account will be credited when cleared — no balance movement yet.
       cheque.status = 'DEPOSITED';
       cheque.accountId = accountId;
-      cheque.issueDate = depositDate ? new Date(depositDate) : (new Date() as unknown as Date);
+      cheque.depositDate = depositDate ? new Date(depositDate) : (new Date() as unknown as Date);
       await chqRepo.save(cheque);
       await logHistory(m, cheque.id, 'PENDING', 'DEPOSITED', userId, notes);
     });
@@ -357,6 +413,14 @@ router.post('/:id/issue', async (req, res, next) => {
     if (cheque.type !== 'ISSUED') throw new AppError('Only ISSUED-type cheques can be issued', 400);
     if (cheque.status !== 'PENDING') throw new AppError('Only PENDING cheques can be issued', 400);
 
+    // Same reasoning as /deposit — /clear later trusts this id blindly.
+    await requireCashAccount(Source, {
+      branchId,
+      explicitAccountId: accountId,
+      requiredType: 'BANK',
+      actionLabel: 'depositing/clearing cheques',
+    });
+
     await Source.transaction(async (m) => {
       const chqRepo = m.getRepository(Cheque);
       // Record which account will be debited when cleared — no balance movement yet
@@ -381,7 +445,7 @@ router.post('/:id/clear', async (req, res, next) => {
   try {
     const branchId = req.user!.branchId;
     const userId = req.user!.userId;
-    const { notes } = req.body;
+    const { notes, clearedDate } = req.body;
 
     const repo = Source.getRepository(Cheque);
     const cheque = await repo.findOne({ where: { id: req.params.id, branchId } });
@@ -392,47 +456,62 @@ router.post('/:id/clear', async (req, res, next) => {
 
     const prevStatus = cheque.status;
 
+    // Re-validate the account /deposit or /issue recorded — it must still exist,
+    // still belong to this branch, and still be a BANK account. Previously this
+    // trusted cheque.accountId blindly and used increment()/decrement(), which
+    // silently no-ops (no error, 0 rows affected) against a stale/removed account —
+    // the cheque would still clear with zero real cash movement.
+    if (!cheque.accountId) {
+      throw new AppError(
+        'This cheque has no bank account on file — it cannot be cleared. Re-open it via Deposit/Issue and select a valid Bank account first.',
+        400,
+      );
+    }
+    const targetAccount = await requireCashAccount(Source, {
+      branchId,
+      explicitAccountId: cheque.accountId,
+      requiredType: 'BANK',
+      actionLabel: 'depositing/clearing cheques',
+    });
+
     await Source.transaction(async (m) => {
       const chqRepo = m.getRepository(Cheque);
       const entryRepo = m.getRepository(CashbookEntry);
       const accountRepo = m.getRepository(CashBankAccount);
 
-      if (cheque.accountId) {
-        const isReceived = cheque.type !== 'ISSUED';
-        const entry = entryRepo.create({
-          referenceNo: `CHQ-CLR-${cheque.chequeNo}-${Date.now()}`,
-          date: new Date(),
-          accountId: cheque.accountId,
-          entryType: isReceived ? 'RECEIPT' : 'PAYMENT',
-          amount: Number(cheque.amount),
-          category: isReceived ? 'Cheque Deposit' : 'Cheque Payment',
-          description: `Cheque cleared — ${cheque.partyName} #${cheque.chequeNo}${cheque.sourceLabel ? ` · ${cheque.sourceLabel}` : ''}`,
-          paymentMode: 'Cheque',
-          chequeNo: cheque.chequeNo,
-          notes: notes || undefined,
-          createdBy: userId,
-          branchId,
-          sourceType: 'CHEQUE_CLEAR',
-          sourceId: cheque.id,
-        });
-        const saved = await entryRepo.save(entry);
-        cheque.cashbookEntryId = saved.id;
-        if (isReceived) {
-          await accountRepo.increment(
-            { id: cheque.accountId },
-            'currentBalance',
-            Number(cheque.amount),
-          );
-        } else {
-          await accountRepo.decrement(
-            { id: cheque.accountId },
-            'currentBalance',
-            Number(cheque.amount),
-          );
-        }
+      const isReceived = cheque.type !== 'ISSUED';
+      const entry = entryRepo.create({
+        referenceNo: `CHQ-CLR-${cheque.chequeNo}-${Date.now()}`,
+        date: new Date(),
+        accountId: targetAccount.id,
+        entryType: isReceived ? 'RECEIPT' : 'PAYMENT',
+        amount: Number(cheque.amount),
+        category: isReceived ? 'Cheque Deposit' : 'Cheque Payment',
+        description: `Cheque cleared — ${cheque.partyName} #${cheque.chequeNo}${cheque.sourceLabel ? ` · ${cheque.sourceLabel}` : ''}`,
+        paymentMode: 'Cheque',
+        chequeNo: cheque.chequeNo,
+        notes: notes || undefined,
+        createdBy: userId,
+        branchId,
+        sourceType: 'CHEQUE_CLEAR',
+        sourceId: cheque.id,
+      });
+      const saved = await entryRepo.save(entry);
+      cheque.cashbookEntryId = saved.id;
+
+      const account = await accountRepo.findOne({ where: { id: targetAccount.id } });
+      if (!account) {
+        throw new AppError(
+          'The bank account for this cheque could not be found — it may have just been removed. Please try again after selecting a valid Bank account.',
+          400,
+        );
       }
+      const delta = isReceived ? Number(cheque.amount) : -Number(cheque.amount);
+      account.currentBalance = Number(account.currentBalance) + delta;
+      await accountRepo.save(account);
 
       cheque.status = 'CLEARED';
+      cheque.clearedDate = clearedDate ? new Date(clearedDate) : (new Date() as unknown as Date);
       await chqRepo.save(cheque);
       await logHistory(m, cheque.id, prevStatus, 'CLEARED', userId, notes);
     });

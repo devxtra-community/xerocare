@@ -131,6 +131,9 @@ export interface ExpenseEntry {
   notes?: string;
   createdBy: string;
   createdAt: string;
+  isPrepayment?: boolean;
+  coveredPeriodStart?: string;
+  coveredPeriodEnd?: string;
 }
 
 export interface DepreciationBrandRule {
@@ -227,6 +230,7 @@ export interface ManualReceivable {
   amountPaid: number;
   outstanding: number;
   status: string;
+  linkedInvoiceId?: string;
   branchId: string;
   notes?: string;
   createdAt: string;
@@ -249,6 +253,7 @@ export interface ManualPayable {
   amountPaid: number;
   outstanding: number;
   status: string;
+  linkedPurchaseId?: string;
   branchId: string;
   notes?: string;
   createdAt: string;
@@ -441,6 +446,42 @@ export async function fetchDayBook(params?: {
   );
 }
 
+// ─── Branch Daily Activity ──────────────────────────────────────────────────
+// A broader, non-cash-scoped index of everything that happened in a branch on
+// a given day — deliberately separate from Day Book above, whose Total
+// Earnings/Expenses/Net Cash figures stay strictly cash-transaction-based.
+
+export interface ActivityEvent {
+  id: string;
+  type:
+    | 'QUOTATION'
+    | 'INVOICE'
+    | 'PURCHASE'
+    | 'SERVICE_TICKET'
+    | 'STOCK_TRANSFER'
+    | 'CHEQUE'
+    | 'EXPENSE'
+    | 'EXPENSE_REQUEST'
+    | 'CREDIT_NOTE';
+  subType: string;
+  time: string;
+  title: string;
+  description?: string;
+  amount?: number;
+  currency?: string;
+  refId: string;
+  meta?: Record<string, unknown>;
+}
+
+export async function fetchBranchActivity(params?: {
+  date?: string;
+  branchId?: string;
+  branchIds?: string;
+}): Promise<{ date: string; events: ActivityEvent[] }> {
+  const res = await api.get(`${BASE}/branch-activity`, { params });
+  return res.data?.data ?? { date: params?.date ?? '', events: [] };
+}
+
 // ─── Expense Entries ─────────────────────────────────────────────────────────
 
 export async function fetchExpenseEntries(params?: {
@@ -450,6 +491,7 @@ export async function fetchExpenseEntries(params?: {
   status?: string;
   fromDate?: string;
   toDate?: string;
+  isPrepayment?: boolean;
 }): Promise<ExpenseEntry[]> {
   const res = await api.get(`${BASE}/expenses`, { params });
   return res.data?.data ?? [];
@@ -628,6 +670,7 @@ export async function recordReceivablePayment(
     chequeNumber?: string;
     chequeBankName?: string;
     chequeDueDate?: string;
+    chequeDate?: string;
     notes?: string;
   },
 ): Promise<ManualReceivable> {
@@ -684,8 +727,10 @@ export type EquityType =
   | 'RESERVES'
   | 'OWNER_CONTRIBUTION'
   | 'DIVIDEND'
+  | 'WITHDRAWAL'
   | 'PROFIT_TRANSFER'
   | 'LOSS_TRANSFER'
+  | 'OPENING_BALANCE_EQUITY'
   | 'OTHER';
 
 export interface EquityEntry {
@@ -908,12 +953,23 @@ export interface AccountBalance {
   lastUpdated: string;
 }
 
+export interface CustomAccountBalance extends AccountBalance {
+  id: string;
+  parentAccountId: string | null;
+  sourceType:
+    | 'CASH_BANK_LINKED'
+    | 'EXPENSE_CATEGORY_LINKED'
+    | 'INCOME_CATEGORY_LINKED'
+    | 'MANUAL_JOURNAL';
+}
+
 export interface ChartOfAccountsResponse {
   asOfDate: string;
   periodFrom: string;
   periodTo: string;
   branchIds: string[];
   currency: string;
+  warnings: string[];
   assets: {
     currentAssets: {
       cashInHand: AccountBalance;
@@ -923,12 +979,14 @@ export interface ChartOfAccountsResponse {
       prepaidExpenses: AccountBalance;
       sparePartsInventory: AccountBalance;
       productInventory: AccountBalance;
+      custom: CustomAccountBalance[];
       totalCurrentAssets: number;
     };
     nonCurrentAssets: {
       equipmentGrossCost: AccountBalance;
       accumulatedDepreciation: AccountBalance;
       equipmentNBV: number;
+      custom: CustomAccountBalance[];
       totalNonCurrentAssets: number;
     };
     totalAssets: number;
@@ -941,9 +999,10 @@ export interface ChartOfAccountsResponse {
       securityDepositsReceived: AccountBalance;
       deferredRevenue: AccountBalance;
       salaryPayable: AccountBalance;
+      custom: CustomAccountBalance[];
       totalCurrentLiabilities: number;
     };
-    nonCurrentLiabilities: { totalNonCurrentLiabilities: number };
+    nonCurrentLiabilities: { custom: CustomAccountBalance[]; totalNonCurrentLiabilities: number };
     totalLiabilities: number;
   };
   equity: {
@@ -952,6 +1011,7 @@ export interface ChartOfAccountsResponse {
     reserves: AccountBalance;
     lessWithdrawals: AccountBalance;
     lessDividends: AccountBalance;
+    custom: CustomAccountBalance[];
     totalEquity: number;
   };
   income: {
@@ -962,6 +1022,8 @@ export interface ChartOfAccountsResponse {
     usageRevenue: AccountBalance;
     amcSmaRevenue: AccountBalance;
     sparePartSales: AccountBalance;
+    otherIncome: AccountBalance;
+    custom: CustomAccountBalance[];
     totalIncome: number;
   };
   expenses: {
@@ -980,6 +1042,7 @@ export interface ChartOfAccountsResponse {
     otherExpenses: AccountBalance;
     importLabourCost: AccountBalance;
     customsDuty: AccountBalance;
+    custom: CustomAccountBalance[];
     totalExpenses: number;
   };
   summary: {
@@ -1008,6 +1071,619 @@ export const getChartOfAccounts = (params: ChartOfAccountsParams = {}) =>
         periodFrom: params.periodFrom,
         periodTo: params.periodTo,
       },
+    })
+    .then((r) => r.data.data);
+
+// ─── Chart of Accounts — structure management (ADMIN/FINANCE) ────────────────
+
+export interface ChartOfAccountRow {
+  id: string;
+  accountNumber: string;
+  accountName: string;
+  category: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+  accountGroup: string;
+  parentAccountId: string | null;
+  sourceType:
+    | 'SYSTEM'
+    | 'CASH_BANK_LINKED'
+    | 'EXPENSE_CATEGORY_LINKED'
+    | 'INCOME_CATEGORY_LINKED'
+    | 'MANUAL_JOURNAL';
+  isSystemDefault: boolean;
+  linkedCashBankAccountId: string | null;
+  categoryKey: string | null;
+  isActive: boolean;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const fetchChartOfAccountsStructure = () =>
+  api
+    .get<{ success: boolean; data: ChartOfAccountRow[] }>(`${BASE}/chart-of-accounts/structure`)
+    .then((r) => r.data.data);
+
+export const getNextAccountNumber = (params: { category?: string; parentAccountId?: string }) =>
+  api
+    .get<{
+      success: boolean;
+      data: { accountNumber: string };
+    }>(`${BASE}/chart-of-accounts/next-number`, { params })
+    .then((r) => r.data.data.accountNumber);
+
+export interface CreateChartOfAccountInput {
+  accountName: string;
+  category?: string;
+  accountGroup?: string;
+  accountNumber?: string;
+  parentAccountId?: string;
+  sourceType: string;
+  linkedCashBankAccountId?: string;
+  categoryKey?: string;
+}
+
+export const createChartOfAccount = (data: CreateChartOfAccountInput) =>
+  api
+    .post<{ success: boolean; data: ChartOfAccountRow }>(`${BASE}/chart-of-accounts`, data)
+    .then((r) => r.data.data);
+
+export const renameChartOfAccount = (id: string, accountName: string) =>
+  api
+    .patch<{ success: boolean; data: ChartOfAccountRow }>(`${BASE}/chart-of-accounts/${id}`, {
+      accountName,
+    })
+    .then((r) => r.data.data);
+
+export const setChartOfAccountActive = (id: string, isActive: boolean) =>
+  api
+    .patch<{
+      success: boolean;
+      data: ChartOfAccountRow;
+    }>(`${BASE}/chart-of-accounts/${id}/active`, { isActive })
+    .then((r) => r.data.data);
+
+export const deleteChartOfAccount = (id: string) =>
+  api.delete(`${BASE}/chart-of-accounts/${id}`).then((r) => r.data);
+
+// ─── Income Entries (mirrors Expense Entries) ─────────────────────────────────
+
+export interface IncomeEntry {
+  id: string;
+  incomeNo: string;
+  date: string;
+  category: string;
+  subCategory?: string;
+  description: string;
+  branchId: string;
+  amount: number;
+  vatAmount: number;
+  netAmount: number;
+  currency: string;
+  status: 'PENDING' | 'APPROVED' | 'RECEIVED' | 'REJECTED';
+  receivedTo?: string;
+  receivedDate?: string;
+  receivedMode?: string;
+  referenceNo?: string;
+  approvedBy?: string;
+  receiptUrl?: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function fetchIncomeEntries(params?: {
+  category?: string;
+  status?: string;
+  fromDate?: string;
+  toDate?: string;
+}): Promise<IncomeEntry[]> {
+  const res = await api.get(`${BASE}/income`, { params });
+  return res.data?.data ?? [];
+}
+
+export async function createIncomeEntry(data: Partial<IncomeEntry>): Promise<IncomeEntry> {
+  const res = await api.post(`${BASE}/income`, data);
+  return res.data?.data;
+}
+
+export async function updateIncomeEntry(
+  id: string,
+  data: Partial<IncomeEntry>,
+): Promise<IncomeEntry> {
+  const res = await api.put(`${BASE}/income/${id}`, data);
+  return res.data?.data;
+}
+
+export async function approveIncomeEntry(id: string): Promise<IncomeEntry> {
+  const res = await api.patch(`${BASE}/income/${id}/approve`);
+  return res.data?.data;
+}
+
+export async function receiveIncomeEntry(
+  id: string,
+  data: {
+    receivedTo?: string;
+    receivedMode?: string;
+    receivedDate?: string;
+    referenceNo?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+  },
+): Promise<IncomeEntry> {
+  const res = await api.patch(`${BASE}/income/${id}/receive`, data);
+  return res.data?.data;
+}
+
+export async function deleteIncomeEntry(id: string): Promise<void> {
+  await api.delete(`${BASE}/income/${id}`);
+}
+
+export interface IncomeEntryDetail extends IncomeEntry {
+  receivedToAccount: { id: string; name: string; type: string } | null;
+  cheque: Cheque | null;
+}
+
+export async function fetchIncomeEntryDetail(id: string): Promise<IncomeEntryDetail> {
+  const res = await api.get(`${BASE}/income/${id}/detail`);
+  return res.data?.data;
+}
+
+// ─── Manual Journal Entries ────────────────────────────────────────────────────
+
+export interface ManualJournalEntryRow {
+  id: string;
+  entryNo: string;
+  date: string;
+  chartOfAccountId: string;
+  amount: number;
+  description: string;
+  branchId: string;
+  referenceNo?: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export const fetchManualJournalEntries = (params?: { chartOfAccountId?: string }) =>
+  api
+    .get<{ success: boolean; data: ManualJournalEntryRow[] }>(`${BASE}/manual-journal`, { params })
+    .then((r) => r.data.data);
+
+export const createManualJournalEntry = (data: {
+  chartOfAccountId: string;
+  date: string;
+  amount: number;
+  description: string;
+  referenceNo?: string;
+  notes?: string;
+}) =>
+  api
+    .post<{ success: boolean; data: ManualJournalEntryRow }>(`${BASE}/manual-journal`, data)
+    .then((r) => r.data.data);
+
+export const reverseManualJournalEntry = (id: string) =>
+  api
+    .post<{ success: boolean; data: ManualJournalEntryRow }>(`${BASE}/manual-journal/${id}/reverse`)
+    .then((r) => r.data.data);
+
+// ─── Revenue Drill-Down (Sale/Rent/Lease sub-category breakdown) ─────────────
+
+export const RENT_PLAN_TYPES = [
+  'FIXED_LIMIT',
+  'FIXED_COMBO',
+  'FIXED_FLAT',
+  'CPC',
+  'CPC_COMBO',
+] as const;
+export type RentPlanType = (typeof RENT_PLAN_TYPES)[number];
+
+export const RENT_PLAN_TYPE_LABELS: Record<RentPlanType, string> = {
+  FIXED_LIMIT: 'Fixed Rent + Individual Limit',
+  FIXED_COMBO: 'Fixed Rent + Combined Limit',
+  FIXED_FLAT: 'Fixed Flat Rent (No Limits)',
+  CPC: 'CPC (Individual)',
+  CPC_COMBO: 'CPC (Combined)',
+};
+
+export interface RevenueBreakdown {
+  sale: { total: number; productSale: number; sparePartSale: number };
+  rent: { total: number; byPlanType: Record<RentPlanType, number> };
+  lease: {
+    total: number;
+    emi: number;
+    fsm: { total: number; byPlanType: Record<RentPlanType, number> };
+  };
+  currencyWarnings: string[];
+  periodFrom: string;
+  periodTo: string;
+  currency: string;
+}
+
+export const fetchRevenueBreakdown = (params: {
+  periodFrom?: string;
+  periodTo?: string;
+  branchId?: string;
+}) =>
+  api
+    .get<{ success: boolean; data: RevenueBreakdown }>(`${BASE}/revenue-breakdown`, { params })
+    .then((r) => r.data.data);
+
+export interface RevenueTransactionRow {
+  id: string;
+  rowType: 'INVOICE' | 'ADVANCE' | 'USAGE_PERIOD';
+  invoiceId: string;
+  invoiceNumber: string;
+  customerName: string;
+  date: string;
+  amount: number;
+  currencyCode: string;
+  branchId: string;
+  saleType: string;
+  rentType: string | null;
+  leaseType: string | null;
+  rentPeriod: string | null;
+  billingPeriodStart: string | null;
+  billingPeriodEnd: string | null;
+  baseCharge: number | null;
+  exceededCharge: number | null;
+  meterReadings: {
+    bwA4Count: number;
+    bwA3Count: number;
+    colorA4Count: number;
+    colorA3Count: number;
+  } | null;
+}
+
+export const fetchRevenueTransactions = (params: {
+  category: string;
+  periodFrom?: string;
+  periodTo?: string;
+  customerName?: string;
+  search?: string;
+  amountMin?: string;
+  amountMax?: string;
+  branchId?: string;
+}) =>
+  api
+    .get<{
+      success: boolean;
+      data: RevenueTransactionRow[];
+    }>(`${BASE}/revenue-breakdown/transactions`, { params })
+    .then((r) => r.data.data);
+
+// ─── Line-item drill-downs (Liabilities/Equity lines with no existing API) ────
+
+export interface VatRemittance {
+  id: string;
+  branchId: string;
+  periodFrom: string;
+  periodTo: string;
+  amountRemitted: number;
+  remittedDate: string;
+  referenceNo?: string;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export const fetchVatRemittances = () =>
+  api
+    .get<{ success: boolean; data: VatRemittance[] }>(`${BASE}/vat-remittances`)
+    .then((r) => r.data.data);
+
+export interface LineItemFilterParams {
+  customerName?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  amountMin?: string;
+  amountMax?: string;
+  branchId?: string;
+  branchIds?: string;
+}
+
+export interface OutputVatRow {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  date: string;
+  amount: number;
+  currencyCode: string;
+  branchId: string;
+}
+
+export const fetchOutputVatTransactions = (params: LineItemFilterParams = {}) =>
+  api
+    .get<{ success: boolean; data: OutputVatRow[] }>(`${BASE}/line-items/output-vat`, { params })
+    .then((r) => r.data.data);
+
+export interface SecurityDepositRow {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  date: string;
+  amount: number;
+  currencyCode: string;
+  branchId: string;
+  saleType: string;
+  depositMode: string | null;
+  depositReference: string | null;
+  depositDate: string | null;
+}
+
+export const fetchSecurityDepositTransactions = (params: LineItemFilterParams = {}) =>
+  api
+    .get<{ success: boolean; data: SecurityDepositRow[] }>(`${BASE}/line-items/security-deposits`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+export interface DeferredRevenueRow {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  date: string;
+  amount: number;
+  advanceAmount: number;
+  advanceAdjustedSoFar: number;
+  currencyCode: string;
+  branchId: string;
+  saleType: string;
+}
+
+export const fetchDeferredRevenueTransactions = (params: LineItemFilterParams = {}) =>
+  api
+    .get<{ success: boolean; data: DeferredRevenueRow[] }>(`${BASE}/line-items/deferred-revenue`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+export interface OtherIncomeRow {
+  id: string;
+  incomeNo: string;
+  category: string;
+  subCategory: string | null;
+  description: string;
+  date: string;
+  amount: number;
+  currencyCode: string;
+  branchId: string;
+  receivedMode: string | null;
+}
+
+export const fetchOtherIncomeTransactions = (params: LineItemFilterParams = {}) =>
+  api
+    .get<{ success: boolean; data: OtherIncomeRow[] }>(`${BASE}/line-items/other-income`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+export interface RetainedEarningsMonthRow {
+  month: string;
+  revenue: number;
+  expenses: number;
+  netIncome: number;
+  cumulative: number;
+}
+
+export const fetchRetainedEarningsMonthly = (params: { months?: number; branchId?: string } = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: RetainedEarningsMonthRow[];
+      currency: string;
+    }>(`${BASE}/line-items/retained-earnings-monthly`, { params })
+    .then((r) => r.data);
+
+export interface ReceivableRow {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  saleType: string;
+  date: string;
+  /** Outstanding balance (totalAmount - paid) — 0 for a fully-settled invoice. */
+  amount: number;
+  totalAmount: number;
+  paid: number;
+  /** 'OUTSTANDING' | 'PARTIAL' | 'PAID' — derived from amount/paid. */
+  status: string;
+  currencyCode: string;
+  branchId: string;
+  aging: string;
+}
+
+export const fetchAccountsReceivableTransactions = (
+  params: LineItemFilterParams & { aging?: string; includeSettled?: boolean } = {},
+) =>
+  api
+    .get<{ success: boolean; data: ReceivableRow[] }>(`${BASE}/line-items/accounts-receivable`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+// ─── Customer Statement of Account ──────────────────────────────────────────
+
+export interface CustomerStatementRow {
+  date: string;
+  reference: string;
+  description: string;
+  debit?: number;
+  credit?: number;
+}
+
+export interface CustomerStatement {
+  customerName: string;
+  periodFrom: string;
+  periodTo: string;
+  currency: string;
+  openingBalance: number;
+  closingBalance: number;
+  rows: CustomerStatementRow[];
+}
+
+export const fetchCustomerStatement = (params: {
+  customerName: string;
+  periodFrom?: string;
+  periodTo?: string;
+  branchId?: string;
+  branchIds?: string;
+}) =>
+  api
+    .get<{ success: boolean; data: CustomerStatement }>(`${BASE}/line-items/customer-statement`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+export interface VendorStatement {
+  vendorName: string;
+  periodFrom: string;
+  periodTo: string;
+  currency: string;
+  openingBalance: number;
+  closingBalance: number;
+  rows: CustomerStatementRow[];
+}
+
+export const fetchVendorStatement = (params: {
+  vendorName: string;
+  periodFrom?: string;
+  periodTo?: string;
+  branchId?: string;
+  branchIds?: string;
+}) =>
+  api
+    .get<{ success: boolean; data: VendorStatement }>(`${BASE}/line-items/vendor-statement`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+export interface AccountStatement {
+  accountName: string;
+  accountType: string;
+  periodFrom: string;
+  periodTo: string;
+  currency: string;
+  openingBalance: number;
+  closingBalance: number;
+  currentBalance: number;
+  rows: CustomerStatementRow[];
+}
+
+export const fetchAccountStatement = (params: {
+  accountId: string;
+  periodFrom?: string;
+  periodTo?: string;
+  branchId?: string;
+  branchIds?: string;
+}) =>
+  api
+    .get<{ success: boolean; data: AccountStatement }>(`${BASE}/line-items/account-statement`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+// ─── Receivable / Payable row-level "View" drill-down ────────────────────────
+
+export interface PaymentHistoryRow {
+  id: string;
+  date: string;
+  amount: number;
+  mode: string | null;
+  referenceNumber: string | null;
+}
+
+export interface RowChequeInfo {
+  id: string;
+  chequeNo: string;
+  bankName: string | null;
+  amount: number;
+  dueDate: string;
+  status: string;
+  type: string;
+}
+
+export interface ReceivableRowDetail {
+  source: 'INVOICE' | 'MANUAL';
+  id: string;
+  referenceNo: string;
+  saleType: string;
+  status: string;
+  issueDate: string;
+  dueDate: string | null;
+  billingPeriodStart: string | null;
+  billingPeriodEnd: string | null;
+  totalAmount: number;
+  paid: number;
+  outstanding: number;
+  currencyCode: string;
+  branchId: string;
+  customer: {
+    name: string | null;
+    vatNumber: string | null;
+    country: string | null;
+    stateProvince: string | null;
+    city: string | null;
+    phone: string | null;
+    email: string | null;
+  };
+  paymentHistory: PaymentHistoryRow[];
+  cheques: RowChequeInfo[];
+}
+
+export const fetchReceivableRowDetail = (type: 'INVOICE' | 'MANUAL', id: string) =>
+  api
+    .get<{ success: boolean; data: ReceivableRowDetail }>(`${BASE}/line-items/receivable-detail`, {
+      params: { type, id },
+    })
+    .then((r) => r.data.data);
+
+export interface PayableApprovalInfo {
+  id: string;
+  requestNo: string;
+  status: string;
+  employeeName: string;
+  paymentMode?: string;
+  amount: number;
+  submittedAt?: string;
+  reviewedBy: string | null;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}
+
+export interface PayableRowDetail {
+  source: 'PO' | 'MANUAL';
+  id: string;
+  referenceNo: string;
+  category: string | null;
+  origin: string | null;
+  issueDate: string;
+  dueDate: string | null;
+  totalAmount: number;
+  paid: number;
+  outstanding: number;
+  currencyCode: string;
+  branchId: string;
+  vendor: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    contactPerson: string | null;
+    vatNumber: string | null;
+    country: string | null;
+    stateProvince: string | null;
+    city: string | null;
+    bankAccounts: unknown[];
+  } | null;
+  paymentHistory: PaymentHistoryRow[];
+  cheques: RowChequeInfo[];
+  approvals: PayableApprovalInfo[];
+}
+
+export const fetchPayableRowDetail = (type: 'PO' | 'MANUAL', id: string) =>
+  api
+    .get<{ success: boolean; data: PayableRowDetail }>(`${BASE}/line-items/payable-detail`, {
+      params: { type, id },
     })
     .then((r) => r.data.data);
 
@@ -1111,7 +1787,14 @@ export interface Cheque {
   partyName: string;
   amount: number;
   dueDate: string;
+  /** The date physically written on the cheque — independent of dueDate (a
+   * post-dated cheque has chequeDate earlier than dueDate). */
+  chequeDate?: string;
   issueDate?: string;
+  /** Set when a RECEIVED cheque is deposited. */
+  depositDate?: string;
+  /** Set when a cheque is marked Cleared — the actual cash-received/paid date. */
+  clearedDate?: string;
   type: 'RECEIVED' | 'ISSUED';
   status: 'PENDING' | 'DEPOSITED' | 'CLEARED' | 'BOUNCED' | 'CANCELLED' | 'ISSUED';
   description?: string;
@@ -1126,6 +1809,8 @@ export interface Cheque {
   saleType?: string | null;
   /** Payment proof (screenshot/PDF) uploaded with the cheque payment, if any */
   receiptUrl?: string | null;
+  /** Reason for the most recent BOUNCED/CANCELLED status change, if any. */
+  reason?: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -1178,6 +1863,7 @@ export const createCheque = (body: {
   partyName: string;
   amount: number;
   dueDate: string;
+  chequeDate?: string;
   issueDate?: string;
   type: 'RECEIVED' | 'ISSUED';
   description?: string;
@@ -1198,6 +1884,7 @@ export const updateCheque = (
       | 'partyName'
       | 'amount'
       | 'dueDate'
+      | 'chequeDate'
       | 'issueDate'
       | 'description'
       | 'accountId'
@@ -1224,7 +1911,7 @@ export const issueCheque = (
     .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/issue`, body)
     .then((r) => r.data.data);
 
-export const clearCheque = (id: string, body?: { notes?: string }) =>
+export const clearCheque = (id: string, body?: { notes?: string; clearedDate?: string }) =>
   api
     .post<{ success: boolean; data: Cheque }>(`${CHEQUE_BASE}/${id}/clear`, body ?? {})
     .then((r) => r.data.data);
@@ -1283,6 +1970,9 @@ export interface OutputTaxRow {
   totalInvoice: number;
   currencyCode?: string;
   status: string;
+  /** True when the customer was VAT-exempt (a distinct reportable zero-rated
+   * category) — permanently snapshotted on the invoice, not a live lookup. */
+  isExempt?: boolean;
 }
 
 export interface InputTaxLocalRow {

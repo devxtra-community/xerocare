@@ -122,7 +122,7 @@ app.use('/bank-reference', express.json(), bankReferenceRouter);
 app.get(
   '/b/audit-logs/:entityId',
   authMiddleware,
-  requireRole(UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
+  requireRole(UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.FINANCE, UserRole.ADMIN),
   getAuditLogs,
 );
 

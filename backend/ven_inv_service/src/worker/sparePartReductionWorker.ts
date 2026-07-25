@@ -4,6 +4,7 @@ import { Source } from '../config/db';
 import { SparePart } from '../entities/sparePartEntity';
 import { SparePartRepository } from '../repositories/sparePartRepository';
 import { ProcessedInvoiceItem } from '../entities/processedInvoiceItemEntity';
+import { deleteCached } from '../utils/cacheUtil';
 
 const EXCHANGE = 'domain_events';
 const QUEUE = 'inventory.sparepart.reduce.queue';
@@ -86,6 +87,12 @@ export async function startSparePartReductionConsumer() {
           await queryRunner.manager.save(ProcessedInvoiceItem, { invoiceItemId });
 
           await queryRunner.commitTransaction();
+          // Read-through cache (sparePartService.findById, 1h TTL) is never
+          // written to by this worker — without invalidating it here, stale
+          // stock figures are served for up to 1h, including to createDirectSale's
+          // own oversell-prevention check (confirmed: this let a real oversell
+          // through, driving quantity negative).
+          await deleteCached(`sparepart:${sparePartId}`);
 
           logger.info('Spare part stock reduced successfully (Idempotent)', {
             sparePartId,
@@ -110,6 +117,7 @@ export async function startSparePartReductionConsumer() {
 
         // Deduct quantity
         await repo.updateStock(sparePartId, -quantity);
+        await deleteCached(`sparepart:${sparePartId}`);
 
         logger.info('Spare part stock reduced successfully (Legacy)', {
           sparePartId,

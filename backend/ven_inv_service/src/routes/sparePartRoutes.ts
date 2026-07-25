@@ -6,6 +6,7 @@ import {
   updateSparePart,
   deleteSparePart,
   getSparePartById,
+  getSparePartsBatch,
   getSparePartStock,
   getInventoryValue,
 } from '../controllers/sparePartController';
@@ -16,6 +17,9 @@ const router = Router();
 
 // Internal endpoint — no auth required (called service-to-service)
 router.get('/inventory-value', getInventoryValue);
+
+// Internal batch fetch — used by billing_service for Segmented P&L cost matching
+router.post('/batch', authMiddleware, getSparePartsBatch);
 
 router.post('/bulk', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), bulkUploadSpareParts);
 router.post('/add', authMiddleware, roleMiddleware(['MANAGER', 'ADMIN']), addSparePart);

@@ -9,6 +9,7 @@ import {
 } from '../types/purchaseTypes';
 import { Purchase } from '../entities/purchaseEntity';
 import { PurchasePayment } from '../entities/purchasePaymentEntity';
+import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 
 export class PurchaseService {
@@ -63,10 +64,16 @@ export class PurchaseService {
     const result = await this.paymentRepo.addPayment(purchaseId, data, branchId);
     logger.info('Payment added successfully', { purchaseId, amount: data.amount });
 
+    // Used to be "non-critical": a failure here (most commonly billing_service
+    // rejecting because the branch has no matching Cash/Bank account) was only
+    // logged, leaving this PurchasePayment standing — the purchase's outstanding
+    // balance would show reduced with no real cash movement or approval-queue
+    // record behind it anywhere. Void the payment and surface the real error instead.
     try {
       await this.notifyBillingExpenseRequest(purchaseId, result, data, branchId);
     } catch (err) {
-      logger.warn('[Purchase] Billing expense-request creation failed (non-critical):', err);
+      await this.paymentRepo.voidPayment(result.id, branchId);
+      throw err;
     }
 
     return result;
@@ -108,8 +115,15 @@ export class PurchaseService {
     });
 
     if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`${res.status}: ${body}`);
+      const bodyText = await res.text();
+      let message = bodyText;
+      try {
+        const parsed = JSON.parse(bodyText) as { message?: string };
+        if (parsed.message) message = parsed.message;
+      } catch {
+        // Not JSON — fall back to the raw text above.
+      }
+      throw new AppError(message, res.status >= 400 && res.status < 600 ? res.status : 502);
     }
   }
 

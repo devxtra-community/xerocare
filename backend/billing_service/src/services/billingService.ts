@@ -16,7 +16,7 @@ import { UsageRepository } from '../repositories/usageRepository';
 import { SecurityDepositMode, Invoice } from '../entities/invoiceEntity';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { logger } from '../config/logger';
-import { postCashbookEntry } from './cashbookService';
+import { postCashbookEntry, requireCashAccount } from './cashbookService';
 import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
 import { RentType } from '../entities/enums/rentType';
 import { RentPeriod } from '../entities/enums/rentPeriod';
@@ -713,15 +713,45 @@ export class BillingService {
         calculatedTotal === 0 ? Number(payload.advanceAmount || 0) : calculatedTotal;
     }
 
-    // ─── Snapshot: branch currency/tax + customer info ────────────────────────
-    // Rent/Lease contracts are VAT-exempt (confirmed business/regulatory position) — no
-    // tax_name/tax_percent/tax_amount is calculated or applied for these sale types.
+    // ─── Snapshot: customer info (fetched first — tax calc below needs to know
+    // the customer's VAT status before, not after, computing tax_amount) ───────
+    let customer: Awaited<ReturnType<typeof this.getCustomerDetails>> = null;
+    if (payload.customerId) {
+      try {
+        customer = await this.getCustomerDetails(payload.customerId);
+        if (customer) {
+          invoice.customerName = customer.name ?? null;
+          invoice.customerVatNumber = customer.vatNumber ?? null;
+          invoice.customerVatStatus = customer.vatStatus ?? null;
+          invoice.customerCountry = payload.customerCountry ?? customer.country ?? null;
+          invoice.customerStateProvince =
+            payload.customerStateProvince ?? customer.stateProvince ?? null;
+          invoice.customerCity = payload.customerCity ?? customer.city ?? null;
+        }
+      } catch (err) {
+        logger.warn('Could not fetch customer info for snapshot on invoice creation', err);
+      }
+    }
+
+    // ─── Snapshot: branch currency/tax ─────────────────────────────────────────
+    // Two independent, coexisting reasons for zero VAT:
+    //  - Rent/Lease contracts are VAT-exempt by transaction type (confirmed
+    //    business/regulatory position), regardless of customer.
+    //  - An EXEMPT customer (government/embassy/charity/etc., a specific legal
+    //    status — not just "no VAT number") never gets VAT, regardless of
+    //    transaction type. See CustomerVatStatus in crm_service's customerEntity.ts.
     const isTaxExemptSaleType = [SaleType.RENT, SaleType.LEASE].includes(payload.saleType);
+    const isExemptCustomer = customer?.vatStatus === 'EXEMPT';
     try {
       const branchInfo = await getBranchCurrencyInfo(payload.branchId);
       if (branchInfo) {
         invoice.currencyCode = branchInfo.currencyCode;
-        if (!isTaxExemptSaleType && branchInfo.hasTax && branchInfo.taxPercent) {
+        if (
+          !isTaxExemptSaleType &&
+          !isExemptCustomer &&
+          branchInfo.hasTax &&
+          branchInfo.taxPercent
+        ) {
           invoice.taxName = branchInfo.taxName;
           invoice.taxPercent = branchInfo.taxPercent;
           invoice.taxAmount = Number(invoice.totalAmount) * (branchInfo.taxPercent / 100);
@@ -733,22 +763,6 @@ export class BillingService {
       }
     } catch (err) {
       logger.warn('Could not fetch branch info for tax snapshot on invoice creation', err);
-    }
-
-    if (payload.customerId) {
-      try {
-        const customer = await this.getCustomerDetails(payload.customerId);
-        if (customer) {
-          invoice.customerName = customer.name ?? null;
-          invoice.customerVatNumber = customer.vatNumber ?? null;
-          invoice.customerCountry = payload.customerCountry ?? customer.country ?? null;
-          invoice.customerStateProvince =
-            payload.customerStateProvince ?? customer.stateProvince ?? null;
-          invoice.customerCity = payload.customerCity ?? customer.city ?? null;
-        }
-      } catch (err) {
-        logger.warn('Could not fetch customer info for snapshot on invoice creation', err);
-      }
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -1834,6 +1848,7 @@ export class BillingService {
       receivedDate?: string;
       chequeBankName?: string;
       chequeDueDate?: string;
+      chequeDate?: string;
     },
     itemUpdates?: {
       id: string;
@@ -1983,6 +1998,7 @@ export class BillingService {
                 (deposit.mode as string) === 'CHEQUE' ? deposit.reference || undefined : undefined,
               chequeBankName: deposit.chequeBankName,
               chequeDueDate: deposit.chequeDueDate,
+              chequeDate: deposit.chequeDate,
             },
             userId,
           );
@@ -3240,6 +3256,19 @@ export class BillingService {
       }
     }
 
+    // Fetch customer before computing any tax — an EXEMPT customer's tax must be
+    // forced to zero server-side regardless of what item.taxRate the client sent
+    // (this endpoint previously trusted item.taxRate completely unvalidated).
+    let directSaleCustomer: Awaited<ReturnType<typeof this.getCustomerDetails>> = null;
+    if (payload.customerId) {
+      try {
+        directSaleCustomer = await this.getCustomerDetails(payload.customerId);
+      } catch (err) {
+        logger.warn('Could not fetch customer info for tax exemption check on direct sale', err);
+      }
+    }
+    const isExemptDirectSaleCustomer = directSaleCustomer?.vatStatus === 'EXEMPT';
+
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
     let calculatedTotal = 0;
 
@@ -3258,6 +3287,9 @@ export class BillingService {
         status: InvoiceStatus.DRAFT, // Will update based on payment later
         isDirectSale: true,
         notes: payload.notes,
+        customerName: directSaleCustomer?.name ?? null,
+        customerVatNumber: directSaleCustomer?.vatNumber ?? null,
+        customerVatStatus: directSaleCustomer?.vatStatus ?? null,
         grossAmount: 0,
         discountAmount: 0,
         totalAmount: 0,
@@ -3286,7 +3318,9 @@ export class BillingService {
       for (const item of payload.items) {
         const quantity = item.itemType === 'SPARE_PART' ? item.quantity! : 1;
         const discount = item.discount || 0;
-        const taxRate = item.taxRate || 0;
+        // Forced to 0 for an EXEMPT customer regardless of what the client sent —
+        // this cannot be overridden by the request payload.
+        const taxRate = isExemptDirectSaleCustomer ? 0 : item.taxRate || 0;
 
         // Tax is levied on the consideration actually charged (price after discount).
         const subtotalAfterDiscount = (item.unitPrice - discount) * quantity;
@@ -3363,7 +3397,7 @@ export class BillingService {
         const branchInfo = await getBranchCurrencyInfo(payload.branchId);
         if (branchInfo) {
           savedInvoice.currencyCode = branchInfo.currencyCode;
-          if (branchInfo.hasTax) {
+          if (branchInfo.hasTax && !isExemptDirectSaleCustomer) {
             savedInvoice.taxName = branchInfo.taxName;
             savedInvoice.taxPercent = branchInfo.taxPercent;
             savedInvoice.taxRegistrationNumber = branchInfo.taxRegistrationNumber;
@@ -3759,6 +3793,17 @@ export class BillingService {
       if (notes !== undefined) quotation.notes = notes;
       quotation.status = InvoiceStatus.DRAFT;
 
+      // The quotation's tax (if any) was computed at template-creation time, when no
+      // real customer — and so no possible Exempt status — existed yet. Re-check now
+      // that a real customer is known, and zero any tax that was speculatively applied.
+      const assignedCustomer = await this.getCustomerDetails(customerId).catch(() => null);
+      quotation.customerVatStatus = assignedCustomer?.vatStatus ?? null;
+      if (assignedCustomer?.vatStatus === 'EXEMPT') {
+        quotation.taxAmount = 0;
+        quotation.taxPercent = undefined;
+        quotation.taxName = undefined;
+      }
+
       if (
         [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(quotation.saleType)
       ) {
@@ -3772,6 +3817,12 @@ export class BillingService {
 
     if (quotation.customerId !== customerId) {
       const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
+
+      // The new (swapped-in) customer's exemption status governs the clone's tax —
+      // not the old customer's/quotation's already-computed taxPercent.
+      const swappedCustomer = await this.getCustomerDetails(customerId).catch(() => null);
+      const isSwappedCustomerExempt = swappedCustomer?.vatStatus === 'EXEMPT';
+      const effectiveTaxPercent = isSwappedCustomerExempt ? 0 : Number(quotation.taxPercent || 0);
 
       const clonedItems = (quotation.items || []).map((item) => {
         const newItem = new InvoiceItem();
@@ -3833,20 +3884,23 @@ export class BillingService {
         totalAmount: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
           quotation.saleType,
         )
-          ? (Number(quotation.grossAmount || 0) - finalDiscount) *
-            (1 + Number(quotation.taxPercent || 0) / 100)
+          ? (Number(quotation.grossAmount || 0) - finalDiscount) * (1 + effectiveTaxPercent / 100)
           : quotation.totalAmount,
         taxAmount: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
           quotation.saleType,
         )
-          ? (Number(quotation.grossAmount || 0) - finalDiscount) *
-            (Number(quotation.taxPercent || 0) / 100)
-          : quotation.taxAmount,
-        taxPercent: quotation.taxPercent,
-        taxName: quotation.taxName,
+          ? (Number(quotation.grossAmount || 0) - finalDiscount) * (effectiveTaxPercent / 100)
+          : isSwappedCustomerExempt
+            ? 0
+            : quotation.taxAmount,
+        taxPercent: isSwappedCustomerExempt ? undefined : quotation.taxPercent,
+        taxName: isSwappedCustomerExempt ? undefined : quotation.taxName,
         taxRegistrationNumber: quotation.taxRegistrationNumber,
         currencyCode: quotation.currencyCode,
         grossAmount: quotation.grossAmount,
+        customerName: swappedCustomer?.name ?? undefined,
+        customerVatNumber: swappedCustomer?.vatNumber ?? undefined,
+        customerVatStatus: swappedCustomer?.vatStatus ?? undefined,
         items: clonedItems,
       });
 
@@ -4172,6 +4226,14 @@ export class BillingService {
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
     const invoiceRepo = Source.getRepository(Invoice);
 
+    // Service invoices don't compute VAT for any customer today (pre-existing —
+    // no tax logic exists for SERVICE saleType at all, confirmed, not something
+    // this change introduces or needs to build). Still snapshot the customer's
+    // VAT status for consistency with every other invoice-creation path and so
+    // the Output Tax report can categorize these correctly if/when Service VAT
+    // is added later.
+    const contractCustomer = await this.getCustomerDetails(payload.customerId).catch(() => null);
+
     const invoice = invoiceRepo.create({
       invoiceNumber,
       customerId: payload.customerId,
@@ -4183,6 +4245,9 @@ export class BillingService {
       type: InvoiceType.FINAL,
       status: InvoiceStatus.INVOICED,
       totalAmount: payload.amount,
+      customerName: contractCustomer?.name ?? undefined,
+      customerVatNumber: contractCustomer?.vatNumber ?? undefined,
+      customerVatStatus: contractCustomer?.vatStatus ?? undefined,
     });
     const savedInvoice = await invoiceRepo.save(invoice);
 
@@ -4601,6 +4666,10 @@ export class BillingService {
       chequeNumber?: string;
       chequeBankName?: string;
       chequeDueDate?: string;
+      /** The date physically written on the cheque — independent of chequeDueDate
+       * (a post-dated cheque has chequeDate < chequeDueDate). Falls back to the
+       * payment's transactionDate when omitted. */
+      chequeDate?: string;
       /**
        * Overrides the auto-derived "MMM YYYY to MMM YYYY" period text in the created
        * cheque's sourceLabel (which otherwise falls back to invoice.billingPeriodStart/End —
@@ -4646,6 +4715,23 @@ export class BillingService {
 
     if (Number(data.amount) <= 0) {
       throw new AppError('Payment amount must be greater than zero', 400);
+    }
+
+    // Block the whole payment before recording anything: a CASH/BANK payment with no
+    // matching account behind it used to still succeed — the PaymentTransaction, the
+    // ledger, and the invoice's PAID status all get written below regardless of
+    // whether the cashbook posting further down succeeds (that posting is wrapped in
+    // its own best-effort try/catch, and none of these writes share one transaction).
+    // Checking here, before any of that runs, is what actually stops it — a failure
+    // once we're already mid-way through would leave the invoice showing paid with no
+    // real cash movement behind it. CHEQUE payments don't touch cash until cleared
+    // (Accounts → Cheques), so they're validated there instead, not here.
+    const isChequePaymentPreflight = (data.paymentMode ?? '').toUpperCase() === 'CHEQUE';
+    if (invoice.branchId && !isChequePaymentPreflight) {
+      await requireCashAccount(Source, {
+        branchId: invoice.branchId,
+        paymentMode: data.paymentMode,
+      });
     }
 
     // Paid-so-far must count both payment tables: payment_transactions (current path)
@@ -4853,6 +4939,9 @@ export class BillingService {
               amount: Number(transaction.amount),
               dueDate: data.chequeDueDate
                 ? new Date(data.chequeDueDate)
+                : new Date(transaction.transactionDate),
+              chequeDate: data.chequeDate
+                ? new Date(data.chequeDate)
                 : new Date(transaction.transactionDate),
               issueDate: new Date(transaction.transactionDate),
               type: 'RECEIVED',

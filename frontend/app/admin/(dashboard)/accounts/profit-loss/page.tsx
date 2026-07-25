@@ -1,22 +1,41 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Download } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { fetchConsolidatedPL } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
-import * as XLSX from 'xlsx';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 
 function PLContent() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const period = searchParams.get('period') ?? 'this_year';
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const params: Record<string, string> = { period };
   if (branchIds) params.branchIds = branchIds;
@@ -36,24 +55,28 @@ function PLContent() {
   const monthly = pl?.monthly ?? [];
   const withNet = monthly.map((r) => ({ ...r, net: r.income - r.expenses }));
 
-  const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      ...withNet.map((r) => ({
-        Month: r.month,
-        Income: r.income,
-        Expenses: r.expenses,
-        'Net P&L': r.net,
-      })),
+  const fmt = (n: number) => formatCurrency(n, currency);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Profit & Loss — Consolidated',
+    periodFrom: monthly[0]?.month,
+    periodTo: monthly[monthly.length - 1]?.month,
+    sections: [
       {
-        Month: 'TOTAL',
-        Income: pl?.totalIncome ?? 0,
-        Expenses: pl?.totalExpenses ?? 0,
-        'Net P&L': pl?.netProfit ?? 0,
+        title: 'Monthly P&L',
+        rows: withNet.flatMap((r) => [
+          { label: `${r.month} — Income`, value: fmt(r.income) },
+          { label: `${r.month} — Expenses`, value: fmt(r.expenses) },
+          { label: `${r.month} — Net`, value: fmt(r.net) },
+        ]),
       },
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'P&L');
-    XLSX.writeFile(wb, 'consolidated_pl.xlsx');
+    ],
+    summary: [
+      { label: 'Total Revenue', value: fmt(pl?.totalIncome ?? 0) },
+      { label: 'Total Expenses', value: fmt(pl?.totalExpenses ?? 0) },
+      { label: 'Net Profit', value: fmt(pl?.netProfit ?? 0), bold: true },
+      { label: 'Margin', value: `${pl?.margin?.toFixed(1) ?? 0}%` },
+    ],
   };
 
   return (
@@ -64,10 +87,10 @@ function PLContent() {
           <p className="text-sm text-gray-500">All branches in AED</p>
         </div>
         <button
-          onClick={exportExcel}
+          onClick={() => setShowStatement(true)}
           className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
         >
-          <Download className="h-4 w-4" /> Export
+          <FileText className="h-4 w-4" /> Generate Statement
         </button>
       </div>
 
@@ -190,6 +213,14 @@ function PLContent() {
             </div>
           </div>
         </>
+      )}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
       )}
     </div>
   );

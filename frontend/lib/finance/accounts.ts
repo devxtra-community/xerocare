@@ -152,6 +152,12 @@ export const CHART_OF_ACCOUNTS: ChartAccount[] = [
     group: 'INCOME',
     description: 'Revenue from spare parts sold to customers',
   },
+  {
+    code: '4008',
+    name: 'Other Income',
+    group: 'INCOME',
+    description: 'Non-invoice cash income (e.g. scrap sale) — not tied to any Accounts Receivable',
+  },
   // EXPENSES
   {
     code: '5001',
@@ -214,6 +220,36 @@ export const CHART_OF_ACCOUNTS: ChartAccount[] = [
     group: 'EXPENSES',
     description: 'Import customs duty on International purchases, expensed directly',
   },
+  {
+    code: '5009',
+    name: 'Travel Expense',
+    group: 'EXPENSES',
+    description: 'Employee/business travel costs (expense_entries category TRAVEL)',
+  },
+  {
+    code: '5010',
+    name: 'Premises Rent Expense',
+    group: 'EXPENSES',
+    description: 'Rent paid for branch/office premises (expense_entries category RENT)',
+  },
+  {
+    code: '5011',
+    name: 'Utilities Expense',
+    group: 'EXPENSES',
+    description: 'Electricity, water, internet, etc. (expense_entries category UTILITIES)',
+  },
+  {
+    code: '5012',
+    name: 'Marketing Expense',
+    group: 'EXPENSES',
+    description: 'Advertising and marketing spend (expense_entries category MARKETING)',
+  },
+  {
+    code: '5013',
+    name: 'Insurance Expense',
+    group: 'EXPENSES',
+    description: 'Insurance premiums (expense_entries category INSURANCE)',
+  },
 ];
 
 // ─────────────────────────────────────────────
@@ -227,6 +263,10 @@ export interface InvoiceSummary {
   customerName: string;
   contractType: string;
   saleType: string;
+  /** Rent plan type — 'FIXED_LIMIT'|'FIXED_COMBO'|'FIXED_FLAT'|'CPC'|'CPC_COMBO'. Only present when saleType === 'RENT'. */
+  rentType?: string | null;
+  /** 'EMI'|'FSM'. Only present when saleType === 'LEASE'. */
+  leaseType?: string | null;
   status: string;
   totalAmount: number;
   paidAmount: number;
@@ -245,6 +285,16 @@ export interface PaymentRecord {
   paymentDate: string;
   currency: string;
   branchId: string;
+  /** What generated this cashbook entry — e.g. 'INVOICE_PAYMENT', 'CHEQUE_CLEAR',
+   * 'RECEIVABLE_PAYMENT'. Used to know how to interpret sourceId. */
+  sourceType?: string;
+  /** ID of the record named by sourceType — a PaymentTransaction id for
+   * INVOICE_PAYMENT, a Cheque id for CHEQUE_CLEAR, etc. */
+  sourceId?: string;
+  /** Cheque number, when this receipt came from a cleared cheque. */
+  chequeNo?: string;
+  description?: string;
+  createdBy?: string;
 }
 
 export interface UsageRecord {
@@ -297,6 +347,11 @@ interface CashbookReceipt {
   paymentMode?: string;
   date: string;
   branchId: string;
+  sourceType?: string;
+  sourceId?: string;
+  chequeNo?: string;
+  description?: string;
+  createdBy?: string;
 }
 
 // Real customer receipts from the cashbook (auto-posted from invoice payments).
@@ -319,6 +374,11 @@ export async function fetchPayments(params?: {
     invoiceId: e.linkedInvoiceId ?? '',
     amount: Number(e.amount),
     method: e.paymentMode ?? 'CASH',
+    sourceType: e.sourceType,
+    sourceId: e.sourceId,
+    chequeNo: e.chequeNo,
+    description: e.description,
+    createdBy: e.createdBy,
     paymentDate: e.date,
     currency: '',
     branchId: e.branchId,
@@ -396,8 +456,10 @@ export async function fetchSpareParts(params?: { branchId?: string }): Promise<S
 
 export interface PurchaseOrder {
   id: string;
+  lotId?: string;
   vendorId: string;
   vendor?: { id: string; name: string };
+  vendorCountry?: string | null;
   totalAmount: number;
   purchaseAmount?: number;
   documentationFee?: number;

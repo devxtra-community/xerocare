@@ -53,6 +53,8 @@ export class PaymentService {
     chequeNumber?: string;
     chequeBankName?: string;
     chequeDueDate?: string;
+    /** The date physically written on the cheque — independent of chequeDueDate. */
+    chequeDate?: string;
     /** Currency amountPaid is in, when different from the invoice's own currency
      * (e.g. paid from a foreign-currency customer bank account). */
     currencyCode?: string;
@@ -79,6 +81,7 @@ export class PaymentService {
         chequeNumber: data.chequeNumber,
         chequeBankName: data.chequeBankName,
         chequeDueDate: data.chequeDueDate,
+        chequeDate: data.chequeDate,
         currencyCode: data.currencyCode,
         exchangeRate: data.exchangeRate,
       },

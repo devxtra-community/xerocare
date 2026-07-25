@@ -5,11 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Clock,
-  RefreshCw,
   ArrowDownCircle,
   ArrowUpCircle,
   TrendingUp,
@@ -30,146 +25,19 @@ import {
   cancelCheque,
   Cheque,
 } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-const STATUS_BADGE: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  DEPOSITED: 'bg-blue-100 text-blue-700',
-  ISSUED: 'bg-purple-100 text-purple-700',
-  CLEARED: 'bg-emerald-100 text-emerald-700',
-  BOUNCED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-gray-100 text-gray-500',
-};
-
-const STATUS_ICON: Record<string, React.ReactNode> = {
-  PENDING: <Clock className="h-3.5 w-3.5" />,
-  DEPOSITED: <RefreshCw className="h-3.5 w-3.5" />,
-  ISSUED: <RefreshCw className="h-3.5 w-3.5" />,
-  CLEARED: <CheckCircle className="h-3.5 w-3.5" />,
-  BOUNCED: <AlertTriangle className="h-3.5 w-3.5" />,
-  CANCELLED: <XCircle className="h-3.5 w-3.5" />,
-};
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
+import {
+  ChequeDetailModal,
+  CHEQUE_TABLE_STATUS_BADGE as STATUS_BADGE,
+  CHEQUE_STATUS_ICON as STATUS_ICON,
+  SaleTypeBadge,
+} from '@/components/accounts/ChequeDetailModal';
 
 type ActionType = 'deposit' | 'issue' | 'clear' | 'bounce' | 'cancel';
-
-// Transaction-type badge for the cheque's source invoice
-const SALE_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  SALE: { label: 'SALE', cls: 'bg-blue-100 text-blue-700' },
-  PRODUCT_SALE: { label: 'PRODUCT SALE', cls: 'bg-blue-100 text-blue-700' },
-  SPAREPART_SALE: { label: 'SPARE PART SALE', cls: 'bg-blue-100 text-blue-700' },
-  RENT: { label: 'RENT', cls: 'bg-orange-100 text-orange-700' },
-  LEASE: { label: 'LEASE', cls: 'bg-purple-100 text-purple-700' },
-};
-
-function SaleTypeBadge({ saleType }: { saleType?: string | null }) {
-  if (!saleType) return null;
-  const badge = SALE_TYPE_BADGE[saleType] ?? {
-    label: saleType.replace(/_/g, ' '),
-    cls: 'bg-slate-100 text-slate-600',
-  };
-  return (
-    <span
-      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${badge.cls}`}
-    >
-      {badge.label}
-    </span>
-  );
-}
-
-// ─── Cheque Detail Modal (transaction details + payment proof) ────────────────
-function ChequeDetailModal({
-  cheque,
-  currency,
-  onClose,
-}: {
-  cheque: Cheque;
-  currency: string;
-  onClose: () => void;
-}) {
-  const rows: { label: string; value: React.ReactNode }[] = [
-    { label: 'Cheque Number', value: <span className="font-mono">{cheque.chequeNo}</span> },
-    { label: cheque.type === 'RECEIVED' ? 'Customer' : 'Party', value: cheque.partyName },
-    { label: 'Bank', value: cheque.bankName ?? '—' },
-    { label: 'Amount', value: formatCurrency(cheque.amount, currency) },
-    { label: 'Due Date', value: String(cheque.dueDate).slice(0, 10) },
-    {
-      label: 'Status',
-      value: (
-        <span
-          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[cheque.status] ?? 'bg-gray-100 text-gray-600'}`}
-        >
-          {STATUS_ICON[cheque.status]}
-          {cheque.status}
-        </span>
-      ),
-    },
-  ];
-  if (cheque.saleType) {
-    rows.push({ label: 'Transaction Type', value: <SaleTypeBadge saleType={cheque.saleType} /> });
-  }
-  if (cheque.invoiceNo) rows.push({ label: 'Invoice', value: cheque.invoiceNo });
-  if (cheque.sourceLabel) rows.push({ label: 'Source', value: cheque.sourceLabel });
-  if (cheque.description) rows.push({ label: 'Description', value: cheque.description });
-
-  const isImageProof =
-    !!cheque.receiptUrl && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(cheque.receiptUrl);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">Cheque Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
-            ×
-          </button>
-        </div>
-        <div className="p-6 space-y-4">
-          <dl className="space-y-2.5">
-            {rows.map((r) => (
-              <div key={r.label} className="flex items-start justify-between gap-4 text-sm">
-                <dt className="text-gray-500 whitespace-nowrap">{r.label}</dt>
-                <dd className="font-medium text-gray-800 text-right break-words min-w-0">
-                  {r.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          {/* Payment proof */}
-          <div className="border-t pt-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
-              Payment Proof
-            </p>
-            {cheque.receiptUrl ? (
-              <div className="space-y-2">
-                {isImageProof && (
-                  <img
-                    src={cheque.receiptUrl}
-                    alt="Payment proof"
-                    className="w-full max-h-64 object-contain rounded-lg border bg-gray-50"
-                  />
-                )}
-                <a
-                  href={cheque.receiptUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:underline"
-                >
-                  <FileText className="h-4 w-4" /> View Payment Proof
-                </a>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">No payment proof uploaded.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Add Cheque Modal ─────────────────────────────────────────────────────────
 function AddChequeModal({
@@ -188,18 +56,21 @@ function AddChequeModal({
     partyName: '',
     amount: '',
     dueDate: '',
+    chequeDate: new Date().toISOString().slice(0, 10),
     issueDate: '',
     type: defaultType,
     description: '',
     accountId: '',
   });
+  const isReceived = form.type === 'RECEIVED';
 
   const mut = useMutation({
     mutationFn: () =>
       createCheque({
         ...form,
         amount: Number(form.amount),
-        issueDate: form.issueDate || undefined,
+        chequeDate: isReceived ? form.chequeDate || undefined : undefined,
+        issueDate: !isReceived ? form.issueDate || undefined : undefined,
         description: form.description || undefined,
         accountId: form.accountId || undefined,
         bankName: form.bankName || undefined,
@@ -231,6 +102,7 @@ function AddChequeModal({
             if (!form.partyName.trim()) return toast.error('Party name required');
             if (!form.amount || Number(form.amount) <= 0) return toast.error('Amount must be > 0');
             if (!form.dueDate) return toast.error('Due date required');
+            if (isReceived && !form.chequeDate) return toast.error('Cheque date required');
             mut.mutate();
           }}
           className="p-6 space-y-4"
@@ -302,11 +174,19 @@ function AddChequeModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-600">Issue Date</label>
+              <label className="text-xs font-medium text-gray-600">
+                {isReceived ? (
+                  <>
+                    Cheque Date * <span className="font-normal">(date on the cheque)</span>
+                  </>
+                ) : (
+                  'Issue Date'
+                )}
+              </label>
               <input
                 type="date"
-                value={form.issueDate}
-                onChange={(e) => set('issueDate', e.target.value)}
+                value={isReceived ? form.chequeDate : form.issueDate}
+                onChange={(e) => set(isReceived ? 'chequeDate' : 'issueDate', e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -381,7 +261,7 @@ function ChequeActionModal({
     if (action === 'deposit')
       return depositCheque(cheque.id, { accountId, depositDate: date, notes });
     if (action === 'issue') return issueCheque(cheque.id, { accountId, issueDate: date, notes });
-    if (action === 'clear') return clearCheque(cheque.id, { notes });
+    if (action === 'clear') return clearCheque(cheque.id, { notes, clearedDate: date });
     if (action === 'bounce') return bounceCheque(cheque.id, { notes });
     return cancelCheque(cheque.id, { notes });
   };
@@ -399,7 +279,7 @@ function ChequeActionModal({
   });
 
   const needsAccount = action === 'deposit' || action === 'issue';
-  const needsDate = action === 'deposit' || action === 'issue';
+  const needsDate = action === 'deposit' || action === 'issue' || action === 'clear';
 
   const requiresReason = action === 'bounce' || action === 'cancel';
 
@@ -482,7 +362,9 @@ function ChequeActionModal({
           )}
           {needsDate && (
             <div>
-              <label className="text-xs font-medium text-gray-600">Transaction Date</label>
+              <label className="text-xs font-medium text-gray-600">
+                {action === 'clear' ? 'Cleared / Cash Received Date' : 'Transaction Date'}
+              </label>
               <input
                 type="date"
                 value={date}
@@ -692,13 +574,20 @@ function ChequeTable({
       <table className="w-full text-sm">
         <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
           <tr>
-            {['Cheque #', 'Party / Bank', 'Amount', 'Due Date', 'Source', 'Status', 'Actions'].map(
-              (h) => (
-                <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
-                  {h}
-                </th>
-              ),
-            )}
+            {[
+              'Cheque #',
+              'Party / Bank',
+              'Amount',
+              'Cheque Date',
+              'Due Date',
+              'Source',
+              'Status',
+              'Actions',
+            ].map((h) => (
+              <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -714,6 +603,15 @@ function ChequeTable({
               </td>
               <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                 {formatCurrency(c.amount, currency)}
+              </td>
+              <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                {c.type === 'RECEIVED'
+                  ? c.chequeDate
+                    ? String(c.chequeDate).slice(0, 10)
+                    : '—'
+                  : c.issueDate
+                    ? String(c.issueDate).slice(0, 10)
+                    : '—'}
               </td>
               <td
                 className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
@@ -743,6 +641,14 @@ function ChequeTable({
                   {STATUS_ICON[c.status]}
                   {c.status}
                 </span>
+                {(c.status === 'BOUNCED' || c.status === 'CANCELLED') && c.reason && (
+                  <span
+                    className="ml-1 inline-block cursor-help text-gray-400 hover:text-gray-600"
+                    title={c.reason}
+                  >
+                    ⓘ
+                  </span>
+                )}
               </td>
               <td className="px-4 py-3">
                 <ActionButtons cheque={c} onAction={onAction} onView={onView} />
@@ -768,6 +674,21 @@ export default function ChequesPage() {
     null,
   );
   const [viewCheque, setViewCheque] = useState<Cheque | null>(null);
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranchInfo = branches.find((b) => b.id === currentUser?.branchId) ?? branches[0];
+  const branchInfo = {
+    name: activeBranchInfo?.name ?? 'XeroCare',
+    address: activeBranchInfo?.address,
+    tax_registration_number: activeBranchInfo?.tax_registration_number,
+    country: activeBranchInfo?.country,
+  };
 
   const params = useMemo(() => {
     const p: Record<string, string> = { type: activeTab === 'received' ? 'RECEIVED' : 'ISSUED' };
@@ -812,6 +733,34 @@ export default function ChequesPage() {
       ? ['PENDING', 'DEPOSITED', 'CLEARED', 'BOUNCED', 'CANCELLED']
       : ['PENDING', 'ISSUED', 'CLEARED', 'BOUNCED', 'CANCELLED'];
 
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: activeTab === 'received' ? 'Cheques from Customers' : 'Cheques to Vendors',
+    filters: {
+      Search: search || undefined,
+      Status: statusFilter !== 'ALL' ? statusFilter : undefined,
+      'Due From': dateFrom || undefined,
+      'Due To': dateTo || undefined,
+    },
+    sections: [
+      {
+        title: 'Cheques',
+        rows: cheques.map((c) => ({
+          code: String(c.dueDate).slice(0, 10),
+          label: `#${c.chequeNo} — ${c.partyName}${c.bankName ? ` (${c.bankName})` : ''} — ${c.status}`,
+          value: formatCurrency(c.amount, currency),
+        })),
+        total: {
+          label: 'Total',
+          value: formatCurrency(
+            cheques.reduce((s, c) => s + Number(c.amount), 0),
+            currency,
+          ),
+        },
+      },
+    ],
+  };
+
   return (
     <div className="bg-blue-50/30 min-h-full p-6 space-y-6">
       {/* Header */}
@@ -835,16 +784,12 @@ export default function ChequesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportPdfButton
-            targetId={activeTab === 'received' ? 'cheques-received-pdf' : 'cheques-issued-pdf'}
-            reportTitle={activeTab === 'received' ? 'Cheques from Customers' : 'Cheques to Vendors'}
-            filters={{
-              Search: search,
-              Status: statusFilter !== 'ALL' ? statusFilter : undefined,
-              'Due From': dateFrom,
-              'Due To': dateTo,
-            }}
-          />
+          <button
+            onClick={() => setShowStatement(true)}
+            className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          >
+            <FileText className="h-4 w-4" /> Generate Statement
+          </button>
           <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 shadow-sm"
@@ -888,10 +833,7 @@ export default function ChequesPage() {
         ))}
       </div>
 
-      <div
-        id={activeTab === 'received' ? 'cheques-received-pdf' : 'cheques-issued-pdf'}
-        className="space-y-6"
-      >
+      <div className="space-y-6">
         {/* Stats */}
         <StatsRow
           summary={tabSummary}
@@ -974,6 +916,14 @@ export default function ChequesPage() {
           cheque={viewCheque}
           currency={currency}
           onClose={() => setViewCheque(null)}
+        />
+      )}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
         />
       )}
     </div>

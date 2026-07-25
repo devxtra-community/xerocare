@@ -825,16 +825,25 @@ export function startReminderCronJobs() {
   cron.schedule('0 9 * * *', () => {
     chequeDueReminderJob();
   });
+
+  // 5. Cheque Date Reminder (Daily): Run at 9:00 AM daily
+  cron.schedule('0 9 * * *', () => {
+    chequeDateReminderJob();
+  });
 }
 
 /**
- * Daily: notifies the branch manager 2 days before a not-yet-cleared cheque's due
+ * Daily: notifies Finance (per-branch) 2 days before a not-yet-cleared cheque's due
  * date — both Received (from customers) and Issued (to vendors). Fires via the shared
  * in-app notification system (NotificationPublisher → domain_events → employee_service),
  * the same path ChequeNotificationBell's live "due soon" list already reads from, so
  * this doesn't create a second, disconnected notification mechanism. Naturally
  * idempotent: a cheque's dueDate matches "today + 2 days" on exactly one calendar day,
  * so re-running this job daily can't double-notify the same cheque.
+ *
+ * Fires unconditionally, including when chequeDate equals dueDate (non-post-dated
+ * cheque) — chequeDateReminderJob is the one that skips that overlap, so the pair
+ * collapses into exactly this one notification rather than either zero or two.
  */
 export async function chequeDueReminderJob() {
   logger.info('[CRON] Running Cheque Due Reminder Job...');
@@ -846,6 +855,10 @@ export async function chequeDueReminderJob() {
     target.setDate(target.getDate() + 2);
     const targetDateStr = target.toISOString().split('T')[0];
 
+    // Always fires unconditionally on the Due Date's own -2-day mark — including when
+    // chequeDate equals dueDate (non-post-dated cheque). The dedupe for that overlap
+    // lives on chequeDateReminderJob instead (it skips same-day cheques), so exactly
+    // one of the two jobs notifies on the shared day rather than neither or both.
     const dueCheques = await chequeRepo
       .createQueryBuilder('c')
       .where('c.status IN (:...statuses)', { statuses: ['PENDING', 'DEPOSITED', 'ISSUED'] })
@@ -855,21 +868,104 @@ export async function chequeDueReminderJob() {
     logger.info(`[CRON] Found ${dueCheques.length} cheque(s) due in 2 days.`);
 
     for (const cheque of dueCheques) {
-      const managerId = await getBranchManagerId(cheque.branchId);
-      if (!managerId) continue;
+      const financeIds = await getBranchFinanceIds(cheque.branchId);
+      if (financeIds.length === 0) continue;
 
       const direction = cheque.type === 'ISSUED' ? 'issued to' : 'received from';
-      await NotificationPublisher.publishInAppRequest({
-        recipientId: managerId,
-        title: 'Cheque Due in 2 Days',
-        message: `Cheque #${cheque.chequeNo} (${direction} ${cheque.partyName}, ${Number(cheque.amount).toFixed(2)}) is due on ${targetDateStr} — ${cheque.type === 'ISSUED' ? 'ensure funds are available to clear it' : 'deposit it if you haven’t already'}.`,
-        type: 'INFO',
-        referenceId: cheque.id,
-        referenceType: 'CHEQUE',
-      });
+      for (const recipientId of financeIds) {
+        await sendChequeReminderNotification(
+          recipientId,
+          'Cheque Due in 2 Days',
+          `Cheque #${cheque.chequeNo} (${direction} ${cheque.partyName}, ${Number(cheque.amount).toFixed(2)}) is due on ${targetDateStr} — ${cheque.type === 'ISSUED' ? 'ensure funds are available to clear it' : 'deposit it if you haven’t already'}.`,
+          cheque.id,
+        );
+      }
     }
   } catch (err) {
     logger.error('[CRON] Cheque Due Reminder Job failed:', err);
+  }
+}
+
+/**
+ * Daily: notifies Finance (per-branch) 2 days before a RECEIVED cheque's own Cheque
+ * Date — the date it becomes valid/eligible to be taken to the bank. A post-dated
+ * cheque (chequeDate later than the date it was physically received) isn't presentable
+ * until its Cheque Date arrives, so this is a distinct concern from the Due Date
+ * reminder above. Only fires for cheques not yet Deposited (status = PENDING) — once
+ * deposited, it's no longer waiting to be taken to the bank, so this stops on its own
+ * without any extra "already notified" bookkeeping.
+ *
+ * Skips cheques whose chequeDate equals dueDate — those are covered by
+ * chequeDueReminderJob firing on the very same day, avoiding a duplicate pair.
+ */
+export async function chequeDateReminderJob() {
+  logger.info('[CRON] Running Cheque Date Reminder Job...');
+  try {
+    const { Cheque } = await import('../entities/chequeEntity');
+    const chequeRepo = Source.getRepository(Cheque);
+
+    const target = new Date();
+    target.setDate(target.getDate() + 2);
+    const targetDateStr = target.toISOString().split('T')[0];
+
+    const chequesBecomingValid = await chequeRepo
+      .createQueryBuilder('c')
+      .where('c.type = :type', { type: 'RECEIVED' })
+      .andWhere('c.status = :status', { status: 'PENDING' })
+      .andWhere('c.chequeDate IS NOT NULL')
+      .andWhere('CAST(c.chequeDate AS DATE) = :targetDate', { targetDate: targetDateStr })
+      .andWhere('CAST(c.chequeDate AS DATE) != CAST(c.dueDate AS DATE)')
+      .getMany();
+
+    logger.info(`[CRON] Found ${chequesBecomingValid.length} cheque(s) becoming valid in 2 days.`);
+
+    for (const cheque of chequesBecomingValid) {
+      const financeIds = await getBranchFinanceIds(cheque.branchId);
+      if (financeIds.length === 0) continue;
+
+      for (const recipientId of financeIds) {
+        await sendChequeReminderNotification(
+          recipientId,
+          'Post-Dated Cheque Becomes Valid in 2 Days',
+          `Cheque #${cheque.chequeNo} received from ${cheque.partyName} (${Number(cheque.amount).toFixed(2)}) is dated ${targetDateStr} — it will be presentable at the bank from that date.`,
+          cheque.id,
+        );
+      }
+    }
+  } catch (err) {
+    logger.error('[CRON] Cheque Date Reminder Job failed:', err);
+  }
+}
+
+/**
+ * Delivers an in-app notification via the direct internal HTTP endpoint (the same
+ * one chequesRoutes.ts's own sendNotification() uses for Deposited/Bounced alerts) —
+ * NOT the RabbitMQ NotificationPublisher path, which has no consumer on the
+ * employee_service side and silently never delivers anything despite publishing
+ * without error. This is the one proven-working path into the Finance notifications
+ * page (GET /e/notifications/my), so cheque reminders route through it too.
+ */
+async function sendChequeReminderNotification(
+  employeeId: string,
+  title: string,
+  message: string,
+  chequeId: string,
+) {
+  try {
+    const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    await fetch(`${employeeServiceUrl}/notifications/internal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-service': 'billing' },
+      body: JSON.stringify({
+        employee_id: employeeId,
+        title,
+        message,
+        type: 'INFO',
+        data: { referenceId: chequeId, referenceType: 'CHEQUE' },
+      }),
+    });
+  } catch (err) {
+    logger.warn('[CRON] Cheque reminder notification send failed (non-fatal):', err);
   }
 }
 
@@ -893,6 +989,35 @@ async function getBranchManagerId(branchId: string): Promise<string | null> {
   } catch (err) {
     logger.error('[CRON] Error resolving branch manager for target finalization:', err);
     return null;
+  }
+}
+
+/**
+ * All FINANCE-role employees for a branch — cheques are a Finance-owned module (the
+ * Cheques page, Deposit/Clear/Bounce actions all require FINANCE access), so cheque
+ * reminders must land on the Finance notifications page, not the branch Manager's.
+ */
+async function getBranchFinanceIds(branchId: string): Promise<string[]> {
+  try {
+    const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+    const response = await fetch(`${employeeServiceUrl}/employee?role=FINANCE&limit=100`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    const json = await response.json();
+    const employees = json?.data?.employees || [];
+    return employees
+      .filter((emp: { branch_id?: string }) => emp.branch_id === branchId)
+      .map((emp: { id: string }) => emp.id);
+  } catch (err) {
+    logger.error('[CRON] Error resolving branch Finance employees for cheque reminders:', err);
+    return [];
   }
 }
 

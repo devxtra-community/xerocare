@@ -3,6 +3,7 @@ import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
 import { Product } from '../entities/productEntity';
 import { SparePart } from '../entities/sparePartEntity';
+import { deleteCached } from '../utils/cacheUtil';
 
 export class InventoryReturnService {
   /**
@@ -20,6 +21,7 @@ export class InventoryReturnService {
       }
       product.product_status = ProductStatus.AVAILABLE;
       await productRepo.save(product);
+      await deleteCached(`product:${itemId}`);
       return { success: true, message: 'Product returned and marked as fully available.' };
     } else if (itemType === 'SPARE_PART') {
       const sparePartRepo = Source.getRepository(SparePart);
@@ -29,6 +31,7 @@ export class InventoryReturnService {
       }
       sparePart.quantity += quantity;
       await sparePartRepo.save(sparePart);
+      await deleteCached(`sparepart:${itemId}`);
       return { success: true, message: 'Spare part quantity incremented successfully.' };
     } else {
       throw new AppError('Invalid itemType provided', 400);

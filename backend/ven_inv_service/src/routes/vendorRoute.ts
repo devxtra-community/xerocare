@@ -39,7 +39,7 @@ router.post(
 router.get(
   '/',
   authMiddleware,
-  roleMiddleware(['ADMIN', 'HR', 'MANAGER']),
+  roleMiddleware(['ADMIN', 'HR', 'MANAGER', 'FINANCE']),
   vendorController.getVendors,
 );
 

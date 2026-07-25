@@ -3,14 +3,32 @@
 import React, { Suspense, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Search, Download } from 'lucide-react';
-import { fetchManualPayables, fetchPayableCharts } from '@/lib/finance/accountsApi';
+import { Search, Eye, FileText } from 'lucide-react';
+import {
+  fetchManualPayables,
+  fetchPayableCharts,
+  fetchVendorStatement,
+} from '@/lib/finance/accountsApi';
+import { fetchPurchases, agingBucket, fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { getUserFromToken } from '@/lib/auth';
 import StatCard from '@/components/StatCard';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
-import * as XLSX from 'xlsx';
+import { PayableDetailModal } from '@/components/accounts/ReceivablePayableDetail';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from 'sonner';
+import StatementDialog, {
+  type RunningBalanceStatementData,
+} from '@/components/shared/StatementDialog';
 
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700',
@@ -20,18 +38,101 @@ const AGING_COLORS: Record<string, string> = {
   '90+ days': 'bg-red-200 text-red-800',
 };
 
+function SelectVendorModal({
+  vendors,
+  onClose,
+  onSelect,
+}: {
+  vendors: string[];
+  onClose: () => void;
+  onSelect: (vendorName: string) => void;
+}) {
+  const [chosen, setChosen] = useState('');
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h2 className="font-bold text-gray-900">Select Vendor</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ×
+          </button>
+        </div>
+        <div className="px-6 py-4 space-y-3">
+          <p className="text-sm text-gray-500">
+            A Vendor Statement of Account needs a specific vendor — choose who this statement is
+            for.
+          </p>
+          <Select value={chosen} onValueChange={setChosen}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Choose a vendor" />
+            </SelectTrigger>
+            <SelectContent>
+              {vendors.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button onClick={() => chosen && onSelect(chosen)} disabled={!chosen} className="flex-1">
+            Generate Statement
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PayableContent() {
   const currency = useBranchCurrency();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
+  const branchIdList = useMemo(
+    () => (branchIds ? branchIds.split(',').filter(Boolean) : []),
+    [branchIds],
+  );
   const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('ALL');
+  const [viewingRow, setViewingRow] = useState<{ type: 'PO' | 'MANUAL'; id: string } | null>(null);
+  const [showVendorPicker, setShowVendorPicker] = useState(false);
+  const [statementData, setStatementData] = useState<RunningBalanceStatementData | null>(null);
+  const [generatingStatement, setGeneratingStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = useMemo(() => {
+    if (branchIds && !branchIds.includes(',')) return branches.find((b) => b.id === branchIds);
+    if (currentUser?.branchId) return branches.find((b) => b.id === currentUser.branchId);
+    return branches[0];
+  }, [branches, branchIds, currentUser?.branchId]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const params: Record<string, string> = {};
   if (branchIds) params.branchIds = branchIds;
 
-  const { data: payables = [], isLoading } = useQuery({
+  const { data: manualPayables = [], isLoading } = useQuery({
     queryKey: ['admin-payables', branchIds],
     queryFn: () => fetchManualPayables(params),
+  });
+  // PO-based payables — ven_inv_service's list endpoint doesn't support multi-branch
+  // filtering server-side for ADMIN, so branchIds is applied client-side below.
+  const { data: purchases = [] } = useQuery({
+    queryKey: ['admin-purchases-ap'],
+    queryFn: () => fetchPurchases(),
   });
   const { data: charts } = useQuery({
     queryKey: ['admin-pay-charts', branchIds],
@@ -43,36 +144,95 @@ function PayableContent() {
       }>,
   });
 
+  // Manual payables linked to a PO are excluded — that PO's own outstanding
+  // balance already covers it (mirrors the Finance page's guard).
+  const combined = useMemo(() => {
+    const fromPurchases = purchases
+      .filter((p) => branchIdList.length === 0 || branchIdList.includes(p.branchId))
+      .filter((p) => (p.remainingAmount ?? p.totalAmount ?? 0) > 0)
+      .map((p) => ({
+        id: p.id,
+        referenceNo: `PO-${p.id?.slice(0, 8)}`,
+        payableTo: p.vendor?.name ?? '',
+        type: 'VENDOR_INVOICE',
+        amount: p.totalAmount ?? 0,
+        outstanding: Number(p.remainingAmount ?? p.totalAmount ?? 0),
+        aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
+        status: p.status ?? 'PENDING',
+        source: 'Purchase Order' as const,
+        isPurchase: true,
+      }));
+    const fromManual = manualPayables
+      .filter((p) => !p.linkedPurchaseId)
+      .map((p) => ({
+        id: p.id,
+        referenceNo: p.referenceNo,
+        payableTo: p.payableTo,
+        type: p.type,
+        amount: p.amount,
+        outstanding: p.outstanding,
+        aging: p.aging,
+        status: p.status,
+        source: 'Manual Entry' as const,
+        isPurchase: false,
+      }));
+    return [...fromPurchases, ...fromManual];
+  }, [purchases, manualPayables, branchIdList]);
+
   const filtered = useMemo(
     () =>
-      payables.filter(
-        (p) =>
+      combined.filter((p) => {
+        const matchSource = sourceFilter === 'ALL' || p.source === sourceFilter;
+        const matchSearch =
           !search ||
           p.payableTo?.toLowerCase().includes(search.toLowerCase()) ||
-          p.referenceNo?.toLowerCase().includes(search.toLowerCase()),
-      ),
-    [payables, search],
+          p.referenceNo?.toLowerCase().includes(search.toLowerCase());
+        return matchSource && matchSearch;
+      }),
+    [combined, sourceFilter, search],
   );
 
-  const totalOutstanding = payables.reduce((s, p) => s + Number(p.outstanding), 0);
-  const overdue = payables
+  const totalOutstanding = combined.reduce((s, p) => s + Number(p.outstanding), 0);
+  const overdue = combined
     .filter((p) => p.aging && p.aging !== 'Current')
     .reduce((s, p) => s + Number(p.outstanding), 0);
 
-  const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      filtered.map((p) => ({
-        Ref: p.referenceNo,
-        'Payable To': p.payableTo,
-        Amount: p.amount,
-        Outstanding: p.outstanding,
-        Aging: p.aging,
-        Status: p.status,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Payables');
-    XLSX.writeFile(wb, 'consolidated_payables.xlsx');
+  const vendorNames = useMemo(
+    () => [...new Set(combined.map((p) => p.payableTo))].filter(Boolean).sort() as string[],
+    [combined],
+  );
+
+  const generateVendorStatement = async (vendorName: string) => {
+    setShowVendorPicker(false);
+    setGeneratingStatement(true);
+    try {
+      const stmt = await fetchVendorStatement({ vendorName, branchIds: branchIds || undefined });
+      setStatementData({
+        kind: 'running-balance',
+        title: 'Vendor Statement of Account',
+        subjectName: stmt.vendorName,
+        periodFrom: stmt.periodFrom,
+        periodTo: stmt.periodTo,
+        currency: stmt.currency,
+        openingBalance: stmt.openingBalance,
+        closingBalance: stmt.closingBalance,
+        rows: stmt.rows,
+        balanceLabel: 'Closing Balance (Amount We Owe)',
+      });
+    } catch {
+      toast.error('Failed to generate statement');
+    } finally {
+      setGeneratingStatement(false);
+    }
+  };
+
+  const handleGenerateStatementClick = () => {
+    const uniqueVisible = [...new Set(filtered.map((p) => p.payableTo))].filter(Boolean);
+    if (uniqueVisible.length === 1) {
+      generateVendorStatement(uniqueVisible[0] as string);
+      return;
+    }
+    setShowVendorPicker(true);
   };
 
   return (
@@ -83,10 +243,12 @@ function PayableContent() {
           <p className="text-sm text-gray-500">All branches</p>
         </div>
         <button
-          onClick={exportExcel}
-          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50"
+          onClick={handleGenerateStatementClick}
+          disabled={generatingStatement}
+          className="flex items-center gap-1.5 text-sm border rounded-lg px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-50"
         >
-          <Download className="h-4 w-4" /> Export
+          <FileText className="h-4 w-4" />{' '}
+          {generatingStatement ? 'Generating…' : 'Generate Statement'}
         </button>
       </div>
 
@@ -99,7 +261,7 @@ function PayableContent() {
           subtitle="All branches"
         />
         <StatCard title="Overdue" value={formatCurrency(overdue, currency)} subtitle="Past due" />
-        <StatCard title="Total Entries" value={payables.length.toString()} subtitle="Records" />
+        <StatCard title="Total Entries" value={combined.length.toString()} subtitle="Records" />
         <StatCard title="Shown" value={filtered.length.toString()} subtitle="Filtered" />
       </div>
 
@@ -131,8 +293,8 @@ function PayableContent() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="flex items-center gap-3 p-4 border-b">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-3 p-4 border-b flex-wrap">
+          <div className="relative flex-1 min-w-50">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               value={search}
@@ -141,6 +303,15 @@ function PayableContent() {
               className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          <select
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            className="text-sm border rounded-lg px-3 py-2 bg-white"
+          >
+            <option value="ALL">All Sources</option>
+            <option value="Purchase Order">Purchase Order</option>
+            <option value="Manual Entry">Manual Entry</option>
+          </select>
         </div>
         {isLoading ? (
           <div className="p-8 text-center text-gray-400">Loading…</div>
@@ -152,11 +323,13 @@ function PayableContent() {
                   {[
                     'Reference',
                     'Payable To',
+                    'Source',
                     'Type',
                     'Amount',
                     'Outstanding',
                     'Aging',
                     'Status',
+                    '',
                   ].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium">
                       {h}
@@ -167,7 +340,7 @@ function PayableContent() {
               <tbody className="divide-y">
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-400">
+                    <td colSpan={9} className="text-center py-8 text-gray-400">
                       No payables found
                     </td>
                   </tr>
@@ -176,6 +349,17 @@ function PayableContent() {
                     <tr key={p.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.referenceNo}</td>
                       <td className="px-4 py-3">{p.payableTo}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            p.source === 'Purchase Order'
+                              ? 'bg-indigo-100 text-indigo-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {p.source}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-500">
                         {p.type?.replace(/_/g, ' ')}
                       </td>
@@ -191,6 +375,17 @@ function PayableContent() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500">{p.status}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() =>
+                            setViewingRow({ type: p.isPurchase ? 'PO' : 'MANUAL', id: p.id })
+                          }
+                          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                          title="View full details"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -199,6 +394,28 @@ function PayableContent() {
           </div>
         )}
       </div>
+      {viewingRow && (
+        <PayableDetailModal
+          sourceType={viewingRow.type}
+          id={viewingRow.id}
+          onClose={() => setViewingRow(null)}
+        />
+      )}
+      {showVendorPicker && (
+        <SelectVendorModal
+          vendors={vendorNames}
+          onClose={() => setShowVendorPicker(false)}
+          onSelect={generateVendorStatement}
+        />
+      )}
+      {statementData && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setStatementData(null)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }

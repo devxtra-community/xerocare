@@ -9,6 +9,31 @@ import { calculateDepreciation } from './depreciation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// A custom (non-system) chart-of-accounts row with its live computed balance —
+// folded into the relevant total, and also returned individually so callers can
+// render it nested under its parent account.
+export interface CustomAccountBalance {
+  id: string;
+  accountNumber: string;
+  accountName: string;
+  accountGroup: string;
+  parentAccountId: string | null;
+  sourceType: string;
+  amount: number;
+}
+
+interface RawChartOfAccountRow {
+  id: string;
+  accountNumber: string;
+  accountName: string;
+  category: string;
+  accountGroup: string;
+  parentAccountId: string | null;
+  sourceType: string;
+  categoryKey: string | null;
+  linkedCashBankAccountId: string | null;
+}
+
 export interface PnLResult {
   // Revenue accounts 4001-4007
   rentalRevenue: number;
@@ -36,7 +61,13 @@ export interface PnLResult {
   otherExpenses: number;
   importLabourCost: number; // 5014: purchase-side labour_cost (e.g. import/customs-clearance) — distinct from 5002
   customsDuty: number; // 5015: purchases.customs_duty, expensed directly (not capitalized into inventory)
+  otherIncome: number; // 4008 catch-all: income_entries rows not yet linked to a custom account
   totalExpenses: number;
+
+  // Custom (non-system) chart-of-accounts rows — already folded into totalRevenue/
+  // totalExpenses above, returned individually for nested display.
+  customIncome: CustomAccountBalance[];
+  customExpenses: CustomAccountBalance[];
 
   grossProfit: number;
   netProfit: number;
@@ -72,9 +103,10 @@ export interface BalanceSheetResult {
   // Current Liabilities
   accountsPayable: number;
   accruedExpenses: number; // APPROVED-but-not-PAID expense entries
-  vatPayable: number; // output VAT collected minus remitted
+  vatPayable: number; // output VAT collected − input VAT credit − remitted; can be negative (net recoverable)
   securityDepositsReceived: number;
   deferredRevenue: number;
+  deferredRevenueMemo: number; // informational only — see computeBalanceSheet for why
   salaryPayable: number;
 
   // Equity
@@ -83,6 +115,12 @@ export interface BalanceSheetResult {
   reserves: number;
   dividends: number;
   withdrawals: number;
+
+  // Custom (non-system) chart-of-accounts rows — already folded into the totals
+  // below, returned individually for nested display.
+  customAssets: CustomAccountBalance[];
+  customLiabilities: CustomAccountBalance[];
+  customEquity: CustomAccountBalance[];
 
   totalCurrentAssets: number;
   totalNonCurrentAssets: number;
@@ -227,6 +265,10 @@ export async function computeProfitAndLoss(
   const bSqlAllExp = branchSql('ex', '"branchId"', bParam);
   const bSqlAllDep = branchSql('dj', '"branchId"', bParam);
   const bSqlCn = branchSql('cn', '"branchId"', bParam);
+  const bSqlInc = branchSql('inc', '"branchId"', bParam);
+  const bSqlAllInc = branchSql('allinc', '"branchId"', bParam);
+  const bSqlMj = branchSql('mj', '"branchId"', bParam);
+  const bSqlAllMj = branchSql('allmj', '"branchId"', bParam);
 
   const rates = await loadExchangeRates(db, baseCurrency);
 
@@ -250,6 +292,11 @@ export async function computeProfitAndLoss(
     allTimeExpAmount,
     allTimeDepAmount,
     creditNoteRows,
+    incRows,
+    allTimeIncAmount,
+    customAccountsPL,
+    mjRows,
+    allTimeMjAmount,
   ] = await Promise.all([
     // 4001 Rental Revenue — RENT contracts reuse a single invoice across their whole
     // lifecycle, so revenue can't be read from invoice.totalAmount filtered by
@@ -392,12 +439,19 @@ export async function computeProfitAndLoss(
     // postDepreciationJournal() writes a mirror expense_entries row (for audit-trail
     // visibility in the expense list) alongside the dedicated depreciation_journal_entries
     // row that 5003 already reads below — counting both here would double the expense.
+    // Prepayments (1005 Prepaid Expenses) recognize in the period their covered period
+    // ENDS, not when paid — matches computeBalanceSheet's prepaidExpenses (an unexpired
+    // prepayment is an asset, zero P&L impact; once it expires it becomes a real expense
+    // in that period) so the two stay balanced at every point in time, not just at signing.
     db.query<{ category: string; amount: string }[]>(`
       SELECT category, COALESCE(SUM("netAmount"), 0) AS amount
       FROM expense_entries e
       WHERE status IN ('APPROVED', 'PAID')
         AND category != 'DEPRECIATION'
-        AND date BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND (
+          (NOT "isPrepayment" AND date BETWEEN '${dateFrom}' AND '${dateTo}')
+          OR ("isPrepayment" AND COALESCE("coveredPeriodEnd", date) BETWEEN '${dateFrom}' AND '${dateTo}')
+        )
         ${bSqlExp}
       GROUP BY category
     `),
@@ -486,6 +540,44 @@ export async function computeProfitAndLoss(
         AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
         ${bSqlCn}
     `),
+    // Custom income (income_entries), by category — period-filtered, RECEIVED only.
+    // Mirrors the expense_entries query above exactly (same no-currency-conversion
+    // precedent — entries are assumed to already be in the branch's own currency).
+    db.query<{ category: string; amount: string }[]>(`
+      SELECT category, COALESCE(SUM("netAmount"), 0) AS amount
+      FROM income_entries inc
+      WHERE status = 'RECEIVED'
+        AND date BETWEEN '${dateFrom}' AND '${dateTo}'
+        ${bSqlInc}
+      GROUP BY category
+    `),
+    // All-time custom income — for retained earnings
+    db.query<{ amount: string }[]>(`
+      SELECT COALESCE(SUM("netAmount"), 0) AS amount
+      FROM income_entries allinc
+      WHERE status = 'RECEIVED' ${bSqlAllInc}
+    `),
+    // Custom (non-system) INCOME/EXPENSE chart-of-accounts rows — company-wide definitions
+    db.query<RawChartOfAccountRow[]>(`
+      SELECT id, "accountNumber", "accountName", category, "accountGroup",
+             "parentAccountId", "sourceType", "categoryKey", "linkedCashBankAccountId"
+      FROM chart_of_accounts
+      WHERE "isActive" = true AND "isSystemDefault" = false AND category IN ('INCOME', 'EXPENSE')
+    `),
+    // Manual-journal postings against custom INCOME/EXPENSE accounts — period-filtered
+    db.query<{ chartOfAccountId: string; amount: string }[]>(`
+      SELECT "chartOfAccountId", COALESCE(SUM(amount), 0) AS amount
+      FROM manual_journal_entries mj
+      WHERE date BETWEEN '${dateFrom}' AND '${dateTo}' ${bSqlMj}
+      GROUP BY "chartOfAccountId"
+    `),
+    // All-time manual-journal postings against custom INCOME/EXPENSE accounts — for retained earnings
+    db.query<{ chartOfAccountId: string; amount: string }[]>(`
+      SELECT "chartOfAccountId", COALESCE(SUM(amount), 0) AS amount
+      FROM manual_journal_entries allmj
+      WHERE 1=1 ${bSqlAllMj}
+      GROUP BY "chartOfAccountId"
+    `),
   ]);
 
   // Convert revenues with currency handling
@@ -504,6 +596,17 @@ export async function computeProfitAndLoss(
   const expMap: Record<string, number> = {};
   for (const row of expRows) {
     expMap[row.category] = Number(row.amount);
+  }
+
+  // Income categories from income_entries (a wholly separate, additive revenue
+  // source — never overlaps with the invoice-derived revenue lines above).
+  const incMap: Record<string, number> = {};
+  for (const row of incRows) {
+    incMap[row.category] = Number(row.amount);
+  }
+  const mjByAccount: Record<string, number> = {};
+  for (const row of mjRows) {
+    mjByAccount[row.chartOfAccountId] = Number(row.amount);
   }
 
   const depreciationExpense = Number(depAmount[0]?.amount ?? 0);
@@ -600,9 +703,71 @@ export async function computeProfitAndLoss(
     'CUSTOMS_DUTY',
     'OTHER',
   ]);
+
+  // ── Custom (non-system) INCOME/EXPENSE chart-of-accounts rows ─────────────────
+  // EXPENSE_CATEGORY_LINKED accounts pull straight from expMap — this is a
+  // re-bucketing of the SAME expense_entries total (moving a key out of the
+  // "otherExpenses" catch-all into its own named line), not an addition, so
+  // totalExpenses cannot double-count. MANUAL_JOURNAL accounts post to a
+  // separate table entirely, so their contribution is genuinely additive.
+  // INCOME_CATEGORY_LINKED/MANUAL_JOURNAL income accounts are always additive —
+  // income_entries has no other line item reading from it anywhere above.
+  const customExpenseBreakdown: CustomAccountBalance[] = [];
+  const customIncomeBreakdown: CustomAccountBalance[] = [];
+  const customExpenseCategoryKeys = new Set<string>();
+  const linkedIncomeCategoryKeys = new Set<string>();
+  let customExpenseTotal = 0;
+  let customIncomeTotal = 0;
+  for (const acc of customAccountsPL) {
+    let amount = 0;
+    if (acc.category === 'EXPENSE') {
+      if (acc.sourceType === 'EXPENSE_CATEGORY_LINKED' && acc.categoryKey) {
+        amount = expMap[acc.categoryKey] ?? 0;
+        customExpenseCategoryKeys.add(acc.categoryKey);
+      } else if (acc.sourceType === 'MANUAL_JOURNAL') {
+        amount = mjByAccount[acc.id] ?? 0;
+      }
+      customExpenseBreakdown.push({
+        id: acc.id,
+        accountNumber: acc.accountNumber,
+        accountName: acc.accountName,
+        accountGroup: acc.accountGroup,
+        parentAccountId: acc.parentAccountId,
+        sourceType: acc.sourceType,
+        amount,
+      });
+      customExpenseTotal += amount;
+    } else if (acc.category === 'INCOME') {
+      if (acc.sourceType === 'INCOME_CATEGORY_LINKED' && acc.categoryKey) {
+        amount = incMap[acc.categoryKey] ?? 0;
+        linkedIncomeCategoryKeys.add(acc.categoryKey);
+      } else if (acc.sourceType === 'MANUAL_JOURNAL') {
+        amount = mjByAccount[acc.id] ?? 0;
+      }
+      customIncomeBreakdown.push({
+        id: acc.id,
+        accountNumber: acc.accountNumber,
+        accountName: acc.accountName,
+        accountGroup: acc.accountGroup,
+        parentAccountId: acc.parentAccountId,
+        sourceType: acc.sourceType,
+        amount,
+      });
+      customIncomeTotal += amount;
+    }
+  }
+  for (const key of customExpenseCategoryKeys) KNOWN_CATEGORIES.add(key);
+
   let otherExpenses = expMap['OTHER'] ?? 0;
   for (const [cat, amt] of Object.entries(expMap)) {
     if (!KNOWN_CATEGORIES.has(cat)) otherExpenses += amt;
+  }
+
+  // 4008 Other Income — any income_entries category not yet linked to a custom
+  // account, so real recorded income is never silently dropped from the total.
+  let otherIncome = 0;
+  for (const [cat, amt] of Object.entries(incMap)) {
+    if (!linkedIncomeCategoryKeys.has(cat)) otherIncome += amt;
   }
 
   const totalRevenue =
@@ -612,7 +777,9 @@ export async function computeProfitAndLoss(
     serviceRevenue +
     amcSmaRevenue +
     sparePartSalesRevenue +
-    usageRevenue;
+    usageRevenue +
+    customIncomeTotal +
+    otherIncome;
 
   const totalExpenses =
     costOfParts +
@@ -629,14 +796,30 @@ export async function computeProfitAndLoss(
     insuranceExpense +
     importLabourCost +
     customsDuty +
-    otherExpenses;
+    otherExpenses +
+    customExpenseTotal;
 
   const grossProfit = totalRevenue - costOfParts - labourCost;
   const netProfit = totalRevenue - totalExpenses;
 
-  // All-time totals for retained earnings
-  const allTimeRevenue = aggByCurrency(allTimeRevRows, baseCurrency, rates, currencyWarnings);
-  const allTimeExpenses = Number(allTimeExpAmount[0]?.amount ?? 0);
+  // All-time totals for retained earnings. allTimeExpAmount already sums every
+  // expense_entries row regardless of category, so a custom EXPENSE_CATEGORY_LINKED
+  // account's contribution is already in there (same non-double-count reasoning as
+  // the period totals above) — only MANUAL_JOURNAL postings are genuinely additive.
+  const allTimeCustomIncome = Number(allTimeIncAmount[0]?.amount ?? 0);
+  let allTimeCustomMjIncome = 0;
+  let allTimeCustomMjExpense = 0;
+  for (const row of allTimeMjAmount) {
+    const acc = customAccountsPL.find((a) => a.id === row.chartOfAccountId);
+    if (!acc) continue;
+    if (acc.category === 'INCOME') allTimeCustomMjIncome += Number(row.amount);
+    else if (acc.category === 'EXPENSE') allTimeCustomMjExpense += Number(row.amount);
+  }
+  const allTimeRevenue =
+    aggByCurrency(allTimeRevRows, baseCurrency, rates, currencyWarnings) +
+    allTimeCustomIncome +
+    allTimeCustomMjIncome;
+  const allTimeExpenses = Number(allTimeExpAmount[0]?.amount ?? 0) + allTimeCustomMjExpense;
   const allTimeDepreciation = Number(allTimeDepAmount[0]?.amount ?? 0);
 
   return {
@@ -662,7 +845,10 @@ export async function computeProfitAndLoss(
     insuranceExpense,
     importLabourCost,
     customsDuty,
+    otherIncome,
     otherExpenses,
+    customIncome: customIncomeBreakdown,
+    customExpenses: customExpenseBreakdown,
     totalExpenses,
     grossProfit,
     netProfit,
@@ -677,10 +863,17 @@ export async function computeProfitAndLoss(
 
 // ─── computeBalanceSheet ──────────────────────────────────────────────────────
 
+// Sentinel "beginning of time" start date for the all-time P&L fetch below — this
+// deployment has no real data before it, and it's simpler than tracking the actual
+// earliest transaction date. Exported so any other "all-time" aggregation (e.g. the
+// Retained Earnings monthly drill-down) starts from the exact same point in time as
+// computeBalanceSheet's own all-time retained-earnings calculation.
+export const ALL_TIME_START = '2000-01-01';
+
 export async function computeBalanceSheet(
   db: DataSource,
   branchFilter: string[],
-  _asOfDate: string,
+  asOfDate: string,
   baseCurrency: string,
   invUrl: string,
   pnlAllTime?: { allTimeRevenue: number; allTimeExpenses: number; allTimeDepreciation: number },
@@ -692,6 +885,32 @@ export async function computeBalanceSheet(
   const safeBranches = branchFilter.filter((b) => uuidRe.test(b));
   const bParam = safeBranches.length > 0 ? safeBranches : null;
   const bSql = (alias: string, col = '"branchId"') => branchSql(alias, col, bParam);
+
+  // Retained earnings needs a true all-time net income figure, including the
+  // cross-service lines (vendor purchases, COGS, labour) that only the period P&L
+  // query used to fetch — the all-time queries this function used to run locally
+  // only ever summed local tables (expense_entries/invoices/income_entries),
+  // silently excluding any cross-service cost. That gap let Accounts Payable
+  // (booked against a cross-service vendor purchase) grow with no matching
+  // reduction in Retained Earnings, breaking Assets = Liabilities + Equity.
+  // Reusing computeProfitAndLoss here (rather than a second copy of its
+  // cross-service fetch logic) with an all-time date range keeps this in sync
+  // automatically as new expense/revenue sources are added there. Callers may
+  // still pass pnlAllTime explicitly to avoid the extra network round trip when
+  // they've already computed a period P&L that happens to be all-time.
+  const pnlAllTimePromise: Promise<{
+    allTimeRevenue: number;
+    allTimeExpenses: number;
+    allTimeDepreciation: number;
+  }> = pnlAllTime
+    ? Promise.resolve(pnlAllTime)
+    : computeProfitAndLoss(db, branchFilter, ALL_TIME_START, asOfDate, baseCurrency, invUrl).then(
+        (pl) => ({
+          allTimeRevenue: pl.totalRevenue,
+          allTimeExpenses: pl.totalExpenses,
+          allTimeDepreciation: pl.depreciationExpense,
+        }),
+      );
 
   const rates = await loadExchangeRates(db, baseCurrency);
 
@@ -710,9 +929,11 @@ export async function computeBalanceSheet(
     vatRemittedRows,
     secDepReceivedRows,
     equityRows,
-    allTimeRevRows,
-    allTimeExpRows,
-    allTimeDepRows,
+    customAccountsAll,
+    mjAllRows,
+    cashBankRowsById,
+    deferredRevenueRows,
+    prepaidExpensesRows,
   ] = await Promise.all([
     // 1001/1002 Cash in hand and at bank
     db.query<{ type: string; currency_code: string | null; amount: string }[]>(`
@@ -795,11 +1016,15 @@ export async function computeBalanceSheet(
     `),
     // 2001 Accounts Payable — outstanding manual payables
     // Use COALESCE(outstanding, amount - amountPaid) so that records created without
-    // an explicit outstanding snapshot are still counted correctly.
+    // an explicit outstanding snapshot are still counted correctly. Excludes rows
+    // linked to a PO (linkedPurchaseId) — those are already tracked via the PO's own
+    // outstanding balance, mirroring the 1003 manual-AR exclusion above.
     db.query<{ amount: string }[]>(`
       SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
       FROM manual_payables
-      WHERE status NOT IN ('PAID') ${bSql('manual_payables')}
+      WHERE status NOT IN ('PAID')
+        AND "linkedPurchaseId" IS NULL
+        ${bSql('manual_payables')}
     `),
     // 2002 Accrued Expenses — APPROVED but not yet PAID expense entries
     db.query<{ amount: string }[]>(`
@@ -851,65 +1076,62 @@ export async function computeBalanceSheet(
       WHERE 1=1 ${bSql('equity_entries')}
       GROUP BY type, currency
     `),
-    // All-time revenue for retained earnings. The `type NOT IN ('PROFORMA', ...)` filter
-    // excludes RENT/LEASE entirely — those contracts are stored as type=PROFORMA for their
-    // whole lifecycle and never get a type=FINAL invoice generated, so this query used to
-    // recognize precisely zero lifetime revenue from any Rent/Lease contract. Same corrected
-    // methodology as 4001/4002 in computeProfitAndLoss: advance once + all billed periods'
-    // monthlyRent (net of advanceAdjusted) + all exceededCharge, added on separately.
-    db.query<CcyRow[]>(`
-      (
-        SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
-               COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS amount
-        FROM invoices
-        WHERE status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND type NOT IN ('QUOTATION', 'PROFORMA', 'OPENING')
-          AND "deletedAt" IS NULL
-          ${bSql('invoices')}
-        GROUP BY "currency_code"
-      )
-      UNION ALL
-      (
-        SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
-               COALESCE(SUM(COALESCE(i."advanceAmount", 0) + COALESCE(adv."totalAdvanceAdjusted", 0)), 0) AS amount
-        FROM invoices i
-        LEFT JOIN (
-          SELECT "contractId", SUM(COALESCE("advanceAdjusted", 0)) AS "totalAdvanceAdjusted"
-          FROM usage_records GROUP BY "contractId"
-        ) adv ON adv."contractId" = i.id
-        WHERE i."saleType" IN ('RENT', 'LEASE')
-          AND i.status NOT IN ('DRAFT', 'CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-          AND i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')
-          AND i."deletedAt" IS NULL
-          ${bSql('i')}
-        GROUP BY i."currency_code"
-      )
-      UNION ALL
-      (
-        SELECT COALESCE(inv."currency_code", '${baseCurrency}') AS currency_code,
-               COALESCE(SUM(u."monthlyRent" - COALESCE(u."advanceAdjusted", 0) + u."exceededCharge"), 0) AS amount
-        FROM usage_records u
-        JOIN invoices inv ON inv.id = u."contractId"
-        WHERE inv."saleType" IN ('RENT', 'LEASE')
-          AND inv."deletedAt" IS NULL
-          ${bSql('inv')}
-        GROUP BY inv."currency_code"
-      )
+    // Custom (non-system) chart-of-accounts rows, all categories — company-wide
+    // definitions. ASSET/LIABILITY/EQUITY rows drive the breakdown below;
+    // INCOME/EXPENSE rows aren't used here (retained earnings now comes from
+    // pnlAllTimePromise, which already folds in custom income/expense itself).
+    db.query<RawChartOfAccountRow[]>(`
+      SELECT id, "accountNumber", "accountName", category, "accountGroup",
+             "parentAccountId", "sourceType", "categoryKey", "linkedCashBankAccountId"
+      FROM chart_of_accounts
+      WHERE "isActive" = true AND "isSystemDefault" = false
     `),
-    // All-time expenses for retained earnings. Excludes DEPRECIATION — the dedicated
-    // depreciation_journal_entries-sourced allTimeDepreciation below is the single
-    // source of truth; postDepreciationJournal()'s mirror expense_entries row would
-    // otherwise double the deduction against retained earnings.
+    // Manual-journal postings against ANY custom account, cumulative (no date bound
+    // — matches the existing equity_entries query's own "WHERE 1=1" precedent).
+    db.query<{ chartOfAccountId: string; amount: string }[]>(`
+      SELECT "chartOfAccountId", COALESCE(SUM(amount), 0) AS amount
+      FROM manual_journal_entries
+      WHERE 1=1 ${bSql('manual_journal_entries')}
+      GROUP BY "chartOfAccountId"
+    `),
+    // Per-account cash/bank balances — for CASH_BANK_LINKED custom account display
+    db.query<{ id: string; currency: string; currentBalance: string }[]>(`
+      SELECT id, currency, "currentBalance"
+      FROM cash_bank_accounts
+      WHERE "isActive" = true ${bSql('cash_bank_accounts')}
+    `),
+    // Deferred Revenue MEMO (2005) — unearned advance on active Rent/Lease
+    // contracts (advanceAmount minus lifetime advanceAdjusted). Informational
+    // only, NOT folded into totalLiabilities below: the full advance is already
+    // recognized as revenue at signing (see 4001/4002 above), so adding this as
+    // a real liability with nothing offsetting it would break the accounting
+    // equation rather than just explain it. Shown for visibility only.
+    db.query<CcyRow[]>(`
+      SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+             COALESCE(SUM(GREATEST(COALESCE(i."advanceAmount", 0) - COALESCE(adv."totalAdvanceAdjusted", 0), 0)), 0) AS amount
+      FROM invoices i
+      LEFT JOIN (
+        SELECT "contractId", SUM(COALESCE("advanceAdjusted", 0)) AS "totalAdvanceAdjusted"
+        FROM usage_records GROUP BY "contractId"
+      ) adv ON adv."contractId" = i.id
+      WHERE i."saleType" IN ('RENT', 'LEASE')
+        AND i.status = 'ACTIVE_CONTRACT'
+        AND i."deletedAt" IS NULL
+        ${bSql('i')}
+      GROUP BY i."currency_code"
+    `),
+    // 1005 Prepaid Expenses — only once actually PAID (cash left the business) is
+    // there a real prepaid asset; an APPROVED-but-unpaid prepayment is still just
+    // a normal payable (2002 Accrued Expenses already covers that, unchanged).
+    // Stays an asset until its covered period ends. Same no-currency-conversion
+    // precedent as expense_entries elsewhere in this file.
     db.query<{ amount: string }[]>(`
       SELECT COALESCE(SUM("netAmount"), 0) AS amount
       FROM expense_entries
-      WHERE status IN ('APPROVED', 'PAID') AND category != 'DEPRECIATION' ${bSql('expense_entries')}
-    `),
-    // All-time depreciation for retained earnings
-    db.query<{ amount: string }[]>(`
-      SELECT COALESCE(SUM("totalAmount"), 0) AS amount
-      FROM depreciation_journal_entries
-      WHERE status = 'POSTED' ${bSql('depreciation_journal_entries')}
+      WHERE "isPrepayment" = true
+        AND status = 'PAID'
+        AND "coveredPeriodEnd" >= CURRENT_DATE
+        ${bSql('expense_entries')}
     `),
   ]);
 
@@ -1056,8 +1278,14 @@ export async function computeBalanceSheet(
   const vatCollected = aggByCurrency(vatCollectedRows, baseCurrency, rates, currencyWarnings);
   const vatRemitted = Number(vatRemittedRows[0]?.amount ?? 0);
   // Net owed to the authority = Output VAT collected − Input VAT credit − Reverse Charge
-  // credit, minus whatever's already been remitted for prior periods.
-  const vatPayable = Math.max(0, vatCollected - inputVatReclaimable - vatRemitted);
+  // credit, minus whatever's already been remitted for prior periods. Deliberately NOT
+  // clamped to 0 — this used to hide the true net position (e.g. input credit exceeding
+  // output collected) behind a flat 0.00, while the VAT Payable drill-down summed the
+  // exact same three components with no clamp and showed the real, negative figure. A
+  // negative value here means the authority owes the business money (a net recoverable
+  // position), not that anything is broken — the headline and the drill-down must agree,
+  // and the drill-down was the one telling the truth.
+  const vatPayable = vatCollected - inputVatReclaimable - vatRemitted;
 
   const securityDepositsReceived = aggByCurrency(
     secDepReceivedRows,
@@ -1067,6 +1295,14 @@ export async function computeBalanceSheet(
   );
 
   const deferredRevenue = 0;
+  // Informational only — see the query comment above for why this isn't folded
+  // into totalLiabilities.
+  const deferredRevenueMemo = aggByCurrency(
+    deferredRevenueRows,
+    baseCurrency,
+    rates,
+    currencyWarnings,
+  );
 
   // 2006 Salary Payable — outstanding SALARY_PAYABLE manual payables
   const salaryPayableRows = await db.query<{ amount: string }[]>(`
@@ -1101,19 +1337,84 @@ export async function computeBalanceSheet(
     (eqByType['OWNER_CONTRIBUTION'] ?? 0) +
     (eqByType['OPENING_BALANCE_EQUITY'] ?? 0);
   const reserves = eqByType['RESERVES'] ?? 0;
-  const withdrawals = 0;
+  const withdrawals = eqByType['WITHDRAWAL'] ?? 0;
   const dividends = eqByType['DIVIDEND'] ?? 0;
 
-  // 3002 Retained Earnings — auto-computed from all-time P&L (canonical formula)
-  const atRevenue =
-    pnlAllTime?.allTimeRevenue ??
-    aggByCurrency(allTimeRevRows, baseCurrency, rates, currencyWarnings);
-  const atExpenses = pnlAllTime?.allTimeExpenses ?? Number(allTimeExpRows[0]?.amount ?? 0);
-  const atDepreciation = pnlAllTime?.allTimeDepreciation ?? Number(allTimeDepRows[0]?.amount ?? 0);
-  const retainedEarnings = atRevenue - atExpenses - atDepreciation;
+  // ── Custom (non-system) ASSET/LIABILITY/EQUITY chart-of-accounts rows ─────────
+  const mjByAccountBS: Record<string, number> = {};
+  for (const row of mjAllRows) mjByAccountBS[row.chartOfAccountId] = Number(row.amount);
+  const cashBankById: Record<string, { balance: number; currency: string }> = {};
+  for (const row of cashBankRowsById) {
+    cashBankById[row.id] = { balance: Number(row.currentBalance), currency: row.currency };
+  }
+
+  const customAssetBreakdown: CustomAccountBalance[] = [];
+  const customLiabilityBreakdown: CustomAccountBalance[] = [];
+  const customEquityBreakdown: CustomAccountBalance[] = [];
+  let customCurrentAssetTotal = 0;
+  let customNonCurrentAssetTotal = 0;
+  let customCurrentLiabilityTotal = 0;
+  let customNonCurrentLiabilityTotal = 0;
+  let customEquityTotal = 0;
+  for (const acc of customAccountsAll) {
+    if (acc.category !== 'ASSET' && acc.category !== 'LIABILITY' && acc.category !== 'EQUITY')
+      continue;
+    let amount = 0;
+    if (acc.sourceType === 'MANUAL_JOURNAL') {
+      amount = mjByAccountBS[acc.id] ?? 0;
+    } else if (acc.sourceType === 'CASH_BANK_LINKED' && acc.linkedCashBankAccountId) {
+      const linked = cashBankById[acc.linkedCashBankAccountId];
+      if (linked) {
+        const { value, warning } = convertAmt(linked.balance, linked.currency, baseCurrency, rates);
+        if (warning) {
+          if (!currencyWarnings.includes(warning)) currencyWarnings.push(warning);
+        } else {
+          amount = value;
+        }
+      }
+    }
+    const entry: CustomAccountBalance = {
+      id: acc.id,
+      accountNumber: acc.accountNumber,
+      accountName: acc.accountName,
+      accountGroup: acc.accountGroup,
+      parentAccountId: acc.parentAccountId,
+      sourceType: acc.sourceType,
+      amount,
+    };
+    // CASH_BANK_LINKED balances are already inside cashInHand/cashAtBank above —
+    // shown here for nested display only, never re-added to the totals.
+    const includeInTotal = acc.sourceType !== 'CASH_BANK_LINKED';
+    if (acc.category === 'ASSET') {
+      customAssetBreakdown.push(entry);
+      if (includeInTotal) {
+        if (acc.accountGroup === 'NON_CURRENT_ASSET') customNonCurrentAssetTotal += amount;
+        else customCurrentAssetTotal += amount;
+      }
+    } else if (acc.category === 'LIABILITY') {
+      customLiabilityBreakdown.push(entry);
+      if (includeInTotal) {
+        if (acc.accountGroup === 'NON_CURRENT_LIABILITY') customNonCurrentLiabilityTotal += amount;
+        else customCurrentLiabilityTotal += amount;
+      }
+    } else {
+      customEquityBreakdown.push(entry);
+      if (includeInTotal) customEquityTotal += amount;
+    }
+  }
+
+  // 3002 Retained Earnings — auto-computed from all-time P&L (canonical formula).
+  // pnlAllTimePromise (kicked off at the top of this function) already folds in
+  // custom income/expense AND cross-service costs (vendor purchases/COGS/labour),
+  // so no further additions are needed here. Note: allTimeExpenses (= computeProfitAndLoss's
+  // totalExpenses) already has depreciationExpense summed into it — subtracting
+  // allTimeDepreciation again here would double-count it. allTimeDepreciation is kept on
+  // the type for callers that want it reported separately, just not subtracted twice.
+  const { allTimeRevenue: atRevenue, allTimeExpenses: atExpenses } = await pnlAllTimePromise;
+  const retainedEarnings = atRevenue - atExpenses;
 
   // ── Totals ───────────────────────────────────────────────────────────────────
-  const prepaidExpenses = 0;
+  const prepaidExpenses = Number(prepaidExpensesRows[0]?.amount ?? 0);
   const totalCurrentAssets =
     cashInHand +
     cashAtBank +
@@ -1121,8 +1422,9 @@ export async function computeBalanceSheet(
     securityDepositsReceivable +
     prepaidExpenses +
     sparePartsInventory +
-    productInventory;
-  const totalNonCurrentAssets = equipmentNBV;
+    productInventory +
+    customCurrentAssetTotal;
+  const totalNonCurrentAssets = equipmentNBV + customNonCurrentAssetTotal;
   const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
 
   const totalCurrentLiabilities =
@@ -1131,11 +1433,13 @@ export async function computeBalanceSheet(
     vatPayable +
     securityDepositsReceived +
     deferredRevenue +
-    salaryPayable;
-  const totalNonCurrentLiabilities = 0;
+    salaryPayable +
+    customCurrentLiabilityTotal;
+  const totalNonCurrentLiabilities = customNonCurrentLiabilityTotal;
   const totalLiabilities = totalCurrentLiabilities + totalNonCurrentLiabilities;
 
-  const totalEquity = ownerCapital + retainedEarnings + reserves - withdrawals - dividends;
+  const totalEquity =
+    ownerCapital + retainedEarnings + reserves - withdrawals - dividends + customEquityTotal;
   const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
   const difference = Math.abs(totalAssets - totalLiabilitiesAndEquity);
   const isBalanced = difference < 0.01;
@@ -1159,12 +1463,16 @@ export async function computeBalanceSheet(
     vatPayable,
     securityDepositsReceived,
     deferredRevenue,
+    deferredRevenueMemo,
     salaryPayable,
     ownerCapital,
     retainedEarnings,
     reserves,
     withdrawals,
     dividends,
+    customAssets: customAssetBreakdown,
+    customLiabilities: customLiabilityBreakdown,
+    customEquity: customEquityBreakdown,
     totalCurrentAssets,
     totalNonCurrentAssets,
     totalAssets,

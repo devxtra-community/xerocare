@@ -1,7 +1,32 @@
 import { CustomerRepository } from '../repositories/customerRepository';
-import { Customer } from '../entities/customerEntity';
+import { Customer, CustomerVatStatus, CustomerExemptionReason } from '../entities/customerEntity';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
+
+// Server-side backstop — the frontend form also enforces this, but the API must
+// not accept EXEMPT without a reason regardless of caller (never trust the client
+// alone for a compliance-relevant field).
+function validateVatFields(data: Partial<Customer>): void {
+  if (data.vatStatus === undefined) return;
+  if (!Object.values(CustomerVatStatus).includes(data.vatStatus)) {
+    throw new AppError(`Invalid vatStatus: ${data.vatStatus}`, 400);
+  }
+  if (data.vatStatus === CustomerVatStatus.EXEMPT) {
+    if (
+      !data.exemptionReason ||
+      !Object.values(CustomerExemptionReason).includes(data.exemptionReason)
+    ) {
+      throw new AppError(
+        'exemptionReason is required and must be a valid reason when vatStatus is EXEMPT',
+        400,
+      );
+    }
+  } else if (data.exemptionReason) {
+    // Not exempt — an exemption reason on a Registered/Unregistered-Standard
+    // customer would be stale/misleading data, so it's cleared rather than kept.
+    data.exemptionReason = null;
+  }
+}
 
 export class CustomerService {
   private customerRepository: CustomerRepository;
@@ -21,6 +46,7 @@ export class CustomerService {
         throw new AppError('Email already exists', 409);
       }
     }
+    validateVatFields(data);
 
     const customer = await this.customerRepository.createCustomer(data);
     logger.info('Customer created successfully', { customerId: customer.id });
@@ -57,6 +83,7 @@ export class CustomerService {
    * Updates an existing customer and publishes an update event.
    */
   async updateCustomer(id: string, data: Partial<Customer>): Promise<Customer> {
+    validateVatFields(data);
     const updated = await this.customerRepository.updateCustomer(id, data);
     if (!updated) {
       logger.warn('Customer update failed: Not found', { customerId: id });

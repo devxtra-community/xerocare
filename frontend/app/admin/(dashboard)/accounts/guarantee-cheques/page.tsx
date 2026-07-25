@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   ChevronDown,
   Landmark,
+  FileText,
 } from 'lucide-react';
 import {
   fetchGuaranteeCheques,
@@ -31,11 +32,13 @@ import {
   type GuaranteePurpose,
   type GuaranteeFilters,
 } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { getCustomers, type Customer } from '@/lib/customer';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useExchangeRateMap, convertAmount } from '@/lib/dualCurrency';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -544,6 +547,23 @@ function GuaranteeChequesContent() {
   const [editing, setEditing] = useState<GuaranteeCheque | null>(null);
   const [returning, setReturning] = useState<GuaranteeCheque | null>(null);
   const [depositing, setDepositing] = useState<GuaranteeCheque | null>(null);
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const filters = useMemo(
     (): GuaranteeFilters => ({
@@ -579,6 +599,53 @@ function GuaranteeChequesContent() {
     onError: () => toast.error('Failed to delete'),
   });
 
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Guarantee Cheques — Consolidated',
+    filters: {
+      Search: search || undefined,
+      Status: statusFilter !== 'ALL' ? statusFilter : undefined,
+      Purpose:
+        purposeFilter !== 'ALL' ? (PURPOSE_LABELS[purposeFilter] ?? purposeFilter) : undefined,
+      'Date From': dateFrom || undefined,
+      'Date To': dateTo || undefined,
+    },
+    sections: [
+      {
+        title: 'Guarantee Cheques',
+        rows: cheques.map((c) => ({
+          code: c.receivedDate?.slice(0, 10) ?? '',
+          label: `${c.chequeNumber} — ${c.customerName} (${c.bankName}) — ${PURPOSE_LABELS[c.purpose] ?? c.purpose} — ${c.status}`,
+          value: formatCurrency(Number(c.amount), c.currencyCode),
+        })),
+        total: {
+          label: 'Total',
+          value: formatCurrency(
+            cheques.reduce((s, c) => s + Number(c.amount), 0),
+            currency,
+          ),
+        },
+      },
+    ],
+    summary: stats
+      ? [
+          {
+            label: 'Currently Held',
+            value: formatCurrency(stats.heldAmount, stats.currency ?? currency),
+            bold: true,
+          },
+          {
+            label: 'Deposited to Bank',
+            value: formatCurrency(stats.depositedAmount, stats.currency ?? currency),
+          },
+          {
+            label: 'Returned',
+            value: formatCurrency(stats.returnedAmount, stats.currency ?? currency),
+          },
+        ]
+      : undefined,
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {!isSingleBranch && (
@@ -593,17 +660,10 @@ function GuaranteeChequesContent() {
           Security &amp; performance cheques held as collateral
         </p>
         <div className="flex items-center gap-2">
-          <ExportPdfButton
-            targetId="admin-guarantee-cheques-pdf"
-            reportTitle="Guarantee Cheques"
-            filters={{
-              Search: search,
-              Status: statusFilter !== 'ALL' ? statusFilter : undefined,
-              Purpose: purposeFilter !== 'ALL' ? purposeFilter : undefined,
-              'Date From': dateFrom,
-              'Date To': dateTo,
-            }}
-          />
+          <Button variant="outline" onClick={() => setShowStatement(true)} className="gap-2">
+            <FileText className="h-4 w-4" />
+            Generate Statement
+          </Button>
           {isSingleBranch && (
             <Button
               onClick={() => {
@@ -618,7 +678,7 @@ function GuaranteeChequesContent() {
         </div>
       </div>
 
-      <div id="admin-guarantee-cheques-pdf" className="space-y-6">
+      <div className="space-y-6">
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard
@@ -902,6 +962,14 @@ function GuaranteeChequesContent() {
       )}
       {returning && <ReturnDialog cheque={returning} onClose={() => setReturning(null)} />}
       {depositing && <DepositDialog cheque={depositing} onClose={() => setDepositing(null)} />}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
+      )}
     </div>
   );
 }

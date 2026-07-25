@@ -3,8 +3,10 @@
 import React, { Suspense, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import { Download, RefreshCw, AlertTriangle } from 'lucide-react';
+import { RefreshCw, AlertTriangle, FileText } from 'lucide-react';
 import { fetchProfitLoss } from '@/lib/finance/accountsApi';
+import { fetchBranches } from '@/lib/finance/accounts';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
@@ -16,8 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import * as XLSX from 'xlsx';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 
 type Period = 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'last_year' | 'custom';
 
@@ -111,6 +113,23 @@ function IncomeStatementContent() {
   const [period, setPeriod] = useState<Period>('this_month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branchIds
+    ? branches.find((b) => b.id === branchIds)
+    : (branches.find((b) => b.id === currentUser?.branchId) ?? branches[0]);
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const queryParams: Record<string, string> = {};
   if (branchIds) queryParams.branchIds = branchIds;
@@ -151,28 +170,42 @@ function IncomeStatementContent() {
 
   const dateLabel = pl ? `${pl.fromDate} to ${pl.toDate}` : '…';
 
-  const exportExcel = () => {
-    if (!pl) return;
-    const rows: (string | number)[][] = [
-      ['INCOME STATEMENT / PROFIT & LOSS', '', `${pl.fromDate} to ${pl.toDate}`],
-      [],
-      ['REVENUE'],
-      ...revenueLines.map(([type, amt]) => [REVENUE_LABELS[type] ?? type, amt]),
-      ['TOTAL REVENUE', totalRevenue],
-      [],
-      ['EXPENSES BY CATEGORY'],
-      ...expenseLines.map(([cat, amt]) => [EXPENSE_LABELS[cat] ?? cat, amt]),
-      ['TOTAL EXPENSES', totalExpenses],
-      [],
-      ['GROSS PROFIT', grossProfit],
-      ['Tax Collected (from invoices)', totalTax],
-      ['NET PROFIT', netProfit],
-      ['NET MARGIN %', `${margin.toFixed(2)}%`],
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Income Statement');
-    XLSX.writeFile(wb, `Income_Statement_${pl.fromDate}_${pl.toDate}.xlsx`);
+  const fmt = (n: number) => formatCurrency(n, currency);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Income Statement (P&L)',
+    periodFrom: pl?.fromDate,
+    periodTo: pl?.toDate,
+    sections: [
+      {
+        title: 'Revenue',
+        rows:
+          revenueLines.length === 0
+            ? [{ label: 'No revenue in this period', value: fmt(0) }]
+            : revenueLines.map(([type, amt]) => ({
+                label: REVENUE_LABELS[type] ?? type,
+                value: fmt(amt),
+              })),
+        total: { label: 'Total Revenue', value: fmt(totalRevenue) },
+      },
+      {
+        title: 'Operating Expenses',
+        rows:
+          expenseLines.length === 0
+            ? [{ label: 'No expenses in this period', value: fmt(0) }]
+            : expenseLines.map(([cat, amt]) => ({
+                label: EXPENSE_LABELS[cat] ?? cat,
+                value: fmt(amt),
+              })),
+        total: { label: 'Total Expenses', value: fmt(totalExpenses) },
+      },
+    ],
+    summary: [
+      { label: 'Gross Profit', value: fmt(grossProfit) },
+      { label: 'Tax Collected (from invoices)', value: fmt(totalTax) },
+      { label: 'Net Profit', value: fmt(netProfit), bold: true },
+      { label: 'Net Margin', value: `${margin.toFixed(2)}%` },
+    ],
   };
 
   return (
@@ -221,11 +254,11 @@ function IncomeStatementContent() {
             <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
           </Button>
           <Button
-            onClick={exportExcel}
+            onClick={() => setShowStatement(true)}
             disabled={!pl || dataWarnings.length > 0}
             className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download className="h-4 w-4" /> Export Excel
+            <FileText className="h-4 w-4" /> Generate Statement
           </Button>
         </div>
       </div>
@@ -378,6 +411,14 @@ function IncomeStatementContent() {
             </div>
           )}
         </>
+      )}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
       )}
     </div>
   );

@@ -33,6 +33,16 @@ async function runPreMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS city VARCHAR(100) NULL;
     `);
     logger.info('CRM pre-migration: customers.city column ensured.');
+
+    // ─── customers: VAT status + exemption reason ─────────────────────────────
+    // Default UNREGISTERED_STANDARD preserves pre-existing tax behavior (standard
+    // VAT still applies) for every customer that existed before this column did.
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS vat_status VARCHAR(30) NOT NULL DEFAULT 'UNREGISTERED_STANDARD',
+        ADD COLUMN IF NOT EXISTS exemption_reason VARCHAR(60) NULL;
+    `);
+    logger.info('CRM pre-migration: customers.vat_status/exemption_reason columns ensured.');
   } catch (err) {
     logger.error('CRM pre-migration failed:', err);
     throw err;

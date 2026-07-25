@@ -7,7 +7,6 @@ import EmployeeRequestsTab from '@/components/expenses/EmployeeRequestsTab';
 import { getUserFromToken } from '@/lib/auth';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
-  Download,
   Plus,
   Search,
   Filter,
@@ -33,13 +32,14 @@ import {
   fetchExpenseCharts,
   type ExpenseEntry,
 } from '@/lib/finance/accountsApi';
-import { fetchPurchases, type PurchaseOrder } from '@/lib/finance/accounts';
+import { fetchPurchases, fetchBranches, type PurchaseOrder } from '@/lib/finance/accounts';
 import { StackedBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 import {
   Select,
   SelectContent,
@@ -55,9 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { ExportPdfButton } from '@/components/shared/ExportPdfButton';
 
 const EXPENSE_CATEGORIES = [
   'SALARY',
@@ -170,6 +168,9 @@ function ExpenseModal({
     paymentMode: expense?.paymentMode ?? 'Cash',
     referenceNo: expense?.referenceNo ?? '',
     notes: expense?.notes ?? '',
+    isPrepayment: expense?.isPrepayment ?? false,
+    coveredPeriodStart: expense?.coveredPeriodStart?.slice(0, 10) ?? today,
+    coveredPeriodEnd: expense?.coveredPeriodEnd?.slice(0, 10) ?? '',
   });
   useEffect(() => {
     if (branchCurrency) {
@@ -202,6 +203,8 @@ function ExpenseModal({
         vatAmount: parseFloat(form.vatAmount) || 0,
         netAmount: parseFloat(form.netAmount) || parseFloat(form.amount),
         paidFrom: form.paidFrom || undefined,
+        coveredPeriodStart: form.isPrepayment ? form.coveredPeriodStart : undefined,
+        coveredPeriodEnd: form.isPrepayment ? form.coveredPeriodEnd : undefined,
       };
       if (expense?.id) return updateExpenseEntry(expense.id, payload);
       return createExpenseEntry(payload);
@@ -293,6 +296,50 @@ function ExpenseModal({
                   placeholder="What is this expense for?"
                 />
               </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isPrepayment"
+                  checked={form.isPrepayment}
+                  onChange={(e) => set('isPrepayment', e.target.checked)}
+                  className="rounded"
+                />
+                <label htmlFor="isPrepayment" className="text-sm">
+                  This is a prepayment (e.g. 12 months insurance/rent paid upfront)
+                </label>
+              </div>
+              {form.isPrepayment && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-2">
+                  <p className="text-xs text-blue-700">
+                    Held as a Prepaid Expenses asset (1005) until the covered period ends, then it
+                    becomes a real expense — zero P&amp;L impact when paid.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Covered From
+                      </label>
+                      <input
+                        type="date"
+                        value={form.coveredPeriodStart}
+                        onChange={(e) => set('coveredPeriodStart', e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Covered To *
+                      </label>
+                      <input
+                        type="date"
+                        value={form.coveredPeriodEnd}
+                        onChange={(e) => set('coveredPeriodEnd', e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -852,6 +899,21 @@ export default function ExpenseManagementPage() {
   const [paying, setPaying] = useState<ExpenseEntry | null>(null);
   const [viewing, setViewing] = useState<ExpenseTableRow | null>(null);
   const [chartsOpen, setChartsOpen] = useState(true);
+  const [showStatement, setShowStatement] = useState(false);
+
+  const currentUser = getUserFromToken();
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: fetchBranches,
+    staleTime: 5 * 60 * 1000,
+  });
+  const activeBranch = branches.find((b) => b.id === currentUser?.branchId) ?? branches[0];
+  const branchInfo = {
+    name: activeBranch?.name ?? 'XeroCare',
+    address: activeBranch?.address,
+    tax_registration_number: activeBranch?.tax_registration_number,
+    country: activeBranch?.country,
+  };
 
   const qc = useQueryClient();
 
@@ -1095,24 +1157,33 @@ export default function ExpenseManagementPage() {
       .sort((a, b) => b.value - a.value);
   }, [allRows]);
 
-  const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      filtered.map((row) => ({
-        'Expense #': row.expenseNo,
-        Source: row.source,
-        Date: row.date?.slice(0, 10) ?? '',
-        Category: row.category,
-        Description: row.description,
-        Amount: row.amount,
-        'Tax Type': row.taxLabel || '—',
-        'Tax Amount': row.taxAmount || '',
-        Currency: row.currency,
-        Status: row.status,
-      })),
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
-    XLSX.writeFile(wb, `Expenses_${fromDate}_${toDate}.xlsx`);
+  const statementData: SnapshotStatementData = {
+    kind: 'snapshot',
+    title: 'Expenses',
+    periodFrom: fromDate,
+    periodTo: toDate,
+    filters: {
+      Search: search || undefined,
+      Category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
+      Status: statusFilter !== 'ALL' ? statusFilter : undefined,
+    },
+    sections: [
+      {
+        title: 'Expense Entries',
+        rows: filtered.map((row) => ({
+          code: row.date?.slice(0, 10) ?? '',
+          label: `${row.expenseNo} — ${row.category.replace(/_/g, ' ')} — ${row.description}`,
+          value: formatCurrency(row.amount, row.currency),
+        })),
+        total: {
+          label: 'Total',
+          value: formatCurrency(
+            filtered.reduce((s, r) => s + r.amount, 0),
+            currency,
+          ),
+        },
+      },
+    ],
   };
 
   return (
@@ -1187,20 +1258,13 @@ export default function ExpenseManagementPage() {
                     onChange={(e) => setToDate(e.target.value)}
                     className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
                   />
-                  <Button onClick={exportExcel} variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" /> Export
+                  <Button
+                    onClick={() => setShowStatement(true)}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <FileText className="h-4 w-4" /> Generate Statement
                   </Button>
-                  <ExportPdfButton
-                    targetId="expenses-pdf"
-                    reportTitle="Expenses"
-                    filters={{
-                      'Date From': fromDate,
-                      'Date To': toDate,
-                      Search: search,
-                      Category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
-                      Status: statusFilter !== 'ALL' ? statusFilter : undefined,
-                    }}
-                  />
                   <Button
                     onClick={() => {
                       setEditing(null);
@@ -1213,7 +1277,7 @@ export default function ExpenseManagementPage() {
                 </div>
               </div>
 
-              <div id="expenses-pdf" className="space-y-6">
+              <div className="space-y-6">
                 {/* Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <StatCard
@@ -1577,6 +1641,14 @@ export default function ExpenseManagementPage() {
             </>
           )}
         </>
+      )}
+      {showStatement && (
+        <StatementDialog
+          open
+          onOpenChange={(o) => !o && setShowStatement(false)}
+          data={statementData}
+          branch={branchInfo}
+        />
       )}
     </div>
   );

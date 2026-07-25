@@ -78,8 +78,56 @@ import {
 } from '../controllers/accountsController';
 import chequesRouter from './chequesRoutes';
 import guaranteeChequesRouter from './guaranteeChequesRoutes';
+import { requireRole } from '../middlewares/roleMiddleware';
+import { EmployeeRole } from '../constants/employeeRole';
+import {
+  listChartOfAccountsStructure,
+  getNextAccountNumber,
+  createChartOfAccount,
+  renameChartOfAccount,
+  setChartOfAccountActive,
+  deleteChartOfAccount,
+} from '../controllers/chartOfAccountController';
+import {
+  getIncomeEntries,
+  createIncomeEntry,
+  updateIncomeEntry,
+  approveIncomeEntry,
+  receiveIncomeEntry,
+  getIncomeEntryDetail,
+  deleteIncomeEntry,
+} from '../controllers/incomeEntryController';
+import {
+  getManualJournalEntries,
+  createManualJournalEntry,
+  reverseManualJournalEntry,
+} from '../controllers/manualJournalController';
+import {
+  getRevenueBreakdown,
+  getRevenueTransactions,
+} from '../controllers/revenueBreakdownController';
+import {
+  getOutputVatTransactions,
+  getSecurityDepositTransactions,
+  getDeferredRevenueTransactions,
+  getRetainedEarningsMonthly,
+  getAccountsReceivableTransactions,
+  getReceivableRowDetail,
+  getPayableRowDetail,
+  getOtherIncomeTransactions,
+  getCustomerStatement,
+  getVendorStatement,
+  getAccountStatement,
+} from '../controllers/lineItemDrilldownController';
+import { getBranchActivity } from '../controllers/branchActivityController';
+import {
+  getSegmentedPnl,
+  getSegmentProductDetail,
+  getSegmentContractDetail,
+} from '../controllers/segmentedPnlController';
 
 const router = Router();
+const requireAccountsAdmin = requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE);
 
 // All routes require auth + branch filter enforcement
 router.use(authMiddleware);
@@ -120,6 +168,11 @@ router.post('/cashbook/:id/reverse', reverseCashbookEntry);
 
 // Day Book (per-day cash receipts/payments summary)
 router.get('/daybook', getDayBook);
+
+// Branch Daily Activity — broader, non-cash-scoped feed of everything that
+// happened in a branch on a given day. Deliberately separate from /daybook,
+// whose Total Earnings/Expenses/Net Cash figures stay strictly cash-based.
+router.get('/branch-activity', getBranchActivity);
 
 // Expense Entries
 router.get('/expenses', getExpenseEntries);
@@ -177,6 +230,52 @@ router.delete('/equity/:id', deleteEquityEntry);
 
 // Chart of Accounts
 router.get('/chart-of-accounts', getChartOfAccounts);
+
+// Revenue drill-down — Sale/Rent/Lease sub-category breakdown + transaction detail
+router.get('/revenue-breakdown', getRevenueBreakdown);
+router.get('/revenue-breakdown/transactions', getRevenueTransactions);
+
+// Segmented P&L — profitability by revenue segment, and per-product/per-contract drill-down
+router.get('/segmented-pnl', getSegmentedPnl);
+router.get('/segmented-pnl/products', getSegmentProductDetail);
+router.get('/segmented-pnl/contracts', getSegmentContractDetail);
+
+// Line-item drill-downs — Liabilities/Equity lines with no existing reusable source
+router.get('/line-items/output-vat', getOutputVatTransactions);
+router.get('/line-items/security-deposits', getSecurityDepositTransactions);
+router.get('/line-items/deferred-revenue', getDeferredRevenueTransactions);
+router.get('/line-items/retained-earnings-monthly', getRetainedEarningsMonthly);
+router.get('/line-items/accounts-receivable', getAccountsReceivableTransactions);
+router.get('/line-items/receivable-detail', getReceivableRowDetail);
+router.get('/line-items/payable-detail', getPayableRowDetail);
+router.get('/line-items/other-income', getOtherIncomeTransactions);
+router.get('/line-items/customer-statement', getCustomerStatement);
+router.get('/line-items/vendor-statement', getVendorStatement);
+router.get('/line-items/account-statement', getAccountStatement);
+
+// Chart of Accounts structure management — creating/editing/deleting the account
+// registry itself is ADMIN/FINANCE only; viewing balances above is open to any
+// authenticated branch user (unchanged).
+router.get('/chart-of-accounts/structure', listChartOfAccountsStructure);
+router.get('/chart-of-accounts/next-number', getNextAccountNumber);
+router.post('/chart-of-accounts', requireAccountsAdmin, createChartOfAccount);
+router.patch('/chart-of-accounts/:id', requireAccountsAdmin, renameChartOfAccount);
+router.patch('/chart-of-accounts/:id/active', requireAccountsAdmin, setChartOfAccountActive);
+router.delete('/chart-of-accounts/:id', requireAccountsAdmin, deleteChartOfAccount);
+
+// Income Entries (manual, category-tagged real income — mirrors Expense Entries)
+router.get('/income', getIncomeEntries);
+router.post('/income', createIncomeEntry);
+router.put('/income/:id', updateIncomeEntry);
+router.patch('/income/:id/approve', approveIncomeEntry);
+router.patch('/income/:id/receive', receiveIncomeEntry);
+router.get('/income/:id/detail', getIncomeEntryDetail);
+router.delete('/income/:id', deleteIncomeEntry);
+
+// Manual Journal Entries — postings against custom MANUAL_JOURNAL accounts
+router.get('/manual-journal', getManualJournalEntries);
+router.post('/manual-journal', createManualJournalEntry);
+router.post('/manual-journal/:id/reverse', reverseManualJournalEntry);
 
 // Balance Sheet
 router.get('/balance-sheet', getBalanceSheet);

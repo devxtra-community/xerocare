@@ -68,6 +68,17 @@ export class ExpenseEntry {
   @Column()
   createdBy!: string;
 
+  // Prepaid Expenses (Chart of Accounts 1005) — a prepayment stays a real asset
+  // until its covered period ends, e.g. 12 months' insurance/rent paid upfront.
+  @Column({ type: 'boolean', default: false })
+  isPrepayment!: boolean;
+
+  @Column({ type: 'date', nullable: true })
+  coveredPeriodStart?: Date;
+
+  @Column({ type: 'date', nullable: true })
+  coveredPeriodEnd?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -17,6 +17,7 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       chequeNumber,
       chequeBankName,
       chequeDueDate,
+      chequeDate,
       currency,
       exchangeRate,
     } = req.body;
@@ -46,6 +47,7 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       chequeNumber,
       chequeBankName,
       chequeDueDate,
+      chequeDate,
       currencyCode: currency || undefined,
       exchangeRate: exchangeRate ? Number(exchangeRate) : undefined,
     });
