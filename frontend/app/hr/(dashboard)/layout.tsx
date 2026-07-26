@@ -10,7 +10,7 @@ export default async function HRLayout({ children }: { children: React.ReactNode
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
-        <RoleAwareSidebar fallback="hr" initialIsManager={user?.role === 'MANAGER'} />
+        <RoleAwareSidebar fallback="hr" initialRole={user?.role ?? null} />
 
         <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
           <DashboardHeader />

@@ -1,13 +1,18 @@
 import React from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import ManagerSidebar from '@/components/ManagerDashboardComponents/ManagerAppSidebar';
+import RoleAwareSidebar from '@/components/RoleAwareSidebar';
 import DashboardHeader from '@/components/DashboardHeader';
+import { getServerUser } from '@/lib/server-auth';
 
-export default function ManagerLayout({ children }: { children: React.ReactNode }) {
+export default async function ManagerLayout({ children }: { children: React.ReactNode }) {
+  const user = await getServerUser();
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full" suppressHydrationWarning>
-        <ManagerSidebar />
+        {/* An admin reaching a manager page keeps the admin sidebar; managers
+            fall through to their own. */}
+        <RoleAwareSidebar fallback="employee" initialRole={user?.role ?? 'MANAGER'} />
 
         <SidebarInset className="bg-background min-h-screen w-full flex flex-col">
           <DashboardHeader />

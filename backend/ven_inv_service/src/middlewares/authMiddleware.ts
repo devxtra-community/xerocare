@@ -11,6 +11,27 @@ interface ErrorWithName {
   branchId?: string;
 }
 
+/**
+ * ADMIN tokens carry no `branchId` — an admin belongs to the organisation, not
+ * to one branch. Reads therefore return every branch, but writes cannot: every
+ * create/update path derives the owning branch from `req.user.branchId`.
+ *
+ * The `x-acting-branch` header lets an admin nominate the branch to act in.
+ * It is applied ONLY when the *verified* token says the caller is an ADMIN, so
+ * a non-admin sending the header changes nothing and cannot escalate. Request
+ * bodies still may not carry `branchId` — that guard stays intact.
+ */
+const applyActingBranch = (req: Request) => {
+  if (!req.user || req.user.role !== 'ADMIN') return;
+
+  const actingBranch = req.headers['x-acting-branch'];
+  const branchId = Array.isArray(actingBranch) ? actingBranch[0] : actingBranch;
+
+  if (branchId) {
+    req.user.branchId = branchId;
+  }
+};
+
 export const authMiddleware = (req: Request, _res: Response, next: NextFunction) => {
   logger.info('Auth Middleware invoked');
   const authHeader = req.headers.authorization;
@@ -35,6 +56,8 @@ export const authMiddleware = (req: Request, _res: Response, next: NextFunction)
       branchId: decoded.branchId,
       employeeJob: decoded.employeeJob,
     };
+
+    applyActingBranch(req);
 
     next();
   } catch (error: unknown) {

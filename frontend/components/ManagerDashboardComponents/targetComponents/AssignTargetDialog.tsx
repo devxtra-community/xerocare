@@ -27,6 +27,7 @@ import { createTarget, TargetTier } from '@/lib/targets';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { formatCurrency } from '@/lib/format';
 import { getUserFromToken } from '@/lib/auth';
+import { getActingBranchId } from '@/lib/adminBranch';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface AssignTargetDialogProps {
@@ -77,14 +78,11 @@ export default function AssignTargetDialog({
   useEffect(() => {
     if (!open) return;
 
+    // An admin has no branch of its own, so it scopes by the branch selected
+    // in the header switcher — or sees every branch when none is selected.
     const user = getUserFromToken();
-    getAllEmployees(
-      1,
-      200,
-      undefined,
-      undefined,
-      user?.role === 'MANAGER' ? user.branchId : undefined,
-    )
+    const branchId = user?.role === 'MANAGER' ? user.branchId : (getActingBranchId() ?? undefined);
+    getAllEmployees(1, 200, undefined, undefined, branchId)
       .then((res) => {
         const eligible = res.data.employees.filter((e) =>
           ELIGIBLE_JOBS.includes(e.employee_job as EmployeeJob),

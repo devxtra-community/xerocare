@@ -19,6 +19,8 @@ import { productService, Product } from '@/services/productService';
 import { modelService, Model } from '@/services/modelService';
 import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { getBrands, Brand } from '@/lib/brand';
+import { getUserFromToken } from '@/lib/auth';
+import { getActingBranchId } from '@/lib/adminBranch';
 import { toast } from 'sonner';
 
 interface ProductFormModalProps {
@@ -98,10 +100,16 @@ export function ProductFormModal({
 
   useEffect(() => {
     const loadDependencies = async () => {
+      // An ADMIN on "all branches" has no branch context, so the branch-scoped
+      // warehouse endpoint would answer 400 and only reach the fallback below
+      // after surfacing an error toast. Ask for the full list directly instead.
+      // An admin acting in a branch does have context and stays branch-scoped.
+      const isBranchScoped = Boolean(getUserFromToken()?.branchId || getActingBranchId());
+
       const [mResult, vResult, wResult, bResult, lResult] = await Promise.allSettled([
         modelService.getAllModels(),
         commonService.getAllVendors(),
-        commonService.getWarehousesByBranch(),
+        isBranchScoped ? commonService.getWarehousesByBranch() : commonService.getAllWarehouses(),
         getBrands(),
         lotService.getAllLots(),
       ]);

@@ -24,6 +24,7 @@ import { SessionsDialog } from './SessionsDialog';
 import { SalaryDetailsDialog } from './SalaryDetailsDialog';
 import { HelpGuideDialog } from './HelpGuideDialog';
 import { initBranchCurrency } from '@/lib/currency';
+import AdminBranchSwitcher from './AdminBranchSwitcher';
 
 export interface Notification {
   id: string;
@@ -167,6 +168,11 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
             <Menu className="h-5 w-5" />
           </SidebarTrigger>
           <h1 className="text-base sm:text-lg font-semibold">{title}</h1>
+        </div>
+
+        {/* Acting branch — ADMIN only, renders null for every other role */}
+        <div className="hidden md:flex" suppressHydrationWarning>
+          <AdminBranchSwitcher />
         </div>
 
         {/* Right: Icons and User Profile */}

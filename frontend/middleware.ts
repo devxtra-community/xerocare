@@ -13,12 +13,14 @@ export function middleware(request: NextRequest) {
 
   // Define protected routes and their allowed roles.
   // MANAGER has branch-wide authority: full access to HR, employee and finance sections.
+  // ADMIN is the organisation-wide superuser and reaches every section — it
+  // mirrors the backend role middleware, where ADMIN passes every role gate.
   const protectedRoutes = [
     { path: '/admin', roles: ['ADMIN'] },
-    { path: '/hr', roles: ['HR', 'MANAGER'] },
-    { path: '/manager', roles: ['MANAGER'] },
-    { path: '/employee', roles: ['EMPLOYEE', 'MANAGER'] },
-    { path: '/finance', roles: ['FINANCE', 'MANAGER'] },
+    { path: '/hr', roles: ['HR', 'MANAGER', 'ADMIN'] },
+    { path: '/manager', roles: ['MANAGER', 'ADMIN'] },
+    { path: '/employee', roles: ['EMPLOYEE', 'MANAGER', 'ADMIN'] },
+    { path: '/finance', roles: ['FINANCE', 'MANAGER', 'ADMIN'] },
     // Add more as needed
   ];
 
@@ -45,34 +47,34 @@ export function middleware(request: NextRequest) {
         const decoded = jwtDecode<JwtPayload>(token);
         const role = decoded.role;
 
-        // HR and EMPLOYEE have zero accounts access
-        if (role === 'HR' || role === 'EMPLOYEE') {
-          return NextResponse.redirect(new URL('/unauthorized', request.url));
-        }
-
-        // Finance accounts → must be FINANCE
-        if (
-          path.startsWith('/finance/accounts') ||
-          path.startsWith('/finance/(dashboard)/accounts')
-        ) {
-          if (role === 'MANAGER') {
-            return NextResponse.redirect(new URL('/manager/accounts', request.url));
-          }
-          if (role === 'ADMIN') {
-            return NextResponse.redirect(new URL('/admin/accounts', request.url));
-          }
-        }
-
-        // Manager accounts → MANAGER or ADMIN only
-        if (path.startsWith('/manager/accounts')) {
-          if (role !== 'MANAGER' && role !== 'ADMIN') {
+        // ADMIN owns every ledger in the organisation and is never bounced out
+        // of an accounts area — including the branch-scoped finance and manager
+        // views, which it reads through the acting-branch it selected.
+        if (role !== 'ADMIN') {
+          // HR and EMPLOYEE have zero accounts access
+          if (role === 'HR' || role === 'EMPLOYEE') {
             return NextResponse.redirect(new URL('/unauthorized', request.url));
           }
-        }
 
-        // Admin accounts → ADMIN only
-        if (path.startsWith('/admin/accounts')) {
-          if (role !== 'ADMIN') {
+          // Finance accounts → must be FINANCE
+          if (
+            path.startsWith('/finance/accounts') ||
+            path.startsWith('/finance/(dashboard)/accounts')
+          ) {
+            if (role === 'MANAGER') {
+              return NextResponse.redirect(new URL('/manager/accounts', request.url));
+            }
+          }
+
+          // Manager accounts → MANAGER only (ADMIN already returned above)
+          if (path.startsWith('/manager/accounts')) {
+            if (role !== 'MANAGER') {
+              return NextResponse.redirect(new URL('/unauthorized', request.url));
+            }
+          }
+
+          // Admin accounts → ADMIN only
+          if (path.startsWith('/admin/accounts')) {
             return NextResponse.redirect(new URL('/unauthorized', request.url));
           }
         }

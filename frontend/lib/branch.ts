@@ -87,9 +87,17 @@ export async function getAllBranches(): Promise<Branch[]> {
   return res.data.data;
 }
 
-/** Current manager's own branch (MANAGER role only). */
-export async function getMyBranch(): Promise<Branch> {
-  const res = await api.get<{ success: boolean; data: Branch }>('/i/branch/my-branch');
+/**
+ * Current manager's own branch (MANAGER role only).
+ *
+ * ADMIN tokens carry no branchId, so this endpoint answers 400 for them. Pass
+ * `{ silent: true }` from callers that treat "no branch" as a normal outcome,
+ * so the global interceptor does not toast an error the caller already handles.
+ */
+export async function getMyBranch(opts?: { silent?: boolean }): Promise<Branch> {
+  const res = await api.get<{ success: boolean; data: Branch }>('/i/branch/my-branch', {
+    skipErrorToast: opts?.silent,
+  });
   return res.data.data;
 }
 
