@@ -37,8 +37,8 @@ export class NotificationPublisher {
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
     const rabbitPayload = {
-      recipients: [payload.recipientId],
-      notifyAdmins: false,
+      recipients: payload.recipientId ? [payload.recipientId] : [],
+      notifyAdmins: payload.notifyAdmins ?? false,
       title: payload.title,
       message: payload.message,
       type: payload.type,

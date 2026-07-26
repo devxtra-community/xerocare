@@ -1498,6 +1498,25 @@ export class BillingService {
       }
     }
 
+    // Notify Admins (cross-branch visibility)
+    try {
+      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+      const { QUOTATION_APPROVED } = await import('../constants/notificationTypes');
+      const { getCustomerName } = await import('./billingHelpers');
+
+      const customerName = await getCustomerName(invoice.customerId);
+      await NotificationPublisher.publishInAppRequest({
+        notifyAdmins: true,
+        title: 'Quotation Approved',
+        message: `A quotation [${invoice.invoiceNumber}] for ${customerName} (branch ${invoice.branchId}) has been approved by Finance.`,
+        type: QUOTATION_APPROVED,
+        referenceId: invoice.id,
+        referenceType: 'QUOTATION',
+      });
+    } catch (err) {
+      logger.error('Failed to notify admins about quotation approval', err);
+    }
+
     // Callback to ven_inv_service for Service Tickets
     if (invoice.serviceTicketId) {
       try {
@@ -2136,6 +2155,26 @@ export class BillingService {
         }
       }
 
+      // Notify Admins (cross-branch visibility)
+      try {
+        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+        const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
+        const { getCustomerName } = await import('./billingHelpers');
+
+        const customerName = await getCustomerName(savedInvoice.customerId);
+
+        await NotificationPublisher.publishInAppRequest({
+          notifyAdmins: true,
+          title: 'Contract Activated',
+          message: `The contract for customer ${customerName} (branch ${savedInvoice.branchId}) is now active.`,
+          type: CONTRACT_ACTIVATED,
+          referenceId: savedInvoice.id,
+          referenceType: 'CONTRACT',
+        });
+      } catch (err) {
+        logger.error('Failed to notify admins about contract activation', err);
+      }
+
       return savedInvoice;
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -2293,6 +2332,25 @@ export class BillingService {
       } catch (err) {
         logger.error('Failed to notify branch manager about quotation rejection', err);
       }
+    }
+
+    // Notify Admins (cross-branch visibility)
+    try {
+      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+      const { QUOTATION_REJECTED } = await import('../constants/notificationTypes');
+      const { getCustomerName } = await import('./billingHelpers');
+
+      const customerName = await getCustomerName(invoice.customerId);
+      await NotificationPublisher.publishInAppRequest({
+        notifyAdmins: true,
+        title: 'Quotation Rejected',
+        message: `A quotation [${invoice.invoiceNumber}] for ${customerName} (branch ${invoice.branchId}) has been rejected by Finance. Reason: ${reason}.`,
+        type: QUOTATION_REJECTED,
+        referenceId: invoice.id,
+        referenceType: 'QUOTATION',
+      });
+    } catch (err) {
+      logger.error('Failed to notify admins about quotation rejection', err);
     }
 
     // Release any product allocations back to AVAILABLE

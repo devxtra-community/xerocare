@@ -87,9 +87,12 @@ export async function getAllBranches(): Promise<Branch[]> {
   return res.data.data;
 }
 
-/** Current manager's own branch (MANAGER role only). */
-export async function getMyBranch(): Promise<Branch> {
-  const res = await api.get<{ success: boolean; data: Branch }>('/i/branch/my-branch');
+/**
+ * Current user's own branch — null for ADMIN (a global role with no single
+ * branch) or for any user not yet assigned one.
+ */
+export async function getMyBranch(): Promise<Branch | null> {
+  const res = await api.get<{ success: boolean; data: Branch | null }>('/i/branch/my-branch');
   return res.data.data;
 }
 

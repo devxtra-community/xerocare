@@ -72,6 +72,15 @@ export class BranchController {
    * Retrieves the current user's branch.
    */
   getMyBranch = async (req: Request, res: Response) => {
+    // ADMIN is a global role with no single branch — the Admin entity has no
+    // branch_id column at all, so this would always 400 for them otherwise,
+    // even though the route deliberately allows ADMIN to call it (see the
+    // ADMIN-aware branchId pattern already used in list()/getById() above).
+    if (req.user?.role === 'ADMIN') {
+      res.json({ success: true, data: null });
+      return;
+    }
+
     const branchId = req.user?.branchId;
     if (!branchId) {
       res.status(400).json({ success: false, message: 'Branch ID not found in token' });

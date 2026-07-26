@@ -589,7 +589,7 @@ export class BillingReportService {
         { expiresIn: '1m' },
       );
 
-      const response = await fetch(`${employeeServiceUrl}/employees/${employeeId}`, {
+      const response = await fetch(`${employeeServiceUrl}/employee/${employeeId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

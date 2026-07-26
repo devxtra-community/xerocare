@@ -7,6 +7,32 @@ import { Notification } from '../entities/notificationEntity';
 import { logger } from '../config/logger';
 import { AccessTokenPayload } from '../types/jwt';
 
+// HR-visibility helper — Manager/Admin can also create/update payroll records
+// (see payrollRouter.ts), so HR needs its own notification to stay aware of
+// activity it didn't personally perform. Skipped when HR is the actor, to
+// avoid notifying HR about its own action.
+async function notifyHrOfPayrollEvent(
+  actingRole: string | undefined,
+  title: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  if (actingRole === 'HR') return;
+  try {
+    const employeeRepo = Source.getRepository(Employee);
+    const notificationRepo = Source.getRepository(Notification);
+    const hrEmployees = await employeeRepo.find({ where: { role: 'HR' as never } });
+    if (hrEmployees.length === 0) return;
+    await notificationRepo.save(
+      hrEmployees.map((hr) =>
+        notificationRepo.create({ employee_id: hr.id, title, message, type: 'PAYROLL', data }),
+      ),
+    );
+  } catch (err) {
+    logger.error('Failed to notify HR of payroll event:', err);
+  }
+}
+
 export class PayrollController {
   static async getPayrollSummary(req: Request, res: Response) {
     try {
@@ -166,6 +192,16 @@ export class PayrollController {
         await notificationRepo.save(notification);
       }
 
+      const actingRole = (req.user as AccessTokenPayload | undefined)?.role;
+      const employeeName =
+        `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || employee.email;
+      await notifyHrOfPayrollEvent(
+        actingRole,
+        'Payroll Record Created',
+        `A payroll record for ${employeeName} (${payrollMonth}/${payrollYear}) was created with status ${newPayroll.status}.`,
+        { payroll_id: newPayroll.id, employee_id, month: payrollMonth, year: payrollYear },
+      );
+
       return res
         .status(201)
         .json({ message: 'Payroll record created successfully', payroll: newPayroll });
@@ -216,6 +252,20 @@ export class PayrollController {
           },
         });
         await notificationRepo.save(notification);
+      }
+
+      if (status !== undefined && status !== oldStatus) {
+        const actingRole = (req.user as AccessTokenPayload | undefined)?.role;
+        const employeeName =
+          `${payroll.employee?.first_name || ''} ${payroll.employee?.last_name || ''}`.trim() ||
+          payroll.employee?.email ||
+          'an employee';
+        await notifyHrOfPayrollEvent(
+          actingRole,
+          'Payroll Status Updated',
+          `Payroll for ${employeeName} (${payroll.month}/${payroll.year}) changed from ${oldStatus} to ${status}.`,
+          { payroll_id: payroll.id, employee_id: payroll.employee_id },
+        );
       }
 
       return res.status(200).json({ message: 'Payroll record updated successfully', payroll });

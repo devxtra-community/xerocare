@@ -76,7 +76,7 @@ export default function AddPaymentModal({
   useEffect(() => {
     if (open) {
       getMyBranch()
-        .then((branch) => setCurrencyCode(branch.currency_code || 'AED'))
+        .then((branch) => setCurrencyCode(branch?.currency_code || 'AED'))
         .catch(() => setCurrencyCode('AED'));
       fetchCashBankAccounts()
         .then((accs) => {

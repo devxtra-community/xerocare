@@ -4,12 +4,16 @@
 services:
   xerocare-app:
     ports:
-      - '3000:3000' # Frontend (Next.js)
-      - '3001:3001' # API Gateway
-      - '3002:3002' # Employee Service
-      - '3003:3003' # Vendor/Inventory Service
-      - '3004:3004' # Billing Service
-      - '3005:3005' # CRM Service
+      # Host side shifted by 10 — 3000-3005 are already bound by native (non-
+      # Docker) dev servers on this machine. Container-side ports are untouched
+      # (ecosystem.config.js still starts each service on its normal port);
+      # only how you reach them from the host changes.
+      - '3010:3000' # Frontend (Next.js)
+      - '3011:3001' # API Gateway
+      - '3012:3002' # Employee Service
+      - '3013:3003' # Vendor/Inventory Service
+      - '3014:3004' # Billing Service
+      - '3015:3005' # CRM Service
 
   # The datastores below are published on shifted host ports so they don't
   # collide with the Postgres/Redis/RabbitMQ/Mongo already running natively
@@ -33,4 +37,4 @@ services:
   rabbitmq:
     ports:
       - '5673:5672'
-      - '15672:15672' # Management UI
+      - '15673:15672' # Management UI (15672 also already taken natively)

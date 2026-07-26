@@ -60,6 +60,44 @@ async function findFinanceManagersOfBranch(branchId: string): Promise<string[]> 
   }
 }
 
+// Branch visibility for the branch Manager — used so Managers see their own
+// branch's employee expense-request activity (submission + approve/reject
+// outcome), not just their own MANAGER_PURCHASE requests.
+async function findBranchManager(branchId: string): Promise<string | null> {
+  try {
+    const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const token = makeServiceToken();
+    const res = await fetch(`${empUrl}/employee?branchId=${branchId}&role=MANAGER&status=ACTIVE`, {
+      headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list: Array<{ id: string }> = data.data?.employees ?? data.data ?? data ?? [];
+    return list[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Cross-branch visibility for Admins — same delivery mechanism (direct HTTP
+// call to employee_service's own internal endpoint), broadcast to every
+// active Admin.
+async function findAllAdmins(): Promise<string[]> {
+  try {
+    const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const token = makeServiceToken();
+    const res = await fetch(`${empUrl}/employee?role=ADMIN&status=ACTIVE`, {
+      headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list: Array<{ id: string }> = data.data?.employees ?? data.data ?? data ?? [];
+    return list.map((e) => e.id);
+  } catch {
+    return [];
+  }
+}
+
 async function sendNotification(
   employeeId: string,
   title: string,
@@ -362,6 +400,28 @@ export const submitExpenseRequest = async (req: Request, res: Response, next: Ne
       );
     }
 
+    // Notify the branch Manager (branch-wide visibility) and all Admins
+    // (cross-branch visibility) — same event, different audiences.
+    const managerId = await findBranchManager(request.branchId);
+    if (managerId) {
+      await sendNotification(
+        managerId,
+        'Expense Request Submitted',
+        `${request.employeeName} submitted a ${request.currency} ${Number(request.amount).toFixed(2)} expense request for ${request.category}.`,
+        'EXPENSE_REQUEST',
+        '/manager/expenses',
+      );
+    }
+    const adminIds = await findAllAdmins();
+    for (const adminId of adminIds) {
+      await sendNotification(
+        adminId,
+        'Expense Request Submitted',
+        `${request.employeeName} (branch ${request.branchName}) submitted a ${request.currency} ${Number(request.amount).toFixed(2)} expense request for ${request.category}.`,
+        'EXPENSE_REQUEST',
+      );
+    }
+
     res.json({ success: true, data: saved });
   } catch (err) {
     next(err);
@@ -600,6 +660,26 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
       'EXPENSE_APPROVED',
     );
 
+    // Notify the branch Manager and all Admins of the outcome too.
+    const managerId = await findBranchManager(request.branchId);
+    if (managerId) {
+      await sendNotification(
+        managerId,
+        'Expense Request Approved',
+        `${request.employeeName}'s ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was approved.`,
+        'EXPENSE_APPROVED',
+        '/manager/expenses',
+      );
+    }
+    for (const adminId of await findAllAdmins()) {
+      await sendNotification(
+        adminId,
+        'Expense Request Approved',
+        `${request.employeeName}'s (branch ${request.branchName}) ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was approved.`,
+        'EXPENSE_APPROVED',
+      );
+    }
+
     const updated = await repo.findOne({ where: { id: String(req.params.id) } });
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -684,6 +764,26 @@ export const rejectExpenseRequest = async (req: Request, res: Response, next: Ne
         `Your ${request.category} expense was rejected. Reason: ${rejection_reason}. You can resubmit after corrections.`,
         'EXPENSE_REJECTED',
       );
+
+      // Notify the branch Manager and all Admins of the outcome too.
+      const managerId = await findBranchManager(request.branchId);
+      if (managerId) {
+        await sendNotification(
+          managerId,
+          'Expense Request Rejected',
+          `${request.employeeName}'s ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was rejected. Reason: ${rejection_reason}.`,
+          'EXPENSE_REJECTED',
+          '/manager/expenses',
+        );
+      }
+      for (const adminId of await findAllAdmins()) {
+        await sendNotification(
+          adminId,
+          'Expense Request Rejected',
+          `${request.employeeName}'s (branch ${request.branchName}) ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was rejected. Reason: ${rejection_reason}.`,
+          'EXPENSE_REJECTED',
+        );
+      }
     }
 
     res.json({ success: true, data: saved });

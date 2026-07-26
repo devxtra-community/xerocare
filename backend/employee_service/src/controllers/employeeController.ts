@@ -4,8 +4,42 @@ import { EmployeeService } from '../services/employeeService';
 import { MulterS3File } from '../types/multer-s3-file';
 import { logger } from '../config/logger';
 import { EmployeeRole } from '../constants/employeeRole';
+import { Source } from '../config/dataSource';
+import { Employee } from '../entities/employeeEntities';
+import { Notification } from '../entities/notificationEntity';
 
 const service = new EmployeeService();
+
+// HR-visibility helper — Admin/Manager can also change employee records, so HR
+// (the role responsible for employee records company-wide) gets a notification
+// whenever it isn't the one making the change itself.
+async function notifyHrOfEmployeeChange(
+  actingRole: string | undefined,
+  title: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  if (actingRole === EmployeeRole.HR) return;
+  try {
+    const employeeRepo = Source.getRepository(Employee);
+    const notificationRepo = Source.getRepository(Notification);
+    const hrEmployees = await employeeRepo.find({ where: { role: EmployeeRole.HR } });
+    if (hrEmployees.length === 0) return;
+    await notificationRepo.save(
+      hrEmployees.map((hr) =>
+        notificationRepo.create({
+          employee_id: hr.id,
+          title,
+          message,
+          type: 'EMPLOYEE_RECORD_CHANGE',
+          data,
+        }),
+      ),
+    );
+  } catch (err) {
+    logger.error('Failed to notify HR of employee record change:', err);
+  }
+}
 
 /**
  * Hiring a brand new staff member.
@@ -228,6 +262,28 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
 
     const updatedEmployee = await service.updateEmployee(req.params.id as string, payload);
 
+    // Branch transfer / role change are the record changes HR most needs to
+    // know about when it isn't the one making them — day-to-day profile edits
+    // (phone, address, etc.) aren't notified to avoid noise.
+    const employeeName =
+      `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || employee.email;
+    if (payload.branchId && payload.branchId !== employee.branch_id) {
+      await notifyHrOfEmployeeChange(
+        req.user?.role,
+        'Employee Branch Transfer',
+        `${employeeName} was transferred to a new branch.`,
+        { employeeId: employee.id },
+      );
+    }
+    if (req.body.role && req.body.role !== employee.role) {
+      await notifyHrOfEmployeeChange(
+        req.user?.role,
+        'Employee Role Changed',
+        `${employeeName}'s role changed from ${employee.role} to ${req.body.role}.`,
+        { employeeId: employee.id },
+      );
+    }
+
     return res.json({
       success: true,
       message: 'Employee updated successfully',
@@ -255,6 +311,15 @@ export const deleteEmployee = async (req: Request, res: Response, next: NextFunc
     }
 
     await service.deleteEmployee(req.params.id as string);
+
+    const employeeName =
+      `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || employee.email;
+    await notifyHrOfEmployeeChange(
+      req.user?.role,
+      'Employee Marked Inactive',
+      `${employeeName} was marked inactive by ${req.user?.role || 'a user'}.`,
+      { employeeId: employee.id },
+    );
 
     return res.json({
       success: true,

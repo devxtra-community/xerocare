@@ -52,6 +52,12 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS builder
 WORKDIR /app
 
+# NEXT_PUBLIC_* vars are inlined into the client JS bundle by `next build` —
+# they must be real env vars during the build step, not just present at
+# container-start, or the browser bundle ships with them as undefined.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Copy the full source code on top of the installed deps
 COPY . .
 

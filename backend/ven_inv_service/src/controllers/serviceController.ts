@@ -102,20 +102,48 @@ export class ServiceController {
   }
 
   /**
-   * Helper to fetch admins and managers for notifications.
+   * Notifies the branch manager AND every Admin (cross-branch visibility) of a
+   * service ticket event. Previously named getBranchManagerAndAdmins and only
+   * ever notified the branch manager — "AndAdmins" was aspirational, not real,
+   * since Admin records live in employee_service's own DB and ven_inv_service
+   * has no local way to resolve them. Admins are now reached via the
+   * notifyAdmins broadcast flag, resolved on the employee_service consumer
+   * side where Admin records actually live.
    */
-  private async getBranchManagerAndAdmins(branchId: string): Promise<string[]> {
-    const ids: string[] = [];
+  private async notifyBranchManagerAndAdmins(
+    branchId: string,
+    notification: {
+      title: string;
+      message: string;
+      type: string;
+      referenceId: string;
+      referenceType:
+        | 'QUOTATION'
+        | 'TEMPLATE'
+        | 'CONTRACT'
+        | 'SERVICE'
+        | 'SERVICE_TICKET'
+        | 'SERVICE_CONTRACT'
+        | 'STOCK_TRANSFER';
+    },
+  ): Promise<void> {
     try {
       const branchRepo = Source.getRepository(Branch);
       const branch = await branchRepo.findOne({ where: { id: branchId } });
-      if (branch && branch.manager_id) {
-        ids.push(branch.manager_id);
+      if (branch?.manager_id) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: branch.manager_id,
+          ...notification,
+        });
       }
     } catch (err) {
-      logger.error('Failed to get branch manager for notification:', err);
+      logger.error('Failed to notify branch manager:', err);
     }
-    return ids;
+    try {
+      await NotificationPublisher.publishInAppRequest({ notifyAdmins: true, ...notification });
+    } catch (err) {
+      logger.error('Failed to notify admins:', err);
+    }
   }
 
   /**
@@ -581,17 +609,13 @@ export class ServiceController {
         req.user.userId,
       );
 
-      const managerIds = await this.getBranchManagerAndAdmins(branchId);
-      for (const mId of managerIds) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: mId,
-          title: 'New Service Ticket Created',
-          message: `Ticket ${ticket.ticketNumber} has been created for serial ${ticket.serialNumber}.`,
-          type: 'INFO',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
+      await this.notifyBranchManagerAndAdmins(branchId, {
+        title: 'New Service Ticket Created',
+        message: `Ticket ${ticket.ticketNumber} has been created for serial ${ticket.serialNumber}.`,
+        type: 'INFO',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
 
       res.status(201).json({ success: true, data: ticket });
     } catch (error) {
@@ -931,17 +955,13 @@ export class ServiceController {
 
               // Check stock warnings
               if (part.quantity <= 5) {
-                const managerIds = await this.getBranchManagerAndAdmins(ticket.branchId);
-                for (const mId of managerIds) {
-                  await NotificationPublisher.publishInAppRequest({
-                    recipientId: mId,
-                    title: 'Low Stock Alert (Service Diagnosis)',
-                    message: `Spare part "${part.part_name}" (SKU: ${part.sku}) is low in stock (Qty: ${part.quantity}). Procurement needed for ticket ${ticket.ticketNumber}.`,
-                    type: 'WARNING',
-                    referenceId: ticket.id,
-                    referenceType: 'SERVICE',
-                  });
-                }
+                await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+                  title: 'Low Stock Alert (Service Diagnosis)',
+                  message: `Spare part "${part.part_name}" (SKU: ${part.sku}) is low in stock (Qty: ${part.quantity}). Procurement needed for ticket ${ticket.ticketNumber}.`,
+                  type: 'WARNING',
+                  referenceId: ticket.id,
+                  referenceType: 'SERVICE',
+                });
               }
             }
           }
@@ -1256,17 +1276,13 @@ export class ServiceController {
         req.user?.userId,
       );
 
-      const managerIds = await this.getBranchManagerAndAdmins(ticket.branchId);
-      for (const mId of managerIds) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: mId,
-          title: 'Ticket Diagnosis Completed',
-          message: `Technician diagnosed ticket ${ticket.ticketNumber} and listed parts.`,
-          type: 'INFO',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
+      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        title: 'Ticket Diagnosis Completed',
+        message: `Technician diagnosed ticket ${ticket.ticketNumber} and listed parts.`,
+        type: 'INFO',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
 
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
@@ -1529,17 +1545,13 @@ export class ServiceController {
           req.user?.userId,
         );
 
-        const managerIds = await this.getBranchManagerAndAdmins(ticket.branchId);
-        for (const mId of managerIds) {
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: mId,
-            title: 'Estimate Approved by Finance',
-            message: `Service Estimate for ticket ${ticket.ticketNumber} approved by Finance. Ready for customer review.`,
-            type: 'INFO',
-            referenceId: ticket.id,
-            referenceType: 'SERVICE',
-          });
-        }
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: 'Estimate Approved by Finance',
+          message: `Service Estimate for ticket ${ticket.ticketNumber} approved by Finance. Ready for customer review.`,
+          type: 'INFO',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
       }
 
       res.status(200).json({ success: true, data: estimate });
@@ -2333,17 +2345,13 @@ export class ServiceController {
         req.user?.userId,
       );
 
-      const managerIds = await this.getBranchManagerAndAdmins(ticket.branchId);
-      for (const mId of managerIds) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: mId,
-          title: 'Service Ticket Completed',
-          message: `Ticket ${ticket.ticketNumber} has been completed by technician.`,
-          type: 'INFO',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
+      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        title: 'Service Ticket Completed',
+        message: `Ticket ${ticket.ticketNumber} has been completed by technician.`,
+        type: 'INFO',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
 
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
@@ -3775,17 +3783,13 @@ export class ServiceController {
         }
       }
 
-      const managerIds = await this.getBranchManagerAndAdmins(ticket.branchId);
-      for (const mId of managerIds) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: mId,
-          title: 'Customer Rejected Service',
-          message: `Customer rejected quotation for ticket ${ticket.ticketNumber}.`,
-          type: 'WARNING',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
+      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        title: 'Customer Rejected Service',
+        message: `Customer rejected quotation for ticket ${ticket.ticketNumber}.`,
+        type: 'WARNING',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
 
       res.status(200).json({
         success: true,

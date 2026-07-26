@@ -868,11 +868,11 @@ export async function chequeDueReminderJob() {
     logger.info(`[CRON] Found ${dueCheques.length} cheque(s) due in 2 days.`);
 
     for (const cheque of dueCheques) {
-      const financeIds = await getBranchFinanceIds(cheque.branchId);
-      if (financeIds.length === 0) continue;
+      const recipientIds = await getBranchChequeReminderRecipientIds(cheque.branchId);
+      if (recipientIds.length === 0) continue;
 
       const direction = cheque.type === 'ISSUED' ? 'issued to' : 'received from';
-      for (const recipientId of financeIds) {
+      for (const recipientId of recipientIds) {
         await sendChequeReminderNotification(
           recipientId,
           'Cheque Due in 2 Days',
@@ -887,13 +887,13 @@ export async function chequeDueReminderJob() {
 }
 
 /**
- * Daily: notifies Finance (per-branch) 2 days before a RECEIVED cheque's own Cheque
- * Date — the date it becomes valid/eligible to be taken to the bank. A post-dated
- * cheque (chequeDate later than the date it was physically received) isn't presentable
- * until its Cheque Date arrives, so this is a distinct concern from the Due Date
- * reminder above. Only fires for cheques not yet Deposited (status = PENDING) — once
- * deposited, it's no longer waiting to be taken to the bank, so this stops on its own
- * without any extra "already notified" bookkeeping.
+ * Daily: notifies the branch's Finance users plus Manager 2 days before a RECEIVED
+ * cheque's own Cheque Date — the date it becomes valid/eligible to be taken to the
+ * bank. A post-dated cheque (chequeDate later than the date it was physically
+ * received) isn't presentable until its Cheque Date arrives, so this is a distinct
+ * concern from the Due Date reminder above. Only fires for cheques not yet Deposited
+ * (status = PENDING) — once deposited, it's no longer waiting to be taken to the
+ * bank, so this stops on its own without any extra "already notified" bookkeeping.
  *
  * Skips cheques whose chequeDate equals dueDate — those are covered by
  * chequeDueReminderJob firing on the very same day, avoiding a duplicate pair.
@@ -920,10 +920,10 @@ export async function chequeDateReminderJob() {
     logger.info(`[CRON] Found ${chequesBecomingValid.length} cheque(s) becoming valid in 2 days.`);
 
     for (const cheque of chequesBecomingValid) {
-      const financeIds = await getBranchFinanceIds(cheque.branchId);
-      if (financeIds.length === 0) continue;
+      const recipientIds = await getBranchChequeReminderRecipientIds(cheque.branchId);
+      if (recipientIds.length === 0) continue;
 
-      for (const recipientId of financeIds) {
+      for (const recipientId of recipientIds) {
         await sendChequeReminderNotification(
           recipientId,
           'Post-Dated Cheque Becomes Valid in 2 Days',
@@ -993,9 +993,8 @@ async function getBranchManagerId(branchId: string): Promise<string | null> {
 }
 
 /**
- * All FINANCE-role employees for a branch — cheques are a Finance-owned module (the
- * Cheques page, Deposit/Clear/Bounce actions all require FINANCE access), so cheque
- * reminders must land on the Finance notifications page, not the branch Manager's.
+ * All FINANCE-role employees for a branch — cheque reminders go to Finance plus the
+ * branch Manager, since Managers asked for branch-scoped cheque visibility too.
  */
 async function getBranchFinanceIds(branchId: string): Promise<string[]> {
   try {
@@ -1019,6 +1018,15 @@ async function getBranchFinanceIds(branchId: string): Promise<string[]> {
     logger.error('[CRON] Error resolving branch Finance employees for cheque reminders:', err);
     return [];
   }
+}
+
+async function getBranchChequeReminderRecipientIds(branchId: string): Promise<string[]> {
+  const [financeIds, managerId] = await Promise.all([
+    getBranchFinanceIds(branchId),
+    getBranchManagerId(branchId),
+  ]);
+
+  return [...new Set([...financeIds, ...(managerId ? [managerId] : [])])];
 }
 
 /**

@@ -5,7 +5,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { X, Download, Mail, MessageCircle, Printer, Loader2 } from 'lucide-react';
+import { X, Download, Mail, Phone, Printer, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { sendTaxDocumentEmail } from '@/lib/finance/accountsApi';
 import type {
@@ -594,91 +594,17 @@ export default function TaxDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between px-6 py-3 bg-slate-800 text-white">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {docTitle}
-            </div>
-            <div className="text-sm font-semibold text-white">{docId}</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-slate-300 hover:text-white hover:bg-slate-700 h-8 gap-1.5 text-xs"
-              onClick={handlePrint}
-            >
-              <Printer size={14} /> Print
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-slate-300 hover:text-white hover:bg-slate-700 h-8 gap-1.5 text-xs"
-              onClick={handleDownload}
-              disabled={sending}
-            >
-              {sending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{' '}
-              PDF
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-slate-300 hover:text-white hover:bg-slate-700 h-8 gap-1.5 text-xs"
-              onClick={() => setShowEmailInput(!showEmailInput)}
-            >
-              <Mail size={14} /> Email
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-green-400 hover:text-green-300 hover:bg-slate-700 h-8 gap-1.5 text-xs"
-              onClick={handleWhatsApp}
-            >
-              <MessageCircle size={14} /> WhatsApp
-            </Button>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="ml-2 text-slate-400 hover:text-white"
-            >
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Email input strip */}
-        {showEmailInput && (
-          <div className="flex items-center gap-2 px-6 py-2 bg-blue-50 border-b border-blue-100">
-            <Mail size={14} className="text-blue-500 shrink-0" />
-            <Input
-              type="email"
-              placeholder="Recipient email address"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleEmail()}
-              className="h-8 text-sm rounded-lg border-blue-200 bg-white flex-1"
-              autoFocus
-            />
-            <Button
-              size="sm"
-              onClick={handleEmail}
-              disabled={sending}
-              className="h-8 text-xs px-4 rounded-lg"
-            >
-              {sending ? <Loader2 size={13} className="animate-spin" /> : 'Send'}
-            </Button>
-            <button
-              onClick={() => setShowEmailInput(false)}
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* Document preview */}
-        <div className="overflow-y-auto max-h-[78vh] bg-gray-100 p-6">
+      {/* flex flex-col + max-h-[95vh] caps total dialog height at the viewport,
+          matching QuotationViewDialog (the reference design) — without this the
+          dialog's height is only as tall as its content, and since the base
+          DialogContent centers via top-50%/-translate-y-50% with no scroll
+          wrapper of its own, a long document simply extends past the top/bottom
+          of the viewport instead of scrolling. The doc-preview div below is the
+          flex-1/overflow-y-auto child that actually scrolls, so only ONE region
+          scrolls internally and the dialog chrome (toolbar/footer) stays put. */}
+      <DialogContent className="sm:max-w-5xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl bg-white flex flex-col max-h-[95vh]">
+        {/* Document preview — the scrollable region */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide bg-gray-100 p-6">
           <div
             ref={printRef}
             id="tax-doc-print-content"
@@ -692,6 +618,95 @@ export default function TaxDocumentDialog({
             {data.type === 'international' && (
               <InputIntlDocument row={data.row as InputTaxInternationalRow} branch={branch} />
             )}
+          </div>
+        </div>
+
+        {/* Email input strip */}
+        {showEmailInput && (
+          <div className="shrink-0 flex items-center gap-2 px-6 py-3 bg-blue-50 border-t border-blue-100">
+            <Mail size={14} className="text-blue-500 shrink-0" />
+            <Input
+              type="email"
+              placeholder="Recipient email address"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleEmail()}
+              className="h-9 text-sm rounded-md border-blue-200 bg-white flex-1"
+              autoFocus
+            />
+            <Button
+              size="sm"
+              onClick={handleEmail}
+              disabled={sending}
+              className="h-9 text-[11px] font-normal uppercase tracking-widest px-4 rounded-md"
+            >
+              {sending ? <Loader2 size={13} className="animate-spin" /> : 'Send'}
+            </Button>
+            <button
+              onClick={() => setShowEmailInput(false)}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Footer Actions — matches the Employee Quotation view's footer bar
+            (spacing, proportions, and button treatment) exactly */}
+        <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center">
+          <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
+            <span className="text-[9px] font-normal uppercase tracking-widest text-slate-400">
+              {docTitle}:
+            </span>
+            <span className="text-[9px] font-normal uppercase tracking-widest text-blue-600">
+              {docId}
+            </span>
+          </div>
+          <div className="flex gap-3 items-center">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-slate-200 text-slate-700 hover:bg-slate-100 gap-2"
+              >
+                <Printer size={14} /> Print
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                disabled={sending}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-slate-200 text-slate-700 hover:bg-slate-100 gap-2"
+              >
+                {sending ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEmailInput(!showEmailInput)}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+              >
+                <Mail size={14} /> Email
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleWhatsApp}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+              >
+                <Phone size={14} /> WhatsApp
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-9 text-[11px] font-normal uppercase tracking-widest text-slate-500 hover:text-red-600"
+            >
+              Close
+            </Button>
           </div>
         </div>
       </DialogContent>

@@ -82,29 +82,39 @@ export class LeaveApplicationService {
       return leaveRepo.save(newLeave) as Promise<LeaveApplication>;
     });
 
-    // Notify branch manager of leave submission
+    // Notify branch manager AND HR of leave submission — HR is a company-wide
+    // review role for leave here (see Part 5 of the notifications rollout),
+    // not branch-scoped the way MANAGER is, so it's queried without a branch
+    // filter.
     try {
       const employeeRepo = Source.getRepository(Employee);
       const notificationRepo = Source.getRepository(Notification);
 
-      const manager = await employeeRepo.findOne({
-        where: { branch_id: employee.branch_id!, role: 'MANAGER' as never },
-      });
+      const [manager, hrEmployees] = await Promise.all([
+        employeeRepo.findOne({
+          where: { branch_id: employee.branch_id!, role: 'MANAGER' as never },
+        }),
+        employeeRepo.find({ where: { role: 'HR' as never } }),
+      ]);
 
       const employeeName =
         `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || 'An employee';
 
-      if (manager) {
-        await notificationRepo.save(
+      const recipientIds = new Set<string>();
+      if (manager) recipientIds.add(manager.id);
+      for (const hr of hrEmployees) recipientIds.add(hr.id);
+
+      await notificationRepo.save(
+        [...recipientIds].map((recipientId) =>
           notificationRepo.create({
-            employee_id: manager.id,
+            employee_id: recipientId,
             title: 'Leave Application Submitted',
             message: `${employeeName} has submitted a ${data.leave_type} leave request from ${data.start_date} to ${data.end_date}.`,
             type: 'LEAVE_SUBMITTED',
             data: { leaveId: leaveApplication.id, employeeId },
           }),
-        );
-      }
+        ),
+      );
     } catch {
       // Non-blocking
     }

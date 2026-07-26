@@ -88,7 +88,7 @@ export default function TransferDetail({ transferId, role }: Props) {
     load();
     if (role === 'manager') {
       getMyBranch()
-        .then((b) => setMyBranchId(b.id))
+        .then((b) => setMyBranchId(b?.id ?? null))
         .catch(() => setMyBranchId(null));
     }
   }, [load, role]);

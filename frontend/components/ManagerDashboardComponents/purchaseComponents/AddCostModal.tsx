@@ -57,7 +57,7 @@ export default function AddCostModal({
   useEffect(() => {
     if (open) {
       getMyBranch()
-        .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+        .then((branch) => setCurrencyCode(branch?.currency_code || getActiveCurrency()))
         .catch(() => setCurrencyCode(getActiveCurrency()));
     } else {
       setCustomCostType('');

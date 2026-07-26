@@ -33,7 +33,7 @@ export async function getEmployeeDetails(
       { expiresIn: '1m' },
     );
 
-    const response = await fetch(`${employeeServiceUrl}/employees/${employeeId}`, {
+    const response = await fetch(`${employeeServiceUrl}/employee/${employeeId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ export async function getFinanceEmployeesByBranch(branchId: string | undefined):
       { expiresIn: '1m' },
     );
 
-    const response = await fetch(`${employeeServiceUrl}/employees?role=FINANCE&limit=100`, {
+    const response = await fetch(`${employeeServiceUrl}/employee?role=FINANCE&limit=100`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ export async function getBranchManager(branchId: string | undefined): Promise<st
       { expiresIn: '1m' },
     );
 
-    const response = await fetch(`${employeeServiceUrl}/employees?role=MANAGER&limit=100`, {
+    const response = await fetch(`${employeeServiceUrl}/employee?role=MANAGER&limit=100`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -256,7 +256,7 @@ export async function getBranchManagerEmail(branchId: string | undefined): Promi
       { expiresIn: '1m' },
     );
 
-    const response = await fetch(`${employeeServiceUrl}/employees?role=MANAGER&limit=100`, {
+    const response = await fetch(`${employeeServiceUrl}/employee?role=MANAGER&limit=100`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

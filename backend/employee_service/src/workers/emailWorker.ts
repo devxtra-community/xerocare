@@ -150,7 +150,16 @@ export const startWorker = async () => {
 
     logger.info(`[Notification Worker] Received message`, { routingKey, job });
 
-    if (!job.recipient) {
+    // Email/WhatsApp jobs carry a singular `recipient`; in-app jobs carry a
+    // `recipients` array (and/or a `notifyAdmins` broadcast flag) instead — this
+    // guard previously only accepted the singular field, so every in-app job
+    // (routingKey === 'notification.in_app.request') failed it and was silently
+    // dropped here before ever reaching the branch that actually saves it.
+    const hasRecipient =
+      !!job.recipient ||
+      (Array.isArray(job.recipients) && job.recipients.length > 0) ||
+      job.notifyAdmins === true;
+    if (!hasRecipient) {
       logger.error('Invalid notification job: Missing recipient', { job });
       channel.ack(msg);
       return;

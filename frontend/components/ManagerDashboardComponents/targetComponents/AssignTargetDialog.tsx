@@ -94,7 +94,7 @@ export default function AssignTargetDialog({
       .catch(() => toast.error('Failed to load employees'));
 
     getMyBranch()
-      .then((branch) => setCurrencyCode(branch.currency_code || getActiveCurrency()))
+      .then((branch) => setCurrencyCode(branch?.currency_code || getActiveCurrency()))
       .catch(() => setCurrencyCode(getActiveCurrency()));
   }, [open]);
 

@@ -32,10 +32,26 @@ export interface NotificationRequestEvent {
 }
 
 export interface InAppNotificationRequestEvent {
-  recipientId: string;
+  // Optional — omit (with notifyAdmins: true) for an admin-only broadcast
+  // with no specific individual recipient.
+  recipientId?: string;
+  // Cross-branch/company-wide broadcast to every Admin — resolved on the
+  // employee_service consumer side (Admin records live in that service's
+  // own DB, not here), so this is the only way billing_service can reach
+  // Admin recipients at all.
+  notifyAdmins?: boolean;
   title: string;
   message: string;
   type: string;
   referenceId: string;
-  referenceType: 'QUOTATION' | 'TEMPLATE' | 'CONTRACT' | 'OPENING_BALANCE' | 'TARGET' | 'CHEQUE';
+  referenceType:
+    | 'QUOTATION'
+    | 'TEMPLATE'
+    | 'CONTRACT'
+    | 'OPENING_BALANCE'
+    | 'TARGET'
+    | 'CHEQUE'
+    | 'EXPENSE_REQUEST'
+    | 'CREDIT_NOTE'
+    | 'PURCHASE_PAYMENT';
 }

@@ -10,6 +10,7 @@ import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { requireCashAccount } from '../services/cashbookService';
+import { getBranchManager } from '../services/billingHelpers';
 import { logger } from '../config/logger';
 
 const router = Router();
@@ -24,6 +25,13 @@ async function sendNotification(employeeId: string, title: string, message: stri
   } catch {
     logger.warn('[cheques] Notification send failed (non-fatal)');
   }
+}
+
+async function sendNotifications(employeeIds: string[], title: string, message: string) {
+  const uniqueEmployeeIds = [...new Set(employeeIds.filter(Boolean))];
+  await Promise.all(
+    uniqueEmployeeIds.map((employeeId) => sendNotification(employeeId, title, message)),
+  );
 }
 
 function logHistory(
@@ -602,8 +610,9 @@ router.post('/:id/bounce', async (req, res, next) => {
       await logHistory(m, cheque.id, prevStatus, 'BOUNCED', userId, notes || 'Cheque bounced');
     });
 
-    await sendNotification(
-      userId,
+    const branchManagerId = await getBranchManager(branchId);
+    await sendNotifications(
+      [userId, branchManagerId ?? ''],
       'Cheque Bounced',
       `Cheque #${cheque.chequeNo} from ${cheque.partyName} has bounced.`,
     );
