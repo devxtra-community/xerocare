@@ -92,9 +92,10 @@ interface MenuItem {
 // entries deep-link into the manager, employee, HR and finance desks the same
 // way the manager sidebar does.
 //
-// Those branch-scoped desks read and write through the branch selected in the
-// header switcher (see components/AdminBranchSwitcher.tsx). With "All branches"
-// active they stay read-only, because no single branch owns a new record.
+// Those branch-scoped desks read and write through the acting branch held in
+// lib/adminBranch (sent as the `X-Acting-Branch` header by lib/api.ts). No UI
+// sets it at present, so an admin stays organisation-wide and those desks are
+// effectively read-only, because no single branch owns a new record.
 const menuItems: MenuItem[] = [
   {
     title: 'Dashboard',
