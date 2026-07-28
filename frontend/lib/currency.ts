@@ -1,4 +1,6 @@
 import { getMyBranch } from './branch';
+import { getUserFromToken } from './auth';
+import { getActingBranchId } from './adminBranch';
 
 /**
  * Branch-currency singleton.
@@ -65,8 +67,18 @@ export function clearActiveCurrency() {
  * Users without a branch (e.g. ADMIN) keep the fallback.
  */
 export function initBranchCurrency(): Promise<void> {
+  // /branch/my-branch resolves the branch from req.user.branchId, which comes
+  // either from the token (MANAGER, HR, EMPLOYEE, FINANCE) or, for an ADMIN,
+  // from the acting-branch header. An admin on "all branches" has neither, so
+  // the request could only ever answer 400 — skip it and keep the fallback
+  // rather than firing a guaranteed failure on every dashboard page.
+  const hasBranchContext = Boolean(getUserFromToken()?.branchId || getActingBranchId());
+  if (!hasBranchContext) return Promise.resolve();
+
   if (!fetchPromise) {
-    fetchPromise = getMyBranch()
+    // silent: an ADMIN has no branch and legitimately gets a 400 here. The
+    // fallback currency covers that case, so the failure must not be toasted.
+    fetchPromise = getMyBranch({ silent: true })
       .then((branch) => {
         if (branch?.currency_code) setActiveCurrency(branch.currency_code);
       })

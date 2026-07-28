@@ -4,13 +4,16 @@ import DashboardHeader from '@/components/DashboardHeader';
 import RoleAwareSidebar from '@/components/RoleAwareSidebar';
 import ChequeNotificationBell from '@/components/accounts/ChequeNotificationBell';
 import AuthGuard from '@/components/auth-guard';
+import { getServerUser } from '@/lib/server-auth';
 
-export default function FinanceLayout({ children }: { children: React.ReactNode }) {
+export default async function FinanceLayout({ children }: { children: React.ReactNode }) {
+  const user = await getServerUser();
+
   return (
     <AuthGuard loginUrl="/login">
       <SidebarProvider>
         <div className="flex min-h-screen w-full" suppressHydrationWarning>
-          <RoleAwareSidebar fallback="finance" />
+          <RoleAwareSidebar fallback="finance" initialRole={user?.role ?? null} />
 
           <SidebarInset
             className="bg-background min-h-screen w-full flex flex-col"

@@ -12,7 +12,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
       <div className="flex min-h-screen w-full">
         <RoleAwareSidebar
           fallback="employee"
-          initialIsManager={user?.role === 'MANAGER'}
+          initialRole={user?.role ?? null}
           initialEmployeeJob={user?.employeeJob ?? null}
         />
 

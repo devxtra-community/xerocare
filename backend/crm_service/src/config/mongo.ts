@@ -8,7 +8,10 @@ export const connectMongo = async () => {
       logger.warn('MONGO_URI not provided, skipping MongoDB connection');
       return;
     }
-    await mongoose.connect(mongoUri);
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
     logger.info('MongoDB connected successfully');
   } catch (error) {
     logger.error('MongoDB connection error:', error);

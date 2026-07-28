@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { getAllEmployees, Employee } from '@/lib/employee';
 import { getUserFromToken } from '@/lib/auth';
+import { getActingBranchId } from '@/lib/adminBranch';
 import { formatCurrency } from '@/lib/format';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { monthlyAchievement, TargetWithAchievement } from '@/lib/targets';
@@ -39,14 +40,12 @@ export default function ManagerTargetsPage() {
       const data = await monthlyAchievement(month);
       setRows(data);
 
+      // An admin has no branch of its own, so it scopes by the branch selected
+      // in the header switcher — or sees every branch when none is selected.
       const user = getUserFromToken();
-      const empRes = await getAllEmployees(
-        1,
-        200,
-        undefined,
-        undefined,
-        user?.role === 'MANAGER' ? user.branchId : undefined,
-      );
+      const branchId =
+        user?.role === 'MANAGER' ? user.branchId : (getActingBranchId() ?? undefined);
+      const empRes = await getAllEmployees(1, 200, undefined, undefined, branchId);
       const map: Record<string, Employee> = {};
       empRes.data.employees.forEach((e) => {
         map[e.id] = e;

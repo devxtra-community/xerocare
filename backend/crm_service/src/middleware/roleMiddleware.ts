@@ -13,6 +13,12 @@ export const requireRole = (...allowedRoles: string[]) => {
 
     const userRole = req.user.role;
 
+    // ADMIN is the organisation-wide superuser: it outranks every other role,
+    // so it passes any role gate without having to be listed on each route.
+    if (userRole === 'ADMIN') {
+      return next();
+    }
+
     if (
       userRole === 'MANAGER' &&
       allowedRoles.some((role) => MANAGER_INHERITED_ROLES.includes(role))

@@ -18,12 +18,12 @@ export default function AccountsRoleLayout({ children }: { children: React.React
 
     const { role } = user;
 
-    if (role === 'FINANCE') {
+    // ADMIN is the organisation-wide superuser: it reads the branch-scoped
+    // finance ledgers directly, through whichever acting-branch it selected.
+    if (role === 'FINANCE' || role === 'ADMIN') {
       setAuthorized(true);
     } else if (role === 'MANAGER') {
       router.replace('/manager/accounts');
-    } else if (role === 'ADMIN') {
-      router.replace('/admin/accounts');
     } else {
       // HR, EMPLOYEE, and any unknown role
       router.replace('/unauthorized');

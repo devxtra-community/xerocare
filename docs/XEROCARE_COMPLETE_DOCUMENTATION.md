@@ -130,10 +130,28 @@ For detailed system mechanics, build settings, database schemas, complex busines
    ```bash
    pnpm install
    ```
-2. **Start Postgres, MongoDB, Redis & RabbitMQ**:
+2. **Install & start Redis and RabbitMQ natively**:
+
+   PostgreSQL and MongoDB are external managed services (Neon and MongoDB Atlas) —
+   there is nothing to install for them, just set the connection strings in `.env`
+   (`*_DATABASE_URL` and `MONGO_URI`). Only Redis and RabbitMQ run locally:
+
    ```bash
-   docker-compose up -d postgres mongodb redis rabbitmq
+   # Debian / Ubuntu
+   sudo apt update
+   sudo apt install -y redis-server rabbitmq-server
+
+   sudo systemctl enable --now redis-server
+   sudo systemctl enable --now rabbitmq-server
    ```
+
+   Verify both are reachable on the ports the services expect:
+
+   ```bash
+   redis-cli ping           # → PONG          (REDIS_URL=redis://localhost:6379)
+   sudo rabbitmqctl status  # → runtime info  (RABBITMQ_URL=amqp://localhost:5672)
+   ```
+
 3. **Run services in development mode**:
    ```bash
    pnpm dev

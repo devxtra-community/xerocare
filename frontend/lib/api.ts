@@ -1,7 +1,9 @@
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 import { toast } from 'sonner';
 import { requestRefresh } from './auth-refresh';
 import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
+import { getActingBranchId } from './adminBranch';
 
 /**
  * This is the "Messenger" of our application.
@@ -33,6 +35,17 @@ interface CustomConfig {
   _startTime?: number;
   /** Set to true on a request to suppress the automatic error toast. */
   skipErrorToast?: boolean;
+}
+
+/**
+ * Make `skipErrorToast` assignable on a per-request config. Without this
+ * augmentation the interceptor reads a flag no caller can pass type-safely.
+ */
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /** Suppress the global error toast for this request. */
+    skipErrorToast?: boolean;
+  }
 }
 
 /**
@@ -77,12 +90,50 @@ const showApiErrorToast = (error: {
   });
 };
 
+/**
+ * A branch-scoped endpoint rejected the request because no branch could be
+ * derived. For an admin on "All branches" that is not a failure to debug — it
+ * is the expected answer, and the fix is to pick a branch in the header.
+ *
+ * The backend raises this from several call sites with slightly different
+ * wording, so match on the shapes rather than one exact string.
+ */
+const BRANCH_CONTEXT_ERRORS = [
+  'user context missing or incomplete',
+  'branch context missing',
+  'branch id is required',
+  'branchid is required',
+];
+
+const isAdminMissingBranchError = (status?: number, message?: string): boolean => {
+  if (status !== 400 && status !== 401) return false;
+  if (getActingBranchId()) return false; // a branch is selected — a real error
+
+  const text = (message || '').toLowerCase();
+  if (!BRANCH_CONTEXT_ERRORS.some((m) => text.startsWith(m))) return false;
+
+  try {
+    const token = localStorage.getItem('accessToken');
+    return token ? jwtDecode<{ role?: string }>(token).role === 'ADMIN' : false;
+  } catch {
+    return false;
+  }
+};
+
 // Security Check: Every time we send a message, we attach a "Digital ID Card"
 // (AccessToken) so the server knows who is asking.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Admins carry no branch in their token, so they nominate the branch they are
+  // acting in. Sent unconditionally: the backend applies it only when the
+  // verified token says ADMIN, so a non-admin with a stale value is a no-op.
+  const actingBranchId = getActingBranchId();
+  if (actingBranchId) {
+    config.headers['X-Acting-Branch'] = actingBranchId;
   }
 
   // --- LOGGING: Request ---
@@ -158,6 +209,21 @@ api.interceptors.response.use(
     if (error.response?.data) console.log('Error Data:', error.response.data);
     console.log('Full Error Object:', error);
     console.groupEnd();
+
+    const serverMessage = error.response?.data?.message || error.response?.data?.error;
+
+    // An admin acting organisation-wide hit a branch-scoped endpoint. Answer
+    // with the action that fixes it, and stop here: a token refresh cannot
+    // supply a branch, and without this the 401 would fail silently.
+    if (isAdminMissingBranchError(status, serverMessage)) {
+      toast.error('Select a branch to act in', {
+        id: 'admin-acting-branch-required',
+        description:
+          'This action belongs to a single branch. Pick one in the header switcher, then try again.',
+        duration: 8000,
+      });
+      return Promise.reject(error);
+    }
 
     // Surface every failure to the user — 401s are excluded because they are
     // either silently retried after a token refresh or end in a login redirect.

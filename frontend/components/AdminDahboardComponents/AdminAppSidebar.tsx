@@ -37,6 +37,20 @@ import {
   BookMarked,
   Coins,
   SplitSquareHorizontal,
+  Target,
+  Tags,
+  Cpu,
+  Puzzle,
+  UserCheck,
+  CalendarCheck,
+  ClipboardList,
+  FileSignature,
+  ShoppingBag,
+  Handshake,
+  KeyRound,
+  ShieldAlert,
+  Repeat,
+  type LucideIcon,
 } from 'lucide-react';
 
 import {
@@ -58,20 +72,121 @@ import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
 import { useRouter, usePathname } from 'next/navigation';
 
-const menuItems = [
+interface MenuLink {
+  title: string;
+  icon: LucideIcon;
+  href: string;
+}
+
+interface MenuItem {
+  title: string;
+  icon: LucideIcon;
+  href?: string;
+  disabled?: boolean;
+  subItems?: MenuLink[];
+}
+
+// The admin is the organisation-wide superuser, so this sidebar is the union of
+// every desk in the product — not an admin-only subset. Where an admin-native
+// page exists it wins (`/admin/...`, all-branch data by default); the remaining
+// entries deep-link into the manager, employee, HR and finance desks the same
+// way the manager sidebar does.
+//
+// Those branch-scoped desks read and write through the acting branch held in
+// lib/adminBranch (sent as the `X-Acting-Branch` header by lib/api.ts). No UI
+// sets it at present, so an admin stays organisation-wide and those desks are
+// effectively read-only, because no single branch owns a new record.
+const menuItems: MenuItem[] = [
   {
     title: 'Dashboard',
     icon: LayoutDashboard,
-    href: '/admin/dashboard',
+    subItems: [
+      {
+        title: 'Organisation Overview',
+        icon: LayoutDashboard,
+        href: '/admin/dashboard',
+      },
+      {
+        title: 'Branch Overview',
+        icon: Building2,
+        href: '/manager/dashboard',
+      },
+    ],
   },
   {
-    title: 'Sales',
+    title: 'Branches',
+    icon: Building2,
+    href: '/admin/branch',
+  },
+  {
+    title: 'Catalog',
+    icon: Tags,
+    subItems: [
+      {
+        title: 'Products',
+        icon: Package,
+        href: '/manager/products',
+      },
+      {
+        title: 'Models',
+        icon: Cpu,
+        href: '/manager/models',
+      },
+      {
+        title: 'Brands',
+        icon: Tags,
+        href: '/manager/brands',
+      },
+      {
+        title: 'Spare Parts',
+        icon: Puzzle,
+        href: '/manager/spare-parts',
+      },
+    ],
+  },
+  {
+    title: 'Sales Desk',
     icon: ShoppingCart,
     subItems: [
       {
         title: 'Overview',
         icon: ShoppingCart,
         href: '/admin/sales',
+      },
+      {
+        title: 'Direct Sale',
+        icon: ShoppingBag,
+        href: '/employee/sales',
+      },
+      {
+        title: 'Quotations',
+        icon: FileText,
+        href: '/employee/quotations',
+      },
+      {
+        title: 'Orders',
+        icon: ClipboardList,
+        href: '/employee/orders',
+      },
+      {
+        title: 'Templates',
+        icon: FileSignature,
+        href: '/manager/sales/templates',
+      },
+      {
+        title: 'Leads',
+        icon: Handshake,
+        href: '/employee/leads',
+      },
+      {
+        title: 'Rent',
+        icon: KeyRound,
+        href: '/employee/rent',
+      },
+      {
+        title: 'Lease',
+        icon: Repeat,
+        href: '/employee/lease',
       },
       {
         title: 'Returns',
@@ -81,20 +196,14 @@ const menuItems = [
     ],
   },
   {
-    title: 'Branch',
-    icon: Building2,
-    href: '/admin/branch',
-    disabled: true,
-  },
-  {
-    title: 'Human Resources',
-    icon: Users,
-    href: '/admin/human-resource',
-  },
-  {
     title: 'Customers',
     icon: Users,
     href: '/admin/customers',
+  },
+  {
+    title: 'Targets',
+    icon: Target,
+    href: '/manager/targets',
   },
   {
     title: 'Warehouse',
@@ -165,13 +274,120 @@ const menuItems = [
     ],
   },
   {
+    title: 'HR Desk',
+    icon: Users,
+    subItems: [
+      {
+        title: 'Human Resources',
+        icon: Users,
+        href: '/admin/human-resource',
+      },
+      {
+        title: 'HR Overview',
+        icon: BarChart2,
+        href: '/hr/dashboard',
+      },
+      {
+        title: 'Employee Directory',
+        icon: UserCheck,
+        href: '/hr/employees',
+      },
+      {
+        title: 'Branch Employees',
+        icon: Users,
+        href: '/manager/employees',
+      },
+      {
+        title: 'Attendance',
+        icon: CalendarCheck,
+        href: '/hr/attendance',
+      },
+      {
+        title: 'Leave Approvals',
+        icon: CalendarDays,
+        href: '/hr/leave',
+      },
+      {
+        title: 'Payroll',
+        icon: Banknote,
+        href: '/hr/payroll',
+      },
+    ],
+  },
+  {
+    title: 'Finance Desk',
+    icon: DollarSign,
+    subItems: [
+      {
+        title: 'Finance Overview',
+        icon: BarChart2,
+        href: '/finance/dashboard',
+      },
+      {
+        title: 'AR Invoices',
+        icon: ReceiptText,
+        href: '/finance/ar/invoices',
+      },
+      {
+        title: 'AP Invoices',
+        icon: CreditCard,
+        href: '/finance/ap/invoices',
+      },
+      {
+        title: 'Rent Collections',
+        icon: KeyRound,
+        href: '/finance/rent',
+      },
+      {
+        title: 'Lease Collections',
+        icon: Repeat,
+        href: '/finance/lease',
+      },
+      {
+        title: 'Sale Collections',
+        icon: ShoppingBag,
+        href: '/finance/sale',
+      },
+      {
+        title: 'Orders',
+        icon: ClipboardList,
+        href: '/finance/orders',
+      },
+      {
+        title: 'Quotation Approvals',
+        icon: FileCheck,
+        href: '/finance/quotations',
+      },
+      {
+        title: 'Service Estimates',
+        icon: Wrench,
+        href: '/finance/service-estimates',
+      },
+      {
+        title: 'Returns',
+        icon: RotateCcw,
+        href: '/finance/returns',
+      },
+      {
+        title: 'Opening Balances',
+        icon: BookText,
+        href: '/manager/opening-balances',
+      },
+    ],
+  },
+  {
+    title: 'My Expenses',
+    icon: Receipt,
+    href: '/employee/expenses',
+  },
+  {
     title: 'Notifications',
     icon: Bell,
     href: '/admin/notifications',
   },
 ];
 
-const adminAccountsMenuItems = [
+const adminAccountsMenuItems: MenuLink[] = [
   { title: 'Overview', icon: BarChart2, href: '/admin/accounts' },
   { title: 'Cash & Bank', icon: BookOpen, href: '/admin/accounts/cash-bank' },
   { title: 'Day Book', icon: CalendarDays, href: '/admin/accounts/day-book' },
@@ -194,6 +410,7 @@ const adminAccountsMenuItems = [
   { title: 'Depreciation', icon: PieChart, href: '/admin/accounts/depreciation' },
   { title: 'Exchange Rates', icon: ArrowRightLeft, href: '/admin/accounts/exchange-rates' },
   { title: 'Reports Hub', icon: FileBarChart, href: '/admin/accounts/reports' },
+  { title: 'Data Integrity', icon: ShieldAlert, href: '/admin/accounts/data-integrity' },
 ];
 
 export default function AppSidebar() {
