@@ -25,8 +25,10 @@ import {
   fetchEquityStatement,
   fetchBalanceSheet,
   fetchCashBankAccounts,
+  CREATABLE_EQUITY_TYPES,
   type EquityEntry,
   type EquityType,
+  type EquityReserveSource,
 } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
@@ -34,6 +36,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatementDialog, { type StatementData } from '@/components/shared/StatementDialog';
 import StatCard from '@/components/StatCard';
+import OwnerSelect from '@/components/finance/OwnerSelect';
 import {
   DonutChart,
   SimpleLineChart,
@@ -42,17 +45,21 @@ import {
 } from '@/components/accounts/charts';
 
 import { getActiveCurrency } from '@/lib/currency';
-const EQUITY_TYPES: EquityType[] = [
-  'SHARE_CAPITAL',
-  'RETAINED_EARNINGS',
-  'RESERVES',
-  'OWNER_CONTRIBUTION',
-  'DIVIDEND',
-  'WITHDRAWAL',
-  'PROFIT_TRANSFER',
-  'LOSS_TRANSFER',
-  'OTHER',
-];
+
+// The 6 types actually offered on the create form (imported from accountsApi
+// so the frontend list can't drift from what the backend will accept).
+const EQUITY_TYPES: EquityType[] = CREATABLE_EQUITY_TYPES;
+
+const PAYMENT_MODES = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'CREDIT_CARD'];
+
+const TYPE_LABELS: Record<string, string> = {
+  SHARE_CAPITAL: 'Share Capital',
+  RESERVES: 'Reserves',
+  OWNER_CONTRIBUTION: 'Owner Contribution',
+  DIVIDEND: 'Dividend',
+  WITHDRAWAL: 'Withdrawal',
+  OTHER: 'Other',
+};
 
 const TYPE_BADGE: Record<string, string> = {
   SHARE_CAPITAL: 'bg-blue-100 text-blue-700',
@@ -76,6 +83,17 @@ interface ModalProps {
   saving: boolean;
 }
 
+// Which of the type-specific fields apply to a given type — drives both which
+// fields render and which of them get cleared (sent as null) on save, so
+// switching an entry's type never leaves stale hidden values behind.
+const OWNER_TRACKED_TYPES: EquityType[] = [
+  'SHARE_CAPITAL',
+  'OWNER_CONTRIBUTION',
+  'DIVIDEND',
+  'WITHDRAWAL',
+];
+const PAYMENT_MODE_TYPES = OWNER_TRACKED_TYPES;
+
 function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProps) {
   const today = new Date().toISOString().slice(0, 10);
   const branchCurrency = useBranchCurrency();
@@ -88,6 +106,22 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
     referenceNo: entry?.referenceNo ?? '',
     linkedCashAccountId: entry?.linkedCashAccountId ?? '',
     notes: entry?.notes ?? '',
+    // Type-specific
+    ownerId: entry?.ownerId ?? '',
+    paymentMode: entry?.paymentMode ?? 'CASH',
+    numberOfShares: entry?.numberOfShares ? String(entry.numberOfShares) : '',
+    pricePerShare: entry?.pricePerShare ? String(entry.pricePerShare) : '',
+    reserveType: entry?.reserveType ?? '',
+    reserveSource: (entry?.reserveSource ?? 'DIRECT_ENTRY') as EquityReserveSource,
+    paymentDate: entry?.paymentDate?.slice(0, 10) ?? '',
+    documentUrl: entry?.documentUrl ?? '',
+    // Cheque-mode-only — not stored on the entry itself, only used to create the
+    // PENDING cheque record (mirrors the Cheque details block on invoice/purchase
+    // payment forms elsewhere in this app).
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDate: today,
+    chequeDueDate: '',
   });
   // Every equity movement must have a documented double-entry counterpart. Linking a cash
   // account is the common case; this confirms non-cash entries (e.g. a non-cash capital
@@ -104,29 +138,76 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const showOwner = OWNER_TRACKED_TYPES.includes(form.type);
+  const showPaymentMode = PAYMENT_MODE_TYPES.includes(form.type);
+  const isShareCapital = form.type === 'SHARE_CAPITAL';
+  const isReserves = form.type === 'RESERVES';
+  const isDividend = form.type === 'DIVIDEND';
+  const isWithdrawal = form.type === 'WITHDRAWAL';
+  // A cheque's bank account isn't chosen yet — that happens later at Deposit/Issue
+  // in Accounts → Cheques — so this type/mode combination skips the linked-account
+  // picker entirely in favor of the cheque-detail fields below.
+  const isCheque = showPaymentMode && form.paymentMode === 'CHEQUE';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.description || !form.amount || !form.date) {
       toast.error('Date, description and amount are required');
       return;
     }
-    if (!form.linkedCashAccountId && !confirmNonCash) {
+    if (showOwner && !form.ownerId) {
+      toast.error(`Select an owner/shareholder for a ${TYPE_LABELS[form.type]} entry`);
+      return;
+    }
+    if (isCheque) {
+      if (!form.chequeNumber || !form.chequeBankName || !form.chequeDate || !form.chequeDueDate) {
+        toast.error('Cheque number, bank name, cheque date and due date are all required');
+        return;
+      }
+    } else if (!form.linkedCashAccountId && !confirmNonCash) {
       toast.error(
         'Confirm this entry has no cash/bank movement, or link a Cash/Bank Account above',
       );
       return;
     }
-    onSave({
-      ...form,
+
+    // Build the payload from a clean slate rather than spreading `form` — a
+    // field left over from switching types (e.g. numberOfShares after
+    // switching SHARE_CAPITAL → OTHER) must be explicitly nulled on save,
+    // not just omitted, so an update actually clears the stale value.
+    const payload: Record<string, unknown> = {
+      date: form.date,
+      type: form.type,
+      description: form.description,
       amount: parseFloat(form.amount),
-      linkedCashAccountId: form.linkedCashAccountId || undefined,
-    });
+      currency: form.currency,
+      referenceNo: form.referenceNo || null,
+      linkedCashAccountId: isCheque ? null : form.linkedCashAccountId || null,
+      notes: form.notes || null,
+      ownerId: showOwner ? form.ownerId : null,
+      paymentMode: showPaymentMode ? form.paymentMode : null,
+      numberOfShares: isShareCapital && form.numberOfShares ? Number(form.numberOfShares) : null,
+      pricePerShare: isShareCapital && form.pricePerShare ? Number(form.pricePerShare) : null,
+      documentUrl: isShareCapital ? form.documentUrl || null : null,
+      reserveType: isReserves ? form.reserveType || null : null,
+      reserveSource: isReserves ? form.reserveSource : null,
+      paymentDate: isDividend ? form.paymentDate || null : null,
+      ...(isCheque
+        ? {
+            chequeNumber: form.chequeNumber,
+            chequeBankName: form.chequeBankName,
+            chequeDate: form.chequeDate,
+            chequeDueDate: form.chequeDueDate,
+          }
+        : {}),
+    };
+    onSave(payload as Partial<EquityEntry>);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-5 border-b">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 border-b sticky top-0 bg-white z-10">
           <h3 className="font-semibold text-gray-900">
             {entry ? 'Edit Equity Entry' : 'New Equity Entry'}
           </h3>
@@ -137,7 +218,9 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {isDividend ? 'Declaration Date' : 'Date'}
+              </label>
               <input
                 type="date"
                 value={form.date}
@@ -155,12 +238,29 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               >
                 {EQUITY_TYPES.map((t) => (
                   <option key={t} value={t}>
-                    {t.replace(/_/g, ' ')}
+                    {TYPE_LABELS[t] ?? t.replace(/_/g, ' ')}
                   </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {/* Dividend — Payment Date, separate from the Declaration Date above */}
+          {isDividend && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Payment Date{' '}
+                <span className="text-gray-400 font-normal">(leave blank if not yet paid)</span>
+              </label>
+              <input
+                type="date"
+                value={form.paymentDate}
+                onChange={(e) => set('paymentDate', e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
             <input
@@ -170,6 +270,75 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               required
             />
           </div>
+
+          {/* Owner — Share Capital / Owner Contribution / Dividend / Withdrawal */}
+          {showOwner && (
+            <OwnerSelect
+              value={form.ownerId}
+              onChange={(id) => set('ownerId', id)}
+              label={isDividend ? 'Recipient Owner' : 'Owner / Shareholder'}
+              required
+            />
+          )}
+
+          {/* Share Capital — shares issued */}
+          {isShareCapital && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Number of Shares
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.numberOfShares}
+                  onChange={(e) => set('numberOfShares', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Price per Share
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={form.pricePerShare}
+                  onChange={(e) => set('pricePerShare', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Reserves — reserve type + source */}
+          {isReserves && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Reserve Type</label>
+                <input
+                  value={form.reserveType}
+                  onChange={(e) => set('reserveType', e.target.value)}
+                  placeholder="e.g. General Reserve"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Source</label>
+                <select
+                  value={form.reserveSource}
+                  onChange={(e) => set('reserveSource', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="DIRECT_ENTRY">Direct Entry</option>
+                  <option value="FROM_RETAINED_EARNINGS">From Retained Earnings</option>
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
@@ -190,6 +359,83 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               </div>
             </div>
           </div>
+
+          {/* Payment Mode — Share Capital / Owner Contribution / Dividend / Withdrawal */}
+          {showPaymentMode && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Payment Mode</label>
+              <select
+                value={form.paymentMode}
+                onChange={(e) => set('paymentMode', e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {PAYMENT_MODES.map((m) => (
+                  <option key={m} value={m}>
+                    {m.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Cheque details — mirrors the Cheque block on invoice/purchase payment forms.
+              No cash movement happens now; a PENDING cheque is created instead, and Cash
+              at Bank only moves once it's cleared in Accounts → Cheques. */}
+          {isCheque && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="col-span-full text-xs font-medium text-amber-700">
+                This creates a PENDING {isDividend || isWithdrawal ? 'Issued' : 'Received'} cheque
+                record. Cash at Bank only moves once it&apos;s cleared in Accounts → Cheques.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Cheque Number
+                </label>
+                <input
+                  value={form.chequeNumber}
+                  onChange={(e) => set('chequeNumber', e.target.value)}
+                  placeholder="e.g. CHQ-001234"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Bank Name</label>
+                <input
+                  value={form.chequeBankName}
+                  onChange={(e) => set('chequeBankName', e.target.value)}
+                  placeholder="e.g. Emirates NBD"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Cheque Date <span className="text-gray-400 font-normal">(date on cheque)</span>
+                </label>
+                <input
+                  type="date"
+                  value={form.chequeDate}
+                  onChange={(e) => set('chequeDate', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Cheque Due Date
+                </label>
+                <input
+                  type="date"
+                  value={form.chequeDueDate}
+                  onChange={(e) => set('chequeDueDate', e.target.value)}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Reference No.</label>
             <input
@@ -198,43 +444,63 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {/* Share Capital — optional document reference (e.g. share certificate link) */}
+          {isShareCapital && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Document Reference{' '}
+                <span className="text-gray-400 font-normal">(e.g. certificate link, optional)</span>
+              </label>
+              <input
+                value={form.documentUrl}
+                onChange={(e) => set('documentUrl', e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
+          {!isCheque && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Linked Cash/Bank Account (auto-creates cashbook entry)
+              </label>
+              <select
+                value={form.linkedCashAccountId}
+                onChange={(e) => {
+                  set('linkedCashAccountId', e.target.value);
+                  if (e.target.value) setConfirmNonCash(false);
+                }}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">— none —</option>
+                {cashAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              {!form.linkedCashAccountId && (
+                <label className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={confirmNonCash}
+                    onChange={(e) => setConfirmNonCash(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    This entry does not involve any cash/bank account movement (e.g. a non-cash
+                    contribution, or a transfer between equity types) — confirm this is intentional.
+                    No cashbook entry will be created.
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Linked Cash/Bank Account (auto-creates cashbook entry)
+              {isWithdrawal ? 'Reason' : 'Notes'}
             </label>
-            <select
-              value={form.linkedCashAccountId}
-              onChange={(e) => {
-                set('linkedCashAccountId', e.target.value);
-                if (e.target.value) setConfirmNonCash(false);
-              }}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">— none —</option>
-              {cashAccounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-            {!form.linkedCashAccountId && (
-              <label className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                <input
-                  type="checkbox"
-                  checked={confirmNonCash}
-                  onChange={(e) => setConfirmNonCash(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  This entry does not involve any cash/bank account movement (e.g. a non-cash
-                  contribution, or a transfer between equity types) — confirm this is intentional.
-                  No cashbook entry will be created.
-                </span>
-              </label>
-            )}
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
             <textarea
               value={form.notes}
               onChange={(e) => set('notes', e.target.value)}

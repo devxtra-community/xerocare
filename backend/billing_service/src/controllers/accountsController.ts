@@ -12,6 +12,7 @@ import { ReceivablePayment } from '../entities/receivablePaymentEntity';
 import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
+import { Owner } from '../entities/ownerEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { SaleType } from '../entities/enums/saleType';
@@ -1554,8 +1555,116 @@ export const getEquityEntries = async (req: Request, res: Response, next: NextFu
   }
 };
 
+const RETIRED_EQUITY_TYPES = ['RETAINED_EARNINGS', 'PROFIT_TRANSFER', 'LOSS_TRANSFER'];
+
+// Money actually moving in/out — the 4 types the payment-mode / cheque routing below
+// applies to. Reserves/Other keep the older direct-cashbook-only behavior (no cheque
+// option is offered for them on the form).
+const EQUITY_INFLOW_TYPES = ['SHARE_CAPITAL', 'OWNER_CONTRIBUTION'];
+const EQUITY_OUTFLOW_TYPES = ['DIVIDEND', 'WITHDRAWAL'];
+
+const EQUITY_TYPE_LABELS: Record<string, string> = {
+  SHARE_CAPITAL: 'Share Capital',
+  RESERVES: 'Reserves',
+  OWNER_CONTRIBUTION: 'Owner Contribution',
+  DIVIDEND: 'Dividend',
+  WITHDRAWAL: 'Withdrawal',
+  OTHER: 'Other',
+};
+
+/**
+ * Mirrors a saved Equity entry's cash effect into the shared Cash/Bank/Cheque
+ * routing used everywhere else in this module (recordReceivablePayment /
+ * recordPayablePayment): Cash/Bank/Card moves the account balance immediately via
+ * postCashbookEntry; Cheque creates a PENDING Received/Issued cheque instead — no
+ * balance movement until it clears, matching the confirmed symmetric rule in
+ * chequesRoutes.ts (`Neither Deposit nor Issue moves the balance — only a
+ * confirmed Clear does`, for BOTH directions, not just Issued). Best-effort after
+ * the entry is committed; idempotent on (sourceType, sourceId).
+ */
+async function postEquityCashEffect(
+  entry: EquityEntry,
+  body: Record<string, unknown>,
+  branchId: string,
+  userId: string,
+) {
+  if (!EQUITY_INFLOW_TYPES.includes(entry.type) && !EQUITY_OUTFLOW_TYPES.includes(entry.type)) {
+    return; // RESERVES / OTHER — handled by the plain linkedCashAccountId path below
+  }
+  const isInflow = EQUITY_INFLOW_TYPES.includes(entry.type);
+  const isCheque = (entry.paymentMode ?? '').trim().toUpperCase() === 'CHEQUE';
+  const typeLabel = EQUITY_TYPE_LABELS[entry.type] ?? entry.type;
+
+  let ownerName: string | undefined;
+  if (entry.ownerId) {
+    const owner = await Source.getRepository(Owner).findOne({ where: { id: entry.ownerId } });
+    ownerName = owner?.name;
+  }
+
+  if (isCheque) {
+    const chequeRepo = Source.getRepository(Cheque);
+    const chequeNo = (body.chequeNumber as string) || `CHQ-EQ-${Date.now()}`;
+    const existing = await chequeRepo.findOne({ where: { chequeNo, branchId } });
+    if (existing) return;
+    const cheque = chequeRepo.create({
+      chequeNo,
+      bankName: (body.chequeBankName as string) || undefined,
+      partyName: ownerName || 'Owner/Shareholder',
+      amount: Number(entry.amount),
+      dueDate: body.chequeDueDate ? new Date(body.chequeDueDate as string) : new Date(entry.date),
+      chequeDate: body.chequeDate ? new Date(body.chequeDate as string) : new Date(entry.date),
+      issueDate: new Date(entry.date),
+      type: isInflow ? 'RECEIVED' : 'ISSUED',
+      status: 'PENDING',
+      description: `${typeLabel} — ${entry.description}`,
+      branchId,
+      sourceType: 'EQUITY',
+      sourceReferenceId: entry.id,
+      sourceLabel: `Equity — ${typeLabel}${ownerName ? ` — ${ownerName}` : ''}`,
+      createdBy: userId,
+    });
+    await chequeRepo.save(cheque);
+    return;
+  }
+
+  if (!entry.linkedCashAccountId) return;
+  await postCashbookEntry({
+    date: entry.date,
+    entryType: isInflow ? 'RECEIPT' : 'PAYMENT',
+    amount: Number(entry.amount),
+    category: 'EQUITY',
+    branchId,
+    createdBy: userId,
+    paymentMode: entry.paymentMode,
+    accountId: entry.linkedCashAccountId,
+    description: `${typeLabel}${ownerName ? ` — ${ownerName}` : ''}: ${entry.description}`,
+    notes: entry.notes,
+    sourceType: 'EQUITY',
+    sourceId: entry.id,
+  });
+}
+
 export const createEquityEntry = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (RETIRED_EQUITY_TYPES.includes(req.body.type)) {
+      throw new AppError(
+        `${req.body.type} entries can no longer be created manually — Retained Earnings is auto-computed from all-time profit/loss and does not roll up from this table. Use a Reserves or Other entry instead if you need to record this movement.`,
+        400,
+      );
+    }
+    const isChequeMode = (req.body.paymentMode ?? '').trim().toUpperCase() === 'CHEQUE';
+    if (
+      isChequeMode &&
+      (EQUITY_INFLOW_TYPES.includes(req.body.type) || EQUITY_OUTFLOW_TYPES.includes(req.body.type))
+    ) {
+      if (!req.body.chequeNumber || !req.body.chequeBankName || !req.body.chequeDueDate) {
+        throw new AppError(
+          'Cheque number, bank name and due date are required for a Cheque-mode equity entry',
+          400,
+        );
+      }
+    }
+
     const repo = Source.getRepository(EquityEntry);
 
     if (!req.body.entryNo) {
@@ -1564,47 +1673,25 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
     }
 
     const jwtBranchId = req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId;
-    let savedEntry!: EquityEntry;
-    await Source.transaction(async (em) => {
-      const txRepo = em.getRepository(EquityEntry);
-      const txCashRepo = em.getRepository(CashBankAccount);
-      const txCbRepo = em.getRepository(CashbookEntry);
+    const userId = req.user?.userId ?? req.body.createdBy ?? SYSTEM_UUID;
 
-      const entry = txRepo.create({
-        ...req.body,
-        branchId: jwtBranchId,
-        createdBy: req.user?.userId ?? req.body.createdBy,
-      }) as unknown as EquityEntry;
-      savedEntry = await txRepo.save(entry);
+    // Cheque-mode entries have no bank account chosen yet (that happens later, at
+    // Deposit/Issue in Accounts → Cheques) — never persist a linkedCashAccountId for
+    // them, so the Equity list/drilldown never implies an immediate account movement
+    // that hasn't actually happened.
+    const entry = repo.create({
+      ...req.body,
+      linkedCashAccountId: isChequeMode ? undefined : req.body.linkedCashAccountId,
+      branchId: jwtBranchId,
+      createdBy: userId,
+    }) as unknown as EquityEntry;
+    const savedEntry = await repo.save(entry);
 
-      if (req.body.linkedCashAccountId) {
-        const acct = await txCashRepo.findOne({
-          where: { id: req.body.linkedCashAccountId as string },
-        });
-        if (acct) {
-          const isInflow = ['SHARE_CAPITAL', 'OWNER_CONTRIBUTION', 'RETAINED_EARNINGS'].includes(
-            req.body.type,
-          );
-          const entryType = isInflow ? 'RECEIPT' : 'PAYMENT';
-          const cbCount = await txCbRepo.count();
-          const cb = txCbRepo.create({
-            referenceNo: `CB-EQ-${String(cbCount + 1).padStart(4, '0')}`,
-            date: req.body.date,
-            accountId: acct.id,
-            entryType,
-            amount: Number(req.body.amount),
-            category: 'EQUITY',
-            description: `Equity: ${req.body.description}`,
-            branchId: jwtBranchId,
-            createdBy: req.user?.userId ?? req.body.createdBy,
-          }) as unknown as CashbookEntry;
-          await txCbRepo.save(cb);
-          const delta = isInflow ? Number(req.body.amount) : -Number(req.body.amount);
-          acct.currentBalance = Number(acct.currentBalance) + delta;
-          await txCashRepo.save(acct);
-        }
-      }
-    });
+    try {
+      await postEquityCashEffect(savedEntry, req.body, jwtBranchId, userId);
+    } catch (postErr) {
+      logger.error('Failed to post equity entry cash/cheque effect', postErr);
+    }
 
     res.status(201).json({ success: true, data: savedEntry });
   } catch (err) {
@@ -1618,6 +1705,20 @@ export const updateEquityEntry = async (req: Request, res: Response, next: NextF
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Equity entry not found', 404);
+
+    // Editing an existing historical entry's amount/description/etc. is fine
+    // even if its type is retired; only block *newly assigning* a retired type.
+    if (
+      req.body.type &&
+      req.body.type !== entry.type &&
+      RETIRED_EQUITY_TYPES.includes(req.body.type)
+    ) {
+      throw new AppError(
+        `${req.body.type} entries can no longer be created manually — Retained Earnings is auto-computed from all-time profit/loss and does not roll up from this table.`,
+        400,
+      );
+    }
+
     Object.assign(entry, req.body);
     const savedEntry = await repo.save(entry);
     res.json({ success: true, data: savedEntry });

@@ -32,6 +32,7 @@ import { ReceivablePayment } from '../entities/receivablePaymentEntity';
 import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry } from '../entities/equityEntryEntity';
+import { Owner } from '../entities/ownerEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { EmployeeTarget } from '../entities/employeeTargetEntity';
@@ -81,6 +82,7 @@ export const Source = new DataSource({
     ManualPayable,
     PayablePayment,
     EquityEntry,
+    Owner,
     ExchangeRate,
     AccountReconciliation,
     EmployeeTarget,
@@ -729,6 +731,38 @@ async function runPreMigrations() {
         "updatedAt" TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    // owners: company-wide Owners/Shareholders/Partners reference list, and the
+    // type-specific columns the dynamic Equity form needs (see ownerEntity.ts /
+    // equityEntryEntity.ts for why each exists).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS owners (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR NOT NULL,
+          email VARCHAR,
+          phone VARCHAR,
+          "ownershipPercent" DECIMAL(5,2),
+          "isActive" BOOLEAN DEFAULT true,
+          notes TEXT,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          "updatedAt" TIMESTAMP DEFAULT NOW()
+        );
+
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "ownerId" UUID NULL REFERENCES owners(id);
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "paymentMode" VARCHAR NULL;
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "numberOfShares" INT NULL;
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "pricePerShare" DECIMAL(14,4) NULL;
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "reserveType" VARCHAR NULL;
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "reserveSource" VARCHAR NULL;
+        ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "paymentDate" DATE NULL;
+      `);
+      logger.info(
+        'Guaranteed owners table exists, and equity_entries has its type-specific columns.',
+      );
+    } catch (ownerErr) {
+      logger.warn('Failed to ensure owners table / equity_entries columns:', ownerErr);
+    }
     // vat_remittances: tracks VAT payments made to the tax authority
     // VAT Payable = cumulative output VAT collected − SUM(amount_remitted)
     await client.query(`

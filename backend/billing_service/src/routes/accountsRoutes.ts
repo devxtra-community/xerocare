@@ -76,6 +76,12 @@ import {
   createVatRemittance,
   deleteVatRemittance,
 } from '../controllers/accountsController';
+import {
+  getOwners,
+  createOwner,
+  updateOwner,
+  deactivateOwner,
+} from '../controllers/ownerController';
 import chequesRouter from './chequesRoutes';
 import guaranteeChequesRouter from './guaranteeChequesRoutes';
 import { requireRole } from '../middlewares/roleMiddleware';
@@ -227,6 +233,12 @@ router.get('/equity', getEquityEntries);
 router.post('/equity', createEquityEntry);
 router.patch('/equity/:id', updateEquityEntry);
 router.delete('/equity/:id', deleteEquityEntry);
+
+// Owners/Shareholders/Partners — reference list used by the Equity form
+router.get('/owners', getOwners);
+router.post('/owners', createOwner);
+router.patch('/owners/:id', updateOwner);
+router.delete('/owners/:id', deactivateOwner);
 
 // Chart of Accounts
 router.get('/chart-of-accounts', getChartOfAccounts);

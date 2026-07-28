@@ -733,6 +733,20 @@ export type EquityType =
   | 'OPENING_BALANCE_EQUITY'
   | 'OTHER';
 
+// The 6 types actually offered on the create form — Retained Earnings,
+// Profit Transfer and Loss Transfer stay in EquityType (above) only so
+// historical rows of those types keep rendering correctly.
+export const CREATABLE_EQUITY_TYPES: EquityType[] = [
+  'SHARE_CAPITAL',
+  'RESERVES',
+  'OWNER_CONTRIBUTION',
+  'DIVIDEND',
+  'WITHDRAWAL',
+  'OTHER',
+];
+
+export type EquityReserveSource = 'FROM_RETAINED_EARNINGS' | 'DIRECT_ENTRY';
+
 export interface EquityEntry {
   id: string;
   entryNo: string;
@@ -746,8 +760,28 @@ export interface EquityEntry {
   linkedCashAccountId?: string;
   documentUrl?: string;
   notes?: string;
+  // Type-specific fields — see equityEntryEntity.ts for which type(s) use each
+  ownerId?: string;
+  paymentMode?: string;
+  numberOfShares?: number;
+  pricePerShare?: number;
+  reserveType?: string;
+  reserveSource?: EquityReserveSource;
+  paymentDate?: string;
   createdBy: string;
   createdAt: string;
+}
+
+export interface Owner {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  ownershipPercent?: number;
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EquitySummary {
@@ -865,6 +899,26 @@ export const fetchEquityStatement = (params?: Record<string, string>) =>
   api
     .get<{ success: boolean; data: EquityStatement }>(`${BASE}/equity/statement`, { params })
     .then((r) => r.data.data);
+
+// ─── OWNERS/SHAREHOLDERS ────────────────────────────────────────────────────
+
+export const fetchOwners = (params?: { includeInactive?: boolean }) =>
+  api
+    .get<{ success: boolean; data: Owner[] }>(`${BASE}/owners`, {
+      params: params?.includeInactive ? { includeInactive: 'true' } : undefined,
+    })
+    .then((r) => r.data.data);
+
+export const createOwner = (body: Partial<Owner>) =>
+  api.post<{ success: boolean; data: Owner }>(`${BASE}/owners`, body).then((r) => r.data.data);
+
+export const updateOwner = (id: string, body: Partial<Owner>) =>
+  api
+    .patch<{ success: boolean; data: Owner }>(`${BASE}/owners/${id}`, body)
+    .then((r) => r.data.data);
+
+export const deactivateOwner = (id: string) =>
+  api.delete(`${BASE}/owners/${id}`).then((r) => r.data);
 
 export const fetchBalanceSheet = (params?: Record<string, string>) =>
   api
