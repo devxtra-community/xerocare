@@ -204,10 +204,18 @@ export default function NotificationsPage({ role }: { role: string }) {
         ) : (
           <div className="space-y-2">
             {filtered.map((notif) => (
-              <button
+              <div
                 key={notif.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleClick(notif)}
-                className={`w-full text-left rounded-xl p-4 border transition-all ${
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleClick(notif);
+                  }
+                }}
+                className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
                   notif.is_read
                     ? 'bg-white border-gray-100 hover:border-gray-200'
                     : 'bg-white border-primary/20 shadow-sm hover:shadow-md'
@@ -254,7 +262,7 @@ export default function NotificationsPage({ role }: { role: string }) {
                     </button>
                   )}
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
