@@ -4,6 +4,7 @@ import { LeaveStatus } from '../constants/leaveStatus';
 import { LeaveType } from '../constants/leaveType';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/dataSource';
+import { logger } from '../config/logger';
 import { Notification } from '../entities/notificationEntity';
 import { Employee } from '../entities/employeeEntities';
 import { LeaveApplication } from '../entities/leaveApplicationEntity';
@@ -183,13 +184,17 @@ export class LeaveApplicationService {
         notificationRepo.create({
           employee_id: leaveApplication.employee_id,
           title: 'Leave Approved',
-          message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date.toDateString()} to ${leaveApplication.end_date.toDateString()} has been approved.`,
+          // start_date/end_date come back from TypeORM as plain 'YYYY-MM-DD'
+          // strings here, not Date objects — .toDateString() previously threw
+          // and was swallowed by this same try/catch, silently killing every
+          // approval notification with zero trace in the logs.
+          message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date} to ${leaveApplication.end_date} has been approved.`,
           type: 'LEAVE_APPROVED',
           data: { leaveId },
         }),
       );
-    } catch {
-      // Non-blocking
+    } catch (err) {
+      logger.error('Failed to notify employee of leave approval:', err);
     }
 
     return this.leaveRepo.findById(leaveId);
@@ -222,13 +227,13 @@ export class LeaveApplicationService {
         notificationRepo.create({
           employee_id: leaveApplication.employee_id,
           title: 'Leave Rejected',
-          message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date.toDateString()} to ${leaveApplication.end_date.toDateString()} was rejected. Reason: ${reason.trim()}`,
+          message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date} to ${leaveApplication.end_date} was rejected. Reason: ${reason.trim()}`,
           type: 'LEAVE_REJECTED',
           data: { leaveId },
         }),
       );
-    } catch {
-      // Non-blocking
+    } catch (err) {
+      logger.error('Failed to notify employee of leave rejection:', err);
     }
 
     return this.leaveRepo.findById(leaveId);

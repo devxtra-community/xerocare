@@ -1341,13 +1341,22 @@ export class InvoiceAggregationService {
     saleType?: string,
   ) {
     try {
-      if (!user.branchId) {
+      let branchId = user.branchId;
+      if (!branchId && (user.role === 'ADMIN' || user.role === 'FINANCE')) {
+        const { getFallbackBranchId } = await import('../utils/branchHelper');
+        branchId = await getFallbackBranchId();
+      }
+
+      if (!branchId) {
         throw new AppError('Branch ID not found in user context', 400);
       }
 
       const url = `${BILLING_SERVICE_URL}/invoices/history${saleType ? `?saleType=${saleType}` : ''}`;
       const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Acting-Branch': branchId,
+        },
       });
 
       const invoices = response.data.data;
@@ -1387,12 +1396,21 @@ export class InvoiceAggregationService {
 
   async getCompletedCollections(user: { role: string; branchId?: string }, token: string) {
     try {
-      if (!user.branchId) {
+      let branchId = user.branchId;
+      if (!branchId && (user.role === 'ADMIN' || user.role === 'FINANCE')) {
+        const { getFallbackBranchId } = await import('../utils/branchHelper');
+        branchId = await getFallbackBranchId();
+      }
+
+      if (!branchId) {
         throw new AppError('Branch ID not found in user context', 400);
       }
 
       const response = await axios.get(`${BILLING_SERVICE_URL}/invoices/completed-collections`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-Acting-Branch': branchId,
+        },
       });
 
       const collections = response.data.data;

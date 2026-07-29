@@ -102,6 +102,39 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.warn('Could not alter job enums:', err);
         }
 
+        // notifications.employee_id was created as a real FK to employee(id) by an
+        // earlier synchronize() run, but it's a recipient ID that must also accept
+        // Admin IDs (a separate table, not an Employee row) — every notifyAdmins
+        // broadcast insert was silently failing on this constraint. Drop it;
+        // notificationEntity.ts's relation no longer recreates it on fresh syncs.
+        try {
+          await Source.query(`
+            DO $$
+            DECLARE
+              fk_name text;
+            BEGIN
+              SELECT tc.constraint_name INTO fk_name
+              FROM information_schema.table_constraints tc
+              JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_name = kcu.constraint_name
+              WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_name = 'notifications'
+                AND kcu.column_name = 'employee_id'
+              LIMIT 1;
+
+              IF fk_name IS NOT NULL THEN
+                EXECUTE format('ALTER TABLE notifications DROP CONSTRAINT %I', fk_name);
+              END IF;
+            END
+            $$;
+          `);
+          logger.info(
+            'Guaranteed notifications.employee_id has no FK constraint (Admin recipients allowed).',
+          );
+        } catch (err) {
+          logger.warn('Could not drop notifications employee_id FK constraint:', err);
+        }
+
         await seedAdmin(Source);
       }
       return Source;

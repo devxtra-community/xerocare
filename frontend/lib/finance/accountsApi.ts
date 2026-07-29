@@ -1545,6 +1545,7 @@ export interface ReceivableRow {
   currencyCode: string;
   branchId: string;
   aging: string;
+  isOpeningEntry?: boolean;
 }
 
 export const fetchAccountsReceivableTransactions = (

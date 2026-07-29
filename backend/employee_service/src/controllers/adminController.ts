@@ -3,6 +3,8 @@ import { AppError } from '../errors/appError';
 import { AdminService } from '../services/adminService';
 import { AuthService } from '../services/authService';
 import { issueTokens } from '../services/tokenService';
+import { Source } from '../config/dataSource';
+import { Admin } from '../entities/adminEntities';
 
 const adminService = new AdminService();
 const authService = new AuthService();
@@ -19,6 +21,20 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
       data: admin,
       success: true,
     });
+  } catch (error: unknown) {
+    const err = error as { message?: string; statusCode?: number };
+    next(new AppError(err.message || 'Internal Server Error', err.statusCode || 500));
+  }
+};
+
+// Admin accounts live in their own table, not as Employee rows with
+// role='ADMIN' — cross-service "notify all Admins" lookups (e.g.
+// billing_service's findAllAdmins()) need a real way to reach them, since
+// GET /employee?role=ADMIN always returns nothing.
+export const listAdmins = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const admins = await Source.getRepository(Admin).find({ select: ['id', 'email'] });
+    res.json({ success: true, data: admins });
   } catch (error: unknown) {
     const err = error as { message?: string; statusCode?: number };
     next(new AppError(err.message || 'Internal Server Error', err.statusCode || 500));

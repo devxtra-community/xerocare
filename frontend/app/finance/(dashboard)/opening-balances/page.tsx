@@ -1,7 +1,12 @@
 'use client';
 
-import OpeningBalancePage from '@/components/OpeningBalances/OpeningBalancePage';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Page() {
-  return <OpeningBalancePage />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/finance/accounts/opening-balances');
+  }, [router]);
+  return null;
 }

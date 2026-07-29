@@ -29,10 +29,10 @@ import {
   Landmark,
   Bell,
   ShieldCheck,
-  Banknote,
   ArrowLeftRight,
   Coins,
   Layers,
+  Banknote,
 } from 'lucide-react';
 
 import {
@@ -88,17 +88,22 @@ export default function FinanceSidebar() {
     { title: 'Day Book', icon: CalendarDays, href: '/finance/accounts/day-book' },
     { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
     { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
-    { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
     { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
     { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
     { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
     { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
     { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
+    { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
     { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
     {
       title: 'Exchange Rates',
       icon: ArrowLeftRight,
       href: '/finance/accounts/exchange-rates',
+    },
+    {
+      title: 'Opening Balances',
+      icon: FileText,
+      href: '/finance/accounts/opening-balances',
     },
     { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
   ];
@@ -151,11 +156,6 @@ export default function FinanceSidebar() {
           title: 'Returns',
           icon: RotateCcw,
           href: '/finance/returns',
-        },
-        {
-          title: 'Opening Balances',
-          icon: FileText,
-          href: '/finance/opening-balances',
         },
       ],
     },

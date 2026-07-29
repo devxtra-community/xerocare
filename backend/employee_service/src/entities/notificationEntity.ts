@@ -40,8 +40,11 @@ export class Notification {
   @UpdateDateColumn({ type: 'timestamp with time zone' })
   updatedAt!: Date;
 
-  // Relations
-  @ManyToOne(() => Employee)
+  // employee_id is a recipient ID, not strictly an Employee row — Admin accounts
+  // (a separate table, not a role on Employee) are valid recipients too via the
+  // notifyAdmins broadcast, so this must not be a real foreign key constraint.
+  // See dataSource.ts's FK-drop bootstrap for the matching fix on existing DBs.
+  @ManyToOne(() => Employee, { createForeignKeyConstraints: false })
   @JoinColumn({ name: 'employee_id' })
   employee!: Employee;
 }

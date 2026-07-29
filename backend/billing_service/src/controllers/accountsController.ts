@@ -2094,7 +2094,7 @@ export const getReceivableCharts = async (req: Request, res: Response, next: Nex
         ) u GROUP BY invoice_id
       ) pt ON pt.invoice_id = i.id
       WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
-        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
+        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')) OR i.type = 'OPENING')
         AND i."totalAmount" > 0
         AND i."deletedAt" IS NULL
         ${branchClause}

@@ -381,7 +381,12 @@ export const getPendingCounts = async (
     if (!user) throw new Error('User not authenticated');
     const token = req.headers.authorization?.split(' ')[1] || '';
 
-    const branchId = user.branchId;
+    let branchId = user.branchId;
+    if (!branchId && (user.role === 'ADMIN' || user.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
+
     if (!branchId) throw new Error('Branch ID missing');
 
     const counts = await invoiceAggregationService.getPendingCounts(token, branchId);

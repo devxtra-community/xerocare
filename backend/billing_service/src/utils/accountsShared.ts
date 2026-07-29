@@ -956,6 +956,12 @@ export async function computeBalanceSheet(
     // by their full outstanding balance — a real trial-balance mismatch, not just a
     // reporting quirk (Balance Sheet Assets = Liabilities + Equity requires this AR
     // line to track the same population P&L recognizes as revenue).
+    //
+    // type='OPENING' covers historical-debt opening balance entries (SALE_OUTSTANDING,
+    // SERVICE_DEBT, OTHER_DEBT). RENT_CONTRACT/LEASE_CONTRACT opening balance entries
+    // create PROFORMA invoices (caught by the PROFORMA+ACTIVE_CONTRACT clause above).
+    // Excluding fully-settled OPENING invoices (totalAmount - paid ≤ 0) is handled
+    // by the outer SUM — they contribute 0 naturally.
     db.query<CcyRow[]>(`
       SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
              COALESCE(SUM(i."totalAmount" - COALESCE(pt.paid, 0)), 0) AS amount
@@ -972,7 +978,7 @@ export async function computeBalanceSheet(
         ) u GROUP BY invoice_id
       ) pt ON pt.invoice_id = i.id
       WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
-        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
+        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')) OR i.type = 'OPENING')
         AND i."totalAmount" > 0
         AND i."deletedAt" IS NULL
         ${bSql('i')}

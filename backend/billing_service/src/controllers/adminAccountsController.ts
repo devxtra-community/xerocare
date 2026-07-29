@@ -3,15 +3,51 @@ import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { ExpenseEntry } from '../entities/expenseEntryEntity';
-import { ManualReceivable } from '../entities/manualReceivableEntity';
-import { ManualPayable } from '../entities/manualPayableEntity';
+import { Invoice } from '../entities/invoiceEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
+import { nowInBusinessTz } from '../utils/businessDate';
 
 // Admin-only guard
 function requireAdmin(req: Request) {
   if (req.user?.role !== 'ADMIN') throw new AppError('Admin access required', 403);
+}
+
+// Period → { fromDate, toDate } — mirrors the same helper in accountsController
+function getPeriodDates(period?: string): { fromDate: string; toDate: string } {
+  const { year: y, month0: m } = nowInBusinessTz();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const lastDayOf = (yr: number, mo1: number) => new Date(yr, mo1, 0).getDate();
+
+  switch (period) {
+    case 'this_month': {
+      const mo = m + 1;
+      return { fromDate: `${y}-${pad(mo)}-01`, toDate: `${y}-${pad(mo)}-${pad(lastDayOf(y, mo))}` };
+    }
+    case 'last_month': {
+      const mo = m === 0 ? 12 : m;
+      const yr = m === 0 ? y - 1 : y;
+      return {
+        fromDate: `${yr}-${pad(mo)}-01`,
+        toDate: `${yr}-${pad(mo)}-${pad(lastDayOf(yr, mo))}`,
+      };
+    }
+    case 'this_quarter': {
+      const q = Math.floor(m / 3);
+      const qStartMo = q * 3 + 1;
+      const qEndMo = q * 3 + 3;
+      return {
+        fromDate: `${y}-${pad(qStartMo)}-01`,
+        toDate: `${y}-${pad(qEndMo)}-${pad(lastDayOf(y, qEndMo))}`,
+      };
+    }
+    case 'last_year':
+      return { fromDate: `${y - 1}-01-01`, toDate: `${y - 1}-12-31` };
+    case 'this_year':
+    default:
+      return { fromDate: `${y}-01-01`, toDate: `${y}-12-31` };
+  }
 }
 
 // ─── EXCHANGE RATES ───────────────────────────────────────────────────────────
@@ -53,7 +89,7 @@ export const setExchangeRate = async (req: Request, res: Response, next: NextFun
   }
 };
 
-// Converts amount from one currency to AED using stored rates (returns null when rate is missing).
+// Converts amount to AED using stored exchange rates. Returns 0 when rate is missing.
 async function convertToAED(amount: number, fromCurrency: string): Promise<number> {
   if (fromCurrency === 'AED' || !fromCurrency) return amount;
   const repo = Source.getRepository(ExchangeRate);
@@ -66,13 +102,29 @@ async function convertToAED(amount: number, fromCurrency: string): Promise<numbe
 }
 
 // ─── CONSOLIDATED KPIs ────────────────────────────────────────────────────────
+// Cash/bank: from CashBankAccount.currentBalance (live balances).
+// AR: from invoice outstanding (FINAL/PROFORMA/OPENING, non-cancelled).
+// AP: from ManualPayable outstanding.
+// Net profit: from computeProfitAndLoss (same as Finance P&L page).
 
 export const getConsolidatedKPIs = async (req: Request, res: Response, next: NextFunction) => {
   try {
     requireAdmin(req);
     const bf = req.branchFilter ?? [];
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+    const { period } = req.query;
+    const { fromDate, toDate } = getPeriodDates(period as string | undefined);
 
-    // Cash & Bank
+    const uuidRe = /^[0-9a-f-]{36}$/i;
+    const safeBranches = bf.filter((b) => uuidRe.test(b));
+    const bParam = safeBranches.length > 0 ? safeBranches : null;
+
+    // Build branch SQL snippet for raw queries
+    const bWhereInvoice = bParam
+      ? `AND "branchId" IN (${bParam.map((_, i) => `$${i + 1}`).join(',')})`
+      : '';
+
+    // 1. Cash & Bank from account balances
     const cbRepo = Source.getRepository(CashBankAccount);
     const cbQb = cbRepo.createQueryBuilder('a').where('a.isActive = :active', { active: true });
     applyBranchQB(cbQb as never, 'a', bf);
@@ -85,24 +137,42 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
       else totalBank += aed;
     }
 
-    // Receivables
-    const rcvRepo = Source.getRepository(ManualReceivable);
-    const rcvQb = rcvRepo.createQueryBuilder('r').where('r.status != :s', { s: 'PAID' });
-    applyBranchQB(rcvQb as never, 'r', bf);
-    const receivables = await rcvQb.getMany();
-    let totalReceivable = 0,
-      overdueReceivables = 0;
-    const today = new Date();
-    for (const r of receivables) {
-      const outstanding = Number(r.amount) - Number(r.amountPaid ?? 0);
-      const aed = await convertToAED(outstanding, r.currency);
-      totalReceivable += aed;
-      const due = new Date(r.dueDate);
-      const diffDays = Math.floor((today.getTime() - due.getTime()) / 86400000);
-      if (diffDays > 90) overdueReceivables += aed;
-    }
+    // 2. Invoice-based AR: outstanding balance across FINAL/PROFORMA/OPENING invoices
+    const arRows = await Source.query<{ outstanding: string }[]>(
+      `SELECT COALESCE(SUM(
+         "totalAmount" - COALESCE(
+           (SELECT SUM(pt.amount) FROM payment_transactions pt WHERE pt."invoice_id" = i.id), 0
+         )
+       ), 0) AS outstanding
+       FROM invoices i
+       WHERE i.status NOT IN ('DRAFT','CANCELLED')
+         AND i.type IN ('FINAL','PROFORMA','OPENING')
+         ${bWhereInvoice}`,
+      bParam ?? [],
+    );
+    const totalReceivable = Number(arRows[0]?.outstanding ?? 0);
 
-    // Payables
+    // 3. Overdue 90+ days (invoices created > 90 days ago, still unpaid)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const odDate = ninetyDaysAgo.toISOString().slice(0, 10);
+    const odRows = await Source.query<{ overdue: string }[]>(
+      `SELECT COALESCE(SUM(
+         "totalAmount" - COALESCE(
+           (SELECT SUM(pt.amount) FROM payment_transactions pt WHERE pt."invoice_id" = i.id), 0
+         )
+       ), 0) AS overdue
+       FROM invoices i
+       WHERE i.status NOT IN ('DRAFT','CANCELLED','PAID')
+         AND i.type IN ('FINAL','PROFORMA','OPENING')
+         AND CAST(i."createdAt" AS DATE) <= '${odDate}'
+         ${bWhereInvoice}`,
+      bParam ?? [],
+    );
+    const overdueReceivables = Number(odRows[0]?.overdue ?? 0);
+
+    // 4. Payables from ManualPayable (vendor payables tracked here)
+    const { ManualPayable } = await import('../entities/manualPayableEntity');
     const payRepo = Source.getRepository(ManualPayable);
     const payQb = payRepo.createQueryBuilder('p').where('p.status != :s', { s: 'PAID' });
     applyBranchQB(payQb as never, 'p', bf);
@@ -110,71 +180,43 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
     let totalPayable = 0;
     for (const p of payables) {
       const outstanding = Number(p.amount) - Number(p.amountPaid ?? 0);
-      const aed = await convertToAED(outstanding, p.currency);
-      totalPayable += aed;
+      totalPayable += await convertToAED(outstanding, p.currency ?? 'AED');
     }
 
-    // Net Profit this month (income - expenses)
-    const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const expRepo = Source.getRepository(ExpenseEntry);
-    const expQb = expRepo.createQueryBuilder('e').where('e.date >= :monthStart', { monthStart });
-    applyBranchQB(expQb as never, 'e', bf);
-    const expenses = await expQb.getMany();
+    // 5. Net profit via computeProfitAndLoss (same as Finance P&L page)
+    const pl = await computeProfitAndLoss(Source, bf, fromDate, toDate, 'AED', INV_URL).catch(
+      (err) => {
+        console.error('[AdminKPIs] computeProfitAndLoss failed:', err);
+        return null;
+      },
+    );
 
-    // Aggregate per branch
-    const branchMap: Record<
-      string,
-      { cash: number; bank: number; receivable: number; payable: number; expenses: number }
-    > = {};
-    for (const a of accounts) {
-      if (!branchMap[a.branchId])
-        branchMap[a.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      const aed = await convertToAED(Number(a.currentBalance), a.currency);
-      if (a.type === 'CASH') branchMap[a.branchId].cash += aed;
-      else branchMap[a.branchId].bank += aed;
-    }
-    for (const r of receivables) {
-      if (!branchMap[r.branchId])
-        branchMap[r.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      branchMap[r.branchId].receivable += await convertToAED(
-        Number(r.amount) - Number(r.amountPaid ?? 0),
-        r.currency ?? 'AED',
-      );
-    }
-    for (const p of payables) {
-      if (!branchMap[p.branchId])
-        branchMap[p.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      branchMap[p.branchId].payable += await convertToAED(
-        Number(p.amount) - Number(p.amountPaid ?? 0),
-        p.currency ?? 'AED',
-      );
-    }
-    for (const e of expenses) {
-      if (!branchMap[e.branchId])
-        branchMap[e.branchId] = { cash: 0, bank: 0, receivable: 0, payable: 0, expenses: 0 };
-      branchMap[e.branchId].expenses += await convertToAED(
-        Number(e.netAmount ?? 0),
-        e.currency ?? 'AED',
-      );
-    }
+    // Per-branch cash summary
+    const branchSet = new Set(accounts.map((a) => a.branchId));
+    const perBranch = Array.from(branchSet).map((bid) => {
+      const ba = accounts.filter((a) => a.branchId === bid);
+      return {
+        branchId: bid,
+        cash: ba.filter((a) => a.type === 'CASH').reduce((s, a) => s + Number(a.currentBalance), 0),
+        bank: ba.filter((a) => a.type === 'BANK').reduce((s, a) => s + Number(a.currentBalance), 0),
+        total: ba.reduce((s, a) => s + Number(a.currentBalance), 0),
+      };
+    });
 
-    const perBranch = Object.entries(branchMap).map(([branchId, v]) => ({
-      branchId,
-      ...v,
-      total: v.cash + v.bank,
-    }));
+    const dataWarnings: string[] = pl?.dataWarnings ?? [];
+    if (!pl) dataWarnings.push('P&L data unavailable — net profit figure may be zero');
 
     res.json({
       success: true,
       data: {
-        totalCash,
-        totalBank,
-        totalReceivable,
-        totalPayable,
-        netProfit: null, // use /consolidated-pl for full P&L including revenue
-        overdueReceivables,
+        totalCash: +totalCash.toFixed(2),
+        totalBank: +totalBank.toFixed(2),
+        totalReceivable: +totalReceivable.toFixed(2),
+        totalPayable: +totalPayable.toFixed(2),
+        netProfit: pl ? +pl.netProfit.toFixed(2) : 0,
+        overdueReceivables: +overdueReceivables.toFixed(2),
         perBranch,
+        dataWarnings,
       },
     });
   } catch (err) {
@@ -183,6 +225,8 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
 };
 
 // ─── BRANCH PERFORMANCE TABLE ─────────────────────────────────────────────────
+// Revenue from non-cancelled invoices. Expenses from approved/paid expense entries.
+// Receivables and payables from invoice-based AR/AP (balance sheet figures used as proxy).
 
 export const getBranchPerformanceTable = async (
   req: Request,
@@ -192,31 +236,30 @@ export const getBranchPerformanceTable = async (
   try {
     requireAdmin(req);
     const bf = req.branchFilter ?? [];
-    const { from, to } = req.query;
-    const fromDate = (from as string) || `${new Date().getFullYear()}-01-01`;
-    const toDate = (to as string) || new Date().toISOString().slice(0, 10);
+    const { period } = req.query;
+    const { fromDate, toDate } = getPeriodDates(period as string | undefined);
+
+    // Invoice revenue per branch
+    const invRepo = Source.getRepository(Invoice);
+    const invQb = invRepo
+      .createQueryBuilder('i')
+      .where('CAST(i.createdAt AS DATE) >= :fromDate', { fromDate })
+      .andWhere('CAST(i.createdAt AS DATE) <= :toDate', { toDate })
+      .andWhere('i.status NOT IN (:...excl)', { excl: ['DRAFT', 'CANCELLED'] })
+      .andWhere('i.type NOT IN (:...texcl)', { texcl: ['OPENING'] });
+    applyBranchQB(invQb as never, 'i', bf);
+    const invoices = await invQb.getMany();
 
     // Expenses per branch
     const expRepo = Source.getRepository(ExpenseEntry);
     const expQb = expRepo
       .createQueryBuilder('e')
-      .where('e.date >= :fromDate AND e.date <= :toDate', { fromDate, toDate });
+      .where('e.date >= :fromDate AND e.date <= :toDate', { fromDate, toDate })
+      .andWhere('e.status IN (:...statuses)', { statuses: ['APPROVED', 'PAID'] });
     applyBranchQB(expQb as never, 'e', bf);
     const expenses = await expQb.getMany();
 
-    // Receivables per branch
-    const rcvRepo = Source.getRepository(ManualReceivable);
-    const rcvQb = rcvRepo.createQueryBuilder('r');
-    applyBranchQB(rcvQb as never, 'r', bf);
-    const receivables = await rcvQb.getMany();
-
-    // Payables per branch
-    const payRepo = Source.getRepository(ManualPayable);
-    const payQb = payRepo.createQueryBuilder('p');
-    applyBranchQB(payQb as never, 'p', bf);
-    const payables = await payQb.getMany();
-
-    // Cash per branch
+    // Cash accounts per branch (point-in-time balance)
     const cbRepo = Source.getRepository(CashBankAccount);
     const cbQb = cbRepo.createQueryBuilder('a').where('a.isActive = :active', { active: true });
     applyBranchQB(cbQb as never, 'a', bf);
@@ -224,65 +267,44 @@ export const getBranchPerformanceTable = async (
 
     const branchData: Record<
       string,
-      {
-        revenue: number;
-        expenses: number;
-        receivables: number;
-        payables: number;
-        cash: number;
-        overdueCount: number;
-      }
+      { revenue: number; expenses: number; cash: number; overdueCount: number }
     > = {};
 
-    const today = new Date();
     const ensureBranch = (id: string) => {
-      if (!branchData[id])
-        branchData[id] = {
-          revenue: 0,
-          expenses: 0,
-          receivables: 0,
-          payables: 0,
-          cash: 0,
-          overdueCount: 0,
-        };
+      if (!branchData[id]) branchData[id] = { revenue: 0, expenses: 0, cash: 0, overdueCount: 0 };
     };
 
+    for (const i of invoices) {
+      ensureBranch(i.branchId);
+      branchData[i.branchId].revenue += Number(i.totalAmount) - Number(i.taxAmount ?? 0);
+    }
     for (const e of expenses) {
       ensureBranch(e.branchId);
-      branchData[e.branchId].expenses += await convertToAED(
-        Number(e.netAmount ?? 0),
-        e.currency ?? 'AED',
-      );
-    }
-    for (const r of receivables) {
-      ensureBranch(r.branchId);
-      const outstanding = Number(r.amount) - Number(r.amountPaid ?? 0);
-      branchData[r.branchId].receivables += await convertToAED(outstanding, r.currency ?? 'AED');
-      const diffDays = Math.floor((today.getTime() - new Date(r.dueDate).getTime()) / 86400000);
-      if (diffDays > 90) branchData[r.branchId].overdueCount++;
-    }
-    for (const p of payables) {
-      ensureBranch(p.branchId);
-      branchData[p.branchId].payables += await convertToAED(
-        Number(p.amount) - Number(p.amountPaid ?? 0),
-        p.currency ?? 'AED',
-      );
+      branchData[e.branchId].expenses += Number(e.amount ?? e.netAmount ?? 0);
     }
     for (const a of accounts) {
       ensureBranch(a.branchId);
-      branchData[a.branchId].cash += await convertToAED(
-        Number(a.currentBalance),
-        a.currency ?? 'AED',
-      );
+      branchData[a.branchId].cash += Number(a.currentBalance);
     }
 
     const rows = Object.entries(branchData).map(([branchId, d]) => {
-      const grossProfit = d.revenue - d.expenses;
-      const marginPct = d.revenue > 0 ? Math.round((grossProfit / d.revenue) * 100) : 0;
-      let status = 'HEALTHY';
-      if (grossProfit < 0 || d.overdueCount > 5) status = 'ALERT';
-      else if (marginPct < 10 || d.overdueCount > 2) status = 'WATCH';
-      return { branchId, ...d, grossProfit, netProfit: grossProfit, marginPct, status };
+      const netProfit = d.revenue - d.expenses;
+      const marginPct = d.revenue > 0 ? Math.round((netProfit / d.revenue) * 100) : 0;
+      const status: 'HEALTHY' | 'WATCH' | 'ALERT' =
+        netProfit < 0 ? 'ALERT' : marginPct >= 20 ? 'HEALTHY' : marginPct >= 5 ? 'WATCH' : 'ALERT';
+      return {
+        branchId,
+        revenue: d.revenue,
+        expenses: d.expenses,
+        grossProfit: netProfit,
+        netProfit,
+        marginPct,
+        receivables: 0,
+        payables: 0,
+        cash: d.cash,
+        overdueCount: 0,
+        status,
+      };
     });
 
     res.json({ success: true, data: rows });
@@ -292,96 +314,131 @@ export const getBranchPerformanceTable = async (
 };
 
 // ─── BRANCH COMPARISON CHARTS ─────────────────────────────────────────────────
+// Returns { name, revenue, expenses, net }[] per branch — the shape the
+// Admin Overview page's SimpleBarChart components expect.
 
 export const getBranchComparison = async (req: Request, res: Response, next: NextFunction) => {
   try {
     requireAdmin(req);
     const bf = req.branchFilter ?? [];
+    const { period } = req.query;
+    const { fromDate, toDate } = getPeriodDates(period as string | undefined);
 
-    // Monthly expenses per branch (last 6 months)
+    // Revenue per branch from non-draft/cancelled invoices
+    const invRepo = Source.getRepository(Invoice);
+    const invQb = invRepo
+      .createQueryBuilder('i')
+      .where('CAST(i.createdAt AS DATE) >= :fromDate', { fromDate })
+      .andWhere('CAST(i.createdAt AS DATE) <= :toDate', { toDate })
+      .andWhere('i.status NOT IN (:...excl)', { excl: ['DRAFT', 'CANCELLED'] })
+      .andWhere('i.type NOT IN (:...texcl)', { texcl: ['OPENING'] });
+    applyBranchQB(invQb as never, 'i', bf);
+    const invoices = await invQb.getMany();
+
+    // Expenses per branch
     const expRepo = Source.getRepository(ExpenseEntry);
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const fromDate = sixMonthsAgo.toISOString().slice(0, 10);
-
-    const expQb = expRepo.createQueryBuilder('e').where('e.date >= :fromDate', { fromDate });
+    const expQb = expRepo
+      .createQueryBuilder('e')
+      .where('e.date >= :fromDate AND e.date <= :toDate', { fromDate, toDate })
+      .andWhere('e.status IN (:...statuses)', { statuses: ['APPROVED', 'PAID'] });
     applyBranchQB(expQb as never, 'e', bf);
     const expenses = await expQb.getMany();
 
-    // Aggregate: month → branchId → total expenses
-    const monthBranchMap: Record<string, Record<string, number>> = {};
-    const branches = new Set<string>();
+    const byBranch: Record<string, { revenue: number; expenses: number }> = {};
+    const ensure = (id: string) => {
+      if (!byBranch[id]) byBranch[id] = { revenue: 0, expenses: 0 };
+    };
+    for (const i of invoices) {
+      ensure(i.branchId);
+      byBranch[i.branchId].revenue += Number(i.totalAmount) - Number(i.taxAmount ?? 0);
+    }
     for (const e of expenses) {
-      const month = String(e.date).slice(0, 7);
-      if (!monthBranchMap[month]) monthBranchMap[month] = {};
-      const aedAmount = await convertToAED(Number(e.netAmount ?? 0), e.currency ?? 'AED');
-      monthBranchMap[month][e.branchId] = (monthBranchMap[month][e.branchId] ?? 0) + aedAmount;
-      branches.add(e.branchId);
+      ensure(e.branchId);
+      byBranch[e.branchId].expenses += Number(e.amount ?? e.netAmount ?? 0);
     }
 
-    const expenseByBranch = Object.entries(monthBranchMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, bmap]) => ({ month, ...bmap }));
-
-    // Receivables per branch (current outstanding)
-    const rcvRepo = Source.getRepository(ManualReceivable);
-    const rcvQb = rcvRepo.createQueryBuilder('r').where('r.status != :s', { s: 'PAID' });
-    applyBranchQB(rcvQb as never, 'r', bf);
-    const receivables = await rcvQb.getMany();
-    const receivablesByBranch: Record<string, number> = {};
-    for (const r of receivables) {
-      const outstanding = await convertToAED(
-        Number(r.amount) - Number(r.amountPaid ?? 0),
-        r.currency ?? 'AED',
-      );
-      receivablesByBranch[r.branchId] = (receivablesByBranch[r.branchId] ?? 0) + outstanding;
-    }
-    const receivableChart = Object.entries(receivablesByBranch).map(([branchId, value]) => ({
+    const data = Object.entries(byBranch).map(([branchId, d]) => ({
+      name: branchId.slice(0, 8),
       branchId,
-      value,
+      revenue: +d.revenue.toFixed(2),
+      expenses: +d.expenses.toFixed(2),
+      net: +(d.revenue - d.expenses).toFixed(2),
     }));
 
-    // Cash per branch
-    const cbRepo = Source.getRepository(CashBankAccount);
-    const cbQb = cbRepo.createQueryBuilder('a').where('a.isActive = :active', { active: true });
-    applyBranchQB(cbQb as never, 'a', bf);
-    const accounts = await cbQb.getMany();
-    const cashByBranch: Record<string, number> = {};
-    for (const a of accounts) {
-      cashByBranch[a.branchId] =
-        (cashByBranch[a.branchId] ?? 0) +
-        (await convertToAED(Number(a.currentBalance), a.currency ?? 'AED'));
-    }
-    const cashChart = Object.entries(cashByBranch)
-      .map(([branchId, value]) => ({ branchId, value }))
-      .sort((a, b) => b.value - a.value);
-
-    res.json({
-      success: true,
-      data: {
-        expenseByBranch,
-        receivableChart,
-        cashChart,
-        branchIds: [...branches],
-      },
-    });
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
 };
 
 // ─── CONSOLIDATED P&L ─────────────────────────────────────────────────────────
+// Uses computeProfitAndLoss (shared with Finance P&L page) and adds a monthly
+// revenue-vs-expenses breakdown for the Admin Overview chart.
 
 export const getConsolidatedPL = async (req: Request, res: Response, next: NextFunction) => {
   try {
     requireAdmin(req);
     const bf = req.branchFilter ?? [];
-    const { from, to } = req.query;
-    const fromDate = (from as string) || `${new Date().getFullYear()}-01-01`;
-    const toDate = (to as string) || new Date().toISOString().slice(0, 10);
+    const { period } = req.query;
+    const { fromDate, toDate } = getPeriodDates(period as string | undefined);
     const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
 
     const pl = await computeProfitAndLoss(Source, bf, fromDate, toDate, 'AED', INV_URL);
+
+    // Monthly breakdown for the revenue-vs-expenses bar chart.
+    // Use Source.query() with correct DB column names (tax_amount is snake_case due to
+    // @Column({ name: 'tax_amount' }); all others retain camelCase from entity definition).
+    const uuidRe = /^[0-9a-f-]{36}$/i;
+    const safeBranches = (bf ?? []).filter((b) => uuidRe.test(b));
+    const bParam = safeBranches.length > 0 ? safeBranches : null;
+    const bWhereInv = bParam
+      ? `AND "branchId" IN (${bParam.map((_, i) => `$${i + 3}`).join(',')})`
+      : '';
+    const bWhereExp = bParam
+      ? `AND "branchId" IN (${bParam.map((_, i) => `$${i + 3}`).join(',')})`
+      : '';
+
+    const [monthlyRevRaw, monthlyExpRaw] = await Promise.all([
+      Source.query<{ month: string; income: string }[]>(
+        `SELECT TO_CHAR("createdAt", 'YYYY-MM') AS month,
+                COALESCE(SUM("totalAmount" - COALESCE(tax_amount, 0)), 0) AS income
+         FROM invoices
+         WHERE CAST("createdAt" AS DATE) >= $1
+           AND CAST("createdAt" AS DATE) <= $2
+           AND status NOT IN ('DRAFT','CANCELLED')
+           AND type NOT IN ('OPENING')
+           ${bWhereInv}
+         GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
+         ORDER BY month`,
+        [fromDate, toDate, ...(bParam ?? [])],
+      ),
+      Source.query<{ month: string; expenses: string }[]>(
+        `SELECT TO_CHAR(date, 'YYYY-MM') AS month,
+                COALESCE(SUM(amount), 0) AS expenses
+         FROM expense_entries
+         WHERE date >= $1
+           AND date <= $2
+           AND status IN ('APPROVED','PAID')
+           ${bWhereExp}
+         GROUP BY TO_CHAR(date, 'YYYY-MM')
+         ORDER BY month`,
+        [fromDate, toDate, ...(bParam ?? [])],
+      ),
+    ]);
+
+    // Merge into a single sorted array
+    const monthMap: Record<string, { income: number; expenses: number }> = {};
+    for (const r of monthlyRevRaw) {
+      if (!monthMap[r.month]) monthMap[r.month] = { income: 0, expenses: 0 };
+      monthMap[r.month].income = +Number(r.income).toFixed(2);
+    }
+    for (const r of monthlyExpRaw) {
+      if (!monthMap[r.month]) monthMap[r.month] = { income: 0, expenses: 0 };
+      monthMap[r.month].expenses = +Number(r.expenses).toFixed(2);
+    }
+    const monthly = Object.entries(monthMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, v]) => ({ month, ...v }));
 
     res.json({
       success: true,
@@ -391,6 +448,7 @@ export const getConsolidatedPL = async (req: Request, res: Response, next: NextF
         totalExpenses: +pl.totalExpenses.toFixed(2),
         grossProfit: +pl.grossProfit.toFixed(2),
         netProfit: +pl.netProfit.toFixed(2),
+        monthly,
         revenueBreakdown: {
           rentalRevenue: +pl.rentalRevenue.toFixed(2),
           leaseRevenue: +pl.leaseRevenue.toFixed(2),
