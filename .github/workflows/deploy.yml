@@ -73,7 +73,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           source: 'release.tar.gz'
-          target: '/tmp/release.tar.gz'
+          target: '/tmp/'
           overwrite: true
 
       - name: Run Deploy Script on EC2
@@ -83,5 +83,6 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mv /tmp/release.tar.gz/release.tar.gz /tmp/release.tar.gz 2>/dev/null || true
+            cp /tmp/release.tar.gz /tmp/release.tar.gz.bak 2>/dev/null || true
+            ls -la /tmp/release* 2>/dev/null
             bash /opt/xerocare/scripts/deploy.sh
