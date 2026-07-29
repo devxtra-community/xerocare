@@ -577,7 +577,12 @@ export const getStats = async (req: Request, res: Response, next: NextFunction) 
 export const getBranchSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const period = (req.query.period as string) || '1M';
-    const branchId = req.user?.branchId;
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
 
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
@@ -600,7 +605,12 @@ export const getBranchSales = async (req: Request, res: Response, next: NextFunc
  */
 export const getBranchSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const branchId = req.user?.branchId;
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
 
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
@@ -623,7 +633,12 @@ export const getBranchSalesTotals = async (req: Request, res: Response, next: Ne
  */
 export const getBranchFinanceStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const branchId = req.user?.branchId;
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
 
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
@@ -647,7 +662,13 @@ export const getBranchFinanceStats = async (req: Request, res: Response, next: N
  */
 export const getPendingCounts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const branchId = req.user?.branchId;
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
+
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
     }
@@ -667,7 +688,13 @@ export const getPendingCounts = async (req: Request, res: Response, next: NextFu
  */
 export const getCollectionAlerts = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const branchId = req.user?.branchId;
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
+
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
     }
@@ -797,7 +824,13 @@ export const getAdminSalesStats = async (req: Request, res: Response, next: Next
  */
 export const getInvoiceHistory = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const branchId = req.user?.branchId;
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
+
     if (!branchId) {
       throw new AppError('Branch ID not found in user context', 400);
     }
@@ -829,11 +862,14 @@ export const getInvoiceHistory = async (req: Request, res: Response, next: NextF
  */
 export const getCompletedCollections = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user || !req.user.branchId) {
-      throw new AppError('User context missing or incomplete', 401);
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
     }
 
-    const collections = await reportService.getCompletedCollections(req.user.branchId);
+    const collections = await reportService.getCompletedCollections(branchId);
     return res.status(200).json({
       success: true,
       data: collections,
