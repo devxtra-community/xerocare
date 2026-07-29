@@ -32,6 +32,7 @@ import {
   ArrowLeftRight,
   Coins,
   Layers,
+  Banknote,
 } from 'lucide-react';
 
 import {
@@ -92,6 +93,7 @@ export default function FinanceSidebar() {
     { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
     { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
     { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
+    { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
     { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
     {
       title: 'Exchange Rates',
