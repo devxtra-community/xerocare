@@ -115,3 +115,27 @@ export const updateOpeningBalanceEntry = async (
 export const deleteOpeningBalanceEntry = async (id: string): Promise<void> => {
   await api.delete(`/b/opening-balance/${id}`);
 };
+
+export interface RecordOpeningBalancePaymentDto {
+  amount: number;
+  paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+  paymentDate?: string;
+  referenceNumber?: string;
+  chequeNumber?: string;
+  chequeBankName?: string;
+  chequeDueDate?: string;
+  chequeDate?: string;
+  notes?: string;
+  paidToAccount?: string;
+}
+
+export const recordOpeningBalancePayment = async (
+  id: string,
+  data: RecordOpeningBalancePaymentDto,
+): Promise<OpeningBalanceEntry> => {
+  const response = await api.post<{ success: boolean; data: OpeningBalanceEntry }>(
+    `/b/opening-balance/${id}/payment`,
+    data,
+  );
+  return response.data.data;
+};

@@ -2,6 +2,7 @@ import { Source } from '../config/dataSource';
 import { OpeningBalanceEntry, BalanceType } from '../entities/openingBalanceEntryEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { SaleType } from '../entities/enums/saleType';
@@ -13,6 +14,8 @@ import { Like } from 'typeorm';
 import { getFinanceEmployeesByBranch } from './billingHelpers';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { logAudit } from './auditLogService';
+import { postCashbookEntry } from './cashbookService';
+import { todayInBusinessTz } from '../utils/businessDate';
 
 export interface CreateOpeningBalanceEntryDto {
   customerId: string;
@@ -210,11 +213,19 @@ export class OpeningBalanceService {
     const entryNumber = `OBE-${yearMonth}-${sequenceStr}`;
     const invoiceNumber = `OPN-${yearMonth}-${sequenceStr}`;
 
-    // Create linked invoice
+    // RENT_CONTRACT / LEASE_CONTRACT opening balances need a PROFORMA invoice so the
+    // normal billing engine (cron, usage service) can treat them as live contracts and
+    // continue generating recurring bills going forward. Debt-only types (SALE, SERVICE,
+    // OTHER) stay OPENING — they're one-time historical balances with no forward billing.
+    const isOngoingContract =
+      dto.balanceType === BalanceType.RENT_CONTRACT ||
+      dto.balanceType === BalanceType.LEASE_CONTRACT;
+
     const invoiceStatus = openingBalance <= 0 ? InvoiceStatus.PAID : InvoiceStatus.ACTIVE_CONTRACT;
+    const contractStart = dto.contractStartDate ? new Date(dto.contractStartDate) : new Date();
     const invoice = this.invoiceRepo.create({
       invoiceNumber,
-      type: InvoiceType.OPENING,
+      type: isOngoingContract ? InvoiceType.PROFORMA : InvoiceType.OPENING,
       billType: mapBalanceTypeToBillType(dto.balanceType),
       saleType: mapBalanceTypeToSaleType(dto.balanceType),
       customerId: dto.customerId,
@@ -224,6 +235,12 @@ export class OpeningBalanceService {
       totalAmount: openingBalance,
       notes: `Opening balance entry: ${entryNumber}. ${dto.notes || ''}`,
       isOpeningEntry: true,
+      // For ongoing contracts: give the billing engine the dates it needs to generate
+      // recurring bills just like a normal PROFORMA contract.
+      ...(isOngoingContract && {
+        effectiveFrom: contractStart,
+        billingCycleInDays: dto.billingCycleInDays ?? 30,
+      }),
     });
 
     const savedInvoice = await this.invoiceRepo.save(invoice);
@@ -471,5 +488,154 @@ export class OpeningBalanceService {
       user.userId,
       `Soft-deleted Opening Balance Entry ${entry.entryNumber} and linked invoice records.`,
     );
+  }
+
+  async recordPayment(
+    id: string,
+    dto: {
+      amount: number;
+      paymentMode: string; // CASH | BANK_TRANSFER | CHEQUE
+      paymentDate?: string;
+      referenceNumber?: string;
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
+      chequeDate?: string;
+      notes?: string;
+      paidToAccount?: string;
+    },
+    user: { userId: string; role: string; branchId?: string },
+  ) {
+    const entry = await this.entryRepo.findOne({ where: { id }, relations: ['invoice'] });
+    if (!entry) throw new AppError('Opening balance entry not found', 404);
+
+    if (user.role !== 'ADMIN' && user.role !== 'FINANCE' && entry.branchId !== user.branchId) {
+      throw new AppError('Access denied: entry belongs to a different branch', 403);
+    }
+    if (entry.isFullySettled) throw new AppError('This entry is already fully settled', 400);
+    if (!entry.invoiceId)
+      throw new AppError('Entry has no linked invoice to record payment against', 400);
+
+    const amount = Number(dto.amount);
+    if (!amount || amount <= 0) throw new AppError('Payment amount must be positive', 400);
+    if (amount > Number(entry.remainingBalance) + 0.005) {
+      throw new AppError(
+        `Payment amount (${amount}) exceeds remaining balance (${entry.remainingBalance})`,
+        400,
+      );
+    }
+
+    const entryRepo = this.entryRepo;
+
+    let savedPayment!: PaymentTransaction;
+
+    await Source.transaction(async (em) => {
+      // 1. Record payment_transaction against the linked invoice
+      const pt = em.getRepository(PaymentTransaction).create({
+        invoiceId: entry.invoiceId!,
+        amount,
+        paymentMode: dto.paymentMode,
+        referenceNumber: dto.referenceNumber,
+        transactionDate: dto.paymentDate ? new Date(dto.paymentDate) : new Date(),
+        recordedBy: user.userId,
+        remarks: dto.notes,
+      });
+      savedPayment = await em.getRepository(PaymentTransaction).save(pt);
+
+      // 2. Update InvoiceLedger
+      const ledger = await em
+        .getRepository(InvoiceLedger)
+        .findOne({ where: { invoiceId: entry.invoiceId! } });
+      if (ledger) {
+        ledger.paidAmount = Number(ledger.paidAmount) + amount;
+        ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
+        await em.getRepository(InvoiceLedger).save(ledger);
+      }
+
+      // 3. Update entry remainingBalance + isFullySettled
+      entry.remainingBalance = Math.max(0, Number(entry.remainingBalance) - amount);
+      entry.isFullySettled = entry.remainingBalance <= 0.005;
+      if (entry.isFullySettled) entry.remainingBalance = 0;
+
+      // 4. Update linked invoice status so it reflects payment state
+      const invoice = await em.getRepository(Invoice).findOne({ where: { id: entry.invoiceId! } });
+      if (invoice) {
+        const totalPaid = Number(invoice.totalAmount) - entry.remainingBalance;
+        if (entry.isFullySettled) {
+          invoice.status = InvoiceStatus.PAID;
+        } else if (totalPaid > 0) {
+          // Keep ACTIVE_CONTRACT/INVOICED — partial payment doesn't change contract status
+        }
+        await em.getRepository(Invoice).save(invoice);
+      }
+
+      await entryRepo.save(entry);
+    });
+
+    // 5. Post to cashbook — best-effort after transaction commits
+    const isCheque = dto.paymentMode.toLowerCase() === 'cheque';
+    try {
+      if (isCheque) {
+        const { Cheque } = await import('../entities/chequeEntity');
+        const chequeRepo = Source.getRepository(Cheque);
+        const chequeNo = dto.chequeNumber || dto.referenceNumber || `CHQ-OBE-${Date.now()}`;
+        const existing = await chequeRepo.findOne({
+          where: { chequeNo, branchId: entry.branchId },
+        });
+        if (!existing) {
+          const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
+          const cheque = chequeRepo.create({
+            chequeNo,
+            bankName: dto.chequeBankName,
+            partyName: entry.customerId,
+            amount,
+            dueDate: dto.chequeDueDate
+              ? new Date(dto.chequeDueDate)
+              : new Date(dto.paymentDate || Date.now()),
+            chequeDate: dto.chequeDate
+              ? new Date(dto.chequeDate)
+              : new Date(dto.paymentDate || Date.now()),
+            issueDate: new Date(dto.paymentDate || Date.now()),
+            type: 'RECEIVED',
+            status: 'PENDING',
+            description: `Customer cheque — opening balance entry ${entry.entryNumber}`,
+            branchId: entry.branchId,
+            sourceType: 'OPENING_BALANCE',
+            sourceReferenceId: entry.id,
+            sourceLabel: `Opening Balance — ${entry.entryNumber}`,
+            createdBy: user.userId || SYSTEM_UUID,
+          });
+          await chequeRepo.save(cheque);
+        }
+      } else {
+        await postCashbookEntry({
+          date: dto.paymentDate || todayInBusinessTz(),
+          entryType: 'RECEIPT',
+          amount,
+          category: 'Opening Balance Receipt',
+          branchId: entry.branchId,
+          createdBy: user.userId,
+          paymentMode: dto.paymentMode,
+          accountId: dto.paidToAccount,
+          autoResolveAccount: true,
+          description: `Payment against opening balance entry ${entry.entryNumber}`,
+          chequeNo: dto.referenceNumber,
+          notes: dto.notes,
+          sourceType: 'OPENING_BALANCE_PAYMENT',
+          sourceId: savedPayment.id,
+        });
+      }
+    } catch (cashErr) {
+      logger.error('Failed to post opening balance payment to cashbook', cashErr);
+    }
+
+    await logAudit(
+      entry.invoiceId || entry.id,
+      'PAYMENT',
+      user.userId,
+      `Recorded ${dto.paymentMode} payment of ${amount} against opening balance entry ${entry.entryNumber}. Remaining: ${entry.remainingBalance}. Settled: ${entry.isFullySettled}.`,
+    );
+
+    return entry;
   }
 }

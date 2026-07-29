@@ -9,6 +9,7 @@ import {
   getCustomerEntries,
   updateEntry,
   deleteEntry,
+  recordPayment,
 } from '../controllers/openingBalanceController';
 
 const router = Router();
@@ -52,7 +53,15 @@ router.delete(
 
 // Read operations available to all authenticated employees
 router.get('/', authMiddleware, getEntries);
-router.get('/:id', authMiddleware, getEntry);
 router.get('/customer/:customerId', authMiddleware, getCustomerEntries);
+router.get('/:id', authMiddleware, getEntry);
+
+// Payment recording — FINANCE and ADMIN only
+router.post(
+  '/:id/payment',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  recordPayment,
+);
 
 export default router;

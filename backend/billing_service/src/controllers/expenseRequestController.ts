@@ -86,12 +86,15 @@ async function findAllAdmins(): Promise<string[]> {
   try {
     const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
     const token = makeServiceToken();
-    const res = await fetch(`${empUrl}/employee?role=ADMIN&status=ACTIVE`, {
+    // Admin accounts live in employee_service's own separate `admin` table, not
+    // as Employee rows with role='ADMIN' — GET /employee?role=ADMIN always
+    // returns nothing. /admin/list is the real source.
+    const res = await fetch(`${empUrl}/admin/list`, {
       headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
     });
     if (!res.ok) return [];
     const data = await res.json();
-    const list: Array<{ id: string }> = data.data?.employees ?? data.data ?? data ?? [];
+    const list: Array<{ id: string }> = data.data ?? [];
     return list.map((e) => e.id);
   } catch {
     return [];

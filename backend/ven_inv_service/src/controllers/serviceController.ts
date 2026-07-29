@@ -720,6 +720,19 @@ export class ServiceController {
         referenceType: 'SERVICE',
       });
 
+      // Skip when the Manager themselves made the assignment — no need to tell
+      // them what they just did. Admin/Service Help Desk assignments still
+      // notify the branch Manager, since they may not be the one who acted.
+      if (req.user?.role !== 'MANAGER') {
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: isReassignment ? 'Service Ticket Reassigned' : 'Technician Assigned to Ticket',
+          message: `Ticket ${ticket.ticketNumber} has been ${isReassignment ? 'reassigned' : 'assigned'} to a technician.`,
+          type: 'INFO',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
+      }
+
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
@@ -1612,6 +1625,17 @@ export class ServiceController {
           `Estimate rejected by Finance. Remarks: ${remarks}`,
           req.user?.userId,
         );
+
+        if (ticket.assignedTechnicianId) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: ticket.assignedTechnicianId,
+            title: 'Estimate Rejected by Finance',
+            message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${remarks}. Please revise.`,
+            type: 'TASK',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE',
+          });
+        }
       }
 
       res.status(200).json({ success: true, data: estimate });
@@ -1773,6 +1797,24 @@ export class ServiceController {
           `Estimate rejected by Customer. Reason: ${reason}`,
           req.user?.userId,
         );
+
+        if (ticket.assignedTechnicianId) {
+          await NotificationPublisher.publishInAppRequest({
+            recipientId: ticket.assignedTechnicianId,
+            title: 'Customer Rejected Estimate',
+            message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
+            type: 'WARNING',
+            referenceId: ticket.id,
+            referenceType: 'SERVICE',
+          });
+        }
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: 'Customer Rejected Estimate',
+          message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
+          type: 'WARNING',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
       }
 
       res.status(200).json({ success: true, data: estimate });
@@ -2272,67 +2314,84 @@ export class ServiceController {
               await yieldRepo.save(newYield);
             }
 
-            // Save Part Usage Log
-            const usageLog = usageLogRepo.create({
-              ticketId: ticket.id,
-              productId: ticket.productId || '',
-              sparePartId: item.sparePartId,
-              sku: item.sku || '',
-              partName: item.partName || '',
-              quantityUsed: item.quantity,
-              unitCost: purchaseCost,
-              totalCost: itemCost,
-              replacedAt: new Date(),
-              calculatedYield: yieldPages || null,
-              isFree: item.isFree,
-              isConsumable: this.isConsumable(partDetails.part_name, partDetails.sku),
-              meterReadingAtReplacement: meterReading || null,
-              linkedInvoiceId: ticket.linkedInvoiceId || null,
-            });
-            await usageLogRepo.save(usageLog);
+            // Save Part Usage Log — productId is NOT NULL here (it's a per-machine
+            // usage record), so this is skipped entirely for a ticket with no
+            // matched Product (e.g. a serial number not yet in the catalog).
+            // Previously this passed '' as a fallback, which isn't a valid uuid
+            // and crashed the whole completion request with a 500 — after the
+            // ticket's status had already been committed as COMPLETED, silently
+            // skipping the rest of the function including the Manager notification.
+            if (ticket.productId) {
+              const usageLog = usageLogRepo.create({
+                ticketId: ticket.id,
+                productId: ticket.productId,
+                sparePartId: item.sparePartId,
+                sku: item.sku || '',
+                partName: item.partName || '',
+                quantityUsed: item.quantity,
+                unitCost: purchaseCost,
+                totalCost: itemCost,
+                replacedAt: new Date(),
+                calculatedYield: yieldPages || null,
+                isFree: item.isFree,
+                isConsumable: this.isConsumable(partDetails.part_name, partDetails.sku),
+                meterReadingAtReplacement: meterReading || null,
+                linkedInvoiceId: ticket.linkedInvoiceId || null,
+              });
+              await usageLogRepo.save(usageLog);
+            }
           }
         }
       }
 
       const labourCost = estimate ? Number(estimate.labourCost) : 0;
 
-      // Update Lifetime Machine History (Accumulated single record)
-      const historyRepo = Source.getRepository(MachineServiceHistory);
-      let historyRecord = await historyRepo.findOne({
-        where: { productId: ticket.productId || undefined },
-      });
-
-      let nextScheduledMaintenanceDate: Date | null = null;
-      if (ticket.serviceContext === ServiceContext.RENT) {
-        nextScheduledMaintenanceDate = new Date();
-        nextScheduledMaintenanceDate.setMonth(nextScheduledMaintenanceDate.getMonth() + 2);
-      }
-
-      if (historyRecord) {
-        historyRecord.totalServiceVisits += 1;
-        if (ticket.ticketType === 'PREVENTATIVE_MAINTENANCE') {
-          historyRecord.totalPreventativeVisits += 1;
-        }
-        historyRecord.lastServiceDate = new Date();
-        historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
-        historyRecord.totalPartsSpend = Number(historyRecord.totalPartsSpend) + totalPartsBilled;
-        historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
-        historyRecord.totalLifetimeCost =
-          Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
-      } else {
-        historyRecord = historyRepo.create({
-          productId: ticket.productId || '',
-          serialNumber: ticket.serialNumber,
-          totalServiceVisits: 1,
-          totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
-          lastServiceDate: new Date(),
-          nextScheduledMaintenanceDate,
-          totalPartsSpend: totalPartsBilled,
-          totalLabourSpend: labourCost,
-          totalLifetimeCost: totalPartsBilled + labourCost,
+      // Update Lifetime Machine History (Accumulated single record) — productId
+      // is NOT NULL + unique here, so this only applies to tickets with a real
+      // matched Product. Previously, a product-less ticket's `productId:
+      // undefined` in the findOne where-clause was silently dropped by TypeORM,
+      // matching (and corrupting) whatever unrelated history row happened to
+      // come back first; the fallback create() path then crashed on `''` not
+      // being a valid uuid. Skipping entirely is correct: there's no real
+      // machine to attribute lifetime history to.
+      if (ticket.productId) {
+        const historyRepo = Source.getRepository(MachineServiceHistory);
+        let historyRecord = await historyRepo.findOne({
+          where: { productId: ticket.productId },
         });
+
+        let nextScheduledMaintenanceDate: Date | null = null;
+        if (ticket.serviceContext === ServiceContext.RENT) {
+          nextScheduledMaintenanceDate = new Date();
+          nextScheduledMaintenanceDate.setMonth(nextScheduledMaintenanceDate.getMonth() + 2);
+        }
+
+        if (historyRecord) {
+          historyRecord.totalServiceVisits += 1;
+          if (ticket.ticketType === 'PREVENTATIVE_MAINTENANCE') {
+            historyRecord.totalPreventativeVisits += 1;
+          }
+          historyRecord.lastServiceDate = new Date();
+          historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
+          historyRecord.totalPartsSpend = Number(historyRecord.totalPartsSpend) + totalPartsBilled;
+          historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
+          historyRecord.totalLifetimeCost =
+            Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
+        } else {
+          historyRecord = historyRepo.create({
+            productId: ticket.productId,
+            serialNumber: ticket.serialNumber,
+            totalServiceVisits: 1,
+            totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
+            lastServiceDate: new Date(),
+            nextScheduledMaintenanceDate,
+            totalPartsSpend: totalPartsBilled,
+            totalLabourSpend: labourCost,
+            totalLifetimeCost: totalPartsBilled + labourCost,
+          });
+        }
+        await historyRepo.save(historyRecord);
       }
-      await historyRepo.save(historyRecord);
 
       // Save report URL to ticket
       ticket.reportUrl = `/i/service/tickets/${ticket.id}/report`;
@@ -3783,6 +3842,16 @@ export class ServiceController {
         }
       }
 
+      if (ticket.assignedTechnicianId) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: ticket.assignedTechnicianId,
+          title: 'Customer Rejected Service',
+          message: `Customer rejected the quotation for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
+          type: 'WARNING',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
+      }
       await this.notifyBranchManagerAndAdmins(ticket.branchId, {
         title: 'Customer Rejected Service',
         message: `Customer rejected quotation for ticket ${ticket.ticketNumber}.`,

@@ -130,3 +130,23 @@ export const deleteEntry = async (req: Request, res: Response, next: NextFunctio
     next(error);
   }
 };
+
+export const recordPayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !req.user.userId) {
+      throw new AppError('User context missing', 401);
+    }
+    const entry = await service.recordPayment(req.params.id as string, req.body, {
+      userId: req.user.userId,
+      role: req.user.role,
+      branchId: req.user.branchId,
+    });
+    res.status(200).json({
+      success: true,
+      message: 'Payment recorded successfully',
+      data: entry,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

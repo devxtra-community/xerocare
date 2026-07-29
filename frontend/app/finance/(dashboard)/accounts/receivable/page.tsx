@@ -538,7 +538,7 @@ export default function AccountsReceivablePage() {
       branchId: inv.branchId,
       aging: inv.aging,
       isInvoice: true,
-      source: 'Invoice' as const,
+      source: (inv.isOpeningEntry ? 'Opening Balance' : 'Invoice') as 'Invoice' | 'Opening Balance',
     }));
     const fromManual = manualRcv
       .filter((r) => !r.linkedInvoiceId)
@@ -861,6 +861,7 @@ export default function AccountsReceivablePage() {
                 <SelectContent>
                   <SelectItem value="ALL">All Sources</SelectItem>
                   <SelectItem value="Invoice">Invoice</SelectItem>
+                  <SelectItem value="Opening Balance">Opening Balance</SelectItem>
                   <SelectItem value="Manual Entry">Manual Entry</SelectItem>
                 </SelectContent>
               </Select>
@@ -1022,7 +1023,9 @@ export default function AccountsReceivablePage() {
                         className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
                           r.source === 'Invoice'
                             ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
+                            : r.source === 'Opening Balance'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
                         }`}
                       >
                         {r.source}

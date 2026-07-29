@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Eye, Edit2, Trash2 } from 'lucide-react';
+import { Eye, Edit2, Trash2, CreditCard } from 'lucide-react';
 import { OpeningBalanceEntry } from '@/lib/openingBalance';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -11,6 +11,7 @@ interface OpeningBalanceTableProps {
   onSelect: (entry: OpeningBalanceEntry) => void;
   onEdit: (entry: OpeningBalanceEntry) => void;
   onDelete: (id: string) => void;
+  onRecordPayment: (entry: OpeningBalanceEntry) => void;
   userRole: string;
 }
 
@@ -20,6 +21,7 @@ export default function OpeningBalanceTable({
   onSelect,
   onEdit,
   onDelete,
+  onRecordPayment,
   userRole,
 }: OpeningBalanceTableProps) {
   const getBalanceTypeLabel = (type: string) => {
@@ -154,6 +156,15 @@ export default function OpeningBalanceTable({
                         >
                           <Eye className="h-4 w-4" />
                         </button>
+                        {['ADMIN', 'FINANCE'].includes(userRole) && !entry.isFullySettled && (
+                          <button
+                            onClick={() => onRecordPayment(entry)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                            title="Record Payment"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => onEdit(entry)}
                           disabled={!canMutate}

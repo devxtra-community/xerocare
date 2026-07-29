@@ -62,11 +62,13 @@ export const getAccountsReceivableTransactions = async (
         branchId: string;
         totalAmount: string;
         paid: string;
+        isOpeningEntry: boolean;
       }[]
     >(`
       SELECT i.id, i."invoiceNumber", i.customer_name, i."saleType",
              TO_CHAR(i."createdAt", 'YYYY-MM-DD') AS "createdAt",
-             i.currency_code, i."branchId", i."totalAmount", COALESCE(pt.paid, 0) AS paid
+             i.currency_code, i."branchId", i."totalAmount", COALESCE(pt.paid, 0) AS paid,
+             i.is_opening_entry AS "isOpeningEntry"
       FROM invoices i
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
@@ -80,7 +82,7 @@ export const getAccountsReceivableTransactions = async (
         ) u GROUP BY invoice_id
       ) pt ON pt.invoice_id = i.id
       WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
-        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
+        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')) OR i.type = 'OPENING')
         AND i."totalAmount" > 0
         AND i."deletedAt" IS NULL
         ${branchSql('i', bParam)}
@@ -104,6 +106,7 @@ export const getAccountsReceivableTransactions = async (
         currencyCode: r.currency_code ?? 'AED',
         branchId: r.branchId,
         aging: agingBucket(r.createdAt),
+        isOpeningEntry: r.isOpeningEntry === true,
       };
     });
     // Default: outstanding-only (matches the 1003 balance-sheet figure this endpoint

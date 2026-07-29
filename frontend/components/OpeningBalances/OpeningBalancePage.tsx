@@ -10,7 +10,10 @@ import {
   getOpeningBalanceEntries,
   updateOpeningBalanceEntry,
   deleteOpeningBalanceEntry,
+  recordOpeningBalancePayment,
+  RecordOpeningBalancePaymentDto,
 } from '@/lib/openingBalance';
+import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
 import { getCustomers, Customer, createCustomer, CreateCustomerData } from '@/lib/customer';
 import { getUserFromToken } from '@/lib/auth';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -63,6 +66,24 @@ export default function OpeningBalancePage() {
   const [accountViewOpen, setAccountViewOpen] = useState(false);
   const [reconcileInvoiceId, setReconcileInvoiceId] = useState<string | null>(null);
 
+  // Payment modal state
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentEntry, setPaymentEntry] = useState<OpeningBalanceEntry | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [cashAccounts, setCashAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [paymentForm, setPaymentForm] = useState<RecordOpeningBalancePaymentDto>({
+    amount: 0,
+    paymentMode: 'CASH',
+    paymentDate: new Date().toISOString().split('T')[0],
+    referenceNumber: '',
+    chequeNumber: '',
+    chequeBankName: '',
+    chequeDueDate: '',
+    chequeDate: '',
+    notes: '',
+    paidToAccount: '',
+  });
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('ALL');
@@ -99,6 +120,70 @@ export default function OpeningBalancePage() {
     productId: '',
     notes: '',
   });
+
+  const openPaymentModal = async (entry: OpeningBalanceEntry) => {
+    setPaymentEntry(entry);
+    setPaymentForm({
+      amount: 0,
+      paymentMode: 'CASH',
+      paymentDate: new Date().toISOString().split('T')[0],
+      referenceNumber: '',
+      chequeNumber: '',
+      chequeBankName: '',
+      chequeDueDate: '',
+      chequeDate: '',
+      notes: '',
+      paidToAccount: '',
+    });
+    try {
+      const accounts = await fetchCashBankAccounts();
+      setCashAccounts(
+        accounts.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })),
+      );
+    } catch {
+      setCashAccounts([]);
+    }
+    setIsPaymentOpen(true);
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!paymentEntry) return;
+    if (!paymentForm.amount || paymentForm.amount <= 0) {
+      toast.error('Enter a valid payment amount');
+      return;
+    }
+    if (paymentForm.amount > Number(paymentEntry.remainingBalance)) {
+      toast.error('Amount exceeds remaining balance');
+      return;
+    }
+    setPaymentLoading(true);
+    try {
+      const payload: RecordOpeningBalancePaymentDto = {
+        amount: paymentForm.amount,
+        paymentMode: paymentForm.paymentMode,
+        paymentDate: paymentForm.paymentDate || undefined,
+        referenceNumber: paymentForm.referenceNumber || undefined,
+        notes: paymentForm.notes || undefined,
+        paidToAccount: paymentForm.paidToAccount || undefined,
+      };
+      if (paymentForm.paymentMode === 'CHEQUE') {
+        payload.chequeNumber = paymentForm.chequeNumber || undefined;
+        payload.chequeBankName = paymentForm.chequeBankName || undefined;
+        payload.chequeDueDate = paymentForm.chequeDueDate || undefined;
+        payload.chequeDate = paymentForm.chequeDate || undefined;
+      }
+      await recordOpeningBalancePayment(paymentEntry.id, payload);
+      toast.success('Payment recorded successfully');
+      setIsPaymentOpen(false);
+      loadData();
+    } catch (err) {
+      const apiErr = err as ApiError;
+      toast.error(apiErr.response?.data?.message || 'Failed to record payment');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -524,6 +609,7 @@ export default function OpeningBalancePage() {
           onSelect={setSelectedEntry}
           onEdit={handleEditOpen}
           onDelete={handleDelete}
+          onRecordPayment={openPaymentModal}
           userRole={userRole}
         />
       )}
@@ -1056,6 +1142,216 @@ export default function OpeningBalancePage() {
               </button>
               <Button type="submit" className="h-11 px-8 rounded-xl">
                 Save Changes
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogOverlay className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm" />
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl p-6"
+        >
+          <DialogHeader className="pb-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="text-lg font-bold">Record Payment</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                {paymentEntry && (
+                  <>
+                    {customerNames[paymentEntry.customerId] || 'Customer'} — Remaining:{' '}
+                    {getActiveCurrency()}{' '}
+                    {Number(paymentEntry.remainingBalance).toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                    })}
+                  </>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={() => setIsPaymentOpen(false)}
+              className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </DialogHeader>
+
+          <form
+            onSubmit={handlePaymentSubmit}
+            className="space-y-5 pt-5 text-slate-700 dark:text-slate-300"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Amount ({getActiveCurrency()})
+                </label>
+                <Input
+                  required
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={paymentForm.amount || ''}
+                  onChange={(e) =>
+                    setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })
+                  }
+                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Payment Mode
+                </label>
+                <select
+                  value={paymentForm.paymentMode}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      paymentMode: e.target.value as RecordOpeningBalancePaymentDto['paymentMode'],
+                    })
+                  }
+                  className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Payment Date
+                </label>
+                <Input
+                  type="date"
+                  value={paymentForm.paymentDate || ''}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                />
+              </div>
+
+              {cashAccounts.length > 0 && (
+                <div className="space-y-1.5 col-span-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Cash / Bank Account
+                  </label>
+                  <select
+                    value={paymentForm.paidToAccount || ''}
+                    onChange={(e) =>
+                      setPaymentForm({ ...paymentForm, paidToAccount: e.target.value })
+                    }
+                    className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                  >
+                    <option value="">Select account (optional)</option>
+                    {cashAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Reference Number
+                </label>
+                <Input
+                  placeholder="Transaction / receipt reference"
+                  value={paymentForm.referenceNumber || ''}
+                  onChange={(e) =>
+                    setPaymentForm({ ...paymentForm, referenceNumber: e.target.value })
+                  }
+                  className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm focus-visible:ring-2 focus-visible:ring-primary/20"
+                />
+              </div>
+
+              {paymentForm.paymentMode === 'CHEQUE' && (
+                <>
+                  <div className="col-span-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <h4 className="text-xs font-bold text-primary uppercase">Cheque Details</h4>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Cheque Number
+                    </label>
+                    <Input
+                      placeholder="e.g. 001234"
+                      value={paymentForm.chequeNumber || ''}
+                      onChange={(e) =>
+                        setPaymentForm({ ...paymentForm, chequeNumber: e.target.value })
+                      }
+                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Bank Name
+                    </label>
+                    <Input
+                      placeholder="e.g. HSBC"
+                      value={paymentForm.chequeBankName || ''}
+                      onChange={(e) =>
+                        setPaymentForm({ ...paymentForm, chequeBankName: e.target.value })
+                      }
+                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Cheque Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={paymentForm.chequeDate || ''}
+                      onChange={(e) =>
+                        setPaymentForm({ ...paymentForm, chequeDate: e.target.value })
+                      }
+                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Due / Clear Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={paymentForm.chequeDueDate || ''}
+                      onChange={(e) =>
+                        setPaymentForm({ ...paymentForm, chequeDueDate: e.target.value })
+                      }
+                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1.5 col-span-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Notes
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Payment notes..."
+                  value={paymentForm.notes || ''}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                  className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end items-center gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsPaymentOpen(false)}
+                className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold rounded-xl text-sm transition"
+              >
+                Cancel
+              </button>
+              <Button type="submit" disabled={paymentLoading} className="h-11 px-8 rounded-xl">
+                {paymentLoading ? 'Recording...' : 'Record Payment'}
               </Button>
             </div>
           </form>
