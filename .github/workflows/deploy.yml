@@ -43,7 +43,7 @@ jobs:
 
       - name: Package Release
         run: |
-          tar -czf /tmp/release.tar.gz \
+          tar -czf release.tar.gz \
             --exclude='**/node_modules/.cache' \
             --exclude='frontend/.next/cache' \
             backend/api_gateway/dist \
@@ -72,9 +72,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: '/tmp/release.tar.gz'
+          source: 'release.tar.gz'
           target: '/tmp/'
-          strip_components: 2
 
       - name: Run Deploy Script on EC2
         uses: appleboy/ssh-action@v1.0.3
