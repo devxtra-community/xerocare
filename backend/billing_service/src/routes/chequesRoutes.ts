@@ -10,6 +10,7 @@ import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { requireCashAccount } from '../services/cashbookService';
+import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { getBranchManager } from '../services/billingHelpers';
 import { logger } from '../config/logger';
 
@@ -226,12 +227,13 @@ router.get('/notifications', async (req, res, next) => {
 // ── GET /:id — single cheque with history ─────────────────────────────────────
 router.get('/:id', async (req, res, next) => {
   try {
-    const branchIds = resolveBranchFilter(req);
     const repo = Source.getRepository(Cheque);
-    const qb = repo
-      .createQueryBuilder('c')
-      .where('c.id = :id', { id: req.params.id })
-      .andWhere('c.branchId IN (:...branchIds)', { branchIds });
+    const qb = repo.createQueryBuilder('c').where('c.id = :id', { id: req.params.id });
+    // req.branchFilter (set by parseBranchFilter) — [] means ADMIN viewing all
+    // branches, which must be a no-op filter here, not an empty IN() clause
+    // (TypeORM throws on `IN (:...x)` with an empty array). Non-admin roles are
+    // always locked to their own branchId, so this stays branch-safe.
+    applyBranchQB(qb, 'c', req.branchFilter ?? []);
     const cheque = await qb.getOne();
     if (!cheque) throw new AppError('Cheque not found', 404);
 
