@@ -1,0 +1,85 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build and Deploy Xerocare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.0
+          run_install: false
+
+      - name: Install Dependencies
+        run: HUSKY=0 pnpm install --frozen-lockfile
+
+      - name: Build Backend Services
+        run: |
+          cd backend/employee_service && pnpm run build && cd ../..
+          cd backend/api_gateway && pnpm run build && cd ../..
+          cd backend/billing_service && pnpm run build && cd ../..
+          cd backend/crm_service && pnpm run build && cd ../..
+          cd backend/ven_inv_service && pnpm run build && cd ../..
+
+      - name: Build Frontend
+        run: cd frontend && NODE_OPTIONS="--max-old-space-size=3072" pnpm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+
+      - name: Package Release
+        run: |
+          tar -czf /tmp/release.tar.gz \
+            --exclude='**/node_modules/.cache' \
+            --exclude='frontend/.next/cache' \
+            backend/api_gateway/dist \
+            backend/api_gateway/package.json \
+            backend/billing_service/dist \
+            backend/billing_service/package.json \
+            backend/crm_service/dist \
+            backend/crm_service/package.json \
+            backend/employee_service/dist \
+            backend/employee_service/package.json \
+            backend/ven_inv_service/dist \
+            backend/ven_inv_service/package.json \
+            frontend/.next \
+            frontend/public \
+            frontend/package.json \
+            frontend/node_modules \
+            node_modules \
+            ecosystem.config.js \
+            package.json \
+            pnpm-workspace.yaml \
+            .npmrc
+
+      - name: Upload Release to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: '/tmp/release.tar.gz'
+          target: '/tmp/'
+          strip_components: 2
+
+      - name: Run Deploy Script on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: bash /opt/xerocare/scripts/deploy.sh

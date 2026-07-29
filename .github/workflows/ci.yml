@@ -9,11 +9,11 @@ on:
   push:
     branches:
       - test
+      - nadhil
 
 jobs:
   build:
     name: Build Xerocare
-
     runs-on: ubuntu-latest
 
     steps:
@@ -37,5 +37,15 @@ jobs:
       - name: Type Check
         run: pnpm run typecheck
 
-      - name: Build Project
-        run: pnpm run build
+      - name: Build Backend Services
+        run: |
+          cd backend/employee_service && pnpm run build && cd ../..
+          cd backend/api_gateway && pnpm run build && cd ../..
+          cd backend/billing_service && pnpm run build && cd ../..
+          cd backend/crm_service && pnpm run build && cd ../..
+          cd backend/ven_inv_service && pnpm run build && cd ../..
+
+      - name: Build Frontend
+        run: cd frontend && NODE_OPTIONS="--max-old-space-size=3072" pnpm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
