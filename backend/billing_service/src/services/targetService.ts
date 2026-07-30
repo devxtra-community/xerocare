@@ -9,7 +9,8 @@ import { TargetType } from '../entities/enums/targetType';
 import { TargetStatus } from '../entities/enums/targetStatus';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
-import { getBranchCurrencyInfo } from './billingHelpers';
+import { getBranchCurrencyInfo, getBranchName, searchEmployeesByName } from './billingHelpers';
+import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { TARGET_ASSIGNED } from '../constants/notificationTypes';
 
@@ -314,26 +315,56 @@ export class TargetService {
     );
   }
 
-  async monthlyAchievement(
-    user: RequestUser,
+  /**
+   * Fetches targets for a month, scoped to `branchFilter` (as resolved by
+   * parseBranchFilter: [] = all branches, [id] = one, [id1,id2,...] = several),
+   * optionally narrowed further by employee name.
+   */
+  private async fetchTargetsForFilter(
+    branchFilter: string[],
     month: string,
-    branchIdParam?: string,
-  ): Promise<Array<{ target: EmployeeTarget } & AchievementResult>> {
-    if (!month) throw new AppError('month is required', 400);
+    search?: string,
+  ): Promise<EmployeeTarget[]> {
+    const qb = this.targetRepo.createQueryBuilder('t').where('t.targetMonth = :month', { month });
+    applyBranchQB(qb as never, 't', branchFilter);
+    let targets = await qb.getMany();
 
-    let branchId: string;
-    if (user.role === 'MANAGER') {
-      branchId = user.branchId;
-    } else {
-      if (!branchIdParam) throw new AppError('branchId is required', 400);
-      branchId = branchIdParam;
+    if (search && search.trim()) {
+      const matchedIds = new Set(await searchEmployeesByName(search));
+      targets = targets.filter((t) => matchedIds.has(t.employeeId));
     }
 
-    const targets = await this.targetRepo.find({ where: { branchId, targetMonth: month } });
-    const rows = await Promise.all(
-      targets.map(async (target) => ({ target, ...(await this.calculateAchievement(target.id)) })),
+    return targets;
+  }
+
+  private async branchNameMapFor(
+    targets: EmployeeTarget[],
+  ): Promise<Record<string, string | null>> {
+    const uniqueBranchIds = [...new Set(targets.map((t) => t.branchId))];
+    const entries = await Promise.all(
+      uniqueBranchIds.map(async (id) => [id, await getBranchName(id)] as const),
     );
-    return rows;
+    return Object.fromEntries(entries);
+  }
+
+  async monthlyAchievement(
+    _user: RequestUser,
+    month: string,
+    branchFilter: string[],
+    search?: string,
+  ): Promise<Array<{ target: EmployeeTarget; branchName: string | null } & AchievementResult>> {
+    if (!month) throw new AppError('month is required', 400);
+
+    const targets = await this.fetchTargetsForFilter(branchFilter, month, search);
+    const branchNames = await this.branchNameMapFor(targets);
+
+    return Promise.all(
+      targets.map(async (target) => ({
+        target,
+        branchName: branchNames[target.branchId] ?? null,
+        ...(await this.calculateAchievement(target.id)),
+      })),
+    );
   }
 
   async myTargets(
@@ -368,9 +399,8 @@ export class TargetService {
   }
 
   /**
-   * Shared ranking computation for a branch/month, sorted by achievementPercent desc.
-   * Used both by the manager-facing leaderboard endpoint and to compute an employee's
-   * own rank (without exposing other employees' rows to them).
+   * Ranking computation for a single branch/month, used to compute an employee's
+   * own rank without exposing other employees' rows to them.
    */
   private async rankedTargetsForBranch(
     branchId: string,
@@ -393,21 +423,28 @@ export class TargetService {
   }
 
   async leaderboard(
-    user: RequestUser,
+    _user: RequestUser,
     month: string,
-    branchIdParam?: string,
-  ): Promise<Array<{ rank: number; target: EmployeeTarget } & AchievementResult>> {
+    branchFilter: string[],
+    search?: string,
+  ): Promise<
+    Array<{ rank: number; target: EmployeeTarget; branchName: string | null } & AchievementResult>
+  > {
     if (!month) throw new AppError('month is required', 400);
 
-    let branchId: string;
-    if (user.role === 'MANAGER') {
-      branchId = user.branchId;
-    } else {
-      if (!branchIdParam) throw new AppError('branchId is required', 400);
-      branchId = branchIdParam;
-    }
+    const targets = await this.fetchTargetsForFilter(branchFilter, month, search);
+    const branchNames = await this.branchNameMapFor(targets);
 
-    const rows = await this.rankedTargetsForBranch(branchId, month);
+    const rows = await Promise.all(
+      targets.map(async (target) => ({
+        target,
+        branchName: branchNames[target.branchId] ?? null,
+        ...(await this.calculateAchievement(target.id)),
+      })),
+    );
+    rows.sort(
+      (a, b) => Number(b.achievement.achievementPercent) - Number(a.achievement.achievementPercent),
+    );
     return rows.map((row, index) => ({ rank: index + 1, ...row }));
   }
 

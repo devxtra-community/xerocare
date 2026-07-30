@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { requireRole } from '../middlewares/roleMiddleware';
+import { parseBranchFilter } from '../middlewares/branchFilterMiddleware';
 import { EmployeeRole } from '../constants/employeeRole';
 import * as targetController from '../controllers/targetController';
 
@@ -11,8 +12,16 @@ router.use(authMiddleware);
 const managerOrAdmin = requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN);
 
 // Static/specific routes must come before the '/:id' param route.
-router.get('/leaderboard', managerOrAdmin, targetController.leaderboard);
-router.get('/achievement/monthly', managerOrAdmin, targetController.monthlyAchievement);
+// parseBranchFilter locks MANAGER to their own JWT branch and lets ADMIN pass an
+// optional branchIds/branchId query param (omitted = all branches) — same
+// contract used across the rest of Accounts.
+router.get('/leaderboard', managerOrAdmin, parseBranchFilter, targetController.leaderboard);
+router.get(
+  '/achievement/monthly',
+  managerOrAdmin,
+  parseBranchFilter,
+  targetController.monthlyAchievement,
+);
 // HR also needs read access here for the payroll-incentive banner integration.
 router.get(
   '/employee/:employeeId',

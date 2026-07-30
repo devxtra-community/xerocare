@@ -51,6 +51,8 @@ export interface TargetWithAchievement {
   achievement: TargetAchievement;
   records: AchievementRecordRow[];
   rank?: number | null;
+  /** Present when the caller can see across branches (ADMIN); null if not resolvable. */
+  branchName?: string | null;
 }
 
 export interface LeaderboardRow extends TargetWithAchievement {
@@ -103,9 +105,11 @@ export const listTargetsByEmployee = async (
 
 export const monthlyAchievement = async (
   month: string,
-  branchId?: string,
+  params?: { branchId?: string; search?: string },
 ): Promise<TargetWithAchievement[]> => {
-  const res = await api.get('/b/targets/achievement/monthly', { params: { month, branchId } });
+  const res = await api.get('/b/targets/achievement/monthly', {
+    params: { month, branchId: params?.branchId, search: params?.search },
+  });
   return res.data.data;
 };
 
@@ -121,9 +125,11 @@ export const getMyTargetMonth = async (month: string): Promise<TargetWithAchieve
 
 export const getLeaderboard = async (
   month: string,
-  branchId?: string,
+  params?: { branchId?: string; search?: string },
 ): Promise<LeaderboardRow[]> => {
-  const res = await api.get('/b/targets/leaderboard', { params: { month, branchId } });
+  const res = await api.get('/b/targets/leaderboard', {
+    params: { month, branchId: params?.branchId, search: params?.search },
+  });
   return res.data.data;
 };
 

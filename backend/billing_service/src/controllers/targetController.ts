@@ -87,11 +87,12 @@ export const listByEmployee = async (req: Request, res: Response, next: NextFunc
 export const monthlyAchievement = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = requireUser(req);
-    const { month, branchId } = req.query;
+    const { month, search } = req.query;
     const rows = await targetService.monthlyAchievement(
       user,
       month as string,
-      branchId as string | undefined,
+      req.branchFilter ?? [],
+      search as string | undefined,
     );
     res.status(200).json({ success: true, data: rows });
   } catch (error) {
@@ -122,11 +123,12 @@ export const myTargetMonth = async (req: Request, res: Response, next: NextFunct
 export const leaderboard = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = requireUser(req);
-    const { month, branchId } = req.query;
+    const { month, search } = req.query;
     const rows = await targetService.leaderboard(
       user,
       month as string,
-      branchId as string | undefined,
+      req.branchFilter ?? [],
+      search as string | undefined,
     );
     res.status(200).json({ success: true, data: rows });
   } catch (error) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Plus, TrendingUp } from 'lucide-react';
+import { Download, Plus, Search, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,11 +15,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getAllEmployees, Employee } from '@/lib/employee';
-import { getUserFromToken } from '@/lib/auth';
-import { getActingBranchId } from '@/lib/adminBranch';
+import { getUserFromToken, type JwtPayload } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { monthlyAchievement, TargetWithAchievement } from '@/lib/targets';
+import { BranchSelector, ALL_BRANCHES } from '@/components/ui/BranchSelector';
 import AssignTargetDialog from '@/components/ManagerDashboardComponents/targetComponents/AssignTargetDialog';
 
 function currentMonthStr(): string {
@@ -29,23 +29,52 @@ function currentMonthStr(): string {
 
 export default function ManagerTargetsPage() {
   const [month, setMonth] = useState(currentMonthStr());
+  const [branchId, setBranchId] = useState(ALL_BRANCHES);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [rows, setRows] = useState<TargetWithAchievement[]>([]);
   const [employeeMap, setEmployeeMap] = useState<Record<string, Employee>>({});
   const [loading, setLoading] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
 
+  // getUserFromToken() reads localStorage, which doesn't exist during SSR — reading
+  // it directly during render would make the server and client markup diverge
+  // (no branch filter/column on the server, present on the client) and trigger a
+  // hydration error. Resolving it in an effect keeps the first client render
+  // identical to the server render; the role-aware UI appears right after mount.
+  const [user, setUser] = useState<JwtPayload | null>(null);
+  useEffect(() => {
+    setUser(getUserFromToken());
+  }, []);
+
+  const isAdmin = user?.role === 'ADMIN';
+
+  // MANAGER is always locked to their own branch; ADMIN uses the filter below
+  // (undefined = all branches). This is what actually gets sent to the API.
+  const effectiveBranchId =
+    user?.role === 'MANAGER' ? user.branchId : branchId === ALL_BRANCHES ? undefined : branchId;
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await monthlyAchievement(month);
+      const data = await monthlyAchievement(month, {
+        branchId: effectiveBranchId,
+        search: debouncedSearch || undefined,
+      });
       setRows(data);
 
-      // An admin has no branch of its own, so it scopes by the branch selected
-      // in the header switcher — or sees every branch when none is selected.
-      const user = getUserFromToken();
-      const branchId =
-        user?.role === 'MANAGER' ? user.branchId : (getActingBranchId() ?? undefined);
-      const empRes = await getAllEmployees(1, 200, undefined, undefined, branchId);
+      const empRes = await getAllEmployees(
+        1,
+        200,
+        undefined,
+        debouncedSearch || undefined,
+        effectiveBranchId,
+      );
       const map: Record<string, Employee> = {};
       empRes.data.employees.forEach((e) => {
         map[e.id] = e;
@@ -56,7 +85,7 @@ export default function ManagerTargetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [month]);
+  }, [month, effectiveBranchId, debouncedSearch]);
 
   useEffect(() => {
     loadData();
@@ -67,12 +96,15 @@ export default function ManagerTargetsPage() {
     [rows],
   );
 
+  const columnCount = isAdmin ? 9 : 8;
+
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(
       rows.map((r) => {
         const emp = employeeMap[r.target.employeeId];
         return {
           Name: emp ? `${emp.first_name || ''} ${emp.last_name || ''}`.trim() : r.target.employeeId,
+          ...(isAdmin ? { Branch: r.branchName || '' } : {}),
           Job: emp?.employee_job ? EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] : '',
           Target: r.target.targetAmount,
           Achieved: r.achievement.achievedAmount,
@@ -90,26 +122,45 @@ export default function ManagerTargetsPage() {
 
   return (
     <div className="min-h-full p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <TrendingUp className="h-6 w-6 text-primary" /> Branch Achievement Dashboard
           </h1>
           <p className="text-sm text-gray-500">Monthly targets and incentive tracking</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="w-40"
-          />
-          <Button variant="outline" onClick={exportExcel} disabled={rows.length === 0}>
-            <Download className="h-4 w-4 mr-1.5" /> Export
-          </Button>
-          <Button onClick={() => setAssignOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" /> Assign Target
-          </Button>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAdmin && (
+              <BranchSelector value={branchId} onValueChange={setBranchId} className="h-9" />
+            )}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search employee..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 w-48 pl-8"
+              />
+            </div>
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="h-9 w-36"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <Button variant="outline" onClick={exportExcel} disabled={rows.length === 0}>
+              <Download className="h-4 w-4 mr-1.5" /> Export
+            </Button>
+            <Button onClick={() => setAssignOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Assign Target
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -118,6 +169,7 @@ export default function ManagerTargetsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              {isAdmin && <TableHead>Branch</TableHead>}
               <TableHead>Job</TableHead>
               <TableHead>Target</TableHead>
               <TableHead>Achieved</TableHead>
@@ -130,14 +182,16 @@ export default function ManagerTargetsPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={columnCount} className="text-center py-8 text-muted-foreground">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No targets assigned for {month}
+                <TableCell colSpan={columnCount} className="text-center py-8 text-muted-foreground">
+                  {debouncedSearch || branchId !== ALL_BRANCHES
+                    ? `No targets match your filters for ${month}`
+                    : `No targets assigned for ${month}`}
                 </TableCell>
               </TableRow>
             ) : (
@@ -150,6 +204,11 @@ export default function ManagerTargetsPage() {
                         ? `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
                         : r.target.employeeId}
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.branchName || '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="text-xs text-muted-foreground">
                       {emp?.employee_job
                         ? EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob]
@@ -196,7 +255,12 @@ export default function ManagerTargetsPage() {
         </div>
       )}
 
-      <AssignTargetDialog open={assignOpen} onOpenChange={setAssignOpen} onSuccess={loadData} />
+      <AssignTargetDialog
+        open={assignOpen}
+        onOpenChange={setAssignOpen}
+        onSuccess={loadData}
+        branchId={effectiveBranchId}
+      />
     </div>
   );
 }

@@ -26,14 +26,14 @@ import { getMyBranch } from '@/lib/branch';
 import { createTarget, TargetTier } from '@/lib/targets';
 import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
 import { formatCurrency } from '@/lib/format';
-import { getUserFromToken } from '@/lib/auth';
-import { getActingBranchId } from '@/lib/adminBranch';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface AssignTargetDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  /** Employee list is scoped to this branch; undefined lists employees across all branches. */
+  branchId?: string;
 }
 
 interface TierRow extends TargetTier {
@@ -66,6 +66,7 @@ export default function AssignTargetDialog({
   open,
   onOpenChange,
   onSuccess,
+  branchId,
 }: AssignTargetDialogProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeId, setEmployeeId] = useState('');
@@ -78,10 +79,10 @@ export default function AssignTargetDialog({
   useEffect(() => {
     if (!open) return;
 
-    // An admin has no branch of its own, so it scopes by the branch selected
-    // in the header switcher — or sees every branch when none is selected.
-    const user = getUserFromToken();
-    const branchId = user?.role === 'MANAGER' ? user.branchId : (getActingBranchId() ?? undefined);
+    // `branchId` mirrors whatever branch scope the caller (the Targets page) is
+    // currently showing — a MANAGER's own branch, an ADMIN's selected branch, or
+    // undefined for "all branches", in which case employees list org-wide and the
+    // employee picked below still pins the target to exactly one branch.
     getAllEmployees(1, 200, undefined, undefined, branchId)
       .then((res) => {
         const eligible = res.data.employees.filter((e) =>
@@ -94,7 +95,7 @@ export default function AssignTargetDialog({
     getMyBranch()
       .then((branch) => setCurrencyCode(branch?.currency_code || getActiveCurrency()))
       .catch(() => setCurrencyCode(getActiveCurrency()));
-  }, [open]);
+  }, [open, branchId]);
 
   const addTier = () => {
     setTiers([

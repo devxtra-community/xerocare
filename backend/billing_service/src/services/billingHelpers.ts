@@ -229,6 +229,74 @@ export async function getBranchCurrencyInfo(branchId: string): Promise<BranchCur
   }
 }
 
+const branchNameCache = new Map<string, { name: string | null; cachedAt: number }>();
+
+export async function getBranchName(branchId: string | undefined): Promise<string | null> {
+  if (!branchId) return null;
+  const cached = branchNameCache.get(branchId);
+  if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
+    return cached.name;
+  }
+
+  try {
+    const vendorServiceUrl = process.env.VENDOR_SERVICE_URL || 'http://localhost:3003';
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+
+    const response = await fetch(`${vendorServiceUrl}/branch/${branchId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      branchNameCache.set(branchId, { name: null, cachedAt: Date.now() });
+      return null;
+    }
+
+    const json = await response.json();
+    const name = json?.data?.name || null;
+    branchNameCache.set(branchId, { name, cachedAt: Date.now() });
+    return name;
+  } catch (err) {
+    console.error('Error fetching branch name:', err);
+    return null;
+  }
+}
+
+/**
+ * Resolves employee ids whose name matches `search`, across all branches — branch
+ * scoping is applied separately by the caller against its own (already
+ * branch-filtered) rows, so this intentionally does not take a branchId.
+ */
+export async function searchEmployeesByName(search: string): Promise<string[]> {
+  if (!search.trim()) return [];
+  try {
+    const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+
+    const params = new URLSearchParams({ search: search.trim(), limit: '500' });
+    const response = await fetch(`${employeeServiceUrl}/employee?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) return [];
+    const json = await response.json();
+    const employees = json?.data?.employees || [];
+    return employees.map((emp: EmployeeData) => emp.id);
+  } catch (err) {
+    console.error('Error searching employees by name:', err);
+    return [];
+  }
+}
+
 export function getProductNamesFromInvoice(invoice: Invoice): string {
   if (!invoice.items || invoice.items.length === 0) {
     return 'Product/Spare Part';
