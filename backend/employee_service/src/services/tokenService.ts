@@ -6,6 +6,7 @@ import { publishEmailJob } from '../queues/emailProducer';
 import { logger } from '../config/logger';
 import { Employee } from '../entities/employeeEntities';
 import { Admin } from '../entities/adminEntities';
+import { REFRESH_COOKIE_NAME, refreshCookieOptions } from '../config/cookieOptions';
 
 const authRepo = new AuthRepository();
 
@@ -47,12 +48,7 @@ export async function issueTokens(user: Employee | Admin, req: Request, res: Res
     time: new Date().toLocaleString(),
   }).catch((err: unknown) => logger.error('Failed to publish login alert job:', err));
 
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 15 * 24 * 60 * 60 * 1000,
-  });
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions);
 
   return accessToken;
 }

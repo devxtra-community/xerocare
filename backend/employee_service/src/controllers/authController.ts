@@ -6,6 +6,7 @@ import { OtpService } from '../services/otpService';
 import { OtpPurpose } from '../constants/otpPurpose';
 import { MagicLinkService } from '../services/magicLinkService';
 import { logger } from '../config/logger';
+import { REFRESH_COOKIE_NAME, clearCookieOptions } from '../config/cookieOptions';
 
 const authService = new AuthService();
 const otpService = new OtpService();
@@ -109,8 +110,8 @@ export const logout = async (req: Request, res: Response, next: NextFunction) =>
     const refreshToken = req.cookies.refreshToken;
     await authService.logout(refreshToken);
 
-    res.clearCookie('refreshToken');
-    res.clearCookie('accessToken');
+    res.clearCookie(REFRESH_COOKIE_NAME, clearCookieOptions);
+    res.clearCookie('accessToken', clearCookieOptions);
     res.json({ message: 'logout successfull', success: true });
   } catch (err: unknown) {
     const error = err as AuthError;

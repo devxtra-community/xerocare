@@ -5,6 +5,7 @@ import { AuthService } from '../services/authService';
 import { issueTokens } from '../services/tokenService';
 import { Source } from '../config/dataSource';
 import { Admin } from '../entities/adminEntities';
+import { REFRESH_COOKIE_NAME, clearCookieOptions } from '../config/cookieOptions';
 
 const adminService = new AdminService();
 const authService = new AuthService();
@@ -45,7 +46,7 @@ export const adminLogout = async (req: Request, res: Response, next: NextFunctio
   try {
     const refreshToken = req.cookies.refreshToken;
     await authService.logout(refreshToken);
-    res.clearCookie('refreshToken');
+    res.clearCookie(REFRESH_COOKIE_NAME, clearCookieOptions);
     res.json({
       message: 'Admin logout successful',
       success: true,
