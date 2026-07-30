@@ -589,11 +589,30 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           await Source.query(`DROP TABLE IF EXISTS service_estimate_revisions CASCADE;`);
         }
 
+        // The ServiceEstimateRevision entity declares `ticketId` with no name override,
+        // so a fresh database (created via Source.synchronize() from entities) gets
+        // "ticketId" while this raw CREATE used to produce snake_case ticket_id. The two
+        // paths disagreed, and any raw SQL joining this table worked on exactly one of
+        // them. Converge on the entity's name — it is what the ORM reads and writes.
+        await Source.query(`
+          DO $$ BEGIN
+            IF EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_name = 'service_estimate_revisions' AND column_name = 'ticket_id'
+            ) AND NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_name = 'service_estimate_revisions' AND column_name = 'ticketId'
+            ) THEN
+              ALTER TABLE service_estimate_revisions RENAME COLUMN ticket_id TO "ticketId";
+            END IF;
+          END $$;
+        `);
+
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_estimate_revisions (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             invoice_id UUID NOT NULL,
-            ticket_id UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+            "ticketId" UUID NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
             revision_number INTEGER NOT NULL,
             revision_type VARCHAR(50) NOT NULL,
             items_snapshot JSONB NOT NULL,

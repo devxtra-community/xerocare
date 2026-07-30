@@ -47,6 +47,9 @@ import { ChartOfAccount } from '../entities/chartOfAccountEntity';
 import { IncomeEntry } from '../entities/incomeEntryEntity';
 import { ManualJournalEntry } from '../entities/manualJournalEntryEntity';
 
+// Overridable so a constrained Postgres plan can be capped without a code change.
+const BILLING_DB_POOL_MAX = Number(process.env.BILLING_DB_POOL_MAX) || 15;
+
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.BILLING_DATABASE_URL,
@@ -97,13 +100,22 @@ export const Source = new DataSource({
     IncomeEntry,
     ManualJournalEntry,
   ],
-  poolSize: 1,
+  // Reporting endpoints (chart-of-accounts, balance sheet, segmented P&L) fan out
+  // 50+ independent queries through Promise.all. A pool of 1 serialized them all and
+  // anything still queued when connectionTimeoutMillis expired failed with
+  // "timeout exceeded when trying to connect" — a 500 on every chart-of-accounts load.
+  // NOTE: TypeORM's pg driver spreads `extra` over its own defaults, so `extra.max`
+  // overrides `poolSize` — both are set to the same value to avoid confusion.
+  poolSize: BILLING_DB_POOL_MAX,
   extra: {
-    max: 1,
+    max: BILLING_DB_POOL_MAX,
     min: 0,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-    statement_timeout: 10000,
+    // Time to WAIT FOR A FREE POOL SLOT, not the TCP connect time. Must comfortably
+    // exceed the slowest query times the fan-out depth, or queued queries get killed
+    // while the pool is healthy.
+    connectionTimeoutMillis: 30000,
+    statement_timeout: 30000,
     keepAlive: true,
   },
 });

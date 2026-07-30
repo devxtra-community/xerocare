@@ -612,8 +612,26 @@ export async function computeProfitAndLoss(
   const depreciationExpense = Number(depAmount[0]?.amount ?? 0);
 
   // 5001 COGS — spare parts consumed in completed service tickets (cross-service)
+  // 5004/5005/5014/5015 — vendor purchase costs from Inventory service purchases
+  // Fetched together: they're independent, and each internalGet carries a 6s abort
+  // timeout, so running them in sequence doubled the worst-case latency of every
+  // report that calls this (and computeBalanceSheet calls it a second time for
+  // all-time retained earnings, making it 4 serial round trips).
   const cogsUrl = `${invUrl}/service/internal/cogs-report?${bParam ? `branchIds=${bParam.join(',')}` : ''}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
-  const cogsData = await internalGet<{ cogsAmount: number; labourAmount: number }>(cogsUrl);
+  const purchaseCostUrl = `${invUrl}/purchases/internal/cost-report?${bParam ? `branchIds=${bParam.join(',')}` : ''}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
+  const [cogsData, purchaseCostData] = await Promise.all([
+    internalGet<{ cogsAmount: number; labourAmount: number }>(cogsUrl),
+    internalGet<{
+      currencyGroups: {
+        currencyCode: string;
+        purchaseCost: number;
+        shippingHandling: number;
+        importLabourCost: number;
+        customsDuty: number;
+      }[];
+    }>(purchaseCostUrl),
+  ]);
+
   const crossServiceCogs = cogsData?.cogsAmount ?? 0;
   const crossServiceLabour = cogsData?.labourAmount ?? 0;
   if (!cogsData)
@@ -621,17 +639,6 @@ export async function computeProfitAndLoss(
       '5001/5002: Inventory service unavailable — spare parts consumed and service labour may be understated (manual expense entries still counted).',
     );
 
-  // 5004/5005/5014/5015 — vendor purchase costs from Inventory service purchases
-  const purchaseCostUrl = `${invUrl}/purchases/internal/cost-report?${bParam ? `branchIds=${bParam.join(',')}` : ''}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
-  const purchaseCostData = await internalGet<{
-    currencyGroups: {
-      currencyCode: string;
-      purchaseCost: number;
-      shippingHandling: number;
-      importLabourCost: number;
-      customsDuty: number;
-    }[];
-  }>(purchaseCostUrl);
   let crossServiceVendorPurchases = 0;
   let crossServiceShipping = 0;
   let crossServiceImportLabour = 0;

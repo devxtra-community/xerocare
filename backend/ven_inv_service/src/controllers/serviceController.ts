@@ -5488,7 +5488,7 @@ For queries contact us at +974 4455 6677`;
         SELECT COALESCE(SUM(sei."totalPrice"), 0) AS amount
         FROM service_estimate_items sei
         JOIN service_estimate_revisions r ON sei."revisionId" = r.id
-        JOIN service_tickets t ON r.ticket_id = t.id
+        JOIN service_tickets t ON r."ticketId" = t.id
         WHERE sei."itemSource" = 'SPARE_PART'
           AND sei."isApproved" = true
           AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
@@ -5513,7 +5513,7 @@ For queries contact us at +974 4455 6677`;
       const labourRevRows = await db.query<{ amount: string }[]>(`
         SELECT COALESCE(SUM(r."labourCost"), 0) AS amount
         FROM service_estimate_revisions r
-        JOIN service_tickets t ON r.ticket_id = t.id
+        JOIN service_tickets t ON r."ticketId" = t.id
         WHERE t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
           ${branchClause}
           ${dateFromRevClause}
@@ -5571,7 +5571,7 @@ For queries contact us at +974 4455 6677`;
           SELECT t."productId" AS "productId", sei."totalPrice" AS amount
           FROM service_estimate_items sei
           JOIN service_estimate_revisions r ON sei."revisionId" = r.id
-          JOIN service_tickets t ON r.ticket_id = t.id
+          JOIN service_tickets t ON r."ticketId" = t.id
           WHERE sei."itemSource" = 'SPARE_PART'
             AND sei."isApproved" = true
             AND t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
@@ -5590,7 +5590,7 @@ For queries contact us at +974 4455 6677`;
           UNION ALL
           SELECT t."productId" AS "productId", r."labourCost" AS amount
           FROM service_estimate_revisions r
-          JOIN service_tickets t ON r.ticket_id = t.id
+          JOIN service_tickets t ON r."ticketId" = t.id
           WHERE t.status IN ('CUSTOMER_APPROVED', 'COMPLETED')
             AND t."productId" = ANY($1::uuid[])
             ${dateFromRevClause}
