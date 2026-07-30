@@ -27,7 +27,15 @@ interface EmployeeDisplay {
  * Dashboard widget displaying recent employee additions.
  * Shows a paginated list of employees with their position, start date, and salary.
  */
-export default function HrTable({ selectedYear }: { selectedYear: number | 'all' }) {
+export default function HrTable({
+  selectedYear,
+  branchId,
+}: {
+  selectedYear: number | 'all';
+  /** Page-level branch filter. When set it governs, and the local branch
+   *  dropdown is hidden so there is only one branch control in play. */
+  branchId?: string;
+}) {
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -38,7 +46,7 @@ export default function HrTable({ selectedYear }: { selectedYear: number | 'all'
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const res = await getAllEmployees();
+        const res = await getAllEmployees(1, 1000, undefined, undefined, branchId);
         // API returns { success: true, data: { employees: [], pagination: {} } }
         let employeeList = res.data?.employees || [];
 
@@ -83,7 +91,7 @@ export default function HrTable({ selectedYear }: { selectedYear: number | 'all'
     };
 
     fetchEmployees();
-  }, [selectedYear]);
+  }, [selectedYear, branchId]);
 
   useEffect(() => {
     const fetchBranches = async () => {
@@ -134,24 +142,26 @@ export default function HrTable({ selectedYear }: { selectedYear: number | 'all'
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-          <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
-            <div className="flex items-center gap-2">
-              <Filter className="h-3 w-3 text-muted-foreground" />
-              <SelectValue placeholder="Branch" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="text-[11px]">
-              All Branches
-            </SelectItem>
-            {branches.map((b) => (
-              <SelectItem key={b.id} value={b.name} className="text-[11px]">
-                {b.name}
+        {!branchId && (
+          <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+            <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3 w-3 text-muted-foreground" />
+                <SelectValue placeholder="Branch" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[11px]">
+                All Branches
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              {branches.map((b) => (
+                <SelectItem key={b.id} value={b.name} className="text-[11px]">
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* TABLE */}

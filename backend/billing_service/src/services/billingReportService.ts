@@ -9,6 +9,24 @@ import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 
+/**
+ * Folds a post-query adjustment (credit exchange, return) into the per-branch
+ * totals. When the branch has several currency rows the adjustment lands on the
+ * largest one — the adjustment carries no currency of its own, and that row is
+ * the branch's operating currency in practice.
+ */
+function applyToBranchTotal(
+  byBranch: { branchId: string | null; currencyCode: string | null; total: number }[],
+  branchId: string | null | undefined,
+  adjustment: number,
+) {
+  if (!branchId) return;
+  const rows = byBranch.filter((r) => r.branchId === branchId);
+  if (!rows.length) return;
+  const target = rows.reduce((a, b) => (Math.abs(b.total) > Math.abs(a.total) ? b : a));
+  target.total += adjustment;
+}
+
 interface EnrichedItem {
   quantity?: number;
   unitPrice?: number;
@@ -182,7 +200,7 @@ export class BillingReportService {
   /**
    * Retrieves global sales trend data.
    */
-  async getGlobalSales(period: string, year?: number) {
+  async getGlobalSales(period: string, year?: number, branchIds?: string[]) {
     let startDate: Date;
     let endDate: Date | undefined;
 
@@ -200,15 +218,16 @@ export class BillingReportService {
       startDate.setDate(startDate.getDate() - days);
     }
 
-    const stats = await this.invoiceRepo.getGlobalSalesTrend(startDate, endDate);
+    const stats = await this.invoiceRepo.getGlobalSalesTrend(startDate, endDate, branchIds);
     return stats;
   }
 
   /**
    * Retrieves global sales total figures.
+   * `branchIds` omitted/empty means every branch.
    */
-  async getGlobalSalesTotals(year?: number) {
-    const sales = await this.invoiceRepo.getGlobalSalesTotals(year);
+  async getGlobalSalesTotals(year?: number, branchIds?: string[]) {
+    const sales = await this.invoiceRepo.getGlobalSalesTotals(year, branchIds);
 
     // Reconcile Credit Exchange adjustments (replacementAmount - returnedAmount)
     try {
@@ -220,6 +239,9 @@ export class BillingReportService {
         .andWhere('cn.type = :type', { type: 'CREDIT_EXCHANGE' });
 
       if (year) qb.andWhere('EXTRACT(YEAR FROM cn.createdAt) = :year', { year });
+      if (branchIds?.length) {
+        qb.andWhere('cn.branchId IN (:...branchIds)', { branchIds });
+      }
 
       const exchanges = await qb.getMany();
       exchanges.forEach((cn) => {
@@ -236,13 +258,17 @@ export class BillingReportService {
           } else {
             sales.salesByType.push({ saleType, total: adjustment });
           }
+          // Keep byBranch reconciled with totalSales — the "All Branches" card sums
+          // these per-currency rows, so an adjustment applied only to totalSales
+          // would make the two disagree.
+          applyToBranchTotal(sales.byBranch, cn.branchId, adjustment);
         }
       });
     } catch (err) {
       logger.error('Failed to reconcile exchange adjustments', err);
     }
 
-    const returns = await this.returnCreditRepo.getGlobalReturnTotals(year);
+    const returns = await this.returnCreditRepo.getGlobalReturnTotals(year, branchIds);
 
     if (returns.totalReturns > 0) {
       sales.totalSales -= returns.totalReturns;
@@ -253,6 +279,11 @@ export class BillingReportService {
         saleStat.total -= returns.totalReturns;
       } else {
         sales.salesByType.push({ saleType: 'SALE', total: -returns.totalReturns });
+      }
+      // Returns are only aggregated organisation-wide here, so they can be
+      // attributed per-branch only when the caller already scoped to one branch.
+      if (branchIds?.length === 1) {
+        applyToBranchTotal(sales.byBranch, branchIds[0], -returns.totalReturns);
       }
     }
 

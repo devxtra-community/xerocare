@@ -21,7 +21,13 @@ const COLORS = {
  * Pie chart component displaying employee distribution by department/role.
  * Categorizes employees into groups like Employee, Finance, HR, and Other.
  */
-export default function EmployeePieChart({ selectedYear }: { selectedYear: number | 'all' }) {
+export default function EmployeePieChart({
+  selectedYear,
+  branchId,
+}: {
+  selectedYear: number | 'all';
+  branchId?: string;
+}) {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<ChartData[]>([]);
   const [total, setTotal] = useState(0);
@@ -30,7 +36,9 @@ export default function EmployeePieChart({ selectedYear }: { selectedYear: numbe
     setIsClient(true);
     const fetchData = async () => {
       try {
-        const res = await getAllEmployees();
+        // A distribution has to see every employee, so ask for one large page
+        // rather than the default 20 (which silently truncated the breakdown).
+        const res = await getAllEmployees(1, 1000, undefined, undefined, branchId);
         let employees = res.data?.employees || [];
 
         // Filter by year if not 'all'
@@ -82,7 +90,7 @@ export default function EmployeePieChart({ selectedYear }: { selectedYear: numbe
     };
 
     fetchData();
-  }, [selectedYear]);
+  }, [selectedYear, branchId]);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex flex-col">

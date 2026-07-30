@@ -19,7 +19,15 @@ import Pagination from '@/components/Pagination';
  * Dashboard widget displaying warehouse list and capacity.
  * Shows location, associated branch, and storage capacity for each warehouse.
  */
-export default function WarehouseTable({ selectedYear }: { selectedYear: number | 'all' }) {
+export default function WarehouseTable({
+  selectedYear,
+  branchId,
+}: {
+  selectedYear: number | 'all';
+  /** Page-level branch filter. When set, it governs and the local branch
+   *  dropdown is hidden — two competing branch controls would only confuse. */
+  branchId?: string;
+}) {
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -69,10 +77,12 @@ export default function WarehouseTable({ selectedYear }: { selectedYear: number 
       const matchesSearch =
         w.warehouseName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         w.location.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesBranch = selectedBranch === 'all' || w.branch?.name === selectedBranch;
+      const matchesBranch = branchId
+        ? w.branchId === branchId
+        : selectedBranch === 'all' || w.branch?.name === selectedBranch;
       return matchesSearch && matchesBranch;
     });
-  }, [warehouses, searchTerm, selectedBranch]);
+  }, [warehouses, searchTerm, selectedBranch, branchId]);
 
   useEffect(() => {
     setTotal(filteredWarehouses.length);
@@ -93,24 +103,26 @@ export default function WarehouseTable({ selectedYear }: { selectedYear: number 
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-          <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
-            <div className="flex items-center gap-2">
-              <Filter className="h-3 w-3 text-muted-foreground" />
-              <SelectValue placeholder="Branch" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="text-[11px]">
-              All Branches
-            </SelectItem>
-            {branches.map((b) => (
-              <SelectItem key={b.id} value={b.name} className="text-[11px]">
-                {b.name}
+        {!branchId && (
+          <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+            <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3 w-3 text-muted-foreground" />
+                <SelectValue placeholder="Branch" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[11px]">
+                All Branches
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              {branches.map((b) => (
+                <SelectItem key={b.id} value={b.name} className="text-[11px]">
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="flex-1 overflow-x-auto">

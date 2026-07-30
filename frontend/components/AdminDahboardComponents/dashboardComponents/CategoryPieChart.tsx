@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell } from 'recharts';
 
 import { getAllProducts, Product } from '@/lib/product';
+import { getWarehouses, Warehouse } from '@/lib/warehouse';
 
 const COLORS = ['#FF6B35', '#004E89', '#00A8E8', '#F7B500', '#E040FB', '#2E7D32'];
 
@@ -11,7 +12,13 @@ const COLORS = ['#FF6B35', '#004E89', '#00A8E8', '#F7B500', '#E040FB', '#2E7D32'
  * Pie chart component displaying product distribution by brand.
  * Visualizes the proportion of products associated with different brands.
  */
-export default function CategoryPieChart({ selectedYear }: { selectedYear: number | 'all' }) {
+export default function CategoryPieChart({
+  selectedYear,
+  branchId,
+}: {
+  selectedYear: number | 'all';
+  branchId?: string;
+}) {
   const [isClient, setIsClient] = useState(false);
   const [data, setData] = useState<{ name: string; value: number; color: string }[]>([]);
 
@@ -22,8 +29,24 @@ export default function CategoryPieChart({ selectedYear }: { selectedYear: numbe
   useEffect(() => {
     const fetchBrandData = async () => {
       try {
-        const products = await getAllProducts();
+        // Products have no branch of their own — their stock sits in warehouses,
+        // which do, so the branch filter is resolved through those.
+        const [products, warehouseRes] = await Promise.all([
+          getAllProducts(),
+          branchId ? getWarehouses() : Promise.resolve(null),
+        ]);
         let productList = products || [];
+
+        if (branchId) {
+          const branchWarehouseIds = new Set(
+            ((warehouseRes?.data ?? []) as Warehouse[])
+              .filter((w) => w.branchId === branchId)
+              .map((w) => w.id),
+          );
+          productList = productList.filter((p: Product) =>
+            p.inventory?.some((inv) => branchWarehouseIds.has(inv.warehouseId)),
+          );
+        }
 
         // Filter by year if not 'all'
         if (selectedYear !== 'all') {
@@ -53,7 +76,7 @@ export default function CategoryPieChart({ selectedYear }: { selectedYear: numbe
       }
     };
     fetchBrandData();
-  }, [selectedYear]);
+  }, [selectedYear, branchId]);
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-[340px] flex flex-col">

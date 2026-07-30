@@ -20,7 +20,7 @@ import Pagination from '@/components/Pagination';
  * Dashboard widget displaying recent products and their stock levels.
  * Shows product name, total aggregated quantity, price, and creation date.
  */
-export default function ProductsTable() {
+export default function ProductsTable({ branchId }: { branchId?: string } = {}) {
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(5);
   const [data, setData] = useState<Product[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -60,6 +60,19 @@ export default function ProductsTable() {
     return map;
   }, [warehouses]);
 
+  // Products carry no branch of their own — stock lives in warehouses, which do.
+  // The page-level filter arrives as an id, so resolve it to the branch name this
+  // component already filters and displays by.
+  const branchNameFromId = useMemo(
+    () => (branchId ? warehouses.find((w) => w.branchId === branchId)?.branch?.name : undefined),
+    [branchId, warehouses],
+  );
+
+  const warehouseIdsForBranch = useMemo(() => {
+    if (!branchId) return null;
+    return new Set(warehouses.filter((w) => w.branchId === branchId).map((w) => w.id));
+  }, [branchId, warehouses]);
+
   const getProductBranches = useCallback(
     (p: Product) => {
       const branchNames = new Set<string>();
@@ -73,6 +86,15 @@ export default function ProductsTable() {
   );
 
   const getBranchQuantity = (p: Product, branchName: string) => {
+    // Page-level filter: count only stock held in that branch's warehouses.
+    if (warehouseIdsForBranch) {
+      return (
+        p.inventory?.reduce(
+          (sum, inv) => (warehouseIdsForBranch.has(inv.warehouseId) ? sum + inv.quantity : sum),
+          0,
+        ) || 0
+      );
+    }
     if (branchName === 'all') {
       return p.inventory?.reduce((sum, inv) => sum + inv.quantity, 0) || 0;
     }
@@ -87,11 +109,16 @@ export default function ProductsTable() {
   const filteredData = useMemo(() => {
     return data.filter((p) => {
       const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      if (warehouseIdsForBranch) {
+        // Keep only products actually stocked in the selected branch.
+        const inBranch = p.inventory?.some((inv) => warehouseIdsForBranch.has(inv.warehouseId));
+        return matchesSearch && !!inBranch;
+      }
       const pBranches = getProductBranches(p);
       const matchesBranch = selectedBranch === 'all' || pBranches.includes(selectedBranch);
       return matchesSearch && matchesBranch;
     });
-  }, [data, searchTerm, selectedBranch, getProductBranches]);
+  }, [data, searchTerm, selectedBranch, getProductBranches, warehouseIdsForBranch]);
 
   useEffect(() => {
     setTotal(filteredData.length);
@@ -120,24 +147,26 @@ export default function ProductsTable() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-          <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
-            <div className="flex items-center gap-2">
-              <Filter className="h-3 w-3 text-muted-foreground" />
-              <SelectValue placeholder="Branch" />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" className="text-[11px]">
-              All Branches
-            </SelectItem>
-            {branches.map((b) => (
-              <SelectItem key={b.id} value={b.name} className="text-[11px]">
-                {b.name}
+        {!branchId && (
+          <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+            <SelectTrigger className="w-full sm:w-[140px] h-8 text-[11px] bg-background/50 border-muted-foreground/20">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3 w-3 text-muted-foreground" />
+                <SelectValue placeholder="Branch" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[11px]">
+                All Branches
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              {branches.map((b) => (
+                <SelectItem key={b.id} value={b.name} className="text-[11px]">
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="flex-1 overflow-x-auto">
@@ -169,9 +198,11 @@ export default function ProductsTable() {
                     {item.name}
                   </td>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
-                    {selectedBranch === 'all'
-                      ? getProductBranches(item).join(', ') || 'N/A'
-                      : selectedBranch}
+                    {branchId
+                      ? (branchNameFromId ?? 'N/A')
+                      : selectedBranch === 'all'
+                        ? getProductBranches(item).join(', ') || 'N/A'
+                        : selectedBranch}
                   </td>
                   <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs text-gray-700">
                     {getBranchQuantity(item, selectedBranch)}

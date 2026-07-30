@@ -695,17 +695,29 @@ export const getBranchFinanceStats = async (
 /**
  * Retrieves global sales totals across all branches.
  */
+/** Per-branch, per-currency slice of the global totals. Branch currencies are
+ *  never converted, so each row stands on its own. */
+export interface BranchSalesSlice {
+  branchId: string | null;
+  currencyCode: string | null;
+  total: number;
+  invoiceCount: number;
+}
+
 export const getGlobalSalesTotals = async (
   year?: number,
+  branchId?: string,
 ): Promise<{
   totalSales: number;
   salesByType: { saleType: string; total: number }[];
   totalInvoices: number;
+  byBranch?: BranchSalesSlice[];
 }> => {
-  const url = year
-    ? `/b/invoices/sales/global-totals?year=${year}`
-    : '/b/invoices/sales/global-totals';
-  const response = await api.get(url);
+  const params = new URLSearchParams();
+  if (year) params.set('year', String(year));
+  if (branchId) params.set('branchId', branchId);
+  const qs = params.toString();
+  const response = await api.get(`/b/invoices/sales/global-totals${qs ? `?${qs}` : ''}`);
   return response.data.data;
 };
 
@@ -716,11 +728,12 @@ export const getGlobalSalesTotals = async (
 export const getGlobalSalesOverview = async (
   period: string = '1M',
   year?: number,
+  branchId?: string,
 ): Promise<{ date: string; saleType: string; totalSales: number }[]> => {
-  const url = year
-    ? `/b/invoices/sales/global-overview?period=${period}&year=${year}`
-    : `/b/invoices/sales/global-overview?period=${period}`;
-  const response = await api.get(url);
+  const params = new URLSearchParams({ period });
+  if (year) params.set('year', String(year));
+  if (branchId) params.set('branchId', branchId);
+  const response = await api.get(`/b/invoices/sales/global-overview?${params.toString()}`);
   return response.data.data;
 };
 // Alerts & Collection

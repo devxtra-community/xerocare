@@ -17,14 +17,18 @@ export class ReturnCreditRepository {
     return repo.save(rc);
   }
 
-  async getReturnTotalsByBranch(branchId?: string, year?: number) {
+  /** `branchId` accepts one branch or a list; omitted means every branch. */
+  async getReturnTotalsByBranch(branchId?: string | string[], year?: number) {
     const query = this.repo
       .createQueryBuilder('rc')
       .select('SUM(rc.amount)', 'totalReturns')
       .addSelect('COUNT(rc.id)', 'returnsCount');
 
-    if (branchId) {
-      query.andWhere('rc.branchId = :branchId', { branchId });
+    const branchIds = (Array.isArray(branchId) ? branchId : branchId ? [branchId] : []).filter(
+      Boolean,
+    );
+    if (branchIds.length) {
+      query.andWhere('rc.branchId IN (:...branchIds)', { branchIds });
     }
     if (year) {
       query.andWhere('EXTRACT(YEAR FROM rc.createdAt) = :year', { year });
@@ -37,8 +41,8 @@ export class ReturnCreditRepository {
     };
   }
 
-  async getGlobalReturnTotals(year?: number) {
-    return this.getReturnTotalsByBranch(undefined, year);
+  async getGlobalReturnTotals(year?: number, branchIds?: string[]) {
+    return this.getReturnTotalsByBranch(branchIds, year);
   }
 
   async getReturnsTrendByBranch(branchId: string, startDate: Date, endDate?: Date) {

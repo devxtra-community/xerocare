@@ -1,4 +1,4 @@
-import { Repository, Brackets } from 'typeorm';
+import { Repository, Brackets, SelectQueryBuilder } from 'typeorm';
 import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceType } from '../entities/enums/invoiceType';
@@ -7,6 +7,19 @@ import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { Source } from '../config/dataSource';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { logger } from '../config/logger';
+
+/**
+ * Narrows an invoice query to specific branches. An empty/omitted list means
+ * "every branch", which is what the global reports have always returned — so
+ * callers that pass nothing keep their existing behaviour.
+ */
+function applyInvoiceBranchScope(
+  qb: SelectQueryBuilder<Invoice>,
+  branchIds?: string[],
+): SelectQueryBuilder<Invoice> {
+  if (!branchIds?.length) return qb;
+  return qb.andWhere('invoice.branchId IN (:...branchScope)', { branchScope: branchIds });
+}
 
 export class InvoiceRepository {
   private repo: Repository<Invoice>;
@@ -430,6 +443,7 @@ export class InvoiceRepository {
   async getGlobalSalesTrend(
     startDate: Date,
     endDate?: Date,
+    branchIds?: string[],
   ): Promise<{ date: string; saleType: string; totalSales: number }[]> {
     const query = this.repo
       .createQueryBuilder('invoice')
@@ -481,6 +495,8 @@ export class InvoiceRepository {
       query.andWhere('invoice.createdAt <= :endDate', { endDate });
     }
 
+    applyInvoiceBranchScope(query, branchIds);
+
     const result = await query
       .groupBy("TO_CHAR(invoice.createdAt, 'YYYY-MM-DD')")
       .addGroupBy('invoice.saleType')
@@ -497,11 +513,27 @@ export class InvoiceRepository {
 
   /**
    * Retrieves global total sales and breakdown by type.
+   *
+   * `branchIds` narrows the result to those branches; omitted/empty means every
+   * branch (the historical behaviour, so existing callers are unaffected).
+   *
+   * `byBranch` groups by branch AND currency rather than summing raw amounts:
+   * branches run their own currencies (QAR, AED, …) and the admin dashboard
+   * shows each in its own, unconverted. Summing across them would be meaningless.
    */
-  async getGlobalSalesTotals(year?: number): Promise<{
+  async getGlobalSalesTotals(
+    year?: number,
+    branchIds?: string[],
+  ): Promise<{
     totalSales: number;
     salesByType: { saleType: string; total: number }[];
     totalInvoices: number;
+    byBranch: {
+      branchId: string | null;
+      currencyCode: string | null;
+      total: number;
+      invoiceCount: number;
+    }[];
   }> {
     const totalQuery = this.repo
       .createQueryBuilder('invoice')
@@ -600,8 +632,70 @@ export class InvoiceRepository {
       typeQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
     }
 
-    const totalResult = await totalQuery.getRawOne();
-    const typeResult = await typeQuery.getRawMany();
+    // Per-branch, per-currency breakdown — drives the "All Branches" earnings card,
+    // which lists each branch's own currency instead of one blended figure.
+    const branchQuery = this.repo
+      .createQueryBuilder('invoice')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .select('u."contractId"', 'contract_id')
+            .addSelect(
+              'SUM(COALESCE(u."monthlyRent", 0) + COALESCE(u."exceededCharge", 0) - COALESCE(u."discountAmount", 0))',
+              'usage_total',
+            )
+            .from('usage_records', 'u')
+            .groupBy('u."contractId"'),
+        'usage',
+        'usage.contract_id = invoice.id',
+      )
+      .select('invoice.branchId', 'branchId')
+      .addSelect('invoice.currencyCode', 'currencyCode')
+      .addSelect(
+        "SUM(CASE WHEN invoice.type = :proforma AND invoice.saleType != 'SALE' THEN COALESCE(invoice.advanceAmount, 0) + COALESCE(usage.usage_total, 0) ELSE COALESCE(invoice.totalAmount, 0) END)",
+        'total',
+      )
+      .addSelect('COUNT(invoice.id)', 'invoiceCount')
+      .where('invoice.status IN (:...statuses)', {
+        statuses: [
+          'TRANSACTION_COMPLETED',
+          InvoiceStatus.PAID,
+          InvoiceStatus.INVOICED,
+          InvoiceStatus.FINANCE_APPROVED,
+          InvoiceStatus.ACTIVE_CONTRACT,
+          InvoiceStatus.EMPLOYEE_APPROVED,
+          'APPROVED',
+          InvoiceStatus.SENT,
+          InvoiceStatus.REFUNDED,
+        ],
+      })
+      .andWhere('(invoice.type != :proforma OR invoice.saleType IN (:...saleTypes))', {
+        proforma: InvoiceType.PROFORMA,
+        saleTypes: [
+          SaleType.SALE,
+          SaleType.PRODUCT_SALE,
+          SaleType.SPAREPART_SALE,
+          SaleType.RENT,
+          SaleType.LEASE,
+        ],
+      })
+      .setParameter('proforma', InvoiceType.PROFORMA)
+      .groupBy('invoice.branchId')
+      .addGroupBy('invoice.currencyCode');
+
+    if (year) {
+      branchQuery.andWhere('EXTRACT(YEAR FROM invoice.createdAt) = :year', { year });
+    }
+
+    applyInvoiceBranchScope(totalQuery, branchIds);
+    applyInvoiceBranchScope(typeQuery, branchIds);
+    applyInvoiceBranchScope(branchQuery, branchIds);
+
+    const [totalResult, typeResult, branchResult] = await Promise.all([
+      totalQuery.getRawOne(),
+      typeQuery.getRawMany(),
+      branchQuery.getRawMany(),
+    ]);
 
     return {
       totalSales: parseFloat(totalResult.totalSales || '0'),
@@ -610,6 +704,12 @@ export class InvoiceRepository {
         total: parseFloat(r.total || '0'),
       })),
       totalInvoices: parseInt(totalResult.totalInvoices || '0'),
+      byBranch: branchResult.map((r) => ({
+        branchId: r.branchId ?? null,
+        currencyCode: r.currencyCode ?? null,
+        total: parseFloat(r.total || '0'),
+        invoiceCount: parseInt(r.invoiceCount || '0'),
+      })),
     };
   }
 

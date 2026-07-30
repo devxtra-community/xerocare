@@ -23,9 +23,17 @@ interface SalesDataPoint {
 
 interface SalesChartProps {
   selectedYear?: number | 'all';
+  /** Narrows the trend to one branch; omitted means organisation-wide. */
+  branchId?: string;
+  /** Currency code for the axis/tooltip labels. */
+  currency?: string;
 }
 
-export default function SalesChart({ selectedYear = new Date().getFullYear() }: SalesChartProps) {
+export default function SalesChart({
+  selectedYear = new Date().getFullYear(),
+  branchId,
+  currency,
+}: SalesChartProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('1Y');
 
   const [isClient, setIsClient] = useState(false);
@@ -41,6 +49,7 @@ export default function SalesChart({ selectedYear = new Date().getFullYear() }: 
         const trendData = await getGlobalSalesOverview(
           selectedPeriod,
           selectedYear === 'all' ? undefined : selectedYear,
+          branchId,
         );
 
         // Group by month
@@ -89,7 +98,7 @@ export default function SalesChart({ selectedYear = new Date().getFullYear() }: 
       }
     };
     fetchSalesData();
-  }, [selectedPeriod, selectedYear]);
+  }, [selectedPeriod, selectedYear, branchId]);
 
   return (
     <div className="rounded-2xl bg-card h-[340px] w-full shadow-sm flex flex-col p-3 border border-gray-100">
@@ -162,7 +171,7 @@ export default function SalesChart({ selectedYear = new Date().getFullYear() }: 
                       `${label} ${selectedYear === 'all' ? '' : selectedYear}`
                     }
                     valueFormatter={(v) =>
-                      `${getActiveCurrency()} ${formatCompactNumber(Number(v))}`
+                      `${currency ?? getActiveCurrency()} ${formatCompactNumber(Number(v))}`
                     }
                   />
                 }

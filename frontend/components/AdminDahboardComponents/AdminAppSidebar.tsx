@@ -98,20 +98,11 @@ interface MenuItem {
 // effectively read-only, because no single branch owns a new record.
 const menuItems: MenuItem[] = [
   {
+    // One dashboard: the organisation-wide and single-branch views are the same
+    // page now, switched by the branch selector in its header (`?branchId=`).
     title: 'Dashboard',
     icon: LayoutDashboard,
-    subItems: [
-      {
-        title: 'Organisation Overview',
-        icon: LayoutDashboard,
-        href: '/admin/dashboard',
-      },
-      {
-        title: 'Branch Overview',
-        icon: Building2,
-        href: '/manager/dashboard',
-      },
-    ],
+    href: '/admin/dashboard',
   },
   {
     title: 'Branches',

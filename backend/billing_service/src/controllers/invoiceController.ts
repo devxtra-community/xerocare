@@ -728,13 +728,37 @@ export const getCollectionAlerts = async (req: Request, res: Response, next: Nex
 };
 
 /**
+ * Optional branch narrowing for the organisation-wide sales reports, read from
+ * `?branchId=` (or a comma-separated `?branchIds=`).
+ *
+ * Honoured for ADMIN only. These endpoints have always returned organisation-wide
+ * figures to every authenticated role, and other desks (e.g. the finance rent
+ * page) depend on that, so a non-admin's param is ignored rather than silently
+ * changing what they see. Values are UUID-checked before reaching SQL.
+ */
+const adminBranchScope = (req: Request): string[] | undefined => {
+  if (req.user?.role !== 'ADMIN') return undefined;
+
+  const raw = (req.query.branchIds ?? req.query.branchId) as string | undefined;
+  if (!raw?.trim()) return undefined;
+
+  const uuidRe = /^[0-9a-f-]{36}$/i;
+  const ids = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => uuidRe.test(s));
+
+  return ids.length ? ids : undefined;
+};
+
+/**
  * Sales performance for the entire global company (HQ view).
  */
 export const getGlobalSales = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const period = (req.query.period as string) || '1M';
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
-    const result = await reportService.getGlobalSales(period, year);
+    const result = await reportService.getGlobalSales(period, year, adminBranchScope(req));
     return res.status(200).json({
       success: true,
       data: result,
@@ -751,7 +775,7 @@ export const getGlobalSales = async (req: Request, res: Response, next: NextFunc
 export const getGlobalSalesTotals = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
-    const result = await reportService.getGlobalSalesTotals(year);
+    const result = await reportService.getGlobalSalesTotals(year, adminBranchScope(req));
     return res.status(200).json({
       success: true,
       data: result,
