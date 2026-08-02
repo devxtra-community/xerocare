@@ -133,7 +133,10 @@ import {
 } from '../controllers/segmentedPnlController';
 
 const router = Router();
+// Create: Finance + Admin can add accounts
 const requireAccountsAdmin = requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE);
+// Edit / Delete: Admin-only — these are structural changes with broad downstream impact
+const requireCoaAdmin = requireRole(EmployeeRole.ADMIN);
 
 // All routes require auth + branch filter enforcement
 router.use(authMiddleware);
@@ -265,15 +268,16 @@ router.get('/line-items/customer-statement', getCustomerStatement);
 router.get('/line-items/vendor-statement', getVendorStatement);
 router.get('/line-items/account-statement', getAccountStatement);
 
-// Chart of Accounts structure management — creating/editing/deleting the account
-// registry itself is ADMIN/FINANCE only; viewing balances above is open to any
-// authenticated branch user (unchanged).
+// Chart of Accounts structure management.
+// GET routes: open to any authenticated branch user.
+// POST (create): Finance + Admin.
+// PATCH (edit name/number) + DELETE: Admin only.
 router.get('/chart-of-accounts/structure', listChartOfAccountsStructure);
 router.get('/chart-of-accounts/next-number', getNextAccountNumber);
 router.post('/chart-of-accounts', requireAccountsAdmin, createChartOfAccount);
-router.patch('/chart-of-accounts/:id', requireAccountsAdmin, renameChartOfAccount);
-router.patch('/chart-of-accounts/:id/active', requireAccountsAdmin, setChartOfAccountActive);
-router.delete('/chart-of-accounts/:id', requireAccountsAdmin, deleteChartOfAccount);
+router.patch('/chart-of-accounts/:id', requireCoaAdmin, renameChartOfAccount);
+router.patch('/chart-of-accounts/:id/active', requireCoaAdmin, setChartOfAccountActive);
+router.delete('/chart-of-accounts/:id', requireCoaAdmin, deleteChartOfAccount);
 
 // Income Entries (manual, category-tagged real income — mirrors Expense Entries)
 router.get('/income', getIncomeEntries);

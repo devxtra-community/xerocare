@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import AddAccountDialog from '@/components/accounts/AddAccountDialog';
+import EditAccountDialog from '@/components/accounts/EditAccountDialog';
 import ManualJournalDialog from '@/components/accounts/ManualJournalDialog';
 import CustomAccountRows from '@/components/accounts/CustomAccountRows';
 import {
@@ -140,6 +141,7 @@ function ChartOfAccountsContent() {
   );
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [journalFor, setJournalFor] = useState<CustomAccountBalance | null>(null);
+  const [editFor, setEditFor] = useState<CustomAccountBalance | null>(null);
   const [viewingNode, setViewingNode] = useState<DrilldownNode | null>(null);
   const [viewingLineItem, setViewingLineItem] = useState<{
     section: DrilldownSection;
@@ -149,6 +151,7 @@ function ChartOfAccountsContent() {
 
   const currentUser = getUserFromToken();
   const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'FINANCE';
+  const canAdmin = currentUser?.role === 'ADMIN';
 
   const queryParams = branchIds
     ? { periodFrom, periodTo, branchIds: [branchIds] }
@@ -326,6 +329,8 @@ function ChartOfAccountsContent() {
               accounts={assets.currentAssets.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal
               label="Total Current Assets"
@@ -351,6 +356,8 @@ function ChartOfAccountsContent() {
               accounts={assets.nonCurrentAssets.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal
               label="Total Non-Current Assets"
@@ -387,6 +394,8 @@ function ChartOfAccountsContent() {
               accounts={liabilities.currentLiabilities.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal
               label="Total Current Liabilities"
@@ -397,6 +406,8 @@ function ChartOfAccountsContent() {
               accounts={liabilities.nonCurrentLiabilities.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal
               label="TOTAL LIABILITIES"
@@ -429,6 +440,8 @@ function ChartOfAccountsContent() {
               accounts={equity.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal label="TOTAL EQUITY" value={equity.totalEquity} currency={currency} />
           </div>
@@ -484,6 +497,8 @@ function ChartOfAccountsContent() {
               accounts={income.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal label="TOTAL INCOME" value={income.totalIncome} currency={currency} />
           </div>
@@ -515,6 +530,8 @@ function ChartOfAccountsContent() {
               accounts={expenses.custom}
               canManage={canManage}
               onPostJournal={setJournalFor}
+              canAdmin={canAdmin}
+              onEdit={setEditFor}
             />
             <SubTotal label="TOTAL EXPENSES" value={expenses.totalExpenses} currency={currency} />
           </div>
@@ -565,6 +582,16 @@ function ChartOfAccountsContent() {
           onClose={() => setShowAddAccount(false)}
           onCreated={() => {
             setShowAddAccount(false);
+            refetch();
+          }}
+        />
+      )}
+      {editFor && (
+        <EditAccountDialog
+          account={editFor}
+          onClose={() => setEditFor(null)}
+          onUpdated={() => {
+            setEditFor(null);
             refetch();
           }}
         />

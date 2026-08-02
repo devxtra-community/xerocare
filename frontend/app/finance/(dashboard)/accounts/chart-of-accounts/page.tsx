@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import StatementDialog from '@/components/shared/StatementDialog';
 import AddAccountDialog from '@/components/accounts/AddAccountDialog';
+import EditAccountDialog from '@/components/accounts/EditAccountDialog';
 import ManualJournalDialog from '@/components/accounts/ManualJournalDialog';
 import CustomAccountRows from '@/components/accounts/CustomAccountRows';
 import {
@@ -137,6 +138,7 @@ export default function ChartOfAccountsPage() {
   );
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [journalFor, setJournalFor] = useState<CustomAccountBalance | null>(null);
+  const [editFor, setEditFor] = useState<CustomAccountBalance | null>(null);
   const [viewingNode, setViewingNode] = useState<DrilldownNode | null>(null);
   const [viewingLineItem, setViewingLineItem] = useState<{
     section: DrilldownSection;
@@ -146,6 +148,7 @@ export default function ChartOfAccountsPage() {
 
   const currentUser = getUserFromToken();
   const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'FINANCE';
+  const canAdmin = currentUser?.role === 'ADMIN';
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches'],
@@ -329,6 +332,8 @@ export default function ChartOfAccountsPage() {
                 accounts={assets.currentAssets.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal
                 label="Total Current Assets"
@@ -355,6 +360,8 @@ export default function ChartOfAccountsPage() {
                 accounts={assets.nonCurrentAssets.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal
                 label="Total Non-Current Assets"
@@ -391,6 +398,8 @@ export default function ChartOfAccountsPage() {
                 accounts={liabilities.currentLiabilities.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal
                 label="Total Current Liabilities"
@@ -401,6 +410,8 @@ export default function ChartOfAccountsPage() {
                 accounts={liabilities.nonCurrentLiabilities.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal
                 label="TOTAL LIABILITIES"
@@ -433,6 +444,8 @@ export default function ChartOfAccountsPage() {
                 accounts={equity.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal label="TOTAL EQUITY" value={equity.totalEquity} currency={currency} />
             </div>
@@ -488,6 +501,8 @@ export default function ChartOfAccountsPage() {
                 accounts={income.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal label="TOTAL INCOME" value={income.totalIncome} currency={currency} />
             </div>
@@ -519,6 +534,8 @@ export default function ChartOfAccountsPage() {
                 accounts={expenses.custom}
                 canManage={canManage}
                 onPostJournal={setJournalFor}
+                canAdmin={canAdmin}
+                onEdit={setEditFor}
               />
               <SubTotal label="TOTAL EXPENSES" value={expenses.totalExpenses} currency={currency} />
             </div>
@@ -570,6 +587,16 @@ export default function ChartOfAccountsPage() {
           onClose={() => setShowAddAccount(false)}
           onCreated={() => {
             setShowAddAccount(false);
+            refetch();
+          }}
+        />
+      )}
+      {editFor && (
+        <EditAccountDialog
+          account={editFor}
+          onClose={() => setEditFor(null)}
+          onUpdated={() => {
+            setEditFor(null);
             refetch();
           }}
         />

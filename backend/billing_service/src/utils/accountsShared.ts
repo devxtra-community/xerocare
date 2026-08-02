@@ -16,6 +16,7 @@ export interface CustomAccountBalance {
   id: string;
   accountNumber: string;
   accountName: string;
+  category: string;
   accountGroup: string;
   parentAccountId: string | null;
   sourceType: string;
@@ -738,6 +739,7 @@ export async function computeProfitAndLoss(
         id: acc.id,
         accountNumber: acc.accountNumber,
         accountName: acc.accountName,
+        category: acc.category,
         accountGroup: acc.accountGroup,
         parentAccountId: acc.parentAccountId,
         sourceType: acc.sourceType,
@@ -755,6 +757,7 @@ export async function computeProfitAndLoss(
         id: acc.id,
         accountNumber: acc.accountNumber,
         accountName: acc.accountName,
+        category: acc.category,
         accountGroup: acc.accountGroup,
         parentAccountId: acc.parentAccountId,
         sourceType: acc.sourceType,
@@ -1390,6 +1393,7 @@ export async function computeBalanceSheet(
       id: acc.id,
       accountNumber: acc.accountNumber,
       accountName: acc.accountName,
+      category: acc.category,
       accountGroup: acc.accountGroup,
       parentAccountId: acc.parentAccountId,
       sourceType: acc.sourceType,

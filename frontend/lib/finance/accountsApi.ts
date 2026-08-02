@@ -1015,6 +1015,8 @@ export interface CustomAccountBalance extends AccountBalance {
     | 'EXPENSE_CATEGORY_LINKED'
     | 'INCOME_CATEGORY_LINKED'
     | 'MANUAL_JOURNAL';
+  category?: string;
+  accountGroup?: string;
 }
 
 export interface ChartOfAccountsResponse {
@@ -1186,6 +1188,14 @@ export const renameChartOfAccount = (id: string, accountName: string) =>
     .patch<{ success: boolean; data: ChartOfAccountRow }>(`${BASE}/chart-of-accounts/${id}`, {
       accountName,
     })
+    .then((r) => r.data.data);
+
+export const updateChartOfAccount = (
+  id: string,
+  data: { accountName: string; accountNumber?: string },
+) =>
+  api
+    .patch<{ success: boolean; data: ChartOfAccountRow }>(`${BASE}/chart-of-accounts/${id}`, data)
     .then((r) => r.data.data);
 
 export const setChartOfAccountActive = (id: string, isActive: boolean) =>

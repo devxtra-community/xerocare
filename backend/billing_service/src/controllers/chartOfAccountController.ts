@@ -271,18 +271,50 @@ export const createChartOfAccount = async (req: Request, res: Response, next: Ne
   }
 };
 
-// Cosmetic rename only — number/category/group/sourceType/parent/link are permanently
-// locked once an account is created (system or custom) since reports and historical
-// entries key off them.
+// Update a custom account's name and optionally its number.
+// Category/group/parent/sourceType remain locked (they drive report calculations).
+// System-default accounts (isSystemDefault=true) are never editable.
 export const renameChartOfAccount = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(ChartOfAccount);
     const id = req.params.id as string;
-    const { accountName } = req.body as { accountName?: string };
+    const { accountName, accountNumber } = req.body as {
+      accountName?: string;
+      accountNumber?: string;
+    };
     if (!accountName?.trim()) throw new AppError('accountName is required', 400);
 
     const acc = await repo.findOne({ where: { id } });
     if (!acc) throw new AppError('Account not found', 404);
+    if (acc.isSystemDefault) throw new AppError('System default accounts cannot be edited', 403);
+
+    if (accountNumber?.trim() && accountNumber.trim() !== acc.accountNumber) {
+      const newNum = accountNumber.trim();
+      const existing = await repo.findOne({ where: { accountNumber: newNum } });
+      if (existing) throw new AppError(`Account number ${newNum} is already in use`, 400);
+
+      if (!acc.parentAccountId) {
+        const range = CATEGORY_RANGES[acc.category];
+        if (range) {
+          const n = parseInt(newNum, 10);
+          if (Number.isNaN(n) || n < range[0] || n > range[1]) {
+            throw new AppError(
+              `Account number for ${acc.category} must be between ${range[0]} and ${range[1]}`,
+              400,
+            );
+          }
+        }
+      } else {
+        const parent = await repo.findOne({ where: { id: acc.parentAccountId } });
+        if (parent && !newNum.startsWith(`${parent.accountNumber}-`)) {
+          throw new AppError(
+            `Sub-account numbers must start with the parent's number, e.g. ${parent.accountNumber}-01`,
+            400,
+          );
+        }
+      }
+      acc.accountNumber = newNum;
+    }
 
     acc.accountName = accountName.trim();
     const saved = await repo.save(acc);
