@@ -150,9 +150,12 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   const handleLogout = async () => {
     try {
       await logout();
-      router.push('/login');
+      // Hard navigation resets all JS memory (including React Query cache) so
+      // the next user on this browser never sees stale data from a prior session.
+      window.location.href = '/login';
     } catch (error) {
       console.error('Failed to logout', error);
+      window.location.href = '/login';
     }
   };
 

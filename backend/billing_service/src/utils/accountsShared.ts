@@ -21,6 +21,7 @@ export interface CustomAccountBalance {
   parentAccountId: string | null;
   sourceType: string;
   amount: number;
+  isActive: boolean;
 }
 
 interface RawChartOfAccountRow {
@@ -33,6 +34,7 @@ interface RawChartOfAccountRow {
   sourceType: string;
   categoryKey: string | null;
   linkedCashBankAccountId: string | null;
+  isActive: boolean;
 }
 
 export interface PnLResult {
@@ -558,12 +560,13 @@ export async function computeProfitAndLoss(
       FROM income_entries allinc
       WHERE status = 'RECEIVED' ${bSqlAllInc}
     `),
-    // Custom (non-system) INCOME/EXPENSE chart-of-accounts rows — company-wide definitions
+    // Custom (non-system) INCOME/EXPENSE chart-of-accounts rows — company-wide definitions.
+    // Inactive accounts are included so their historical balances remain visible in reports.
     db.query<RawChartOfAccountRow[]>(`
       SELECT id, "accountNumber", "accountName", category, "accountGroup",
-             "parentAccountId", "sourceType", "categoryKey", "linkedCashBankAccountId"
+             "parentAccountId", "sourceType", "categoryKey", "linkedCashBankAccountId", "isActive"
       FROM chart_of_accounts
-      WHERE "isActive" = true AND "isSystemDefault" = false AND category IN ('INCOME', 'EXPENSE')
+      WHERE "isSystemDefault" = false AND category IN ('INCOME', 'EXPENSE')
     `),
     // Manual-journal postings against custom INCOME/EXPENSE accounts — period-filtered
     db.query<{ chartOfAccountId: string; amount: string }[]>(`
@@ -744,6 +747,7 @@ export async function computeProfitAndLoss(
         parentAccountId: acc.parentAccountId,
         sourceType: acc.sourceType,
         amount,
+        isActive: acc.isActive,
       });
       customExpenseTotal += amount;
     } else if (acc.category === 'INCOME') {
@@ -762,6 +766,7 @@ export async function computeProfitAndLoss(
         parentAccountId: acc.parentAccountId,
         sourceType: acc.sourceType,
         amount,
+        isActive: acc.isActive,
       });
       customIncomeTotal += amount;
     }
@@ -1096,11 +1101,12 @@ export async function computeBalanceSheet(
     // definitions. ASSET/LIABILITY/EQUITY rows drive the breakdown below;
     // INCOME/EXPENSE rows aren't used here (retained earnings now comes from
     // pnlAllTimePromise, which already folds in custom income/expense itself).
+    // Inactive accounts are included so their historical balances remain visible in reports.
     db.query<RawChartOfAccountRow[]>(`
       SELECT id, "accountNumber", "accountName", category, "accountGroup",
-             "parentAccountId", "sourceType", "categoryKey", "linkedCashBankAccountId"
+             "parentAccountId", "sourceType", "categoryKey", "linkedCashBankAccountId", "isActive"
       FROM chart_of_accounts
-      WHERE "isActive" = true AND "isSystemDefault" = false
+      WHERE "isSystemDefault" = false
     `),
     // Manual-journal postings against ANY custom account, cumulative (no date bound
     // — matches the existing equity_entries query's own "WHERE 1=1" precedent).
@@ -1398,6 +1404,7 @@ export async function computeBalanceSheet(
       parentAccountId: acc.parentAccountId,
       sourceType: acc.sourceType,
       amount,
+      isActive: acc.isActive,
     };
     // CASH_BANK_LINKED balances are already inside cashInHand/cashAtBank above —
     // shown here for nested display only, never re-added to the totals.

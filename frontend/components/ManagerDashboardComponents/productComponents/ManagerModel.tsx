@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, X, Copy } from 'lucide-react';
@@ -35,6 +36,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import { getUserFromToken } from '@/lib/auth';
 
 /**
  * Manager Model Management Page.
@@ -42,7 +45,16 @@ import {
  * Displays total model count and allows managing model details like Name, Brand, and Description.
  */
 export default function ManagerModel() {
+  const searchParams = useSearchParams();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const branchIds = searchParams.get('branchIds');
+  const branchId = branchIds ? branchIds.split(',')[0] : undefined;
+
   const [models, setModels] = useState<Model[]>([]);
+
+  useEffect(() => {
+    setIsAdmin(getUserFromToken()?.role === 'ADMIN');
+  }, []);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Model | null>(null);
@@ -51,7 +63,7 @@ export default function ManagerModel() {
 
   const loadModels = async () => {
     try {
-      const res = await getAllModels();
+      const res = await getAllModels({ branchId });
       setModels(res.data || []);
     } catch (error) {
       console.error('Failed to load models:', error);
@@ -61,7 +73,7 @@ export default function ManagerModel() {
 
   useEffect(() => {
     loadModels();
-  }, []);
+  }, [branchId]);
 
   const filtered = models.filter((m) =>
     `${m.model_name} ${m.model_no}`.toLowerCase().includes(search.toLowerCase()),
@@ -115,7 +127,10 @@ export default function ManagerModel() {
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
-      <h3 className="text-xl sm:text-2xl font-bold text-primary">Models</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Models</h3>
+        {isAdmin && <BranchFilterBar />}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
         <StatCard title="Total Models" value={total.toString()} subtitle="All models" />

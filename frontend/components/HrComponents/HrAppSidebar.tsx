@@ -16,7 +16,7 @@ import {
 
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 const menuItems = [
   {
@@ -57,7 +57,6 @@ const menuItems = [
  * includes user logout functionality.
  */
 export default function HrAppSidebar() {
-  const router = useRouter();
   const pathname = usePathname();
 
   const handleLogout = async () => {
@@ -69,11 +68,12 @@ export default function HrAppSidebar() {
         return;
       }
 
-      router.push('/login');
       toast.success(res.data.message);
+      window.location.href = '/login';
     } catch (error) {
       console.error(error);
       toast.error('Logout failed');
+      window.location.href = '/login';
     }
   };
 

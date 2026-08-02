@@ -11,7 +11,8 @@ export const getallModels = async (req: Request, res: Response) => {
   try {
     const branchId = req.user?.branchId;
     const isAdmin = req.user?.role === 'ADMIN';
-    const filteredBranchId = isAdmin ? undefined : branchId;
+    const adminBranchFilter = req.query.branchId as string | undefined;
+    const filteredBranchId = isAdmin ? adminBranchFilter : branchId;
     const search = req.query.search as string;
 
     logger.info(

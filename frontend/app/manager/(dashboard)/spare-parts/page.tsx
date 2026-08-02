@@ -17,12 +17,19 @@ import EditSparePartDialog from '@/components/ManagerDashboardComponents/sparePa
 import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
 import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
 import { lotService } from '@/lib/lot';
+import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import { getUserFromToken } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 function SparePartsContent() {
   const currency = useBranchCurrency();
+  const [isAdmin, setIsAdmin] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(getUserFromToken()?.role === 'ADMIN');
+  }, []);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<SparePartInventoryItem | null>(null);
@@ -43,13 +50,15 @@ function SparePartsContent() {
   const [parts, setParts] = useState<SparePartInventoryItem[]>([]);
   const [search, setSearch] = useState('');
   const searchParams = useSearchParams();
+  const branchIds = searchParams.get('branchIds');
+  const branchId = branchIds ? branchIds.split(',')[0] : undefined;
   const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
   const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
   const loadParts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await sparePartService.getSpareParts({ page, limit, search });
+      const res = await sparePartService.getSpareParts({ page, limit, search, branch: branchId });
       setParts(res.data || []);
       setTotal(res.total || res.data.length);
     } catch (error) {
@@ -57,7 +66,7 @@ function SparePartsContent() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, setTotal]);
+  }, [page, limit, search, branchId, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -138,8 +147,9 @@ function SparePartsContent() {
       }
     >
       <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <h3 className="text-xl sm:text-2xl font-bold text-primary">Spare Parts Inventory</h3>
+          {isAdmin && <BranchFilterBar />}
           <div className="flex gap-2">
             <Button className="bg-primary text-white gap-2" onClick={() => setAddOpen(true)}>
               + Add Item

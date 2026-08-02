@@ -49,6 +49,7 @@ export const getAllModels = async (params?: {
   page?: number;
   limit?: number;
   search?: string;
+  branchId?: string;
 }): Promise<PaginatedResponse<Model>> => {
   const response = await api.get('/i/models', { params });
   const resData = response.data;

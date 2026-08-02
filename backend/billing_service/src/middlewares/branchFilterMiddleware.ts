@@ -14,8 +14,19 @@ export function parseBranchFilter(req: Request, res: Response, next: NextFunctio
   }
 
   if (role === 'MANAGER' || role === 'FINANCE') {
-    // Locked to their own branch — never override
-    req.branchFilter = jwtBranchId ? [jwtBranchId] : [];
+    // Locked to their own branch — never override.
+    // A missing branchId means the JWT was issued without branch assignment; deny
+    // immediately rather than silently falling back to an empty filter, which most
+    // controllers treat as "all branches" (an admin-only privilege).
+    if (!jwtBranchId) {
+      return next(
+        new AppError(
+          'Your session has no branch assignment. Please log out and log in again.',
+          401,
+        ),
+      );
+    }
+    req.branchFilter = [jwtBranchId];
     req.isMultiBranch = false;
     // MANAGER is read-only; FINANCE can write
     req.canWrite = role === 'FINANCE';

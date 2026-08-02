@@ -148,8 +148,9 @@ export const getallproducts = async (req: Request, res: Response) => {
     const branchId = req.user?.branchId;
     const isAdmin = req.user?.role === 'ADMIN';
 
-    // Admins see all, others only their branch
-    const filteredBranchId = isAdmin ? undefined : branchId;
+    // Admins see all branches by default, but can filter to a specific branch via ?branchId
+    const adminBranchFilter = req.query.branchId as string | undefined;
+    const filteredBranchId = isAdmin ? adminBranchFilter : branchId;
     const modelId = req.query.modelId as string | undefined;
     const status = req.query.status as ProductStatus | undefined;
     const page = parseInt(req.query.page as string) || 1;

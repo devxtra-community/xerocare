@@ -51,7 +51,7 @@ import {
 
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { getBranchInvoices } from '@/lib/invoice';
 
 const menuItems = [
@@ -314,7 +314,6 @@ const accountsMenuItems = [
 ];
 
 export default function ManagerSidebar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [accountsOpen, setAccountsOpen] = useState(pathname.startsWith('/manager/accounts'));
@@ -369,11 +368,12 @@ export default function ManagerSidebar() {
         return;
       }
 
-      router.push('/login');
       toast.success(res.data.message);
+      window.location.href = '/login';
     } catch (error) {
       console.error(error);
       toast.error('Logout failed');
+      window.location.href = '/login';
     }
   };
 

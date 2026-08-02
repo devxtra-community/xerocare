@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Search, Trash2, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -24,8 +25,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import { getUserFromToken } from '@/lib/auth';
 
-export default function BrandsPage() {
+export const dynamic = 'force-dynamic';
+
+function BrandsContent() {
+  const searchParams = useSearchParams();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const branchIds = searchParams.get('branchIds');
+  const branchId = branchIds ? branchIds.split(',')[0] : undefined;
+
+  useEffect(() => {
+    setIsAdmin(getUserFromToken()?.role === 'ADMIN');
+  }, []);
+
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -36,7 +50,7 @@ export default function BrandsPage() {
   const fetchBrands = async () => {
     try {
       setLoading(true);
-      const res = await getBrands();
+      const res = await getBrands(branchId ? { branchId } : undefined);
       if (res.success) {
         setBrands(res.data);
       }
@@ -50,7 +64,7 @@ export default function BrandsPage() {
 
   useEffect(() => {
     fetchBrands();
-  }, []);
+  }, [branchId]);
 
   const handleDelete = async () => {
     if (!deletingBrand) return;
@@ -76,7 +90,10 @@ export default function BrandsPage() {
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-8">
-      <h3 className="text-xl sm:text-2xl font-bold text-primary">Brand Management</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-xl sm:text-2xl font-bold text-primary">Brand Management</h3>
+        {isAdmin && <BranchFilterBar />}
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
         <StatCard
@@ -218,5 +235,19 @@ export default function BrandsPage() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+export default function BrandsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen bg-blue-100">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary" />
+        </div>
+      }
+    >
+      <BrandsContent />
+    </Suspense>
   );
 }

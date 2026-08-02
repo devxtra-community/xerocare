@@ -18,6 +18,8 @@ import { productService, Product } from '@/services/productService';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import { getUserFromToken } from '@/lib/auth';
 
 /**
  * Manager Product Management Page.
@@ -27,6 +29,11 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
  */
 export default function ManagerProduct() {
   const currency = useBranchCurrency();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsAdmin(getUserFromToken()?.role === 'ADMIN');
+  }, []);
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -37,6 +44,8 @@ export default function ManagerProduct() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const branchIds = searchParams.get('branchIds');
+  const branchId = branchIds ? branchIds.split(',')[0] : undefined;
   const [initialLotId, setInitialLotId] = useState<string | undefined>(undefined);
   const [initialItemId, setInitialItemId] = useState<string | undefined>(undefined);
 
@@ -47,10 +56,10 @@ export default function ManagerProduct() {
     try {
       setLoading(true);
       const [res, inStockRes, rentedRes, soldRes] = await Promise.all([
-        productService.getAllProducts({ page, limit, search }),
-        productService.getAllProducts({ limit: 1, search, status: 'AVAILABLE' }),
-        productService.getAllProducts({ limit: 1, search, status: 'RENTED' }),
-        productService.getAllProducts({ limit: 1, search, status: 'SOLD' }),
+        productService.getAllProducts({ page, limit, search, branchId }),
+        productService.getAllProducts({ limit: 1, search, status: 'AVAILABLE', branchId }),
+        productService.getAllProducts({ limit: 1, search, status: 'RENTED', branchId }),
+        productService.getAllProducts({ limit: 1, search, status: 'SOLD', branchId }),
       ]);
       setProducts(res.data);
       setTotal(res.total);
@@ -67,7 +76,7 @@ export default function ManagerProduct() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, setTotal]);
+  }, [page, limit, search, branchId, setTotal]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -138,8 +147,9 @@ export default function ManagerProduct() {
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-4" suppressHydrationWarning>
-      <div className="flex justify-between items-center" suppressHydrationWarning>
+      <div className="flex flex-wrap justify-between items-center gap-3" suppressHydrationWarning>
         <h3 className="text-xl sm:text-2xl font-bold text-primary">Products</h3>
+        {isAdmin && <BranchFilterBar />}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" suppressHydrationWarning>

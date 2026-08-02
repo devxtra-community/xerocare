@@ -24,7 +24,8 @@ export class BrandController {
     try {
       const branchId = req.user?.branchId;
       const isAdmin = req.user?.role === 'ADMIN';
-      const filteredBranchId = isAdmin ? undefined : branchId;
+      const adminBranchFilter = req.query.branchId as string | undefined;
+      const filteredBranchId = isAdmin ? adminBranchFilter : branchId;
 
       const brands = await this.brandService.getAllBrands(filteredBranchId);
       res.json({ success: true, data: brands });

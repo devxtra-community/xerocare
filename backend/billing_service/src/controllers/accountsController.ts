@@ -3418,6 +3418,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
         sourceType: a.sourceType,
         category: a.category,
         accountGroup: a.accountGroup,
+        isActive: a.isActive,
       }));
 
     const allWarnings = [

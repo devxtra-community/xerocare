@@ -1017,6 +1017,7 @@ export interface CustomAccountBalance extends AccountBalance {
     | 'MANUAL_JOURNAL';
   category?: string;
   accountGroup?: string;
+  isActive: boolean;
 }
 
 export interface ChartOfAccountsResponse {

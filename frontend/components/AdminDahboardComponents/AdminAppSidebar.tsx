@@ -70,7 +70,7 @@ import {
 import { useState, useEffect } from 'react';
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 interface MenuLink {
   title: string;
@@ -405,7 +405,6 @@ const adminAccountsMenuItems: MenuLink[] = [
 ];
 
 export default function AppSidebar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [accountsOpen, setAccountsOpen] = useState(pathname.startsWith('/admin/accounts'));
@@ -436,15 +435,12 @@ export default function AppSidebar() {
       if (!res?.data.success) {
         toast.error(res?.data.message);
       } else {
-        if (res.data.isadmin) {
-          router.push('/adminlogin');
-        } else {
-          router.push('/login');
-        }
         toast.success(res.data.message);
+        window.location.href = res.data.isadmin ? '/adminlogin' : '/login';
       }
     } catch (err) {
       console.log(err);
+      window.location.href = '/login';
     }
   };
   return (

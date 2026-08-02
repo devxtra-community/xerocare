@@ -49,7 +49,7 @@ import {
 
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 /**
  * Sidebar navigation component for the Finance dashboard.
@@ -57,7 +57,6 @@ import { useRouter, usePathname } from 'next/navigation';
  * Displays dynamic badges for pending actions (Rent, Lease, Sale, Orders).
  */
 export default function FinanceSidebar() {
-  const router = useRouter();
   const pathname = usePathname();
   const [accountsOpen, setAccountsOpen] = React.useState(pathname.startsWith('/finance/accounts'));
 
@@ -188,11 +187,12 @@ export default function FinanceSidebar() {
       if (!res?.data.success) {
         toast.error(res?.data.message);
       } else {
-        router.push(res.data.isadmin ? '/adminlogin' : '/login');
         toast.success(res.data.message);
+        window.location.href = res.data.isadmin ? '/adminlogin' : '/login';
       }
     } catch (err) {
       console.error(err);
+      window.location.href = '/login';
     }
   };
 

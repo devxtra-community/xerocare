@@ -8,8 +8,8 @@ export interface Brand {
   created_at: string;
 }
 
-export async function getBrands() {
-  const res = await api.get('/i/brands');
+export async function getBrands(params?: { branchId?: string }) {
+  const res = await api.get('/i/brands', { params });
   return res.data;
 }
 

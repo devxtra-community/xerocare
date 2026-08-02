@@ -32,7 +32,7 @@ import {
 import { logout, getUserFromToken } from '@/lib/auth';
 import { hasJobAccess, EmployeeJob } from '@/lib/employeeJob';
 import { toast } from 'sonner';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useMemo, useState, useEffect } from 'react';
 
 const menuItems = [
@@ -143,7 +143,6 @@ export default function EmployeeSidebar({
 }: {
   initialEmployeeJob?: EmployeeJob | null;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(
     initialEmployeeJob,
@@ -187,11 +186,12 @@ export default function EmployeeSidebar({
         return;
       }
 
-      router.push('/login');
       toast.success(res.data.message);
+      window.location.href = '/login';
     } catch (error) {
       console.error(error);
       toast.error('Logout failed');
+      window.location.href = '/login';
     }
   };
 
