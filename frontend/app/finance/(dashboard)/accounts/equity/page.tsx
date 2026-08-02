@@ -554,38 +554,44 @@ export default function EquityPage() {
     country: activeBranch?.country,
   };
 
+  const branchId = currentUser?.branchId;
+
   const { data: entries = [], isLoading: loadingEntries } = useQuery({
-    queryKey: ['equity-entries'],
+    queryKey: ['equity-entries', branchId],
     queryFn: () => fetchEquityEntries(),
   });
 
   const { data: summary } = useQuery({
-    queryKey: ['equity-summary'],
+    queryKey: ['equity-summary', branchId],
     queryFn: () => fetchEquitySummary(),
   });
 
   const { data: statement } = useQuery({
-    queryKey: ['equity-statement', stmtYear],
+    queryKey: ['equity-statement', branchId, stmtYear],
     queryFn: () => fetchEquityStatement({ year: stmtYear }),
     enabled: tab === 'statement',
   });
 
   const { data: balanceSheet } = useQuery({
-    queryKey: ['balance-sheet'],
+    queryKey: ['balance-sheet', branchId],
     queryFn: () => fetchBalanceSheet(),
     enabled: tab === 'balance',
   });
 
   const { data: cashAccounts = [] } = useQuery({
-    queryKey: ['cash-bank-accounts'],
+    queryKey: ['cash-bank-accounts', branchId],
     queryFn: () => fetchCashBankAccounts(),
   });
+
+  const invalidateEquity = () => {
+    qc.invalidateQueries({ queryKey: ['equity-entries', branchId] });
+    qc.invalidateQueries({ queryKey: ['equity-summary', branchId] });
+  };
 
   const createMut = useMutation({
     mutationFn: createEquityEntry,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['equity-entries'] });
-      qc.invalidateQueries({ queryKey: ['equity-summary'] });
+      invalidateEquity();
       toast.success('Equity entry created');
       setModal(null);
     },
@@ -596,8 +602,7 @@ export default function EquityPage() {
     mutationFn: ({ id, data }: { id: string; data: Partial<EquityEntry> }) =>
       updateEquityEntry(id, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['equity-entries'] });
-      qc.invalidateQueries({ queryKey: ['equity-summary'] });
+      invalidateEquity();
       toast.success('Updated');
       setModal(null);
     },
@@ -607,8 +612,7 @@ export default function EquityPage() {
   const deleteMut = useMutation({
     mutationFn: deleteEquityEntry,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['equity-entries'] });
-      qc.invalidateQueries({ queryKey: ['equity-summary'] });
+      invalidateEquity();
       toast.success('Deleted');
     },
     onError: () => toast.error('Delete failed'),

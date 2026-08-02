@@ -171,6 +171,10 @@ export const updateCashBankAccount = async (req: Request, res: Response, next: N
     const id = req.params.id as string;
     const account = await repo.findOne({ where: { id } });
     if (!account) throw new AppError('Account not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(account.branchId)) {
+      throw new AppError('You do not have permission to modify this account', 403);
+    }
     Object.assign(account, req.body);
     const saved = await repo.save(account);
     res.json({ success: true, data: saved });
@@ -183,6 +187,14 @@ export const deleteCashBankAccount = async (req: Request, res: Response, next: N
   try {
     const repo = Source.getRepository(CashBankAccount);
     const id = req.params.id as string;
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0) {
+      const account = await repo.findOne({ where: { id } });
+      if (!account) throw new AppError('Account not found', 404);
+      if (!branchFilter.includes(account.branchId)) {
+        throw new AppError('You do not have permission to delete this account', 403);
+      }
+    }
     await repo.update(id, { isActive: false });
     res.json({ success: true });
   } catch (err) {
@@ -265,6 +277,10 @@ export const reverseCashbookEntry = async (req: Request, res: Response, next: Ne
     const repo = Source.getRepository(CashbookEntry);
     const original = await repo.findOne({ where: { id } });
     if (!original) throw new AppError('Cashbook entry not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(original.branchId)) {
+      throw new AppError('You do not have permission to reverse this entry', 403);
+    }
     if (original.sourceType) {
       throw new AppError(
         'Only MANUAL cashbook entries can be reversed. Correct the source record (invoice / expense) to reverse AUTO entries.',
@@ -629,6 +645,10 @@ export const updateExpenseEntry = async (req: Request, res: Response, next: Next
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Expense not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(entry.branchId)) {
+      throw new AppError('You do not have permission to modify this expense', 403);
+    }
     const wasPaid = entry.status === 'PAID';
     Object.assign(entry, req.body);
 
@@ -805,6 +825,10 @@ export const deleteExpenseEntry = async (req: Request, res: Response, next: Next
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Expense not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(entry.branchId)) {
+      throw new AppError('You do not have permission to delete this expense', 403);
+    }
     if (entry.status === 'PAID')
       throw new AppError('Cannot delete a paid expense — reverse the payment first', 400);
     await repo.delete(id);
@@ -1277,6 +1301,10 @@ export const updateManualReceivable = async (req: Request, res: Response, next: 
     const id = req.params.id as string;
     const item = await repo.findOne({ where: { id } });
     if (!item) throw new AppError('Receivable not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(item.branchId)) {
+      throw new AppError('You do not have permission to modify this receivable', 403);
+    }
     Object.assign(item, req.body);
     const saved = await repo.save(item);
     res.json({ success: true, data: saved });
@@ -1291,6 +1319,10 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
     // Pre-fetch to validate existence before acquiring transaction lock
     const receivable = await Source.getRepository(ManualReceivable).findOne({ where: { id } });
     if (!receivable) throw new AppError('Receivable not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(receivable.branchId)) {
+      throw new AppError('You do not have permission to record payment for this receivable', 403);
+    }
 
     let saved!: ManualReceivable;
     let savedPayment!: ReceivablePayment;
@@ -1439,6 +1471,10 @@ export const updateManualPayable = async (req: Request, res: Response, next: Nex
     const id = req.params.id as string;
     const item = await repo.findOne({ where: { id } });
     if (!item) throw new AppError('Payable not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(item.branchId)) {
+      throw new AppError('You do not have permission to modify this payable', 403);
+    }
     Object.assign(item, req.body);
     const saved = await repo.save(item);
     res.json({ success: true, data: saved });
@@ -1453,6 +1489,10 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     // Pre-fetch to validate existence before acquiring transaction lock
     const payable = await Source.getRepository(ManualPayable).findOne({ where: { id } });
     if (!payable) throw new AppError('Payable not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(payable.branchId)) {
+      throw new AppError('You do not have permission to record payment for this payable', 403);
+    }
 
     let saved!: ManualPayable;
     let savedPayment!: PayablePayment;
@@ -1706,6 +1746,11 @@ export const updateEquityEntry = async (req: Request, res: Response, next: NextF
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Equity entry not found', 404);
 
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(entry.branchId)) {
+      throw new AppError('You do not have permission to modify this entry', 403);
+    }
+
     // Editing an existing historical entry's amount/description/etc. is fine
     // even if its type is retired; only block *newly assigning* a retired type.
     if (
@@ -1731,6 +1776,16 @@ export const deleteEquityEntry = async (req: Request, res: Response, next: NextF
   try {
     const repo = Source.getRepository(EquityEntry);
     const id = req.params.id as string;
+
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0) {
+      const entry = await repo.findOne({ where: { id } });
+      if (!entry) throw new AppError('Equity entry not found', 404);
+      if (!branchFilter.includes(entry.branchId)) {
+        throw new AppError('You do not have permission to delete this entry', 403);
+      }
+    }
+
     await repo.delete(id);
     res.json({ success: true });
   } catch (err) {

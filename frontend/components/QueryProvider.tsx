@@ -1,12 +1,8 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-/**
- * Global Query Provider component.
- * Configures the TanStack Query client for the entire application.
- */
 export default function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -18,6 +14,19 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
         },
       }),
   );
+
+  // When the accessToken changes in localStorage (e.g. a different user logs in
+  // on another tab), wipe the entire cache so stale branch-scoped data is never
+  // served to the new user.
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === 'accessToken') {
+        queryClient.clear();
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, [queryClient]);
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }

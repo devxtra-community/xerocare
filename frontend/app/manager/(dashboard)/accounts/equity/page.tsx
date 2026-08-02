@@ -8,6 +8,7 @@ import {
   fetchEquityEntries,
   fetchEquityStatement,
 } from '@/lib/finance/accountsApi';
+import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
@@ -28,17 +29,18 @@ const TYPE_COLORS: Record<string, string> = {
 export default function ManagerEquityPage() {
   const currency = useBranchCurrency();
   const currentYear = new Date().getFullYear();
+  const branchId = getUserFromToken()?.branchId;
 
   const { data: summary } = useQuery({
-    queryKey: ['mgr-equity-summary'],
+    queryKey: ['mgr-equity-summary', branchId],
     queryFn: () => fetchEquitySummary(),
   });
   const { data: entries = [] } = useQuery({
-    queryKey: ['mgr-equity-entries'],
+    queryKey: ['mgr-equity-entries', branchId],
     queryFn: () => fetchEquityEntries({}),
   });
   const { data: statement } = useQuery({
-    queryKey: ['mgr-equity-stmt', currentYear],
+    queryKey: ['mgr-equity-stmt', branchId, currentYear],
     queryFn: () => fetchEquityStatement({ year: String(currentYear) }),
   });
 

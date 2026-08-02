@@ -88,6 +88,10 @@ export const updateIncomeEntry = async (req: Request, res: Response, next: NextF
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Income entry not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(entry.branchId)) {
+      throw new AppError('You do not have permission to modify this income entry', 403);
+    }
     const wasReceived = entry.status === 'RECEIVED';
     Object.assign(entry, req.body);
 
@@ -252,6 +256,10 @@ export const deleteIncomeEntry = async (req: Request, res: Response, next: NextF
     const id = req.params.id as string;
     const entry = await repo.findOne({ where: { id } });
     if (!entry) throw new AppError('Income entry not found', 404);
+    const branchFilter: string[] = req.branchFilter ?? [];
+    if (branchFilter.length > 0 && !branchFilter.includes(entry.branchId)) {
+      throw new AppError('You do not have permission to delete this income entry', 403);
+    }
     if (entry.status === 'RECEIVED')
       throw new AppError('Cannot delete a received income entry — reverse it first', 400);
     await repo.delete(id);

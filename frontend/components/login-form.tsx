@@ -7,7 +7,6 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { requestLoginOtp, verifyLoginOtp, requestMagicLink } from '@/lib/auth';
 import Link from 'next/link';
@@ -42,8 +41,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [loading, setLoading] = useState(false); // Used to show "Processing..." on buttons
   const [error, setError] = useState<string | null>(null);
-
-  const router = useRouter();
 
   /**
    * STEP 1: Check Password
@@ -108,20 +105,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
           // Redirecting to the right department:
           if (role === 'ADMIN') {
-            router.push('/admin/dashboard');
+            window.location.href = '/admin/dashboard';
           } else if (role === 'HR') {
-            router.push('/hr/dashboard');
+            window.location.href = '/hr/dashboard';
           } else if (role === 'MANAGER') {
-            router.push('/manager/dashboard');
+            window.location.href = '/manager/dashboard';
           } else if (role === 'FINANCE') {
-            router.push('/finance/dashboard');
+            window.location.href = '/finance/dashboard';
           } else if (role === 'EMPLOYEE') {
-            router.push('/employee/dashboard');
+            window.location.href = '/employee/dashboard';
           } else {
-            router.push('/dashboard');
+            window.location.href = '/dashboard';
           }
         } catch {
-          router.push('/dashboard');
+          window.location.href = '/dashboard';
         }
       } else {
         toast.error(res.message);
