@@ -92,6 +92,8 @@ interface SaleItem {
   unitPrice: number;
   discount: number;
   maxDiscount: number;
+  wholesalePrice?: number;
+  retailPrice?: number;
   isManual: boolean;
   productId?: string;
   sparePartId?: string;
@@ -1296,6 +1298,7 @@ function QuotationFormModal({
   const [selectedLayoutStyle] = useState<string | null>('normal');
 
   // ── SALE state ──────────────────────────────────────────────────────────
+  const [transactionType, setTransactionType] = useState<'B2B' | 'B2C'>('B2C');
   const [customerId, setCustomerId] = useState('');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -1671,6 +1674,8 @@ function QuotationFormModal({
   const addItem = (item: SelectableItem) => {
     let description = '',
       basePrice = 0,
+      wholesalePrice = 0,
+      retailPrice = 0,
       maxDiscount = 0,
       itemType: 'PRODUCT' | 'SPAREPART' = 'PRODUCT',
       productId: string | undefined = undefined,
@@ -1686,7 +1691,9 @@ function QuotationFormModal({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sp = item as any;
       description = sp.part_name || 'Spare Part';
-      basePrice = Number(sp.base_price) || 0;
+      retailPrice = Number(sp.base_price) || 0;
+      wholesalePrice = Number(sp.wholesale_price) || 0;
+      basePrice = transactionType === 'B2B' && wholesalePrice > 0 ? wholesalePrice : retailPrice;
       maxDiscount = Number(sp.max_discount_amount) || 0;
       sparePartId = sp.id;
       itemType = 'SPAREPART';
@@ -1695,7 +1702,9 @@ function QuotationFormModal({
       const pr = item as Product;
       description = pr.name || pr.description || pr.model?.description || 'Product';
 
-      basePrice = pr.sale_price || 0;
+      retailPrice = pr.sale_price || 0;
+      wholesalePrice = pr.wholesale_price || 0;
+      basePrice = transactionType === 'B2B' && wholesalePrice > 0 ? wholesalePrice : retailPrice;
       maxDiscount = pr.max_discount_amount || 0;
       productId = pr.id;
       modelId = pr.model?.id;
@@ -1775,6 +1784,8 @@ function QuotationFormModal({
         discount: 0,
         unitPrice: basePrice,
         maxDiscount,
+        wholesalePrice,
+        retailPrice,
         isManual: false,
         productId,
         sparePartId,
@@ -1793,6 +1804,22 @@ function QuotationFormModal({
   };
 
   const removeItem = (i: number) => setSaleItems((prev) => prev.filter((_, idx) => idx !== i));
+
+  // When the user switches B2B ↔ B2C after items are already in the list, reprice
+  // every catalog item to its matching tier. Manual custom items have no stored
+  // catalog prices so they are left exactly as entered.
+  useEffect(() => {
+    setSaleItems((prev) =>
+      prev.map((item) => {
+        if (item.isManual) return item;
+        const newBase =
+          transactionType === 'B2B' && (item.wholesalePrice ?? 0) > 0
+            ? item.wholesalePrice!
+            : (item.retailPrice ?? item.basePrice);
+        return { ...item, basePrice: newBase, unitPrice: newBase, discount: 0 };
+      }),
+    );
+  }, [transactionType]);
 
   const handleBarcodeScan = async (code: string) => {
     try {
@@ -2761,8 +2788,41 @@ function QuotationFormModal({
                 <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-400" /> Customer
                 </label>
-                <CustomerSelect value={customerId} onChange={setCustomerId} />
+                <CustomerSelect
+                  value={customerId}
+                  onChange={(id, entity) => {
+                    setCustomerId(id);
+                    // Pre-fill transaction type from the customer's stored default;
+                    // only applies for SALE quotations — the field is visible there.
+                    const ct = (entity as Record<string, unknown>).customerType;
+                    if (ct === 'B2B' || ct === 'B2C') setTransactionType(ct);
+                    else setTransactionType('B2C');
+                  }}
+                />
               </div>
+
+              {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price/base_price */}
+              {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
+                <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                  <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-purple-400" /> Transaction Type
+                  </label>
+                  <Select
+                    value={transactionType}
+                    onValueChange={(v) => setTransactionType(v as 'B2B' | 'B2C')}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="B2C">B2C — Business to Customer (Retail Price)</SelectItem>
+                      <SelectItem value="B2B">
+                        B2B — Business to Business (Wholesale Price)
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Validity & Notes (all quotation types) */}
               {['PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE'].includes(quotationType) && (

@@ -29,6 +29,7 @@ import {
   Customer,
   CreateCustomerData,
   CustomerBankAccount,
+  CustomerType,
   CustomerVatStatus,
   CustomerExemptionReason,
   CUSTOMER_VAT_STATUS_LABELS,
@@ -85,6 +86,7 @@ export default function CustomerFormDialog({
     status: 'ACTIVE',
     stateProvince: '',
     vatStatus: 'UNREGISTERED_STANDARD',
+    customerType: 'B2C',
   });
 
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function CustomerFormDialog({
         vatNumber: customer.vatNumber ?? undefined,
         vatStatus: customer.vatStatus ?? 'UNREGISTERED_STANDARD',
         exemptionReason: customer.exemptionReason ?? undefined,
+        customerType: customer.customerType ?? 'B2C',
         country: customer.country ?? undefined,
         stateProvince: customer.stateProvince ?? undefined,
         city: customer.city ?? undefined,
@@ -146,6 +149,7 @@ export default function CustomerFormDialog({
         status: 'ACTIVE',
         stateProvince: '',
         vatStatus: 'UNREGISTERED_STANDARD',
+        customerType: 'B2C',
       });
       setBankAccounts([]);
       setParsedDial(null);
@@ -445,7 +449,26 @@ export default function CustomerFormDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Customer Type
+                </Label>
+                <Select
+                  value={formData.customerType ?? 'B2C'}
+                  onValueChange={(val) =>
+                    setFormData((prev) => ({ ...prev, customerType: val as CustomerType }))
+                  }
+                >
+                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-none shadow-xl">
+                    <SelectItem value="B2C">B2C — Retail (Selling Price)</SelectItem>
+                    <SelectItem value="B2B">B2B — Wholesale Price</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                   VAT Status

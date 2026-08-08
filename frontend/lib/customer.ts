@@ -27,6 +27,8 @@ export interface CustomerBankAccount {
 
 export type CustomerVatStatus = 'REGISTERED' | 'UNREGISTERED_STANDARD' | 'EXEMPT';
 
+export type CustomerType = 'B2B' | 'B2C';
+
 export type CustomerExemptionReason =
   | 'GOVERNMENT_ORGANIZATION'
   | 'EMBASSY_OR_DIPLOMATIC_MISSION'
@@ -62,6 +64,10 @@ export interface Customer {
   /** Defaults to UNREGISTERED_STANDARD server-side — standard VAT applies unless
    * explicitly EXEMPT. Only EXEMPT zeroes tax on this customer's invoices. */
   vatStatus?: CustomerVatStatus;
+  /** Defaults to B2C server-side. Drives the default transaction type on quotation
+   * forms — B2B uses wholesale_price, B2C uses sale_price/base_price. Always
+   * overridable per-quotation without changing this stored default. */
+  customerType?: CustomerType;
   /** Internal-only (see exemptionReason on Invoice docs) — required when
    * vatStatus is EXEMPT, never shown on a customer-facing document. */
   exemptionReason?: CustomerExemptionReason | null;
@@ -132,6 +138,7 @@ export interface CreateCustomerData {
   vatNumber?: string;
   vatStatus?: CustomerVatStatus;
   exemptionReason?: CustomerExemptionReason | null;
+  customerType?: CustomerType;
   country?: string;
   stateProvince?: string;
   city?: string;

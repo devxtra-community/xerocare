@@ -23,10 +23,19 @@ const cleanNumber = (val: string | number | undefined | null) =>
   val === '' || val === undefined || val === null ? undefined : Number(val);
 
 const handleNumberInput = (val: string) => {
-  // Allow empty string to clear the input
   if (val === '') return '';
-  // Check if it's a valid number format (though input type="number" restricts this mostly)
   return val;
+};
+
+// For currency/rate fields that must accept decimals.
+// type="number" inputs return "" for incomplete states like "0." or "1.", which
+// wipes the field mid-typing. Use type="text" + this helper instead.
+const handleDecimalInput = (val: string): string | undefined => {
+  if (val === '') return '';
+  // Allow: digits, an optional single decimal point, and more digits.
+  // Covers intermediate states: "0.", ".", ".5", "1.2"
+  if (/^\d*\.?\d*$/.test(val)) return val;
+  return undefined; // non-numeric character — caller should not update state
 };
 
 interface SlabRange {
@@ -953,14 +962,13 @@ export default function RentFormModal({
                           Total Lease Amount
                         </label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={form.totalLeaseAmount}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              totalLeaseAmount: handleNumberInput(e.target.value),
-                            })
-                          }
+                          onChange={(e) => {
+                            const v = handleDecimalInput(e.target.value);
+                            if (v !== undefined) setForm({ ...form, totalLeaseAmount: v });
+                          }}
                           className="font-bold text-slate-800"
                         />
                       </div>
@@ -991,14 +999,13 @@ export default function RentFormModal({
                           Total Lease Amount
                         </label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={form.totalLeaseAmount}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              totalLeaseAmount: handleNumberInput(e.target.value),
-                            })
-                          }
+                          onChange={(e) => {
+                            const v = handleDecimalInput(e.target.value);
+                            if (v !== undefined) setForm({ ...form, totalLeaseAmount: v });
+                          }}
                           className="font-bold text-slate-800"
                         />
                       </div>
@@ -1028,14 +1035,13 @@ export default function RentFormModal({
                       Advance Amount
                     </label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={form.advanceAmount}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          advanceAmount: handleNumberInput(e.target.value),
-                        })
-                      }
+                      onChange={(e) => {
+                        const v = handleDecimalInput(e.target.value);
+                        if (v !== undefined) setForm({ ...form, advanceAmount: v });
+                      }}
                       className="font-bold text-slate-800"
                     />
                   </div>
@@ -1049,12 +1055,14 @@ export default function RentFormModal({
                       Monthly Rent ({currency})
                     </label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0"
                       value={form.monthlyRent}
-                      onChange={(e) =>
-                        setForm({ ...form, monthlyRent: handleNumberInput(e.target.value) })
-                      }
+                      onChange={(e) => {
+                        const v = handleDecimalInput(e.target.value);
+                        if (v !== undefined) setForm({ ...form, monthlyRent: v });
+                      }}
                       className="font-bold text-slate-800 border-border focus:border-indigo-400"
                     />
                   </div>
@@ -1063,12 +1071,14 @@ export default function RentFormModal({
                       Advance ({currency})
                     </label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="0"
                       value={form.advanceAmount}
-                      onChange={(e) =>
-                        setForm({ ...form, advanceAmount: handleNumberInput(e.target.value) })
-                      }
+                      onChange={(e) => {
+                        const v = handleDecimalInput(e.target.value);
+                        if (v !== undefined) setForm({ ...form, advanceAmount: v });
+                      }}
                       className="font-bold text-slate-800"
                     />
                   </div>
@@ -1489,8 +1499,8 @@ export default function RentFormModal({
                         </label>
                         <div className="relative">
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={
                               (item.description.startsWith('Combined')
@@ -1499,17 +1509,19 @@ export default function RentFormModal({
                                   ? item.bwExcessRate
                                   : item.colorExcessRate) ?? ''
                             }
-                            onChange={(e) =>
-                              updatePricingItem(
-                                index,
-                                item.description.startsWith('Combined')
-                                  ? 'combinedExcessRate'
-                                  : item.description.startsWith('Black & White')
-                                    ? 'bwExcessRate'
-                                    : 'colorExcessRate',
-                                handleNumberInput(e.target.value),
-                              )
-                            }
+                            onChange={(e) => {
+                              const v = handleDecimalInput(e.target.value);
+                              if (v !== undefined)
+                                updatePricingItem(
+                                  index,
+                                  item.description.startsWith('Combined')
+                                    ? 'combinedExcessRate'
+                                    : item.description.startsWith('Black & White')
+                                      ? 'bwExcessRate'
+                                      : 'colorExcessRate',
+                                  v,
+                                );
+                            }}
                             className={`h-9 font-bold pl-6 ${isFixed ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-emerald-700 bg-emerald-50/50 border-emerald-100'}`}
                           />
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">
@@ -1597,17 +1609,14 @@ export default function RentFormModal({
                                 />
                                 <Input
                                   placeholder="Rate"
-                                  type="number"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={slab.rate}
-                                  onChange={(e) =>
-                                    handleUpdateSlab(
-                                      index,
-                                      slabType,
-                                      sIdx,
-                                      'rate',
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const v = handleDecimalInput(e.target.value);
+                                    if (v !== undefined)
+                                      handleUpdateSlab(index, slabType, sIdx, 'rate', v);
+                                  }}
                                   className="h-7 text-xs font-bold text-blue-600"
                                 />
                               </div>
@@ -1652,8 +1661,8 @@ export default function RentFormModal({
                               <div className="w-24 relative">
                                 <Input
                                   placeholder="Rate"
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={
                                     (item.description.startsWith('Combined')
                                       ? item.combinedExcessRate
@@ -1661,13 +1670,10 @@ export default function RentFormModal({
                                         ? item.bwExcessRate
                                         : item.colorExcessRate) ?? ''
                                   }
-                                  onChange={(e) =>
-                                    updatePricingItem(
-                                      index,
-                                      excessField,
-                                      handleNumberInput(e.target.value),
-                                    )
-                                  }
+                                  onChange={(e) => {
+                                    const v = handleDecimalInput(e.target.value);
+                                    if (v !== undefined) updatePricingItem(index, excessField, v);
+                                  }}
                                   className="h-7 text-xs font-bold text-blue-600 pl-4"
                                 />
                                 <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-30">

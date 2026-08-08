@@ -1428,7 +1428,7 @@ export default function UsageRecordingModal({
                                       </span>
                                       {slabs.map((s: SlabRange, i: number) => (
                                         <span key={i} className="whitespace-nowrap font-mono">
-                                          {s.from}-{s.to}: ₹{s.rate}
+                                          {s.from}-{s.to}: {getActiveCurrency()} {s.rate}
                                         </span>
                                       ))}
                                     </div>
@@ -1593,7 +1593,7 @@ export default function UsageRecordingModal({
                                       </span>
                                       {slabs.map((s: SlabRange, i: number) => (
                                         <span key={i} className="whitespace-nowrap font-mono">
-                                          {s.from}-{s.to}: ₹{s.rate}
+                                          {s.from}-{s.to}: {getActiveCurrency()} {s.rate}
                                         </span>
                                       ))}
                                     </div>
@@ -2241,7 +2241,7 @@ export default function UsageRecordingModal({
                                 <div className="flex justify-between text-slate-500 text-[11px] mt-1">
                                   <span>Excess Rate:</span>
                                   <span className="font-bold">
-                                    ₹{applicableRate}{' '}
+                                    {getActiveCurrency()} {applicableRate}{' '}
                                     {applicableRange ? `(${applicableRange} units)` : '/ unit'}
                                   </span>
                                 </div>
@@ -2383,7 +2383,7 @@ export default function UsageRecordingModal({
                                     <div className="flex justify-between text-slate-500 text-[11px] mt-1">
                                       <span>Excess Rate (BW):</span>
                                       <span className="font-bold">
-                                        ₹{applicableRate}{' '}
+                                        {getActiveCurrency()} {applicableRate}{' '}
                                         {applicableRange ? `(${applicableRange} units)` : '/ unit'}
                                       </span>
                                     </div>
@@ -2525,7 +2525,7 @@ export default function UsageRecordingModal({
                                     <div className="flex justify-between text-slate-500 text-[11px] mt-1">
                                       <span>Excess Rate (Color):</span>
                                       <span className="font-bold">
-                                        ₹{applicableRate}{' '}
+                                        {getActiveCurrency()} {applicableRate}{' '}
                                         {applicableRange ? `(${applicableRange} units)` : '/ unit'}
                                       </span>
                                     </div>

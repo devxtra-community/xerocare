@@ -16,6 +16,14 @@ export enum CustomerVatStatus {
   EXEMPT = 'EXEMPT',
 }
 
+// B2C is the safe default — keeps existing customers on retail pricing unless
+// explicitly marked B2B. Stored on the customer record so quotation forms can
+// pre-fill the transaction type, but always overridable per-quotation.
+export enum CustomerType {
+  B2B = 'B2B',
+  B2C = 'B2C',
+}
+
 export enum CustomerExemptionReason {
   GOVERNMENT_ORGANIZATION = 'GOVERNMENT_ORGANIZATION',
   EMBASSY_OR_DIPLOMATIC_MISSION = 'EMBASSY_OR_DIPLOMATIC_MISSION',
@@ -77,6 +85,10 @@ export class Customer {
   // (validated in customerService.ts) when vatStatus === EXEMPT, null otherwise.
   @Column({ name: 'exemption_reason', type: 'varchar', length: 60, nullable: true })
   exemptionReason?: CustomerExemptionReason | null;
+
+  // Default B2C — retail pricing applies unless the customer is explicitly B2B.
+  @Column({ name: 'customer_type', type: 'varchar', length: 3, default: CustomerType.B2C })
+  customerType!: CustomerType;
 
   @Column({ name: 'country', type: 'varchar', length: 2, nullable: true })
   country?: string | null;

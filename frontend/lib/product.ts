@@ -23,6 +23,7 @@ export interface Product {
   lease_price_monthly: number;
   lease_price_yearly: number;
   sale_price: number;
+  wholesale_price?: number;
   tax_rate: number;
   product_status: ProductStatus;
   print_colour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
