@@ -31,9 +31,11 @@ import {
   Key,
   Home,
   Tag,
+  RefreshCcw,
 } from 'lucide-react';
 
 import { useState, useEffect } from 'react';
+import { SidebarSearch, type SearchableNavItem } from '@/components/ui/SidebarSearch';
 import {
   Sidebar,
   SidebarContent,
@@ -143,6 +145,11 @@ const menuItems = [
         title: 'Service Contracts',
         icon: FileText,
         href: '/employee/service/contracts',
+      },
+      {
+        title: 'Machine Swaps',
+        icon: RefreshCcw,
+        href: '/manager/machine-swaps',
       },
     ],
   },
@@ -313,6 +320,27 @@ const accountsMenuItems = [
   { title: 'Depreciation', icon: PieChart, href: '/manager/accounts/depreciation' },
 ];
 
+const managerSearchItems: SearchableNavItem[] = [
+  ...menuItems.flatMap((item) =>
+    item.subItems
+      ? item.subItems.map((sub) => ({
+          title: sub.title,
+          href: sub.href,
+          icon: sub.icon,
+          group: item.title,
+        }))
+      : item.href
+        ? [{ title: item.title, href: item.href, icon: item.icon }]
+        : [],
+  ),
+  ...accountsMenuItems.map((item) => ({
+    title: item.title,
+    href: item.href,
+    icon: item.icon,
+    group: 'Accounts',
+  })),
+];
+
 export default function ManagerSidebar() {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
@@ -388,6 +416,7 @@ export default function ManagerSidebar() {
             Xerocare
           </span>
         </div>
+        <SidebarSearch items={managerSearchItems} />
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">

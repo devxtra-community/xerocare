@@ -102,18 +102,6 @@ app.get('/', (_req: Request, res: Response) => {
 });
 
 /**
- * Invoice Management: Local Billing Routes
- * These routes handle financial documents (invoices).
- * We process these directly here at the gateway for convenience.
- */
-app.use(
-  '/b/invoices',
-  express.json({ limit: '50mb' }),
-  express.urlencoded({ limit: '50mb', extended: true }),
-  invoiceRouter,
-);
-
-/**
  * Bank/Branch Reference Data: shared, cross-cutting reference lookups for customer
  * and vendor bank-detail forms — not owned by any single domain service.
  */
@@ -213,6 +201,45 @@ for (const [key, value] of Object.entries(requiredEnvVars)) {
  * - "/c" goes to CRM (Customer Management)
  */
 app.use('/e', createServiceProxy(EMPLOYEE_SERVICE_URL));
+
+// ─── Billing: new sale-workflow endpoints that share /b/invoices prefix ────────
+// MUST be registered before the local /b/invoices handler (which runs
+// express.json() and consumes the body stream, breaking downstream POSTs).
+// Use app.all (route handler) NOT app.use (middleware): app.use strips the
+// matched prefix from req.url before passing to the proxy, so the billing
+// service would receive "/" instead of "/invoices/:id/contract-agreement".
+// app.all preserves req.url, letting the proxy's pathRewrite do its job.
+app.all('/b/invoices/:id/contract-agreement', createServiceProxy(BILLING_SERVICE_URL));
+app.all(
+  '/b/invoices/:id/contract-agreement/sign-employee',
+  createServiceProxy(BILLING_SERVICE_URL),
+);
+app.all(
+  '/b/invoices/:id/contract-agreement/sign-customer',
+  createServiceProxy(BILLING_SERVICE_URL),
+);
+app.all(
+  '/b/invoices/:id/contract-agreement/sign-customer-upload',
+  createServiceProxy(BILLING_SERVICE_URL),
+);
+app.all(
+  '/b/invoices/:id/contract-agreement/signing-token',
+  createServiceProxy(BILLING_SERVICE_URL),
+);
+app.all('/b/invoices/:id/sale-payments', createServiceProxy(BILLING_SERVICE_URL));
+app.all('/b/invoices/:id/installation-request', createServiceProxy(BILLING_SERVICE_URL));
+
+/**
+ * Invoice Management: Local Billing Routes
+ * These routes handle financial documents (invoices).
+ * We process these directly here at the gateway for convenience.
+ */
+app.use(
+  '/b/invoices',
+  express.json({ limit: '50mb' }),
+  express.urlencoded({ limit: '50mb', extended: true }),
+  invoiceRouter,
+);
 
 // --- Service Management Module Gateway Routes ---
 app.post(

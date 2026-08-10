@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PaymentSummary, recordPayment, getAccountSummary } from '@/lib/payment';
+import { recordSalePayment } from '@/lib/saleWorkflow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -32,9 +33,17 @@ interface InvoiceAccountViewProps {
   invoiceId: string;
   onClose: () => void;
   open: boolean;
+  /** When true, payment is routed through the Finance approval gate
+   * (creates a SalePaymentRequest) instead of posting directly to the ledger. */
+  gated?: boolean;
 }
 
-export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountViewProps) {
+export function InvoiceAccountView({
+  invoiceId,
+  onClose,
+  open,
+  gated = false,
+}: InvoiceAccountViewProps) {
   const currency = useBranchCurrency();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,26 +133,45 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
 
     try {
       setSubmitting(true);
-      await recordPayment({
-        invoiceId,
-        amountPaid: Number(amountPaid),
-        paymentMode,
-        paymentDate,
-        referenceNumber,
-        remarks,
-        receiptFile,
-        chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
-        chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
-        chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
-        chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
-        currency: paidCurrency || undefined,
-        exchangeRate,
-      });
-      toast.success(
-        paymentMode === 'CHEQUE'
-          ? 'Cheque recorded (PENDING). Go to Accounts → Cheques to deposit when cleared.'
-          : 'Payment recorded successfully',
-      );
+      if (gated) {
+        // Route through Finance approval gate — do NOT touch the ledger directly
+        await recordSalePayment(invoiceId, {
+          amount: Number(amountPaid),
+          paymentMode: paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
+          paymentDate,
+          referenceNumber: referenceNumber || undefined,
+          remarks: remarks || undefined,
+          chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
+          chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
+          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+          chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
+        });
+        toast.success('Payment submitted for Finance approval.', {
+          description: 'The outstanding balance will update once Finance approves the payment.',
+        });
+      } else {
+        await recordPayment({
+          invoiceId,
+          amountPaid: Number(amountPaid),
+          paymentMode,
+          paymentDate,
+          referenceNumber,
+          remarks,
+          receiptFile,
+          chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
+          chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
+          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+          chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
+          currency: paidCurrency || undefined,
+          exchangeRate,
+        });
+        toast.success(
+          paymentMode === 'CHEQUE'
+            ? 'Cheque recorded (PENDING). Go to Accounts → Cheques to deposit when cleared.'
+            : 'Payment recorded successfully',
+        );
+        fetchSummary();
+      }
       setShowForm(false);
       setAmountPaid('');
       setReferenceNumber('');
@@ -155,7 +183,6 @@ export function InvoiceAccountView({ invoiceId, onClose, open }: InvoiceAccountV
       setChequeDate(new Date().toISOString().split('T')[0]);
       setSelectedBankAccountIdx('');
       setPaidCurrency(summary?.currency || invoiceCurrency);
-      fetchSummary();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to record payment');

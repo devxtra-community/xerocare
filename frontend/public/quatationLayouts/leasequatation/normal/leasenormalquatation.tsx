@@ -1078,7 +1078,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: '#666' }}>Subtotal (Before VAT)</span>
+                <span style={{ color: '#666' }}>Subtotal</span>
                 <span style={{ color: '#000', fontWeight: '300' }}>{fmt(totals.subTotal)}</span>
               </div>
               <div
@@ -1097,31 +1097,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                marginBottom: '10px',
-                borderBottom: '1px solid #ddd',
-                paddingBottom: '8px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: '#666' }}>{totals.taxName || 'VAT Amount'}</span>
-                <span style={{ color: '#000', fontWeight: '300' }}>{fmt(totals.tax)}</span>
-              </div>
-              <div
-                style={{
-                  fontSize: '9px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                }}
-              >
-                {numberToWords(totals.tax, getActiveCurrency())}
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
                 color: ACCENT,
               }}
             >
@@ -1133,7 +1108,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   fontWeight: '300',
                 }}
               >
-                <span>Grand Total (Including VAT)</span>
+                <span>Grand Total</span>
                 <span>
                   {getActiveCurrency()} {fmt(totals.total)}
                 </span>

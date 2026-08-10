@@ -15,6 +15,8 @@ import {
   Bell,
   Award,
   Receipt,
+  FileSignature,
+  Wrench,
 } from 'lucide-react';
 
 import {
@@ -34,6 +36,7 @@ import { hasJobAccess, EmployeeJob } from '@/lib/employeeJob';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState, useEffect } from 'react';
+import { SidebarSearch } from '@/components/ui/SidebarSearch';
 
 const menuItems = [
   {
@@ -118,12 +121,24 @@ const menuItems = [
     title: 'Service',
     icon: ClipboardList,
     href: '/employee/service',
-    modules: ['service'],
+    modules: ['service_desk'],
   },
   {
     title: 'Service Contracts',
     icon: FileText,
     href: '/employee/service/contracts',
+    modules: ['service_desk'],
+  },
+  {
+    title: 'Customer Contracts',
+    icon: FileSignature,
+    href: '/employee/service/sale-contracts',
+    modules: ['service_desk'],
+  },
+  {
+    title: 'Installation Requests',
+    icon: Wrench,
+    href: '/employee/service/installation-requests',
     modules: ['service'],
   },
   {
@@ -206,6 +221,13 @@ export default function EmployeeSidebar({
             Xerocare
           </span>
         </div>
+        <SidebarSearch
+          items={allowedMenuItems.map((item) => ({
+            title: item.title,
+            href: item.href,
+            icon: item.icon,
+          }))}
+        />
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">

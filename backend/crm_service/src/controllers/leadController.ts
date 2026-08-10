@@ -130,6 +130,24 @@ export class LeadController {
   };
 
   /**
+   * Look up the lead that originated a given customer — used by the Customer 360° profile.
+   * Branch scope is enforced: non-ADMIN roles can only retrieve leads from their own branch.
+   */
+  getLeadByCustomerId = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) throw new Error('User not identified');
+      const lead = await this.leadService.getLeadByCustomerId(
+        req.params.customerId as string,
+        req.user.role,
+        req.user.branchId,
+      );
+      res.status(200).json({ success: true, data: lead ?? null });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
    * Update the information we have on a potential customer.
    *
    * We check to make sure the staff member is only editing leads

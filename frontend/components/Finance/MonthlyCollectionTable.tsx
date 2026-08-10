@@ -16,7 +16,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { getCollectionAlerts, CollectionAlert } from '@/lib/invoice';
-import { Loader2, FileText, History as HistoryIcon, Eye, PlusCircle } from 'lucide-react';
+import {
+  Loader2,
+  FileText,
+  History as HistoryIcon,
+  Eye,
+  PlusCircle,
+  DollarSign,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
@@ -25,8 +32,20 @@ import UsageRecordingModal from './UsageRecordingModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
-
 import { getActiveCurrency } from '@/lib/currency';
+import { recordSalePayment } from '@/lib/saleWorkflow';
+import { getApiErrorMessage } from '@/lib/apiError';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
 /**
  * Table displaying monthly collection alerts for active contracts.
  * Shows pending usage recording, invoicing, and final summary actions.
@@ -51,6 +70,23 @@ export default function MonthlyCollectionTable({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
+
+  // Collect Payment modal (INVOICE_PENDING items)
+  const [collectTarget, setCollectTarget] = useState<CollectionAlert | null>(null);
+  const [collectAmount, setCollectAmount] = useState('');
+  const [collectMode, setCollectMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
+  const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
+  const [collectRef, setCollectRef] = useState('');
+  const [collectChequeNo, setCollectChequeNo] = useState('');
+  const [collectChequeBankName, setCollectChequeBankName] = useState('');
+  const [collectChequeDueDate, setCollectChequeDueDate] = useState('');
+  const [collectChequeDate, setCollectChequeDate] = useState(
+    new Date().toISOString().split('T')[0],
+  );
+  const [collectLater, setCollectLater] = useState(false);
+  const [collectAccountId, setCollectAccountId] = useState('');
+  const [isSavingCollect, setIsSavingCollect] = useState(false);
+  const [collectAccounts, setCollectAccounts] = useState<CashBankAccount[]>([]);
 
   const { page, limit, setPage, setLimit } = usePagination(5);
   // const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
@@ -131,6 +167,54 @@ export default function MonthlyCollectionTable({
     } finally {
       setLoading(false);
       setContractToComplete(null);
+    }
+  };
+
+  const openCollect = async (alertItem: CollectionAlert) => {
+    const accts = await fetchCashBankAccounts().catch(() => [] as CashBankAccount[]);
+    setCollectAccounts(accts);
+    setCollectTarget(alertItem);
+    setCollectAmount('');
+    setCollectMode('CASH');
+    setCollectDate(new Date().toISOString().split('T')[0]);
+    setCollectRef('');
+    setCollectChequeNo('');
+    setCollectChequeBankName('');
+    setCollectChequeDueDate('');
+    setCollectChequeDate(new Date().toISOString().split('T')[0]);
+    setCollectLater(false);
+    setCollectAccountId('');
+  };
+
+  const handleCollectPayment = async () => {
+    if (!collectTarget || !collectAmount) return;
+    setIsSavingCollect(true);
+    try {
+      const context = collectTarget.saleType === 'LEASE' ? 'LEASE_PERIODIC' : 'RENT_PERIODIC';
+      await recordSalePayment(collectTarget.contractId, {
+        amount: Number(collectAmount),
+        paymentMode: collectMode,
+        paymentDate: collectDate,
+        referenceNumber: collectRef || undefined,
+        cashAccountId: collectAccountId || undefined,
+        chequeNumber: collectMode === 'CHEQUE' ? collectChequeNo : undefined,
+        chequeBankName: collectMode === 'CHEQUE' ? collectChequeBankName : undefined,
+        chequeDueDate: collectMode === 'CHEQUE' ? collectChequeDueDate : undefined,
+        chequeDate: collectMode === 'CHEQUE' ? collectChequeDate : undefined,
+        collectLater,
+        paymentContext: context,
+      });
+      const msg = collectLater
+        ? 'Collect Later entry saved — Accounts will confirm receipt.'
+        : 'Payment submitted for Accounts approval.';
+      toast.success('Periodic payment recorded', { description: msg });
+      setCollectTarget(null);
+      fetchAlerts();
+      onSuccess?.();
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err));
+    } finally {
+      setIsSavingCollect(false);
     }
   };
 
@@ -304,15 +388,25 @@ export default function MonthlyCollectionTable({
             </Button>
           )}
           {(alertItem.type === 'INVOICE_PENDING' || alertItem.type === 'SEND_PENDING') && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleViewDetails(alertItem)}
-              className="h-8 px-4 text-xs font-bold rounded-xl"
-            >
-              <Eye className="h-3 w-3 mr-2" />
-              View
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleViewDetails(alertItem)}
+                className="h-8 px-3 text-xs font-bold rounded-xl"
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                View
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => openCollect(alertItem)}
+                className="h-8 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <DollarSign className="h-3 w-3 mr-1" />
+                Collect
+              </Button>
+            </>
           )}
         </div>
       ),
@@ -386,6 +480,193 @@ export default function MonthlyCollectionTable({
         }
         onSuccess={onSuccess}
       />
+
+      {/* Collect Payment Dialog */}
+      <Dialog open={!!collectTarget} onOpenChange={(v) => !v && setCollectTarget(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
+          <DialogTitle className="sr-only">Collect Periodic Payment</DialogTitle>
+          <div className="bg-emerald-600 p-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+                <DollarSign size={18} />
+              </div>
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
+                  Collect Periodic Payment
+                </p>
+                <p className="text-base font-black">{collectTarget?.invoiceNumber}</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            {/* Collect Now / Collect Later toggle */}
+            <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setCollectLater(false)}
+                className={`flex-1 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${!collectLater ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}`}
+              >
+                Collect Now
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollectLater(true)}
+                className={`flex-1 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${collectLater ? 'bg-white shadow text-amber-600' : 'text-slate-500'}`}
+              >
+                Collect Later
+              </button>
+            </div>
+            {collectLater && (
+              <p className="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                Pre-enter payment details. Accounts will confirm receipt when the payment physically
+                arrives.
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Amount
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={collectAmount}
+                  onChange={(e) => setCollectAmount(e.target.value)}
+                  className="h-9 text-sm font-bold"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Date
+                </Label>
+                <Input
+                  type="date"
+                  value={collectDate}
+                  onChange={(e) => setCollectDate(e.target.value)}
+                  className="h-9 text-sm font-bold"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                Payment Mode
+              </Label>
+              <Select
+                value={collectMode}
+                onValueChange={(v) => setCollectMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')}
+              >
+                <SelectTrigger className="h-9 text-sm font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(collectMode === 'CASH' || collectMode === 'BANK_TRANSFER') &&
+              collectAccounts.length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Account
+                  </Label>
+                  <Select value={collectAccountId} onValueChange={setCollectAccountId}>
+                    <SelectTrigger className="h-9 text-sm font-bold">
+                      <SelectValue placeholder="Select account..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {collectAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            {collectMode === 'CHEQUE' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Cheque No.
+                  </Label>
+                  <Input
+                    value={collectChequeNo}
+                    onChange={(e) => setCollectChequeNo(e.target.value)}
+                    className="h-9 text-sm font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Bank
+                  </Label>
+                  <Input
+                    value={collectChequeBankName}
+                    onChange={(e) => setCollectChequeBankName(e.target.value)}
+                    className="h-9 text-sm font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Cheque Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={collectChequeDate}
+                    onChange={(e) => setCollectChequeDate(e.target.value)}
+                    className="h-9 text-sm font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Due Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={collectChequeDueDate}
+                    onChange={(e) => setCollectChequeDueDate(e.target.value)}
+                    className="h-9 text-sm font-bold"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                Reference (optional)
+              </Label>
+              <Input
+                value={collectRef}
+                onChange={(e) => setCollectRef(e.target.value)}
+                placeholder="Ref / transaction ID"
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 h-9 text-xs font-black"
+                onClick={() => setCollectTarget(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 h-9 text-xs font-black bg-emerald-600 hover:bg-emerald-700"
+                onClick={handleCollectPayment}
+                disabled={isSavingCollect || !collectAmount}
+              >
+                {isSavingCollect ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : collectLater ? (
+                  'Save (Collect Later)'
+                ) : (
+                  'Submit for Approval'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmSummaryOpen} onOpenChange={setConfirmSummaryOpen}>
         <AlertDialogContent>

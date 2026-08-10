@@ -16,12 +16,7 @@ const router = Router();
 router.post(
   '/record',
   authMiddleware,
-  requireRole(
-    EmployeeRole.FINANCE,
-    EmployeeRole.ADMIN,
-    EmployeeRole.MANAGER,
-    EmployeeRole.EMPLOYEE,
-  ),
+  requireRole(EmployeeRole.FINANCE, EmployeeRole.ADMIN),
   uploadPaymentReceipt.single('receipt'),
   recordPayment,
 );

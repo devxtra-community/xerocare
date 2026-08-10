@@ -449,8 +449,9 @@ export default function CustomerFormDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
+            {/* Row 1: Customer Type + Account Status */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2 min-w-0">
                 <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                   Customer Type
                 </Label>
@@ -460,7 +461,7 @@ export default function CustomerFormDialog({
                     setFormData((prev) => ({ ...prev, customerType: val as CustomerType }))
                   }
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 overflow-hidden">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-none shadow-xl">
@@ -469,38 +470,7 @@ export default function CustomerFormDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                  VAT Status
-                </Label>
-                <Select
-                  value={formData.vatStatus ?? 'UNREGISTERED_STANDARD'}
-                  onValueChange={(val) => {
-                    const nextStatus = val as CustomerVatStatus;
-                    setFormData((prev) => ({
-                      ...prev,
-                      vatStatus: nextStatus,
-                      // A VAT number only makes sense when Registered; an exemption
-                      // reason only when Exempt — clear the other field on switch so
-                      // stale data can't linger from a prior selection.
-                      vatNumber: nextStatus === 'REGISTERED' ? prev.vatNumber : '',
-                      exemptionReason: nextStatus === 'EXEMPT' ? prev.exemptionReason : undefined,
-                    }));
-                  }}
-                >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-none shadow-xl">
-                    {(Object.keys(CUSTOMER_VAT_STATUS_LABELS) as CustomerVatStatus[]).map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {CUSTOMER_VAT_STATUS_LABELS[s]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
                   Account Status
                 </Label>
@@ -510,7 +480,7 @@ export default function CustomerFormDialog({
                     handleSelectChange('status', val as 'ACTIVE' | 'INACTIVE')
                   }
                 >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 pl-11 relative text-left">
+                  <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400 pl-11 relative text-left overflow-hidden">
                     <div
                       className={`absolute left-4 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full ${formData.status === 'ACTIVE' ? 'bg-green-500' : 'bg-red-500'}`}
                     />
@@ -526,6 +496,36 @@ export default function CustomerFormDialog({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Row 2: VAT Status — full width to accommodate long labels */}
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                VAT Status
+              </Label>
+              <Select
+                value={formData.vatStatus ?? 'UNREGISTERED_STANDARD'}
+                onValueChange={(val) => {
+                  const nextStatus = val as CustomerVatStatus;
+                  setFormData((prev) => ({
+                    ...prev,
+                    vatStatus: nextStatus,
+                    vatNumber: nextStatus === 'REGISTERED' ? prev.vatNumber : '',
+                    exemptionReason: nextStatus === 'EXEMPT' ? prev.exemptionReason : undefined,
+                  }));
+                }}
+              >
+                <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-xl">
+                  {(Object.keys(CUSTOMER_VAT_STATUS_LABELS) as CustomerVatStatus[]).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {CUSTOMER_VAT_STATUS_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {formData.vatStatus === 'REGISTERED' && (

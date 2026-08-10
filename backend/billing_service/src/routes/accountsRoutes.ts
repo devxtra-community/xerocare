@@ -75,6 +75,7 @@ import {
   getVatRemittances,
   createVatRemittance,
   deleteVatRemittance,
+  getCustomer360Profile,
 } from '../controllers/accountsController';
 import {
   getOwners,
@@ -310,6 +311,9 @@ router.post('/tax/send-email', sendTaxDocumentEmail);
 router.get('/tax-rules', getCountryTaxRules);
 router.post('/tax-rules', upsertCountryTaxRule);
 router.delete('/tax-rules/:id', deleteCountryTaxRule);
+
+// Customer 360° profile — aggregates invoices + payments for one customer, branch-scoped
+router.get('/customers/:customerId/profile', getCustomer360Profile);
 
 // Admin consolidated routes (ADMIN role only — branch security enforced in parseBranchFilter)
 router.get('/admin/orphaned-cashbook', getOrphanedCashbookEntries);

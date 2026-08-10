@@ -1125,6 +1125,7 @@ export default function EmployeeQuotationTable() {
         <InvoiceAccountView
           invoiceId={selectedQ.id}
           open={accountViewOpen}
+          gated
           onClose={() => setAccountViewOpen(false)}
         />
       )}

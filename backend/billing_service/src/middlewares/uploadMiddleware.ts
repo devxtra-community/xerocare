@@ -53,6 +53,29 @@ export const uploadPaymentReceipt = multer({
   },
 });
 
+// Physically-signed agreement document uploaded by Employee as customer signature proof.
+export const uploadSignedAgreementDoc = multer({
+  storage: multerS3({
+    s3: r2,
+    bucket: process.env.R2_BUCKET!,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (req: Request, file, cb) => {
+      const agreementId = req.params?.id || 'unknown';
+      const fileName = `signed-agreements/${agreementId}/${Date.now()}-${file.originalname}`;
+      cb(null, fileName);
+    },
+    acl: 'public-read',
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf';
+    if (!allowed) {
+      return cb(new Error('Only image or PDF files are allowed'));
+    }
+    cb(null, true);
+  },
+});
+
 // Proof of payment for expense requests / manager purchase payments.
 export const uploadExpenseProof = multer({
   storage: multerS3({

@@ -14,7 +14,9 @@ import {
   Mail,
   MapPin,
   AlertCircle,
+  LayoutList,
 } from 'lucide-react';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -464,15 +466,27 @@ export default function CustomerReport() {
 
                       {/* Actions */}
                       <TableCell className="py-4 px-4 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenDetail(cust)}
-                          className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-slate-50 border-slate-200"
-                        >
-                          <Eye className="h-3.5 w-3.5 text-slate-500" />
-                          View Details
-                        </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenDetail(cust)}
+                            className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-slate-50 border-slate-200"
+                          >
+                            <Eye className="h-3.5 w-3.5 text-slate-500" />
+                            Details
+                          </Button>
+                          <Link href={`/admin/customers/${cust.id}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs font-semibold gap-1.5 hover:bg-indigo-50 border-indigo-200 text-indigo-700"
+                            >
+                              <LayoutList className="h-3.5 w-3.5" />
+                              360°
+                            </Button>
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

@@ -266,8 +266,10 @@ export interface ManualPayable {
 export async function fetchCashBankAccounts(params?: {
   branchId?: string;
   branchIds?: string;
+  skipErrorToast?: boolean;
 }): Promise<CashBankAccount[]> {
-  const res = await api.get(`${BASE}/cash-bank`, { params });
+  const { skipErrorToast, ...queryParams } = params ?? {};
+  const res = await api.get(`${BASE}/cash-bank`, { params: queryParams, skipErrorToast });
   return res.data?.data ?? [];
 }
 

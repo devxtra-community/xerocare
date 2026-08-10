@@ -41,6 +41,13 @@ export class LeadRepository {
   }
 
   /**
+   * Finds a lead by the customer ID it was converted into.
+   */
+  async findLeadByCustomerId(customerId: string): Promise<ILead | null> {
+    return await LeadModel.findOne({ customerId, isDeleted: false });
+  }
+
+  /**
    * Updates a lead's status and optionally links a customer ID.
    */
   async updateLeadStatus(

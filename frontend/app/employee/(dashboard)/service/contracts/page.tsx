@@ -22,7 +22,8 @@ import {
   FsmaBillingMode,
   ContractInitialPayment,
 } from '@/lib/serviceContract';
-import { recordPayment, getAccountSummary, PaymentSummary } from '@/lib/payment';
+import { getAccountSummary, PaymentSummary } from '@/lib/payment';
+import { recordSalePayment } from '@/lib/saleWorkflow';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import { InvoiceViewDialog } from '@/components/employeeComponents/InvoiceViewDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -62,8 +63,10 @@ import {
   X,
   Eye,
   Loader2,
+  Package,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface CustomerMachine {
@@ -180,6 +183,7 @@ const emptyForm = (): ContractFormState => ({
 
 export default function ServiceContractsPage() {
   const router = useRouter();
+  const [viewProductId, setViewProductId] = useState<string | null>(null);
   const [contracts, setContracts] = useState<ServiceContract[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
@@ -553,19 +557,14 @@ export default function ServiceContractsPage() {
     }
     setSavingPayment(true);
     try {
-      await recordPayment({
-        invoiceId: payingContract.invoiceId,
-        amountPaid: amount,
-        paymentMode: payingForm.paymentMode,
+      await recordSalePayment(payingContract.invoiceId!, {
+        amount,
+        paymentMode: payingForm.paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
         paymentDate: payingForm.paymentDate,
         referenceNumber: payingForm.referenceNumber || undefined,
         remarks: payingForm.remarks || undefined,
       });
-      const summary = await getAccountSummary(payingContract.invoiceId).catch(() => null);
-      if (summary) {
-        setContractPaymentSummaries((prev) => ({ ...prev, [payingContract.invoiceId!]: summary }));
-      }
-      toast.success('Payment recorded against the AMC invoice.');
+      toast.success('Payment submitted for Finance approval.');
       setPayingContract(null);
     } catch (error) {
       console.error(error);
@@ -1305,6 +1304,17 @@ export default function ServiceContractsPage() {
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <div className="flex items-center justify-end gap-1 flex-nowrap">
+                        {c.productId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setViewProductId(c.productId)}
+                            title="View machine details"
+                            className="h-7 w-7 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          >
+                            <Package className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -2844,6 +2854,12 @@ export default function ServiceContractsPage() {
         onOpenChange={setShowAddCustomer}
         customer={null}
         onSubmit={handleCreateCustomer}
+      />
+
+      <ProductDetailModal
+        productId={viewProductId}
+        open={!!viewProductId}
+        onClose={() => setViewProductId(null)}
       />
     </div>
   );

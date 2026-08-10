@@ -17,6 +17,7 @@ import {
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
+import { SidebarSearch } from '@/components/ui/SidebarSearch';
 
 const menuItems = [
   {
@@ -89,6 +90,9 @@ export default function HrAppSidebar() {
             Xerocare
           </span>
         </div>
+        <SidebarSearch
+          items={menuItems.map((item) => ({ title: item.title, href: item.href, icon: item.icon }))}
+        />
       </SidebarHeader>
 
       {/* Content */}

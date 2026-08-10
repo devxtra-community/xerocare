@@ -53,6 +53,10 @@ export interface Vendor {
   bankAccounts?: BankAccount[];
   branchId?: string | null;
   branch?: { id: string; name: string } | null;
+  /** Branch-currency-equivalent total: SUM(lot.total_amount * lot.exchange_rate_snapshot). */
+  purchaseValueConverted?: number;
+  /** Distinct currency codes from this vendor's lots — used for dual-currency display. */
+  lotCurrencyCodes?: string[];
 }
 
 export async function createVendor(data: Partial<Vendor>) {

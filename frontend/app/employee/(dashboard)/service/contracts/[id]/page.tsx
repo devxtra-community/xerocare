@@ -11,7 +11,8 @@ import {
   ContractBill,
 } from '@/lib/serviceContract';
 import { getCustomerById, Customer } from '@/lib/customer';
-import { recordPayment, getAccountSummary, PaymentSummary } from '@/lib/payment';
+import { getAccountSummary, PaymentSummary } from '@/lib/payment';
+import { recordSalePayment } from '@/lib/saleWorkflow';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import { InvoiceViewDialog } from '@/components/employeeComponents/InvoiceViewDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -179,16 +180,14 @@ export default function ServiceContractDetailPage() {
     }
     setSavingPayment(true);
     try {
-      await recordPayment({
-        invoiceId: contract.invoiceId,
-        amountPaid: amount,
-        paymentMode: payForm.paymentMode,
+      await recordSalePayment(contract.invoiceId, {
+        amount,
+        paymentMode: payForm.paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
         paymentDate: payForm.paymentDate,
         referenceNumber: payForm.referenceNumber || undefined,
         remarks: payForm.remarks || undefined,
       });
-      setPaymentSummary(await getAccountSummary(contract.invoiceId));
-      toast.success('Payment recorded against the contract invoice.');
+      toast.success('Payment submitted for Finance approval.');
       setPayDialogOpen(false);
     } catch (error) {
       console.error(error);

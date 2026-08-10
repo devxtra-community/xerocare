@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Eye, LayoutList } from 'lucide-react';
+import { getUserFromToken } from '@/lib/auth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ export default function EmployeeCustomerTable() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const isManager = typeof window !== 'undefined' && getUserFromToken()?.role === 'MANAGER';
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -279,6 +281,17 @@ export default function EmployeeCustomerTable() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        {isManager && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+                            onClick={() => router.push(`/manager/customers/${customer.id}`)}
+                            title="360° Profile"
+                          >
+                            <LayoutList className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"

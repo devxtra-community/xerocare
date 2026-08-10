@@ -71,6 +71,7 @@ import { useState, useEffect } from 'react';
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
+import { SidebarSearch, type SearchableNavItem } from '@/components/ui/SidebarSearch';
 
 interface MenuLink {
   title: string;
@@ -404,6 +405,27 @@ const adminAccountsMenuItems: MenuLink[] = [
   { title: 'Data Integrity', icon: ShieldAlert, href: '/admin/accounts/data-integrity' },
 ];
 
+const adminSearchItems: SearchableNavItem[] = [
+  ...menuItems.flatMap((item) =>
+    item.subItems
+      ? item.subItems.map((sub) => ({
+          title: sub.title,
+          href: sub.href,
+          icon: sub.icon,
+          group: item.title,
+        }))
+      : item.href
+        ? [{ title: item.title, href: item.href, icon: item.icon }]
+        : [],
+  ),
+  ...adminAccountsMenuItems.map((item) => ({
+    title: item.title,
+    href: item.href,
+    icon: item.icon,
+    group: 'Accounts',
+  })),
+];
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
@@ -454,6 +476,7 @@ export default function AppSidebar() {
             Xerocare
           </span>
         </div>
+        <SidebarSearch items={adminSearchItems} />
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">

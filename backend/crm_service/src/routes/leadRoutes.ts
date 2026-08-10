@@ -25,6 +25,16 @@ router.post('/', requireRole('EMPLOYEE', 'ADMIN'), leadController.createLead);
 router.get('/', requireRole('EMPLOYEE', 'ADMIN'), leadController.getAllLeads);
 
 /**
+ * Look up the lead that was converted into a given customer (Customer 360° profile).
+ * Must be registered BEFORE /:id to prevent Express matching "by-customer" as an ID param.
+ */
+router.get(
+  '/by-customer/:customerId',
+  requireRole('EMPLOYEE', 'MANAGER', 'ADMIN'),
+  leadController.getLeadByCustomerId,
+);
+
+/**
  * Get the specific details of one potential customer.
  */
 router.get('/:id', requireRole('EMPLOYEE', 'ADMIN'), leadController.getLeadById);

@@ -53,5 +53,6 @@ export interface InAppNotificationRequestEvent {
     | 'CHEQUE'
     | 'EXPENSE_REQUEST'
     | 'CREDIT_NOTE'
-    | 'PURCHASE_PAYMENT';
+    | 'PURCHASE_PAYMENT'
+    | 'MACHINE_SWAP';
 }

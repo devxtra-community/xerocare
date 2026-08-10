@@ -25,7 +25,7 @@ export const EMPLOYEE_JOB_ACCESS: Record<EmployeeJob, string[]> = {
   [EmployeeJob.RENT_AND_LEASE]: ['rent', 'lease', 'reading', 'billing'],
   [EmployeeJob.MANAGER]: ['*'], // Access all employee modules
   [EmployeeJob.TECHNICIAN]: ['reading'],
-  [EmployeeJob.SERVICE_HELP_DESK]: ['service', 'customers', 'crm'],
+  [EmployeeJob.SERVICE_HELP_DESK]: ['service', 'service_desk', 'customers', 'crm'],
   [EmployeeJob.SERVICE_TECHNICIAN]: ['service'],
 };
 

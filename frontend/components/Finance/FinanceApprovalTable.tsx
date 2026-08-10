@@ -69,16 +69,14 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
     queryKey: ['invoices', 'finance-approval', saleType],
     queryFn: async () => {
       const data = await getBranchInvoices();
-      let filtered = data.filter(
-        (inv) =>
-          inv.type !== 'QUOTATION' &&
-          (inv.status === 'EMPLOYEE_APPROVED' ||
-            inv.status === 'FINANCE_APPROVED' ||
-            inv.status === 'APPROVED' ||
-            inv.contractStatus === 'PENDING_CONFIRMATION') &&
-          inv.contractStatus !== 'ACTIVE' &&
-          inv.contractStatus !== 'COMPLETED',
-      );
+      let filtered = data.filter((inv) => {
+        if (inv.type === 'QUOTATION') return false;
+        if (inv.contractStatus === 'ACTIVE' || inv.contractStatus === 'COMPLETED') return false;
+
+        // Finance only handles pricing approval — activation, signing, and payment
+        // collection are now done by Employee (RENT/LEASE mirrors the SALE flow).
+        return inv.status === 'EMPLOYEE_APPROVED';
+      });
 
       if (saleType) {
         filtered = filtered.filter((inv) => {

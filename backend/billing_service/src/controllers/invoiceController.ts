@@ -365,17 +365,11 @@ export const activateContract = async (req: Request, res: Response, next: NextFu
       throw new AppError('Invoice not found', 404);
     }
 
-    if (
-      !contractConfirmationUrl &&
-      invoiceCheck.saleType !== 'SALE' &&
-      invoiceCheck.saleType !== 'PRODUCT_SALE' &&
-      invoiceCheck.saleType !== 'SPAREPART_SALE'
-    ) {
-      throw new AppError(
-        'Contract confirmation document URL is required to activate the contract',
-        400,
-      );
-    }
+    // RENT/LEASE: digital contract agreement covers signing — no physical doc URL required.
+    // SALE/PRODUCT_SALE/SPAREPART_SALE: URL was historically required but is now optional since
+    // ContractAgreementModal provides the digital signing trail.
+    // Keep the guard only as a no-op (future: remove entirely).
+    void contractConfirmationUrl;
 
     const invoice = await billingService.activateContract(
       id,

@@ -1006,22 +1006,9 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 color: TEXT_MUTED,
               }}
             >
-              <span>Subtotal (Before VAT)</span>
+              <span>Subtotal</span>
               <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
                 {getActiveCurrency()} {fmt(totals.subTotal)}
-              </span>
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: TEXT_MUTED,
-              }}
-            >
-              <span>{totals.taxName || 'VAT Amount'}</span>
-              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
-                {getActiveCurrency()} {fmt(totals.tax)}
               </span>
             </div>
             <div
@@ -1035,7 +1022,7 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 fontWeight: '800',
               }}
             >
-              <span>GRAND TOTAL (INCLUDING VAT)</span>
+              <span>GRAND TOTAL</span>
               <span>
                 {getActiveCurrency()} {fmt(totals.total)}
               </span>

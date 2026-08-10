@@ -27,6 +27,8 @@ import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
 import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
 import { Cheque } from '../entities/chequeEntity';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
+import { ContractAgreement } from '../entities/contractAgreementEntity';
 
 // Nil UUID used as createdBy when no real user ID is available (cashbook_entries.createdBy UUID NOT NULL).
 const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
@@ -4226,6 +4228,78 @@ export const deleteCountryTaxRule = async (req: Request, res: Response, next: Ne
     if (!rule) return next(new AppError('Country tax rule not found', 404));
     await repo.remove(rule);
     res.json({ success: true, message: 'Country tax rule deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── CUSTOMER 360° PROFILE ───────────────────────────────────────────────────
+
+export const getCustomer360Profile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { customerId } = req.params;
+    const branchFilter = req.branchFilter ?? [];
+
+    const invoiceRepo = Source.getRepository(Invoice);
+    const paymentRepo = Source.getRepository(SalePaymentRequest);
+
+    // Fetch all invoices for this customer, applying branch scope
+    const qb = invoiceRepo
+      .createQueryBuilder('i')
+      .leftJoinAndSelect('i.items', 'items')
+      .leftJoinAndSelect('i.creditNotes', 'cn')
+      .where('i.customerId = :customerId', { customerId });
+    applyBranchQB(qb as never, 'i', branchFilter);
+    qb.orderBy('i.createdAt', 'DESC');
+    const invoices = await qb.getMany();
+
+    const invoiceIds = invoices.map((inv) => inv.id);
+
+    let payments: SalePaymentRequest[] = [];
+    let agreements: ContractAgreement[] = [];
+    if (invoiceIds.length > 0) {
+      [payments, agreements] = await Promise.all([
+        paymentRepo
+          .createQueryBuilder('p')
+          .where('p.invoiceId IN (:...invoiceIds)', { invoiceIds })
+          .orderBy('p.createdAt', 'DESC')
+          .getMany(),
+        Source.getRepository(ContractAgreement)
+          .createQueryBuilder('ca')
+          .select([
+            'ca.id',
+            'ca.invoiceId',
+            'ca.agreementNumber',
+            'ca.signatureStatus',
+            'ca.employeeSignedAt',
+            'ca.customerSignedAt',
+          ])
+          .where('ca.invoiceId IN (:...invoiceIds)', { invoiceIds })
+          .getMany(),
+      ]);
+    }
+
+    const contracts = invoices.filter((i) => i.type !== 'QUOTATION');
+    const totalInvoiced = contracts.reduce((sum, i) => sum + Number(i.totalAmount ?? 0), 0);
+    const totalPaid = payments
+      .filter((p) => p.status === 'APPROVED')
+      .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        invoices,
+        payments,
+        agreements,
+        summary: {
+          totalInvoiced,
+          totalPaid,
+          totalOutstanding: Math.max(0, totalInvoiced - totalPaid),
+          contractCount: contracts.length,
+          paymentCount: payments.length,
+        },
+      },
+    });
   } catch (err) {
     next(err);
   }

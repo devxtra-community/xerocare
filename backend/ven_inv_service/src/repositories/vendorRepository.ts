@@ -44,6 +44,8 @@ export class VendorRepository extends Repository<Vendor> {
           ...vendor,
           totalOrders: stats.totalOrders,
           purchaseValue: stats.purchaseValue,
+          purchaseValueConverted: stats.purchaseValueConverted,
+          lotCurrencyCodes: stats.lotCurrencyCodes,
         };
       }),
     );
@@ -67,6 +69,8 @@ export class VendorRepository extends Repository<Vendor> {
       ...vendor,
       totalOrders: stats.totalOrders,
       purchaseValue: stats.purchaseValue,
+      purchaseValueConverted: stats.purchaseValueConverted,
+      lotCurrencyCodes: stats.lotCurrencyCodes,
     };
   }
 
@@ -87,10 +91,16 @@ export class VendorRepository extends Repository<Vendor> {
 
     const requestCount = await ordersQuery.getCount();
 
-    // Get total purchase value (from lots)
+    // Get total purchase value (from lots), plus branch-currency-converted total
+    // and the set of distinct currency codes for dual-currency display.
     const lotStatsQuery = manager
       .createQueryBuilder('lots', 'l')
       .select('SUM(l.total_amount)', 'total')
+      .addSelect('SUM(l.total_amount * COALESCE(l.exchange_rate_snapshot, 1))', 'total_converted')
+      .addSelect(
+        'ARRAY_AGG(DISTINCT l.currency_code) FILTER (WHERE l.currency_code IS NOT NULL)',
+        'currency_codes',
+      )
       .where('l.vendor_id = :vendorId', { vendorId });
 
     if (branchId) {
@@ -102,6 +112,8 @@ export class VendorRepository extends Repository<Vendor> {
     return {
       totalOrders: requestCount || 0,
       purchaseValue: parseFloat(lotStats?.total) || 0,
+      purchaseValueConverted: parseFloat(lotStats?.total_converted) || 0,
+      lotCurrencyCodes: (lotStats?.currency_codes as string[] | null) ?? [],
     };
   }
 }

@@ -62,6 +62,17 @@ async function runPreMigrations(): Promise<void> {
         ADD COLUMN IF NOT EXISTS updated_by UUID NULL;
     `);
     logger.info('CRM pre-migration: customers audit columns ensured.');
+
+    // ─── customers: B2B/B2C type + address detail + bank fields ──────────
+    await client.query(`
+      ALTER TABLE customers
+        ADD COLUMN IF NOT EXISTS customer_type VARCHAR(3) NOT NULL DEFAULT 'B2C',
+        ADD COLUMN IF NOT EXISTS country VARCHAR(2) NULL,
+        ADD COLUMN IF NOT EXISTS state_province VARCHAR(100) NULL,
+        ADD COLUMN IF NOT EXISTS bank_name VARCHAR(100) NULL,
+        ADD COLUMN IF NOT EXISTS bank_account_number VARCHAR(50) NULL;
+    `);
+    logger.info('CRM pre-migration: customers type/address/bank columns ensured.');
   } catch (err) {
     logger.error('CRM pre-migration failed:', err);
     throw err;

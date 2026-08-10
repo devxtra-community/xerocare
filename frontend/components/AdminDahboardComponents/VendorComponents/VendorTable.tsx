@@ -43,6 +43,8 @@ import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 import { formatCurrency } from '@/lib/format';
 import { getActiveCurrency } from '@/lib/currency';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useExchangeRateMap, convertAmount } from '@/lib/dualCurrency';
 import { getAllBranches, type Branch } from '@/lib/branch';
 import {
   Select,
@@ -114,6 +116,8 @@ type Vendor = {
   bankAccounts?: BankAccount[];
   branchId?: string | null;
   branchName?: string;
+  purchaseValueConverted?: number;
+  lotCurrencyCodes?: string[];
 };
 
 type VendorFormData = {
@@ -390,6 +394,8 @@ export { type Vendor }; // Export so parent can use it
  */
 export default function VendorTable({ basePath = '/admin' }: { basePath?: string }) {
   const router = useRouter();
+  const branchCurrency = useBranchCurrency();
+  const ratesMap = useExchangeRateMap(branchCurrency);
   // Admins see (and manage) vendors across branches; managers are scoped to
   // their own branch by the backend and never pick a branch themselves.
   const isAdmin = basePath === '/admin';
@@ -432,6 +438,8 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         bankAccounts: (v.bankAccounts as BankAccount[]) || [],
         branchId: (v.branchId as string | null) ?? null,
         branchName: (v.branch as { name?: string } | null)?.name || '',
+        purchaseValueConverted: (v.purchaseValueConverted as number) || 0,
+        lotCurrencyCodes: (v.lotCurrencyCodes as string[]) || [],
       }));
 
       setVendors(mappedVendors);
@@ -667,22 +675,69 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
           {
             id: 'purchase',
             header: 'PURCHASE VALUE',
-            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
-            cell: (v: Vendor) => (
-              <span className="font-bold text-primary">
-                {formatCurrency(v.purchaseValue, v.currency)}
-              </span>
-            ),
+            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[140px]',
+            cell: (v: Vendor) => {
+              const codes = v.lotCurrencyCodes ?? [];
+              const isDomestic = codes.length === 0 || codes.every((c) => c === branchCurrency);
+              const singleForeign =
+                codes.length === 1 && codes[0] !== branchCurrency ? codes[0] : null;
+              const isMulti = codes.length > 1;
+              const primaryAmount = isDomestic
+                ? v.purchaseValue
+                : (v.purchaseValueConverted ?? v.purchaseValue);
+              return (
+                <span className="font-bold text-primary">
+                  {formatCurrency(primaryAmount, branchCurrency)}
+                  {!isDomestic && (
+                    <span className="block text-[10px] font-normal text-slate-400">
+                      {isMulti
+                        ? '(multi-currency)'
+                        : `(${formatCurrency(v.purchaseValue, singleForeign!)})`}
+                    </span>
+                  )}
+                </span>
+              );
+            },
           },
           {
             id: 'outstanding',
             header: 'OUTSTANDING',
-            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[120px]',
-            cell: (v: Vendor) => (
-              <span className="font-bold text-red-600">
-                {formatCurrency(v.outstandingAmount, v.currency)}
-              </span>
-            ),
+            className: 'text-right font-semibold text-[11px] text-primary uppercase w-[140px]',
+            cell: (v: Vendor) => {
+              const isDomestic = !v.currency || v.currency === branchCurrency;
+              const codes = v.lotCurrencyCodes ?? [];
+              const isMulti = codes.length > 1;
+              if (isDomestic) {
+                return (
+                  <span className="font-bold text-red-600">
+                    {formatCurrency(v.outstandingAmount, branchCurrency)}
+                  </span>
+                );
+              }
+              const converted = convertAmount(
+                v.outstandingAmount,
+                v.currency,
+                branchCurrency,
+                ratesMap,
+              );
+              if (converted === null) {
+                return (
+                  <span className="font-bold text-red-600">
+                    {formatCurrency(v.outstandingAmount, v.currency)}
+                  </span>
+                );
+              }
+              return (
+                <span className="font-bold text-red-600">
+                  {formatCurrency(converted, branchCurrency)}
+                  <span className="block text-[10px] font-normal text-slate-400">
+                    {isMulti
+                      ? '(multi-currency)'
+                      : `(${formatCurrency(v.outstandingAmount, v.currency)})`}
+                  </span>
+                </span>
+              );
+            },
           },
           {
             id: 'status',

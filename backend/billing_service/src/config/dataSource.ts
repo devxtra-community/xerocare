@@ -46,6 +46,10 @@ import { VatRemittance } from '../entities/vatRemittanceEntity';
 import { ChartOfAccount } from '../entities/chartOfAccountEntity';
 import { IncomeEntry } from '../entities/incomeEntryEntity';
 import { ManualJournalEntry } from '../entities/manualJournalEntryEntity';
+import { ContractAgreement } from '../entities/contractAgreementEntity';
+import { InstallationRequest } from '../entities/installationRequestEntity';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
+import { MachineSwapRequest } from '../entities/machineSwapRequestEntity';
 
 // Overridable so a constrained Postgres plan can be capped without a code change.
 const BILLING_DB_POOL_MAX = Number(process.env.BILLING_DB_POOL_MAX) || 15;
@@ -99,6 +103,10 @@ export const Source = new DataSource({
     ChartOfAccount,
     IncomeEntry,
     ManualJournalEntry,
+    ContractAgreement,
+    InstallationRequest,
+    SalePaymentRequest,
+    MachineSwapRequest,
   ],
   // Reporting endpoints (chart-of-accounts, balance sheet, segmented P&L) fan out
   // 50+ independent queries through Promise.all. A pool of 1 serialized them all and
@@ -1387,6 +1395,172 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS customer_vat_status VARCHAR(30) NULL;
     `);
     logger.info('Invoice customer_vat_status column applied.');
+
+    // ─── Sale Workflow: Contract Agreements ───────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS contract_agreements (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "agreementNumber" VARCHAR UNIQUE NOT NULL,
+        "invoiceId" UUID NOT NULL,
+        "branchId" UUID NOT NULL,
+        "contractDate" DATE NOT NULL,
+        "customerName" VARCHAR NOT NULL,
+        "customerAddress" VARCHAR,
+        "customerPhone" VARCHAR,
+        "customerEmail" VARCHAR,
+        "customerVatNumber" VARCHAR,
+        "createdByEmployeeId" UUID NOT NULL,
+        "createdByEmployeeName" VARCHAR NOT NULL,
+        "dealerName" VARCHAR NOT NULL,
+        "dealerAddress" VARCHAR,
+        "dealerPhone" VARCHAR,
+        "employeeSignatureData" TEXT,
+        "employeeSignedById" UUID,
+        "employeeSignedByName" VARCHAR,
+        "employeeSignedAt" TIMESTAMP,
+        "customerSignatureData" TEXT,
+        "customerSignedMethod" VARCHAR DEFAULT 'IN_PERSON',
+        "customerSignedByName" VARCHAR,
+        "customerSignedAt" TIMESTAMP,
+        "signingToken" VARCHAR UNIQUE,
+        "signingTokenExpiresAt" TIMESTAMP,
+        "signingTokenUsed" BOOLEAN NOT NULL DEFAULT false,
+        "signatureStatus" VARCHAR NOT NULL DEFAULT 'PENDING_SIGNATURES',
+        "termsAndConditions" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_contract_agreements_invoiceId" ON contract_agreements ("invoiceId");
+      CREATE INDEX IF NOT EXISTS "IDX_contract_agreements_branchId" ON contract_agreements ("branchId");
+    `);
+    await client.query(`
+      ALTER TABLE contract_agreements ADD COLUMN IF NOT EXISTS "customerSignedDocumentUrl" VARCHAR;
+      ALTER TABLE contract_agreements ADD COLUMN IF NOT EXISTS "customerSignedDocumentNote" TEXT;
+    `);
+    logger.info('Contract agreements table ensured.');
+
+    // ─── Sale Workflow: Installation Requests ─────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS installation_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "invoiceId" UUID NOT NULL,
+        "branchId" UUID NOT NULL,
+        "assignedByEmployeeId" UUID NOT NULL,
+        "assignedByEmployeeName" VARCHAR NOT NULL,
+        "technicianId" UUID,
+        "technicianName" VARCHAR,
+        "customerName" VARCHAR NOT NULL,
+        "customerAddress" VARCHAR,
+        "invoiceNumber" VARCHAR NOT NULL,
+        notes TEXT,
+        "startTime" TIMESTAMP,
+        "endTime" TIMESTAMP,
+        "durationSeconds" INTEGER,
+        status VARCHAR NOT NULL DEFAULT 'PENDING',
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_installation_requests_invoiceId" ON installation_requests ("invoiceId");
+      CREATE INDEX IF NOT EXISTS "IDX_installation_requests_branchId" ON installation_requests ("branchId");
+    `);
+    logger.info('Installation requests table ensured.');
+
+    // installation_requests: columns added after initial table creation
+    await client.query(`
+      ALTER TABLE installation_requests
+        ADD COLUMN IF NOT EXISTS "saleType" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "initialReadingEnteredAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "initialReadingEnteredByName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "initialReadingPhotoUrl" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "initialReadingTakenDate" DATE NULL;
+    `);
+    logger.info('Installation requests extended columns (saleType, initialReadings) ensured.');
+
+    // ─── Sale Workflow: Sale Payment Requests (Finance approval gate) ──────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sale_payment_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "requestNo" VARCHAR UNIQUE NOT NULL,
+        "invoiceId" UUID NOT NULL,
+        "invoiceNumber" VARCHAR NOT NULL,
+        "branchId" UUID NOT NULL,
+        "recordedByEmployeeId" UUID NOT NULL,
+        "recordedByEmployeeName" VARCHAR NOT NULL,
+        "customerName" VARCHAR NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        currency VARCHAR(3) NOT NULL DEFAULT 'AED',
+        "paymentMode" VARCHAR NOT NULL,
+        "paymentDate" DATE NOT NULL,
+        "referenceNumber" VARCHAR,
+        remarks TEXT,
+        "cashAccountId" UUID,
+        "chequeNumber" VARCHAR,
+        "chequeBankName" VARCHAR,
+        "chequeDueDate" DATE,
+        "chequeDate" DATE,
+        "receiptUrl" VARCHAR,
+        status VARCHAR NOT NULL DEFAULT 'PENDING',
+        "reviewedById" UUID,
+        "reviewedByName" VARCHAR,
+        "reviewedAt" TIMESTAMP,
+        "rejectionReason" TEXT,
+        "paymentTransactionId" UUID,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_sale_payment_requests_invoiceId" ON sale_payment_requests ("invoiceId");
+      CREATE INDEX IF NOT EXISTS "IDX_sale_payment_requests_branchId" ON sale_payment_requests ("branchId");
+      CREATE INDEX IF NOT EXISTS "IDX_sale_payment_requests_status" ON sale_payment_requests (status);
+    `);
+    logger.info('Sale payment requests table ensured.');
+
+    // sale_payment_requests: columns added after initial table creation
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+        ADD COLUMN IF NOT EXISTS "collectLater" BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "paymentContext" VARCHAR NULL;
+    `);
+    logger.info('Sale payment requests extended columns (collectLater, paymentContext) ensured.');
+
+    // machine_swap_requests: serial number swap requests raised by technicians
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'swap_request_status_enum') THEN
+          CREATE TYPE swap_request_status_enum AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+        END IF;
+      END $$;
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS machine_swap_requests (
+        id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        branch_id             UUID NOT NULL,
+        contract_id           UUID NOT NULL,
+        invoice_number        VARCHAR(100) NOT NULL,
+        contract_type         VARCHAR(50) NOT NULL,
+        customer_name         VARCHAR(255),
+        model_id              UUID,
+        model_name            VARCHAR(255),
+        current_product_id    UUID,
+        current_serial_number VARCHAR(255) NOT NULL,
+        requested_product_id  UUID NOT NULL,
+        requested_serial_number VARCHAR(255) NOT NULL,
+        reason                TEXT,
+        requested_by_id       UUID NOT NULL,
+        requested_by_name     VARCHAR(255) NOT NULL,
+        status                swap_request_status_enum NOT NULL DEFAULT 'PENDING',
+        reviewed_by_id        UUID,
+        reviewed_by_name      VARCHAR(255),
+        reviewed_at           TIMESTAMPTZ,
+        rejection_reason      TEXT,
+        swap_executed_at      TIMESTAMPTZ,
+        created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_machine_swap_requests_branchId"   ON machine_swap_requests (branch_id);
+      CREATE INDEX IF NOT EXISTS "IDX_machine_swap_requests_contractId" ON machine_swap_requests (contract_id);
+      CREATE INDEX IF NOT EXISTS "IDX_machine_swap_requests_status"     ON machine_swap_requests (status);
+    `);
+    logger.info('machine_swap_requests table ensured.');
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

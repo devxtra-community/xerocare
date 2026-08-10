@@ -81,6 +81,20 @@ export class LeadService {
   }
 
   /**
+   * Finds the lead that originated a given customer, enforcing branch scope for non-ADMIN.
+   */
+  async getLeadByCustomerId(
+    customerId: string,
+    role: string,
+    jwtBranchId?: string,
+  ): Promise<ILead | null> {
+    const lead = await this.leadRepository.findLeadByCustomerId(customerId);
+    if (!lead) return null;
+    if (role !== 'ADMIN' && lead.branch_id !== jwtBranchId) return null;
+    return lead;
+  }
+
+  /**
    * Converts a lead into a customer entity.
    */
   async convertLeadToCustomer(

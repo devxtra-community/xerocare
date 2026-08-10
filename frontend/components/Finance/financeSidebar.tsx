@@ -33,6 +33,7 @@ import {
   Coins,
   Layers,
   Banknote,
+  DollarSign,
 } from 'lucide-react';
 
 import {
@@ -50,12 +51,163 @@ import {
 import { logout } from '@/lib/auth';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
+import { SidebarSearch, type SearchableNavItem } from '@/components/ui/SidebarSearch';
 
 /**
  * Sidebar navigation component for the Finance dashboard.
  * Includes links to Accounts Receivable, Payable, Collections, and Performance analytics.
  * Displays dynamic badges for pending actions (Rent, Lease, Sale, Orders).
  */
+type FinanceMenuItem = {
+  title: string;
+  icon: LucideIcon;
+  href: string;
+  disabled?: boolean;
+};
+
+type FinanceMenuGroup = {
+  group: string;
+  items: FinanceMenuItem[];
+};
+
+const accountsMenu: FinanceMenuItem[] = [
+  { title: 'Chart of Accounts', icon: BookOpen, href: '/finance/accounts/chart-of-accounts' },
+  { title: 'General Ledger', icon: BookMarked, href: '/finance/accounts/general-ledger' },
+  { title: 'Cash & Bank', icon: Landmark, href: '/finance/accounts/cash-bank' },
+  { title: 'Income Statement', icon: TrendingUp, href: '/finance/accounts/income-statement' },
+  { title: 'Segmented P&L', icon: Layers, href: '/finance/accounts/segmented-pnl' },
+  { title: 'Balance Sheet', icon: Scale, href: '/finance/accounts/balance-sheet' },
+  { title: 'Cash Flow', icon: Waves, href: '/finance/accounts/cash-flow' },
+  { title: 'Day Book', icon: CalendarDays, href: '/finance/accounts/day-book' },
+  { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
+  { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
+  { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
+  { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
+  { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
+  { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
+  { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
+  { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
+  { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
+  { title: 'Payments', icon: DollarSign, href: '/finance/accounts/sale-payments' },
+  {
+    title: 'Exchange Rates',
+    icon: ArrowLeftRight,
+    href: '/finance/accounts/exchange-rates',
+  },
+  {
+    title: 'Opening Balances',
+    icon: FileText,
+    href: '/finance/accounts/opening-balances',
+  },
+  { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
+];
+
+const financeMenu: FinanceMenuGroup[] = [
+  {
+    group: 'Main',
+    items: [
+      {
+        title: 'Dashboard',
+        icon: LayoutDashboard,
+        href: '/finance/dashboard',
+      },
+    ],
+  },
+  {
+    group: 'Operations',
+    items: [
+      {
+        title: 'Rent',
+        icon: Key,
+        href: '/finance/rent',
+      },
+      {
+        title: 'Lease',
+        icon: Home,
+        href: '/finance/lease',
+      },
+      {
+        title: 'Sale',
+        icon: Tag,
+        href: '/finance/sale',
+      },
+      {
+        title: 'Orders',
+        icon: ShoppingCart,
+        href: '/finance/orders',
+      },
+      {
+        title: 'Quotations',
+        icon: FileQuestion,
+        href: '/finance/quotations',
+      },
+      {
+        title: 'Service Estimates',
+        icon: FileQuestion,
+        href: '/finance/service-estimates',
+      },
+      {
+        title: 'Returns',
+        icon: RotateCcw,
+        href: '/finance/returns',
+      },
+    ],
+  },
+  {
+    group: 'Account',
+    items: [
+      {
+        title: 'Notifications',
+        icon: Bell,
+        href: '/finance/notifications',
+      },
+    ],
+  },
+];
+
+/**
+ * Helper to get badge count for a specific title from the counts object
+ * 'Rent' -> counts.RENT
+ * 'Lease' -> counts.LEASE
+ * 'Sale' -> counts.SALE
+ */
+const getBadgeCount = (title: string, counts: Record<string, number>) => {
+  const key = title.toUpperCase();
+  return counts[key] || 0;
+};
+
+const handleLogOut = async () => {
+  try {
+    const res = await logout();
+    if (!res?.data.success) {
+      toast.error(res?.data.message);
+    } else {
+      toast.success(res.data.message);
+      window.location.href = res.data.isadmin ? '/adminlogin' : '/login';
+    }
+  } catch (err) {
+    console.error(err);
+    window.location.href = '/login';
+  }
+};
+
+const financeSearchItems: SearchableNavItem[] = [
+  ...financeMenu.flatMap((section) =>
+    section.items.map((item) => ({
+      title: item.title,
+      href: item.href,
+      icon: item.icon,
+      group: section.group,
+    })),
+  ),
+  ...accountsMenu.map((item) => ({
+    title: item.title,
+    href: item.href,
+    icon: item.icon,
+    group: 'Accounts',
+  })),
+];
+
 export default function FinanceSidebar() {
   const pathname = usePathname();
   const [accountsOpen, setAccountsOpen] = React.useState(pathname.startsWith('/finance/accounts'));
@@ -63,138 +215,6 @@ export default function FinanceSidebar() {
   React.useEffect(() => {
     if (pathname.startsWith('/finance/accounts')) setAccountsOpen(true);
   }, [pathname]);
-
-  type FinanceMenuItem = {
-    title: string;
-    icon: LucideIcon;
-    href: string;
-    disabled?: boolean;
-  };
-
-  type FinanceMenuGroup = {
-    group: string;
-    items: FinanceMenuItem[];
-  };
-
-  const accountsMenu: FinanceMenuItem[] = [
-    { title: 'Chart of Accounts', icon: BookOpen, href: '/finance/accounts/chart-of-accounts' },
-    { title: 'General Ledger', icon: BookMarked, href: '/finance/accounts/general-ledger' },
-    { title: 'Cash & Bank', icon: Landmark, href: '/finance/accounts/cash-bank' },
-    { title: 'Income Statement', icon: TrendingUp, href: '/finance/accounts/income-statement' },
-    { title: 'Segmented P&L', icon: Layers, href: '/finance/accounts/segmented-pnl' },
-    { title: 'Balance Sheet', icon: Scale, href: '/finance/accounts/balance-sheet' },
-    { title: 'Cash Flow', icon: Waves, href: '/finance/accounts/cash-flow' },
-    { title: 'Day Book', icon: CalendarDays, href: '/finance/accounts/day-book' },
-    { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
-    { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
-    { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
-    { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
-    { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
-    { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
-    { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
-    { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
-    { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
-    {
-      title: 'Exchange Rates',
-      icon: ArrowLeftRight,
-      href: '/finance/accounts/exchange-rates',
-    },
-    {
-      title: 'Opening Balances',
-      icon: FileText,
-      href: '/finance/accounts/opening-balances',
-    },
-    { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
-  ];
-
-  const financeMenu: FinanceMenuGroup[] = [
-    {
-      group: 'Main',
-      items: [
-        {
-          title: 'Dashboard',
-          icon: LayoutDashboard,
-          href: '/finance/dashboard',
-        },
-      ],
-    },
-    {
-      group: 'Operations',
-      items: [
-        {
-          title: 'Rent',
-          icon: Key,
-          href: '/finance/rent',
-        },
-        {
-          title: 'Lease',
-          icon: Home,
-          href: '/finance/lease',
-        },
-        {
-          title: 'Sale',
-          icon: Tag,
-          href: '/finance/sale',
-        },
-        {
-          title: 'Orders',
-          icon: ShoppingCart,
-          href: '/finance/orders',
-        },
-        {
-          title: 'Quotations',
-          icon: FileQuestion,
-          href: '/finance/quotations',
-        },
-        {
-          title: 'Service Estimates',
-          icon: FileQuestion,
-          href: '/finance/service-estimates',
-        },
-        {
-          title: 'Returns',
-          icon: RotateCcw,
-          href: '/finance/returns',
-        },
-      ],
-    },
-    {
-      group: 'Account',
-      items: [
-        {
-          title: 'Notifications',
-          icon: Bell,
-          href: '/finance/notifications',
-        },
-      ],
-    },
-  ];
-
-  /**
-   * Helper to get badge count for a specific title from the counts object
-   * 'Rent' -> counts.RENT
-   * 'Lease' -> counts.LEASE
-   * 'Sale' -> counts.SALE
-   */
-  const getBadgeCount = (title: string, counts: Record<string, number>) => {
-    const key = title.toUpperCase();
-    return counts[key] || 0;
-  };
-
-  const handleLogOut = async () => {
-    try {
-      const res = await logout();
-      if (!res?.data.success) {
-        toast.error(res?.data.message);
-      } else {
-        toast.success(res.data.message);
-        window.location.href = res.data.isadmin ? '/adminlogin' : '/login';
-      }
-    } catch (err) {
-      console.error(err);
-      window.location.href = '/login';
-    }
-  };
 
   // State to store pending counts
   const [counts, setCounts] = React.useState<Record<string, number>>({});
@@ -226,6 +246,7 @@ export default function FinanceSidebar() {
             Xerocare
           </span>
         </div>
+        <SidebarSearch items={financeSearchItems} />
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">

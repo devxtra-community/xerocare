@@ -22,7 +22,7 @@ import {
   allocateMachinesInvoice,
   activateContractInvoice,
 } from '@/lib/invoice';
-import { recordPayment } from '@/lib/payment';
+import { recordSalePayment } from '@/lib/saleWorkflow';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 
@@ -210,21 +210,21 @@ export function QuotationConversionFlow({
         });
       }
 
-      // 4. Record advance payment in the ledger
+      // 4. Submit advance payment request for Finance approval
       if (advanceAmount && Number(advanceAmount) > 0) {
-        await recordPayment({
-          invoiceId: quotation.id,
-          amountPaid: Number(advanceAmount),
-          paymentMode,
+        const mode = paymentMode === 'CREDIT_CARD' ? 'BANK_TRANSFER' : paymentMode;
+        await recordSalePayment(quotation.id, {
+          amount: Number(advanceAmount),
+          paymentMode: mode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
           paymentDate,
-          referenceNumber: paymentMode === 'CHEQUE' ? undefined : referenceNumber || undefined,
+          referenceNumber: mode === 'CHEQUE' ? undefined : referenceNumber || undefined,
           remarks:
             remarks ||
             `Advance payment collected at conversion — Invoice ${quotation.invoiceNumber}`,
-          chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
-          chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
-          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
-          chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
+          chequeNumber: mode === 'CHEQUE' ? chequeNumber : undefined,
+          chequeBankName: mode === 'CHEQUE' ? chequeBankName : undefined,
+          chequeDueDate: mode === 'CHEQUE' ? chequeDueDate : undefined,
+          chequeDate: mode === 'CHEQUE' ? chequeDate : undefined,
         });
       }
 

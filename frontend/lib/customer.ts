@@ -81,6 +81,7 @@ export interface Customer {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string | null;
 }
 
 export interface CustomerResponse {
