@@ -22,6 +22,7 @@ import {
   Copy,
   Scan,
   Send,
+  Wallet,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -1060,6 +1061,21 @@ export default function EmployeeQuotationTable() {
                             Locked
                           </span>
                         )}
+                        {q.type === 'PROFORMA' &&
+                          ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(q.saleType || '') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                              onClick={() => {
+                                setSelectedQ(q);
+                                setAccountViewOpen(true);
+                              }}
+                              title="Record Advance Payment (sent to Finance for approval)"
+                            >
+                              <Wallet className="h-4 w-4" />
+                            </Button>
+                          )}
                       </div>
                     </TableCell>
                     <TableCell>

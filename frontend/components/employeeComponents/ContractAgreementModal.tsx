@@ -222,26 +222,31 @@ export function ContractAgreementModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border-0 shadow-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border border-slate-200 shadow-2xl max-h-[90vh] flex flex-col">
         <DialogTitle className="sr-only">Contract Agreement — {invoice.invoiceNumber}</DialogTitle>
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 p-5 text-white shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-              <FileSignature size={20} />
+        {/* ── Neutral toolbar — visually separate from the paper document ── */}
+        <div className="bg-white border-b border-slate-200 px-5 pt-4 pb-0 shrink-0 print:hidden">
+          {/* Title row */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                <FileSignature size={14} className="text-slate-500" />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none mb-0.5">
+                  Contract Agreement
+                </p>
+                <p className="text-sm font-black text-slate-800 leading-none">
+                  {invoice.invoiceNumber}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
-                Contract Agreement
-              </p>
-              <p className="text-lg font-black tracking-tight">{invoice.invoiceNumber}</p>
-            </div>
-            {agreement && <div className="ml-auto">{statusBadge(agreement.signatureStatus)}</div>}
+            {agreement && <div className="shrink-0">{statusBadge(agreement.signatureStatus)}</div>}
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-1 mt-4">
+          {/* Tab strip */}
+          <div className="flex gap-0 -mb-px">
             {[
               { key: 'view' as SignTab, label: 'Document', icon: FileSignature },
               { key: 'employee-sign' as SignTab, label: 'Employee Sign', icon: PenLine },
@@ -251,10 +256,10 @@ export function ContractAgreementModal({
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all ${
                   tab === key
-                    ? 'bg-white text-indigo-600'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'border-slate-800 text-slate-800'
+                    : 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-300'
                 }`}
               >
                 <Icon size={10} />
@@ -264,10 +269,10 @@ export function ContractAgreementModal({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 bg-white print:overflow-visible print:max-h-none">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-indigo-500" />
+              <Loader2 size={24} className="animate-spin text-slate-400" />
             </div>
           ) : agreement ? (
             <>
@@ -325,7 +330,7 @@ export function ContractAgreementModal({
                         <Button
                           onClick={handleSignEmployee}
                           disabled={isSaving}
-                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl"
+                          className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl"
                         >
                           {isSaving ? (
                             <Loader2 size={14} className="animate-spin" />
@@ -369,7 +374,7 @@ export function ContractAgreementModal({
                           href={agreement.customerSignedDocumentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-indigo-600 hover:underline"
+                          className="inline-flex items-center gap-1 mt-2 text-xs font-bold text-slate-700 hover:underline"
                         >
                           <ExternalLink size={11} /> View Document
                         </a>
@@ -389,7 +394,7 @@ export function ContractAgreementModal({
                           onClick={() => setCustomerSignMethod('CAPTURE')}
                           className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${
                             customerSignMethod === 'CAPTURE'
-                              ? 'bg-indigo-600 text-white'
+                              ? 'bg-slate-800 text-white'
                               : 'bg-white text-slate-400 hover:bg-slate-50'
                           }`}
                         >
@@ -400,7 +405,7 @@ export function ContractAgreementModal({
                           onClick={() => setCustomerSignMethod('UPLOAD')}
                           className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${
                             customerSignMethod === 'UPLOAD'
-                              ? 'bg-indigo-600 text-white'
+                              ? 'bg-slate-800 text-white'
                               : 'bg-white text-slate-400 hover:bg-slate-50'
                           }`}
                         >
@@ -423,7 +428,7 @@ export function ContractAgreementModal({
                             <Button
                               onClick={handleSignCustomer}
                               disabled={isSaving}
-                              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl"
+                              className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl"
                             >
                               {isSaving ? (
                                 <Loader2 size={14} className="animate-spin" />
@@ -451,11 +456,11 @@ export function ContractAgreementModal({
                             </Label>
                             <div
                               onClick={() => fileInputRef.current?.click()}
-                              className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-all"
+                              className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-all"
                             >
                               {uploadFile ? (
                                 <div className="flex items-center justify-center gap-2">
-                                  <FileText size={16} className="text-indigo-500" />
+                                  <FileText size={16} className="text-slate-500" />
                                   <span className="text-xs font-bold text-slate-700 truncate max-w-[200px]">
                                     {uploadFile.name}
                                   </span>
@@ -512,7 +517,7 @@ export function ContractAgreementModal({
                           <Button
                             onClick={handleUploadSignedDoc}
                             disabled={isSaving || !uploadFile || !attestationNote.trim()}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl disabled:opacity-50"
+                            className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl disabled:opacity-50"
                           >
                             {isSaving ? (
                               <Loader2 size={14} className="animate-spin" />
@@ -533,11 +538,11 @@ export function ContractAgreementModal({
               {/* ── Remote Sign Tab ────────────────────────────── */}
               {tab === 'remote-sign' && (
                 <div className="space-y-4">
-                  <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                    <p className="text-xs font-black text-indigo-700 mb-1">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <p className="text-xs font-black text-slate-700 mb-1">
                       Remote Customer Signing
                     </p>
-                    <p className="text-[11px] text-indigo-600 leading-relaxed">
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
                       Generate a secure 72-hour signing link to send to the customer via
                       WhatsApp/Email. The link allows them to review and sign the contract on their
                       own device without needing an account.
@@ -557,7 +562,7 @@ export function ContractAgreementModal({
                         <Button
                           onClick={handleGenerateRemoteLink}
                           disabled={isGeneratingLink}
-                          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl"
+                          className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest h-10 rounded-xl"
                         >
                           {isGeneratingLink ? (
                             <Loader2 size={14} className="animate-spin" />
@@ -570,7 +575,7 @@ export function ContractAgreementModal({
                         </Button>
                       ) : (
                         <div className="space-y-3">
-                          <div className="p-3 bg-white rounded-xl border border-indigo-100 flex items-center gap-2">
+                          <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-2">
                             <div className="flex-1 text-xs font-bold text-slate-700 break-all">
                               {remoteLink}
                             </div>
@@ -578,7 +583,7 @@ export function ContractAgreementModal({
                               variant="ghost"
                               size="sm"
                               onClick={copyLink}
-                              className="shrink-0 h-8 w-8 p-0 text-indigo-500"
+                              className="shrink-0 h-8 w-8 p-0 text-slate-500"
                             >
                               <Copy size={14} />
                             </Button>
@@ -598,7 +603,7 @@ export function ContractAgreementModal({
                             </Button>
                             <Button
                               size="sm"
-                              className="text-[10px] font-black uppercase tracking-widest h-9 bg-indigo-600 text-white hover:bg-indigo-700"
+                              className="text-[10px] font-black uppercase tracking-widest h-9 bg-slate-800 text-white hover:bg-slate-900"
                               onClick={() => {
                                 const wa = `https://wa.me/?text=${encodeURIComponent(
                                   `Please sign your contract agreement: ${remoteLink}`,
@@ -620,7 +625,7 @@ export function ContractAgreementModal({
           ) : null}
         </div>
 
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 print:hidden">
           <Button
             variant="ghost"
             onClick={onClose}

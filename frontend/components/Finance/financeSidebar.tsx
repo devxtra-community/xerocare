@@ -33,7 +33,6 @@ import {
   Coins,
   Layers,
   Banknote,
-  DollarSign,
 } from 'lucide-react';
 
 import {
@@ -88,7 +87,6 @@ const accountsMenu: FinanceMenuItem[] = [
   { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
   { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
   { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
-  { title: 'Payments', icon: DollarSign, href: '/finance/accounts/sale-payments' },
   {
     title: 'Exchange Rates',
     icon: ArrowLeftRight,
@@ -236,7 +234,7 @@ export default function FinanceSidebar() {
   }, [pathname]); // Refresh counts on navigation too, ensuring updates after approvals
 
   return (
-    <Sidebar collapsible="icon" className="border-none !border-r-0">
+    <Sidebar collapsible="icon" className="border-none border-r-0!">
       <SidebarHeader className="bg-sidebar border-b border-white/10">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-card/10">

@@ -2016,6 +2016,7 @@ export class BillingService {
         invoice.contractStatus = ContractStatus.ACTIVE; // Set to Active for consistency
       } else {
         invoice.contractStatus = ContractStatus.ACTIVE;
+        invoice.status = InvoiceStatus.ACTIVE_CONTRACT;
         this.setEffectiveDates(invoice);
       }
 

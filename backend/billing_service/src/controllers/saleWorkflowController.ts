@@ -778,10 +778,25 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
         paymentTransactionId: savedTxn.id,
       });
 
-      // 3. Update invoice ledger — with overpayment guard
-      const ledger = await queryRunner.manager.findOne(InvoiceLedger, {
+      // 3. Update invoice ledger — with overpayment guard.
+      // For Rent/Lease contracts, the ledger may not exist yet if the contract was activated
+      // before the ACTIVE_CONTRACT status fix; create it on first approved payment in that case.
+      let ledger = await queryRunner.manager.findOne(InvoiceLedger, {
         where: { invoiceId: request.invoiceId },
       });
+      if (!ledger) {
+        const inv = await queryRunner.manager.findOne(Invoice, {
+          where: { id: request.invoiceId },
+        });
+        if (inv) {
+          ledger = queryRunner.manager.create(InvoiceLedger, {
+            invoiceId: request.invoiceId,
+            totalAmount: Number(inv.totalAmount),
+            paidAmount: 0,
+            balanceAmount: Number(inv.totalAmount),
+          });
+        }
+      }
       if (ledger) {
         const newPaidAmount = Number(ledger.paidAmount) + Number(request.amount);
         const totalAmount = Number(ledger.totalAmount);

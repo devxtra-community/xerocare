@@ -1561,6 +1561,19 @@ async function runPreMigrations() {
       CREATE INDEX IF NOT EXISTS "IDX_machine_swap_requests_status"     ON machine_swap_requests (status);
     `);
     logger.info('machine_swap_requests table ensured.');
+
+    // Fix: Rent/Lease contracts stuck at FINANCE_APPROVED after activation.
+    // activateContract() previously omitted setting status = ACTIVE_CONTRACT for the RENT/LEASE
+    // branch, leaving them invisible to the AR query, cron job, and recordPayment() gate.
+    await client.query(`
+      UPDATE invoices
+      SET status = 'ACTIVE_CONTRACT'
+      WHERE type = 'PROFORMA'
+        AND "contractStatus" = 'ACTIVE'
+        AND status = 'FINANCE_APPROVED'
+        AND "saleType" IN ('RENT', 'LEASE');
+    `);
+    logger.info('Backfill: stuck RENT/LEASE contracts set to ACTIVE_CONTRACT.');
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

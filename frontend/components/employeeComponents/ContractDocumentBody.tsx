@@ -3,16 +3,7 @@
 import React from 'react';
 import { Invoice } from '@/lib/invoice';
 import { ContractAgreement } from '@/lib/saleWorkflow';
-import {
-  Building2,
-  User,
-  Package,
-  FileText,
-  ShieldCheck,
-  CheckCircle2,
-  ExternalLink,
-  Banknote,
-} from 'lucide-react';
+import { ExternalLink, FileText } from 'lucide-react';
 
 interface Props {
   invoice: Invoice;
@@ -20,32 +11,20 @@ interface Props {
   currency: string;
 }
 
-// ─── Tiny shared layout pieces ────────────────────────────────────────────────
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
-function SectionHead({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
-      {children}
-    </p>
-  );
+function fmtDate(d?: string | null) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-        {label}
-      </p>
-      <p className="text-sm font-bold text-slate-700">{value || '—'}</p>
-    </div>
-  );
+function fmtAmt(n?: number | null, cur = 'QAR') {
+  return `${cur} ${Number(n ?? 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
-function Divider() {
-  return <hr className="border-slate-100" />;
-}
-
-// ─── Plan type → human label ──────────────────────────────────────────────────
 
 function planLabel(rentType?: string) {
   const map: Record<string, string> = {
@@ -79,20 +58,90 @@ function paymentModeLabel(mode?: string) {
   return mode ? map[mode] || mode : '—';
 }
 
-function fmtDate(d?: string | null) {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+// ─── Layout primitives ────────────────────────────────────────────────────────
+
+function DocRule() {
+  return <hr className="border-0 border-t border-slate-300 my-0 print:border-slate-400" />;
 }
 
-function fmtAmt(n?: number | null, cur = 'QAR') {
-  return `${cur} ${Number(n ?? 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-600 mb-3 print:text-slate-800">
+      {children}
+    </p>
+  );
 }
 
-// ─── Shared: Parties ──────────────────────────────────────────────────────────
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5 print:text-slate-500">
+      {children}
+    </p>
+  );
+}
+
+// ─── Document Header ──────────────────────────────────────────────────────────
+
+const AGREEMENT_TITLE: Record<string, { title: string; subtitle: string }> = {
+  SALE: {
+    title: 'Sale Agreement',
+    subtitle: 'This document confirms the sale transaction between the parties named below.',
+  },
+  RENT: {
+    title: 'Rental Agreement',
+    subtitle:
+      'This document sets out the terms for rental of equipment between the parties named below.',
+  },
+  LEASE: {
+    title: 'Lease Agreement',
+    subtitle:
+      'This document sets out the terms for equipment lease between the parties named below.',
+  },
+};
+
+function DocumentHeader({
+  agreement,
+  saleType,
+}: {
+  agreement: ContractAgreement;
+  saleType: string;
+}) {
+  const meta = AGREEMENT_TITLE[saleType] || AGREEMENT_TITLE.SALE;
+  return (
+    <div>
+      {/* Letterhead row */}
+      <div className="flex items-start justify-between mb-5">
+        {/* Left: company mark */}
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-0.5">
+            Xerocare Trading &amp; Services W.L.L
+          </p>
+          <p className="text-[10px] text-slate-400 leading-relaxed max-w-65">
+            {agreement.dealerAddress || ''}
+            {agreement.dealerPhone ? ` · ${agreement.dealerPhone}` : ''}
+          </p>
+        </div>
+        {/* Right: document type */}
+        <div className="text-right">
+          <p className="text-2xl font-black tracking-tight text-slate-800 uppercase leading-none">
+            {meta.title}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            Ref: <span className="font-bold text-slate-600">{agreement.agreementNumber}</span>
+          </p>
+          <p className="text-[10px] text-slate-400">
+            Date:{' '}
+            <span className="font-bold text-slate-600">{fmtDate(agreement.contractDate)}</span>
+          </p>
+        </div>
+      </div>
+      <DocRule />
+      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">{meta.subtitle}</p>
+    </div>
+  );
+}
+
+// ─── Parties ──────────────────────────────────────────────────────────────────
 
 function PartiesSection({
   invoice,
@@ -102,109 +151,547 @@ function PartiesSection({
   agreement: ContractAgreement;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
-          <Building2 size={9} /> Seller / Dealer
-        </p>
-        <p className="text-sm font-black text-slate-800">{agreement.dealerName}</p>
-        {agreement.dealerAddress && (
-          <p className="text-[11px] text-slate-500 mt-0.5">{agreement.dealerAddress}</p>
-        )}
-        {agreement.dealerPhone && (
-          <p className="text-[11px] text-slate-500">{agreement.dealerPhone}</p>
-        )}
-        {invoice.taxRegistrationNumber && (
-          <p className="text-[10px] text-slate-400 mt-1">
-            VAT Reg: {invoice.taxRegistrationNumber}
-          </p>
-        )}
-        {invoice.employeeName && (
-          <p className="text-[10px] text-slate-500 mt-1.5 font-bold">
-            Sales Rep: {invoice.employeeName}
-          </p>
-        )}
-      </div>
-      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1">
-          <User size={9} /> Buyer / Customer
-        </p>
-        <p className="text-sm font-black text-slate-800">{agreement.customerName}</p>
-        {agreement.customerAddress && (
-          <p className="text-[11px] text-slate-500 mt-0.5">{agreement.customerAddress}</p>
-        )}
-        {agreement.customerPhone && (
-          <p className="text-[11px] text-slate-500">{agreement.customerPhone}</p>
-        )}
-        {agreement.customerEmail && (
-          <p className="text-[11px] text-slate-500">{agreement.customerEmail}</p>
-        )}
-        {agreement.customerVatNumber && (
-          <p className="text-[10px] text-slate-400 mt-1">VAT: {agreement.customerVatNumber}</p>
-        )}
+    <div>
+      <SectionHeading>Parties to this Agreement</SectionHeading>
+      <div className="grid grid-cols-2 gap-0 border border-slate-200">
+        {/* Seller */}
+        <div className="p-3 border-r border-slate-200">
+          <FieldLabel>Seller / Dealer</FieldLabel>
+          <p className="text-sm font-black text-slate-800 mb-1">{agreement.dealerName}</p>
+          {agreement.dealerAddress && (
+            <p className="text-[11px] text-slate-500 leading-snug">{agreement.dealerAddress}</p>
+          )}
+          {agreement.dealerPhone && (
+            <p className="text-[11px] text-slate-500">{agreement.dealerPhone}</p>
+          )}
+          {invoice.taxRegistrationNumber && (
+            <p className="text-[10px] text-slate-400 mt-1.5">
+              VAT Reg. No.: {invoice.taxRegistrationNumber}
+            </p>
+          )}
+          {invoice.employeeName && (
+            <p className="text-[10px] text-slate-400 mt-1">Sales Rep: {invoice.employeeName}</p>
+          )}
+        </div>
+        {/* Buyer */}
+        <div className="p-3">
+          <FieldLabel>Buyer / Customer</FieldLabel>
+          <p className="text-sm font-black text-slate-800 mb-1">{agreement.customerName}</p>
+          {agreement.customerAddress && (
+            <p className="text-[11px] text-slate-500 leading-snug">{agreement.customerAddress}</p>
+          )}
+          {agreement.customerPhone && (
+            <p className="text-[11px] text-slate-500">{agreement.customerPhone}</p>
+          )}
+          {agreement.customerEmail && (
+            <p className="text-[11px] text-slate-500">{agreement.customerEmail}</p>
+          )}
+          {agreement.customerVatNumber && (
+            <p className="text-[10px] text-slate-400 mt-1.5">
+              VAT Reg. No.: {agreement.customerVatNumber}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Shared: Product details ──────────────────────────────────────────────────
+// ─── Product / Equipment ──────────────────────────────────────────────────────
 
 function ProductSection({ invoice }: { invoice: Invoice }) {
   const productItems = (invoice.items || []).filter(
     (i) => i.itemType === 'PRODUCT' || !!i.productId,
   );
   const allocations = (invoice.productAllocations || []).filter((a) => a.status === 'ALLOCATED');
-
   if (productItems.length === 0 && allocations.length === 0) return null;
 
   return (
     <div>
-      <SectionHead>
-        <span className="flex items-center gap-1">
-          <Package size={9} />
-          Equipment / Product Details
-        </span>
-      </SectionHead>
-      <div className="border border-slate-100 rounded-xl overflow-hidden">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="text-left p-2.5 font-black text-slate-500 text-[10px]">Description</th>
-              <th className="text-left p-2.5 font-black text-slate-500 text-[10px]">Serial No.</th>
-              <th className="text-left p-2.5 font-black text-slate-500 text-[10px]">Warranty</th>
-            </tr>
-          </thead>
-          <tbody>
-            {productItems.length > 0
-              ? productItems.map((item, idx) => {
-                  // Find matching allocation for serial number if not on item
-                  const alloc = allocations[idx];
-                  const serial = item.serialNumber || item.sn || alloc?.serialNumber || '—';
-                  return (
-                    <tr key={idx} className="border-t border-slate-50">
-                      <td className="p-2.5 font-bold text-slate-700">{item.description}</td>
-                      <td className="p-2.5 font-mono text-[11px] text-slate-600">{serial}</td>
-                      <td className="p-2.5 text-[11px] text-slate-500">{item.warranty || '—'}</td>
-                    </tr>
-                  );
-                })
-              : allocations.map((alloc, idx) => (
-                  <tr key={idx} className="border-t border-slate-50">
-                    <td className="p-2.5 font-bold text-slate-700">Allocated Machine</td>
-                    <td className="p-2.5 font-mono text-[11px] text-slate-600">
-                      {alloc.serialNumber}
-                    </td>
-                    <td className="p-2.5 text-[11px] text-slate-500">—</td>
+      <SectionHeading>Equipment / Product Details</SectionHeading>
+      <table className="w-full text-xs border border-slate-200 border-collapse">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50">
+            <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+              Description
+            </th>
+            <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+              Serial No.
+            </th>
+            <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+              Warranty
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {productItems.length > 0
+            ? productItems.map((item, idx) => {
+                const alloc = allocations[idx];
+                const serial = item.serialNumber || item.sn || alloc?.serialNumber || '—';
+                return (
+                  <tr key={idx} className="border-t border-slate-100">
+                    <td className="px-3 py-2 font-semibold text-slate-700">{item.description}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{serial}</td>
+                    <td className="px-3 py-2 text-[11px] text-slate-500">{item.warranty || '—'}</td>
                   </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
+                );
+              })
+            : allocations.map((alloc, idx) => (
+                <tr key={idx} className="border-t border-slate-100">
+                  <td className="px-3 py-2 font-semibold text-slate-700">Allocated Machine</td>
+                  <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
+                    {alloc.serialNumber}
+                  </td>
+                  <td className="px-3 py-2 text-[11px] text-slate-500">—</td>
+                </tr>
+              ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-// ─── Shared: Warranty ─────────────────────────────────────────────────────────
+// ─── SALE terms ───────────────────────────────────────────────────────────────
+
+function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
+  const subtotal = Number(invoice.totalAmount ?? 0) - Number(invoice.taxAmount ?? 0);
+  const tax = Number(invoice.taxAmount ?? 0);
+  const total = Number(invoice.totalAmount ?? 0);
+  const advance = Number(invoice.advanceAmount ?? 0);
+  const balanceDue = Math.max(0, total - advance);
+
+  return (
+    <div>
+      <SectionHeading>Sale Summary</SectionHeading>
+      <table className="w-full text-xs border border-slate-200 border-collapse">
+        <tbody>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 text-slate-600 font-semibold">Subtotal</td>
+            <td className="px-3 py-2 text-right font-semibold text-slate-800">
+              {fmtAmt(subtotal, currency)}
+            </td>
+          </tr>
+          {tax > 0 && (
+            <tr className="border-b border-slate-100">
+              <td className="px-3 py-2 text-slate-500 font-semibold">
+                {invoice.taxName || 'VAT'}
+                {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
+              </td>
+              <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                {fmtAmt(tax, currency)}
+              </td>
+            </tr>
+          )}
+          {invoice.customerVatStatus === 'EXEMPT' && (
+            <tr className="border-b border-slate-100">
+              <td className="px-3 py-2 text-slate-500 font-semibold">VAT</td>
+              <td className="px-3 py-2 text-right font-semibold text-slate-700">VAT Exempt</td>
+            </tr>
+          )}
+          <tr className="border-b border-slate-200 bg-slate-50">
+            <td className="px-3 py-2 font-black text-slate-800">Total Amount</td>
+            <td className="px-3 py-2 text-right font-black text-slate-800">
+              {fmtAmt(total, currency)}
+            </td>
+          </tr>
+          {advance > 0 && (
+            <>
+              <tr className="border-b border-slate-100">
+                <td className="px-3 py-2 text-slate-500 font-semibold">Advance Paid</td>
+                <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                  − {fmtAmt(advance, currency)}
+                </td>
+              </tr>
+              <tr className="bg-slate-50">
+                <td className="px-3 py-2 font-black text-slate-800">Balance Due</td>
+                <td className="px-3 py-2 text-right font-black text-slate-800">
+                  {fmtAmt(balanceDue, currency)}
+                </td>
+              </tr>
+            </>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── RENT terms ───────────────────────────────────────────────────────────────
+
+function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
+  const bwItem = (invoice.items || []).find(
+    (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0,
+  );
+  const colorItem = (invoice.items || []).find(
+    (i) => (i.colorIncludedLimit ?? 0) > 0 || (i.colorExcessRate ?? 0) > 0,
+  );
+  const comboItem = (invoice.items || []).find(
+    (i) => (i.combinedIncludedLimit ?? 0) > 0 || (i.combinedExcessRate ?? 0) > 0,
+  );
+
+  return (
+    <div>
+      <SectionHeading>Rental Terms</SectionHeading>
+      <table className="w-full text-xs border border-slate-200 border-collapse">
+        <tbody>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Contract Start
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800">
+              {fmtDate(invoice.effectiveFrom)}
+            </td>
+          </tr>
+          {invoice.effectiveTo && (
+            <tr className="border-b border-slate-100">
+              <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                Contract End
+              </td>
+              <td className="px-3 py-2 font-semibold text-slate-800">
+                {fmtDate(invoice.effectiveTo)}
+              </td>
+            </tr>
+          )}
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Billing Cycle
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800">
+              {billingCycleLabel(invoice.rentPeriod)}
+            </td>
+          </tr>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Plan Type
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800">
+              {planLabel(invoice.rentType)}
+            </td>
+          </tr>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Monthly Rate
+            </td>
+            <td className="px-3 py-2 font-black text-slate-800">
+              {fmtAmt(invoice.monthlyRent, currency)}
+            </td>
+          </tr>
+
+          {/* B&W usage */}
+          {bwItem && (
+            <>
+              {(bwItem.bwIncludedLimit ?? 0) > 0 && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    B&W Free Limit (A4)
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {Number(bwItem.bwIncludedLimit).toLocaleString()} copies / billing period
+                  </td>
+                </tr>
+              )}
+              {(bwItem.bwExcessRate ?? 0) > 0 && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    B&W Excess Rate (A4)
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {currency} {Number(bwItem.bwExcessRate).toFixed(4)} per copy
+                  </td>
+                </tr>
+              )}
+            </>
+          )}
+
+          {/* Color usage */}
+          {colorItem && (
+            <>
+              {(colorItem.colorIncludedLimit ?? 0) > 0 && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Color Free Limit
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {Number(colorItem.colorIncludedLimit).toLocaleString()} copies / billing period
+                  </td>
+                </tr>
+              )}
+              {(colorItem.colorExcessRate ?? 0) > 0 && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Color Excess Rate
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {currency} {Number(colorItem.colorExcessRate).toFixed(4)} per copy
+                  </td>
+                </tr>
+              )}
+            </>
+          )}
+
+          {/* Combo usage */}
+          {comboItem && (
+            <>
+              {(comboItem.combinedIncludedLimit ?? 0) > 0 && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Combined Free Limit
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {Number(comboItem.combinedIncludedLimit).toLocaleString()} copies / billing
+                    period
+                  </td>
+                </tr>
+              )}
+              {(comboItem.combinedExcessRate ?? 0) > 0 && (
+                <tr>
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Combined Excess Rate
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {currency} {Number(comboItem.combinedExcessRate).toFixed(4)} per copy
+                  </td>
+                </tr>
+              )}
+            </>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── LEASE terms ──────────────────────────────────────────────────────────────
+
+function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
+  const isEMI = invoice.leaseType === 'EMI';
+  const bwItem = !isEMI
+    ? (invoice.items || []).find((i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0)
+    : undefined;
+  const colorItem = !isEMI
+    ? (invoice.items || []).find(
+        (i) => (i.colorIncludedLimit ?? 0) > 0 || (i.colorExcessRate ?? 0) > 0,
+      )
+    : undefined;
+
+  return (
+    <div>
+      <SectionHeading>Lease Terms</SectionHeading>
+      <table className="w-full text-xs border border-slate-200 border-collapse">
+        <tbody>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Lease Type
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800">
+              {isEMI ? 'EMI — Equal Monthly Installments' : 'FSM — Full-Service Management'}
+            </td>
+          </tr>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Tenure
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800">
+              {invoice.leaseTenureMonths ?? '—'} months
+            </td>
+          </tr>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Contract Start
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800">
+              {fmtDate(invoice.effectiveFrom)}
+            </td>
+          </tr>
+
+          {isEMI ? (
+            <>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Monthly EMI
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(invoice.monthlyEmiAmount ?? invoice.monthlyLeaseAmount, currency)}
+                </td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Total Lease Value
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(invoice.totalLeaseAmount ?? invoice.totalAmount, currency)}
+                </td>
+              </tr>
+            </>
+          ) : (
+            <>
+              <tr className="border-b border-slate-100">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Service Plan
+                </td>
+                <td className="px-3 py-2 font-semibold text-slate-800">
+                  {planLabel(invoice.rentType)}
+                </td>
+              </tr>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Monthly Service Amount
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(invoice.monthlyLeaseAmount ?? invoice.monthlyRent, currency)}
+                </td>
+              </tr>
+              {bwItem && (
+                <>
+                  {(bwItem.bwIncludedLimit ?? 0) > 0 && (
+                    <tr className="border-b border-slate-100">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        B&W Free Limit (A4)
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-slate-700">
+                        {Number(bwItem.bwIncludedLimit).toLocaleString()} copies / month
+                      </td>
+                    </tr>
+                  )}
+                  {(bwItem.bwExcessRate ?? 0) > 0 && (
+                    <tr className="border-b border-slate-100">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        B&W Excess Rate
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-slate-700">
+                        {currency} {Number(bwItem.bwExcessRate).toFixed(4)} / copy
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
+              {colorItem && (
+                <>
+                  {(colorItem.colorIncludedLimit ?? 0) > 0 && (
+                    <tr className="border-b border-slate-100">
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        Color Free Limit
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-slate-700">
+                        {Number(colorItem.colorIncludedLimit).toLocaleString()} copies / month
+                      </td>
+                    </tr>
+                  )}
+                  {(colorItem.colorExcessRate ?? 0) > 0 && (
+                    <tr>
+                      <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        Color Excess Rate
+                      </td>
+                      <td className="px-3 py-2 font-semibold text-slate-700">
+                        {currency} {Number(colorItem.colorExcessRate).toFixed(4)} / copy
+                      </td>
+                    </tr>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Advance / Deposit ────────────────────────────────────────────────────────
+
+function AdvanceSection({
+  invoice,
+  saleType,
+  currency,
+}: {
+  invoice: Invoice;
+  saleType: string;
+  currency: string;
+}) {
+  const advance = Number(invoice.advanceAmount ?? 0);
+  const secDeposit = Number(invoice.securityDepositAmount ?? 0);
+  const hasAdvance = advance > 0;
+  const hasDeposit = secDeposit > 0;
+  if (!hasAdvance && !hasDeposit) return null;
+
+  const advanceLabel = saleType === 'LEASE' ? 'Down Payment' : 'Advance Payment';
+
+  const advanceNote =
+    saleType === 'RENT'
+      ? 'Advance payment will be adjusted against the first billing period.'
+      : saleType === 'LEASE'
+        ? 'Down payment is deducted from the total lease value.'
+        : 'Advance reduces the final balance due.';
+
+  const depositNote =
+    'Security deposit is held for the duration of the rental and refunded upon equipment return after final settlement.';
+
+  return (
+    <div>
+      <SectionHeading>
+        {saleType === 'LEASE' ? 'Down Payment / Advance' : 'Advance & Deposit'}
+      </SectionHeading>
+      <table className="w-full text-xs border border-slate-200 border-collapse">
+        <tbody>
+          {hasAdvance && (
+            <>
+              <tr className="border-b border-slate-100">
+                <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  {advanceLabel}
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">{fmtAmt(advance, currency)}</td>
+              </tr>
+              {invoice.preferredPaymentMode && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Payment Mode
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {paymentModeLabel(invoice.preferredPaymentMode)}
+                  </td>
+                </tr>
+              )}
+              <tr className={hasDeposit ? 'border-b border-slate-200' : ''}>
+                <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
+                  {advanceNote}
+                </td>
+              </tr>
+            </>
+          )}
+          {hasDeposit && (
+            <>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Security Deposit
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(secDeposit, currency)}
+                </td>
+              </tr>
+              {invoice.securityDepositMode && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Deposit Mode
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {paymentModeLabel(invoice.securityDepositMode)}
+                  </td>
+                </tr>
+              )}
+              <tr>
+                <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
+                  {depositNote}
+                </td>
+              </tr>
+            </>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Warranty ─────────────────────────────────────────────────────────────────
 
 function WarrantySection({ invoice }: { invoice: Invoice }) {
   const wType = invoice.warrantyType;
@@ -222,20 +709,14 @@ function WarrantySection({ invoice }: { invoice: Invoice }) {
 
   return (
     <div>
-      <SectionHead>
-        <span className="flex items-center gap-1">
-          <ShieldCheck size={9} />
-          Warranty
-        </span>
-      </SectionHead>
-      <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 space-y-1">
+      <SectionHeading>Warranty</SectionHeading>
+      <div className="border border-slate-200 px-3 py-2.5 text-xs space-y-1">
         {lines.map((line, i) => (
-          <p key={i} className="text-xs font-bold text-emerald-700 flex items-center gap-2">
-            <CheckCircle2 size={12} className="shrink-0" />
+          <p key={i} className="font-semibold text-slate-700">
             {line}
           </p>
         ))}
-        <p className="text-[10px] text-emerald-600 pt-0.5">
+        <p className="text-[10px] text-slate-500 mt-1 italic">
           Warranty applies from the date of installation/delivery and covers manufacturing defects
           under normal operating conditions.
         </p>
@@ -244,564 +725,14 @@ function WarrantySection({ invoice }: { invoice: Invoice }) {
   );
 }
 
-// ─── Shared: Signatures ───────────────────────────────────────────────────────
-
-function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
-  return (
-    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-      {/* Seller */}
-      <div>
-        <SectionHead>Seller Signature</SectionHead>
-        {agreement.employeeSignatureData ? (
-          <div className="border border-slate-100 rounded-xl p-2 bg-white">
-            <img
-              src={agreement.employeeSignatureData}
-              alt="Employee Signature"
-              className="max-h-20 w-full object-contain"
-            />
-            <p className="text-[9px] text-slate-400 mt-1 font-bold">
-              {agreement.employeeSignedByName}
-              {agreement.employeeSignedAt
-                ? ` · ${new Date(agreement.employeeSignedAt).toLocaleDateString('en-GB')}`
-                : ''}
-            </p>
-          </div>
-        ) : (
-          <div className="border border-dashed border-slate-200 rounded-xl p-4 text-center">
-            <p className="text-[10px] text-slate-400 font-bold">Awaiting seller signature</p>
-          </div>
-        )}
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <p className="text-[9px] text-slate-400">Authorised Signatory</p>
-          <p className="text-[9px] text-slate-400">{agreement.dealerName}</p>
-        </div>
-      </div>
-
-      {/* Customer */}
-      <div>
-        <SectionHead>Customer Signature</SectionHead>
-        {agreement.customerSignedMethod === 'UPLOAD' && agreement.customerSignedDocumentUrl ? (
-          <div className="border border-amber-200 rounded-xl p-3 bg-amber-50 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <FileText size={13} className="text-amber-600 shrink-0" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">
-                Uploaded Document
-              </p>
-            </div>
-            <a
-              href={agreement.customerSignedDocumentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:underline"
-            >
-              <ExternalLink size={11} />
-              View Signed Document
-            </a>
-            {agreement.customerSignedDocumentNote && (
-              <p className="text-[10px] text-amber-700 bg-amber-100 rounded px-2 py-1">
-                {agreement.customerSignedDocumentNote}
-              </p>
-            )}
-            <p className="text-[9px] text-slate-400 font-bold">
-              {agreement.customerSignedByName}
-              {agreement.customerSignedAt
-                ? ` · ${new Date(agreement.customerSignedAt).toLocaleDateString('en-GB')}`
-                : ''}
-            </p>
-          </div>
-        ) : agreement.customerSignatureData ? (
-          <div className="border border-slate-100 rounded-xl p-2 bg-white">
-            <img
-              src={agreement.customerSignatureData}
-              alt="Customer Signature"
-              className="max-h-20 w-full object-contain"
-            />
-            <p className="text-[9px] text-slate-400 mt-1 font-bold">
-              {agreement.customerSignedByName}
-              {agreement.customerSignedAt
-                ? ` · ${new Date(agreement.customerSignedAt).toLocaleDateString('en-GB')}`
-                : ''}
-              {agreement.customerSignedMethod === 'REMOTE' && (
-                <span className="ml-1 text-indigo-500">(Remote)</span>
-              )}
-            </p>
-          </div>
-        ) : (
-          <div className="border border-dashed border-slate-200 rounded-xl p-4 text-center">
-            <p className="text-[10px] text-slate-400 font-bold">Awaiting customer signature</p>
-          </div>
-        )}
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <p className="text-[9px] text-slate-400">Customer / Authorised Representative</p>
-          <p className="text-[9px] text-slate-400">{agreement.customerName}</p>
-        </div>
-      </div>
-
-      {/* Footer declaration */}
-      <div className="col-span-2 text-center pt-2">
-        <p className="text-[10px] text-slate-400 leading-relaxed">
-          By signing above, both parties confirm that they have read, understood, and agreed to the
-          terms and conditions set out in this agreement.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ─── SALE: type-specific section ──────────────────────────────────────────────
-
-function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
-  const subtotal = Number(invoice.totalAmount ?? 0) - Number(invoice.taxAmount ?? 0);
-  const tax = Number(invoice.taxAmount ?? 0);
-  const total = Number(invoice.totalAmount ?? 0);
-  const advance = Number(invoice.advanceAmount ?? 0);
-  const balanceDue = Math.max(0, total - advance);
-
-  return (
-    <div>
-      <SectionHead>Sale Summary</SectionHead>
-      <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl space-y-2">
-        <div className="flex justify-between text-xs">
-          <span className="font-bold text-slate-600">Subtotal</span>
-          <span className="font-black text-slate-800">{fmtAmt(subtotal, currency)}</span>
-        </div>
-        {tax > 0 && (
-          <div className="flex justify-between text-xs">
-            <span className="font-bold text-slate-500">
-              {invoice.taxName || 'VAT'}
-              {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
-            </span>
-            <span className="font-black text-slate-700">{fmtAmt(tax, currency)}</span>
-          </div>
-        )}
-        {invoice.customerVatStatus === 'EXEMPT' && (
-          <div className="flex justify-between text-xs">
-            <span className="font-bold text-slate-500">VAT</span>
-            <span className="font-black text-emerald-600">VAT Exempt</span>
-          </div>
-        )}
-        <div className="flex justify-between border-t border-indigo-100 pt-2 text-sm">
-          <span className="font-black text-slate-700">Total Amount</span>
-          <span className="font-black text-indigo-700">{fmtAmt(total, currency)}</span>
-        </div>
-        {advance > 0 && (
-          <>
-            <div className="flex justify-between text-xs text-emerald-600">
-              <span className="font-bold">Advance Paid</span>
-              <span className="font-black">− {fmtAmt(advance, currency)}</span>
-            </div>
-            <div className="flex justify-between border-t border-indigo-100 pt-2 text-sm">
-              <span className="font-black text-slate-700">Balance Due</span>
-              <span className="font-black text-red-600">{fmtAmt(balanceDue, currency)}</span>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── RENT: type-specific section ──────────────────────────────────────────────
-
-function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
-  const bwItem = (invoice.items || []).find(
-    (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0,
-  );
-  const colorItem = (invoice.items || []).find(
-    (i) => (i.colorIncludedLimit ?? 0) > 0 || (i.colorExcessRate ?? 0) > 0,
-  );
-  const comboItem = (invoice.items || []).find(
-    (i) => (i.combinedIncludedLimit ?? 0) > 0 || (i.combinedExcessRate ?? 0) > 0,
-  );
-
-  return (
-    <div>
-      <SectionHead>Rental Terms</SectionHead>
-      <div className="border border-blue-100 rounded-xl overflow-hidden">
-        {/* Contract period + billing cycle row */}
-        <div className="bg-blue-50/60 p-3 grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-blue-500 mb-0.5">
-              Contract Period
-            </p>
-            <p className="text-sm font-black text-slate-700">{fmtDate(invoice.effectiveFrom)}</p>
-            {invoice.effectiveTo && (
-              <p className="text-[11px] text-slate-500">to {fmtDate(invoice.effectiveTo)}</p>
-            )}
-          </div>
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-blue-500 mb-0.5">
-              Billing Cycle
-            </p>
-            <p className="text-sm font-black text-slate-700">
-              {billingCycleLabel(invoice.rentPeriod)}
-            </p>
-          </div>
-        </div>
-
-        {/* Plan type + monthly rate */}
-        <div className="p-3 grid grid-cols-2 gap-4 border-t border-blue-100">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-              Plan Type
-            </p>
-            <p className="text-sm font-bold text-slate-700">{planLabel(invoice.rentType)}</p>
-          </div>
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-              Monthly Rate
-            </p>
-            <p className="text-sm font-black text-blue-700">
-              {fmtAmt(invoice.monthlyRent, currency)}
-            </p>
-          </div>
-        </div>
-
-        {/* B&W usage limits */}
-        {bwItem && (
-          <div className="p-3 border-t border-slate-100 bg-slate-50/40">
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-slate-700 inline-block" />
-              Black & White Usage
-            </p>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              {(bwItem.bwIncludedLimit ?? 0) > 0 && (
-                <InfoRow
-                  label="Free Limit (A4)"
-                  value={`${Number(bwItem.bwIncludedLimit).toLocaleString()} copies / billing period`}
-                />
-              )}
-              {(bwItem.bwExcessRate ?? 0) > 0 && (
-                <InfoRow
-                  label="Excess Rate (A4)"
-                  value={`${currency} ${Number(bwItem.bwExcessRate).toFixed(4)} per copy`}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Color usage limits */}
-        {colorItem && (
-          <div className="p-3 border-t border-slate-100 bg-rose-50/30">
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
-              Color Usage
-            </p>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              {(colorItem.colorIncludedLimit ?? 0) > 0 && (
-                <InfoRow
-                  label="Free Limit"
-                  value={`${Number(colorItem.colorIncludedLimit).toLocaleString()} copies / billing period`}
-                />
-              )}
-              {(colorItem.colorExcessRate ?? 0) > 0 && (
-                <InfoRow
-                  label="Excess Rate"
-                  value={`${currency} ${Number(colorItem.colorExcessRate).toFixed(4)} per copy`}
-                />
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Combined/Combo limits */}
-        {comboItem && (
-          <div className="p-3 border-t border-slate-100 bg-violet-50/30">
-            <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-violet-500 inline-block" />
-              Combined (B&W + Color)
-            </p>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              {(comboItem.combinedIncludedLimit ?? 0) > 0 && (
-                <InfoRow
-                  label="Free Limit"
-                  value={`${Number(comboItem.combinedIncludedLimit).toLocaleString()} copies / billing period`}
-                />
-              )}
-              {(comboItem.combinedExcessRate ?? 0) > 0 && (
-                <InfoRow
-                  label="Excess Rate"
-                  value={`${currency} ${Number(comboItem.combinedExcessRate).toFixed(4)} per copy`}
-                />
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── LEASE: type-specific section ────────────────────────────────────────────
-
-function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
-  const isEMI = invoice.leaseType === 'EMI';
-
-  // For FSM leases, reuse rent pricing rule items
-  const bwItem = !isEMI
-    ? (invoice.items || []).find((i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0)
-    : undefined;
-  const colorItem = !isEMI
-    ? (invoice.items || []).find(
-        (i) => (i.colorIncludedLimit ?? 0) > 0 || (i.colorExcessRate ?? 0) > 0,
-      )
-    : undefined;
-
-  return (
-    <div>
-      <SectionHead>Lease Terms</SectionHead>
-      <div className="border border-violet-100 rounded-xl overflow-hidden">
-        {/* Lease type + tenure */}
-        <div className="bg-violet-50/60 p-3 grid grid-cols-3 gap-4">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-violet-500 mb-0.5">
-              Lease Type
-            </p>
-            <p className="text-sm font-black text-slate-700">{isEMI ? 'EMI' : 'FSM'}</p>
-            <p className="text-[10px] text-slate-500">
-              {isEMI ? 'Equal Monthly Installments' : 'Full-Service Management'}
-            </p>
-          </div>
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-violet-500 mb-0.5">
-              Tenure
-            </p>
-            <p className="text-sm font-black text-slate-700">
-              {invoice.leaseTenureMonths ?? '—'} months
-            </p>
-          </div>
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-violet-500 mb-0.5">
-              Contract Start
-            </p>
-            <p className="text-sm font-black text-slate-700">{fmtDate(invoice.effectiveFrom)}</p>
-          </div>
-        </div>
-
-        {isEMI ? (
-          /* EMI details */
-          <div className="p-3 border-t border-violet-100 grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                Monthly EMI
-              </p>
-              <p className="text-sm font-black text-violet-700">
-                {fmtAmt(invoice.monthlyEmiAmount ?? invoice.monthlyLeaseAmount, currency)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                Total Lease Value
-              </p>
-              <p className="text-sm font-black text-slate-700">
-                {fmtAmt(invoice.totalLeaseAmount ?? invoice.totalAmount, currency)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* FSM: plan type + service rate */
-          <>
-            <div className="p-3 border-t border-violet-100 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                  Service Plan
-                </p>
-                <p className="text-sm font-bold text-slate-700">{planLabel(invoice.rentType)}</p>
-              </div>
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                  Monthly Service Amount
-                </p>
-                <p className="text-sm font-black text-violet-700">
-                  {fmtAmt(invoice.monthlyLeaseAmount ?? invoice.monthlyRent, currency)}
-                </p>
-              </div>
-            </div>
-
-            {bwItem && (
-              <div className="p-3 border-t border-slate-100 bg-slate-50/40">
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-slate-700 inline-block" />
-                  Black & White Usage
-                </p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  {(bwItem.bwIncludedLimit ?? 0) > 0 && (
-                    <InfoRow
-                      label="Free Limit (A4)"
-                      value={`${Number(bwItem.bwIncludedLimit).toLocaleString()} copies / month`}
-                    />
-                  )}
-                  {(bwItem.bwExcessRate ?? 0) > 0 && (
-                    <InfoRow
-                      label="Excess Rate"
-                      value={`${currency} ${Number(bwItem.bwExcessRate).toFixed(4)} / copy`}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-
-            {colorItem && (
-              <div className="p-3 border-t border-slate-100 bg-rose-50/30">
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
-                  Color Usage
-                </p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  {(colorItem.colorIncludedLimit ?? 0) > 0 && (
-                    <InfoRow
-                      label="Free Limit"
-                      value={`${Number(colorItem.colorIncludedLimit).toLocaleString()} copies / month`}
-                    />
-                  )}
-                  {(colorItem.colorExcessRate ?? 0) > 0 && (
-                    <InfoRow
-                      label="Excess Rate"
-                      value={`${currency} ${Number(colorItem.colorExcessRate).toFixed(4)} / copy`}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Shared: Advance / Deposit / Down-payment section ─────────────────────────
-
-function AdvanceSection({
-  invoice,
-  saleType,
-  currency,
-}: {
-  invoice: Invoice;
-  saleType: string;
-  currency: string;
-}) {
-  const advance = Number(invoice.advanceAmount ?? 0);
-  const secDeposit = Number(invoice.securityDepositAmount ?? 0);
-  const hasAdvance = advance > 0;
-  const hasDeposit = secDeposit > 0;
-
-  // Label depends on contract type
-  const advanceLabel =
-    saleType === 'SALE'
-      ? 'Advance Payment'
-      : saleType === 'LEASE'
-        ? 'Down Payment'
-        : 'Advance Payment';
-
-  const depositNote =
-    saleType === 'RENT'
-      ? 'Security deposit is held for the duration of the rental and refunded upon equipment return after final settlement.'
-      : null;
-
-  const advanceNote =
-    saleType === 'RENT'
-      ? 'Advance payment will be adjusted against the first billing period.'
-      : saleType === 'LEASE'
-        ? 'Down payment is deducted from the total lease value.'
-        : 'Advance reduces the final balance due.';
-
-  if (!hasAdvance && !hasDeposit) {
-    return (
-      <div>
-        <SectionHead>
-          <span className="flex items-center gap-1">
-            <Banknote size={9} />
-            Advance / Deposit
-          </span>
-        </SectionHead>
-        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-center">
-          <p className="text-xs font-bold text-slate-400">No advance or deposit taken</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <SectionHead>
-        <span className="flex items-center gap-1">
-          <Banknote size={9} />
-          {saleType === 'LEASE' ? 'Down Payment / Advance' : 'Advance & Deposit Details'}
-        </span>
-      </SectionHead>
-      <div className="border border-slate-100 rounded-xl overflow-hidden">
-        {hasAdvance && (
-          <div className="p-3 grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                {advanceLabel}
-              </p>
-              <p className="text-sm font-black text-slate-800">{fmtAmt(advance, currency)}</p>
-            </div>
-            {invoice.preferredPaymentMode && (
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                  Payment Mode
-                </p>
-                <p className="text-sm font-bold text-slate-700">
-                  {paymentModeLabel(invoice.preferredPaymentMode)}
-                </p>
-              </div>
-            )}
-            <div className="col-span-2">
-              <p className="text-[10px] text-slate-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5">
-                {advanceNote}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {hasDeposit && (
-          <div
-            className={`p-3 grid grid-cols-2 gap-4 ${
-              hasAdvance ? 'border-t border-slate-100 bg-slate-50/40' : ''
-            }`}
-          >
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                Security Deposit
-              </p>
-              <p className="text-sm font-black text-slate-800">{fmtAmt(secDeposit, currency)}</p>
-            </div>
-            {invoice.securityDepositMode && (
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-0.5">
-                  Deposit Mode
-                </p>
-                <p className="text-sm font-bold text-slate-700">
-                  {paymentModeLabel(invoice.securityDepositMode)}
-                </p>
-              </div>
-            )}
-            {depositNote && (
-              <div className="col-span-2">
-                <p className="text-[10px] text-slate-500 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
-                  {depositNote}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Shared: Terms & Conditions ───────────────────────────────────────────────
+// ─── Terms & Conditions ───────────────────────────────────────────────────────
 
 function TermsSection({ agreement }: { agreement: ContractAgreement }) {
   if (!agreement.termsAndConditions) return null;
   return (
     <div>
-      <SectionHead>Terms & Conditions</SectionHead>
-      <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+      <SectionHeading>Terms &amp; Conditions</SectionHeading>
+      <div className="border border-slate-200 px-3 py-3">
         <pre className="text-[10px] text-slate-600 whitespace-pre-wrap font-sans leading-relaxed">
           {agreement.termsAndConditions}
         </pre>
@@ -810,95 +741,159 @@ function TermsSection({ agreement }: { agreement: ContractAgreement }) {
   );
 }
 
-// ─── Main exported component ──────────────────────────────────────────────────
+// ─── Signatures ───────────────────────────────────────────────────────────────
 
-const AGREEMENT_META: Record<
-  string,
-  { title: string; subtitle: string; accentBg: string; accentText: string; borderColor: string }
-> = {
-  SALE: {
-    title: 'Sale Agreement',
-    subtitle: 'This document confirms the sale transaction between the parties named below.',
-    accentBg: 'bg-indigo-50',
-    accentText: 'text-indigo-700',
-    borderColor: 'border-indigo-100',
-  },
-  RENT: {
-    title: 'Rental Agreement',
-    subtitle:
-      'This document sets out the terms for rental of equipment between the parties named below.',
-    accentBg: 'bg-blue-50',
-    accentText: 'text-blue-700',
-    borderColor: 'border-blue-100',
-  },
-  LEASE: {
-    title: 'Lease Agreement',
-    subtitle:
-      'This document sets out the terms for equipment lease between the parties named below.',
-    accentBg: 'bg-violet-50',
-    accentText: 'text-violet-700',
-    borderColor: 'border-violet-100',
-  },
-};
+function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
+  return (
+    <div>
+      <SectionHeading>Signatures</SectionHeading>
+      <div className="grid grid-cols-2 border border-slate-200">
+        {/* Seller */}
+        <div className="p-3 border-r border-slate-200">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
+            Seller Signature
+          </p>
+          {agreement.employeeSignatureData ? (
+            <div>
+              <img
+                src={agreement.employeeSignatureData}
+                alt="Employee Signature"
+                className="max-h-16 w-full object-contain border border-slate-200 bg-white p-1 mb-1"
+              />
+              <p className="text-[9px] text-slate-500">
+                {agreement.employeeSignedByName}
+                {agreement.employeeSignedAt
+                  ? ` · ${new Date(agreement.employeeSignedAt).toLocaleDateString('en-GB')}`
+                  : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-300 py-4 text-center">
+              <p className="text-[10px] text-slate-400">Awaiting seller signature</p>
+            </div>
+          )}
+          <div className="mt-3 pt-2 border-t border-slate-200">
+            <p className="text-[9px] text-slate-400">Authorised Signatory</p>
+            <p className="text-[9px] font-bold text-slate-600">{agreement.dealerName}</p>
+          </div>
+        </div>
+
+        {/* Customer */}
+        <div className="p-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
+            Customer Signature
+          </p>
+          {agreement.customerSignedMethod === 'UPLOAD' && agreement.customerSignedDocumentUrl ? (
+            <div className="border border-slate-200 p-2 space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <FileText size={12} className="text-slate-500 shrink-0" />
+                <p className="text-[10px] font-bold text-slate-600">Uploaded Document</p>
+              </div>
+              <a
+                href={agreement.customerSignedDocumentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs font-bold text-slate-700 hover:underline"
+              >
+                <ExternalLink size={10} />
+                View Signed Document
+              </a>
+              {agreement.customerSignedDocumentNote && (
+                <p className="text-[10px] text-slate-500 border-t border-slate-100 pt-1">
+                  {agreement.customerSignedDocumentNote}
+                </p>
+              )}
+              <p className="text-[9px] text-slate-400">
+                {agreement.customerSignedByName}
+                {agreement.customerSignedAt
+                  ? ` · ${new Date(agreement.customerSignedAt).toLocaleDateString('en-GB')}`
+                  : ''}
+              </p>
+            </div>
+          ) : agreement.customerSignatureData ? (
+            <div>
+              <img
+                src={agreement.customerSignatureData}
+                alt="Customer Signature"
+                className="max-h-16 w-full object-contain border border-slate-200 bg-white p-1 mb-1"
+              />
+              <p className="text-[9px] text-slate-500">
+                {agreement.customerSignedByName}
+                {agreement.customerSignedAt
+                  ? ` · ${new Date(agreement.customerSignedAt).toLocaleDateString('en-GB')}`
+                  : ''}
+                {agreement.customerSignedMethod === 'REMOTE' && (
+                  <span className="ml-1 text-slate-400">(Remote)</span>
+                )}
+              </p>
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-300 py-4 text-center">
+              <p className="text-[10px] text-slate-400">Awaiting customer signature</p>
+            </div>
+          )}
+          <div className="mt-3 pt-2 border-t border-slate-200">
+            <p className="text-[9px] text-slate-400">Customer / Authorised Representative</p>
+            <p className="text-[9px] font-bold text-slate-600">{agreement.customerName}</p>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[10px] text-slate-400 text-center mt-3 leading-relaxed">
+        By signing above, both parties confirm that they have read, understood, and agreed to the
+        terms and conditions set out in this agreement.
+      </p>
+    </div>
+  );
+}
+
+// ─── Main exported component ──────────────────────────────────────────────────
 
 export function ContractDocumentBody({ invoice, agreement, currency }: Props) {
   const saleType = (invoice.saleType || 'SALE').toUpperCase();
-  const meta = AGREEMENT_META[saleType] || AGREEMENT_META.SALE;
 
   return (
-    <div className="space-y-5 text-slate-800">
-      {/* ── Document Header ──────────────────────────────────────── */}
-      <div className={`text-center rounded-xl p-4 border ${meta.accentBg} ${meta.borderColor}`}>
-        <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${meta.accentText}`}>
-          {meta.title}
-        </p>
-        <h2 className="text-xl font-black text-slate-800 mt-1">{agreement.agreementNumber}</h2>
-        <p className="text-xs text-slate-500 mt-1">{fmtDate(agreement.contractDate)}</p>
-        <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed max-w-sm mx-auto">
-          {meta.subtitle}
-        </p>
-        <p className="text-[10px] font-bold text-slate-500 mt-2">
-          Contract Ref: {invoice.invoiceNumber}
-        </p>
-      </div>
+    <div className="space-y-5 text-slate-800 bg-white print:p-6">
+      {/* ── Letterhead / Document Header ── */}
+      <DocumentHeader agreement={agreement} saleType={saleType} />
 
-      <Divider />
-
-      {/* ── Parties ─────────────────────────────────────────────── */}
+      {/* ── Parties ── */}
       <PartiesSection invoice={invoice} agreement={agreement} />
 
-      {/* ── Product / Equipment ─────────────────────────────────── */}
+      <DocRule />
+
+      {/* ── Equipment ── */}
       <ProductSection invoice={invoice} />
 
-      <Divider />
+      <DocRule />
 
-      {/* ── Type-specific terms ──────────────────────────────────── */}
+      {/* ── Type-specific terms ── */}
       {saleType === 'SALE' && <SaleTermsSection invoice={invoice} currency={currency} />}
       {saleType === 'RENT' && <RentTermsSection invoice={invoice} currency={currency} />}
       {saleType === 'LEASE' && <LeaseTermsSection invoice={invoice} currency={currency} />}
 
-      <Divider />
+      <DocRule />
 
-      {/* ── Advance / Deposit ───────────────────────────────────── */}
+      {/* ── Advance / Deposit ── */}
       <AdvanceSection invoice={invoice} saleType={saleType} currency={currency} />
 
-      {/* ── Warranty ────────────────────────────────────────────── */}
+      {/* ── Warranty ── */}
       <WarrantySection invoice={invoice} />
 
-      <Divider />
+      <DocRule />
 
-      {/* ── Terms & Conditions ──────────────────────────────────── */}
+      {/* ── Terms & Conditions ── */}
       <TermsSection agreement={agreement} />
 
-      <Divider />
+      <DocRule />
 
-      {/* ── Signatures ──────────────────────────────────────────── */}
+      {/* ── Signatures ── */}
       <SignaturesSection agreement={agreement} />
     </div>
   );
 }
 
-// ─── Type-aware default T&C generator (used at agreement creation) ────────────
+// ─── Type-aware default T&C generator ────────────────────────────────────────
 
 export function defaultTermsForType(saleType?: string): string {
   const type = (saleType || 'SALE').toUpperCase();

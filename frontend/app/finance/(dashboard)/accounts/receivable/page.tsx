@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import ReceiptsTab from '@/components/Finance/ReceiptsTab';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Plus,
@@ -441,6 +443,16 @@ function SelectCustomerModal({
 }
 
 export default function AccountsReceivablePage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const activeTab = (searchParams.get('tab') ?? 'receivable') as 'receivable' | 'receipts';
+
+  const switchTab = (t: 'receivable' | 'receipts') => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', t);
+    router.replace(`?${params.toString()}`);
+  };
+
   const currency = useBranchCurrency();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -665,473 +677,513 @@ export default function AccountsReceivablePage() {
 
   return (
     <div className="bg-blue-50/50 min-h-full p-6 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Page header + tab switcher */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Accounts Receivable</h3>
           <p className="text-muted-foreground">
-            Customer balances, aging analysis, and payment tracking
+            Customer balances, aging analysis, and payment receipts
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleGenerateStatementClick}
-            variant="outline"
-            className="gap-2"
-            disabled={generatingStatement}
-          >
-            <FileText className="h-4 w-4" />
-            {generatingStatement ? 'Generating…' : 'Generate Statement'}
-          </Button>
-          <Button onClick={() => setShowAdd(true)} className="gap-2">
-            <Plus className="h-4 w-4" /> Add Receivable
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {/* Aging Summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <StatCard
-            title="Total Outstanding"
-            value={formatCurrency(totalOutstanding, currency)}
-            subtitle="All receivables"
-          />
-          {AGING_BUCKETS.map((b) => (
-            <StatCard
-              key={b}
-              title={b}
-              value={formatCurrency(agingTotals.find((a) => a.bucket === b)?.total ?? 0, currency)}
-              subtitle={b === '90+ days' ? 'Critical' : ''}
-            />
+        {/* Tab pills */}
+        <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl shadow-sm">
+          {(['receivable', 'receipts'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => switchTab(t)}
+              className={`px-4 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${
+                activeTab === t
+                  ? 'bg-indigo-600 text-white shadow'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t === 'receivable' ? 'Receivable' : 'Receipts'}
+            </button>
           ))}
         </div>
+      </div>
+      {/* Receipts tab */}
+      {activeTab === 'receipts' && <ReceiptsTab />}
+      {/* Receivable tab content */}
+      {activeTab === 'receivable' && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div />
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleGenerateStatementClick}
+                variant="outline"
+                className="gap-2"
+                disabled={generatingStatement}
+              >
+                <FileText className="h-4 w-4" />
+                {generatingStatement ? 'Generating…' : 'Generate Statement'}
+              </Button>
+              <Button onClick={() => setShowAdd(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Add Receivable
+              </Button>
+            </div>
+          </div>
 
-        {/* Charts section */}
-        <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
-          <button
-            onClick={() => setChartsOpen((o) => !o)}
-            className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
-          >
-            <span className="flex items-center gap-2 font-semibold text-gray-800">
-              <BarChart2 className="h-4 w-4 text-blue-500" />
-              AR Analytics
-            </span>
-            {chartsOpen ? (
-              <ChevronUp className="h-4 w-4 text-gray-400" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            )}
-          </button>
-          {chartsOpen && (
-            <div className="px-4 pb-4 space-y-4">
-              {/* Aging bar */}
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                  AR Aging Analysis
-                </h4>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={agingTotals} barSize={44}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="bucket"
-                      tick={{ fontSize: 12 }}
-                      tickLine={false}
-                      axisLine={false}
+          <div className="space-y-6">
+            {/* Aging Summary */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <StatCard
+                title="Total Outstanding"
+                value={formatCurrency(totalOutstanding, currency)}
+                subtitle="All receivables"
+              />
+              {AGING_BUCKETS.map((b) => (
+                <StatCard
+                  key={b}
+                  title={b}
+                  value={formatCurrency(
+                    agingTotals.find((a) => a.bucket === b)?.total ?? 0,
+                    currency,
+                  )}
+                  subtitle={b === '90+ days' ? 'Critical' : ''}
+                />
+              ))}
+            </div>
+
+            {/* Charts section */}
+            <div className="rounded-2xl bg-card shadow-sm border border-slate-100">
+              <button
+                onClick={() => setChartsOpen((o) => !o)}
+                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl"
+              >
+                <span className="flex items-center gap-2 font-semibold text-gray-800">
+                  <BarChart2 className="h-4 w-4 text-blue-500" />
+                  AR Analytics
+                </span>
+                {chartsOpen ? (
+                  <ChevronUp className="h-4 w-4 text-gray-400" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-400" />
+                )}
+              </button>
+              {chartsOpen && (
+                <div className="px-4 pb-4 space-y-4">
+                  {/* Aging bar */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      AR Aging Analysis
+                    </h4>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={agingTotals} barSize={44}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis
+                          dataKey="bucket"
+                          tick={{ fontSize: 12 }}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11 }}
+                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
+                          tickLine={false}
+                          axisLine={false}
+                        />
+                        <Tooltip
+                          formatter={(v: number) => formatCurrency(v, currency)}
+                          contentStyle={{
+                            borderRadius: '10px',
+                            fontSize: '12px',
+                            border: '1px solid #e2e8f0',
+                          }}
+                        />
+                        <Bar
+                          dataKey="total"
+                          name="Outstanding"
+                          fill="#3b82f6"
+                          radius={[6, 6, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-2">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        Collection Rate Trend
+                      </h4>
+                      <SimpleLineChart
+                        data={rcvCharts?.collectionRate ?? []}
+                        xKey="month"
+                        lines={[
+                          { key: 'issued', color: '#3b82f6', label: 'Issued' },
+                          { key: 'collected', color: '#10b981', label: 'Collected' },
+                        ]}
+                        height={220}
+                        currency={currency}
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                        By Type
+                      </h4>
+                      <DonutChart data={rcvCharts?.byType ?? []} height={220} currency={currency} />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                      Top 10 Customers by Amount
+                    </h4>
+                    <HorizontalBarChart
+                      data={rcvCharts?.topCustomers ?? []}
+                      height={240}
+                      color="#8b5cf6"
+                      currency={currency}
                     />
-                    <YAxis
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip
-                      formatter={(v: number) => formatCurrency(v, currency)}
-                      contentStyle={{
-                        borderRadius: '10px',
-                        fontSize: '12px',
-                        border: '1px solid #e2e8f0',
-                      }}
-                    />
-                    <Bar dataKey="total" name="Outstanding" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                    Collection Rate Trend
-                  </h4>
-                  <SimpleLineChart
-                    data={rcvCharts?.collectionRate ?? []}
-                    xKey="month"
-                    lines={[
-                      { key: 'issued', color: '#3b82f6', label: 'Issued' },
-                      { key: 'collected', color: '#10b981', label: 'Collected' },
-                    ]}
-                    height={220}
-                    currency={currency}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    className="pl-10 bg-muted/50 border-none"
+                    placeholder="Search customer or reference..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">By Type</h4>
-                  <DonutChart data={rcvCharts?.byType ?? []} height={220} currency={currency} />
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
+                  <Filter className="h-3.5 w-3.5" /> Filters
                 </div>
               </div>
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                  Top 10 Customers by Amount
-                </h4>
-                <HorizontalBarChart
-                  data={rcvCharts?.topCustomers ?? []}
-                  height={240}
-                  color="#8b5cf6"
-                  currency={currency}
-                />
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Type
+                  </label>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-full bg-card border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Types</SelectItem>
+                      {RECEIVABLE_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t.replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="RENT">RENT</SelectItem>
+                      <SelectItem value="LEASE">LEASE</SelectItem>
+                      <SelectItem value="SALE">SALE</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Aging
+                  </label>
+                  <Select value={agingFilter} onValueChange={setAgingFilter}>
+                    <SelectTrigger className="w-full bg-card border-border">
+                      <SelectValue placeholder="All Aging" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Aging</SelectItem>
+                      {AGING_BUCKETS.map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {b}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Source
+                  </label>
+                  <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                    <SelectTrigger className="w-full bg-card border-border">
+                      <SelectValue placeholder="All Sources" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Sources</SelectItem>
+                      <SelectItem value="Invoice">Invoice</SelectItem>
+                      <SelectItem value="Opening Balance">Opening Balance</SelectItem>
+                      <SelectItem value="Manual Entry">Manual Entry</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Status
+                  </label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full bg-card border-border">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Status</SelectItem>
+                      {RECEIVABLE_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s.replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Issue Date From
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full h-9 px-3 rounded-md border border-border text-sm bg-card"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Issue Date To
+                  </label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full h-9 px-3 rounded-md border border-border text-sm bg-card"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Min Outstanding
+                  </label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={amountMin}
+                    onChange={(e) => setAmountMin(e.target.value)}
+                    className="w-full bg-card border-border"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Max Outstanding
+                  </label>
+                  <Input
+                    type="number"
+                    placeholder="Any"
+                    value={amountMax}
+                    onChange={(e) => setAmountMax(e.target.value)}
+                    className="w-full bg-card border-border"
+                  />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
 
-        {/* Filters */}
-        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                className="pl-10 bg-muted/50 border-none"
-                placeholder="Search customer or reference..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
-              <Filter className="h-3.5 w-3.5" /> Filters
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Type
-              </label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-full bg-card border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Types</SelectItem>
-                  {RECEIVABLE_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t.replace(/_/g, ' ')}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="RENT">RENT</SelectItem>
-                  <SelectItem value="LEASE">LEASE</SelectItem>
-                  <SelectItem value="SALE">SALE</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Aging
-              </label>
-              <Select value={agingFilter} onValueChange={setAgingFilter}>
-                <SelectTrigger className="w-full bg-card border-border">
-                  <SelectValue placeholder="All Aging" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Aging</SelectItem>
-                  {AGING_BUCKETS.map((b) => (
-                    <SelectItem key={b} value={b}>
-                      {b}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Source
-              </label>
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="w-full bg-card border-border">
-                  <SelectValue placeholder="All Sources" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Sources</SelectItem>
-                  <SelectItem value="Invoice">Invoice</SelectItem>
-                  <SelectItem value="Opening Balance">Opening Balance</SelectItem>
-                  <SelectItem value="Manual Entry">Manual Entry</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Status
-              </label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full bg-card border-border">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Status</SelectItem>
-                  {RECEIVABLE_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, ' ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Issue Date From
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-border text-sm bg-card"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Issue Date To
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-border text-sm bg-card"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Min Outstanding
-              </label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={amountMin}
-                onChange={(e) => setAmountMin(e.target.value)}
-                className="w-full bg-card border-border"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Max Outstanding
-              </label>
-              <Input
-                type="number"
-                placeholder="Any"
-                value={amountMax}
-                onChange={(e) => setAmountMax(e.target.value)}
-                className="w-full bg-card border-border"
-              />
-            </div>
-          </div>
-
-          {(typeFilter !== 'ALL' ||
-            agingFilter !== 'ALL' ||
-            sourceFilter !== 'ALL' ||
-            statusFilter !== 'ALL' ||
-            search ||
-            dateFrom ||
-            dateTo ||
-            amountMin ||
-            amountMax) && (
-            <div className="flex justify-end">
-              <button
-                onClick={() => {
-                  setSearch('');
-                  setTypeFilter('ALL');
-                  setAgingFilter('ALL');
-                  setSourceFilter('ALL');
-                  setStatusFilter('ALL');
-                  setDateFrom('');
-                  setDateTo('');
-                  setAmountMin('');
-                  setAmountMax('');
-                }}
-                className="text-xs font-semibold text-primary hover:underline"
-              >
-                Clear all filters
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Table */}
-        <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-          <Table>
-            <TableHeader className="bg-muted/40">
-              <TableRow>
-                <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Customer
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Ref #
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Source
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Type
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Issue Date
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Due Date
-                </TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Total
-                </TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Paid
-                </TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Outstanding
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Aging
-                </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="text-center py-16 text-muted-foreground">
-                    No receivables found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((r) => (
-                  <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
-                    <TableCell className="pl-4 font-medium text-slate-800">
-                      {r.customerName}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-blue-600 font-bold">
-                      {r.referenceNo}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
-                          r.source === 'Invoice'
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                            : r.source === 'Opening Balance'
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        {r.source}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                        {r.type}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {r.issueDate?.slice(0, 10)}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <span
-                        className={
-                          r.aging !== 'Current'
-                            ? 'text-red-600 font-medium'
-                            : 'text-muted-foreground'
-                        }
-                      >
-                        {r.dueDate?.slice(0, 10) ?? '—'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground text-sm">
-                      {formatCurrency(r.amount, r.currency)}
-                    </TableCell>
-                    <TableCell className="text-right text-emerald-600 font-medium text-sm">
-                      {formatCurrency(r.amountPaid, r.currency)}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-slate-800">
-                      {formatCurrency(r.outstanding ?? 0, r.currency)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${AGING_COLORS[r.aging] ?? ''}`}
-                      >
-                        {r.aging}
-                      </span>
-                    </TableCell>
-                    <TableCell className="pr-4">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() =>
-                            setViewingRow({ type: r.isInvoice ? 'INVOICE' : 'MANUAL', id: r.id })
-                          }
-                          className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                          title="View full details"
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </button>
-                        {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
-                          <button
-                            onClick={() => setPayingFor(r as ManualReceivable)}
-                            className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
-                            title="Record Payment"
-                          >
-                            <CreditCard className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+              {(typeFilter !== 'ALL' ||
+                agingFilter !== 'ALL' ||
+                sourceFilter !== 'ALL' ||
+                statusFilter !== 'ALL' ||
+                search ||
+                dateFrom ||
+                dateTo ||
+                amountMin ||
+                amountMax) && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setSearch('');
+                      setTypeFilter('ALL');
+                      setAgingFilter('ALL');
+                      setSourceFilter('ALL');
+                      setStatusFilter('ALL');
+                      setDateFrom('');
+                      setDateTo('');
+                      setAmountMin('');
+                      setAmountMax('');
+                    }}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+            </div>
 
-      {showAdd && (
-        <AddReceivableModal
-          accounts={accounts}
-          onClose={() => setShowAdd(false)}
-          onSaved={() => setShowAdd(false)}
-        />
-      )}
-      {payingFor && (
-        <PaymentModal
-          receivable={payingFor}
-          accounts={accounts}
-          onClose={() => setPayingFor(null)}
-        />
-      )}
-      {viewingRow && (
-        <ReceivableDetailModal
-          sourceType={viewingRow.type}
-          id={viewingRow.id}
-          onClose={() => setViewingRow(null)}
-        />
-      )}
-      {showCustomerPicker && (
-        <SelectCustomerModal
-          customers={customerNames}
-          onClose={() => setShowCustomerPicker(false)}
-          onSelect={generateCustomerStatement}
-        />
-      )}
-      {statementData && (
-        <StatementDialog
-          open
-          onOpenChange={(o) => !o && setStatementData(null)}
-          data={statementData}
-          branch={branchInfo}
-        />
-      )}
+            {/* Table */}
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <Table>
+                <TableHeader className="bg-muted/40">
+                  <TableRow>
+                    <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Customer
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Ref #
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Source
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Type
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Issue Date
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Due Date
+                    </TableHead>
+                    <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Total
+                    </TableHead>
+                    <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Paid
+                    </TableHead>
+                    <TableHead className="text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Outstanding
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                      Aging
+                    </TableHead>
+                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground pr-4">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-16 text-muted-foreground">
+                        No receivables found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((r) => (
+                      <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
+                        <TableCell className="pl-4 font-medium text-slate-800">
+                          {r.customerName}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-blue-600 font-bold">
+                          {r.referenceNo}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                              r.source === 'Invoice'
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                : r.source === 'Opening Balance'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {r.source}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            {r.type}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {r.issueDate?.slice(0, 10)}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <span
+                            className={
+                              r.aging !== 'Current'
+                                ? 'text-red-600 font-medium'
+                                : 'text-muted-foreground'
+                            }
+                          >
+                            {r.dueDate?.slice(0, 10) ?? '—'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground text-sm">
+                          {formatCurrency(r.amount, r.currency)}
+                        </TableCell>
+                        <TableCell className="text-right text-emerald-600 font-medium text-sm">
+                          {formatCurrency(r.amountPaid, r.currency)}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-slate-800">
+                          {formatCurrency(r.outstanding ?? 0, r.currency)}
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${AGING_COLORS[r.aging] ?? ''}`}
+                          >
+                            {r.aging}
+                          </span>
+                        </TableCell>
+                        <TableCell className="pr-4">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() =>
+                                setViewingRow({
+                                  type: r.isInvoice ? 'INVOICE' : 'MANUAL',
+                                  id: r.id,
+                                })
+                              }
+                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                              title="View full details"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                            {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
+                              <button
+                                onClick={() => setPayingFor(r as ManualReceivable)}
+                                className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                title="Record Payment"
+                              >
+                                <CreditCard className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {showAdd && (
+            <AddReceivableModal
+              accounts={accounts}
+              onClose={() => setShowAdd(false)}
+              onSaved={() => setShowAdd(false)}
+            />
+          )}
+          {payingFor && (
+            <PaymentModal
+              receivable={payingFor}
+              accounts={accounts}
+              onClose={() => setPayingFor(null)}
+            />
+          )}
+          {viewingRow && (
+            <ReceivableDetailModal
+              sourceType={viewingRow.type}
+              id={viewingRow.id}
+              onClose={() => setViewingRow(null)}
+            />
+          )}
+          {showCustomerPicker && (
+            <SelectCustomerModal
+              customers={customerNames}
+              onClose={() => setShowCustomerPicker(false)}
+              onSelect={generateCustomerStatement}
+            />
+          )}
+          {statementData && (
+            <StatementDialog
+              open
+              onOpenChange={(o) => !o && setStatementData(null)}
+              data={statementData}
+              branch={branchInfo}
+            />
+          )}
+        </>
+      )}{' '}
+      {/* end activeTab === 'receivable' */}
     </div>
   );
 }

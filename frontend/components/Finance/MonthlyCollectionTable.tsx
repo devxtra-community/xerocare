@@ -83,7 +83,6 @@ export default function MonthlyCollectionTable({
   const [collectChequeDate, setCollectChequeDate] = useState(
     new Date().toISOString().split('T')[0],
   );
-  const [collectLater, setCollectLater] = useState(false);
   const [collectAccountId, setCollectAccountId] = useState('');
   const [isSavingCollect, setIsSavingCollect] = useState(false);
   const [collectAccounts, setCollectAccounts] = useState<CashBankAccount[]>([]);
@@ -182,7 +181,6 @@ export default function MonthlyCollectionTable({
     setCollectChequeBankName('');
     setCollectChequeDueDate('');
     setCollectChequeDate(new Date().toISOString().split('T')[0]);
-    setCollectLater(false);
     setCollectAccountId('');
   };
 
@@ -201,13 +199,11 @@ export default function MonthlyCollectionTable({
         chequeBankName: collectMode === 'CHEQUE' ? collectChequeBankName : undefined,
         chequeDueDate: collectMode === 'CHEQUE' ? collectChequeDueDate : undefined,
         chequeDate: collectMode === 'CHEQUE' ? collectChequeDate : undefined,
-        collectLater,
         paymentContext: context,
       });
-      const msg = collectLater
-        ? 'Collect Later entry saved — Accounts will confirm receipt.'
-        : 'Payment submitted for Accounts approval.';
-      toast.success('Periodic payment recorded', { description: msg });
+      toast.success('Periodic payment recorded', {
+        description: 'Payment submitted for Accounts approval.',
+      });
       setCollectTarget(null);
       fetchAlerts();
       onSuccess?.();
@@ -499,29 +495,6 @@ export default function MonthlyCollectionTable({
             </div>
           </div>
           <div className="p-5 space-y-4">
-            {/* Collect Now / Collect Later toggle */}
-            <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setCollectLater(false)}
-                className={`flex-1 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${!collectLater ? 'bg-white shadow text-emerald-700' : 'text-slate-500'}`}
-              >
-                Collect Now
-              </button>
-              <button
-                type="button"
-                onClick={() => setCollectLater(true)}
-                className={`flex-1 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${collectLater ? 'bg-white shadow text-amber-600' : 'text-slate-500'}`}
-              >
-                Collect Later
-              </button>
-            </div>
-            {collectLater && (
-              <p className="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                Pre-enter payment details. Accounts will confirm receipt when the payment physically
-                arrives.
-              </p>
-            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
@@ -657,8 +630,6 @@ export default function MonthlyCollectionTable({
               >
                 {isSavingCollect ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : collectLater ? (
-                  'Save (Collect Later)'
                 ) : (
                   'Submit for Approval'
                 )}

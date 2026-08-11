@@ -3,10 +3,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Eye, FileText, Activity, PenLine } from 'lucide-react';
+import { Plus, Search, Loader2, Eye, FileText, Activity } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
-import { ContractAgreementModal } from './ContractAgreementModal';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
@@ -97,7 +96,6 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [selectedForConversion, setSelectedForConversion] = useState<Invoice | null>(null);
-  const [contractInvoice, setContractInvoice] = useState<Invoice | null>(null);
 
   const searchParams = useSearchParams();
   const convertId = searchParams.get('convert');
@@ -519,19 +517,6 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                               <Activity className="h-4 w-4" />
                             </Button>
                           )}
-
-                        {['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(inv.saleType || '') &&
-                          inv.contractStatus === 'ACTIVE' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-violet-500 hover:text-violet-600 hover:bg-violet-50"
-                              onClick={() => setContractInvoice(inv)}
-                              title="Contract Agreement"
-                            >
-                              <PenLine className="h-4 w-4" />
-                            </Button>
-                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -584,18 +569,6 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
           quotation={selectedForConversion}
           onClose={() => setSelectedForConversion(null)}
           onSuccess={handleConversionSuccess}
-        />
-      )}
-
-      {contractInvoice && (
-        <ContractAgreementModal
-          invoice={contractInvoice}
-          open={true}
-          onClose={() => setContractInvoice(null)}
-          onSigned={() => {
-            setContractInvoice(null);
-            fetchInvoices();
-          }}
         />
       )}
 

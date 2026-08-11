@@ -15,6 +15,7 @@ import { Customer } from '@/lib/customer';
 import { Invoice } from '@/lib/invoice';
 import { getTechnicians, ServiceTechnicianInfo } from '@/lib/serviceTicket';
 import { ContractAgreementModal } from '@/components/employeeComponents/ContractAgreementModal';
+import { InvoiceAccountView } from '@/components/invoice/InvoiceAccountView';
 import { getActiveCurrency } from '@/lib/currency';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { toast } from 'sonner';
@@ -45,6 +46,7 @@ import {
   ExternalLink,
   FileDown,
   Eye,
+  PlusCircle,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 
@@ -74,6 +76,9 @@ export default function SaleContractsPage() {
   // Agreement modal
   const [agreementTarget, setAgreementTarget] = useState<SaleContractRow | null>(null);
   const [agreementOpen, setAgreementOpen] = useState(false);
+
+  // Collection payment modal (Sale only — gated, goes to Finance queue)
+  const [collectionInvoiceId, setCollectionInvoiceId] = useState<string | null>(null);
 
   // Installation modal
   const [installTarget, setInstallTarget] = useState<SaleContractRow | null>(null);
@@ -163,8 +168,10 @@ export default function SaleContractsPage() {
     }
   };
 
+  const isSaleType = (saleType?: string | null) =>
+    ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(saleType || '');
+
   const statusBadge = (contract: SaleContractRow) => {
-    const isFullySigned = contract.agreement?.signatureStatus === 'FULLY_SIGNED';
     const installed = contract.installation?.status === 'COMPLETED';
     if (installed)
       return (
@@ -172,21 +179,30 @@ export default function SaleContractsPage() {
           Installed
         </span>
       );
-    if (isFullySigned)
+    // Agreement statuses only apply to Rent/Lease
+    if (!isSaleType(contract.saleType)) {
+      const isFullySigned = contract.agreement?.signatureStatus === 'FULLY_SIGNED';
+      if (isFullySigned)
+        return (
+          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-black uppercase tracking-wider">
+            Signed
+          </span>
+        );
+      if (contract.agreement)
+        return (
+          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[9px] font-black uppercase tracking-wider">
+            Partial Sig.
+          </span>
+        );
       return (
-        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[9px] font-black uppercase tracking-wider">
-          Signed
+        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-wider">
+          No Agreement
         </span>
       );
-    if (contract.agreement)
-      return (
-        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[9px] font-black uppercase tracking-wider">
-          Partial Sig.
-        </span>
-      );
+    }
     return (
       <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full text-[9px] font-black uppercase tracking-wider">
-        No Agreement
+        Active
       </span>
     );
   };
@@ -362,7 +378,9 @@ export default function SaleContractsPage() {
                         </TableCell>
                         <TableCell>{statusBadge(contract)}</TableCell>
                         <TableCell>
-                          {contract.agreement ? (
+                          {isSaleType(contract.saleType) ? (
+                            <span className="text-[10px] text-slate-400">—</span>
+                          ) : contract.agreement ? (
                             <div className="flex items-center gap-1">
                               {contract.agreement.employeeSignatureData && (
                                 <CheckCircle2
@@ -405,18 +423,20 @@ export default function SaleContractsPage() {
                                 <Eye size={14} />
                               </Button>
                             )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setAgreementTarget(contract);
-                                setAgreementOpen(true);
-                              }}
-                              className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50"
-                              title="Contract Agreement"
-                            >
-                              <FileSignature size={14} />
-                            </Button>
+                            {!isSaleType(contract.saleType) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setAgreementTarget(contract);
+                                  setAgreementOpen(true);
+                                }}
+                                className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50"
+                                title="Contract Agreement"
+                              >
+                                <FileSignature size={14} />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -435,9 +455,21 @@ export default function SaleContractsPage() {
                         <TableRow>
                           <TableCell colSpan={8} className="p-0 bg-slate-50/60">
                             <div className="px-6 py-3 border-l-2 border-indigo-200 ml-6">
-                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                                Payment History
-                              </p>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Payment History
+                                </p>
+                                {isSaleType(contract.saleType) && (
+                                  <button
+                                    onClick={() => setCollectionInvoiceId(contract.id)}
+                                    className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-0.5 transition-colors"
+                                    title="Record a new collection payment (sent to Finance for approval)"
+                                  >
+                                    <PlusCircle size={9} />
+                                    Record Collection
+                                  </button>
+                                )}
+                              </div>
                               {isLoadingPmts ? (
                                 <div className="flex items-center gap-2 py-2 text-slate-400">
                                   <Loader2 size={12} className="animate-spin" />
@@ -499,7 +531,12 @@ export default function SaleContractsPage() {
                                             </span>
                                           </td>
                                           <td className="py-1">
-                                            {pmt.status === 'APPROVED' ? (
+                                            {/* Sale: receipt available immediately; Rent/Lease: gated by approval */}
+                                            {(
+                                              isSaleType(contract.saleType)
+                                                ? pmt.status !== 'REJECTED'
+                                                : pmt.status === 'APPROVED'
+                                            ) ? (
                                               <button
                                                 onClick={() => handleGenerateReceipt(pmt)}
                                                 disabled={isGenerating}
@@ -547,7 +584,25 @@ export default function SaleContractsPage() {
         </CardContent>
       </Card>
 
-      {/* Contract Agreement Modal */}
+      {/* Sale Collection Payment (gated — goes to Finance queue) */}
+      {collectionInvoiceId && (
+        <InvoiceAccountView
+          invoiceId={collectionInvoiceId}
+          open={!!collectionInvoiceId}
+          gated
+          onClose={() => {
+            setCollectionInvoiceId(null);
+            // Reload payments for this invoice so the new PENDING row appears immediately
+            setPaymentsByInvoice((prev) => {
+              const updated = { ...prev };
+              delete updated[collectionInvoiceId];
+              return updated;
+            });
+          }}
+        />
+      )}
+
+      {/* Contract Agreement Modal (Rent/Lease only) */}
       {agreementTarget && (
         <ContractAgreementModal
           open={agreementOpen}
