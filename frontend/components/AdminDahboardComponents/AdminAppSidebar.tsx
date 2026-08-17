@@ -21,7 +21,6 @@ import {
   PieChart,
   TrendingUp,
   Globe,
-  FileBarChart,
   ArrowRightLeft,
   Bell,
   Wrench,
@@ -383,9 +382,7 @@ const adminAccountsMenuItems: MenuLink[] = [
   { title: 'Overview', icon: BarChart2, href: '/admin/accounts' },
   { title: 'Cash & Bank', icon: BookOpen, href: '/admin/accounts/cash-bank' },
   { title: 'Day Book', icon: CalendarDays, href: '/admin/accounts/day-book' },
-  { title: 'Cheques', icon: FileCheck, href: '/admin/accounts/cheques' },
   { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/admin/accounts/guarantee-cheques' },
-  { title: 'Expenses', icon: DollarSign, href: '/admin/accounts/expenses' },
   { title: 'Income', icon: Coins, href: '/admin/accounts/income' },
   { title: 'Receivables', icon: ReceiptText, href: '/admin/accounts/receivable' },
   { title: 'Payables', icon: CreditCard, href: '/admin/accounts/payable' },
@@ -401,7 +398,6 @@ const adminAccountsMenuItems: MenuLink[] = [
   { title: 'Equity', icon: Scale, href: '/admin/accounts/equity' },
   { title: 'Depreciation', icon: PieChart, href: '/admin/accounts/depreciation' },
   { title: 'Exchange Rates', icon: ArrowRightLeft, href: '/admin/accounts/exchange-rates' },
-  { title: 'Reports Hub', icon: FileBarChart, href: '/admin/accounts/reports' },
   { title: 'Data Integrity', icon: ShieldAlert, href: '/admin/accounts/data-integrity' },
 ];
 
