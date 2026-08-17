@@ -1,0 +1,124 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict ZUUHOMJ93Fhz654wlLF0XdJNyXVdtUrBFucMdu9FacSWyPaK7Iym0lS5RgtJ3Sq
+
+-- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
+-- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: customers; Type: TABLE; Schema: public; Owner: xerouser
+--
+
+CREATE TABLE public.customers (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying NOT NULL,
+    email character varying,
+    phone character varying,
+    location character varying(255),
+    "isActive" boolean DEFAULT true NOT NULL,
+    branch_id character varying,
+    "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
+    "updatedAt" timestamp without time zone DEFAULT now() NOT NULL,
+    address text,
+    vat_number character varying(50),
+    country character varying(2),
+    state_province character varying(100),
+    bank_name character varying(100),
+    bank_account_number character varying(50),
+    city character varying(100),
+    bank_accounts jsonb DEFAULT '[]'::jsonb,
+    vat_status character varying(30) DEFAULT 'UNREGISTERED_STANDARD'::character varying NOT NULL,
+    exemption_reason character varying(60),
+    created_by uuid,
+    updated_by uuid,
+    customer_type character varying(3) DEFAULT 'B2C'::character varying NOT NULL
+);
+
+
+ALTER TABLE public.customers OWNER TO xerouser;
+
+--
+-- Data for Name: customers; Type: TABLE DATA; Schema: public; Owner: xerouser
+--
+
+COPY public.customers (id, name, email, phone, location, "isActive", branch_id, "createdAt", "updatedAt", address, vat_number, country, state_province, bank_name, bank_account_number, city, bank_accounts, vat_status, exemption_reason, created_by, updated_by, customer_type) FROM stdin;
+f4e495c8-8a12-4805-94bc-05f3b33421b5	NADHIL CUSTOMER	nadhilkn33429@gmail.com	+974 66377377	\N	t	426625c1-62e8-4e14-952b-457452eb0f28	2026-08-10 13:53:24.87945	2026-08-10 13:53:24.87945	SHUTTUMANI BU LDING 123	\N	QA	Doha	Qatar National Bank (QNB)	345634354324	Doha	[{"iban": "QA123456456456433564343566456", "branch": "QNB DOHA BRANCH", "address": "QNB DOHA STREET 231", "bankName": "Qatar National Bank (QNB)", "currency": "QAR", "isPrimary": true, "swiftCode": "WEERFRW", "accountType": "Current Account", "bankCountry": "QA", "accountNumber": "345634354324", "routingNumber": "", "accountHolderName": "NADHIL"}]	UNREGISTERED_STANDARD	\N	eb75c7ec-441c-48b4-acea-295f64cfc332	\N	B2C
+f889a7bb-8903-4570-bc4d-bdaf7444fe4a	Omar Al Nuaimi	omar@mail.ae	+971502220002	Dubai	t	c24a0a2c-6b0f-4ae5-aaaf-0346a65e6b6e	2026-08-13 00:44:29.562992	2026-08-13 00:44:29.562992	Jumeirah 2	\N	AE	\N	\N	\N	Dubai	[]	UNREGISTERED_STANDARD	\N	eb75c7ec-441c-48b4-acea-295f64cfc332	\N	B2C
+5cc2aed0-cefe-46bc-9244-c2b7becefa73	Falcon Trading FZ-LLC	ap@falcon.ae	+971502220001	Dubai	t	c24a0a2c-6b0f-4ae5-aaaf-0346a65e6b6e	2026-08-13 00:44:29.511693	2026-08-13 00:49:28.422617	Business Bay	TRN555666777	AE	\N	\N	\N	Dubai	[]	REGISTERED	\N	eb75c7ec-441c-48b4-acea-295f64cfc332	eb75c7ec-441c-48b4-acea-295f64cfc332	B2B
+511213d3-3b9b-4a84-b0c0-0ae1f9eb0c18	Dubai Charity Foundation	fin@charity.ae	+971502220003	Dubai	t	c24a0a2c-6b0f-4ae5-aaaf-0346a65e6b6e	2026-08-13 00:44:29.593115	2026-08-13 00:49:47.599029	Deira	\N	AE	\N	\N	\N	Dubai	[]	EXEMPT	CHARITY_OR_NON_PROFIT	eb75c7ec-441c-48b4-acea-295f64cfc332	eb75c7ec-441c-48b4-acea-295f64cfc332	B2B
+\.
+
+
+--
+-- Name: customers PK_133ec679a801fab5e070f73d3ea; Type: CONSTRAINT; Schema: public; Owner: xerouser
+--
+
+ALTER TABLE ONLY public.customers
+    ADD CONSTRAINT "PK_133ec679a801fab5e070f73d3ea" PRIMARY KEY (id);
+
+
+--
+-- Name: IDX_2ae4f4add790956c0f16a48cb7; Type: INDEX; Schema: public; Owner: xerouser
+--
+
+CREATE INDEX "IDX_2ae4f4add790956c0f16a48cb7" ON public.customers USING btree (branch_id);
+
+
+--
+-- Name: IDX_8536b8b85c06969f84f0c098b0; Type: INDEX; Schema: public; Owner: xerouser
+--
+
+CREATE INDEX "IDX_8536b8b85c06969f84f0c098b0" ON public.customers USING btree (email);
+
+
+--
+-- Name: IDX_88acd889fbe17d0e16cc4bc917; Type: INDEX; Schema: public; Owner: xerouser
+--
+
+CREATE INDEX "IDX_88acd889fbe17d0e16cc4bc917" ON public.customers USING btree (phone);
+
+
+--
+-- Name: SCHEMA public; Type: ACL; Schema: -; Owner: pg_database_owner
+--
+
+GRANT ALL ON SCHEMA public TO xerouser;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict ZUUHOMJ93Fhz654wlLF0XdJNyXVdtUrBFucMdu9FacSWyPaK7Iym0lS5RgtJ3Sq
+

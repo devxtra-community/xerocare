@@ -100,6 +100,8 @@ export interface SalePaymentRequest {
   paymentTransactionId?: string;
   collectLater?: boolean;
   paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
+  /** Links a RENT_PERIODIC/LEASE_PERIODIC collection to the billing period it pays toward. */
+  usageRecordId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -113,6 +115,7 @@ export interface SaleContract {
   createdByEmployeeName?: string | null;
   status: string;
   contractStatus: string;
+  deliveryStatus: 'DELIVERED' | 'NOT_DELIVERED';
   saleType: string;
   totalAmount: number;
   currencyCode: string;
@@ -305,8 +308,56 @@ export const getPendingSalePayments = async (): Promise<SalePaymentRequest[]> =>
   return res.data.data;
 };
 
-export const getAllSalePayments = async (): Promise<SalePaymentRequest[]> => {
-  const res = await api.get<ApiResponse<SalePaymentRequest[]>>('/b/sale-payments');
+export const getAllSalePayments = async (params?: {
+  /** ADMIN only — comma-separated branch ids. Ignored by the server for other roles,
+   *  which stay locked to their own branch. */
+  branchIds?: string;
+}): Promise<SalePaymentRequest[]> => {
+  const res = await api.get<ApiResponse<SalePaymentRequest[]>>('/b/sale-payments', { params });
+  return res.data.data;
+};
+
+export interface PendingUsagePayment {
+  usageRecordId: string;
+  contractId: string;
+  invoiceNumber: string;
+  customerName: string | null;
+  saleType: string | null;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  totalCharge: number;
+  amountGiven: number;
+  amountPending: number;
+  createdAt: string;
+}
+
+/** Rent/Lease billing periods whose full charge hasn't yet been collected — a partial
+ *  collection's shortfall, or a period recorded with nothing collected at all. */
+export const getPendingUsagePayments = async (): Promise<PendingUsagePayment[]> => {
+  const res = await api.get<ApiResponse<PendingUsagePayment[]>>('/b/usage-payments/pending');
+  return res.data.data;
+};
+
+/** Collects a further amount against a specific period's outstanding shortfall. Creates
+ *  its own PENDING SalePaymentRequest linked to the same usageRecordId. */
+export const collectPendingUsagePayment = async (
+  usageRecordId: string,
+  data: {
+    amount: number;
+    paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+    paymentDate: string;
+    referenceNumber?: string;
+    cashAccountId?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDueDate?: string;
+    chequeDate?: string;
+  },
+): Promise<SalePaymentRequest> => {
+  const res = await api.post<ApiResponse<SalePaymentRequest>>(
+    `/b/usage-records/${usageRecordId}/collect-pending`,
+    data,
+  );
   return res.data.data;
 };
 
@@ -391,6 +442,17 @@ export const sendReceiptWhatsApp = async (
 
 export const getSaleContracts = async (): Promise<SaleContract[]> => {
   const res = await api.get<ApiResponse<SaleContract[]>>('/b/sale-contracts');
+  return res.data.data;
+};
+
+export const updateDeliveryStatus = async (
+  contractId: string,
+  deliveryStatus: 'DELIVERED' | 'NOT_DELIVERED',
+): Promise<{ id: string; deliveryStatus: string }> => {
+  const res = await api.patch<ApiResponse<{ id: string; deliveryStatus: string }>>(
+    `/b/sale-contracts/${contractId}/delivery-status`,
+    { deliveryStatus },
+  );
   return res.data.data;
 };
 

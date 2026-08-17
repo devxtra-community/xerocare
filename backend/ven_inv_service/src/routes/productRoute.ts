@@ -8,7 +8,11 @@ import {
   getproductbyid,
   getProductHistoryData,
 } from '../controllers/productController';
-import { getProductInventoryValue } from '../controllers/sparePartController';
+import {
+  getProductInventoryValue,
+  getWrittenOffProductValue,
+  getDeployedProductValue,
+} from '../controllers/sparePartController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 import { uploadProductImage } from '../middlewares/uploadProductImage';
@@ -22,6 +26,8 @@ const productRoute = Router();
 
 // Internal endpoint — no auth required (service-to-service call from billing_service)
 productRoute.get('/inventory-value', getProductInventoryValue);
+productRoute.get('/written-off-value', getWrittenOffProductValue);
+productRoute.get('/deployed-value', getDeployedProductValue);
 
 // --- 1. Basic Product Management ---
 
@@ -94,7 +100,12 @@ productRoute.post(
         return res.json({ success: true, data: [] });
       }
       const products = await Source.query(
+        // sale_price / wholesale_price / max_discount_amount are returned so Billing can
+        // enforce catalogue pricing on quotation lines (retail vs wholesale by customer
+        // type, and the per-unit discount ceiling) instead of trusting whatever price the
+        // caller sends.
         `SELECT p.id, p.serial_no, p.product_status, p.purchase_price, p.brand,
+                p.sale_price, p.wholesale_price, p.max_discount_amount,
                 m.model_name, b.name AS brand_name
          FROM products p
          LEFT JOIN model m ON m.id = p.model_id

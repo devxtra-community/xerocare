@@ -1242,6 +1242,7 @@ export function QuotationViewDialog({
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
                   taxName: vatLabel,
+                  taxPercent: rentTaxRate,
                   total: rentTotalAmount,
                 }}
               />
@@ -1256,6 +1257,7 @@ export function QuotationViewDialog({
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
                   taxName: vatLabel,
+                  taxPercent: rentTaxRate,
                   total: rentTotalAmount,
                 }}
               />
@@ -1270,6 +1272,7 @@ export function QuotationViewDialog({
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
                   taxName: vatLabel,
+                  taxPercent: rentTaxRate,
                   total: rentTotalAmount,
                 }}
               />
@@ -1284,6 +1287,7 @@ export function QuotationViewDialog({
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
                   taxName: vatLabel,
+                  taxPercent: leaseTaxRate,
                   total: leaseTotalAmount,
                 }}
               />
@@ -1298,6 +1302,7 @@ export function QuotationViewDialog({
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
                   taxName: vatLabel,
+                  taxPercent: leaseTaxRate,
                   total: leaseTotalAmount,
                 }}
               />
@@ -1312,6 +1317,7 @@ export function QuotationViewDialog({
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
                   taxName: vatLabel,
+                  taxPercent: leaseTaxRate,
                   total: leaseTotalAmount,
                 }}
               />

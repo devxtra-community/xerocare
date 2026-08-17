@@ -155,6 +155,18 @@ export function QuotationConversionFlow({
   );
   const [cautionReference] = useState(quotation.securityDepositReference || '');
 
+  // The entered advance is the pre-tax base (mirrors monthlyRent/advanceAmount being
+  // tax-exclusive everywhere else on the contract) — VAT is layered on top here purely
+  // for display, matching the exact gross-up createSalePaymentRequest applies server-side
+  // when this is submitted, so what's shown here never drifts from what actually gets
+  // recorded, receipted, and sent to Accounts.
+  const advanceTaxPercent = Number(quotation.taxPercent || 0);
+  const advanceTaxAmount =
+    advanceTaxPercent > 0 && Number(advanceAmount) > 0
+      ? (Number(advanceAmount) * advanceTaxPercent) / 100
+      : 0;
+  const advanceInclTax = Number(advanceAmount || 0) + advanceTaxAmount;
+
   const updateSerial = (index: number, productId: string) => {
     setSerialUpdates((prev) => {
       const updated = [...prev];
@@ -237,13 +249,13 @@ export function QuotationConversionFlow({
       if (hasAdvance && hasCaution) {
         successMsg +=
           paymentMode === 'CHEQUE'
-            ? ` Cheque (PENDING) ${currency} ${Number(advanceAmount).toFixed(2)} and Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`
-            : ` Advance ${currency} ${Number(advanceAmount).toFixed(2)} and Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`;
+            ? ` Cheque (PENDING) ${currency} ${advanceInclTax.toFixed(2)} and Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`
+            : ` Advance ${currency} ${advanceInclTax.toFixed(2)} and Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`;
       } else if (hasAdvance) {
         successMsg +=
           paymentMode === 'CHEQUE'
             ? ` Cheque recorded (PENDING) — go to Accounts → Cheques to deposit when cleared.`
-            : ` Advance ${currency} ${Number(advanceAmount).toFixed(2)} recorded.`;
+            : ` Advance ${currency} ${advanceInclTax.toFixed(2)} recorded.`;
       } else if (hasCaution) {
         successMsg += ` Caution ${currency} ${Number(cautionAmount).toFixed(2)} recorded.`;
       }
@@ -443,6 +455,13 @@ export function QuotationConversionFlow({
                       placeholder="0.00"
                       className="h-10 font-black text-emerald-600 text-sm border-slate-200 focus:border-emerald-300"
                     />
+                    {advanceAmount && Number(advanceAmount) > 0 && advanceTaxAmount > 0 && (
+                      <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                        + {quotation.taxName || 'VAT'} ({advanceTaxPercent}%){' '}
+                        {advanceTaxAmount.toFixed(2)} = {currency} {advanceInclTax.toFixed(2)} will
+                        be collected
+                      </p>
+                    )}
                   </div>
                   {advanceAmount && Number(advanceAmount) > 0 && (
                     <>
@@ -579,9 +598,13 @@ export function QuotationConversionFlow({
                 <div className="flex justify-between text-[11px] font-bold">
                   <span className="text-slate-400 uppercase tracking-widest">
                     Advance / Caution Deposit
+                    {advanceTaxAmount > 0 ? ` (Incl. ${quotation.taxName || 'VAT'})` : ''}
                   </span>
                   <span className="text-emerald-600 font-black">
-                    {currency} {Number(advanceAmount || 0).toFixed(2)}
+                    {currency}{' '}
+                    {(advanceTaxAmount > 0 ? advanceInclTax : Number(advanceAmount || 0)).toFixed(
+                      2,
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px] font-bold">

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search, Loader2, Eye, FileText, Activity } from 'lucide-react';
+import { Plus, Search, Loader2, Eye, FileText, Activity, Wallet } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
 import { formatCurrency } from '@/lib/format';
@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
+import { SalePaymentCollectionModal } from '../invoice/SalePaymentCollectionModal';
 
 interface EmployeeSalesTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
@@ -90,6 +91,8 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
   const [loading, setLoading] = useState(true);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  // Payment Collection panel — the sale being collected against, if any.
+  const [collectionTarget, setCollectionTarget] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('All');
   const [isConverterOpen, setIsConverterOpen] = useState(false);
@@ -187,6 +190,19 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
       // Done loading
     }
   };
+
+  // Statuses where the sale is void/terminal — collecting a payment against it, or even
+  // offering to, makes no sense. Every other Sale status here (DRAFT through PAID) is a
+  // live invoice that can still have money collected against it.
+  const COLLECTION_VOID_STATUSES = new Set([
+    'CANCELLED',
+    'RETAKEN',
+    'SUPERSEDED',
+    'REJECTED',
+    'CUSTOMER_REJECTED',
+    'FINANCE_REJECTED',
+    'EXPIRED',
+  ]);
 
   const filteredInvoices = invoices
     .filter(
@@ -501,9 +517,22 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                           size="sm"
                           className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
                           onClick={() => handleViewDetails(inv.id)}
+                          title="View Details"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
+                        {!COLLECTION_VOID_STATUSES.has(inv.status) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                            onClick={() => setCollectionTarget(inv)}
+                            title="Payment Collection"
+                          >
+                            <Wallet className="h-4 w-4" />
+                          </Button>
+                        )}
 
                         {currentUser &&
                           ['MANAGER', 'FINANCE', 'ADMIN'].includes(currentUser.role) && (
@@ -538,6 +567,14 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
 
       {/* formOpen rendering logic removed, sale forms now go through quotient conversion only */}
 
+      {collectionTarget && (
+        <SalePaymentCollectionModal
+          invoiceId={collectionTarget.id}
+          invoiceNumber={collectionTarget.invoiceNumber}
+          open={!!collectionTarget}
+          onClose={() => setCollectionTarget(null)}
+        />
+      )}
       {detailsOpen && selectedInvoice && (
         <InvoiceDetailsDialog
           invoice={selectedInvoice}

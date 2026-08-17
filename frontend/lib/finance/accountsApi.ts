@@ -29,6 +29,18 @@ export interface CashBankAccount {
   isDefault?: boolean;
   createdAt: string;
   updatedAt: string;
+  // Submission-only (creation time) — a non-zero openingBalance needs a matching Equity
+  // entry so it's a documented capital injection rather than money with no origin. Not
+  // persisted on the account itself; threaded through to createCashBankAccount, which
+  // creates the linked Equity entry of this type. Reuses the same 3 of the 6
+  // CREATABLE_EQUITY_TYPES that make sense as a capital-injection source — OTHER is
+  // deliberately excluded here since it isn't summed into any Balance Sheet total,
+  // unlike OPENING_BALANCE_EQUITY (the "no further categorization" option), which is.
+  openingBalanceSource?: 'SHARE_CAPITAL' | 'OWNER_CONTRIBUTION' | 'OPENING_BALANCE_EQUITY';
+  ownerId?: string;
+  numberOfShares?: number;
+  pricePerShare?: number;
+  documentUrl?: string;
 }
 
 export interface AccountReconciliation {

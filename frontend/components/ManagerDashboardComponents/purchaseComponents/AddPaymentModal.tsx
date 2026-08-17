@@ -231,8 +231,12 @@ export default function AddPaymentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] border-none shadow-2xl p-0 overflow-hidden rounded-2xl">
-        <div className="bg-slate-900 px-6 py-6 text-white">
+      {/* Capped to the viewport and laid out as a column: the header and the action buttons
+          stay put while only the field area scrolls. Without the cap this dialog grew past
+          the bottom of the screen — `overflow-hidden` then clipped it with nothing to
+          scroll, so on shorter windows the submit button was simply unreachable. */}
+      <DialogContent className="sm:max-w-[450px] border-none shadow-2xl p-0 overflow-hidden rounded-2xl flex flex-col max-h-[90dvh]">
+        <div className="bg-slate-900 px-6 py-6 text-white shrink-0">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <CreditCard className="text-blue-400" />
@@ -261,203 +265,208 @@ export default function AddPaymentModal({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-white">
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
-              Payment Amount
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                {currencyCode}
-              </span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                className="pl-12 h-11 text-lg font-bold border-slate-200 focus:ring-primary"
-                value={formData.amount || ''}
-                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                autoFocus
-              />
-            </div>
-            {formData.amount > 0 && formData.amount < remainingAmount && (
-              <p className="text-[10px] text-yellow-600 font-medium italic">
-                Partial payment recognized
-              </p>
-            )}
-            {formData.amount >= remainingAmount - 0.01 &&
-              formData.amount <= remainingAmount + 0.01 && (
-                <p className="text-[10px] text-green-600 font-medium italic">
-                  Full payment recognized
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-white">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
+                Payment Amount
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                  {currencyCode}
+                </span>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  className="pl-12 h-11 text-lg font-bold border-slate-200 focus:ring-primary"
+                  value={formData.amount || ''}
+                  onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                  autoFocus
+                />
+              </div>
+              {formData.amount > 0 && formData.amount < remainingAmount && (
+                <p className="text-[10px] text-yellow-600 font-medium italic">
+                  Partial payment recognized
                 </p>
               )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                <Calendar size={12} /> Date
-              </Label>
-              <Input
-                type="date"
-                required
-                className="h-10 text-xs border-slate-200"
-                value={formData.paymentDate}
-                onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-              />
+              {formData.amount >= remainingAmount - 0.01 &&
+                formData.amount <= remainingAmount + 0.01 && (
+                  <p className="text-[10px] text-green-600 font-medium italic">
+                    Full payment recognized
+                  </p>
+                )}
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                <Hash size={12} /> Ref #
-              </Label>
-              <Input
-                placeholder="TRX..."
-                className="h-10 text-xs border-slate-200"
-                value={formData.referenceNumber}
-                onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                  <Calendar size={12} /> Date
+                </Label>
+                <Input
+                  type="date"
+                  required
+                  className="h-10 text-xs border-slate-200"
+                  value={formData.paymentDate}
+                  onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                  <Hash size={12} /> Ref #
+                </Label>
+                <Input
+                  placeholder="TRX..."
+                  className="h-10 text-xs border-slate-200"
+                  value={formData.referenceNumber}
+                  onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Payment Method</Label>
-            <Select
-              value={formData.paymentMethod}
-              onValueChange={(val) => setFormData({ ...formData, paymentMethod: val })}
-            >
-              <SelectTrigger className="h-10 text-xs border-slate-200">
-                <SelectValue placeholder="Select method" />
-              </SelectTrigger>
-              <SelectContent>
-                {['Bank Transfer', 'Cash', 'Credit Card', 'Cheque', 'Online Payment'].map((m) => (
-                  <SelectItem key={m} value={m} className="text-xs">
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {formData.paymentMethod !== 'Cheque' && accounts.length > 0 && (
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase">Pay From Account</Label>
-              <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+              <Label className="text-xs font-bold text-slate-500 uppercase">Payment Method</Label>
+              <Select
+                value={formData.paymentMethod}
+                onValueChange={(val) => setFormData({ ...formData, paymentMethod: val })}
+              >
                 <SelectTrigger className="h-10 text-xs border-slate-200">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder="Select method" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id} className="text-xs">
-                      {a.name} ({a.type})
+                  {['Bank Transfer', 'Cash', 'Credit Card', 'Cheque', 'Online Payment'].map((m) => (
+                    <SelectItem key={m} value={m} className="text-xs">
+                      {m}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
 
-          {formData.paymentMethod === 'Cheque' && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
-              <p className="text-xs font-bold text-amber-700">
-                Cheque details — creates a PENDING issued cheque. Cash at Bank moves only when
-                Finance marks it Cleared.
-              </p>
+            {formData.paymentMethod !== 'Cheque' && accounts.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-500 uppercase">
-                  Cheque Number *
+                  Pay From Account
                 </Label>
-                <Input
-                  required
-                  placeholder="e.g. CHQ-001234"
-                  className="h-10 text-xs border-slate-200"
-                  value={chequeNumber}
-                  onChange={(e) => setChequeNumber(e.target.value)}
-                />
+                <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                  <SelectTrigger className="h-10 text-xs border-slate-200">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id} className="text-xs">
+                        {a.name} ({a.type})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+            )}
+
+            {formData.paymentMethod === 'Cheque' && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
+                <p className="text-xs font-bold text-amber-700">
+                  Cheque details — creates a PENDING issued cheque. Cash at Bank moves only when
+                  Finance marks it Cleared.
+                </p>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase">Our Bank *</Label>
+                  <Label className="text-xs font-bold text-slate-500 uppercase">
+                    Cheque Number *
+                  </Label>
                   <Input
                     required
-                    placeholder="e.g. Emirates NBD"
+                    placeholder="e.g. CHQ-001234"
                     className="h-10 text-xs border-slate-200"
-                    value={chequeBankName}
-                    onChange={(e) => setChequeBankName(e.target.value)}
+                    value={chequeNumber}
+                    onChange={(e) => setChequeNumber(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-500 uppercase">Due Date *</Label>
-                  <Input
-                    type="date"
-                    required
-                    className="h-10 text-xs border-slate-200"
-                    value={chequeDueDate}
-                    onChange={(e) => setChequeDueDate(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase">Our Bank *</Label>
+                    <Input
+                      required
+                      placeholder="e.g. Emirates NBD"
+                      className="h-10 text-xs border-slate-200"
+                      value={chequeBankName}
+                      onChange={(e) => setChequeBankName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase">Due Date *</Label>
+                    <Input
+                      type="date"
+                      required
+                      className="h-10 text-xs border-slate-200"
+                      value={chequeDueDate}
+                      onChange={(e) => setChequeDueDate(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <FileText size={12} /> Description
+              </Label>
+              <Input
+                placeholder="e.g. Advance payment for shipping"
+                className="h-10 text-xs border-slate-200"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <FileText size={12} /> Description
-            </Label>
-            <Input
-              placeholder="e.g. Advance payment for shipping"
-              className="h-10 text-xs border-slate-200"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <Paperclip size={12} /> Receipt / Screenshot
-            </Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            {attachment ? (
-              <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
-                <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <Paperclip size={12} /> Receipt / Screenshot
+              </Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              {attachment ? (
+                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
+                  <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachment(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                    title="Remove attachment"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    setAttachment(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
-                  title="Remove attachment"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
                 >
-                  <X size={14} />
+                  Attach receipt image or PDF (optional)
                 </button>
+              )}
+            </div>
+
+            {getUserFromToken()?.role === 'MANAGER' && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                Payment requests require Finance approval before funds are deducted. Outstanding
+                balance updates immediately; cash moves only after approval.
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
-              >
-                Attach receipt image or PDF (optional)
-              </button>
             )}
           </div>
 
-          {getUserFromToken()?.role === 'MANAGER' && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-              Payment requests require Finance approval before funds are deducted. Outstanding
-              balance updates immediately; cash moves only after approval.
-            </div>
-          )}
-
-          <div className="pt-4 flex gap-3">
+          {/* Pinned action bar — stays visible no matter how long the form gets. */}
+          <div className="shrink-0 flex gap-3 border-t border-slate-200 bg-white px-6 py-4">
             <Button
               type="button"
               variant="ghost"

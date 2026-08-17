@@ -18,6 +18,39 @@ import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent'
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { MoreThanOrEqual } from 'typeorm';
 
+/**
+ * Chooses the contract line that defines the billing plan.
+ *
+ * A contract holds both PRODUCT lines (the allocated machines) and a PRICING_RULE line
+ * (the limits and excess rates). Only the latter carries the numbers billing needs, so an
+ * explicit PRICING_RULE always wins. A PRODUCT is used only as a fallback, and only if it
+ * actually carries limit/rate data, as some older contracts stored the plan there.
+ */
+function selectPricingRule<
+  T extends {
+    itemType?: string;
+    bwIncludedLimit?: number | null;
+    colorIncludedLimit?: number | null;
+    combinedIncludedLimit?: number | null;
+    bwExcessRate?: number | null;
+    colorExcessRate?: number | null;
+    combinedExcessRate?: number | null;
+  },
+>(candidates: T[]): T | undefined {
+  const explicit = candidates.find((c) => c.itemType === 'PRICING_RULE');
+  if (explicit) return explicit;
+
+  const carriesPlan = (c: T) =>
+    c.bwIncludedLimit != null ||
+    c.colorIncludedLimit != null ||
+    c.combinedIncludedLimit != null ||
+    c.bwExcessRate != null ||
+    c.colorExcessRate != null ||
+    c.combinedExcessRate != null;
+
+  return candidates.find(carriesPlan) ?? candidates[0];
+}
+
 export class UsageService {
   private usageRepo = new UsageRepository();
   private invoiceRepo = new InvoiceRepository();
@@ -49,11 +82,14 @@ export class UsageService {
       endColorA3: number;
     }>;
     /**
-     * Optional payment collected for this billing period at the same time the bill is
-     * generated. When paymentMode is present, this period's charge is accrued onto the
-     * contract's totalAmount and immediately paid via the shared recordPayment() flow —
-     * the same one that creates the PENDING RECEIVED cheque for CHEQUE-mode payments.
+     * Payment collected for this billing period at the same time the bill is generated.
+     * This period's charge is always accrued onto the contract's totalAmount; the amount
+     * collected (which may be less than the full charge — a partial collection, or 0 for
+     * a fully deferred period) is submitted as a PENDING SalePaymentRequest, going through
+     * the exact same Accounts-approval gate as every other collection. Defaults to the
+     * full period charge when omitted, for backward-compatible callers.
      */
+    amountCollected?: number;
     paymentMode?: string;
     paymentReferenceNumber?: string;
     paymentDate?: string;
@@ -62,6 +98,7 @@ export class UsageService {
     chequeDueDate?: string;
     /** The date physically written on the cheque — independent of chequeDueDate. */
     chequeDate?: string;
+    cashAccountId?: string;
     recordedBy?: string;
   }) {
     // 1. Fetch Contract
@@ -106,15 +143,18 @@ export class UsageService {
       contract.items?.filter((i) => i.itemType === 'PRICING_RULE' || i.itemType === 'PRODUCT') ||
       [];
 
-    // Sort to prefer PRICING_RULE if both exist? Or just take first.
-    // Usually only one exists.
-
     if (pricingRules.length === 0) {
       logger.warn('No pricing rules (or products with limits) found for contract', {
         contractId: contract.id,
       });
     }
-    const rule = pricingRules[0]; // Assuming single rule for now
+    // Pick the line that actually carries the plan, never simply the first item.
+    // This used to take pricingRules[0], so on any contract whose PRODUCT line is stored
+    // before its PRICING_RULE line the "rule" was the product — which has no limits or
+    // excess rates — and EVERY overage charge silently computed to zero. The customer was
+    // billed base rent only, with no error anywhere. PRODUCT lines are still accepted as a
+    // fallback because older contracts carried the limits directly on the product.
+    const rule = selectPricingRule(pricingRules);
 
     // 3. Previous Readings & Allocations for Delta Calculation
     const previousRecord = history.length > 0 ? history[0] : null;
@@ -428,11 +468,17 @@ export class UsageService {
         contract.advanceAdjusted = advanceAdjusted;
 
         // Payable = (Rent + Exceeded) - Deducted Advance - Discount
-        const finalPeriodCharge = Math.max(
+        const finalPeriodChargeBase = Math.max(
           0,
           monthlyRent + exceededCharge - advanceAdjusted - (payload.discountAmount || 0),
         );
+        const finalPeriodTax = this.computePeriodTax(finalPeriodChargeBase, contract);
+        const finalPeriodCharge = finalPeriodTax.totalWithTax;
         contract.totalAmount = finalPeriodCharge;
+        // This final settlement figure replaces (not accrues) the contract's totalAmount,
+        // so taxAmount is replaced to match rather than accrued — keeping them consistent
+        // for the Output Tax / VAT Payable reports, which derive taxableAmount from the two.
+        contract.taxAmount = finalPeriodTax.taxAmount;
 
         contract.grossAmount = monthlyRent + exceededCharge; // Show full amount as Gross
         contract.discountAmount =
@@ -458,7 +504,10 @@ export class UsageService {
           exceededCharge,
           monthlyRent, // Store ACTUAL rent
           advanceAdjusted, // Store Advance Used
-          totalCharge: finalPeriodCharge, // Store ACTUAL PAYABLE charge
+          totalCharge: finalPeriodCharge, // Store ACTUAL PAYABLE charge (VAT-inclusive)
+          taxableAmount: finalPeriodTax.taxableAmount,
+          taxAmount: finalPeriodTax.taxAmount,
+          taxPercent: finalPeriodTax.taxPercent || undefined,
           exceededTotal,
           discountBwCopies: payload.discountBwCopies || 0,
           discountColorCopies: payload.discountColorCopies || 0,
@@ -478,13 +527,14 @@ export class UsageService {
 
         await queryRunner.commitTransaction();
 
-        // Collect payment for this final period if payment details were supplied — must run
-        // after commit so the invoice row is visible to recordPayment()'s query. Routes
-        // through the exact same billingService.recordPayment() used by activateContract()'s
-        // deposit, so CHEQUE mode creates a correctly-labeled PENDING RECEIVED cheque here too.
-        await this.collectUsageBillPayment(
+        // Collect payment for this final period — must run after commit so the invoice/
+        // usage rows are visible to the query. Creates a PENDING SalePaymentRequest (same
+        // Accounts-approval gate as every other collection) rather than settling directly;
+        // returns null if nothing was collected this visit (amountCollected <= 0).
+        const finalSalePaymentRequest = await this.collectUsageBillPayment(
           contract,
           finalPeriodCharge,
+          usage.id,
           usage.billingPeriodStart,
           usage.billingPeriodEnd,
           payload,
@@ -537,7 +587,7 @@ export class UsageService {
           colorA3: totalEndColorA3 || payload.colorA3Count,
         });
 
-        return usage;
+        return { usage, salePaymentRequest: finalSalePaymentRequest };
       } catch (error) {
         await queryRunner.rollbackTransaction();
         logger.error('Record Usage Transaction failed', { error, contractId: contract.id });
@@ -547,10 +597,12 @@ export class UsageService {
       }
     } else {
       // === STANDARD MONTH LOGIC ===
-      const periodCharge = Math.max(
+      const periodChargeBase = Math.max(
         0,
         exceededCharge + monthlyRent - (payload.discountAmount || 0),
       );
+      const periodTax = this.computePeriodTax(periodChargeBase, contract);
+      const periodCharge = periodTax.totalWithTax;
       const usage = this.usageRepo.create({
         contract: { id: payload.contractId } as Invoice,
         billingPeriodStart: new Date(payload.billingPeriodStart),
@@ -568,7 +620,10 @@ export class UsageService {
         remarks: payload.remarks,
         exceededCharge,
         monthlyRent,
-        totalCharge: periodCharge,
+        totalCharge: periodCharge, // VAT-inclusive
+        taxableAmount: periodTax.taxableAmount,
+        taxAmount: periodTax.taxAmount,
+        taxPercent: periodTax.taxPercent || undefined,
         exceededTotal,
         discountBwCopies: payload.discountBwCopies || 0,
         discountColorCopies: payload.discountColorCopies || 0,
@@ -591,16 +646,21 @@ export class UsageService {
       // never grows beyond the original advance for an ongoing Rent/Lease contract, since
       // this same invoice is reused across every billing period (no per-period invoice
       // is created). This does not touch the pricing/usage calculation above — it only
-      // accrues what was already computed.
+      // accrues what was already computed (now VAT-inclusive). taxAmount is accrued
+      // alongside it so the Output Tax report and VAT Payable (2003), which both read
+      // Invoice.totalAmount/taxAmount directly, stay correct as periods accumulate.
       contract.totalAmount = Number(contract.totalAmount || 0) + periodCharge;
+      contract.taxAmount = Number(contract.taxAmount || 0) + periodTax.taxAmount;
       await this.invoiceRepo.saveInvoice(contract);
 
-      // Collect payment for this period if payment details were supplied — routes through
-      // the exact same billingService.recordPayment() used by activateContract()'s deposit,
-      // so CHEQUE mode creates a correctly-labeled PENDING RECEIVED cheque here too.
-      await this.collectUsageBillPayment(
+      // Collect payment for this period — creates a PENDING SalePaymentRequest (same
+      // Accounts-approval gate as every other collection) rather than settling directly;
+      // returns null if nothing was collected this visit (amountCollected <= 0), leaving
+      // the full charge outstanding and visible on the Pending Payments tab.
+      const salePaymentRequest = await this.collectUsageBillPayment(
         contract,
         periodCharge,
+        usage.id,
         usage.billingPeriodStart,
         usage.billingPeriodEnd,
         payload,
@@ -617,7 +677,7 @@ export class UsageService {
         colorA3: totalEndColorA3 || payload.colorA3Count,
       });
 
-      return { usage, nextPeriod };
+      return { usage, nextPeriod, salePaymentRequest };
     }
   }
 
@@ -669,6 +729,20 @@ export class UsageService {
     return count * Number(applicableRate);
   }
 
+  // Layers VAT on top of an already-computed period charge, using the contract's own
+  // snapshotted taxPercent (set once at quotation creation, never recalculated — the
+  // same invariant already applied to Invoice.taxName/taxAmount). Does not touch the
+  // pricing calculation itself — taxableAmount is exactly what that calculation already
+  // produced (base rent + excess usage − discount, or the final-month equivalent).
+  private computePeriodTax(
+    taxableAmount: number,
+    contract: Invoice,
+  ): { taxableAmount: number; taxAmount: number; totalWithTax: number; taxPercent: number } {
+    const taxPercent = Number(contract.taxPercent || 0);
+    const taxAmount = taxPercent > 0 ? Math.round(taxableAmount * taxPercent) / 100 : 0;
+    return { taxableAmount, taxAmount, totalWithTax: taxableAmount + taxAmount, taxPercent };
+  }
+
   // Helper: human-readable billing period label used in the cheque sourceLabel — works
   // uniformly for Monthly ("Aug 2026"), Quarterly/Half-Yearly/Yearly ("Jul 2026 to Sep 2026")
   // since it's derived from the actual period dates, not the cycle type.
@@ -680,17 +754,25 @@ export class UsageService {
     return startLabel === endLabel ? startLabel : `${startLabel} to ${endLabel}`;
   }
 
-  // Accrues this period's charge onto the contract's running total and immediately collects
-  // payment for it through the SAME shared payment-recording path used by activateContract()'s
-  // deposit — this is what creates the PENDING RECEIVED cheque for CHEQUE-mode payments. Never
-  // called unless the caller supplied paymentMode, so contracts that only record usage without
-  // collecting payment in the same action are unaffected.
+  // Submits whatever was collected for this period as a PENDING SalePaymentRequest —
+  // the same Accounts-approval gate every other collection goes through (advance,
+  // Monthly Collection's final-invoice "Collect", InvoiceAccountView). Previously this
+  // called billingService.recordPayment() directly, settling the money immediately with
+  // no approval step and no SalePaymentRequest row at all — invisible to Accounts
+  // Receipts and to receipt generation, both of which key off that table. The amount
+  // collected may be less than periodChargeAmount (a partial collection) or 0 (fully
+  // deferred); either way the shortfall stays implicitly tracked as
+  // periodChargeAmount minus whatever SalePaymentRequests end up linked to this
+  // usageRecordId (see getPendingUsagePayments), so it surfaces on the Pending
+  // Payments tab rather than silently sitting inside contract.totalAmount unresolved.
   private async collectUsageBillPayment(
     contract: Invoice,
     periodChargeAmount: number,
+    usageRecordId: string,
     billingPeriodStart: Date,
     billingPeriodEnd: Date,
     payload: {
+      amountCollected?: number;
       paymentMode?: string;
       paymentReferenceNumber?: string;
       paymentDate?: string;
@@ -698,38 +780,50 @@ export class UsageService {
       chequeBankName?: string;
       chequeDueDate?: string;
       chequeDate?: string;
+      cashAccountId?: string;
       recordedBy?: string;
     },
   ) {
-    if (!payload.paymentMode || periodChargeAmount <= 0) return;
+    const amount =
+      payload.amountCollected !== undefined && payload.amountCollected !== null
+        ? Number(payload.amountCollected)
+        : periodChargeAmount;
+
+    if (amount <= 0) return null; // fully deferred this visit — nothing to submit
+
+    if (amount > periodChargeAmount + 0.01) {
+      throw new AppError(
+        `Amount collected (${amount}) cannot exceed this period's charge (${periodChargeAmount})`,
+        400,
+      );
+    }
+    if (!payload.paymentMode) {
+      throw new AppError('Payment mode is required when collecting an amount', 400);
+    }
 
     // Dynamic import avoids a circular dependency — BillingService already constructs
     // UsageService (`private usageService = new UsageService()`), so a static top-level
     // import here would fail. Same pattern already used elsewhere in this codebase for
     // breaking circular references (e.g. Cheque/PaymentLedger imports in billingService.ts).
-    const { BillingService } = await import('./billingService');
-    const billingService = new BillingService();
+    const { createSalePaymentRequest } = await import('./salePaymentRequestService');
 
-    await billingService.recordPayment(
-      contract.id,
-      {
-        paymentMode: payload.paymentMode,
-        referenceNumber: payload.chequeNumber || payload.paymentReferenceNumber,
-        amount: periodChargeAmount,
-        transactionDate: payload.paymentDate || new Date().toISOString().split('T')[0],
-        remarks: `Usage bill — ${this.formatPeriodLabel(billingPeriodStart, billingPeriodEnd)}`,
-        // The contract invoice may be ACTIVE_CONTRACT (already allowed) — bypassStatusCheck
-        // is harmless here and keeps this consistent with the other invoice-level payment
-        // entry points that recurring billing shares infrastructure with.
-        bypassStatusCheck: true,
-        chequeNumber: payload.chequeNumber,
-        chequeBankName: payload.chequeBankName,
-        chequeDueDate: payload.chequeDueDate,
-        chequeDate: payload.chequeDate,
-        periodLabel: this.formatPeriodLabel(billingPeriodStart, billingPeriodEnd),
-      },
-      payload.recordedBy,
-    );
+    return createSalePaymentRequest({
+      invoiceId: contract.id,
+      branchId: contract.branchId,
+      userId: payload.recordedBy || 'system',
+      amount,
+      paymentMode: payload.paymentMode,
+      paymentDate: payload.paymentDate ? new Date(payload.paymentDate) : new Date(),
+      referenceNumber: payload.chequeNumber || payload.paymentReferenceNumber,
+      remarks: `Usage bill — ${this.formatPeriodLabel(billingPeriodStart, billingPeriodEnd)}`,
+      cashAccountId: payload.cashAccountId,
+      chequeNumber: payload.chequeNumber,
+      chequeBankName: payload.chequeBankName,
+      chequeDueDate: payload.chequeDueDate ? new Date(payload.chequeDueDate) : undefined,
+      chequeDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+      paymentContext: contract.saleType === SaleType.RENT ? 'RENT_PERIODIC' : 'LEASE_PERIODIC',
+      usageRecordId,
+    });
   }
 
   // Helper: Next Period
@@ -1332,7 +1426,8 @@ export class UsageService {
     const pricingRules =
       contract.items?.filter((i) => i.itemType === 'PRICING_RULE' || i.itemType === 'PRODUCT') ||
       [];
-    const rule = pricingRules[0];
+    // Same selection rule as above — see the comment there for why [0] is wrong.
+    const rule = selectPricingRule(pricingRules);
 
     let prevBwA4 = 0;
     let prevBwA3 = 0;

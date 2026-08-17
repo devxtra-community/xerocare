@@ -14,9 +14,11 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
+import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 
 export default function BranchDeepDivePage() {
   const currency = useBranchCurrency();
+  const { getBranchName } = useBranchNameMap();
   const { branchId } = useParams<{ branchId: string }>();
 
   const params = { branchIds: branchId };
@@ -60,8 +62,8 @@ export default function BranchDeepDivePage() {
         <div className="flex items-center gap-2">
           <Building2 className="h-5 w-5 text-blue-600" />
           <h1 className="text-xl font-bold text-gray-900">Branch Deep Dive</h1>
-          <span className="bg-blue-100 text-blue-700 text-xs font-mono px-2 py-0.5 rounded">
-            {branchId?.slice(0, 8)}…
+          <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded">
+            {getBranchName(branchId)}
           </span>
         </div>
       </div>

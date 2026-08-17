@@ -16,6 +16,7 @@ import StatCard from '@/components/StatCard';
 import { SimpleBarChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import Link from 'next/link';
+import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 
 const STATUS_STYLE: Record<string, string> = {
   HEALTHY: 'bg-emerald-100 text-emerald-700',
@@ -25,6 +26,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 function AccountsOverviewContent() {
   const currency = useBranchCurrency();
+  const { getBranchName } = useBranchNameMap();
   const searchParams = useSearchParams();
   const branchIds = searchParams.get('branchIds') ?? '';
   const period = searchParams.get('period') ?? 'this_year';
@@ -187,7 +189,7 @@ function AccountsOverviewContent() {
               <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   {[
-                    'Branch ID',
+                    'Branch',
                     'Revenue',
                     'Expenses',
                     'Net Profit',
@@ -213,8 +215,8 @@ function AccountsOverviewContent() {
                 ) : (
                   branchPerf.map((row) => (
                     <tr key={row.branchId} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">
-                        {row.branchId.slice(0, 8)}…
+                      <td className="px-4 py-3 text-gray-700 font-medium">
+                        {getBranchName(row.branchId)}
                       </td>
                       <td className="px-4 py-3 text-emerald-600">
                         {formatCurrency(row.revenue, currency)}

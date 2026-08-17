@@ -210,11 +210,19 @@ router.get('/notifications', async (req, res, next) => {
     }
     const placeholders = branchIds.map((_, i) => `$${i + 1}`).join(',');
     const rows = await Source.query<Cheque[]>(
+      // Remind on BOTH dates, not just the due date. cheque_date is the date written on
+      // the cheque — for a post-dated cheque it is the day it becomes presentable, and it
+      // can fall well before the due date. Keying the reminder solely off due_date meant a
+      // cheque becoming presentable in two days produced no warning at all, which is half
+      // the point of the reminder. Ordered by whichever of the two lands first.
       `SELECT * FROM cheques
        WHERE branch_id IN (${placeholders})
          AND status IN ('PENDING', 'ISSUED')
-         AND due_date <= CURRENT_DATE + INTERVAL '3 days'
-       ORDER BY due_date ASC
+         AND (
+           due_date <= CURRENT_DATE + INTERVAL '3 days'
+           OR (cheque_date IS NOT NULL AND cheque_date <= CURRENT_DATE + INTERVAL '3 days')
+         )
+       ORDER BY LEAST(due_date, COALESCE(cheque_date, due_date)) ASC
        LIMIT 20`,
       branchIds,
     );
@@ -276,6 +284,21 @@ router.post('/', async (req, res, next) => {
     if (!partyName) throw new AppError('Party name is required', 400);
     if (!amount || Number(amount) <= 0) throw new AppError('Amount must be > 0', 400);
     if (!dueDate) throw new AppError('Due date is required', 400);
+
+    // A cheque must say what it is settling. Clearing one moves Cash at Bank, and the
+    // other half of that entry comes from the source document — the invoice receivable it
+    // pays down, or the purchase/expense payable it settles. Created without a source, a
+    // cleared cheque credited cash with no counterpart anywhere and broke
+    // Assets = Liabilities + Equity by its own amount.
+    // Every real flow already supplies this (sale payments send SALE + invoiceId, purchase
+    // payments send PURCHASE + purchaseId, and so on) — this endpoint was simply the one
+    // path that let it be omitted.
+    if (!sourceType || !sourceReferenceId) {
+      throw new AppError(
+        'A cheque must be linked to what it settles: provide sourceType (e.g. SALE, RENT, LEASE, PURCHASE, EXPENSE) and sourceReferenceId.',
+        400,
+      );
+    }
 
     const repo = Source.getRepository(Cheque);
 

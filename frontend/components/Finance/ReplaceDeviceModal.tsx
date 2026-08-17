@@ -142,25 +142,25 @@ export default function ReplaceDeviceModal({
       const oldClrA4 = Number(formData.currentColorA4 || 0);
       const oldClrA3 = Number(formData.currentColorA3 || 0);
 
-      if (oldBwA4 > 0 && oldBwA4 < prevUsage.bwA4Count) {
+      if (oldBwA4 < prevUsage.bwA4Count) {
         toast.error(
           `Old B&W A4 meter (${oldBwA4}) cannot be lower than previously billed (${prevUsage.bwA4Count}).`,
         );
         return;
       }
-      if (oldBwA3 > 0 && oldBwA3 < prevUsage.bwA3Count) {
+      if (oldBwA3 < prevUsage.bwA3Count) {
         toast.error(
           `Old B&W A3 meter (${oldBwA3}) cannot be lower than previously billed (${prevUsage.bwA3Count}).`,
         );
         return;
       }
-      if (oldClrA4 > 0 && oldClrA4 < prevUsage.colorA4Count) {
+      if (oldClrA4 < prevUsage.colorA4Count) {
         toast.error(
           `Old Color A4 meter (${oldClrA4}) cannot be lower than previously billed (${prevUsage.colorA4Count}).`,
         );
         return;
       }
-      if (oldClrA3 > 0 && oldClrA3 < prevUsage.colorA3Count) {
+      if (oldClrA3 < prevUsage.colorA3Count) {
         toast.error(
           `Old Color A3 meter (${oldClrA3}) cannot be lower than previously billed (${prevUsage.colorA3Count}).`,
         );

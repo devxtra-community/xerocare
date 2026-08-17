@@ -10,6 +10,11 @@ interface CalculationInput {
   /** Effective clicks charged per A3 page. Defaults to 2 (industry-standard
    *  A3 = 2x A4) when not set on the contract. */
   a3Multiplier?: number;
+  /** Months of rent this invoice covers — 1 monthly, 3 quarterly, 6 half-yearly,
+   *  12 yearly (see resolveBillingCycle). Scales both the base rent and the
+   *  included page allowances, so a quarterly bill charges three months of rent
+   *  against three months of free pages. Defaults to 1. */
+  periodMonths?: number;
   usage: {
     bwA4: number;
     bwA3: number;
@@ -34,7 +39,29 @@ export class BillingCalculationService {
   /**
    * Calculates the billing amount based on rent type and usage.
    */
-  calculate(input: CalculationInput): CalculationResult {
+  calculate(rawInput: CalculationInput): CalculationResult {
+    // Scale the per-month figures up to the length of the billing cycle before any
+    // rule runs. Rent and included allowances both scale; per-click excess rates and
+    // slab ranges are already per-page and must not.
+    const periodMonths = Number(rawInput.periodMonths ?? 1) || 1;
+    const input: CalculationInput =
+      periodMonths === 1
+        ? rawInput
+        : {
+            ...rawInput,
+            monthlyRent: Number(rawInput.monthlyRent || 0) * periodMonths,
+            pricingItems: (rawInput.pricingItems || []).map((rule) => {
+              const scaled = { ...rule } as InvoiceItem;
+              if (rule.bwIncludedLimit !== undefined && rule.bwIncludedLimit !== null)
+                scaled.bwIncludedLimit = Number(rule.bwIncludedLimit) * periodMonths;
+              if (rule.colorIncludedLimit !== undefined && rule.colorIncludedLimit !== null)
+                scaled.colorIncludedLimit = Number(rule.colorIncludedLimit) * periodMonths;
+              if (rule.combinedIncludedLimit !== undefined && rule.combinedIncludedLimit !== null)
+                scaled.combinedIncludedLimit = Number(rule.combinedIncludedLimit) * periodMonths;
+              return scaled;
+            }),
+          };
+
     const a3Multiplier = input.a3Multiplier ?? 2;
     const effectiveBw = input.usage.bwA4 + input.usage.bwA3 * a3Multiplier;
     const effectiveColor = input.usage.colorA4 + input.usage.colorA3 * a3Multiplier;
@@ -175,9 +202,14 @@ export class BillingCalculationService {
         amount += effectiveBw * Number(rule.bwExcessRate);
       }
 
-      // Color Slabs
+      // Colour slabs, falling back to a flat per-click rate exactly as B&W does above.
+      // Without the fallback a CPC contract priced with a flat colour rate (rather than
+      // slab ranges) billed every colour page at zero — silently, since the invoice still
+      // rendered and simply omitted the colour revenue.
       if (rule.colorSlabRanges) {
         amount += this.calculateSlabAmount(effectiveColor, rule.colorSlabRanges);
+      } else if (rule.colorExcessRate) {
+        amount += effectiveColor * Number(rule.colorExcessRate);
       }
     }
     return amount;
@@ -195,8 +227,12 @@ export class BillingCalculationService {
     const effectiveTotal =
       totalUsage + (input.usage.extraBwA4 || 0) + (input.usage.extraColorA4 || 0);
     for (const rule of rules) {
+      // Same flat-rate fallback as CPC above: a combo contract priced with a single
+      // per-click rate instead of slab ranges must still bill, not silently total zero.
       if (rule.comboSlabRanges) {
         amount += this.calculateSlabAmount(effectiveTotal, rule.comboSlabRanges);
+      } else if (rule.combinedExcessRate) {
+        amount += effectiveTotal * Number(rule.combinedExcessRate);
       }
     }
     return amount;

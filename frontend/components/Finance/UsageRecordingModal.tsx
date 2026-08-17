@@ -22,7 +22,15 @@ import {
 } from '@/lib/invoice';
 import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
-import { Loader2, Calendar, Coins } from 'lucide-react';
+import {
+  Loader2,
+  Calendar,
+  Coins,
+  Mail,
+  MessageSquare,
+  FileDown,
+  ExternalLink,
+} from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -30,6 +38,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { getUserFromToken } from '@/lib/auth';
+import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
+import {
+  type SalePaymentRequest,
+  generateSalePaymentReceipt,
+  sendReceiptEmail,
+  sendReceiptWhatsApp,
+} from '@/lib/saleWorkflow';
+import { getApiErrorMessage } from '@/lib/apiError';
 interface UsageInvoiceItem extends InvoiceItem {
   allocationId?: string;
   allocation?: {
@@ -133,6 +150,11 @@ export default function UsageRecordingModal({
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [estimatedCost, setEstimatedCost] = useState<number>(0);
+  // VAT portion of estimatedCost, layered on top of the same pricing calculation the
+  // backend uses (usageService.ts's computePeriodTax) — kept as its own state (set
+  // alongside estimatedCost, never derived by dividing it back out) so the two numbers
+  // can never drift out of exact-subtraction sync for the Subtotal/VAT/Total breakdown.
+  const [estimatedTax, setEstimatedTax] = useState<number>(0);
   const [showPreview, setShowPreview] = useState(false);
   // const [recordedUsageData, setRecordedUsageData] = useState<RecordedUsageData | null>(null);
   const isInitialized = React.useRef(false);
@@ -166,9 +188,10 @@ export default function UsageRecordingModal({
   });
   const [file, setFile] = useState<File | null>(null);
 
-  // Optional: collect this period's payment in the same action that generates the bill.
-  // Off by default so Finance can still record usage alone and collect payment separately.
-  const [collectPayment, setCollectPayment] = useState(false);
+  // Collection for this period — always visible (no more opt-in checkbox). Left blank
+  // means "collect the full computed amount"; typed lower (including 0) means a partial
+  // or fully-deferred collection, with the shortfall surfacing on the Pending Payments tab.
+  const [amountCollected, setAmountCollected] = useState('');
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
   const [paymentReferenceNumber, setPaymentReferenceNumber] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -176,6 +199,18 @@ export default function UsageRecordingModal({
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDueDate, setChequeDueDate] = useState('');
   const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [cashAccountId, setCashAccountId] = useState('');
+  const [cashAccounts, setCashAccounts] = useState<CashBankAccount[]>([]);
+
+  // Finance-only: the PENDING SalePaymentRequest just created, offered for an immediate
+  // receipt before the modal closes (Employee has no receipt responsibility for periodic
+  // Rent/Lease collections — only the advance, handled elsewhere).
+  const [justCollected, setJustCollected] = useState<SalePaymentRequest | null>(null);
+  const currentUser = React.useMemo(() => getUserFromToken(), []);
+  const isFinanceContext =
+    currentUser?.role === 'FINANCE' ||
+    currentUser?.role === 'ADMIN' ||
+    currentUser?.role === 'MANAGER';
 
   const isSimplifiedLease = contract?.saleType === 'LEASE' && contract?.leaseType !== 'FSM';
 
@@ -184,8 +219,18 @@ export default function UsageRecordingModal({
       setShowPreview(false);
       // setRecordedUsageData(null);
       isInitialized.current = false;
+      setJustCollected(null);
+      setAmountCollected('');
+      setCashAccountId('');
     }
   }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen || !isFinanceContext) return;
+    fetchCashBankAccounts({ skipErrorToast: true })
+      .then(setCashAccounts)
+      .catch(() => {});
+  }, [isOpen, isFinanceContext]);
 
   // Hook Ordering Fix: Define memoized values used in effects first
   const prevUsage = React.useMemo(() => {
@@ -423,7 +468,19 @@ export default function UsageRecordingModal({
 
         contract.productAllocations.forEach((a) => {
           const alreadyInItems = items.find((it) => it.allocationId === a.id);
-          if (alreadyInItems) return;
+          if (alreadyInItems) {
+            // When a machine that was billed in a previous period has since been REPLACED,
+            // the history-initialized item has endBw/Color set to the last billed reading.
+            // Override those end values with the allocation's captured final meter reading
+            // (set at replacement time) so replacedDeltas computes the correct delta.
+            if (a.status === 'REPLACED') {
+              alreadyInItems.endBwA4 = a.currentBwA4 ?? alreadyInItems.endBwA4;
+              alreadyInItems.endBwA3 = a.currentBwA3 ?? alreadyInItems.endBwA3;
+              alreadyInItems.endColorA4 = a.currentColorA4 ?? alreadyInItems.endColorA4;
+              alreadyInItems.endColorA3 = a.currentColorA3 ?? alreadyInItems.endColorA3;
+            }
+            return;
+          }
 
           // Check if this allocation was active during the period
           const allocStartTs = a.startTimestamp ? new Date(a.startTimestamp).getTime() : 0;
@@ -926,7 +983,14 @@ export default function UsageRecordingModal({
       netTotal = Math.max(0, netTotal - Number(formData.discountAmount || 0));
     }
 
-    setEstimatedCost(netTotal);
+    // Layer VAT on top of the computed period charge, mirroring usageService.ts's
+    // computePeriodTax exactly (same taxPercent source, same rounding) so this preview
+    // matches what actually gets stored once submitted.
+    const taxPercent = Number(contract?.taxPercent || 0);
+    const taxAmount = taxPercent > 0 ? Math.round(netTotal * taxPercent) / 100 : 0;
+
+    setEstimatedTax(taxAmount);
+    setEstimatedCost(netTotal + taxAmount);
   }, [
     formData,
     contract,
@@ -1012,7 +1076,17 @@ export default function UsageRecordingModal({
       }
     }
 
-    if (collectPayment && paymentMode === 'CHEQUE') {
+    const resolvedCollected = amountCollected === '' ? estimatedCost : Number(amountCollected || 0);
+
+    if (resolvedCollected < 0) {
+      errors.push('Amount collected cannot be negative');
+    }
+    if (resolvedCollected > estimatedCost + 0.01) {
+      errors.push(
+        `Amount collected cannot exceed this period's total (${formatCurrency(estimatedCost, currency)})`,
+      );
+    }
+    if (resolvedCollected > 0 && paymentMode === 'CHEQUE') {
       if (!chequeNumber) errors.push('Cheque number is required for cheque payments');
       if (!chequeBankName) errors.push('Cheque bank name is required for cheque payments');
       if (!chequeDate) errors.push('Cheque date is required for cheque payments');
@@ -1167,55 +1241,43 @@ export default function UsageRecordingModal({
           payload.append('file', file);
         }
 
-        if (collectPayment) {
-          payload.append('paymentMode', paymentMode);
-          payload.append('paymentDate', paymentDate);
-          if (paymentMode === 'CHEQUE') {
-            payload.append('chequeNumber', chequeNumber);
-            payload.append('chequeBankName', chequeBankName);
-            payload.append('chequeDueDate', chequeDueDate);
-            payload.append('chequeDate', chequeDate);
-          } else if (paymentReferenceNumber) {
+        const resolvedCollected =
+          amountCollected === '' ? estimatedCost : Number(amountCollected || 0);
+        payload.append('amountCollected', String(resolvedCollected));
+        payload.append('paymentMode', paymentMode);
+        payload.append('paymentDate', paymentDate);
+        if (paymentMode === 'CHEQUE') {
+          payload.append('chequeNumber', chequeNumber);
+          payload.append('chequeBankName', chequeBankName);
+          payload.append('chequeDueDate', chequeDueDate);
+          payload.append('chequeDate', chequeDate);
+        } else {
+          if (paymentReferenceNumber) {
             payload.append('paymentReferenceNumber', paymentReferenceNumber);
+          }
+          if (cashAccountId) {
+            payload.append('cashAccountId', cashAccountId);
           }
         }
 
-        // const response = await recordUsage(payload);
-        await recordUsage(payload);
+        const result = await recordUsage(payload);
         toast.success('Usage recorded successfully');
 
-        toast.success('Usage recorded successfully');
-
-        /*
-        const prevBwA4 = effectivePrevCounts.bwA4;
-        const prevBwA3 = effectivePrevCounts.bwA3;
-        const prevClrA4 = effectivePrevCounts.clrA4;
-        const prevClrA3 = effectivePrevCounts.clrA3;
-        setRecordedUsageData({
-          bwA4Count: Number(formData.bwA4Count),
-          bwA3Count: Number(formData.bwA3Count),
-          colorA4Count: Number(formData.colorA4Count),
-          colorA3Count: Number(formData.colorA3Count),
-          bwA4Delta: Math.max(0, Number(formData.bwA4Count || 0) - prevBwA4),
-          bwA3Delta: Math.max(0, Number(formData.bwA3Count || 0) - prevBwA3),
-          colorA4Delta: Math.max(0, Number(formData.colorA4Count || 0) - prevClrA4),
-          colorA3Delta: Math.max(0, Number(formData.colorA3Count || 0) - prevClrA3),
-          billingPeriodStart: formData.billingPeriodStart,
-          billingPeriodEnd: formData.billingPeriodEnd,
-          remarks: formData.remarks,
-          meterImageUrl: (response as { meterImageUrl?: string })?.meterImageUrl,
-        });
-        */
-
-        // setShowPreview(true);
-        // We do *not* call onSuccess() here. Calling it triggers the parent to fetch and remount
-        // the state, which instantly kills the UsagePreviewDialog and flips back to the input form.
-        // onSuccess is deferred to the close callback of the Preview Dialog.
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
         queryClient.invalidateQueries({ queryKey: ['usage-history', contractId] });
         queryClient.invalidateQueries({ queryKey: ['invoice', contractId] });
         onSuccess();
-        onClose();
+
+        // Finance can send a receipt for what they just collected immediately, regardless
+        // of Accounts approval — same decoupled-receipt-from-approval principle already
+        // established for Sale. Employee has no receipt responsibility for periodic
+        // Rent/Lease collections (advance only, handled elsewhere), so the modal simply
+        // closes for them as before.
+        if (isFinanceContext && result.salePaymentRequest) {
+          setJustCollected(result.salePaymentRequest);
+        } else {
+          onClose();
+        }
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
@@ -1228,6 +1290,47 @@ export default function UsageRecordingModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const [generatingReceipt, setGeneratingReceipt] = useState(false);
+  const [sendingReceiptVia, setSendingReceiptVia] = useState<'email' | 'whatsapp' | null>(null);
+
+  const handleGenerateCollectionReceipt = async () => {
+    if (!justCollected) return;
+    setGeneratingReceipt(true);
+    try {
+      if (justCollected.receiptUrl) {
+        window.open(justCollected.receiptUrl, '_blank');
+        return;
+      }
+      const { receiptUrl } = await generateSalePaymentReceipt(justCollected.id);
+      setJustCollected((prev) => (prev ? { ...prev, receiptUrl } : prev));
+      window.open(receiptUrl, '_blank');
+    } catch (err) {
+      toast.error('Failed to generate receipt', { description: getApiErrorMessage(err) });
+    } finally {
+      setGeneratingReceipt(false);
+    }
+  };
+
+  const handleSendCollectionReceipt = async (channel: 'email' | 'whatsapp') => {
+    if (!justCollected) return;
+    setSendingReceiptVia(channel);
+    try {
+      const result =
+        channel === 'email'
+          ? await sendReceiptEmail(justCollected.id)
+          : await sendReceiptWhatsApp(justCollected.id);
+      toast.success(`Receipt sent via ${channel === 'email' ? 'email' : 'WhatsApp'}`, {
+        description: `Sent to ${result.recipient}`,
+      });
+    } catch (err) {
+      toast.error(`Failed to send receipt via ${channel}`, {
+        description: getApiErrorMessage(err),
+      });
+    } finally {
+      setSendingReceiptVia(null);
     }
   };
 
@@ -2751,6 +2854,25 @@ export default function UsageRecordingModal({
                     </div>
                   )}
 
+                  {estimatedTax > 0 && (
+                    <>
+                      <div className="pt-2 flex justify-between items-center text-sm">
+                        <span className="text-slate-500">Subtotal (Before VAT)</span>
+                        <span className="text-slate-700">
+                          {formatCurrency(estimatedCost - estimatedTax, currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-slate-500">
+                          {contract?.taxName || 'VAT'}
+                          {contract?.taxPercent ? ` (${contract.taxPercent}%)` : ''}
+                        </span>
+                        <span className="text-slate-700">
+                          {formatCurrency(estimatedTax, currency)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                   <div className="pt-3 border-t-2 border-slate-200 flex justify-between items-center mt-2">
                     <span className="font-bold text-sm text-slate-800">Grand Total</span>
                     <span className="font-bold text-lg text-green-600">
@@ -2762,89 +2884,107 @@ export default function UsageRecordingModal({
             )}
 
             <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
-              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={collectPayment}
-                  onChange={(e) => setCollectPayment(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                Collect payment for this period now
-              </label>
+              <Label className="text-sm font-semibold text-slate-700">
+                Collection for This Period
+              </Label>
 
-              {collectPayment && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-slate-600">Payment Mode</Label>
-                    <select
-                      value={paymentMode}
-                      onChange={(e) =>
-                        setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')
-                      }
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="CASH">Cash</option>
-                      <option value="BANK_TRANSFER">Bank Transfer</option>
-                      <option value="CHEQUE">Cheque</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-slate-600">Payment Date</Label>
-                    <Input
-                      type="date"
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-slate-600">Amount Collected</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={amountCollected}
+                    onChange={(e) => setAmountCollected(e.target.value)}
+                    placeholder={estimatedCost.toFixed(2)}
+                  />
+                  {(() => {
+                    const collected =
+                      amountCollected === '' ? estimatedCost : Number(amountCollected || 0);
+                    const remaining = Math.max(0, estimatedCost - collected);
+                    return remaining > 0.01 ? (
+                      <p className="text-[11px] text-amber-600">
+                        {formatCurrency(remaining, currency)} will remain pending for this period,
+                        tracked on the Pending Payments tab.
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">
+                        Leave blank to collect the full amount shown above.
+                      </p>
+                    );
+                  })()}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-slate-600">Payment Mode</Label>
+                  <select
+                    value={paymentMode}
+                    onChange={(e) =>
+                      setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')
+                    }
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="BANK_TRANSFER">Bank Transfer</option>
+                    <option value="CHEQUE">Cheque</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-slate-600">Payment Date</Label>
+                  <Input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                  />
+                </div>
 
-                  {paymentMode === 'CHEQUE' ? (
-                    <>
-                      <div className="space-y-2 sm:col-span-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                        Creates a PENDING cheque record. Cash at Bank increases only when it&apos;s
-                        deposited in Accounts → Cheques.
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-slate-600">
-                          Cheque Number
-                        </Label>
-                        <Input
-                          value={chequeNumber}
-                          onChange={(e) => setChequeNumber(e.target.value)}
-                          placeholder="e.g. CHQ-001234"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-slate-600">
-                          Name of the Bank
-                        </Label>
-                        <Input
-                          value={chequeBankName}
-                          onChange={(e) => setChequeBankName(e.target.value)}
-                          placeholder="e.g. Emirates NBD"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-slate-600">
-                          Cheque Date <span className="font-normal">(on the cheque)</span>
-                        </Label>
-                        <Input
-                          type="date"
-                          value={chequeDate}
-                          onChange={(e) => setChequeDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-slate-600">
-                          Cheque Due Date
-                        </Label>
-                        <Input
-                          type="date"
-                          value={chequeDueDate}
-                          onChange={(e) => setChequeDueDate(e.target.value)}
-                        />
-                      </div>
-                    </>
-                  ) : (
+                {paymentMode === 'CHEQUE' ? (
+                  <>
+                    <div className="space-y-2 sm:col-span-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                      Creates a PENDING cheque record. Cash at Bank increases only when it&apos;s
+                      deposited in Accounts → Cheques.
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-slate-600">Cheque Number</Label>
+                      <Input
+                        value={chequeNumber}
+                        onChange={(e) => setChequeNumber(e.target.value)}
+                        placeholder="e.g. CHQ-001234"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-slate-600">
+                        Name of the Bank
+                      </Label>
+                      <Input
+                        value={chequeBankName}
+                        onChange={(e) => setChequeBankName(e.target.value)}
+                        placeholder="e.g. Emirates NBD"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-slate-600">
+                        Cheque Date <span className="font-normal">(on the cheque)</span>
+                      </Label>
+                      <Input
+                        type="date"
+                        value={chequeDate}
+                        onChange={(e) => setChequeDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold text-slate-600">
+                        Cheque Due Date
+                      </Label>
+                      <Input
+                        type="date"
+                        value={chequeDueDate}
+                        onChange={(e) => setChequeDueDate(e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold text-slate-600">
                         Reference Number (Optional)
@@ -2855,9 +2995,28 @@ export default function UsageRecordingModal({
                         placeholder="e.g. TXN-123456"
                       />
                     </div>
-                  )}
-                </div>
-              )}
+                    {cashAccounts.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-slate-600">
+                          Cash/Bank Account (Optional)
+                        </Label>
+                        <select
+                          value={cashAccountId}
+                          onChange={(e) => setCashAccountId(e.target.value)}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="">Select account...</option>
+                          {cashAccounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -2928,6 +3087,96 @@ export default function UsageRecordingModal({
           }}
         />
       )} */}
+
+      {justCollected && (
+        <Dialog
+          open={!!justCollected}
+          onOpenChange={(v) => {
+            if (!v) {
+              setJustCollected(null);
+              onClose();
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-sm rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
+            <DialogTitle className="sr-only">Collection Recorded</DialogTitle>
+            <div className="bg-linear-to-r from-emerald-600 to-emerald-500 p-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
+                  <Coins size={18} />
+                </div>
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
+                    Collected
+                  </p>
+                  <p className="text-base font-black">
+                    {formatCurrency(justCollected.amount, justCollected.currency)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-slate-500">
+                {justCollected.requestNo} has been submitted to Accounts for approval. You can send
+                the customer a receipt now — it won&apos;t move Cash in Hand/Bank or the
+                invoice&apos;s Paid figure until Accounts actually approves it.
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-9 text-xs font-bold gap-1"
+                  onClick={handleGenerateCollectionReceipt}
+                  disabled={generatingReceipt}
+                >
+                  {generatingReceipt ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : justCollected.receiptUrl ? (
+                    <ExternalLink className="h-4 w-4" />
+                  ) : (
+                    <FileDown className="h-4 w-4" />
+                  )}
+                  {justCollected.receiptUrl ? 'View Receipt' : 'Generate Receipt'}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-9 w-9 p-0"
+                  onClick={() => handleSendCollectionReceipt('email')}
+                  disabled={sendingReceiptVia === 'email'}
+                  title="Email receipt to customer"
+                >
+                  {sendingReceiptVia === 'email' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-9 w-9 p-0"
+                  onClick={() => handleSendCollectionReceipt('whatsapp')}
+                  disabled={sendingReceiptVia === 'whatsapp'}
+                  title="WhatsApp receipt to customer"
+                >
+                  {sendingReceiptVia === 'whatsapp' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MessageSquare className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <Button
+                className="w-full h-9 text-xs font-black bg-slate-800 hover:bg-slate-900"
+                onClick={() => {
+                  setJustCollected(null);
+                  onClose();
+                }}
+              >
+                Done
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

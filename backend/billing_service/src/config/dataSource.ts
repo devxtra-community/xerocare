@@ -1574,6 +1574,75 @@ async function runPreMigrations() {
         AND "saleType" IN ('RENT', 'LEASE');
     `);
     logger.info('Backfill: stuck RENT/LEASE contracts set to ACTIVE_CONTRACT.');
+
+    // Delivery status: tracks whether the physical machine has reached the
+    // customer's premises. Gates the Assign Technician action — installation
+    // makes no sense before the machine is on-site.
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_deliverystatus_enum') THEN
+          CREATE TYPE invoices_deliverystatus_enum AS ENUM ('NOT_DELIVERED', 'DELIVERED');
+        END IF;
+      END $$;
+    `);
+    await client.query(`
+      ALTER TABLE invoices
+      ADD COLUMN IF NOT EXISTS "deliveryStatus" invoices_deliverystatus_enum NOT NULL DEFAULT 'NOT_DELIVERED';
+    `);
+    logger.info('Delivery status column ensured on invoices table.');
+
+    // Backfill: a contract that already has an installation request (any
+    // status) already had its machine on-site when that request was raised —
+    // mark it Delivered so pre-existing rows don't lose the Wrench icon.
+    await client.query(`
+      UPDATE invoices i
+      SET "deliveryStatus" = 'DELIVERED'
+      FROM installation_requests ir
+      WHERE ir."invoiceId" = i.id
+        AND i."deliveryStatus" = 'NOT_DELIVERED';
+    `);
+    logger.info('Backfill: contracts with an existing installation request marked DELIVERED.');
+
+    // Links a periodic Rent/Lease sale-payment request back to the specific billing
+    // period (usage_records row) it was collected against, so a partial collection's
+    // shortfall can be tracked and topped up per-period (Pending Payments tab).
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+      ADD COLUMN IF NOT EXISTS "usageRecordId" UUID NULL;
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_sale_payment_requests_usageRecordId"
+        ON sale_payment_requests ("usageRecordId");
+    `);
+    logger.info('usageRecordId column ensured on sale_payment_requests table.');
+
+    // VAT breakdown columns — usage_records (per-period tax layered on top of the
+    // existing pricing calculation) and sale_payment_requests (RENT_ADVANCE/
+    // LEASE_ADVANCE gross-up breakdown).
+    await client.query(`
+      ALTER TABLE usage_records
+      ADD COLUMN IF NOT EXISTS "taxableAmount" DECIMAL(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "taxAmount" DECIMAL(10,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "taxPercent" DECIMAL(5,2) NULL;
+    `);
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+      ADD COLUMN IF NOT EXISTS "taxableAmount" DECIMAL(12,2) NULL,
+      ADD COLUMN IF NOT EXISTS "taxAmount" DECIMAL(12,2) NULL,
+      ADD COLUMN IF NOT EXISTS "taxPercent" DECIMAL(5,2) NULL;
+    `);
+    logger.info('VAT breakdown columns ensured on usage_records and sale_payment_requests.');
+
+    // Backfill: every existing usage_records row predates VAT layering, so its
+    // totalCharge is entirely taxable base with zero tax — mirror that explicitly
+    // rather than leaving taxableAmount at the column default of 0 (which would
+    // silently misstate the base for any pre-existing period).
+    await client.query(`
+      UPDATE usage_records
+      SET "taxableAmount" = "totalCharge"
+      WHERE "taxableAmount" = 0 AND "taxAmount" = 0 AND "totalCharge" > 0;
+    `);
+    logger.info('Backfill: pre-existing usage_records taxableAmount set to totalCharge.');
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

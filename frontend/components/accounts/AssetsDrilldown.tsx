@@ -35,6 +35,14 @@ interface CommonModalProps {
   onClose: () => void;
 }
 
+function resolveBranchName(
+  branches: { id: string; name: string }[] | undefined,
+  branchId?: string,
+): string {
+  if (!branchId) return '—';
+  return branches?.find((b) => b.id === branchId)?.name ?? 'Unknown Branch';
+}
+
 // ─── 1001 Cash in Hand / 1002 Cash at Bank ────────────────────────────────────
 
 function filterCashBankRows(rows: CashBankAccount[], f: DrilldownFilters): CashBankAccount[] {
@@ -68,7 +76,9 @@ export function CashInHandModal({
     {
       header: 'Branch',
       render: (a) => (
-        <span className="font-mono text-xs text-muted-foreground">{a.branchId?.slice(0, 8)}…</span>
+        <span className="text-xs text-muted-foreground font-medium">
+          {resolveBranchName(branches, a.branchId)}
+        </span>
       ),
     },
     {
@@ -171,7 +181,9 @@ export function CashAtBankModal({
     {
       header: 'Branch',
       render: (a) => (
-        <span className="font-mono text-xs text-muted-foreground">{a.branchId?.slice(0, 8)}…</span>
+        <span className="text-xs text-muted-foreground font-medium">
+          {resolveBranchName(branches, a.branchId)}
+        </span>
       ),
     },
     {

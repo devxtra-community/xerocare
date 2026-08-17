@@ -16,6 +16,7 @@ import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { EmployeeTarget } from '../entities/employeeTargetEntity';
+import { resolveBillingCycle } from '../utils/billingPeriod';
 import { TargetService, getPreviousMonthStr } from './targetService';
 import {
   TARGET_ACHIEVEMENT_FINALIZED,
@@ -520,7 +521,10 @@ export async function rentLeaseDueReminderJob() {
         currentPeriodStart = new Date(contract.effectiveFrom);
       }
 
-      const cycleDays = contract.billingCycleInDays || 30;
+      // Derive the cycle from the contract's chosen rentPeriod. billingCycleInDays is
+      // only persisted for CUSTOM, so a bare `|| 30` billed QUARTERLY/HALF_YEARLY/YEARLY
+      // contracts every month — the period selection had no effect on billing at all.
+      const cycleDays = resolveBillingCycle(contract.rentPeriod, contract.billingCycleInDays).days;
 
       const currentPeriodEnd = new Date(currentPeriodStart);
       currentPeriodEnd.setDate(currentPeriodEnd.getDate() + cycleDays - 1);

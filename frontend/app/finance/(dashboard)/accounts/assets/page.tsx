@@ -36,6 +36,7 @@ import {
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -218,7 +219,7 @@ function AddAssetModal({
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // Fetch branch name from API using branchId in JWT
-  const { data: branchData } = useQuery<{
+  const { data: branchData, isLoading: branchLoading } = useQuery<{
     name: string;
     id: string;
     currency_code?: string;
@@ -232,11 +233,15 @@ function AddAssetModal({
     staleTime: 600_000,
   });
 
+  // Never fall back to a raw branch-ID substring — while loading or on failure, show
+  // a clear placeholder instead.
   const branchDisplayName = branchData?.name
     ? branchData.name
-    : currentUser?.branchId
-      ? `Branch ${currentUser.branchId.slice(0, 8)}…`
-      : 'Your Branch';
+    : !currentUser?.branchId
+      ? 'Your Branch'
+      : branchLoading
+        ? 'Loading…'
+        : 'Unknown Branch';
 
   // Asset type selection (only for new assets)
   const [assetType, setAssetType] = useState<'PRINTER_PRODUCT' | 'MANUAL_ASSET'>(
@@ -994,6 +999,7 @@ type SubTab = 'rules' | 'register' | 'summary' | 'journal';
 
 export default function DepreciationPage() {
   const currency = useBranchCurrency();
+  const { getBranchName } = useBranchNameMap();
   const currentUser = getUserFromToken();
   const [subTab, setSubTab] = useState<SubTab>('register');
   const [showBrandRuleModal, setShowBrandRuleModal] = useState(false);
@@ -1658,8 +1664,8 @@ export default function DepreciationPage() {
                       <TableCell className="text-xs text-muted-foreground">
                         {j.postedAt?.slice(0, 10) ?? '—'}
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground pr-4">
-                        {j.branchId?.slice(0, 8)}…
+                      <TableCell className="text-xs text-muted-foreground font-medium pr-4">
+                        {getBranchName(j.branchId)}
                       </TableCell>
                     </TableRow>
                   ))

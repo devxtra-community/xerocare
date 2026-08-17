@@ -40,6 +40,7 @@ import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
+import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import {
   Select,
   SelectContent,
@@ -243,15 +244,7 @@ function ExpenseModal({
         <div className="px-6 py-4 space-y-3 max-h-96 overflow-y-auto">
           {step === 1 && (
             <>
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-                <span className="text-sm text-blue-600">Branch:</span>
-                <span className="text-sm font-medium text-blue-800">
-                  {currentUser?.branchId
-                    ? `Branch ${currentUser.branchId.slice(0, 8)}…`
-                    : 'Your Branch'}
-                </span>
-                <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
-              </div>
+              <BranchIdentityChip branchId={currentUser?.branchId} role={currentUser?.role} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Expense #</label>

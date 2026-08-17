@@ -107,6 +107,28 @@ export class SalePaymentRequest {
   @Column({ type: 'varchar', nullable: true })
   paymentContext?: string;
 
+  // Links a RENT_PERIODIC/LEASE_PERIODIC collection to the specific billing period
+  // (UsageRecord) it pays toward, so a partial payment's shortfall can be tracked and
+  // later topped up against that same period. Null for advances and Sale payments.
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  usageRecordId?: string;
+
+  // VAT breakdown for a RENT_ADVANCE/LEASE_ADVANCE collection — taxableAmount is the
+  // entered pre-tax advance, taxAmount is VAT on it at the contract's own snapshotted
+  // taxPercent, and `amount` (above) is taxableAmount + taxAmount. Periodic (usage-bill)
+  // collections don't set these here — their VAT is already layered into UsageRecord's
+  // totalCharge upstream, so `amount` there is simply whatever portion of that
+  // tax-inclusive total was collected. Null/0 for Sale payments and no-tax branches.
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxableAmount?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxAmount?: number;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  taxPercent?: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

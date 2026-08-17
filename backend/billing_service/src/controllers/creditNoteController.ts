@@ -12,6 +12,9 @@ import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { ReturnCreditRepository } from '../repositories/returnCreditRepository';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { CreditNoteType } from '../entities/enums/creditNoteType';
+import { ManualPayable } from '../entities/manualPayableEntity';
+import { ManualReceivable } from '../entities/manualReceivableEntity';
+import { CashBankAccount } from '../entities/cashBankAccountEntity';
 
 export class CreditNoteController {
   private repository = Source.getRepository(CreditNote);
@@ -69,6 +72,17 @@ export class CreditNoteController {
     } catch (err) {
       logger.error(`Failed to reach inventory service at ${path}`, err);
     }
+  }
+
+  // ── Resolve the operating currency for a branch from its cash/bank accounts.
+  // Falls back to 'QAR' when no account exists yet, rather than silently
+  // hardcoding the wrong region's currency.
+  private async getBranchCurrency(branchId: string, manager?: EntityManager): Promise<string> {
+    const repo = manager
+      ? manager.getRepository(CashBankAccount)
+      : Source.getRepository(CashBankAccount);
+    const account = await repo.findOne({ where: { branchId } });
+    return account?.currency ?? 'QAR';
   }
 
   // ── B.10: Atomic credit note number via PostgreSQL per-year sequence ──────
@@ -325,8 +339,14 @@ export class CreditNoteController {
       creditNote.damageReason = damageReason;
       creditNote.paymentMode = paymentMode || undefined; // B.1
 
-      const inventoryStatus: 'DAMAGED' | 'RETURNED' =
-        damageReason === 'Damaged Product' ? 'DAMAGED' : 'RETURNED';
+      // Which returns are scrapped vs put back on the shelf. Reasons that describe a
+      // faulty or incomplete unit are written off; a unit returned merely because it was
+      // the wrong item is still perfectly sellable and goes back to stock. Previously only
+      // 'Damaged Product' scrapped, so genuinely defective units were treated as resaleable.
+      const SCRAP_REASONS = ['Damaged Product', 'Defective', 'Incomplete Parts'];
+      const inventoryStatus: 'DAMAGED' | 'RETURNED' = SCRAP_REASONS.includes(damageReason)
+        ? 'DAMAGED'
+        : 'RETURNED';
       let postCommitInventorySideEffect: (() => Promise<void>) | null = null;
 
       if (creditNote.type === 'DIRECT_REFUND') {
@@ -386,6 +406,40 @@ export class CreditNoteController {
             status: InvoiceStatus.REFUNDED,
           });
         }
+        // Create ManualPayable so the refund owed to the customer appears on the Payable Payments tab.
+        // This is atomic with the credit note save — if either fails, both roll back.
+        const refundAmount = Number(creditNote.productAmount) + Number(creditNote.taxAmount || 0);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const branchCurrency = await this.getBranchCurrency(
+          creditNote.branchId,
+          queryRunner.manager,
+        );
+        const payable = queryRunner.manager.create(ManualPayable, {
+          referenceNo: `REFUND-${creditNote.creditNoteNo}`,
+          type: 'CUSTOMER_REFUND',
+          payableTo: creditNote.customerName,
+          amount: refundAmount,
+          currency: branchCurrency,
+          issueDate: new Date(todayStr),
+          dueDate: new Date(todayStr),
+          outstanding: refundAmount,
+          amountPaid: 0,
+          status: 'PENDING',
+          branchId: creditNote.branchId,
+          createdBy: req.user?.userId || 'FINANCE',
+          description: `Refund for Credit Note ${creditNote.creditNoteNo}`,
+          // NOTE: linkedPurchaseId must stay null here. It means "this payable is a
+          // vendor Purchase Order already tracked by the PO's own outstanding balance",
+          // and every reader treats a non-null value as a reason to SKIP the row —
+          // the Balance Sheet's Accounts Payable, the vendor statement drill-down and
+          // the payables aggregation all filter on `linkedPurchaseId IS NULL`. Stuffing
+          // the credit note's own id in here made customer refunds invisible as
+          // liabilities: the money owed back to the customer never appeared in AP, so
+          // Assets = Liabilities + Equity broke by the refund amount. The link back to
+          // the credit note is already carried by referenceNo and description.
+          notes: financeNote,
+        });
+        await queryRunner.manager.save(ManualPayable, payable);
       } else {
         // REPLACEMENT or CREDIT_EXCHANGE: Finance approval only — inventory updated later in complete()
         creditNote.status = CreditNoteStatus.APPROVED;
@@ -629,6 +683,62 @@ export class CreditNoteController {
 
       logger.info(`Completing Return: ${creditNote.creditNoteNo}, Status: ${creditNote.status}`);
       await this.repository.save(creditNote);
+
+      // For CREDIT_EXCHANGE, wire the variance into the Payable/Receivable approval-gate system.
+      // REPLACEMENT intentionally creates no financial record.
+      if (creditNote.type === 'CREDIT_EXCHANGE') {
+        const variance =
+          Number(creditNote.replacementAmount || 0) -
+          Number(creditNote.productAmount || 0) -
+          Number(creditNote.replacementDiscount || 0);
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const branchCurrency = await this.getBranchCurrency(creditNote.branchId);
+
+        if (variance > 0) {
+          // Customer owes the difference → ManualReceivable (company receives)
+          const rec = Source.getRepository(ManualReceivable).create({
+            referenceNo: `EXCH-${creditNote.creditNoteNo}`,
+            type: 'CREDIT_EXCHANGE_DIFF',
+            customerId: creditNote.customerId,
+            customerName: creditNote.customerName,
+            amount: variance,
+            currency: branchCurrency,
+            issueDate: new Date(todayStr),
+            dueDate: new Date(todayStr),
+            outstanding: variance,
+            amountPaid: 0,
+            status: 'PENDING',
+            branchId: creditNote.branchId,
+            createdBy: req.user?.userId || 'SYSTEM',
+            description: `Credit Exchange difference for ${creditNote.creditNoteNo}`,
+            linkedInvoiceId: creditNote.id,
+          });
+          await Source.getRepository(ManualReceivable).save(rec);
+          logger.info(`Created ManualReceivable EXCH-${creditNote.creditNoteNo} for ${variance}`);
+        } else if (variance < 0) {
+          // Company owes the difference → ManualPayable (company pays customer)
+          const absVariance = Math.abs(variance);
+          const pay = Source.getRepository(ManualPayable).create({
+            referenceNo: `EXCH-${creditNote.creditNoteNo}`,
+            type: 'CUSTOMER_REFUND',
+            payableTo: creditNote.customerName,
+            amount: absVariance,
+            currency: branchCurrency,
+            issueDate: new Date(todayStr),
+            dueDate: new Date(todayStr),
+            outstanding: absVariance,
+            amountPaid: 0,
+            status: 'PENDING',
+            branchId: creditNote.branchId,
+            createdBy: req.user?.userId || 'SYSTEM',
+            description: `Credit Exchange difference for ${creditNote.creditNoteNo}`,
+            // Same reason as the DIRECT_REFUND payable above — leave linkedPurchaseId null.
+          });
+          await Source.getRepository(ManualPayable).save(pay);
+          logger.info(`Created ManualPayable EXCH-${creditNote.creditNoteNo} for ${absVariance}`);
+        }
+        // zero variance: no record needed
+      }
 
       return res.status(200).json({
         success: true,

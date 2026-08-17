@@ -896,7 +896,18 @@ export const createManagerPurchasePaymentRequest = async (
     // Step 2: Route by paymentMethod.
     // Cheque → bypass approval queue; create ISSUED cheque directly (Cheques-to-Vendors page).
     // Cash / Bank → go through Finance approval queue (existing flow).
-    if (paymentMethod === 'Cheque') {
+    // Case-insensitive on purpose. This was an exact `=== 'Cheque'` match, so a caller
+    // sending 'CHEQUE' or 'cheque' — which ven_inv_service does, since it passes through
+    // whatever the client supplied — fell straight through to the Cash/Bank branch below.
+    // The result was that a vendor paid by cheque got NO cheque record at all (invisible in
+    // the register, no dates, no reminder, no clear/bounce lifecycle) AND had the bank
+    // debited immediately, before the cheque had cleared. The cheque-handling code here was
+    // correct all along; it simply never ran.
+    if (
+      String(paymentMethod ?? '')
+        .trim()
+        .toUpperCase() === 'CHEQUE'
+    ) {
       const chequeRepo = Source.getRepository(Cheque);
       const chequeNo = chequeNumber || referenceNumber || `CHQ-${Date.now()}`;
       const existing = await chequeRepo.findOne({ where: { chequeNo, branchId: empBranchId } });
@@ -1042,6 +1053,13 @@ export const createExpenseRequestFromPurchasePayment = async (
     // triggered this call) is left standing with no real cash movement behind it.
     // Resolved here (once) and reused below, rather than a second lookup that
     // silently skipped the deduction whenever paidFromAccountId wasn't given at all.
+    // NOTE: this comparison is deliberately left exact-case for now. Making it
+    // case-insensitive is correct in isolation — it stops a 'CHEQUE' payment being treated
+    // as cash and deducted before the cheque clears — but this path creates no Cheque row,
+    // so skipping the deduction removes one leg of the entry without adding the other:
+    // Accounts Payable falls with no cheque liability to replace it and the balance sheet
+    // breaks by the payment amount (measured: 2,000). The two changes must land together.
+    // See CHQ4 in docs/production-readiness-audit-2026-08-13.md for the full plan.
     const resolvedAccount =
       paymentMethod !== 'Cheque'
         ? await requireCashAccount(Source, {

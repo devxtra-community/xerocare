@@ -112,6 +112,19 @@ export class SparePartService {
           );
         }
       }
+
+      // Reject a part the lot was never booked with BEFORE writing anything.
+      // validateAndTrackUsage below enforces the same rule, but only after the
+      // master row has already been saved — which used to leave an orphaned,
+      // stocked spare part behind on every rejected call.
+      const belongsToLot = await this.lotService.lotContainsSparePart(
+        lotId,
+        data.part_name?.trim(),
+        sku,
+      );
+      if (!belongsToLot) {
+        throw new Error('This lot does not contain this Spare Part');
+      }
     }
 
     if (lotId && sku) {

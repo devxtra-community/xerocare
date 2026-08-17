@@ -74,6 +74,8 @@ export interface LeaseNormalQuotationProps {
     tax: number;
     /** Overrides the default "VAT Amount" label — e.g. "VAT Exempt". */
     taxName?: string;
+    /** Drives the "(5%)" suffix on the VAT row label when present. */
+    taxPercent?: number;
     total: number;
   };
 }
@@ -1090,6 +1092,23 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                 }}
               >
                 {numberToWords(totals.subTotal, getActiveCurrency())}
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                marginBottom: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span style={{ color: '#666' }}>
+                  {totals.taxPercent
+                    ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                    : totals.taxName || 'VAT Amount'}
+                </span>
+                <span style={{ color: '#000', fontWeight: '300' }}>{fmt(totals.tax)}</span>
               </div>
             </div>
 

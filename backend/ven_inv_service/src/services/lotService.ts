@@ -188,4 +188,16 @@ export class LotService {
   ): Promise<void> {
     await this.lotRepository.linkSparePartToLotItem(lotId, customSparePartName, sparePartId);
   }
+
+  /**
+   * Checks whether a lot was booked with this spare part, without writing anything.
+   */
+  async lotContainsSparePart(
+    lotId: string,
+    customSparePartName?: string,
+    sku?: string,
+  ): Promise<boolean> {
+    const item = await this.lotRepository.findSparePartLotItem(lotId, customSparePartName, sku);
+    return item !== null;
+  }
 }

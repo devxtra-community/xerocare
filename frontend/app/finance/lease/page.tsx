@@ -7,6 +7,7 @@ import { getBranchInvoices, Invoice } from '@/lib/invoice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import MonthlyCollectionTable from '@/components/Finance/MonthlyCollectionTable';
 import CompletedCollectionsTable from '@/components/Finance/CompletedCollectionsTable';
+import PendingUsagePaymentsTable from '@/components/Finance/PendingUsagePaymentsTable';
 import FinanceApprovalTable from '@/components/Finance/FinanceApprovalTable';
 import FinanceQuotationTable from '@/components/Finance/FinanceQuotationTable';
 
@@ -42,6 +43,7 @@ export default function LeasePage() {
             <TabsTrigger value="pending">Pending Approvals</TabsTrigger>
             <TabsTrigger value="quotations">All Quotations</TabsTrigger>
             <TabsTrigger value="collection">Monthly Collection</TabsTrigger>
+            <TabsTrigger value="pendingPayments">Pending Payments</TabsTrigger>
             <TabsTrigger value="completed">Completed Collections</TabsTrigger>
           </TabsList>
 
@@ -67,6 +69,13 @@ export default function LeasePage() {
             </h3>
             <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
               <MonthlyCollectionTable mode="LEASE" onSuccess={fetchInvoices} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="pendingPayments" className="space-y-4">
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Pending Payments</h3>
+            <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
+              <PendingUsagePaymentsTable mode="LEASE" />
             </div>
           </TabsContent>
 

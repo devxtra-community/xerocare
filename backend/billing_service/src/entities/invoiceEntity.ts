@@ -16,6 +16,7 @@ import { RentType } from './enums/rentType';
 import { RentPeriod } from './enums/rentPeriod';
 import { LeaseType } from './enums/leaseType';
 import { ContractStatus } from './enums/contractStatus';
+import { DeliveryStatus } from './enums/deliveryStatus';
 import { ProductAllocation } from './productAllocationEntity';
 import { BillType } from './enums/billType';
 import { CreditNote } from './creditNoteEntity';
@@ -95,6 +96,15 @@ export class Invoice {
 
   @Column({ type: 'varchar', nullable: true })
   contractConfirmationUrl?: string;
+
+  // Physical delivery of the machine to the customer's premises — gates the
+  // Assign Technician action, which makes no sense before the machine arrives.
+  @Column({
+    type: 'enum',
+    enum: DeliveryStatus,
+    default: DeliveryStatus.NOT_DELIVERED,
+  })
+  deliveryStatus!: DeliveryStatus;
 
   // --- Audit Fields ---
   @Column({ nullable: true })

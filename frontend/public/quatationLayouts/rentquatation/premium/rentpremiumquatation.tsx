@@ -56,9 +56,9 @@ export interface RentPremiumQuotationProps {
   totals: {
     subTotal: number;
     tax: number;
-    /** Not currently rendered by this layout (no VAT line exists here) — kept
-     * for prop-shape parity with the other Rent layouts. */
     taxName?: string;
+    /** Drives the "(5%)" suffix on the VAT line label when present. */
+    taxPercent?: number;
     total: number;
   };
 }
@@ -77,6 +77,7 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
   quotation,
   lineItems = [],
   agreementDetails,
+  totals,
 }) => {
   const LOGO_PATH =
     '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png';
@@ -730,6 +731,15 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
               style={{ fontSize: '11px', color: ACCENT_COLOR, marginTop: '8px', fontWeight: '700' }}
             >
               (Excluding Excess Usage)
+            </div>
+            <div style={{ fontSize: '11px', color: TEXT_MUTED, marginTop: '10px' }}>
+              {totals.taxPercent
+                ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                : totals.taxName || 'VAT Amount'}
+              : {getActiveCurrency()} {fmt(totals.tax)}
+            </div>
+            <div style={{ fontSize: '13px', color: '#fff', fontWeight: '800', marginTop: '4px' }}>
+              Total (Incl. VAT): {getActiveCurrency()} {fmt(totals.total)}
             </div>
           </div>
         </div>

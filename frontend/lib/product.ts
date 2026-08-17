@@ -124,12 +124,7 @@ export const getAllProducts = async (params?: {
  */
 export const getAvailableProductsByModel = async (modelId: string): Promise<Product[]> => {
   const allProducts = await getAllProducts({ modelId, limit: 1000 });
-  const allowed = [
-    ProductStatus.AVAILABLE,
-    ProductStatus.LEASE,
-    ProductStatus.RETURNED,
-    ProductStatus.DAMAGED,
-  ];
+  const allowed = [ProductStatus.AVAILABLE, ProductStatus.RETURNED];
   return allProducts.filter((p) => allowed.includes(p.product_status));
 };
 

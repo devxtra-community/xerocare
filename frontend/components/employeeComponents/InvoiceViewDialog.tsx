@@ -863,6 +863,7 @@ export function InvoiceViewDialog({
                         subTotal: rentSubTotal,
                         tax: rentTaxAmount,
                         taxName: vatLabel,
+                        taxPercent: rentTaxRate,
                         total: rentTotalAmount,
                       }}
                     />
@@ -877,6 +878,7 @@ export function InvoiceViewDialog({
                         subTotal: rentSubTotal,
                         tax: rentTaxAmount,
                         taxName: vatLabel,
+                        taxPercent: rentTaxRate,
                         total: rentTotalAmount,
                       }}
                     />
@@ -891,6 +893,7 @@ export function InvoiceViewDialog({
                         subTotal: rentSubTotal,
                         tax: rentTaxAmount,
                         taxName: vatLabel,
+                        taxPercent: rentTaxRate,
                         total: rentTotalAmount,
                       }}
                     />
@@ -906,6 +909,7 @@ export function InvoiceViewDialog({
                         subTotal: leaseSubTotal,
                         tax: leaseTaxAmount,
                         taxName: vatLabel,
+                        taxPercent: leaseTaxRate,
                         total: leaseTotalAmount,
                       }}
                     />
@@ -920,6 +924,7 @@ export function InvoiceViewDialog({
                         subTotal: leaseSubTotal,
                         tax: leaseTaxAmount,
                         taxName: vatLabel,
+                        taxPercent: leaseTaxRate,
                         total: leaseTotalAmount,
                       }}
                     />
@@ -934,6 +939,7 @@ export function InvoiceViewDialog({
                         subTotal: leaseSubTotal,
                         tax: leaseTaxAmount,
                         taxName: vatLabel,
+                        taxPercent: leaseTaxRate,
                         total: leaseTotalAmount,
                       }}
                     />

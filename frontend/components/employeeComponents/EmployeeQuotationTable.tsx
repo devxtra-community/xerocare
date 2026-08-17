@@ -110,9 +110,9 @@ interface SaleItem {
   bwIncludedLimit?: number;
   colorIncludedLimit?: number;
   combinedIncludedLimit?: number;
-  bwExcessRate?: number;
-  colorExcessRate?: number;
-  combinedExcessRate?: number;
+  bwExcessRate?: string;
+  colorExcessRate?: string;
+  combinedExcessRate?: string;
   bwSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
@@ -243,6 +243,14 @@ const getRemainingDays = (expiryDate?: string | Date) => {
   const diffTime = new Date(expiryDate).getTime() - new Date().getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays > 0 ? `${diffDays} days remaining` : 'Expired';
+};
+
+// Allows valid decimal intermediate states (e.g. "0.", "0.2", "0.20") without
+// converting to a number mid-entry, which would strip the decimal point.
+const handleDecimalInput = (val: string): string | undefined => {
+  if (val === '') return '';
+  if (/^\d*\.?\d*$/.test(val)) return val;
+  return undefined;
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -679,9 +687,11 @@ export default function EmployeeQuotationTable() {
           bwIncludedLimit: item.bwIncludedLimit,
           colorIncludedLimit: item.colorIncludedLimit,
           combinedIncludedLimit: item.combinedIncludedLimit,
-          bwExcessRate: item.bwExcessRate,
-          colorExcessRate: item.colorExcessRate,
-          combinedExcessRate: item.combinedExcessRate,
+          bwExcessRate: item.bwExcessRate !== undefined ? String(item.bwExcessRate) : undefined,
+          colorExcessRate:
+            item.colorExcessRate !== undefined ? String(item.colorExcessRate) : undefined,
+          combinedExcessRate:
+            item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : undefined,
 
           bwSlabRanges: mappedSlabs(item.bwSlabRanges),
           colorSlabRanges: mappedSlabs(item.colorSlabRanges),
@@ -1552,9 +1562,11 @@ function QuotationFormModal({
           bwIncludedLimit: item.bwIncludedLimit,
           colorIncludedLimit: item.colorIncludedLimit,
           combinedIncludedLimit: item.combinedIncludedLimit,
-          bwExcessRate: item.bwExcessRate,
-          colorExcessRate: item.colorExcessRate,
-          combinedExcessRate: item.combinedExcessRate,
+          bwExcessRate: item.bwExcessRate !== undefined ? String(item.bwExcessRate) : undefined,
+          colorExcessRate:
+            item.colorExcessRate !== undefined ? String(item.colorExcessRate) : undefined,
+          combinedExcessRate:
+            item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : undefined,
 
           bwSlabRanges: mappedSlabs(item.bwSlabRanges),
           colorSlabRanges: mappedSlabs(item.colorSlabRanges),
@@ -1976,9 +1988,13 @@ function QuotationFormModal({
             </span>
             <Input
               placeholder="0.00"
-              type="number"
-              value={rateValue || ''}
-              onChange={(e) => updateItem(itemIndex, rateField, e.target.value)}
+              type="text"
+              inputMode="decimal"
+              value={rateValue ?? ''}
+              onChange={(e) => {
+                const v = handleDecimalInput(e.target.value);
+                if (v !== undefined) updateItem(itemIndex, rateField, v);
+              }}
               className="h-9 text-xs font-black text-blue-700 bg-white border-blue-200 focus:ring-2 focus:ring-blue-500/20 pr-10 text-right"
             />
           </div>
@@ -2036,9 +2052,13 @@ function QuotationFormModal({
                   </span>
                   <Input
                     placeholder="0.00"
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={slab.rate}
-                    onChange={(e) => updateSlab(itemIndex, type, sIdx, 'rate', e.target.value)}
+                    onChange={(e) => {
+                      const v = handleDecimalInput(e.target.value);
+                      if (v !== undefined) updateSlab(itemIndex, type, sIdx, 'rate', v);
+                    }}
                     className="h-9 text-xs font-black text-blue-600 bg-blue-50/30 border-blue-50 focus:bg-white text-right pr-10"
                   />
                 </div>
@@ -2190,13 +2210,11 @@ function QuotationFormModal({
         const b = Number(value);
         items[index] = { ...item, basePrice: b, unitPrice: b - item.discount };
       } else if (
+        ['bwIncludedLimit', 'colorIncludedLimit', 'combinedIncludedLimit'].includes(field as string)
+      ) {
+        items[index] = { ...item, [field]: Number(value) };
+      } else if (
         [
-          'bwIncludedLimit',
-          'colorIncludedLimit',
-          'combinedIncludedLimit',
-          'bwExcessRate',
-          'colorExcessRate',
-          'combinedExcessRate',
           'bwExcessRate',
           'colorExcessRate',
           'combinedExcessRate',
@@ -2205,7 +2223,7 @@ function QuotationFormModal({
           'comboRateUpTo100k',
         ].includes(field as string)
       ) {
-        items[index] = { ...item, [field]: Number(value) };
+        items[index] = { ...item, [field]: value };
       } else if (
         ['useBwRateUpTo100k', 'useColorRateUpTo100k', 'useComboRateUpTo100k'].includes(
           field as string,
@@ -2364,6 +2382,9 @@ function QuotationFormModal({
             unitPrice: 0,
             productId: undefined,
             warranty: it.warranty,
+            bwExcessRate: Number(it.bwExcessRate) || 0,
+            colorExcessRate: Number(it.colorExcessRate) || 0,
+            combinedExcessRate: Number(it.combinedExcessRate) || 0,
           };
         }),
         pricingItems: [],
@@ -2458,12 +2479,16 @@ function QuotationFormModal({
                   combinedIncludedLimit:
                     rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
                   bwExcessRate:
-                    rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.bwExcessRate || 0 : 0,
+                    rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+                      ? Number(it.bwExcessRate) || 0
+                      : 0,
                   colorExcessRate:
-                    rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.colorExcessRate || 0 : 0,
+                    rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+                      ? Number(it.colorExcessRate) || 0
+                      : 0,
                   combinedExcessRate:
                     rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
-                      ? it.combinedExcessRate || 0
+                      ? Number(it.combinedExcessRate) || 0
                       : 0,
                   bwSlabRanges:
                     rentType === 'CPC' || rentType === 'CPC_COMBO'
@@ -2527,12 +2552,16 @@ function QuotationFormModal({
                 combinedIncludedLimit:
                   rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
                 bwExcessRate:
-                  rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.bwExcessRate || 0 : 0,
+                  rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+                    ? Number(it.bwExcessRate) || 0
+                    : 0,
                 colorExcessRate:
-                  rentType === 'FIXED_LIMIT' || rentType === 'CPC' ? it.colorExcessRate || 0 : 0,
+                  rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+                    ? Number(it.colorExcessRate) || 0
+                    : 0,
                 combinedExcessRate:
                   rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
-                    ? it.combinedExcessRate || 0
+                    ? Number(it.combinedExcessRate) || 0
                     : 0,
                 bwSlabRanges:
                   rentType === 'CPC' || rentType === 'CPC_COMBO'
@@ -3536,12 +3565,14 @@ function QuotationFormModal({
                                       B/W Excess Rate
                                     </label>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="Rate"
-                                      value={m.bwExcessRate || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'bwExcessRate', e.target.value)
-                                      }
+                                      value={m.bwExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined) updateItem(index, 'bwExcessRate', v);
+                                      }}
                                       className="h-8 text-[11px] font-bold"
                                     />
                                   </div>
@@ -3552,12 +3583,15 @@ function QuotationFormModal({
                                       Color Excess Rate
                                     </label>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="Rate"
-                                      value={m.colorExcessRate || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'colorExcessRate', e.target.value)
-                                      }
+                                      value={m.colorExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined)
+                                          updateItem(index, 'colorExcessRate', v);
+                                      }}
                                       className="h-8 text-[11px] font-bold"
                                     />
                                   </div>
@@ -3568,12 +3602,15 @@ function QuotationFormModal({
                                       Combo Excess Rate
                                     </label>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="Rate"
-                                      value={m.combinedExcessRate || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'combinedExcessRate', e.target.value)
-                                      }
+                                      value={m.combinedExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined)
+                                          updateItem(index, 'combinedExcessRate', v);
+                                      }}
                                       className="h-8 text-[11px] font-bold"
                                     />
                                   </div>
@@ -3644,10 +3681,14 @@ function QuotationFormModal({
                             <span>Periodic Rent ({rentPeriod.replace('_', ' ')})</span>
                           </label>
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={monthlyRent}
-                            onChange={(e) => setMonthlyRent(e.target.value)}
+                            onChange={(e) => {
+                              const v = handleDecimalInput(e.target.value);
+                              if (v !== undefined) setMonthlyRent(v);
+                            }}
                             className="h-9 text-sm"
                           />
                         </div>
@@ -3656,13 +3697,16 @@ function QuotationFormModal({
                             Advance / Caution Deposit ({currency})
                           </label>
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={advanceAmount}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              setAdvanceAmount(val);
-                              setSecurityDepositAmount(val);
+                              const v = handleDecimalInput(e.target.value);
+                              if (v !== undefined) {
+                                setAdvanceAmount(v);
+                                setSecurityDepositAmount(v);
+                              }
                             }}
                             className="h-9 text-sm"
                           />
@@ -3928,12 +3972,14 @@ function QuotationFormModal({
                                       B/W Excess Rate
                                     </label>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="Rate"
-                                      value={m.bwExcessRate || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'bwExcessRate', e.target.value)
-                                      }
+                                      value={m.bwExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined) updateItem(index, 'bwExcessRate', v);
+                                      }}
                                       className="h-8 text-[11px] font-bold"
                                     />
                                   </div>
@@ -3944,12 +3990,15 @@ function QuotationFormModal({
                                       Color Excess Rate
                                     </label>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="Rate"
-                                      value={m.colorExcessRate || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'colorExcessRate', e.target.value)
-                                      }
+                                      value={m.colorExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined)
+                                          updateItem(index, 'colorExcessRate', v);
+                                      }}
                                       className="h-8 text-[11px] font-bold"
                                     />
                                   </div>
@@ -3960,12 +4009,15 @@ function QuotationFormModal({
                                       Combo Excess Rate
                                     </label>
                                     <Input
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="Rate"
-                                      value={m.combinedExcessRate || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'combinedExcessRate', e.target.value)
-                                      }
+                                      value={m.combinedExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined)
+                                          updateItem(index, 'combinedExcessRate', v);
+                                      }}
                                       className="h-8 text-[11px] font-bold"
                                     />
                                   </div>
@@ -4049,15 +4101,19 @@ function QuotationFormModal({
                         Total Lease Amount ({currency})
                       </label>
                       <Input
-                        type="number"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="0.00"
                         value={totalLeaseAmount}
                         onChange={(e) => {
-                          setLastEditedLease('TOTAL');
-                          setTotalLeaseAmount(e.target.value);
-                          if (!e.target.value) {
-                            setMonthlyEmiAmount('');
-                            setMonthlyRent('');
+                          const v = handleDecimalInput(e.target.value);
+                          if (v !== undefined) {
+                            setLastEditedLease('TOTAL');
+                            setTotalLeaseAmount(v);
+                            if (!v) {
+                              setMonthlyEmiAmount('');
+                              setMonthlyRent('');
+                            }
                           }
                         }}
                         className="h-9 text-sm font-bold text-blue-700"
@@ -4070,12 +4126,16 @@ function QuotationFormModal({
                           <span className="text-[9px] lowercase">(auto)</span>
                         </label>
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           value={monthlyEmiAmount}
                           onChange={(e) => {
-                            setLastEditedLease('PERIODIC');
-                            setMonthlyEmiAmount(e.target.value);
-                            if (!e.target.value) setTotalLeaseAmount('');
+                            const v = handleDecimalInput(e.target.value);
+                            if (v !== undefined) {
+                              setLastEditedLease('PERIODIC');
+                              setMonthlyEmiAmount(v);
+                              if (!v) setTotalLeaseAmount('');
+                            }
                           }}
                           className="h-9 text-sm font-bold text-purple-700"
                         />
@@ -4090,12 +4150,16 @@ function QuotationFormModal({
                               <span className="text-[9px] lowercase">(auto)</span>
                             </label>
                             <Input
-                              type="number"
+                              type="text"
+                              inputMode="decimal"
                               value={monthlyRent}
                               onChange={(e) => {
-                                setLastEditedLease('PERIODIC');
-                                setMonthlyRent(e.target.value);
-                                if (!e.target.value) setTotalLeaseAmount('');
+                                const v = handleDecimalInput(e.target.value);
+                                if (v !== undefined) {
+                                  setLastEditedLease('PERIODIC');
+                                  setMonthlyRent(v);
+                                  if (!v) setTotalLeaseAmount('');
+                                }
                               }}
                               className="h-9 text-sm font-bold text-blue-700"
                             />
@@ -4106,13 +4170,16 @@ function QuotationFormModal({
                             Advance / Caution Deposit ({currency})
                           </label>
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             value={advanceAmount}
                             onChange={(e) => {
-                              const val = e.target.value;
-                              setAdvanceAmount(val);
-                              setSecurityDepositAmount(val);
+                              const v = handleDecimalInput(e.target.value);
+                              if (v !== undefined) {
+                                setAdvanceAmount(v);
+                                setSecurityDepositAmount(v);
+                              }
                             }}
                             className="h-9 text-sm"
                           />

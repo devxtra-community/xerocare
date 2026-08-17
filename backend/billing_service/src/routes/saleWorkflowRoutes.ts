@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/authMiddleware';
+import { requireJob, EmployeeJob } from '../middlewares/jobMiddleware';
+import { requireRole } from '../middlewares/roleMiddleware';
+import { EmployeeRole } from '../constants/employeeRole';
 import {
   initiateMachineSwap,
   getMachineSwapRequests,
@@ -27,6 +30,9 @@ import {
   approveSalePayment,
   rejectSalePayment,
   getSaleContracts,
+  updateDeliveryStatus,
+  getPendingUsagePayments,
+  collectPendingUsagePayment,
   generateSalePaymentReceipt,
   sendSalePaymentReceiptEmail,
   sendSalePaymentReceiptWhatsApp,
@@ -37,6 +43,12 @@ const router = Router();
 
 // ─── Sale Contracts list ──────────────────────────────────────────────────────
 router.get('/sale-contracts', authMiddleware, getSaleContracts);
+router.patch(
+  '/sale-contracts/:id/delivery-status',
+  authMiddleware,
+  requireJob(EmployeeJob.SERVICE_HELP_DESK),
+  updateDeliveryStatus,
+);
 
 // ─── Contract Agreements ──────────────────────────────────────────────────────
 router.get('/invoices/:id/contract-agreement', authMiddleware, getContractAgreement);
@@ -61,10 +73,34 @@ router.post('/contract/sign/:token', signContractRemote);
 
 // ─── Installation Requests ────────────────────────────────────────────────────
 router.get('/installation-requests', authMiddleware, getInstallationRequestsForBranch);
-router.post('/invoices/:id/installation-request', authMiddleware, createInstallationRequest);
-router.patch('/installation-requests/:id/assign', authMiddleware, assignTechnician);
+router.post(
+  '/invoices/:id/installation-request',
+  authMiddleware,
+  requireJob(EmployeeJob.SERVICE_HELP_DESK),
+  createInstallationRequest,
+);
+router.patch(
+  '/installation-requests/:id/assign',
+  authMiddleware,
+  requireJob(EmployeeJob.SERVICE_HELP_DESK),
+  assignTechnician,
+);
 router.post('/installation-requests/:id/start', authMiddleware, startInstallation);
 router.post('/installation-requests/:id/stop', authMiddleware, stopInstallation);
+
+// ─── Pending Usage Payments (Rent/Lease periodic collection shortfalls) ───────
+router.get(
+  '/usage-payments/pending',
+  authMiddleware,
+  requireRole(EmployeeRole.FINANCE),
+  getPendingUsagePayments,
+);
+router.post(
+  '/usage-records/:id/collect-pending',
+  authMiddleware,
+  requireRole(EmployeeRole.FINANCE),
+  collectPendingUsagePayment,
+);
 
 // ─── Sale Payments ────────────────────────────────────────────────────────────
 router.get('/sale-payments/pending', authMiddleware, getPendingSalePayments);

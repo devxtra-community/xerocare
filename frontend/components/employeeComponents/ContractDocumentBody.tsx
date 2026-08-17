@@ -319,6 +319,13 @@ function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
 // ─── RENT terms ───────────────────────────────────────────────────────────────
 
 function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
+  // Tax on the recurring monthly rate — computed fresh here rather than reused from
+  // invoice.taxAmount, which (for an ongoing contract) accrues across every billing
+  // period and would misstate the tax on a single month's rate shown alongside it.
+  const monthlyRentTax = invoice.taxPercent
+    ? (Number(invoice.monthlyRent || 0) * Number(invoice.taxPercent)) / 100
+    : 0;
+  const monthlyRentInclTax = Number(invoice.monthlyRent || 0) + monthlyRentTax;
   const bwItem = (invoice.items || []).find(
     (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0,
   );
@@ -376,6 +383,27 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               {fmtAmt(invoice.monthlyRent, currency)}
             </td>
           </tr>
+          {monthlyRentTax > 0 && (
+            <>
+              <tr className="border-b border-slate-100">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  {invoice.taxName || 'VAT'}
+                  {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
+                </td>
+                <td className="px-3 py-2 font-semibold text-slate-700">
+                  {fmtAmt(monthlyRentTax, currency)}
+                </td>
+              </tr>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Monthly Rate (Incl. VAT)
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(monthlyRentInclTax, currency)}
+                </td>
+              </tr>
+            </>
+          )}
 
           {/* B&W usage */}
           {bwItem && (
@@ -465,6 +493,14 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
 
 function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
   const isEMI = invoice.leaseType === 'EMI';
+  // Tax on the recurring monthly figure — computed fresh here rather than reused from
+  // invoice.taxAmount, which (for an ongoing FSM contract) accrues across every billing
+  // period and would misstate the tax on a single month's amount shown alongside it.
+  const monthlyBase = isEMI
+    ? Number(invoice.monthlyEmiAmount ?? invoice.monthlyLeaseAmount ?? 0)
+    : Number(invoice.monthlyLeaseAmount ?? invoice.monthlyRent ?? 0);
+  const monthlyTax = invoice.taxPercent ? (monthlyBase * Number(invoice.taxPercent)) / 100 : 0;
+  const monthlyInclTax = monthlyBase + monthlyTax;
   const bwItem = !isEMI
     ? (invoice.items || []).find((i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0)
     : undefined;
@@ -514,6 +550,27 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                   {fmtAmt(invoice.monthlyEmiAmount ?? invoice.monthlyLeaseAmount, currency)}
                 </td>
               </tr>
+              {monthlyTax > 0 && (
+                <>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      {invoice.taxName || 'VAT'}
+                      {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
+                    </td>
+                    <td className="px-3 py-2 font-semibold text-slate-700">
+                      {fmtAmt(monthlyTax, currency)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      Monthly EMI (Incl. VAT)
+                    </td>
+                    <td className="px-3 py-2 font-black text-slate-800">
+                      {fmtAmt(monthlyInclTax, currency)}
+                    </td>
+                  </tr>
+                </>
+              )}
               <tr>
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Total Lease Value
@@ -541,6 +598,27 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                   {fmtAmt(invoice.monthlyLeaseAmount ?? invoice.monthlyRent, currency)}
                 </td>
               </tr>
+              {monthlyTax > 0 && (
+                <>
+                  <tr className="border-b border-slate-100">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      {invoice.taxName || 'VAT'}
+                      {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
+                    </td>
+                    <td className="px-3 py-2 font-semibold text-slate-700">
+                      {fmtAmt(monthlyTax, currency)}
+                    </td>
+                  </tr>
+                  <tr className="border-b border-slate-100 bg-slate-50">
+                    <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      Monthly Service Amount (Incl. VAT)
+                    </td>
+                    <td className="px-3 py-2 font-black text-slate-800">
+                      {fmtAmt(monthlyInclTax, currency)}
+                    </td>
+                  </tr>
+                </>
+              )}
               {bwItem && (
                 <>
                   {(bwItem.bwIncludedLimit ?? 0) > 0 && (
@@ -614,6 +692,16 @@ function AdvanceSection({
   const hasDeposit = secDeposit > 0;
   if (!hasAdvance && !hasDeposit) return null;
 
+  // Rent/Lease advances are collected VAT-inclusive (see createSalePaymentRequest's
+  // gross-up) — mirror that same figure here so the Contract Agreement, the receipt,
+  // and the Accounts Receipts request all show the identical number. Sale's advance
+  // display is untouched (Sale already handles its own tax at the invoice level, in
+  // SaleTermsSection above).
+  const isRentOrLease = saleType === 'RENT' || saleType === 'LEASE';
+  const advanceTax =
+    isRentOrLease && invoice.taxPercent ? (advance * Number(invoice.taxPercent)) / 100 : 0;
+  const advanceInclTax = advance + advanceTax;
+
   const advanceLabel = saleType === 'LEASE' ? 'Down Payment' : 'Advance Payment';
 
   const advanceNote =
@@ -639,8 +727,24 @@ function AdvanceSection({
                 <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   {advanceLabel}
                 </td>
-                <td className="px-3 py-2 font-black text-slate-800">{fmtAmt(advance, currency)}</td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(advanceTax > 0 ? advanceInclTax : advance, currency)}
+                </td>
               </tr>
+              {advanceTax > 0 && (
+                <tr className="border-b border-slate-100">
+                  <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    {invoice.taxName || 'VAT'}
+                    {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''} on {advanceLabel}
+                  </td>
+                  <td className="px-3 py-2 font-semibold text-slate-700">
+                    {fmtAmt(advanceTax, currency)}{' '}
+                    <span className="text-slate-400 font-normal">
+                      (base {fmtAmt(advance, currency)})
+                    </span>
+                  </td>
+                </tr>
+              )}
               {invoice.preferredPaymentMode && (
                 <tr className="border-b border-slate-100">
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">

@@ -476,7 +476,9 @@ export default function InstallationRequestsPage() {
                               <Eye size={13} />
                             </Button>
                           )}
-                          {req.currentProductId && req.status !== 'PENDING' && (
+                          {/* Sale-only: Rent/Lease machines are replaced by Finance/Admin from the
+                              contract screen, so the meter readings needed for billing get captured. */}
+                          {req.currentProductId && req.status !== 'PENDING' && !isRentLease && (
                             <Button
                               size="sm"
                               variant="ghost"

@@ -9,13 +9,16 @@ import { ContractAgreement } from '../entities/contractAgreementEntity';
 import { InstallationRequest } from '../entities/installationRequestEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { DeliveryStatus } from '../entities/enums/deliveryStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { Cheque } from '../entities/chequeEntity';
+import { UsageRecord } from '../entities/usageRecordEntity';
 import { r2 } from '../config/r2';
+import { createSalePaymentRequest } from '../services/salePaymentRequestService';
 
 import { logger } from '../config/logger';
 
@@ -55,17 +58,6 @@ async function generateAgreementNumber(): Promise<string> {
     .getCount();
   const seq = String(count + 1).padStart(3, '0');
   return `CA-${year}-${seq}`;
-}
-
-async function generateSalePaymentRequestNo(): Promise<string> {
-  const repo = Source.getRepository(SalePaymentRequest);
-  const year = new Date().getFullYear();
-  const count = await repo
-    .createQueryBuilder('r')
-    .where(`EXTRACT(YEAR FROM r."createdAt") = :year`, { year })
-    .getCount();
-  const seq = String(count + 1).padStart(4, '0');
-  return `SPAY-${year}-${seq}`;
 }
 
 // ─── Contract Agreement ───────────────────────────────────────────────────────
@@ -114,6 +106,18 @@ export const createOrGetContractAgreement = async (
     const invoice = await Source.getRepository(Invoice).findOne({ where: { id } });
     if (!invoice) throw new AppError('Invoice not found', 404);
     if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    // Contract agreements exist for RENT and LEASE only — a Sale is a one-off transaction
+    // covered by its invoice, and Sale agreements were removed. That removal was applied
+    // in the UI alone, so the endpoint still happily minted a numbered, signable agreement
+    // for any Sale invoice anyone posted to it directly.
+    const agreementSaleType = (invoice.saleType ?? '').toUpperCase();
+    if (agreementSaleType !== 'RENT' && agreementSaleType !== 'LEASE') {
+      throw new AppError(
+        'Contract agreements apply to Rent and Lease contracts only — a Sale is covered by its invoice.',
+        400,
+      );
+    }
 
     const [agreementNumber, empName] = await Promise.all([
       generateAgreementNumber(),
@@ -451,9 +455,16 @@ export const createInstallationRequest = async (
       fetchEmployeeName(userId),
       Source.getRepository(Invoice).findOne({
         where: { id },
-        select: ['id', 'saleType', 'branchId'],
+        select: ['id', 'saleType', 'branchId', 'deliveryStatus'],
       }),
     ]);
+
+    if (invoice?.deliveryStatus !== DeliveryStatus.DELIVERED) {
+      throw new AppError(
+        'Cannot raise an installation request until the machine has been delivered',
+        400,
+      );
+    }
 
     const request = repo.create({
       invoiceId: id,
@@ -485,6 +496,14 @@ export const assignTechnician = async (req: Request, res: Response, next: NextFu
     const request = await repo.findOne({ where: { id } });
     if (!request) throw new AppError('Installation request not found', 404);
     if (request.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    const invoice = await Source.getRepository(Invoice).findOne({
+      where: { id: request.invoiceId },
+      select: ['id', 'deliveryStatus'],
+    });
+    if (invoice?.deliveryStatus !== DeliveryStatus.DELIVERED) {
+      throw new AppError('Cannot assign a technician until the machine has been delivered', 400);
+    }
 
     request.technicianId = technicianId;
     request.technicianName = technicianName;
@@ -622,8 +641,21 @@ export const getAllSalePaymentsForBranch = async (
 
     const qb = repo.createQueryBuilder('spr');
 
-    if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(role);
+    if (!isAdmin) {
       qb.where('spr."branchId" = :branchId', { branchId });
+    } else {
+      // Admin sees every branch by default, but must also be able to narrow to one or
+      // more via the Accounts branch filter — the same `branchIds` contract the other
+      // admin-facing accounts endpoints already use. Without this the Admin Receipts view
+      // could only ever show everything, so the branch selector had no effect on it.
+      const requested = String(req.query.branchIds ?? '')
+        .split(',')
+        .map((b) => b.trim())
+        .filter((b) => /^[0-9a-f-]{36}$/i.test(b));
+      if (requested.length > 0) {
+        qb.where('spr."branchId" IN (:...requested)', { requested });
+      }
     }
 
     const payments = await qb.orderBy('spr."createdAt"', 'DESC').getMany();
@@ -652,67 +684,24 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       paymentContext,
     } = req.body;
 
-    if (!amount || !paymentMode || !paymentDate) {
-      throw new AppError('amount, paymentMode, and paymentDate are required', 400);
-    }
-    if (paymentMode === 'CHEQUE' && !chequeNumber) {
-      throw new AppError('chequeNumber is required for CHEQUE payment', 400);
-    }
-
-    const invoiceRepo = Source.getRepository(Invoice);
-    const invoice = await invoiceRepo.findOne({ where: { id } });
-    if (!invoice) throw new AppError('Invoice not found', 404);
-    if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
-
-    // Auto-detect paymentContext when not explicitly provided
-    let resolvedContext = paymentContext;
-    if (!resolvedContext) {
-      const saleType = (invoice.saleType || '').toUpperCase();
-      if (saleType === 'RENT' || saleType === 'LEASE') {
-        const existingCount = await Source.getRepository(SalePaymentRequest).count({
-          where: { invoiceId: id },
-        });
-        if (saleType === 'RENT') {
-          resolvedContext = existingCount === 0 ? 'RENT_ADVANCE' : 'RENT_PERIODIC';
-        } else {
-          resolvedContext = existingCount === 0 ? 'LEASE_ADVANCE' : 'LEASE_PERIODIC';
-        }
-      } else {
-        resolvedContext = 'SALE';
-      }
-    }
-
-    const [requestNo, employeeName] = await Promise.all([
-      generateSalePaymentRequestNo(),
-      fetchEmployeeName(userId),
-    ]);
-
-    const repo = Source.getRepository(SalePaymentRequest);
-    const request = repo.create({
-      requestNo,
+    const request = await createSalePaymentRequest({
       invoiceId: id,
-      invoiceNumber: invoice.invoiceNumber,
       branchId,
-      recordedByEmployeeId: userId,
-      recordedByEmployeeName: employeeName,
-      customerName: invoice.customerName || 'Customer',
+      userId,
       amount: Number(amount),
-      currency: invoice.currencyCode || 'AED',
       paymentMode,
-      paymentDate: new Date(paymentDate),
+      paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
       referenceNumber,
       remarks,
-      cashAccountId: paymentMode !== 'CHEQUE' ? cashAccountId : undefined,
+      cashAccountId,
       chequeNumber,
       chequeBankName,
       chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : undefined,
       chequeDate: chequeDate ? new Date(chequeDate) : undefined,
-      collectLater: Boolean(collectLater),
-      paymentContext: resolvedContext,
-      status: 'PENDING',
+      collectLater,
+      paymentContext,
     });
 
-    await repo.save(request);
     res.status(201).json({ success: true, data: request });
   } catch (err) {
     next(err);
@@ -823,6 +812,17 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
             where: { chequeNo: request.chequeNumber!, branchId: request.branchId },
           });
           if (!existing) {
+            // RENT_PERIODIC / LEASE_PERIODIC contexts settle a rent or lease contract,
+            // not a sale.
+            const ctx = (request.paymentContext ?? '').toUpperCase();
+            const chequeSourceType = ctx.startsWith('RENT')
+              ? 'RENT'
+              : ctx.startsWith('LEASE')
+                ? 'LEASE'
+                : 'SALE';
+            const chequeContextLabel =
+              chequeSourceType === 'SALE' ? 'Sale' : chequeSourceType === 'RENT' ? 'Rent' : 'Lease';
+
             const cheque = queryRunner.manager.create(Cheque, {
               chequeNo: request.chequeNumber!,
               bankName: request.chequeBankName || undefined,
@@ -833,10 +833,14 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
               issueDate: new Date(request.paymentDate),
               type: 'RECEIVED',
               status: 'PENDING',
-              description: `Sale payment — ${request.invoiceNumber} (${request.customerName})`,
+              description: `${chequeContextLabel} payment — ${request.invoiceNumber} (${request.customerName})`,
               branchId: request.branchId,
               accountId: request.cashAccountId || undefined,
-              sourceType: 'SALE',
+              // Label the cheque with the contract type it actually settles. This was
+              // hardcoded 'SALE', so a rent or lease periodic collection taken by cheque
+              // filed itself under Sale — misreporting every metered-contract cheque in
+              // the cheque register and in any per-context filtering built on it.
+              sourceType: chequeSourceType,
               sourceReferenceId: request.invoiceId,
               sourceLabel: `Invoice ${request.invoiceNumber}`,
               invoiceNo: request.invoiceNumber,
@@ -954,6 +958,7 @@ export const getSaleContracts = async (req: Request, res: Response, next: NextFu
         'i.createdBy',
         'i.status',
         'i.contractStatus',
+        'i.deliveryStatus',
         'i.saleType',
         'i.totalAmount',
         'i.currencyCode',
@@ -1073,6 +1078,7 @@ export const getSaleContracts = async (req: Request, res: Response, next: NextFu
         createdByEmployeeName: createdByName,
         status: c.i_status,
         contractStatus: c['i_contractStatus'],
+        deliveryStatus: c['i_deliveryStatus'],
         saleType: c['i_saleType'],
         totalAmount: c['i_totalAmount'],
         currencyCode: c['i_currencyCode'],
@@ -1086,6 +1092,201 @@ export const getSaleContracts = async (req: Request, res: Response, next: NextFu
     });
 
     res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateDeliveryStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string; // invoiceId
+    const { branchId, role } = req.user!;
+    const { deliveryStatus } = req.body as { deliveryStatus?: string };
+
+    if (!Object.values(DeliveryStatus).includes(deliveryStatus as DeliveryStatus)) {
+      throw new AppError('Invalid delivery status', 400);
+    }
+
+    const repo = Source.getRepository(Invoice);
+    const invoice = await repo.findOne({ where: { id } });
+    if (!invoice) throw new AppError('Contract not found', 404);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && invoice.branchId !== branchId) {
+      throw new AppError('Access denied', 403);
+    }
+
+    invoice.deliveryStatus = deliveryStatus as DeliveryStatus;
+    await repo.save(invoice);
+
+    res.json({
+      success: true,
+      data: { id: invoice.id, deliveryStatus: invoice.deliveryStatus },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Pending Usage Payments (Rent/Lease periodic collections not fully collected) ─────
+
+/**
+ * One row per billing period (UsageRecord) whose full charge hasn't yet been submitted
+ * as collections — covers both a partial collection's shortfall and a period recorded
+ * with nothing collected at all. "Given"/"Pending" are computed from non-REJECTED
+ * SalePaymentRequests linked to that usageRecordId, independent of whether Accounts has
+ * approved them yet — this tracks what still needs chasing from the customer, which is
+ * a separate concern from the accounting figures that only move on approval.
+ */
+export const getPendingUsagePayments = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId, role } = req.user!;
+
+    const invoiceRepo = Source.getRepository(Invoice);
+    const invQb = invoiceRepo.createQueryBuilder('i').where(`i."saleType" IN ('RENT', 'LEASE')`);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      invQb.andWhere('i."branchId" = :branchId', { branchId });
+    }
+    const invoices = await invQb
+      .select(['i.id', 'i.invoiceNumber', 'i.customerName', 'i.saleType'])
+      .getMany();
+
+    if (invoices.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    const invoiceIds = invoices.map((i) => i.id);
+    const invoiceMap = new Map(invoices.map((i) => [i.id, i]));
+
+    const usageRecords = await Source.getRepository(UsageRecord)
+      .createQueryBuilder('ur')
+      .where('ur."contractId" IN (:...ids)', { ids: invoiceIds })
+      .orderBy('ur."billingPeriodEnd"', 'DESC')
+      .getMany();
+
+    if (usageRecords.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+    const usageRecordIds = usageRecords.map((u) => u.id);
+
+    const payments = await Source.getRepository(SalePaymentRequest)
+      .createQueryBuilder('spr')
+      .where('spr."usageRecordId" IN (:...ids)', { ids: usageRecordIds })
+      .getMany();
+
+    const givenByUsageRecord = new Map<string, number>();
+    for (const p of payments) {
+      if (p.status === 'REJECTED' || !p.usageRecordId) continue;
+      givenByUsageRecord.set(
+        p.usageRecordId,
+        (givenByUsageRecord.get(p.usageRecordId) || 0) + Number(p.amount),
+      );
+    }
+
+    const result = usageRecords
+      .map((ur) => {
+        const invoice = invoiceMap.get(ur.contractId);
+        const given = givenByUsageRecord.get(ur.id) || 0;
+        const pending = Math.max(0, Number(ur.totalCharge) - given);
+        return {
+          usageRecordId: ur.id,
+          contractId: ur.contractId,
+          invoiceNumber: invoice?.invoiceNumber || '',
+          customerName: invoice?.customerName || null,
+          saleType: invoice?.saleType || null,
+          billingPeriodStart: ur.billingPeriodStart,
+          billingPeriodEnd: ur.billingPeriodEnd,
+          totalCharge: Number(ur.totalCharge),
+          amountGiven: given,
+          amountPending: pending,
+          createdAt: ur.createdAt,
+        };
+      })
+      .filter((row) => row.amountPending > 0.01);
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Collects a further amount against a specific period's outstanding shortfall (e.g.
+ * later collecting the AED 80 left over from a AED 280 bill / AED 200 partial). Creates
+ * its own PENDING SalePaymentRequest, linked to the same usageRecordId, through the same
+ * approval gate as every other collection. Capped at the period's remaining pending
+ * balance — the same overpayment-guard philosophy already applied when approving a
+ * SalePaymentRequest against an invoice's total.
+ */
+export const collectPendingUsagePayment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const usageRecordId = req.params.id as string;
+    const { userId, branchId } = req.user!;
+    const {
+      amount,
+      paymentMode,
+      paymentDate,
+      referenceNumber,
+      cashAccountId,
+      chequeNumber,
+      chequeBankName,
+      chequeDueDate,
+      chequeDate,
+    } = req.body;
+
+    const usageRecord = await Source.getRepository(UsageRecord).findOne({
+      where: { id: usageRecordId },
+    });
+    if (!usageRecord) throw new AppError('Usage record not found', 404);
+
+    const invoice = await Source.getRepository(Invoice).findOne({
+      where: { id: usageRecord.contractId },
+    });
+    if (!invoice) throw new AppError('Contract not found', 404);
+    if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    const existing = await Source.getRepository(SalePaymentRequest).find({
+      where: { usageRecordId },
+    });
+    const alreadyGiven = existing
+      .filter((p) => p.status !== 'REJECTED')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const remainingPending = Number(usageRecord.totalCharge) - alreadyGiven;
+
+    const requestedAmount = Number(amount);
+    if (!requestedAmount || requestedAmount <= 0) {
+      throw new AppError('amount is required', 400);
+    }
+    if (requestedAmount > remainingPending + 0.01) {
+      throw new AppError(
+        `Amount (${requestedAmount}) exceeds the remaining pending balance ` +
+          `(${remainingPending}) for this period`,
+        400,
+      );
+    }
+
+    const periodLabel = `${new Date(usageRecord.billingPeriodStart).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })} to ${new Date(usageRecord.billingPeriodEnd).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`;
+
+    const request = await createSalePaymentRequest({
+      invoiceId: invoice.id,
+      branchId,
+      userId,
+      amount: requestedAmount,
+      paymentMode,
+      paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+      referenceNumber: chequeNumber || referenceNumber,
+      remarks: `Usage bill pending top-up — ${periodLabel}`,
+      cashAccountId,
+      chequeNumber,
+      chequeBankName,
+      chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : undefined,
+      chequeDate: chequeDate ? new Date(chequeDate) : undefined,
+      paymentContext: invoice.saleType === 'RENT' ? 'RENT_PERIODIC' : 'LEASE_PERIODIC',
+      usageRecordId,
+    });
+
+    res.status(201).json({ success: true, data: request });
   } catch (err) {
     next(err);
   }
@@ -1105,8 +1306,13 @@ export const generateSalePaymentReceipt = async (
     const repo = Source.getRepository(SalePaymentRequest);
     const request = await repo.findOne({ where: { id } });
     if (!request) throw new AppError('Payment request not found', 404);
-    if (request.status !== 'APPROVED') {
-      throw new AppError('Receipt can only be generated for APPROVED payments', 400);
+    // The employee physically took the money, so the customer gets their receipt at
+    // that moment — Accounts approval is an internal accounting step and must not
+    // hold up proof of payment. Issuing the receipt still moves nothing: cash only
+    // reaches the books when the request is approved. A REJECTED request is the one
+    // case where no money is being held, so no receipt may be issued for it.
+    if (request.status === 'REJECTED') {
+      throw new AppError('Cannot generate a receipt for a rejected payment', 400);
     }
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && request.branchId !== branchId) {
       throw new AppError('Access denied', 403);
@@ -1358,8 +1564,14 @@ export const sendSalePaymentReceiptEmail = async (
     const repo = Source.getRepository(SalePaymentRequest);
     const request = await repo.findOne({ where: { id } });
     if (!request) throw new AppError('Payment request not found', 404);
-    if (request.status !== 'APPROVED')
-      throw new AppError('Receipt email can only be sent for APPROVED payments', 400);
+    // Employee sends the receipt at the moment they take the money, same rule as
+    // generateSalePaymentReceipt (see the comment there): Accounts approval is an
+    // internal accounting step and must not hold up proof of payment. This was still
+    // gated to APPROVED only, requiring the customer to wait on Finance before getting
+    // an emailed receipt for money they had already handed over. REJECTED is the one
+    // case where no money is being held, so sending is refused only there.
+    if (request.status === 'REJECTED')
+      throw new AppError('Cannot send a receipt for a rejected payment', 400);
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && request.branchId !== branchId)
       throw new AppError('Access denied', 403);
 
@@ -1448,8 +1660,10 @@ export const sendSalePaymentReceiptWhatsApp = async (
     const repo = Source.getRepository(SalePaymentRequest);
     const request = await repo.findOne({ where: { id } });
     if (!request) throw new AppError('Payment request not found', 404);
-    if (request.status !== 'APPROVED')
-      throw new AppError('Receipt can only be sent for APPROVED payments', 400);
+    // Same rule as the email sender above and generateSalePaymentReceipt — Accounts
+    // approval must not hold up proof of payment. Only REJECTED (no money held) blocks.
+    if (request.status === 'REJECTED')
+      throw new AppError('Cannot send a receipt for a rejected payment', 400);
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && request.branchId !== branchId)
       throw new AppError('Access denied', 403);
 

@@ -1,4 +1,5 @@
 import api from './api';
+import type { SalePaymentRequest } from './saleWorkflow';
 
 export interface InvoiceItem {
   id?: string;
@@ -804,11 +805,19 @@ export const getCollectionAlerts = async (date?: string): Promise<CollectionAler
   return response.data.data;
 };
 
+export interface RecordUsageResult {
+  usage: UsageRecord;
+  nextPeriod?: { billingPeriodStart: string; billingPeriodEnd: string };
+  /** The PENDING SalePaymentRequest created for whatever was collected this visit —
+   *  null when amountCollected was 0 (fully deferred to the Pending Payments tab). */
+  salePaymentRequest?: SalePaymentRequest | null;
+}
+
 /**
  * Records meter usage for a contract.
  * @param payload FormData containing meter readings and images
  */
-export const recordUsage = async (payload: FormData): Promise<unknown> => {
+export const recordUsage = async (payload: FormData): Promise<RecordUsageResult> => {
   const response = await api.post('/b/usage', payload, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });

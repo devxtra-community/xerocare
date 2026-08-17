@@ -59,6 +59,9 @@ import StatementDialog, {
   type SnapshotStatementData,
 } from '@/components/shared/StatementDialog';
 import type { BranchInfo } from '@/components/shared/documentTemplate';
+import OwnerSelect from '@/components/finance/OwnerSelect';
+import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
+import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 
 import { getActiveCurrency } from '@/lib/currency';
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -169,7 +172,23 @@ interface AccountFormData {
   iban: string;
   accountType: string;
   contactPerson: string;
+  // Opening Balance source — required together with a non-zero Opening Balance so it's
+  // a documented capital injection (matching Equity entry), not money with no origin.
+  openingBalanceSource: '' | 'SHARE_CAPITAL' | 'OWNER_CONTRIBUTION' | 'OPENING_BALANCE_EQUITY';
+  ownerId: string;
+  numberOfShares: string;
+  pricePerShare: string;
+  documentUrl: string;
 }
+
+// Same 3 of the 6 Equity types already on the Equity page's own create form — one
+// consistent set of capital-injection categories across the app, not a second list.
+const OPENING_BALANCE_SOURCE_LABELS: Record<string, string> = {
+  SHARE_CAPITAL: 'Share Capital',
+  OWNER_CONTRIBUTION: 'Owner Contribution',
+  OPENING_BALANCE_EQUITY: 'Other / Unspecified',
+};
+const OPENING_BALANCE_OWNER_TRACKED_SOURCES = ['SHARE_CAPITAL', 'OWNER_CONTRIBUTION'];
 
 function AccountModal({
   account,
@@ -211,6 +230,11 @@ function AccountModal({
     iban: account?.iban ?? '',
     accountType: account?.accountType ?? 'CURRENT',
     contactPerson: account?.contactPerson ?? '',
+    openingBalanceSource: '',
+    ownerId: '',
+    numberOfShares: '',
+    pricePerShare: '',
+    documentUrl: '',
   });
 
   // Sync currency to branch currency whenever it's fetched (for new accounts only)
@@ -221,6 +245,13 @@ function AccountModal({
   }, [branchCurrency, account]);
 
   const set = (k: keyof AccountFormData, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const openingBalanceNum = parseFloat(form.openingBalance) || 0;
+  const needsOpeningBalanceSource = !isEdit && openingBalanceNum > 0;
+  const isShareCapitalSource = form.openingBalanceSource === 'SHARE_CAPITAL';
+  const isOwnerTrackedSource = OPENING_BALANCE_OWNER_TRACKED_SOURCES.includes(
+    form.openingBalanceSource,
+  );
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -237,8 +268,17 @@ function AccountModal({
           contactPerson: form.contactPerson.trim() || undefined,
         }),
         ...(!isEdit && {
-          openingBalance: parseFloat(form.openingBalance) || 0,
+          openingBalance: openingBalanceNum,
           openingDate: form.openingDate,
+          ...(needsOpeningBalanceSource && {
+            openingBalanceSource: form.openingBalanceSource || undefined,
+            ownerId: isOwnerTrackedSource ? form.ownerId || undefined : undefined,
+            numberOfShares:
+              isShareCapitalSource && form.numberOfShares ? Number(form.numberOfShares) : undefined,
+            pricePerShare:
+              isShareCapitalSource && form.pricePerShare ? Number(form.pricePerShare) : undefined,
+            documentUrl: isShareCapitalSource ? form.documentUrl.trim() || undefined : undefined,
+          }),
         }),
       };
       if (isEdit) return updateCashBankAccount(account!.id, payload);
@@ -263,7 +303,9 @@ function AccountModal({
   const valid =
     form.name.trim().length >= 3 &&
     (form.type === 'CASH' ||
-      (form.bankName.trim().length > 0 && form.accountNumber.trim().length > 0));
+      (form.bankName.trim().length > 0 && form.accountNumber.trim().length > 0)) &&
+    (!needsOpeningBalanceSource ||
+      (!!form.openingBalanceSource && (!isOwnerTrackedSource || !!form.ownerId)));
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -272,15 +314,7 @@ function AccountModal({
           <DialogTitle>{isEdit ? 'Edit Account' : 'Add Account'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-            <span className="text-sm text-blue-600">Branch:</span>
-            <span className="text-sm font-medium text-blue-800">
-              {currentUser?.branchId
-                ? `Branch ${currentUser.branchId.slice(0, 8)}…`
-                : 'Your Branch'}
-            </span>
-            <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
-          </div>
+          <BranchIdentityChip branchId={currentUser?.branchId} role={currentUser?.role} />
           {!isEdit && (
             <div>
               <label className="text-sm font-medium text-slate-700">Account Type *</label>
@@ -443,6 +477,98 @@ function AccountModal({
               <strong>{fmtMoney(account!.openingBalance, account!.currency)}</strong> — Use
               Add/Withdraw to change current balance.
             </div>
+          )}
+
+          {needsOpeningBalanceSource && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  Opening Balance Source *
+                </label>
+                <Select
+                  value={form.openingBalanceSource}
+                  onValueChange={(v) =>
+                    setForm((f) => ({
+                      ...f,
+                      openingBalanceSource: v as AccountFormData['openingBalanceSource'],
+                      // Clear Share-Capital-only fields when switching away so a stale
+                      // value never lingers if the source is switched and switched back.
+                      ...(v !== 'SHARE_CAPITAL' && {
+                        numberOfShares: '',
+                        pricePerShare: '',
+                        documentUrl: '',
+                      }),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select source..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(OPENING_BALANCE_SOURCE_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  A non-zero opening balance needs a documented origin — this creates a matching
+                  Equity entry for the same amount.
+                </p>
+              </div>
+
+              {isOwnerTrackedSource && (
+                <OwnerSelect
+                  value={form.ownerId}
+                  onChange={(id) => set('ownerId', id)}
+                  label="Owner / Shareholder"
+                  required
+                />
+              )}
+
+              {isShareCapitalSource && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Number of Shares</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        className="mt-1"
+                        value={form.numberOfShares}
+                        onChange={(e) => set('numberOfShares', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-slate-700">Price per Share</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        className="mt-1"
+                        value={form.pricePerShare}
+                        onChange={(e) => set('pricePerShare', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700">
+                      Document Reference{' '}
+                      <span className="text-slate-400 font-normal">
+                        (e.g. certificate link, optional)
+                      </span>
+                    </label>
+                    <Input
+                      className="mt-1"
+                      value={form.documentUrl}
+                      onChange={(e) => set('documentUrl', e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+            </>
           )}
 
           <div>
@@ -1641,6 +1767,7 @@ type ModalState =
 
 export default function CashBankPage() {
   const currency = useBranchCurrency();
+  const { getBranchName } = useBranchNameMap();
   const [tab, setTab] = useState<ActiveTab>('cash');
   const [modal, setModal] = useState<ModalState>(null);
   const [search, setSearch] = useState('');
@@ -1974,8 +2101,8 @@ export default function CashBankPage() {
                       {filteredCash.map((a) => (
                         <tr key={a.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs font-mono">
-                            {a.branchId.slice(0, 8)}…
+                          <td className="px-4 py-3 text-slate-600 text-xs font-medium">
+                            {getBranchName(a.branchId)}
                           </td>
                           <td className="px-4 py-3">
                             <span className="px-2 py-0.5 rounded text-xs bg-slate-100">

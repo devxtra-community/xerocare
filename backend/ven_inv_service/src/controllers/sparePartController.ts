@@ -233,6 +233,85 @@ export const getInventoryValue = async (req: Request, res: Response) => {
  * Internal endpoint — used by billing_service chart-of-accounts.
  * Products are linked to branches via their warehouse.
  */
+/**
+ * Cost of product units written off out of sellable stock (returned or scrapped).
+ *
+ * getProductInventoryValue below counts ONLY `AVAILABLE` units, so the moment a refund
+ * marks a unit DAMAGED or RETURNED its cost silently leaves the balance sheet's inventory
+ * asset. Nothing recognised the loss, so the asset reduction had no counterpart and
+ * Assets = Liabilities + Equity broke by the unit's cost on every refund.
+ *
+ * Billing adds this to expenses so the write-off lands in the P&L, matching the asset it
+ * removed. All-time (no date filter) to mirror inventory-value, which is likewise a
+ * point-in-time balance.
+ */
+export const getWrittenOffProductValue = async (req: Request, res: Response) => {
+  try {
+    const branchIds = req.query.branchIds as string | undefined;
+    const ids = (branchIds ? branchIds.split(',') : []).filter((b) => /^[0-9a-f-]{36}$/i.test(b));
+
+    let branchClause = '';
+    if (ids.length === 1) {
+      branchClause = `AND w.branch_id = '${ids[0]}'`;
+    } else if (ids.length > 1) {
+      branchClause = `AND w.branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
+    }
+
+    const rows = await Source.query<{ total: string }[]>(`
+      SELECT COALESCE(SUM(p.purchase_price), 0)::numeric AS total
+      FROM products p
+      JOIN warehouses w ON w.id = p.warehouse_id
+      WHERE p.product_status = 'DAMAGED'
+        AND p.purchase_price IS NOT NULL
+        ${branchClause}
+    `);
+
+    res.json({ total: Number(rows[0]?.total ?? 0) });
+  } catch (error) {
+    logger.error('Error in getWrittenOffProductValue:', error);
+    res.status(500).json({ total: 0 });
+  }
+};
+
+/**
+ * Cost of product units currently deployed on rent/lease contracts.
+ *
+ * getProductInventoryValue counts ONLY `AVAILABLE` units, so the moment a machine is
+ * allocated to a RENT or LEASE contract its cost vanished from the balance sheet — even
+ * though the company still owns the machine and is earning rent on it. Nothing else picked
+ * it up, so every contract signed understated assets by the cost of the machines deployed.
+ *
+ * A rented unit has not left the business, it has only changed category: from sellable
+ * stock to equipment out on hire. Billing reports it as its own asset line.
+ */
+export const getDeployedProductValue = async (req: Request, res: Response) => {
+  try {
+    const branchIds = req.query.branchIds as string | undefined;
+    const ids = (branchIds ? branchIds.split(',') : []).filter((b) => /^[0-9a-f-]{36}$/i.test(b));
+
+    let branchClause = '';
+    if (ids.length === 1) {
+      branchClause = `AND w.branch_id = '${ids[0]}'`;
+    } else if (ids.length > 1) {
+      branchClause = `AND w.branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
+    }
+
+    const rows = await Source.query<{ total: string }[]>(`
+      SELECT COALESCE(SUM(p.purchase_price), 0)::numeric AS total
+      FROM products p
+      JOIN warehouses w ON w.id = p.warehouse_id
+      WHERE p.product_status IN ('RENTED', 'LEASE')
+        AND p.purchase_price IS NOT NULL
+        ${branchClause}
+    `);
+
+    res.json({ total: Number(rows[0]?.total ?? 0) });
+  } catch (error) {
+    logger.error('Error in getDeployedProductValue:', error);
+    res.status(500).json({ total: 0 });
+  }
+};
+
 export const getProductInventoryValue = async (req: Request, res: Response) => {
   try {
     const branchIds = req.query.branchIds as string | undefined;
@@ -249,7 +328,11 @@ export const getProductInventoryValue = async (req: Request, res: Response) => {
       SELECT COALESCE(SUM(p.purchase_price), 0)::numeric AS total
       FROM products p
       JOIN warehouses w ON w.id = p.warehouse_id
-      WHERE p.product_status = 'AVAILABLE'
+      -- RETURNED counts as stock: a unit swapped out during a machine replacement, or
+      -- returned for a non-scrap reason, goes back on the shelf and is sellable again.
+      -- Only DAMAGED units are written off (see getWrittenOffProductValue). Counting
+      -- AVAILABLE alone made every swapped-out machine vanish from assets.
+      WHERE p.product_status IN ('AVAILABLE', 'RETURNED')
         AND p.purchase_price IS NOT NULL
         ${branchClause}
     `);

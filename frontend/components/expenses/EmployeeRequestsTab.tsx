@@ -51,21 +51,13 @@ const CATEGORIES = [
   { value: 'OTHER', label: '📋 Other' },
 ];
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  PENDING: { label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-200' },
-  SUBMITTED: { label: 'Awaiting Approval', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-700 border-red-200' },
-  PAID: { label: 'Paid', color: 'bg-purple-100 text-purple-700 border-purple-200' },
-};
-
 function getCategoryLabel(value: string) {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value.replace(/_/g, ' ');
 }
 
 // ─── View & Approve Modal ─────────────────────────────────────────────────────
 
-function ViewApproveModal({
+export function ViewApproveModal({
   expense,
   accounts,
   onClose,
@@ -465,9 +457,35 @@ function ViewApproveModal({
 
 // ─── Pay Modal ────────────────────────────────────────────────────────────────
 
-const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'Cheque', 'Card'];
+export const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'Cheque', 'Card'];
 
-function PayModal({
+export const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  PENDING: { label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+  SUBMITTED: { label: 'Awaiting Approval', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  APPROVED: { label: 'Approved', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-700 border-red-200' },
+  PAID: { label: 'Paid', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+};
+
+export const EXPENSE_CATEGORIES_LIST = [
+  { value: 'TRAVEL', label: 'Travel' },
+  { value: 'FUEL', label: 'Fuel' },
+  { value: 'ACCOMMODATION', label: 'Accommodation' },
+  { value: 'MEALS', label: 'Meals & Entertainment' },
+  { value: 'OFFICE_SUPPLIES', label: 'Office Supplies' },
+  { value: 'COMMUNICATION', label: 'Communication' },
+  { value: 'TRANSPORT', label: 'Transport' },
+  { value: 'MAINTENANCE', label: 'Maintenance' },
+  { value: 'MARKETING', label: 'Marketing' },
+  { value: 'TRAINING', label: 'Training' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+export function getExpenseCategoryLabel(value: string) {
+  return EXPENSE_CATEGORIES_LIST.find((c) => c.value === value)?.label ?? value.replace(/_/g, ' ');
+}
+
+export function PayModal({
   expense,
   accounts,
   onClose,
@@ -703,9 +721,15 @@ export default function EmployeeRequestsTab() {
   });
   const accounts = accountsRaw as { id: string; name: string; type: string }[];
 
+  // MANAGER_PURCHASE requests are handled in Accounts Payable → Payments tab
+  const employeeOnly = useMemo(
+    () => requests.filter((r) => r.requestSource !== 'MANAGER_PURCHASE'),
+    [requests],
+  );
+
   const filtered = useMemo(
     () =>
-      requests.filter((r) => {
+      employeeOnly.filter((r) => {
         if (!search) return true;
         return (
           r.employeeName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -714,7 +738,7 @@ export default function EmployeeRequestsTab() {
           r.description?.toLowerCase().includes(search.toLowerCase())
         );
       }),
-    [requests, search],
+    [employeeOnly, search],
   );
 
   return (

@@ -259,6 +259,12 @@ export class PurchaseRepository {
         ? purchase.costs.reduce((sum, cost) => sum + Number(cost.amount), 0)
         : 0;
 
+      // customsDuty is deliberately NOT part of totalAmount: this figure drives the
+      // vendor payable (`outstanding = total_amount - payments`), and duty is paid to
+      // the customs authority, not the vendor. It is captured as its own expense
+      // bucket (CoA 5015) by the internal cost-report instead. taxableAmount below
+      // does include it, which is correct — import VAT is assessed on customs value
+      // plus duty, so the VAT base legitimately exceeds the vendor invoice.
       purchase.totalAmount =
         purchaseAmount +
         Number(purchase.documentationFee) +

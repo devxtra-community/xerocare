@@ -78,6 +78,20 @@ export const initiateMachineSwap = async (req: Request, res: Response, next: Nex
       throw new AppError('Forbidden', 403);
     }
 
+    // This technician-request → approval flow ("Flow B") is SALE-only by design.
+    // Rent/Lease machine replacement goes exclusively through the Finance/Admin
+    // direct-replace flow ("Flow A", see docs/machine-replacement-flow-a.md), which
+    // captures the old unit's final meter readings and the new unit's initial
+    // readings. This flow captures no readings at all, so letting it touch a metered
+    // contract would silently corrupt the next combined bill.
+    const swapSaleType = (invoice.saleType ?? '').toUpperCase();
+    if (swapSaleType === 'RENT' || swapSaleType === 'LEASE') {
+      throw new AppError(
+        'Machine replacement for Rent/Lease contracts must be performed by Finance or Admin from the contract screen, which records the meter readings required for billing.',
+        400,
+      );
+    }
+
     // Find the current active allocation
     const allocationRepo = Source.getRepository(ProductAllocation);
     const currentAllocation = await allocationRepo.findOne({

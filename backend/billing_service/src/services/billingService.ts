@@ -1,6 +1,7 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { In, Raw } from 'typeorm';
 import { Source } from '../config/dataSource';
+import { resolveBillingCycle } from '../utils/billingPeriod';
 import { logAudit } from './auditLogService';
 import { QuotationTemplateAssignment } from '../entities/quotationTemplateAssignmentEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
@@ -65,6 +66,84 @@ export class BillingService {
   private returnCreditRepo = new ReturnCreditRepository();
   private notificationService = new NotificationService();
 
+  /**
+   * Rejects quotation lines priced outside the catalogue.
+   *
+   * The base price depends on who is buying — B2B customers get the wholesale price,
+   * everyone else the retail price — and `max_discount_amount` caps how far below that
+   * base a line may be discounted. Neither was ever checked: the API accepted the
+   * wholesale price for a retail customer, and accepted 1 for a machine listed at 6,500
+   * (a 6,499 discount against a 300 ceiling).
+   *
+   * Only lines carrying a real productId are checked. Ad-hoc/service lines have no
+   * catalogue entry to compare against, and if the inventory service cannot be reached
+   * the quotation is allowed through rather than blocking sales on a lookup failure —
+   * the check is a guard rail, not a gate.
+   */
+  private async enforceCataloguePricing(
+    items: Array<{ productId?: string; description?: string; unitPrice?: number }> | undefined,
+    customer?: { customerType?: string } | null,
+  ): Promise<void> {
+    const priced = (items ?? []).filter((i) => i.productId);
+    if (priced.length === 0) return;
+
+    const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+    type CatalogueRow = {
+      id: string;
+      sale_price: string | number | null;
+      wholesale_price: string | number | null;
+      max_discount_amount: string | number | null;
+    };
+    let rows: CatalogueRow[] = [];
+    try {
+      const { sign } = await import('jsonwebtoken');
+      const token = sign(
+        { userId: 'billing_service', role: 'ADMIN' },
+        process.env.ACCESS_SECRET as string,
+        { expiresIn: '2m' },
+      );
+      const res = await fetch(`${inventoryServiceUrl}/products/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productIds: priced.map((i) => i.productId) }),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      rows = json?.data ?? [];
+    } catch (err) {
+      logger.warn('Catalogue price check skipped — inventory service unreachable', err);
+      return;
+    }
+
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const isB2B = (customer?.customerType ?? '').toUpperCase() === 'B2B';
+
+    for (const item of priced) {
+      const row = byId.get(item.productId as string);
+      if (!row) continue;
+
+      const retail = Number(row.sale_price ?? 0);
+      const wholesale = Number(row.wholesale_price ?? 0);
+      // Fall back to whichever price exists — a product with no wholesale price set is
+      // sold at retail to everyone.
+      const base = isB2B && wholesale > 0 ? wholesale : retail;
+      if (!(base > 0)) continue;
+
+      const maxDiscount = Number(row.max_discount_amount ?? 0);
+      const floor = Math.max(0, base - Math.max(0, maxDiscount));
+      const unitPrice = Number(item.unitPrice ?? 0);
+
+      if (unitPrice < floor) {
+        const tier = isB2B ? 'wholesale' : 'retail';
+        throw new AppError(
+          `Price ${unitPrice} for "${item.description ?? 'item'}" is below the permitted minimum ` +
+            `${floor} (${tier} price ${base} less the maximum discount ${maxDiscount}).`,
+          400,
+        );
+      }
+    }
+  }
+
   // ... existing methods ...
 
   // ... existing methods ...
@@ -99,19 +178,29 @@ export class BillingService {
     const contract = await this.invoiceRepo.findById(invoice.referenceContractId);
     if (!contract) throw new AppError('Reference contract not found', 404);
 
+    // An EMI lease is a fixed instalment with no metered component: the quotation form
+    // stores its amount in monthlyEmiAmount and leaves rentType/rentPeriod unset. Passing
+    // that straight through billed the (unset) monthlyRent of 0 and threw
+    // "Unsupported Rent Type: undefined" the moment anyone opened Record Usage on one.
+    // Treat it as a flat charge so the instalment bills and usage is ignored.
+    const isEmiLease = contract.saleType === SaleType.LEASE && contract.leaseType === LeaseType.EMI;
+
     // 3. Recalculate
     const calcResult = this.calculator.calculate({
-      rentType: contract.rentType,
+      rentType: isEmiLease ? RentType.FIXED_FLAT : contract.rentType,
       monthlyRent:
         payload.monthlyRent !== undefined
           ? Number(payload.monthlyRent)
-          : [SaleType.LEASE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
-                contract.saleType as SaleType,
-              ) && contract.leaseType === LeaseType.FSM
-            ? Number(contract.monthlyLeaseAmount || 0)
-            : Number(contract.monthlyRent || 0),
+          : isEmiLease
+            ? Number(contract.monthlyEmiAmount || 0)
+            : [SaleType.LEASE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
+                  contract.saleType as SaleType,
+                ) && contract.leaseType === LeaseType.FSM
+              ? Number(contract.monthlyLeaseAmount || 0)
+              : Number(contract.monthlyRent || 0),
       discountPercent: Number(contract.discountPercent || 0),
       a3Multiplier: Number(contract.a3Multiplier ?? 2),
+      periodMonths: resolveBillingCycle(contract.rentPeriod, contract.billingCycleInDays).months,
       pricingItems: contract.items, // Items from contract
       usage: {
         bwA4: payload.bwA4Count,
@@ -131,10 +220,12 @@ export class BillingService {
     const finalCalcResult = isFinalMonth
       ? this.calculator.calculate({
           ...contract,
-          rentType: contract.rentType,
+          rentType: isEmiLease ? RentType.FIXED_FLAT : contract.rentType,
           monthlyRent: 0,
           discountPercent: Number(contract.discountPercent || 0),
           a3Multiplier: Number(contract.a3Multiplier ?? 2),
+          periodMonths: resolveBillingCycle(contract.rentPeriod, contract.billingCycleInDays)
+            .months,
           pricingItems: contract.items,
           usage: {
             bwA4: payload.bwA4Count,
@@ -508,6 +599,30 @@ export class BillingService {
     customerCity?: string;
   }) {
     // 1. Validation Logic
+
+    // Line amounts must be sane. Nothing previously checked this, so a quotation could be
+    // created with a negative unit price and persist a negative-value invoice
+    // (observed: totalAmount -525.00 from unitPrice -500) — which manufactures a credit
+    // against the customer out of thin air and would flow straight into revenue reporting.
+    // Zero quantities are rejected for the same reason: they produce lines that bill
+    // nothing while still consuming stock allocations.
+    for (const item of payload.items ?? []) {
+      const unitPrice = Number(item.unitPrice ?? 0);
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        throw new AppError(
+          `Invalid unit price for "${item.description ?? 'item'}": price cannot be negative`,
+          400,
+        );
+      }
+      const qty = item.quantity === undefined ? 1 : Number(item.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        throw new AppError(
+          `Invalid quantity for "${item.description ?? 'item'}": quantity must be greater than zero`,
+          400,
+        );
+      }
+    }
+
     if (
       payload.saleType !== SaleType.SPAREPART_SALE &&
       payload.items?.some(
@@ -739,25 +854,36 @@ export class BillingService {
       }
     }
 
+    // ─── Catalogue price enforcement ───────────────────────────────────────────
+    // Line prices used to be taken entirely on trust, so the API would accept the B2B
+    // wholesale price for a B2C customer, or 1 for a 6,500 machine — max_discount_amount
+    // existed on every product for exactly this purpose and was never consulted.
+    // The customer's type picks the base (B2B -> wholesale, B2C -> retail) and the
+    // per-unit discount ceiling bounds how far below it a line may be priced.
+    // Sale types only: on RENT/LEASE the product line is an allocation of a machine the
+    // customer never buys, so it legitimately carries a unit price of 0 and has no
+    // catalogue floor to meet. Applying the sale floor there blocks contract creation
+    // outright.
+    if (
+      [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
+        payload.saleType as SaleType,
+      )
+    ) {
+      await this.enforceCataloguePricing(payload.items, customer);
+    }
+
     // ─── Snapshot: branch currency/tax ─────────────────────────────────────────
-    // Two independent, coexisting reasons for zero VAT:
-    //  - Rent/Lease contracts are VAT-exempt by transaction type (confirmed
-    //    business/regulatory position), regardless of customer.
-    //  - An EXEMPT customer (government/embassy/charity/etc., a specific legal
-    //    status — not just "no VAT number") never gets VAT, regardless of
-    //    transaction type. See CustomerVatStatus in crm_service's customerEntity.ts.
-    const isTaxExemptSaleType = [SaleType.RENT, SaleType.LEASE].includes(payload.saleType);
+    // VAT applies to Sale, Rent, and Lease alike — driven solely by whether the
+    // branch has tax configured. The one remaining reason to suppress VAT is an
+    // EXEMPT customer (government/embassy/charity with a specific legal status —
+    // not just "no VAT number"). That exemption holds regardless of sale type.
+    // See CustomerVatStatus in crm_service's customerEntity.ts.
     const isExemptCustomer = customer?.vatStatus === 'EXEMPT';
     try {
       const branchInfo = await getBranchCurrencyInfo(payload.branchId);
       if (branchInfo) {
         invoice.currencyCode = branchInfo.currencyCode;
-        if (
-          !isTaxExemptSaleType &&
-          !isExemptCustomer &&
-          branchInfo.hasTax &&
-          branchInfo.taxPercent
-        ) {
+        if (!isExemptCustomer && branchInfo.hasTax && branchInfo.taxPercent) {
           invoice.taxName = branchInfo.taxName;
           invoice.taxPercent = branchInfo.taxPercent;
           invoice.taxAmount = Number(invoice.totalAmount) * (branchInfo.taxPercent / 100);
@@ -1703,6 +1829,17 @@ export class BillingService {
     token: string,
     itemUpdates?: { id: string; productId: string }[],
   ) {
+    // Reject an empty/absent list rather than reporting success having done nothing.
+    // The endpoint reads `itemUpdates`; a caller sending any other key (e.g. `allocations`)
+    // got back 200 "Machines allocated successfully" with zero machines allocated, and the
+    // contract then activated with no allocation at all.
+    if (!Array.isArray(itemUpdates) || itemUpdates.length === 0) {
+      throw new AppError(
+        'No machines to allocate: provide itemUpdates as a non-empty array of { id, productId }.',
+        400,
+      );
+    }
+
     const queryRunner = this.invoiceRepo.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -1912,6 +2049,23 @@ export class BillingService {
       if (!invoice) throw new AppError('Quotation not found', 404);
       if (invoice.contractStatus !== ContractStatus.PENDING_CONFIRMATION) {
         throw new AppError('Contract is not pending confirmation', 400);
+      }
+
+      // A metered contract must have at least one machine allocated before it goes live.
+      // Activation used to succeed with zero allocations, and allocateMachines then refuses
+      // to run on an already-active contract — leaving a live RENT/LEASE contract that can
+      // never have a machine attached, cannot be metered, and cannot be replaced. Blocking
+      // here is the only point at which it is still recoverable.
+      if (invoice.saleType === SaleType.RENT || invoice.saleType === SaleType.LEASE) {
+        const allocationCount = await queryRunner.manager.count(ProductAllocation, {
+          where: { contractId: invoice.id },
+        });
+        if (allocationCount === 0) {
+          throw new AppError(
+            'Cannot activate this contract: no machine has been allocated yet. Allocate the machines first, then activate.',
+            400,
+          );
+        }
       }
 
       invoice.contractConfirmationUrl = contractConfirmationUrl;
@@ -2446,6 +2600,10 @@ export class BillingService {
    */
   async getAllInvoices(branchId?: string) {
     const invoices = await this.invoiceRepo.findAll(branchId);
+    // Same gap as getInvoicesByCreator had: this backs the Finance/Admin view of
+    // getBranchInvoices, and without totalPaid every Payment Status column here would
+    // have shown the same stale PENDING regardless of real, approved payments.
+    const paidMap = await this.getPaidAmountsByInvoice(invoices.map((i) => i.id));
     return Promise.all(
       invoices.map(async (invoice) => {
         const history = await this.usageRepo.getUsageHistory(invoice.id);
@@ -2454,10 +2612,13 @@ export class BillingService {
           0,
         );
         const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+        const totalPaid = paidMap.get(invoice.id) ?? 0;
         return {
           ...invoice,
           usageRevenue,
           discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+          totalPaid,
+          pendingBalance: Math.max(0, Number(invoice.totalAmount || 0) - totalPaid),
         };
       }),
     );
@@ -2466,8 +2627,53 @@ export class BillingService {
   /**
    * Retrieves invoices created by a specific user.
    */
+  /**
+   * Sums approved payments per invoice from both payment tables (PaymentTransaction +
+   * the legacy PaymentLedger), excluding refundable security deposits.
+   *
+   * This is the ONE place totalPaid/pendingBalance get computed from raw payment rows.
+   * It used to live only inside getBranchInvoices, so getInvoicesByCreator — which backs
+   * /my-invoices, the endpoint the Employee Sales table actually calls — never attached
+   * totalPaid at all. Every row's Payment Status column then silently fell back to
+   * `paid = 0`, showing PENDING for sales that were, per the exact same payment rows,
+   * fully paid and approved (confirmed live: QTN-2026-0004 showed PENDING on the table
+   * while its Payment Collection panel — which reads getAccountSummary, itself backed by
+   * the same PaymentTransaction/PaymentLedger rows — correctly showed 36,750 / 36,750
+   * paid across 4 APPROVED requests). Both callers now share this one calculation.
+   */
+  private async getPaidAmountsByInvoice(invoiceIds: string[]): Promise<Map<string, number>> {
+    const paidMap = new Map<string, number>();
+    if (invoiceIds.length === 0) return paidMap;
+
+    const { PaymentLedger } = await import('../entities/paymentLedgerEntity');
+    const [txSums, ledgerSums] = await Promise.all([
+      Source.getRepository(PaymentTransaction)
+        .createQueryBuilder('tx')
+        .select('tx.invoice_id', 'invoiceId')
+        .addSelect('SUM(tx.amount)', 'total')
+        .where('tx.invoice_id IN (:...ids)', { ids: invoiceIds })
+        // Security deposits are refundable caution money, not invoice settlement
+        .andWhere(`(tx.remarks IS NULL OR LOWER(TRIM(tx.remarks)) != 'security deposit')`)
+        .groupBy('tx.invoice_id')
+        .getRawMany<{ invoiceId: string; total: string }>(),
+      Source.getRepository(PaymentLedger)
+        .createQueryBuilder('lp')
+        .select('lp."invoiceId"', 'invoiceId')
+        .addSelect('SUM(lp."amountPaid")', 'total')
+        .where('lp."invoiceId" IN (:...ids)', { ids: invoiceIds })
+        .andWhere(`(lp.remarks IS NULL OR LOWER(TRIM(lp.remarks)) != 'security deposit')`)
+        .groupBy('lp."invoiceId"')
+        .getRawMany<{ invoiceId: string; total: string }>(),
+    ]);
+    for (const row of [...txSums, ...ledgerSums]) {
+      paidMap.set(row.invoiceId, (paidMap.get(row.invoiceId) ?? 0) + Number(row.total));
+    }
+    return paidMap;
+  }
+
   async getInvoicesByCreator(creatorId: string) {
     const invoices = await this.invoiceRepo.findByCreatorId(creatorId);
+    const paidMap = await this.getPaidAmountsByInvoice(invoices.map((i) => i.id));
     return Promise.all(
       invoices.map(async (invoice) => {
         const history = await this.usageRepo.getUsageHistory(invoice.id);
@@ -2476,10 +2682,13 @@ export class BillingService {
           0,
         );
         const discountAmount = history.reduce((sum, u) => sum + Number(u.discountAmount || 0), 0);
+        const totalPaid = paidMap.get(invoice.id) ?? 0;
         return {
           ...invoice,
           usageRevenue,
           discountAmount: Number(invoice.discountAmount || 0) || discountAmount,
+          totalPaid,
+          pendingBalance: Math.max(0, Number(invoice.totalAmount || 0) - totalPaid),
         };
       }),
     );
@@ -2493,36 +2702,7 @@ export class BillingService {
    */
   async getBranchInvoices(branchId: string) {
     const invoices = await this.invoiceRepo.findByBranchId(branchId);
-
-    // Batch-sum payments per invoice from both payment tables so the frontend
-    // can derive the payment status (PENDING / ADVANCE / PARTIAL / PAID).
-    const paidMap = new Map<string, number>();
-    const invoiceIds = invoices.map((i) => i.id);
-    if (invoiceIds.length > 0) {
-      const { PaymentLedger } = await import('../entities/paymentLedgerEntity');
-      const [txSums, ledgerSums] = await Promise.all([
-        Source.getRepository(PaymentTransaction)
-          .createQueryBuilder('tx')
-          .select('tx.invoice_id', 'invoiceId')
-          .addSelect('SUM(tx.amount)', 'total')
-          .where('tx.invoice_id IN (:...ids)', { ids: invoiceIds })
-          // Security deposits are refundable caution money, not invoice settlement
-          .andWhere(`(tx.remarks IS NULL OR LOWER(TRIM(tx.remarks)) != 'security deposit')`)
-          .groupBy('tx.invoice_id')
-          .getRawMany<{ invoiceId: string; total: string }>(),
-        Source.getRepository(PaymentLedger)
-          .createQueryBuilder('lp')
-          .select('lp."invoiceId"', 'invoiceId')
-          .addSelect('SUM(lp."amountPaid")', 'total')
-          .where('lp."invoiceId" IN (:...ids)', { ids: invoiceIds })
-          .andWhere(`(lp.remarks IS NULL OR LOWER(TRIM(lp.remarks)) != 'security deposit')`)
-          .groupBy('lp."invoiceId"')
-          .getRawMany<{ invoiceId: string; total: string }>(),
-      ]);
-      for (const row of [...txSums, ...ledgerSums]) {
-        paidMap.set(row.invoiceId, (paidMap.get(row.invoiceId) ?? 0) + Number(row.total));
-      }
-    }
+    const paidMap = await this.getPaidAmountsByInvoice(invoices.map((i) => i.id));
 
     // Enrich with usageRevenue and discountAmount for stats accuracy
     const enriched = await Promise.all(
@@ -3880,6 +4060,10 @@ export class BillingService {
       const assignedCustomer = await this.getCustomerDetails(customerId).catch(() => null);
       quotation.customerVatStatus = assignedCustomer?.vatStatus ?? null;
       if (assignedCustomer?.vatStatus === 'EXEMPT') {
+        // Strip the tax amount out of totalAmount (which was tax-inclusive at creation)
+        // before zeroing the tax fields, so totalAmount stays consistent.
+        quotation.totalAmount =
+          Number(quotation.totalAmount || 0) - Number(quotation.taxAmount || 0);
         quotation.taxAmount = 0;
         quotation.taxPercent = undefined;
         quotation.taxName = undefined;
@@ -3966,7 +4150,11 @@ export class BillingService {
           quotation.saleType,
         )
           ? (Number(quotation.grossAmount || 0) - finalDiscount) * (1 + effectiveTaxPercent / 100)
-          : quotation.totalAmount,
+          : // RENT/LEASE: totalAmount was tax-inclusive at creation; strip the tax back out
+            // when cloning for an exempt customer so the clone's total stays pre-tax.
+            isSwappedCustomerExempt
+            ? Number(quotation.totalAmount || 0) - Number(quotation.taxAmount || 0)
+            : quotation.totalAmount,
         taxAmount: [SaleType.SALE, SaleType.PRODUCT_SALE, SaleType.SPAREPART_SALE].includes(
           quotation.saleType,
         )

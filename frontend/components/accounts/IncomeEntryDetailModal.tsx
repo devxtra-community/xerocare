@@ -7,6 +7,7 @@ import { fetchIncomeEntryDetail } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import { ModalShell, DetailField, SectionHeading } from './ReceivablePayableDetail';
 import { ChequeDetailBody } from './ChequeDetailModal';
+import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
@@ -20,6 +21,7 @@ export function IncomeEntryDetailModal({ id, onClose }: { id: string; onClose: (
     queryKey: ['income-entry-detail', id],
     queryFn: () => fetchIncomeEntryDetail(id),
   });
+  const { getBranchName } = useBranchNameMap();
 
   return (
     <ModalShell
@@ -64,7 +66,7 @@ export function IncomeEntryDetailModal({ id, onClose }: { id: string; onClose: (
                   {data.status}
                 </span>
               </div>
-              <DetailField label="Branch" value={data.branchId} />
+              <DetailField label="Branch" value={getBranchName(data.branchId)} />
               <DetailField label="Recorded By (Employee ID)" value={data.createdBy} />
               {data.description && (
                 <div className="col-span-full">

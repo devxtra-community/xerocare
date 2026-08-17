@@ -158,14 +158,25 @@ export class PurchaseController {
       const queryParams: string[] = [];
       let paramIdx = 1;
 
+      // created_at is a naive timestamp written by the database in the DB server's
+      // own timezone, but the caller's dateFrom/dateTo are calendar dates in the
+      // BUSINESS timezone. Taking `created_at::date` raw compares two different
+      // clocks: with the server on Asia/Kolkata (+05:30) and the business on
+      // Asia/Qatar (+03:00), every purchase recorded after 21:30 business time lands
+      // on the *next* server date and drops out of an "as of today" range — which
+      // silently removed it from the P&L and therefore from Retained Earnings.
+      // Re-anchor the stored timestamp to the business timezone before taking a date.
+      const businessTz = process.env.BUSINESS_TIMEZONE ?? 'Asia/Qatar';
+      const createdAtBusinessDate = `((p.created_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${businessTz}')::date`;
+
       let dateFromClause = '';
       if (dateFrom) {
-        dateFromClause = `AND p.created_at::date >= $${paramIdx++}::date`;
+        dateFromClause = `AND ${createdAtBusinessDate} >= $${paramIdx++}::date`;
         queryParams.push(dateFrom);
       }
       let dateToClause = '';
       if (dateTo) {
-        dateToClause = `AND p.created_at::date <= $${paramIdx++}::date`;
+        dateToClause = `AND ${createdAtBusinessDate} <= $${paramIdx++}::date`;
         queryParams.push(dateTo);
       }
 
@@ -181,6 +192,7 @@ export class PurchaseController {
         {
           currency_code: string | null;
           purchase_cost: string;
+          purchase_goods_cost: string;
           shipping_handling: string;
           import_labour_cost: string;
           customs_duty: string;
@@ -192,6 +204,7 @@ export class PurchaseController {
         SELECT
           COALESCE(p.currency_code, 'AED') AS currency_code,
           COALESCE(SUM(p.purchase_amount + p.documentation_fee), 0) AS purchase_cost,
+          COALESCE(SUM(p.purchase_amount), 0) AS purchase_goods_cost,
           COALESCE(SUM(p.shipping_cost + p.handling_fee + p.transportation_cost + p.groundfield_cost), 0) AS shipping_handling,
           COALESCE(SUM(p.labour_cost), 0) AS import_labour_cost,
           COALESCE(SUM(p.customs_duty), 0) AS customs_duty,
@@ -216,6 +229,11 @@ export class PurchaseController {
       const currencyGroups = rows.map((r) => ({
         currencyCode: r.currency_code ?? 'AED',
         purchaseCost: Number(r.purchase_cost),
+        // Goods-only component of purchaseCost (excludes documentation_fee). Under the
+        // perpetual inventory model this portion is capitalised into stock rather than
+        // expensed on purchase, so Billing subtracts it from period expenses and lets
+        // it reach the P&L as COGS when the item actually sells.
+        purchaseGoodsCost: Number(r.purchase_goods_cost),
         shippingHandling: Number(r.shipping_handling),
         importLabourCost: Number(r.import_labour_cost),
         customsDuty: Number(r.customs_duty),

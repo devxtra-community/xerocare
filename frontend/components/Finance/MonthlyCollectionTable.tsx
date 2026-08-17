@@ -23,12 +23,14 @@ import {
   Eye,
   PlusCircle,
   DollarSign,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
+import ReplaceDeviceModal from './ReplaceDeviceModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -70,6 +72,14 @@ export default function MonthlyCollectionTable({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
+
+  // Replace Machine modal state
+  const [replaceAllocData, setReplaceAllocData] = useState<{
+    contractId: string;
+    allocationId: string;
+    serialNumber: string;
+    modelId: string;
+  } | null>(null);
 
   // Collect Payment modal (INVOICE_PENDING items)
   const [collectTarget, setCollectTarget] = useState<CollectionAlert | null>(null);
@@ -224,6 +234,27 @@ export default function MonthlyCollectionTable({
     }
   };
 
+  const handleReplaceClick = async (alertItem: CollectionAlert) => {
+    try {
+      const inv = await getInvoiceById(alertItem.contractId);
+      const activeAlloc = inv.productAllocations?.find(
+        (a) => a.status !== 'REPLACED' && a.status !== 'RETURNED',
+      );
+      if (!activeAlloc) {
+        toast.error('No active machine allocation found for this contract');
+        return;
+      }
+      setReplaceAllocData({
+        contractId: alertItem.contractId,
+        allocationId: activeAlloc.id,
+        serialNumber: activeAlloc.serialNumber,
+        modelId: activeAlloc.modelId,
+      });
+    } catch {
+      toast.error('Failed to load contract details');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center p-8">
@@ -363,14 +394,26 @@ export default function MonthlyCollectionTable({
           </Button>
 
           {alertItem.type === 'USAGE_PENDING' && (
-            <Button
-              size="sm"
-              onClick={() => handleRecordUsage(alertItem)}
-              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs font-bold rounded-xl"
-            >
-              <PlusCircle className="h-3 w-3 mr-2" />
-              Record Usage
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleReplaceClick(alertItem)}
+                className="h-8 px-3 text-xs font-bold rounded-xl text-amber-600 border-amber-300 hover:bg-amber-50"
+                title="Replace Machine"
+              >
+                <RefreshCw className="h-3 w-3 mr-1.5" />
+                Replace
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleRecordUsage(alertItem)}
+                className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-4 text-xs font-bold rounded-xl"
+              >
+                <PlusCircle className="h-3 w-3 mr-2" />
+                Record Usage
+              </Button>
+            </>
           )}
           {alertItem.type === 'SUMMARY_PENDING' && (
             <Button
@@ -476,6 +519,22 @@ export default function MonthlyCollectionTable({
         }
         onSuccess={onSuccess}
       />
+
+      {replaceAllocData && (
+        <ReplaceDeviceModal
+          isOpen={true}
+          onClose={() => setReplaceAllocData(null)}
+          contractId={replaceAllocData.contractId}
+          allocationId={replaceAllocData.allocationId}
+          oldSerialNumber={replaceAllocData.serialNumber}
+          modelId={replaceAllocData.modelId}
+          onSuccess={() => {
+            setReplaceAllocData(null);
+            fetchAlerts();
+            onSuccess?.();
+          }}
+        />
+      )}
 
       {/* Collect Payment Dialog */}
       <Dialog open={!!collectTarget} onOpenChange={(v) => !v && setCollectTarget(null)}>

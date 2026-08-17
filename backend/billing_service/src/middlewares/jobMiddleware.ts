@@ -9,6 +9,8 @@ export enum EmployeeJob {
   CRM = 'CRM',
   MANAGER = 'MANAGER',
   TECHNICIAN = 'TECHNICIAN',
+  SERVICE_HELP_DESK = 'SERVICE_HELP_DESK',
+  SERVICE_TECHNICIAN = 'SERVICE_TECHNICIAN',
 }
 
 // Mirror of backend FinanceJob enum

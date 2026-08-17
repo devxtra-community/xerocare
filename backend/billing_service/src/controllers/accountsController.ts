@@ -11,11 +11,10 @@ import { ManualReceivable } from '../entities/manualReceivableEntity';
 import { ReceivablePayment } from '../entities/receivablePaymentEntity';
 import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
-import { EquityEntry } from '../entities/equityEntryEntity';
+import { EquityEntry, EquityType } from '../entities/equityEntryEntity';
 import { Owner } from '../entities/ownerEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { CreditNote } from '../entities/creditNoteEntity';
-import { SaleType } from '../entities/enums/saleType';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
@@ -25,7 +24,7 @@ import { calculateDepreciation, generateDepreciationSchedule } from '../utils/de
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
-import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
+import { computeProfitAndLoss, computeBalanceSheet, ALL_TIME_START } from '../utils/accountsShared';
 import { Cheque } from '../entities/chequeEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { ContractAgreement } from '../entities/contractAgreementEntity';
@@ -70,6 +69,13 @@ async function internalFetchJSON<T>(
 import { postCashbookEntry, requireCashAccount } from '../services/cashbookService';
 import { logger } from '../config/logger';
 import { nowInBusinessTz, todayInBusinessTz } from '../utils/businessDate';
+
+// Business-timezone calendar date of a naive timestamp column. Mirrors the helper in
+// accountsShared.ts — see the long comment there for why a plain CAST(col AS DATE)
+// silently drops every transaction recorded after ~21:30 business time.
+const BUSINESS_TZ_SQL = process.env.BUSINESS_TIMEZONE ?? 'Asia/Qatar';
+const bizDateSql = (col: string) =>
+  `((${col} AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${BUSINESS_TZ_SQL}')::date`;
 
 // ─── PERIOD HELPER ─────────────────────────────────────────────────────────────
 
@@ -127,41 +133,89 @@ export const getCashBankAccounts = async (req: Request, res: Response, next: Nex
   }
 };
 
+// The only equity types a fresh opening balance can be attributed to. SHARE_CAPITAL and
+// OWNER_CONTRIBUTION are two of the six types CREATABLE_EQUITY_TYPES already offers on
+// the Equity page — reused as-is rather than inventing a parallel category list, so
+// there's one consistent set of capital-injection categories across the app.
+// OPENING_BALANCE_EQUITY (not on that list — it's not manually creatable there, only via
+// this auto-create path) is the "no further categorization needed" option: it's already
+// correctly folded into the Balance Sheet's Owner Capital bucket (see accountsShared.ts),
+// unlike the generic EquityType 'OTHER', which is never summed into any Balance Sheet
+// total — offering 'OTHER' here would silently break isBalanced the moment it was picked.
+const OPENING_BALANCE_SOURCES = ['SHARE_CAPITAL', 'OWNER_CONTRIBUTION', 'OPENING_BALANCE_EQUITY'];
+const OPENING_BALANCE_OWNER_TRACKED_SOURCES = ['SHARE_CAPITAL', 'OWNER_CONTRIBUTION'];
+
 export const createCashBankAccount = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const repo = Source.getRepository(CashBankAccount);
     const branchId = req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId;
     const openingBalance = Number(req.body.openingBalance ?? 0);
-    const account = repo.create({
-      ...req.body,
-      branchId,
-      currentBalance: openingBalance,
-    }) as unknown as CashBankAccount;
-    const saved = await repo.save(account);
+    const openingBalanceSource = req.body.openingBalanceSource as string | undefined;
 
     // A non-zero opening balance is an asset with no origin unless it's matched by an
     // equity entry — otherwise the Balance Sheet balances by coincidence, not by
-    // construction. Auto-create the OPENING_BALANCE_EQUITY counterpart so this can never
-    // regress the way the original 8 seeded accounts did (see the one-time true-up script).
+    // construction. A zero opening balance is a brand-new empty account: nothing to
+    // offset, so no source is required and no equity entry is created.
     if (openingBalance > 0) {
-      const equityRepo = Source.getRepository(EquityEntry);
-      const count = await equityRepo.count();
-      const entry = equityRepo.create({
-        entryNo: `EQ-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`,
-        date: new Date().toISOString().slice(0, 10),
-        type: 'OPENING_BALANCE_EQUITY',
-        description: `Opening balance — ${saved.name}`,
-        amount: openingBalance,
-        currency: saved.currency || 'AED',
-        branchId,
-        linkedCashAccountId: saved.id,
-        notes: 'Auto-created at account creation to give the opening balance a documented origin.',
-        createdBy: req.user?.userId ?? req.body.createdBy,
-      }) as unknown as EquityEntry;
-      await equityRepo.save(entry);
+      if (!openingBalanceSource || !OPENING_BALANCE_SOURCES.includes(openingBalanceSource)) {
+        throw new AppError(
+          'A source is required for a non-zero opening balance (Share Capital, Owner Contribution, or Other)',
+          400,
+        );
+      }
+      if (
+        OPENING_BALANCE_OWNER_TRACKED_SOURCES.includes(openingBalanceSource) &&
+        !req.body.ownerId
+      ) {
+        throw new AppError('Select an owner/shareholder for this opening balance source', 400);
+      }
     }
 
-    res.status(201).json({ success: true, data: saved });
+    let saved!: CashBankAccount;
+    let equityEntry: EquityEntry | undefined;
+    // Account + its matching equity entry are created atomically — a plain two-step
+    // save could leave an orphaned account with a seeded balance and no documented
+    // origin if the second save ever threw (see the earlier non-transactional version's
+    // gap, quoted in the git history / task notes for this change).
+    await Source.transaction(async (em) => {
+      const repo = em.getRepository(CashBankAccount);
+      const account = repo.create({
+        ...req.body,
+        branchId,
+        currentBalance: openingBalance,
+      }) as unknown as CashBankAccount;
+      saved = await repo.save(account);
+
+      if (openingBalance > 0) {
+        const equityRepo = em.getRepository(EquityEntry);
+        const count = await equityRepo.count();
+        const isShareCapital = openingBalanceSource === 'SHARE_CAPITAL';
+        const isOwnerTracked = OPENING_BALANCE_OWNER_TRACKED_SOURCES.includes(
+          openingBalanceSource as string,
+        );
+        const entry = equityRepo.create({
+          entryNo: `EQ-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`,
+          date: (req.body.openingDate as string) || new Date().toISOString().slice(0, 10),
+          type: openingBalanceSource as EquityType,
+          description: `Opening balance — ${saved.name}`,
+          amount: openingBalance,
+          currency: saved.currency || 'AED',
+          branchId,
+          linkedCashAccountId: saved.id,
+          ownerId: isOwnerTracked ? req.body.ownerId : undefined,
+          numberOfShares:
+            isShareCapital && req.body.numberOfShares ? Number(req.body.numberOfShares) : undefined,
+          pricePerShare:
+            isShareCapital && req.body.pricePerShare ? Number(req.body.pricePerShare) : undefined,
+          documentUrl: isShareCapital ? req.body.documentUrl || undefined : undefined,
+          notes:
+            'Auto-created at account creation to give the opening balance a documented origin.',
+          createdBy: req.user?.userId ?? req.body.createdBy,
+        }) as unknown as EquityEntry;
+        equityEntry = await equityRepo.save(entry);
+      }
+    });
+
+    res.status(201).json({ success: true, data: saved, equityEntry });
   } catch (err) {
     next(err);
   }
@@ -1721,8 +1775,20 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
     // Deposit/Issue in Accounts → Cheques) — never persist a linkedCashAccountId for
     // them, so the Equity list/drilldown never implies an immediate account movement
     // that hasn't actually happened.
+    // Currency must follow the branch. The column defaults to 'AED', so an entry created
+    // without one in a non-AED branch was stamped AED and then silently dropped from the
+    // Balance Sheet for want of an AED->branch exchange rate — the entry saved with a 201,
+    // appeared in the equity list, and simply never reached the totals.
+    let entryCurrency = req.body.currency as string | undefined;
+    if (!entryCurrency) {
+      const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+      const branchInfo = await getBranchCurrencyInfo(jwtBranchId);
+      entryCurrency = branchInfo?.currencyCode ?? 'AED';
+    }
+
     const entry = repo.create({
       ...req.body,
+      currency: entryCurrency,
       linkedCashAccountId: isChequeMode ? undefined : req.body.linkedCashAccountId,
       branchId: jwtBranchId,
       createdBy: userId,
@@ -1806,7 +1872,9 @@ export const getEquitySummary = async (req: Request, res: Response, next: NextFu
       retainedEarnings = 0,
       reserves = 0,
       ownerContribution = 0,
-      dividends = 0;
+      dividends = 0,
+      withdrawals = 0,
+      otherEquity = 0;
     for (const r of rows) {
       const amt = Number(r.amount);
       if (r.type === 'SHARE_CAPITAL') shareCapital += amt;
@@ -1815,8 +1883,46 @@ export const getEquitySummary = async (req: Request, res: Response, next: NextFu
       if (r.type === 'RESERVES') reserves += amt;
       if (r.type === 'OWNER_CONTRIBUTION') ownerContribution += amt;
       if (r.type === 'DIVIDEND') dividends += amt;
+      // WITHDRAWAL, OTHER and OPENING_BALANCE_EQUITY are all creatable equity types,
+      // but were previously counted in no bucket at all — so a recorded withdrawal
+      // never reduced equity and an opening balance never established it.
+      if (r.type === 'WITHDRAWAL') withdrawals += amt;
+      if (r.type === 'OTHER' || r.type === 'OPENING_BALANCE_EQUITY') otherEquity += amt;
     }
-    const netEquity = shareCapital + retainedEarnings + reserves + ownerContribution - dividends;
+
+    // Retained Earnings cannot come from equity_entries: RETAINED_EARNINGS,
+    // PROFIT_TRANSFER and LOSS_TRANSFER are all blocked from manual creation, so that
+    // bucket is structurally always 0. The Balance Sheet derives the real figure from
+    // all-time profit, which left this page reporting a different net equity for the same
+    // branch — here 400,000 against the Balance Sheet's 339,500, adrift by exactly the
+    // -60,500 of retained earnings. Use the same source so the two pages agree.
+    {
+      const branchFilterEq = req.branchFilter ?? [];
+      let equityBaseCurrency = 'AED';
+      if (branchFilterEq.length === 1) {
+        const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+        const info = await getBranchCurrencyInfo(branchFilterEq[0]);
+        equityBaseCurrency = info?.currencyCode ?? 'AED';
+      }
+      const allTimePl = await computeProfitAndLoss(
+        Source,
+        branchFilterEq,
+        ALL_TIME_START,
+        todayInBusinessTz(),
+        equityBaseCurrency,
+        process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003',
+      );
+      retainedEarnings = allTimePl.totalRevenue - allTimePl.totalExpenses;
+    }
+
+    const netEquity =
+      shareCapital +
+      retainedEarnings +
+      reserves +
+      ownerContribution +
+      otherEquity -
+      dividends -
+      withdrawals;
 
     const assetRepo = Source.getRepository(AssetDepreciationRegister);
     const assetQb = assetRepo.createQueryBuilder('a').where('a.status = :s', { s: 'ACTIVE' });
@@ -1870,6 +1976,8 @@ export const getEquitySummary = async (req: Request, res: Response, next: NextFu
         reserves,
         ownerContribution,
         dividends,
+        withdrawals,
+        otherEquity,
         netEquity,
         totalAssets,
         growthLine,
@@ -1994,6 +2102,15 @@ export const getBalanceSheet = async (req: Request, res: Response, next: NextFun
           accountsReceivable: +bs.accountsReceivable.toFixed(2),
           securityDepositsReceivable: +bs.securityDepositsReceivable.toFixed(2),
           sparePartsInventory: +bs.sparePartsInventory.toFixed(2),
+          // These three were added to computeBalanceSheet's totals (and to the Chart of
+          // Accounts endpoint's response) earlier, but this endpoint — the actual
+          // Balance Sheet page — was never updated to display them. totalAssets already
+          // included them internally, so isBalanced/difference were correct all along;
+          // only the visible line-item breakdown was incomplete, meaning the displayed
+          // lines would never sum to the displayed total.
+          productInventory: +bs.productInventory.toFixed(2),
+          equipmentOnRent: +bs.equipmentOnRent.toFixed(2),
+          chequesInHand: +bs.chequesInHand.toFixed(2),
           inventoryUnavailable: bs.inventoryUnavailable,
           custom: bs.customAssets.map((c) => ({
             name: c.accountName,
@@ -2409,14 +2526,24 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       const info = await getBranchCurrencyInfo(branchF[0]);
       baseCurrency = info?.currencyCode ?? 'AED';
     }
-    // Override with the dominant invoice currency so revenue is never zeroed by missing FX rates
+    // Override with the dominant invoice currency so revenue is never zeroed by missing FX rates.
+    // This MUST be scoped to the branches being reported on: unscoped, a branch whose own
+    // invoices are all in its own currency would inherit whichever currency happens to be
+    // most common company-wide, and then every one of its amounts gets dropped for want of
+    // an FX rate — reporting zero revenue and zero expenses with only a soft warning.
+    const dominantBranchIds = branchF.filter((b) => /^[0-9a-f-]{36}$/i.test(b));
+    const dominantBranchClause =
+      dominantBranchIds.length > 0
+        ? `AND "branchId" IN (${dominantBranchIds.map((b) => `'${b}'`).join(',')})`
+        : '';
     const dominantCcyRow = await Source.query<{ currency_code: string; cnt: string }[]>(`
       SELECT COALESCE("currency_code", 'AED') AS currency_code, COUNT(*) AS cnt
       FROM invoices
       WHERE "deletedAt" IS NULL
         AND status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
         AND (type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT','INVOICED','PAID')))
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND ${bizDateSql('"createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
+        ${dominantBranchClause}
       GROUP BY "currency_code"
       ORDER BY cnt DESC
       LIMIT 1
@@ -2432,7 +2559,7 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
     const invCountQb = invRepo
       .createQueryBuilder('i')
       .select('COUNT(i.id)', 'cnt')
-      .where(`CAST(i."createdAt" AS DATE) BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
+      .where(`${bizDateSql('i."createdAt"')} BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
       .andWhere(`i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')`)
       .andWhere(
         `(i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))`,
@@ -2457,7 +2584,7 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
     const taxQb = invRepo
       .createQueryBuilder('i')
       .select(`COALESCE(SUM(i.tax_amount), 0)`, 'total')
-      .where(`CAST(i."createdAt" AS DATE) BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
+      .where(`${bizDateSql('i."createdAt"')} BETWEEN :from AND :to`, { from: dateFrom, to: dateTo })
       .andWhere(`i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')`)
       .andWhere(
         `(i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))`,
@@ -3376,7 +3503,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       WHERE "deletedAt" IS NULL
         AND status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
         AND (type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT','INVOICED','PAID')))
-        AND CAST("createdAt" AS DATE) BETWEEN '${periodFrom}' AND '${periodTo}'
+        AND ${bizDateSql('"createdAt"')} BETWEEN '${periodFrom}' AND '${periodTo}'
         ${bSqlCoA}
       GROUP BY "currency_code"
       ORDER BY cnt DESC
@@ -3809,12 +3936,7 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       .where('i.status IN (:...statuses)', { statuses: OUTPUT_TAX_STATUSES })
       .andWhere('i.isTemplate = false')
       .andWhere('i.isOpeningEntry = false')
-      .andWhere('i.deletedAt IS NULL')
-      // Rent/Lease is VAT-exempt — no tax is collected on these contracts, so they're
-      // not taxable transactions and are omitted entirely rather than shown as a 0.00 row.
-      .andWhere('i.saleType NOT IN (:...taxExemptSaleTypes)', {
-        taxExemptSaleTypes: [SaleType.RENT, SaleType.LEASE],
-      });
+      .andWhere('i.deletedAt IS NULL');
 
     if (branchFilter.length === 1) {
       qb.andWhere('i.branchId = :bf', { bf: branchFilter[0] });
@@ -3864,12 +3986,10 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       currencyCode: inv.currencyCode,
       status: inv.status,
       isReversal: false,
-      // A distinct reportable VAT category — required in most real VAT regimes
-      // even at zero value, unlike Rent/Lease which is genuinely outside VAT
-      // scope and omitted from this report entirely (see the saleType filter
-      // above). Sourced from the invoice's own permanent snapshot, not a live
-      // customer lookup, so this can't retroactively change if the customer's
-      // VAT status is edited later.
+      // A distinct reportable VAT category in most real VAT regimes. Sourced
+      // from the invoice's own permanent snapshot, not a live customer lookup,
+      // so this can't retroactively change if the customer's VAT status is
+      // edited later.
       isExempt: inv.customerVatStatus === 'EXEMPT',
     }));
 
@@ -4070,7 +4190,6 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
         AND "isTemplate" = false
         AND "is_opening_entry" = false
         AND "deletedAt" IS NULL
-        AND "saleType" NOT IN ('RENT', 'LEASE')
         ${bfClause} ${dfClause} ${dtClause} ${cClause} ${spClause} ${cityClause}
       GROUP BY COALESCE("customer_country", 'Unknown'), COALESCE("customer_state_province", 'Unknown'), COALESCE("customer_city", '')
       ORDER BY output_vat DESC
@@ -4079,10 +4198,9 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
     );
 
     // Exempt-customer supplies — a distinct reportable VAT category in most real
-    // regimes, unlike Rent/Lease (genuinely out of VAT scope, already excluded by
-    // the saleType filter above). Reuses the exact same filter clauses/params as
-    // the country breakdown, plus one static extra condition (EXEMPT is a fixed
-    // enum value, not user input, so no new placeholder is needed).
+    // regimes. Reuses the exact same filter clauses/params as the country
+    // breakdown, plus one static extra condition (EXEMPT is a fixed enum value,
+    // not user input, so no new placeholder is needed).
     const [exemptTotalsRaw] = await Source.query<
       { invoice_count: string; taxable_amount: string }[]
     >(
@@ -4095,7 +4213,6 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
         AND "isTemplate" = false
         AND "is_opening_entry" = false
         AND "deletedAt" IS NULL
-        AND "saleType" NOT IN ('RENT', 'LEASE')
         AND "customer_vat_status" = 'EXEMPT'
         ${bfClause} ${dfClause} ${dtClause} ${cClause} ${spClause} ${cityClause}
     `,

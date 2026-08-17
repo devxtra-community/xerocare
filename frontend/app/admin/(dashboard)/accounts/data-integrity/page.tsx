@@ -6,10 +6,12 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { fetchOrphanedCashbookEntries, CashbookEntry } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useBranchNameMap } from '@/hooks/useBranchNameMap';
 import { Button } from '@/components/ui/button';
 
 export default function DataIntegrityPage() {
   const currency = useBranchCurrency();
+  const { getBranchName } = useBranchNameMap();
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['admin-orphaned-cashbook'],
     queryFn: fetchOrphanedCashbookEntries,
@@ -104,8 +106,8 @@ export default function DataIntegrityPage() {
                     <td className="px-4 py-3 font-mono text-xs text-amber-700">
                       {e.linkedPoId ?? '—'}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">
-                      {e.branchId.slice(0, 8)}…
+                    <td className="px-4 py-3 text-xs text-slate-600 font-medium">
+                      {getBranchName(e.branchId)}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-400">
                       {new Date(e.createdAt).toLocaleDateString()}

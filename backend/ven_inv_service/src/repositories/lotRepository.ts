@@ -347,6 +347,42 @@ export class LotRepository {
   }
 
   /**
+   * Finds the SPARE_PART lot item this incoming part would consume, matching the
+   * same way the write path later does: by the name the lot was booked under, or
+   * by the SKU of an already-linked spare part.
+   *
+   * Callers use this to reject an unrelated part BEFORE anything is persisted —
+   * `validateAndTrackUsage` runs after the master row is written, so without this
+   * pre-check a rejected part still leaves a stocked spare_parts row behind.
+   */
+  async findSparePartLotItem(
+    lotId: string,
+    customSparePartName?: string,
+    sku?: string,
+  ): Promise<LotItem | null> {
+    const qb = this.repo.manager
+      .createQueryBuilder(LotItem, 'lotItem')
+      .leftJoin('lotItem.sparePart', 'sparePart')
+      .where('lotItem.lotId = :lotId', { lotId })
+      .andWhere('lotItem.itemType = :itemType', { itemType: LotItemType.SPARE_PART });
+
+    if (customSparePartName && sku) {
+      qb.andWhere('(lotItem.customSparePartName = :name OR sparePart.sku = :sku)', {
+        name: customSparePartName,
+        sku,
+      });
+    } else if (customSparePartName) {
+      qb.andWhere('lotItem.customSparePartName = :name', { name: customSparePartName });
+    } else if (sku) {
+      qb.andWhere('sparePart.sku = :sku', { sku });
+    } else {
+      return null;
+    }
+
+    return qb.getOne();
+  }
+
+  /**
    * Links a spare part to a custom lot item.
    */
   async linkSparePartToLotItem(

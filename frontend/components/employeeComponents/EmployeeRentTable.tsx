@@ -11,7 +11,7 @@ import {
   Activity,
   Settings2,
   PenLine,
-  DollarSign,
+  Receipt,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getUserFromToken } from '@/lib/auth';
@@ -33,12 +33,10 @@ import {
   employeeApproveInvoice,
   activateContractInvoice,
 } from '@/lib/invoice';
-import { recordSalePayment } from '@/lib/saleWorkflow';
-import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
-import { getApiErrorMessage } from '@/lib/apiError';
 import { Badge } from '@/components/ui/badge';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
+import { SalePaymentCollectionModal } from '@/components/invoice/SalePaymentCollectionModal';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { formatCurrency } from '@/lib/format';
@@ -53,14 +51,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 const getCleanProductName = (name: string) => {
   // Remove "Black & White - " or "Color - " prefixes
@@ -111,22 +101,8 @@ export default function EmployeeRentTable({
   const [selectedForConversion, setSelectedForConversion] = useState<Invoice | null>(null);
   // Contract signing (ContractAgreementModal)
   const [contractInvoice, setContractInvoice] = useState<Invoice | null>(null);
-
-  // Advance payment recording
-  const [advancePaymentInvoice, setAdvancePaymentInvoice] = useState<Invoice | null>(null);
-  const [advanceAmount, setAdvanceAmount] = useState('');
-  const [advanceMode, setAdvanceMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
-  const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [advanceRef, setAdvanceRef] = useState('');
-  const [advanceChequeNo, setAdvanceChequeNo] = useState('');
-  const [advanceChequeBankName, setAdvanceChequeBankName] = useState('');
-  const [advanceChequeDueDate, setAdvanceChequeDueDate] = useState('');
-  const [advanceChequeDate, setAdvanceChequeDate] = useState(
-    new Date().toISOString().split('T')[0],
-  );
-  const [advanceAccountId, setAdvanceAccountId] = useState('');
-  const [isSavingAdvance, setIsSavingAdvance] = useState(false);
-  const [accounts, setAccounts] = useState<CashBankAccount[]>([]);
+  // Advance payment receipt viewing (SalePaymentCollectionModal)
+  const [collectionTarget, setCollectionTarget] = useState<Invoice | null>(null);
 
   const searchParams = useSearchParams();
   const convertId = searchParams.get('convert');
@@ -253,13 +229,6 @@ export default function EmployeeRentTable({
     }
   };
 
-  // Load cash/bank accounts once on mount
-  useEffect(() => {
-    fetchCashBankAccounts({ skipErrorToast: true })
-      .then(setAccounts)
-      .catch(() => {});
-  }, []);
-
   const handleActivateContract = async (inv: Invoice) => {
     try {
       await activateContractInvoice(inv.id, { contractConfirmationUrl: '' });
@@ -270,46 +239,6 @@ export default function EmployeeRentTable({
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message || 'Failed to activate contract');
-    }
-  };
-
-  const openAdvancePayment = (inv: Invoice) => {
-    setAdvancePaymentInvoice(inv);
-    setAdvanceAmount('');
-    setAdvanceMode('CASH');
-    setAdvanceDate(new Date().toISOString().split('T')[0]);
-    setAdvanceRef('');
-    setAdvanceChequeNo('');
-    setAdvanceChequeBankName('');
-    setAdvanceChequeDueDate('');
-    setAdvanceChequeDate(new Date().toISOString().split('T')[0]);
-    setAdvanceAccountId('');
-  };
-
-  const handleRecordAdvance = async () => {
-    if (!advancePaymentInvoice || !advanceAmount) return;
-    setIsSavingAdvance(true);
-    try {
-      const saleType = advancePaymentInvoice.saleType;
-      const context = saleType === 'LEASE' ? 'LEASE_ADVANCE' : 'RENT_ADVANCE';
-      await recordSalePayment(advancePaymentInvoice.id, {
-        amount: Number(advanceAmount),
-        paymentMode: advanceMode,
-        paymentDate: advanceDate,
-        referenceNumber: advanceRef || undefined,
-        cashAccountId: advanceAccountId || undefined,
-        chequeNumber: advanceMode === 'CHEQUE' ? advanceChequeNo : undefined,
-        chequeBankName: advanceMode === 'CHEQUE' ? advanceChequeBankName : undefined,
-        chequeDueDate: advanceMode === 'CHEQUE' ? advanceChequeDueDate : undefined,
-        chequeDate: advanceMode === 'CHEQUE' ? advanceChequeDate : undefined,
-        paymentContext: context,
-      });
-      toast.success('Advance payment submitted for Finance approval');
-      setAdvancePaymentInvoice(null);
-    } catch (err: unknown) {
-      toast.error(getApiErrorMessage(err));
-    } finally {
-      setIsSavingAdvance(false);
     }
   };
 
@@ -544,15 +473,6 @@ export default function EmployeeRentTable({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50"
-                              onClick={() => openAdvancePayment(inv)}
-                              title="Record Advance Payment"
-                            >
-                              <DollarSign className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
                               className="h-8 w-8 text-green-600 hover:bg-green-50 hover:text-green-700"
                               onClick={() => handleActivateContract(inv)}
                               title="Activate Contract"
@@ -571,6 +491,18 @@ export default function EmployeeRentTable({
                             title="Contract Agreement"
                           >
                             <PenLine className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {!!inv.contractStatus && inv.contractStatus !== 'CANCELLED' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
+                            onClick={() => setCollectionTarget(inv)}
+                            title="Advance Payment Receipt"
+                          >
+                            <Receipt className="h-4 w-4" />
                           </Button>
                         )}
 
@@ -678,175 +610,18 @@ export default function EmployeeRentTable({
             }}
           />
         )}
-      </div>
 
-      {/* Advance Payment Dialog */}
-      <Dialog
-        open={!!advancePaymentInvoice}
-        onOpenChange={(v) => !v && setAdvancePaymentInvoice(null)}
-      >
-        <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
-          <DialogTitle className="sr-only">Record Advance Payment</DialogTitle>
-          <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 text-white">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                <DollarSign size={18} />
-              </div>
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
-                  Record Advance Payment
-                </p>
-                <p className="text-base font-black">{advancePaymentInvoice?.invoiceNumber}</p>
-              </div>
-            </div>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  Amount
-                </Label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={advanceAmount}
-                  onChange={(e) => setAdvanceAmount(e.target.value)}
-                  className="h-9 text-sm font-bold"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  Date
-                </Label>
-                <Input
-                  type="date"
-                  value={advanceDate}
-                  onChange={(e) => setAdvanceDate(e.target.value)}
-                  className="h-9 text-sm font-bold"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                Payment Mode
-              </Label>
-              <Select
-                value={advanceMode}
-                onValueChange={(v) => setAdvanceMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')}
-              >
-                <SelectTrigger className="h-9 text-sm font-bold">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CASH">Cash</SelectItem>
-                  <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
-                  <SelectItem value="CHEQUE">Cheque</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {(advanceMode === 'CASH' || advanceMode === 'BANK_TRANSFER') && accounts.length > 0 && (
-              <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  Cash/Bank Account
-                </Label>
-                <Select value={advanceAccountId} onValueChange={setAdvanceAccountId}>
-                  <SelectTrigger className="h-9 text-sm font-bold">
-                    <SelectValue placeholder="Select account..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {advanceMode === 'CHEQUE' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Cheque No.
-                  </Label>
-                  <Input
-                    value={advanceChequeNo}
-                    onChange={(e) => setAdvanceChequeNo(e.target.value)}
-                    className="h-9 text-sm font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Bank Name
-                  </Label>
-                  <Input
-                    value={advanceChequeBankName}
-                    onChange={(e) => setAdvanceChequeBankName(e.target.value)}
-                    className="h-9 text-sm font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Cheque Date
-                  </Label>
-                  <Input
-                    type="date"
-                    value={advanceChequeDate}
-                    onChange={(e) => setAdvanceChequeDate(e.target.value)}
-                    className="h-9 text-sm font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Due Date
-                  </Label>
-                  <Input
-                    type="date"
-                    value={advanceChequeDueDate}
-                    onChange={(e) => setAdvanceChequeDueDate(e.target.value)}
-                    className="h-9 text-sm font-bold"
-                  />
-                </div>
-              </div>
-            )}
-            <div className="space-y-1">
-              <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                Reference (optional)
-              </Label>
-              <Input
-                value={advanceRef}
-                onChange={(e) => setAdvanceRef(e.target.value)}
-                placeholder="Ref / transaction ID"
-                className="h-9 text-sm"
-              />
-            </div>
-            <p className="text-[10px] text-slate-400 font-bold bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              This payment will be submitted to Finance for approval before it is recorded in the
-              books.
-            </p>
-            <div className="flex gap-2 pt-1">
-              <Button
-                variant="outline"
-                className="flex-1 h-9 text-xs font-black"
-                onClick={() => setAdvancePaymentInvoice(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 h-9 text-xs font-black bg-emerald-600 hover:bg-emerald-700"
-                onClick={handleRecordAdvance}
-                disabled={isSavingAdvance || !advanceAmount}
-              >
-                {isSavingAdvance ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  'Submit for Approval'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        {collectionTarget && (
+          <SalePaymentCollectionModal
+            invoiceId={collectionTarget.id}
+            invoiceNumber={collectionTarget.invoiceNumber}
+            saleType={collectionTarget.saleType}
+            open={!!collectionTarget}
+            onClose={() => setCollectionTarget(null)}
+            advanceOnly
+          />
+        )}
+      </div>
     </div>
   );
 }

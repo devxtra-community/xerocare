@@ -21,9 +21,7 @@ import {
   ReceiptText,
   CreditCard,
   Package,
-  PieChart,
   Receipt,
-  FileDown,
   ChevronDown,
   ChevronRight,
   Landmark,
@@ -32,7 +30,6 @@ import {
   ArrowLeftRight,
   Coins,
   Layers,
-  Banknote,
 } from 'lucide-react';
 
 import {
@@ -81,11 +78,9 @@ const accountsMenu: FinanceMenuItem[] = [
   { title: 'Accounts Receivable', icon: ReceiptText, href: '/finance/accounts/receivable' },
   { title: 'Accounts Payable', icon: CreditCard, href: '/finance/accounts/payable' },
   { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
-  { title: 'Expenses', icon: PieChart, href: '/finance/accounts/expenses' },
   { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
   { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
   { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
-  { title: 'Cheques', icon: Banknote, href: '/finance/accounts/cheques' },
   { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
   {
     title: 'Exchange Rates',
@@ -97,7 +92,6 @@ const accountsMenu: FinanceMenuItem[] = [
     icon: FileText,
     href: '/finance/accounts/opening-balances',
   },
-  { title: 'Reports Hub', icon: FileDown, href: '/finance/accounts/reports' },
 ];
 
 const financeMenu: FinanceMenuGroup[] = [

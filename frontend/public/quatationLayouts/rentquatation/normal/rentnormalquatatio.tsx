@@ -68,6 +68,8 @@ export interface RentNormalQuotationProps {
     tax: number;
     /** Overrides the default "VAT Amount" label — e.g. "VAT Exempt". */
     taxName?: string;
+    /** Drives the "(5%)" suffix on the VAT row label when present. */
+    taxPercent?: number;
     total: number;
   };
 }
@@ -895,6 +897,13 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         <div style={{ width: '250px' }}>
           {[
             { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
+            {
+              label: totals.taxPercent
+                ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                : totals.taxName || 'VAT Amount',
+              value: totals.tax,
+              num: totals.tax,
+            },
             {
               label: 'Grand Total',
               value: totals.total,

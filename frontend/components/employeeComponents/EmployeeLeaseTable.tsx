@@ -11,6 +11,7 @@ import {
   Send,
   ClipboardList,
   Activity,
+  Receipt,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getUserFromToken } from '@/lib/auth';
@@ -42,6 +43,7 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import { ApproveQuotationDialog } from '@/components/invoice/ApproveQuotationDialog';
+import { SalePaymentCollectionModal } from '@/components/invoice/SalePaymentCollectionModal';
 
 const calculateDays = (start: string | Date | undefined, end: string | Date | undefined) => {
   if (!start || !end) return 0;
@@ -82,6 +84,8 @@ export default function EmployeeLeaseTable({
   const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [selectedForConversion, setSelectedForConversion] = useState<Invoice | null>(null);
+  // Advance payment receipt viewing (SalePaymentCollectionModal)
+  const [collectionTarget, setCollectionTarget] = useState<Invoice | null>(null);
 
   const searchParams = useSearchParams();
   const convertId = searchParams.get('convert');
@@ -455,6 +459,18 @@ export default function EmployeeLeaseTable({
                           </Button>
                         )}
 
+                        {!!inv.contractStatus && inv.contractStatus !== 'CANCELLED' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
+                            onClick={() => setCollectionTarget(inv)}
+                            title="Advance Payment Receipt"
+                          >
+                            <Receipt className="h-4 w-4" />
+                          </Button>
+                        )}
+
                         {/* Edit button removed to enforce quotation-to-transaction workflow */}
                       </div>
                     </TableCell>
@@ -543,6 +559,17 @@ export default function EmployeeLeaseTable({
           quotation={selectedForConversion}
           onClose={() => setSelectedForConversion(null)}
           onSuccess={handleConversionSuccess}
+        />
+      )}
+
+      {collectionTarget && (
+        <SalePaymentCollectionModal
+          invoiceId={collectionTarget.id}
+          invoiceNumber={collectionTarget.invoiceNumber}
+          saleType={collectionTarget.saleType}
+          open={!!collectionTarget}
+          onClose={() => setCollectionTarget(null)}
+          advanceOnly
         />
       )}
     </div>

@@ -121,8 +121,11 @@ export default function AddCostModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] border-none shadow-2xl p-0 overflow-hidden rounded-2xl">
-        <div className="bg-slate-900 px-6 py-6 text-white">
+      {/* Same viewport cap + column layout as AddPaymentModal: header and actions stay
+          put, only the fields scroll. Previously `overflow-hidden` with no height cap
+          clipped anything past the bottom of the screen with no way to scroll to it. */}
+      <DialogContent className="sm:max-w-[450px] border-none shadow-2xl p-0 overflow-hidden rounded-2xl flex flex-col max-h-[90dvh]">
+        <div className="bg-slate-900 px-6 py-6 text-white shrink-0">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <Banknote className="text-emerald-400" />
@@ -134,127 +137,130 @@ export default function AddCostModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5 bg-white">
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
-              Cost Amount
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
-                {currencyCode}
-              </span>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                className="pl-12 h-11 text-lg font-bold border-slate-200 focus:ring-primary"
-                value={formData.amount || ''}
-                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                autoFocus
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <Calendar size={12} /> Date
-            </Label>
-            <Input
-              type="date"
-              required
-              className="h-10 text-xs border-slate-200"
-              value={formData.costDate}
-              onChange={(e) => setFormData({ ...formData, costDate: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase">Cost Type</Label>
-            <Select
-              value={formData.costType}
-              onValueChange={(val) => setFormData({ ...formData, costType: val })}
-            >
-              <SelectTrigger className="h-10 text-xs border-slate-200">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                {COST_TYPE_OPTIONS.map((m) => (
-                  <SelectItem key={m} value={m} className="text-xs">
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {formData.costType === 'Other' && (
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-white">
+          <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-500 uppercase">
-                Custom Cost Type *
+              <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
+                Cost Amount
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                  {currencyCode}
+                </span>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  className="pl-12 h-11 text-lg font-bold border-slate-200 focus:ring-primary"
+                  value={formData.amount || ''}
+                  onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <Calendar size={12} /> Date
               </Label>
               <Input
+                type="date"
                 required
-                placeholder="e.g. Crane Rental, Warehouse Fee..."
                 className="h-10 text-xs border-slate-200"
-                value={customCostType}
-                onChange={(e) => setCustomCostType(e.target.value)}
-                autoFocus
+                value={formData.costDate}
+                onChange={(e) => setFormData({ ...formData, costDate: e.target.value })}
               />
             </div>
-          )}
 
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <FileText size={12} /> Description
-            </Label>
-            <Input
-              placeholder="e.g. Extra workers for unloading"
-              className="h-10 text-xs border-slate-200"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Cost Type</Label>
+              <Select
+                value={formData.costType}
+                onValueChange={(val) => setFormData({ ...formData, costType: val })}
+              >
+                <SelectTrigger className="h-10 text-xs border-slate-200">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COST_TYPE_OPTIONS.map((m) => (
+                    <SelectItem key={m} value={m} className="text-xs">
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-              <Paperclip size={12} /> Attachment (optional)
-            </Label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            {attachment ? (
-              <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
-                <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+            {formData.costType === 'Other' && (
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-500 uppercase">
+                  Custom Cost Type *
+                </Label>
+                <Input
+                  required
+                  placeholder="e.g. Crane Rental, Warehouse Fee..."
+                  className="h-10 text-xs border-slate-200"
+                  value={customCostType}
+                  onChange={(e) => setCustomCostType(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <FileText size={12} /> Description
+              </Label>
+              <Input
+                placeholder="e.g. Extra workers for unloading"
+                className="h-10 text-xs border-slate-200"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                <Paperclip size={12} /> Attachment (optional)
+              </Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              {attachment ? (
+                <div className="flex items-center justify-between gap-2 h-10 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs">
+                  <span className="truncate text-slate-700 font-medium">{attachment.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachment(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }}
+                    className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                    title="Remove attachment"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    setAttachment(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
-                  className="text-slate-400 hover:text-red-500 transition-colors shrink-0"
-                  title="Remove attachment"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
                 >
-                  <X size={14} />
+                  Attach receipt image or PDF
                 </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-10 rounded-md border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:border-primary hover:text-primary transition-colors"
-              >
-                Attach receipt image or PDF
-              </button>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="pt-4 flex gap-3">
+          {/* Pinned action bar — always reachable regardless of form length. */}
+          <div className="shrink-0 flex gap-3 border-t border-slate-200 bg-white px-6 py-4">
             <Button
               type="button"
               variant="ghost"

@@ -75,6 +75,19 @@ export class UsageRecord {
   @Column('decimal', { precision: 10, scale: 2, default: 0 })
   totalCharge!: number;
 
+  // VAT breakdown for this period's charge, layered on top of the existing pricing
+  // calculation (base rent + excess usage − discount) — taxableAmount is that pre-tax
+  // result, taxAmount is VAT on it at the contract's own snapshotted taxPercent, and
+  // totalCharge (above) is taxableAmount + taxAmount. Zero/null for no-tax branches.
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  taxableAmount!: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  taxAmount!: number;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  taxPercent?: number;
+
   @Column({ type: 'int', default: 0 })
   discountBwCopies!: number;
 

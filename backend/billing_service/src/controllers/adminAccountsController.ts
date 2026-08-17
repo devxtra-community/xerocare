@@ -8,6 +8,7 @@ import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { computeProfitAndLoss, computeBalanceSheet } from '../utils/accountsShared';
 import { nowInBusinessTz } from '../utils/businessDate';
+import { getBranchName } from '../services/billingHelpers';
 
 // Admin-only guard
 function requireAdmin(req: Request) {
@@ -357,8 +358,18 @@ export const getBranchComparison = async (req: Request, res: Response, next: Nex
       byBranch[e.branchId].expenses += Number(e.amount ?? e.netAmount ?? 0);
     }
 
+    // Resolve once per distinct branch (parallelized), not per row — billing_service
+    // has no branches table of its own, so this is a cross-service call to
+    // ven_inv_service; getBranchName's 5-minute cache keeps repeat calls cheap.
+    const distinctBranchIds = Object.keys(byBranch);
+    const resolvedNames = await Promise.all(distinctBranchIds.map((id) => getBranchName(id)));
+    const nameByBranchId: Record<string, string> = {};
+    distinctBranchIds.forEach((id, i) => {
+      nameByBranchId[id] = resolvedNames[i] || 'Unknown Branch';
+    });
+
     const data = Object.entries(byBranch).map(([branchId, d]) => ({
-      name: branchId.slice(0, 8),
+      name: nameByBranchId[branchId],
       branchId,
       revenue: +d.revenue.toFixed(2),
       expenses: +d.expenses.toFixed(2),

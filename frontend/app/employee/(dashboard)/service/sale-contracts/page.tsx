@@ -9,6 +9,7 @@ import {
   createInstallationRequest,
   assignTechnician,
   generateSalePaymentReceipt,
+  updateDeliveryStatus,
   InstallationRequest,
 } from '@/lib/saleWorkflow';
 import { Customer } from '@/lib/customer';
@@ -33,6 +34,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   FileSignature,
   Wrench,
@@ -170,6 +178,29 @@ export default function SaleContractsPage() {
 
   const isSaleType = (saleType?: string | null) =>
     ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(saleType || '');
+
+  const handleDeliveryStatusChange = async (
+    contract: SaleContractRow,
+    value: 'DELIVERED' | 'NOT_DELIVERED',
+  ) => {
+    const previous = contract.deliveryStatus;
+    if (previous === value) return;
+    setContracts((prev) =>
+      prev.map((c) => (c.id === contract.id ? { ...c, deliveryStatus: value } : c)),
+    );
+    try {
+      await updateDeliveryStatus(contract.id, value);
+      toast.success(value === 'DELIVERED' ? 'Marked as delivered' : 'Marked as not delivered', {
+        description: contract.invoiceNumber,
+      });
+    } catch (err) {
+      // Roll back on failure
+      setContracts((prev) =>
+        prev.map((c) => (c.id === contract.id ? { ...c, deliveryStatus: previous } : c)),
+      );
+      toast.error('Failed to update delivery status', { description: getApiErrorMessage(err) });
+    }
+  };
 
   const statusBadge = (contract: SaleContractRow) => {
     const installed = contract.installation?.status === 'COMPLETED';
@@ -330,6 +361,9 @@ export default function SaleContractsPage() {
                   <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                     Agreement
                   </TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Delivery
+                  </TableHead>
                   <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
                     Actions
                   </TableHead>
@@ -410,6 +444,31 @@ export default function SaleContractsPage() {
                             <span className="text-[10px] text-slate-400">—</span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          <Select
+                            value={contract.deliveryStatus || 'NOT_DELIVERED'}
+                            onValueChange={(val) =>
+                              handleDeliveryStatusChange(
+                                contract,
+                                val as 'DELIVERED' | 'NOT_DELIVERED',
+                              )
+                            }
+                          >
+                            <SelectTrigger
+                              className={`h-7 w-32.5 text-[10px] font-black uppercase tracking-wide ${
+                                contract.deliveryStatus === 'DELIVERED'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : 'border-amber-200 bg-amber-50 text-amber-700'
+                              }`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="NOT_DELIVERED">Not Delivered</SelectItem>
+                              <SelectItem value="DELIVERED">Delivered</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {contract.currentProductId && (
@@ -437,15 +496,17 @@ export default function SaleContractsPage() {
                                 <FileSignature size={14} />
                               </Button>
                             )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => openInstall(contract)}
-                              className="h-7 w-7 p-0 text-slate-400 hover:bg-slate-50"
-                              title="Installation Request"
-                            >
-                              <Wrench size={14} />
-                            </Button>
+                            {contract.deliveryStatus === 'DELIVERED' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openInstall(contract)}
+                                className="h-7 w-7 p-0 text-slate-400 hover:bg-slate-50"
+                                title="Installation Request"
+                              >
+                                <Wrench size={14} />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -453,7 +514,7 @@ export default function SaleContractsPage() {
                       {/* Payments sub-row */}
                       {isExpanded && (
                         <TableRow>
-                          <TableCell colSpan={8} className="p-0 bg-slate-50/60">
+                          <TableCell colSpan={9} className="p-0 bg-slate-50/60">
                             <div className="px-6 py-3 border-l-2 border-indigo-200 ml-6">
                               <div className="flex items-center justify-between mb-2">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">

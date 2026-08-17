@@ -33,6 +33,7 @@ import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
+import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ReceivableDetailModal } from '@/components/accounts/ReceivablePayableDetail';
@@ -65,7 +66,13 @@ const AGING_COLORS: Record<string, string> = {
   '90+ days': 'bg-red-200 text-red-800 border-red-300',
 };
 
-const RECEIVABLE_TYPES = ['CUSTOMER_INVOICE', 'SECURITY_DEPOSIT', 'ADVANCE_PAYMENT', 'OTHER'];
+const RECEIVABLE_TYPES = [
+  'CUSTOMER_INVOICE',
+  'SECURITY_DEPOSIT',
+  'ADVANCE_PAYMENT',
+  'CREDIT_EXCHANGE_DIFF',
+  'OTHER',
+];
 const RECEIVABLE_STATUSES = ['OUTSTANDING', 'PENDING', 'PARTIAL', 'OVERDUE', 'PAID', 'WRITTEN_OFF'];
 const today = new Date().toISOString().slice(0, 10);
 
@@ -116,15 +123,7 @@ function AddReceivableModal({
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-            <span className="text-sm text-blue-600">Branch:</span>
-            <span className="text-sm font-medium text-blue-800">
-              {currentUser?.branchId
-                ? `Branch ${currentUser.branchId.slice(0, 8)}…`
-                : 'Your Branch'}
-            </span>
-            <span className="text-xs text-blue-500 ml-auto">{currentUser?.role}</span>
-          </div>
+          <BranchIdentityChip branchId={currentUser?.branchId} role={currentUser?.role} />
           <div>
             <label className="text-xs font-medium text-muted-foreground">Type</label>
             <Select value={form.type} onValueChange={(v) => set('type', v)}>

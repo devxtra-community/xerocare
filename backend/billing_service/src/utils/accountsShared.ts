@@ -96,6 +96,8 @@ export interface BalanceSheetResult {
   prepaidExpenses: number;
   sparePartsInventory: number;
   productInventory: number;
+  equipmentOnRent: number; // cost of units deployed on live RENT/LEASE contracts
+  chequesInHand: number; // RECEIVED cheques not yet cleared
   inventoryUnavailable: boolean;
 
   // Non-Current Assets
@@ -239,6 +241,27 @@ async function internalGet<T>(url: string): Promise<T | null> {
 
 // ─── Branch SQL helper ────────────────────────────────────────────────────────
 
+/**
+ * SQL expression yielding the BUSINESS-timezone calendar date of a naive timestamp column.
+ *
+ * `createdAt` columns are `timestamp without time zone`, written by the database using
+ * its own server timezone. Reports, however, filter on calendar dates computed in the
+ * business timezone (`todayInBusinessTz`). With the DB server on Asia/Kolkata (+05:30)
+ * and the business on Asia/Qatar (+03:00), a plain `CAST(col AS DATE)` compares two
+ * different clocks: anything recorded after ~21:30 business time carries the NEXT
+ * server date and silently falls outside an "as of today" range — dropping real
+ * transactions out of the P&L, Retained Earnings and every period report, with no
+ * warning of any kind.
+ *
+ * Re-anchoring the stored value to the business timezone first makes the comparison
+ * meaningful. This reads the timestamp as server-local (which is how it was written)
+ * and renders it in the business timezone, so it moves records to the date they
+ * actually occurred on for the business — it does not shift stored data.
+ */
+const BUSINESS_TZ_SQL = process.env.BUSINESS_TIMEZONE ?? 'Asia/Qatar';
+const bizDate = (col: string) =>
+  `((${col} AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE '${BUSINESS_TZ_SQL}')::date`;
+
 function branchSql(alias: string, col = '"branchId"', branches: string[] | null): string {
   if (!branches || branches.length === 0) return '';
   if (branches.length === 1) return `AND ${alias}.${col} = '${branches[0]}'`;
@@ -321,7 +344,7 @@ export async function computeProfitAndLoss(
         WHERE i."saleType" = 'RENT'
           AND i.status NOT IN (${EXCL_STATUS})
           AND ${VALID_INVOICES}
-          AND CAST(i."createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+          AND ${bizDate('i."createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
           AND i."deletedAt" IS NULL
           ${bSql}
         GROUP BY i."currency_code"
@@ -353,7 +376,7 @@ export async function computeProfitAndLoss(
         WHERE i."saleType" = 'LEASE'
           AND i.status NOT IN (${EXCL_STATUS})
           AND ${VALID_INVOICES}
-          AND CAST(i."createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+          AND ${bizDate('i."createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
           AND i."deletedAt" IS NULL
           ${bSql}
         GROUP BY i."currency_code"
@@ -380,7 +403,7 @@ export async function computeProfitAndLoss(
       WHERE "saleType" IN ('SALE', 'PRODUCT_SALE')
         AND status NOT IN (${EXCL_STATUS})
         AND ${VALID_INVOICES}
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND ${bizDate('"createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
       GROUP BY "currency_code"
@@ -394,7 +417,7 @@ export async function computeProfitAndLoss(
         AND ("billType" IS NULL OR "billType" NOT IN ('AMC', 'FSMA', 'SMA'))
         AND status NOT IN (${EXCL_STATUS})
         AND ${VALID_INVOICES}
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND ${bizDate('"createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
       GROUP BY "currency_code"
@@ -407,7 +430,7 @@ export async function computeProfitAndLoss(
       WHERE "billType" IN ('AMC', 'FSMA', 'SMA')
         AND status NOT IN (${EXCL_STATUS})
         AND ${VALID_INVOICES}
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND ${bizDate('"createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
       GROUP BY "currency_code"
@@ -420,7 +443,7 @@ export async function computeProfitAndLoss(
       WHERE "saleType" = 'SPAREPART_SALE'
         AND status NOT IN (${EXCL_STATUS})
         AND ${VALID_INVOICES}
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND ${bizDate('"createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
         AND "deletedAt" IS NULL
         ${bSql}
       GROUP BY "currency_code"
@@ -432,8 +455,14 @@ export async function computeProfitAndLoss(
              COALESCE(SUM(u."exceededCharge"), 0) AS amount
       FROM usage_records u
       JOIN invoices inv ON inv.id = u."contractId"
+      -- Recognise usage revenue in the period the usage was RECORDED, not only once the
+      -- whole billing period has elapsed. Keying on billingPeriodEnd deferred the revenue
+      -- while the matching receivable was already booked as an asset — only one side of
+      -- the entry moved, so any branch with an in-flight billing period could not balance.
+      -- (Observed: a period running 2026-08-11 -> 2026-09-10 hid 47,250 of overage for a
+      -- month while its receivable sat in Assets the whole time.)
       WHERE u."billingPeriodStart" >= '${dateFrom}'
-        AND u."billingPeriodEnd" <= '${dateTo}'
+        AND u."billingPeriodStart" <= '${dateTo}'
         AND inv."deletedAt" IS NULL
         ${bSqlUsage.replace('u."branchId"', 'inv."branchId"')}
       GROUP BY inv."currency_code"
@@ -533,14 +562,29 @@ export async function computeProfitAndLoss(
       WHERE status = 'POSTED'
         ${bSqlAllDep}
     `),
-    // Credit note adjustments — CREDIT_EXCHANGE finalized in period
-    // Net: replacementAmount - productAmount (positive = upsell, negative = downgrade/return)
+    // Credit note adjustments against sales revenue, for the period.
+    //  - CREDIT_EXCHANGE (PRODUCT_REPLACED): net replacementAmount - productAmount
+    //    (positive = upsell, negative = downgrade/return).
+    //  - DIRECT_REFUND (COMPLETED): reverse the sale entirely. This used to be missing,
+    //    so a refunded sale kept its revenue forever: approving the refund raised a
+    //    payable to the customer and pulled the unit out of inventory, but profit never
+    //    moved — overstating revenue by the refunded amount and breaking
+    //    Assets = Liabilities + Equity by it too.
+    //    productAmount is the net (pre-tax) figure, which is the right basis here since
+    //    salesRevenue itself is computed net of tax; the VAT half reverses through
+    //    VAT Payable, not through revenue.
     db.query<{ amount: string }[]>(`
-      SELECT COALESCE(SUM(COALESCE("replacementAmount", 0) - "productAmount"), 0) AS amount
+      SELECT COALESCE(SUM(
+        CASE
+          WHEN cn.type = 'CREDIT_EXCHANGE' AND cn.status = 'PRODUCT_REPLACED'
+            THEN COALESCE(cn."replacementAmount", 0) - cn."productAmount"
+          WHEN cn.type = 'DIRECT_REFUND' AND cn.status = 'COMPLETED'
+            THEN -cn."productAmount"
+          ELSE 0
+        END
+      ), 0) AS amount
       FROM credit_notes cn
-      WHERE status = 'PRODUCT_REPLACED'
-        AND type = 'CREDIT_EXCHANGE'
-        AND CAST("createdAt" AS DATE) BETWEEN '${dateFrom}' AND '${dateTo}'
+      WHERE ${bizDate('cn."createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
         ${bSqlCn}
     `),
     // Custom income (income_entries), by category — period-filtered, RECEIVED only.
@@ -623,18 +667,31 @@ export async function computeProfitAndLoss(
   // all-time retained earnings, making it 4 serial round trips).
   const cogsUrl = `${invUrl}/service/internal/cogs-report?${bParam ? `branchIds=${bParam.join(',')}` : ''}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
   const purchaseCostUrl = `${invUrl}/purchases/internal/cost-report?${bParam ? `branchIds=${bParam.join(',')}` : ''}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
-  const [cogsData, purchaseCostData] = await Promise.all([
+  const writtenOffUrl = `${invUrl}/products/written-off-value${bParam ? `?branchIds=${bParam.join(',')}` : ''}`;
+  const [cogsData, purchaseCostData, writtenOffData] = await Promise.all([
     internalGet<{ cogsAmount: number; labourAmount: number }>(cogsUrl),
     internalGet<{
       currencyGroups: {
         currencyCode: string;
         purchaseCost: number;
+        purchaseGoodsCost: number;
         shippingHandling: number;
         importLabourCost: number;
         customsDuty: number;
       }[];
     }>(purchaseCostUrl),
+    internalGet<{ total: number }>(writtenOffUrl),
   ]);
+
+  // Stock written off out of sellable inventory (refund returns / scrapped units). The
+  // Balance Sheet's inventory asset counts AVAILABLE units only, so these have already
+  // left assets; without recognising the loss here the reduction had no counterpart.
+  const stockWriteOff = Number(writtenOffData?.total ?? 0);
+  if (writtenOffData === null) {
+    dataWarnings.push(
+      '5016: Inventory service unavailable — written-off stock could not be fetched. Expenses may be understated.',
+    );
+  }
 
   const crossServiceCogs = cogsData?.cogsAmount ?? 0;
   const crossServiceLabour = cogsData?.labourAmount ?? 0;
@@ -652,7 +709,17 @@ export async function computeProfitAndLoss(
     );
   } else {
     for (const grp of purchaseCostData.currencyGroups ?? []) {
-      const pcResult = convertAmt(grp.purchaseCost, grp.currencyCode, baseCurrency, rates);
+      // Perpetual inventory: the goods portion of a purchase is capitalised into stock,
+      // not expensed on purchase — it reaches the P&L as COGS when the item sells.
+      // Expensing it here while the Balance Sheet simultaneously carried the same goods
+      // as productInventory/sparePartsInventory counted them twice and made
+      // Assets = Liabilities + Equity impossible to satisfy. Only the non-capitalised
+      // ancillary costs (documentation fee here, shipping/labour/duty below) are period
+      // expenses. Older cost-report responses without the goods field fall back to 0,
+      // which preserves the previous behaviour rather than silently zeroing the line.
+      const capitalisedGoods = grp.purchaseGoodsCost ?? 0;
+      const periodPurchaseCost = grp.purchaseCost - capitalisedGoods;
+      const pcResult = convertAmt(periodPurchaseCost, grp.currencyCode, baseCurrency, rates);
       const shResult = convertAmt(grp.shippingHandling, grp.currencyCode, baseCurrency, rates);
       const ilResult = convertAmt(grp.importLabourCost, grp.currencyCode, baseCurrency, rates);
       if (pcResult.warning) {
@@ -811,6 +878,7 @@ export async function computeProfitAndLoss(
     insuranceExpense +
     importLabourCost +
     customsDuty +
+    stockWriteOff +
     otherExpenses +
     customExpenseTotal;
 
@@ -979,8 +1047,30 @@ export async function computeBalanceSheet(
     // by the outer SUM — they contribute 0 naturally.
     db.query<CcyRow[]>(`
       SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM(i."totalAmount" - COALESCE(pt.paid, 0)), 0) AS amount
+             COALESCE(SUM(
+               CASE
+                 -- A RENT/LEASE contract reuses one invoice for its whole life, so
+                 -- totalAmount is a running contract figure, NOT what the customer
+                 -- currently owes. Revenue for these is recognised per billed period
+                 -- from usage_records; booking AR off totalAmount therefore recorded a
+                 -- receivable larger than the revenue ever recognised against it, and
+                 -- the difference had no counterpart anywhere.
+                 -- (Observed: a 3-month contract showed AR 2,100 against 1,100 of
+                 -- recognised revenue — a 1,000 hole that persisted until the contract
+                 -- ended.) Mirror the revenue basis exactly: advance + what has actually
+                 -- been billed.
+                 WHEN i."saleType" IN ('RENT', 'LEASE')
+                   THEN COALESCE(i."advanceAmount", 0) + COALESCE(ur.billed, 0)
+                 ELSE i."totalAmount"
+               END - COALESCE(pt.paid, 0)
+             ), 0) AS amount
       FROM invoices i
+      LEFT JOIN (
+        SELECT "contractId",
+               SUM(COALESCE("monthlyRent", 0) + COALESCE("exceededCharge", 0)) AS billed
+        FROM usage_records
+        GROUP BY "contractId"
+      ) ur ON ur."contractId" = i.id
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
           SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
@@ -1204,11 +1294,12 @@ export async function computeBalanceSheet(
 
   // ── Inventory value (1006/1009) — cross-service ──────────────────────────────
   const branchQs = bParam ? `?branchIds=${bParam.join(',')}` : '';
-  const [invValueData, prodInvData] = await Promise.all([
+  const [invValueData, prodInvData, deployedInvData] = await Promise.all([
     internalGet<{ total: number; currency: string }>(
       `${invUrl}/spare-parts/inventory-value${branchQs}`,
     ),
     internalGet<{ total: number }>(`${invUrl}/products/inventory-value${branchQs}`),
+    internalGet<{ total: number }>(`${invUrl}/products/deployed-value${branchQs}`),
   ]);
 
   let sparePartsInventory = 0;
@@ -1235,6 +1326,36 @@ export async function computeBalanceSheet(
     productInventory = prodInvData.total ?? 0;
   }
 
+  // 1011 Cheques in Hand — RECEIVED cheques taken from customers but not yet cleared.
+  // Approving a cheque payment reduces the customer's receivable straight away, but the
+  // money only reaches Cash at Bank when the cheque clears. Between those two events the
+  // business genuinely holds an asset — the cheque itself — and nothing recorded it, so
+  // assets dropped with no counterpart for the whole window a cheque is outstanding.
+  // cheques carries no currency of its own — amounts follow the branch, so no conversion.
+  const chequesInHandRows = await db.query<{ amount: string }[]>(`
+    SELECT COALESCE(SUM(amount), 0) AS amount
+    FROM cheques
+    WHERE type = 'RECEIVED'
+      AND status IN ('PENDING', 'DEPOSITED')
+      ${bSql('cheques', 'branch_id')}
+  `);
+  const chequesInHand = Number(chequesInHandRows[0]?.amount ?? 0);
+
+  // 1010 Equipment on Rent/Lease — machines allocated to live contracts.
+  // Inventory valuation counts AVAILABLE units only, so a machine deployed on a contract
+  // dropped out of assets entirely even though the business still owns it and is earning
+  // rent on it. It has not left the business, only changed category: from sellable stock
+  // to equipment out on hire. Without this line every rent/lease contract understated the
+  // balance sheet by the cost of the machines it deployed.
+  let equipmentOnRent = 0;
+  if (deployedInvData === null) {
+    dataWarnings.push(
+      '1010: Inventory service unavailable — equipment on rent/lease could not be fetched. Total assets will be understated.',
+    );
+  } else {
+    equipmentOnRent = deployedInvData.total ?? 0;
+  }
+
   // ── Vendor purchases payable — cross-service ─────────────────────────────────
   // The Payable page's frontend merges manual_payables with vendor Purchase Orders
   // (POs), but this Balance Sheet line used to sum only manual_payables — a real PO
@@ -1259,7 +1380,9 @@ export async function computeBalanceSheet(
   }
 
   // ── Liabilities ──────────────────────────────────────────────────────────────
-  const accountsPayable = Number(apRows[0]?.amount ?? 0) + vendorPurchasesPayable;
+  // Mutable: the VAT block below adds the domestic input VAT the vendor billed us,
+  // which is part of that vendor invoice and therefore part of what we owe them.
+  let accountsPayable = Number(apRows[0]?.amount ?? 0) + vendorPurchasesPayable;
   const accruedExpenses = Number(accruedRows[0]?.amount ?? 0);
 
   // Input VAT (Local) + Reverse Charge VAT (International) reclaimable — cross-service,
@@ -1275,6 +1398,13 @@ export async function computeBalanceSheet(
     }[];
   }>(`${invUrl}/purchases/internal/cost-report`);
   let inputVatReclaimable = 0;
+  // Split out so each half can be posted to its correct counterpart below:
+  //  - domesticInputVat is VAT the vendor actually charged us, so it is part of what we
+  //    owe that vendor and belongs in Accounts Payable.
+  //  - reverseChargeVatSelfAssessed is VAT we charge ourselves on an import; it must
+  //    raise an output-VAT liability as well as the input credit, netting to zero.
+  let domesticInputVat = 0;
+  let reverseChargeVatSelfAssessed = 0;
   if (vatCreditData === null) {
     dataWarnings.push(
       '2003: Inventory service unavailable — Input/Reverse Charge VAT could not be fetched. VAT Payable will be overstated.',
@@ -1290,10 +1420,16 @@ export async function computeBalanceSheet(
       );
       if (ivResult.warning) {
         if (!currencyWarnings.includes(ivResult.warning)) currencyWarnings.push(ivResult.warning);
-      } else inputVatReclaimable += ivResult.value;
+      } else {
+        inputVatReclaimable += ivResult.value;
+        domesticInputVat += ivResult.value;
+      }
       if (rcResult.warning) {
         if (!currencyWarnings.includes(rcResult.warning)) currencyWarnings.push(rcResult.warning);
-      } else inputVatReclaimable += rcResult.value;
+      } else {
+        inputVatReclaimable += rcResult.value;
+        reverseChargeVatSelfAssessed += rcResult.value;
+      }
     }
   }
 
@@ -1307,7 +1443,34 @@ export async function computeBalanceSheet(
   // negative value here means the authority owes the business money (a net recoverable
   // position), not that anything is broken — the headline and the drill-down must agree,
   // and the drill-down was the one telling the truth.
-  const vatPayable = vatCollected - inputVatReclaimable - vatRemitted;
+  // The vendor's own VAT charge is part of their invoice — we hold a reclaimable asset
+  // for it, and we owe the vendor the same amount. Booking only the credit left an asset
+  // with no matching liability.
+  accountsPayable += domesticInputVat;
+  // Reverse charge is self-assessed: the import raises an output-VAT liability of the
+  // same size as the input credit claimed for it, so the two cancel. Counting only the
+  // credit understated VAT owed by the full reverse-charge amount.
+  // Output VAT charged on a sale that has since been refunded is no longer owed to the
+  // authority — the refund hands the customer back the tax along with the price. Without
+  // this the business keeps declaring VAT on revenue it has reversed, and the refund
+  // payable (which is gross, price + tax) has no matching relief anywhere.
+  // credit_notes carries no currency of its own — amounts follow the branch, so they are
+  // already in baseCurrency and need no conversion.
+  const creditNoteVatRows = await db.query<{ amount: string }[]>(`
+    SELECT COALESCE(SUM(COALESCE(cn.tax_amount, 0)), 0) AS amount
+    FROM credit_notes cn
+    WHERE cn.type = 'DIRECT_REFUND'
+      AND cn.status = 'COMPLETED'
+      ${bSql('cn')}
+  `);
+  const creditNoteVatReversed = Number(creditNoteVatRows[0]?.amount ?? 0);
+
+  const vatPayable =
+    vatCollected +
+    reverseChargeVatSelfAssessed -
+    inputVatReclaimable -
+    vatRemitted -
+    creditNoteVatReversed;
 
   const securityDepositsReceived = aggByCurrency(
     secDepReceivedRows,
@@ -1316,7 +1479,25 @@ export async function computeBalanceSheet(
     currencyWarnings,
   );
 
-  const deferredRevenue = 0;
+  // 2005 Customer advances — cash already collected and approved against a contract whose
+  // revenue is not yet recognised (still a PROFORMA, nothing delivered). The cash sits in
+  // Cash in Hand / Cash at Bank as an asset, so without the matching obligation to the
+  // customer the balance sheet gained an asset with no counterpart. Recognised revenue
+  // (FINAL invoices, or PROFORMAs already INVOICED/PAID/ACTIVE_CONTRACT) is excluded —
+  // those are earned, not held on account.
+  const customerAdvanceRows = await db.query<CcyRow[]>(`
+    SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+           COALESCE(SUM(spr.amount), 0) AS amount
+    FROM sale_payment_requests spr
+    JOIN invoices i ON i.id = spr."invoiceId"
+    WHERE spr.status = 'APPROVED'
+      AND i."deletedAt" IS NULL
+      AND i.type = 'PROFORMA'
+      AND i.status NOT IN ('INVOICED','PAID','ACTIVE_CONTRACT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+      ${bSql('i')}
+    GROUP BY i."currency_code"
+  `);
+  const deferredRevenue = aggByCurrency(customerAdvanceRows, baseCurrency, rates, currencyWarnings);
   // Informational only — see the query comment above for why this isn't folded
   // into totalLiabilities.
   const deferredRevenueMemo = aggByCurrency(
@@ -1447,6 +1628,8 @@ export async function computeBalanceSheet(
     prepaidExpenses +
     sparePartsInventory +
     productInventory +
+    equipmentOnRent +
+    chequesInHand +
     customCurrentAssetTotal;
   const totalNonCurrentAssets = equipmentNBV + customNonCurrentAssetTotal;
   const totalAssets = totalCurrentAssets + totalNonCurrentAssets;
@@ -1478,6 +1661,8 @@ export async function computeBalanceSheet(
     prepaidExpenses,
     sparePartsInventory,
     productInventory,
+    equipmentOnRent,
+    chequesInHand,
     inventoryUnavailable,
     equipmentGrossCost,
     accumulatedDepreciation,

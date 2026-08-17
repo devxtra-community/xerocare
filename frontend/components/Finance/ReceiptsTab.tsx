@@ -10,7 +10,20 @@ import {
   sendReceiptWhatsApp,
   SalePaymentRequest,
 } from '@/lib/saleWorkflow';
-import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
+import {
+  fetchCashBankAccounts,
+  fetchCheques,
+  CashBankAccount,
+  type Cheque,
+} from '@/lib/finance/accountsApi';
+import {
+  ChequeActionModal,
+  ChequeDetailModal,
+  CHEQUE_TABLE_STATUS_BADGE as CHEQUE_STATUS_BADGE,
+  CHEQUE_STATUS_ICON,
+  type ActionType as ChequeActionType,
+} from '@/components/accounts/ChequeDetailModal';
+import { useQuery } from '@tanstack/react-query';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { getActiveCurrency } from '@/lib/currency';
@@ -61,8 +74,209 @@ import {
   X,
 } from 'lucide-react';
 import { SalePaymentReceiptView } from '@/components/finance/SalePaymentReceiptView';
+import { formatCurrency } from '@/lib/format';
+import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 type FilterTab = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL' | 'CUSTOMERS';
+
+// ─── Customer Cheques (Received) Section ──────────────────────────────────────
+function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
+  const currency = useBranchCurrency();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [viewCheque, setViewCheque] = useState<Cheque | null>(null);
+  const [actionState, setActionState] = useState<{
+    cheque: Cheque;
+    action: ChequeActionType;
+  } | null>(null);
+
+  const params = useMemo(() => {
+    const p: Record<string, string> = { type: 'RECEIVED' };
+    if (statusFilter !== 'ALL') p.status = statusFilter;
+    if (search.trim()) p.search = search.trim();
+    // Admin passes a branch selection; Finance passes nothing and stays JWT-scoped.
+    if (branchIds) p.branchIds = branchIds;
+    return p;
+  }, [statusFilter, search, branchIds]);
+
+  const { data: cheques = [], isLoading } = useQuery<Cheque[]>({
+    queryKey: ['cheques', params],
+    queryFn: () => fetchCheques(params),
+    staleTime: 30_000,
+  });
+
+  const { data: cashAccountsRaw = [] } = useQuery({
+    queryKey: ['cash-bank-accounts'],
+    queryFn: () => fetchCashBankAccounts(),
+    staleTime: 60_000,
+  });
+  const bankAccounts = (
+    cashAccountsRaw as { id: string; name: string; type: string; bankName?: string }[]
+  )
+    .filter((a) => a.type === 'BANK')
+    .map((a) => ({ id: a.id, name: a.name, bankName: a.bankName }));
+
+  return (
+    <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+      <div className="px-4 py-3 border-b border-border">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-bold text-slate-700">Customer Cheques (Received)</h3>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search cheque #, customer…"
+                className="pl-9 pr-3 py-1.5 text-xs border border-border rounded-md bg-card w-52"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-border rounded-md px-2 py-1.5 text-xs bg-card"
+            >
+              <option value="ALL">All Status</option>
+              <option value="PENDING">Pending</option>
+              <option value="DEPOSITED">Deposited</option>
+              <option value="CLEARED">Cleared</option>
+              <option value="BOUNCED">Bounced</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 size={20} className="animate-spin text-slate-400" />
+        </div>
+      ) : cheques.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          No received cheques found
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-xs uppercase text-muted-foreground border-b">
+              <tr>
+                {[
+                  'Cheque #',
+                  'Customer / Bank',
+                  'Amount',
+                  'Cheque Date',
+                  'Due Date',
+                  'Status',
+                  'Actions',
+                ].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left font-medium whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {cheques.map((c) => {
+                const isOverdue =
+                  new Date(c.dueDate) < new Date() && ['PENDING'].includes(c.status);
+                return (
+                  <tr
+                    key={c.id}
+                    className={`transition-colors ${isOverdue ? 'bg-red-50/40' : 'hover:bg-muted/20'}`}
+                  >
+                    <td className="px-4 py-3 font-mono text-gray-700 text-xs">{c.chequeNo}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800 max-w-[140px] truncate">
+                        {c.partyName}
+                      </p>
+                      <p className="text-xs text-gray-400">{c.bankName ?? '—'}</p>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
+                      {formatCurrency(c.amount, currency)}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                      {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+                    >
+                      {String(c.dueDate).slice(0, 10)}
+                      {isOverdue && <span className="ml-1 text-red-500">⚠</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${CHEQUE_STATUS_BADGE[c.status] ?? 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {CHEQUE_STATUS_ICON[c.status]}
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 flex-wrap items-center">
+                        <button
+                          onClick={() => setViewCheque(c)}
+                          className="text-xs font-medium px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 inline-flex items-center gap-1"
+                        >
+                          <Eye size={12} /> View
+                        </button>
+                        {c.status === 'PENDING' && (
+                          <button
+                            onClick={() => setActionState({ cheque: c, action: 'deposit' })}
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          >
+                            Deposit
+                          </button>
+                        )}
+                        {c.status === 'DEPOSITED' && (
+                          <button
+                            onClick={() => setActionState({ cheque: c, action: 'clear' })}
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                          >
+                            Clear
+                          </button>
+                        )}
+                        {['PENDING', 'DEPOSITED'].includes(c.status) && (
+                          <button
+                            onClick={() => setActionState({ cheque: c, action: 'bounce' })}
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+                          >
+                            Bounce
+                          </button>
+                        )}
+                        {c.status === 'PENDING' && (
+                          <button
+                            onClick={() => setActionState({ cheque: c, action: 'cancel' })}
+                            className="text-xs font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          >
+                            Decline
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {viewCheque && (
+        <ChequeDetailModal
+          cheque={viewCheque}
+          currency={currency}
+          onClose={() => setViewCheque(null)}
+        />
+      )}
+      {actionState && (
+        <ChequeActionModal
+          cheque={actionState.cheque}
+          action={actionState.action}
+          cashAccounts={bankAccounts}
+          onClose={() => setActionState(null)}
+        />
+      )}
+    </div>
+  );
+}
 
 // paymentContext → contract type label
 const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | null => {
@@ -72,7 +286,17 @@ const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | null => {
   return null;
 };
 
-export default function ReceiptsTab() {
+/**
+ * Shared Receipts view used by BOTH Finance and Admin.
+ *
+ * `branchIds` is the only difference between the two callers: Finance omits it and the
+ * server scopes every query to the caller's own branch from the JWT, while Admin passes
+ * the branch filter's selection (empty = all branches). Keeping this one component
+ * parameterised — rather than forking an admin copy — is deliberate: these tabs were built
+ * on the Finance side and never reached Admin precisely because the two sides were
+ * separate implementations that drifted apart.
+ */
+export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) {
   const currency = getActiveCurrency();
   const [payments, setPayments] = useState<SalePaymentRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,7 +375,7 @@ export default function ReceiptsTab() {
     setIsLoading(true);
     try {
       const [data, accounts] = await Promise.all([
-        getAllSalePayments(),
+        getAllSalePayments(branchIds ? { branchIds } : undefined),
         fetchCashBankAccounts({ skipErrorToast: true }).catch(() => [] as CashBankAccount[]),
       ]);
       setPayments(data);
@@ -163,9 +387,11 @@ export default function ReceiptsTab() {
     }
   };
 
+  // Re-runs when Admin changes the branch selection; Finance passes no branchIds, so this
+  // fires exactly once there, matching the previous behaviour.
   useEffect(() => {
     loadData();
-  }, []);
+  }, [branchIds]);
 
   const uniqueEmployees = useMemo(
     () =>
@@ -870,6 +1096,9 @@ export default function ReceiptsTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Customer Cheques (Received) */}
+      <CustomerChequesSection branchIds={branchIds} />
 
       {/* Receipt View Dialog */}
       {actionType === 'view' && actionTarget && (
