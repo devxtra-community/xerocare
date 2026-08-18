@@ -100,6 +100,8 @@ export default function ReplaceDeviceModal({
         newInitialColorA3: '',
       }));
 
+      setPrevUsage(null);
+
       if (contractId) {
         getUsageHistory(contractId)
           .then((history) => {
@@ -107,7 +109,20 @@ export default function ReplaceDeviceModal({
               const sorted = [...history].sort(
                 (a, b) => new Date(b.periodEnd).getTime() - new Date(a.periodEnd).getTime(),
               );
-              setPrevUsage(sorted[0]);
+              const latest = sorted[0];
+              setPrevUsage(latest);
+              // Pre-fill the old device's final reading with its last-billed counters —
+              // the exact same baseline the validation below already checks entries
+              // against. Still a plain editable Input: the true physical counter at the
+              // moment of replacement will usually be higher (more pages printed since
+              // the last billing cycle), so this is a starting point, not a lock.
+              setFormData((prev) => ({
+                ...prev,
+                currentBwA4: String(latest.bwA4Count),
+                currentBwA3: String(latest.bwA3Count),
+                currentColorA4: String(latest.colorA4Count),
+                currentColorA3: String(latest.colorA3Count),
+              }));
             }
           })
           .catch(console.error);
