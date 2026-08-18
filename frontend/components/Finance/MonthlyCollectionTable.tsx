@@ -483,12 +483,13 @@ export default function MonthlyCollectionTable({
         onLimitChange={setLimit}
       />
 
-      {selectedContract && (
+      {isModalOpen && selectedContract && (
         <UsageRecordingModal
           isOpen={isModalOpen}
           onClose={() => {
             setIsModalOpen(false);
             setEditingInvoice(null);
+            setSelectedContract(null);
           }}
           contractId={selectedContract.contractId}
           customerName={selectedContract.customerName}

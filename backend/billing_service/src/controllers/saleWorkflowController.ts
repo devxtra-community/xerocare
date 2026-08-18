@@ -119,32 +119,52 @@ export const createOrGetContractAgreement = async (
       );
     }
 
-    const [agreementNumber, empName] = await Promise.all([
-      generateAgreementNumber(),
-      fetchEmployeeName(userId),
-    ]);
+    const empName = await fetchEmployeeName(userId);
 
-    const agreement = repo.create({
-      agreementNumber,
-      invoiceId: id,
-      branchId,
-      contractDate: new Date(),
-      customerName: customerName || 'Customer',
-      customerAddress,
-      customerPhone,
-      customerEmail,
-      customerVatNumber,
-      createdByEmployeeId: userId,
-      createdByEmployeeName: empName,
-      dealerName: dealerName || 'Branch',
-      dealerAddress,
-      dealerPhone,
-      termsAndConditions,
-      signatureStatus: 'PENDING_SIGNATURES',
-    });
+    // generateAgreementNumber() is count-based (no locking), so two requests racing
+    // — for this same invoice, or for two different RENT/LEASE invoices created at
+    // the same moment — can compute the same next number. The DB-level unique index
+    // on agreementNumber (and on invoiceId) turns that into a 23505 constraint error
+    // instead of a silent duplicate; retry past it a few times rather than surfacing
+    // a raw 500 to whichever request lost the race.
+    const MAX_ATTEMPTS = 5;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const agreementNumber = await generateAgreementNumber();
+      const agreement = repo.create({
+        agreementNumber,
+        invoiceId: id,
+        branchId,
+        contractDate: new Date(),
+        customerName: customerName || 'Customer',
+        customerAddress,
+        customerPhone,
+        customerEmail,
+        customerVatNumber,
+        createdByEmployeeId: userId,
+        createdByEmployeeName: empName,
+        dealerName: dealerName || 'Branch',
+        dealerAddress,
+        dealerPhone,
+        termsAndConditions,
+        signatureStatus: 'PENDING_SIGNATURES',
+      });
 
-    await repo.save(agreement);
-    res.status(201).json({ success: true, data: agreement });
+      try {
+        await repo.save(agreement);
+        return res.status(201).json({ success: true, data: agreement });
+      } catch (err) {
+        const dbErr = err as Error & { code?: string };
+        if (dbErr.code !== '23505') throw err;
+
+        // Someone else's concurrent request landed first. If it was for this same
+        // invoice, that's the real "get" half of get-or-create — return it. Otherwise
+        // it was an agreementNumber collision from a different invoice; loop and
+        // regenerate.
+        const winner = await repo.findOne({ where: { invoiceId: id } });
+        if (winner) return res.json({ success: true, data: winner });
+        if (attempt === MAX_ATTEMPTS) throw err;
+      }
+    }
   } catch (err) {
     next(err);
   }
@@ -702,7 +722,36 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       paymentContext,
     });
 
-    res.status(201).json({ success: true, data: request });
+    // Soft, non-blocking heads-up only — never rejects the request. A legitimate
+    // multi-period collection or a partial top-up can validly exceed what a single
+    // invoice-level snapshot suggests is "remaining" (e.g. collecting two periods'
+    // worth at once), so this only surfaces a warning for whoever's recording it to
+    // double-check, rather than hard-blocking at creation the way approval does.
+    // Wrapped so a failure here can never break request creation itself.
+    let overpayWarning: string | undefined;
+    try {
+      const invoice = await Source.getRepository(Invoice).findOne({ where: { id } });
+      if (invoice) {
+        const existing = await Source.getRepository(SalePaymentRequest).find({
+          where: { invoiceId: id },
+        });
+        const committed = existing
+          .filter((r) => r.id !== request.id && (r.status === 'APPROVED' || r.status === 'PENDING'))
+          .reduce((s, r) => s + Number(r.amount), 0);
+        const remaining = Number(invoice.totalAmount || 0) - committed;
+        if (Number(request.amount) > remaining + 0.1) {
+          overpayWarning =
+            `This amount (${request.currency} ${Number(request.amount).toFixed(2)}) is more than the ` +
+            `${request.currency} ${Math.max(0, remaining).toFixed(2)} currently remaining on this invoice, ` +
+            `after already-approved and other pending requests. Double-check it's correct — it will still ` +
+            `need Accounts' approval, and won't post if it turns out to overpay.`;
+        }
+      }
+    } catch {
+      // Never let warning computation break request creation.
+    }
+
+    res.status(201).json({ success: true, data: request, warning: overpayWarning });
   } catch (err) {
     next(err);
   }
@@ -770,23 +819,34 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
       // 3. Update invoice ledger — with overpayment guard.
       // For Rent/Lease contracts, the ledger may not exist yet if the contract was activated
       // before the ACTIVE_CONTRACT status fix; create it on first approved payment in that case.
+      //
+      // Always re-sync totalAmount from the live Invoice, even when the ledger already
+      // exists: a Rent/Lease invoice's totalAmount keeps growing as each new periodic
+      // usage bill accrues (usageService.ts), but the ledger only mirrored it once, on
+      // whichever approval first had to auto-create the row. Without re-syncing here,
+      // every periodic collection approved after that first one gets compared against a
+      // stale, too-low total and false-positives as "overpay" — this is exactly what
+      // blocked a legitimate partial periodic collection (525 advance already approved,
+      // ledger frozen at 525, invoice had since grown to 4354.35 with a new usage bill).
+      const inv = await queryRunner.manager.findOne(Invoice, {
+        where: { id: request.invoiceId },
+      });
+      if (!inv) throw new AppError('Invoice not found for this payment request', 404);
+
       let ledger = await queryRunner.manager.findOne(InvoiceLedger, {
         where: { invoiceId: request.invoiceId },
       });
       if (!ledger) {
-        const inv = await queryRunner.manager.findOne(Invoice, {
-          where: { id: request.invoiceId },
+        ledger = queryRunner.manager.create(InvoiceLedger, {
+          invoiceId: request.invoiceId,
+          totalAmount: Number(inv.totalAmount),
+          paidAmount: 0,
+          balanceAmount: Number(inv.totalAmount),
         });
-        if (inv) {
-          ledger = queryRunner.manager.create(InvoiceLedger, {
-            invoiceId: request.invoiceId,
-            totalAmount: Number(inv.totalAmount),
-            paidAmount: 0,
-            balanceAmount: Number(inv.totalAmount),
-          });
-        }
+      } else {
+        ledger.totalAmount = Number(inv.totalAmount);
       }
-      if (ledger) {
+      {
         const newPaidAmount = Number(ledger.paidAmount) + Number(request.amount);
         const totalAmount = Number(ledger.totalAmount);
         // Allow a tiny floating-point tolerance (0.1 currency units) but block genuine overpayment
@@ -799,6 +859,7 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
           );
         }
         ledger.paidAmount = newPaidAmount;
+
         ledger.balanceAmount = Math.max(0, totalAmount - newPaidAmount);
         await queryRunner.manager.save(InvoiceLedger, ledger);
       }

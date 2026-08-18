@@ -592,9 +592,14 @@ export default function SaleContractsPage() {
                                             </span>
                                           </td>
                                           <td className="py-1">
-                                            {/* Sale: receipt available immediately; Rent/Lease: gated by approval */}
+                                            {/* Sale, and Rent/Lease advances: receipt available
+                                                immediately (the employee already took the money,
+                                                often in front of the customer). Rent/Lease
+                                                periodic collections: gated by Finance approval. */}
                                             {(
-                                              isSaleType(contract.saleType)
+                                              isSaleType(contract.saleType) ||
+                                              pmt.paymentContext === 'RENT_ADVANCE' ||
+                                              pmt.paymentContext === 'LEASE_ADVANCE'
                                                 ? pmt.status !== 'REJECTED'
                                                 : pmt.status === 'APPROVED'
                                             ) ? (

@@ -1,4 +1,5 @@
 import api from './api';
+import { toast } from 'sonner';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,9 @@ interface ApiResponse<T> {
   success: boolean;
   data: T;
   message?: string;
+  /** Non-blocking heads-up alongside a successful response — e.g. recordSalePayment's
+   * amount-looks-too-high check. Never present on failure; never a reason to retry. */
+  warning?: string;
 }
 
 // ─── Contract Agreements ──────────────────────────────────────────────────────
@@ -382,6 +386,11 @@ export const recordSalePayment = async (
     `/b/invoices/${invoiceId}/sale-payments`,
     data,
   );
+  // Soft, non-blocking: the request was already created successfully by the time this
+  // fires — a toast here is a heads-up to double-check the amount, not an error state.
+  if (res.data.warning) {
+    toast.warning('Check this amount', { description: res.data.warning, duration: 10000 });
+  }
   return res.data.data;
 };
 

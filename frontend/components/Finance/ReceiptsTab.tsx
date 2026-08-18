@@ -482,6 +482,23 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     }
   };
 
+  // What's already on record for the invoice picked in "Record Balance Payment" —
+  // computed from the same `payments` list already loaded for the table, so a
+  // Finance-recorded balance payment can't blindly overlap an employee-recorded
+  // one that's still awaiting approval (that combo overpays and gets rejected by
+  // the backend at approval time, but only after Finance has filled the whole form).
+  const directPayExisting = useMemo(() => {
+    if (!directPayInvoice) return null;
+    const forInvoice = payments.filter((p) => p.invoiceId === directPayInvoice.id);
+    const approved = forInvoice.filter((p) => p.status === 'APPROVED');
+    const pending = forInvoice.filter((p) => p.status === 'PENDING');
+    const approvedTotal = approved.reduce((s, p) => s + Number(p.amount), 0);
+    const pendingTotal = pending.reduce((s, p) => s + Number(p.amount), 0);
+    const totalAmount = Number(directPayInvoice.totalAmount || 0);
+    const safeRemaining = Math.max(0, totalAmount - approvedTotal - pendingTotal);
+    return { approvedTotal, pending, pendingTotal, totalAmount, safeRemaining };
+  }, [directPayInvoice, payments]);
+
   const handleDirectInvoiceSearch = async () => {
     if (!directPayInvoiceNo.trim()) return;
     setIsSearchingInvoice(true);
@@ -498,6 +515,16 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       const full = await getInvoiceById(existing.invoiceId);
       setDirectPayInvoice(full);
       setDirectPayStep('form');
+
+      // Prefill with what's actually still safe to record — total minus whatever's
+      // already approved AND whatever's still pending on this same invoice — rather
+      // than leaving Finance to guess and re-type the full invoice amount from memory.
+      const forInvoice = payments.filter((p) => p.invoiceId === existing.invoiceId);
+      const alreadyCommitted = forInvoice
+        .filter((p) => p.status === 'APPROVED' || p.status === 'PENDING')
+        .reduce((s, p) => s + Number(p.amount), 0);
+      const safeRemaining = Math.max(0, Number(full.totalAmount || 0) - alreadyCommitted);
+      setDirectAmount(safeRemaining > 0 ? safeRemaining.toFixed(2) : '');
     } catch (err) {
       toast.error('Failed to load invoice', { description: getApiErrorMessage(err) });
     } finally {
@@ -509,6 +536,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     if (!directPayInvoice || !directAmount) return;
     if (['CASH', 'BANK_TRANSFER'].includes(directMode) && !directAccountId) {
       toast.error('Select a cash or bank account');
+      return;
+    }
+    if (directPayExisting && Number(directAmount) > directPayExisting.safeRemaining + 0.1) {
+      toast.error('This would overpay the invoice', {
+        description:
+          directPayExisting.pending.length > 0
+            ? `${directPayExisting.pending.length} pending request(s) already total ${currency} ${directPayExisting.pendingTotal.toFixed(2)} on this invoice. Approve/reject those first, or lower the amount to ${currency} ${directPayExisting.safeRemaining.toFixed(2)}.`
+            : `Only ${currency} ${directPayExisting.safeRemaining.toFixed(2)} remains unpaid on this invoice.`,
+      });
       return;
     }
     setIsSavingDirect(true);
@@ -1435,7 +1471,39 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     minimumFractionDigits: 2,
                   })}
                 </p>
+                {directPayExisting && directPayExisting.approvedTotal > 0 && (
+                  <p className="text-[10px] text-indigo-500 font-bold mt-1.5">
+                    Already approved: {currency}{' '}
+                    {directPayExisting.approvedTotal.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
+                  </p>
+                )}
               </div>
+              {directPayExisting && directPayExisting.pending.length > 0 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
+                    Already has {directPayExisting.pending.length} pending request
+                    {directPayExisting.pending.length > 1 ? 's' : ''} — {currency}{' '}
+                    {directPayExisting.pendingTotal.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
+                  </p>
+                  <ul className="text-[10px] text-amber-700 font-bold space-y-0.5">
+                    {directPayExisting.pending.map((p) => (
+                      <li key={p.id}>
+                        {p.requestNo} · {currency}{' '}
+                        {Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })} ·
+                        by {p.recordedByEmployeeName}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[10px] text-amber-600 mt-1">
+                    Recording the full remaining balance here will overpay once that request is also
+                    approved. Approve or reject it first, or reduce the amount below.
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
@@ -1448,6 +1516,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     placeholder="0.00"
                     className="h-10 border-slate-200 font-black text-indigo-600"
                   />
+                  {directPayExisting && (
+                    <p className="text-[10px] text-slate-400 font-bold mt-1">
+                      Safe to record without overpaying: {currency}{' '}
+                      {directPayExisting.safeRemaining.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">

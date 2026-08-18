@@ -64,16 +64,22 @@ interface SalePaymentCollectionModalProps {
  *
  * Receipt timing differs by type, and this mirrors an existing, deliberate distinction
  * already live elsewhere in this codebase (see the sale-contracts page's own comment:
- * "Sale: receipt available immediately; Rent/Lease: gated by approval"):
- *   - SALE/PRODUCT_SALE/SPAREPART_SALE: available the moment it's recorded (PENDING or
- *     APPROVED, not REJECTED) — the employee already took the money, so approval being
- *     an internal accounting step must not hold up proof of payment.
- *   - RENT/LEASE: available only once Finance has APPROVED it. Not backend-enforced
- *     (the backend allows either), so this is the one place that rule lives.
+ * "Sale/advance: receipt available immediately; Rent/Lease periodic: gated by approval"):
+ *   - SALE/PRODUCT_SALE/SPAREPART_SALE, and RENT_ADVANCE/LEASE_ADVANCE regardless of
+ *     type: available the moment it's recorded (PENDING or APPROVED, not REJECTED) —
+ *     the employee already took the money (often in person, in front of the customer,
+ *     who may need the receipt immediately), so approval being an internal accounting
+ *     step must not hold up proof of payment.
+ *   - Rent/Lease periodic collections: available only once Finance has APPROVED it.
+ *     Not backend-enforced (the backend allows either), so this is the one place that
+ *     rule lives. Periodic collections aren't recorded through this panel at all
+ *     (Record Usage is Finance's own flow) — this only matters if a future caller
+ *     ever passes non-advance Rent/Lease payments in here.
  *
  * Paid/Pending here come from the same getAccountSummary endpoint InvoiceAccountView
  * uses, which sums only approved payments — so this panel can never show an amount as
- * Paid before Accounts has actually approved it.
+ * Paid before Accounts has actually approved it. Receipt availability is a separate,
+ * looser rule (proof of a collection actually taken), not a statement that it's Paid.
  */
 export function SalePaymentCollectionModal({
   invoiceId,
@@ -86,8 +92,11 @@ export function SalePaymentCollectionModal({
   const isSaleFamily = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(
     (saleType ?? 'SALE').toUpperCase(),
   );
-  const receiptAvailable = (pmt: SalePaymentRequest) =>
-    isSaleFamily ? pmt.status !== 'REJECTED' : pmt.status === 'APPROVED';
+  const receiptAvailable = (pmt: SalePaymentRequest) => {
+    const isAdvance =
+      pmt.paymentContext === 'RENT_ADVANCE' || pmt.paymentContext === 'LEASE_ADVANCE';
+    return isSaleFamily || isAdvance ? pmt.status !== 'REJECTED' : pmt.status === 'APPROVED';
+  };
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [payments, setPayments] = useState<SalePaymentRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -310,8 +319,9 @@ export function SalePaymentCollectionModal({
                                       <MessageSquare size={11} />
                                     )}
                                   </button>
-                                  {/* Sale-family only reaches here while PENDING too — an
-                                      informational hint, the buttons above already work. */}
+                                  {/* Sale-family and advance payments reach here while still
+                                      PENDING too — an informational hint, the buttons above
+                                      already work. */}
                                   {pmt.status === 'PENDING' && (
                                     <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] text-amber-500 whitespace-nowrap">
                                       <Clock size={9} /> awaiting approval
@@ -319,7 +329,8 @@ export function SalePaymentCollectionModal({
                                   )}
                                 </div>
                               ) : (
-                                // Rent/Lease, still PENDING: no receipt until Finance approves.
+                                // Rent/Lease periodic collection, still PENDING: no receipt
+                                // until Finance approves.
                                 <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-500 whitespace-nowrap">
                                   <Clock size={9} /> awaiting approval
                                 </span>

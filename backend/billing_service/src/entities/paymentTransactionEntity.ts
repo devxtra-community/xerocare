@@ -66,6 +66,16 @@ export class PaymentTransaction {
   @Column({ name: 'receipt_url', type: 'varchar', nullable: true })
   receiptUrl?: string; // Proof of payment (screenshot/PDF) uploaded to R2
 
+  // Set on the ORIGINAL transaction when a cheque backing it later bounces/is
+  // cancelled — the correction itself is a separate offsetting transaction (see
+  // reversedById), same convention as CashbookEntry.isReversed/reversedById. Guards
+  // against double-reversal and lets a payment list label the original distinctly.
+  @Column({ name: 'is_reversed', type: 'boolean', default: false })
+  isReversed!: boolean;
+
+  @Column({ name: 'reversed_by_id', type: 'uuid', nullable: true })
+  reversedById?: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }

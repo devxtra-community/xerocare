@@ -15,7 +15,7 @@ export class ContractAgreement {
   @Column({ unique: true })
   agreementNumber!: string; // CA-YYYY-NNN
 
-  @Index()
+  @Index({ unique: true })
   @Column({ type: 'uuid' })
   invoiceId!: string;
 

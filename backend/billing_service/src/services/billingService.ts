@@ -5277,6 +5277,14 @@ export class BillingService {
     }
 
     if (ledger) {
+      // Re-sync totalAmount from the live invoice every time, not just on first
+      // creation above: a Rent/Lease invoice's totalAmount keeps growing as each new
+      // periodic usage bill accrues (usageService.ts), but an existing ledger row
+      // only ever mirrored it once. Left stale, the invoice could get marked PAID
+      // below (balanceAmount hits 0) while genuinely still owing later periods'
+      // charges the ledger never learned about.
+      ledger.totalAmount = Number(invoice.totalAmount || 0);
+
       // Recompute from the full payment history (both tables) rather than
       // incrementing, so ledgers stay correct even for invoices whose earlier
       // payments went through the legacy path. Security deposits are excluded —

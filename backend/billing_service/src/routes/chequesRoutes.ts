@@ -8,7 +8,9 @@ import { ChequeStatusHistory } from '../entities/chequeStatusHistoryEntity';
 import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { requireCashAccount } from '../services/cashbookService';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { getBranchManager } from '../services/billingHelpers';
@@ -46,6 +48,101 @@ function logHistory(
   const histRepo = manager.getRepository(ChequeStatusHistory);
   const h = histRepo.create({ chequeId, fromStatus, toStatus, changedBy, notes });
   return histRepo.save(h);
+}
+
+/**
+ * A RECEIVED cheque tied to a Sale/Rent/Lease invoice already credited that
+ * invoice's Paid figure the moment Finance approved the originating
+ * SalePaymentRequest — well before the cheque is even deposited, let alone
+ * cleared (approveSalePayment updates InvoiceLedger + creates the
+ * PaymentTransaction unconditionally, then only additionally creates the Cheque
+ * row for CHEQUE mode). Bounce and Cancel both end that cheque's life without
+ * ever presenting for payment, so both must undo that credit — otherwise the
+ * invoice is left permanently showing money that was never actually received.
+ *
+ * Reverses via an offsetting negative PaymentTransaction rather than mutating or
+ * deleting the original, mirroring this codebase's existing
+ * CashbookEntry.isReversed/reversedById convention (see reverseCashbookEntry in
+ * accountsController.ts) — full audit trail, and the negative amount nets out
+ * correctly wherever a payment total is summed (getAccountSummary, AR reports)
+ * without those call sites needing to know reversals exist.
+ *
+ * No-ops safely for: ISSUED cheques (never touch AR), cheques not linked to an
+ * invoice, cheques whose originating request can't be found (manually-created
+ * cheque via POST /cheques, not routed through a SalePaymentRequest), or a
+ * request with no paymentTransactionId (shouldn't happen for an APPROVED
+ * CHEQUE-mode request, but this must never throw and block the status change
+ * itself over a reversal it can't perform).
+ */
+async function reverseInvoiceCreditForCheque(
+  manager: import('typeorm').EntityManager,
+  cheque: Cheque,
+  userId: string,
+  reason: string,
+): Promise<void> {
+  if (cheque.type !== 'RECEIVED' || !cheque.sourceReferenceId) return;
+  if (!['SALE', 'RENT', 'LEASE'].includes(cheque.sourceType ?? '')) return;
+
+  try {
+    const sprRepo = manager.getRepository(SalePaymentRequest);
+    const spr = await sprRepo.findOne({
+      where: {
+        invoiceId: cheque.sourceReferenceId,
+        chequeNumber: cheque.chequeNo,
+        status: 'APPROVED',
+      },
+    });
+    if (!spr?.paymentTransactionId) return;
+
+    const txnRepo = manager.getRepository(PaymentTransaction);
+    const original = await txnRepo.findOne({ where: { id: spr.paymentTransactionId } });
+    if (!original || original.isReversed) return;
+
+    const reversal = txnRepo.create({
+      invoiceId: original.invoiceId,
+      transactionDate: new Date(),
+      paymentMode: original.paymentMode,
+      referenceNumber: `REV-${cheque.chequeNo}`,
+      amount: -Number(original.amount),
+      recordedBy: userId,
+      remarks: `Reversal — cheque #${cheque.chequeNo} ${reason}`,
+      currencyCode: original.currencyCode,
+    });
+    const savedReversal = await txnRepo.save(reversal);
+    original.isReversed = true;
+    original.reversedById = savedReversal.id;
+    await txnRepo.save(original);
+
+    // Recompute paidAmount as the actual sum of this invoice's transactions —
+    // matching connectWithRetry's own invoice_ledger reconciliation logic — rather
+    // than decrementing, so this self-corrects even if paidAmount had already
+    // drifted for any other reason.
+    const ledgerRepo = manager.getRepository(InvoiceLedger);
+    const ledger = await ledgerRepo.findOne({ where: { invoiceId: cheque.sourceReferenceId } });
+    if (ledger) {
+      const invoiceRepo = manager.getRepository(Invoice);
+      const inv = await invoiceRepo.findOne({ where: { id: cheque.sourceReferenceId } });
+      const totalAmount = inv ? Number(inv.totalAmount) : Number(ledger.totalAmount);
+
+      const allTxns = await txnRepo.find({ where: { invoiceId: cheque.sourceReferenceId } });
+      const paidAmount = allTxns
+        .filter((t) => (t.remarks ?? '').trim().toLowerCase() !== 'security deposit')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      ledger.totalAmount = totalAmount;
+      ledger.paidAmount = Math.max(0, paidAmount);
+      ledger.balanceAmount = Math.max(0, totalAmount - ledger.paidAmount);
+      await ledgerRepo.save(ledger);
+    }
+  } catch (err) {
+    // A failed reversal must never block the Bounce/Cancel status change itself —
+    // that would leave a dishonored cheque stuck as still-active. Logged for
+    // Finance to reconcile manually if this ever fires.
+    logger.error(
+      `[cheques] Failed to reverse invoice credit for cheque ${cheque.id} (${reason}):`,
+      err,
+    );
+  }
 }
 
 /**
@@ -628,7 +725,11 @@ router.post('/:id/bounce', async (req, res, next) => {
           );
         }
       }
-      // New cheques (cashbookEntryId is null) have no balance movement to reverse.
+      // New cheques (cashbookEntryId is null) have no cash-account movement to
+      // reverse (Cash at Bank only ever moved at Clear, which a bounced cheque
+      // by definition never reached) — but the invoice was still credited as Paid
+      // at approval time, and that credit does need reversing regardless.
+      await reverseInvoiceCreditForCheque(m, cheque, userId, `bounced: ${notes}`);
 
       cheque.status = 'BOUNCED';
       await chqRepo.save(cheque);
@@ -668,6 +769,14 @@ router.post('/:id/cancel', async (req, res, next) => {
 
     await Source.transaction(async (m) => {
       const chqRepo = m.getRepository(Cheque);
+
+      // Only ever reachable from PENDING, i.e. before Deposit/Issue — so there's
+      // never a cash-account effect to undo here. But the Cheque row itself only
+      // ever exists because approveSalePayment already credited the invoice as
+      // Paid when the SalePaymentRequest was approved, so that still needs
+      // reversing even though cash itself was never touched.
+      await reverseInvoiceCreditForCheque(m, cheque, userId, `cancelled: ${notes}`);
+
       cheque.status = 'CANCELLED';
       await chqRepo.save(cheque);
       await logHistory(m, cheque.id, 'PENDING', 'CANCELLED', userId, notes);

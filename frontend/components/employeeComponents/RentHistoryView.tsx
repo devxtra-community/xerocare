@@ -400,7 +400,7 @@ export default function RentHistoryView({ contractId, isOpen, onClose }: RentHis
       )}
 
       {/* Usage Recording Modal */}
-      {contract && (
+      {isUsageModalOpen && contract && (
         <UsageRecordingModal
           isOpen={isUsageModalOpen}
           onClose={() => setIsUsageModalOpen(false)}

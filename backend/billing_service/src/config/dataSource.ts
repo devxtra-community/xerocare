@@ -1282,6 +1282,15 @@ async function runPreMigrations() {
       `ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS receipt_url VARCHAR;`,
     );
 
+    // Lets a bounced/cancelled cheque's reversal correction be recorded as its own
+    // offsetting transaction (mirrors cashbook_entries.is_reversed/reversed_by_id)
+    // instead of mutating or deleting the original approval record.
+    await client.query(`
+      ALTER TABLE payment_transactions
+        ADD COLUMN IF NOT EXISTS is_reversed BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS reversed_by_id UUID NULL;
+    `);
+
     // payment_ledgers predates the receiptUrl column in its CREATE TABLE DDL —
     // CREATE TABLE IF NOT EXISTS never adds columns to an existing table, so the
     // entity/table mismatch made every SELECT on PaymentLedger fail with 500.
@@ -1643,6 +1652,24 @@ async function runPreMigrations() {
       WHERE "taxableAmount" = 0 AND "taxAmount" = 0 AND "totalCharge" > 0;
     `);
     logger.info('Backfill: pre-existing usage_records taxableAmount set to totalCharge.');
+
+    // One contract agreement per invoice. createOrGetContractAgreement's check-then-insert
+    // (findOne, then save if absent) let two concurrent requests for the same invoice both
+    // pass the check and both insert — the second one previously succeeded silently instead
+    // of erroring, leaving two agreement rows for one invoice. Isolated in its own try/catch
+    // since it will fail to create if pre-existing prod data already has duplicates — that
+    // needs a manual data cleanup, not a boot-time crash.
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "uniq_contract_agreements_invoiceId"
+          ON contract_agreements ("invoiceId");
+      `);
+    } catch (err) {
+      logger.warn(
+        `Could not create uniq_contract_agreements_invoiceId index — likely pre-existing ` +
+          `duplicate contract_agreements rows for the same invoiceId need manual cleanup first: ${(err as Error).message}`,
+      );
+    }
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

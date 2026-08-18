@@ -1342,7 +1342,14 @@ export default function UsageRecordingModal({
 
   return (
     <>
-      <Dialog open={isOpen && !showPreview} onOpenChange={onClose}>
+      {/* justCollected excluded here so the form closes the instant the "Collected" receipt
+          dialog below opens — otherwise both are mounted and open at once (this dialog stays
+          open since onClose() is deliberately withheld until the receipt is dismissed), which
+          reads as a second form popping up right after submit. PendingUsagePaymentsTable's
+          near-identical flow avoids this by closing its own dialog before opening the receipt
+          one; this is the same fix, just via the open condition since onClose here also tears
+          down the parent's selected-contract state (see MonthlyCollectionTable). */}
+      <Dialog open={isOpen && !showPreview && !justCollected} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto rounded-[1.5rem] p-6 sm:p-10">
           <DialogHeader>
             <DialogTitle>Record Usage for {customerName}</DialogTitle>
