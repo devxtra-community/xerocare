@@ -1,5 +1,5 @@
 import { Lot } from '../entities/lotEntity';
-import { LotItemType } from '../entities/lotItemEntity';
+import { LotItem, LotItemType } from '../entities/lotItemEntity';
 import { LotDocument, LotDocumentType } from '../entities/lotDocumentEntity';
 import { AppError } from '../errors/appError';
 import { EntityManager } from 'typeorm';
@@ -179,25 +179,22 @@ export class LotService {
   }
 
   /**
-   * Links a spare part to a custom lot item.
+   * Links a spare part to the lot item it was matched against.
    */
-  async linkSparePartToLotItem(
-    lotId: string,
-    customSparePartName: string,
-    sparePartId: string,
-  ): Promise<void> {
-    await this.lotRepository.linkSparePartToLotItem(lotId, customSparePartName, sparePartId);
+  async linkSparePartToLotItem(lotItemId: string, sparePartId: string): Promise<void> {
+    await this.lotRepository.linkSparePartToLotItem(lotItemId, sparePartId);
   }
 
   /**
-   * Checks whether a lot was booked with this spare part, without writing anything.
+   * Returns the lot item this spare part would consume, or null if the lot was
+   * never booked with it. Writes nothing.
    */
-  async lotContainsSparePart(
+  async findSparePartLotItem(
     lotId: string,
     customSparePartName?: string,
     sku?: string,
-  ): Promise<boolean> {
-    const item = await this.lotRepository.findSparePartLotItem(lotId, customSparePartName, sku);
-    return item !== null;
+    mpn?: string,
+  ): Promise<LotItem | null> {
+    return this.lotRepository.findSparePartLotItem(lotId, customSparePartName, sku, mpn);
   }
 }

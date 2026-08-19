@@ -99,6 +99,10 @@ export class SparePartService {
       }
     }
 
+    // The lot item this part consumes, resolved once so every later write targets
+    // the same row instead of re-matching on text that may differ by whitespace.
+    let lotItemId: string | undefined;
+
     // If lotId is present, ensure we have warehouse/vendor info and lot is received
     if (lotId) {
       const lot = await this.lotService.getLotById(lotId);
@@ -117,14 +121,16 @@ export class SparePartService {
       // validateAndTrackUsage below enforces the same rule, but only after the
       // master row has already been saved — which used to leave an orphaned,
       // stocked spare part behind on every rejected call.
-      const belongsToLot = await this.lotService.lotContainsSparePart(
+      const lotItem = await this.lotService.findSparePartLotItem(
         lotId,
-        data.part_name?.trim(),
+        data.part_name,
         sku,
+        data.mpn,
       );
-      if (!belongsToLot) {
+      if (!lotItem) {
         throw new Error('This lot does not contain this Spare Part');
       }
+      lotItemId = lotItem.id;
     }
 
     if (lotId && sku) {
@@ -143,7 +149,7 @@ export class SparePartService {
         await deleteCached(`sparepart:${existingByCode.id}`);
 
         // Track usage on existing lot item
-        await this.lotService.linkSparePartToLotItem(lotId, data.part_name, existingByCode.id);
+        if (lotItemId) await this.lotService.linkSparePartToLotItem(lotItemId, existingByCode.id);
         await this.lotService.validateAndTrackUsage(lotId, LotItemType.SPARE_PART, sku, quantity);
         return { success: true, message: 'Existing spare part updated via SKU' };
       }
@@ -172,7 +178,7 @@ export class SparePartService {
       await deleteCached(`sparepart:${existingPart.id}`);
 
       if (lotId) {
-        await this.lotService.linkSparePartToLotItem(lotId, data.part_name, existingPart.id);
+        if (lotItemId) await this.lotService.linkSparePartToLotItem(lotItemId, existingPart.id);
         await this.lotService.validateAndTrackUsage(
           lotId,
           LotItemType.SPARE_PART,
@@ -187,7 +193,7 @@ export class SparePartService {
     const generatedSku = sku || generateSku();
 
     const sparePart = await this.repo.createMaster({
-      part_name: data.part_name,
+      part_name: data.part_name?.trim(),
       brand: data.brand,
       model_id: primaryModelId || undefined,
       models: models.length > 0 ? models : undefined,
@@ -211,7 +217,7 @@ export class SparePartService {
     await setCached(`sparepart:${sparePart.id}`, sparePart, 3600);
 
     if (lotId) {
-      await this.lotService.linkSparePartToLotItem(lotId, data.part_name, sparePart.id);
+      if (lotItemId) await this.lotService.linkSparePartToLotItem(lotItemId, sparePart.id);
       await this.lotService.validateAndTrackUsage(
         lotId,
         LotItemType.SPARE_PART,

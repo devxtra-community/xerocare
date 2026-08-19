@@ -347,9 +347,27 @@ export class LotRepository {
   }
 
   /**
+   * Collapses a free-text key to the form lot matching compares on: trimmed,
+   * inner whitespace squeezed, case-folded. Lot items are booked from RFQ and
+   * Excel text that routinely carries stray spacing, so an exact `=` compare
+   * rejects parts the lot genuinely contains.
+   */
+  private static normalizeKey(value?: string): string | undefined {
+    const normalized = value?.trim().replace(/\s+/g, ' ').toLowerCase();
+    return normalized ? normalized : undefined;
+  }
+
+  /** Same normalization as `normalizeKey`, expressed in SQL for the compared column. */
+  private static normalizedSql(column: string): string {
+    return `LOWER(REGEXP_REPLACE(TRIM(${column}), '\\s+', ' ', 'g'))`;
+  }
+
+  /**
    * Finds the SPARE_PART lot item this incoming part would consume, matching the
-   * same way the write path later does: by the name the lot was booked under, or
-   * by the SKU of an already-linked spare part.
+   * same way the write path later does: by the SKU of an already-linked spare
+   * part, by the name the lot was booked under, or by manufacturer part number.
+   * All three compare normalized, so trailing spaces or casing differences
+   * between the RFQ text and the inventory form no longer reject the part.
    *
    * Callers use this to reject an unrelated part BEFORE anything is persisted —
    * `validateAndTrackUsage` runs after the master row is written, so without this
@@ -359,45 +377,69 @@ export class LotRepository {
     lotId: string,
     customSparePartName?: string,
     sku?: string,
+    mpn?: string,
   ): Promise<LotItem | null> {
-    const qb = this.repo.manager
-      .createQueryBuilder(LotItem, 'lotItem')
-      .leftJoin('lotItem.sparePart', 'sparePart')
-      .where('lotItem.lotId = :lotId', { lotId })
-      .andWhere('lotItem.itemType = :itemType', { itemType: LotItemType.SPARE_PART });
+    const name = LotRepository.normalizeKey(customSparePartName);
+    const normalizedSku = LotRepository.normalizeKey(sku);
+    const normalizedMpn = LotRepository.normalizeKey(mpn);
 
-    if (customSparePartName && sku) {
-      qb.andWhere('(lotItem.customSparePartName = :name OR sparePart.sku = :sku)', {
-        name: customSparePartName,
-        sku,
+    // Most specific key first: an already-linked SKU pins the exact row, the
+    // booked name is next, and MPN is the last resort (it can repeat across rows).
+    const candidates: { condition: string; params: Record<string, string> }[] = [];
+    if (normalizedSku) {
+      candidates.push({
+        condition: `${LotRepository.normalizedSql('sparePart.sku')} = :sku`,
+        params: { sku: normalizedSku },
       });
-    } else if (customSparePartName) {
-      qb.andWhere('lotItem.customSparePartName = :name', { name: customSparePartName });
-    } else if (sku) {
-      qb.andWhere('sparePart.sku = :sku', { sku });
-    } else {
-      return null;
+    }
+    if (name) {
+      candidates.push({
+        condition: `${LotRepository.normalizedSql('lotItem.customSparePartName')} = :name`,
+        params: { name },
+      });
+    }
+    if (normalizedMpn) {
+      candidates.push({
+        condition:
+          `(${LotRepository.normalizedSql('lotItem.mpn')} = :mpn` +
+          ` OR ${LotRepository.normalizedSql('sparePart.mpn')} = :mpn)`,
+        params: { mpn: normalizedMpn },
+      });
     }
 
-    return qb.getOne();
+    for (const candidate of candidates) {
+      const items = await this.repo.manager
+        .createQueryBuilder(LotItem, 'lotItem')
+        .leftJoin('lotItem.sparePart', 'sparePart')
+        .where('lotItem.lotId = :lotId', { lotId })
+        .andWhere('lotItem.itemType = :itemType', { itemType: LotItemType.SPARE_PART })
+        .andWhere(candidate.condition, candidate.params)
+        .getMany();
+
+      if (items.length === 0) continue;
+      // Prefer a row that still has unconsumed stock, so repeat adds land on the
+      // item that can actually absorb them instead of failing on an exhausted one.
+      return items.find((item) => item.receivedQuantity > item.usedQuantity) ?? items[0];
+    }
+
+    return null;
   }
 
   /**
-   * Links a spare part to a custom lot item.
+   * Links a spare part to the lot item it was matched against. Takes the item id
+   * rather than re-matching on name — name re-matching silently no-ops when the
+   * inventory form's text differs from the booked text by so much as a space,
+   * leaving `spare_part_id` null and breaking the later usage tracking.
    */
   async linkSparePartToLotItem(
-    lotId: string,
-    customSparePartName: string,
+    lotItemId: string,
     sparePartId: string,
     transactionManager?: EntityManager,
   ): Promise<void> {
     const repo = transactionManager
       ? transactionManager.getRepository(LotItem)
       : this.repo.manager.getRepository(LotItem);
-    await repo.update(
-      { lotId, customSparePartName, itemType: LotItemType.SPARE_PART },
-      { sparePartId },
-    );
+    await repo.update({ id: lotItemId }, { sparePartId });
   }
 
   /**
