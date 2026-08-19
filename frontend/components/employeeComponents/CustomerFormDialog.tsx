@@ -313,31 +313,6 @@ export default function CustomerFormDialog({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                  Phone Number
-                </Label>
-                <div className="flex items-center h-12 rounded-xl bg-muted/50 border border-transparent focus-within:ring-2 focus-within:ring-blue-400 focus-within:bg-card focus-within:border-transparent transition-all overflow-hidden relative shadow-sm">
-                  <div className="flex items-center gap-1.5 px-3 h-full bg-blue-50 border-r border-blue-100 shrink-0 min-w-[64px] justify-center">
-                    {formData.country && (
-                      <span className="text-base leading-none select-none">
-                        {isoToFlag(formData.country)}
-                      </span>
-                    )}
-                    <span className="text-xs font-mono font-bold text-blue-600 whitespace-nowrap select-none">
-                      {dialCode || '+--'}
-                    </span>
-                  </div>
-                  <input
-                    type="tel"
-                    value={rawPhone}
-                    onChange={(e) => setRawPhone(e.target.value)}
-                    placeholder={dialCode ? '5555 6666' : 'select country first'}
-                    className="flex-1 h-full px-4 bg-transparent outline-none border-none text-sm text-foreground placeholder:text-muted-foreground"
-                  />
-                </div>
-              </div>
-
               {formData.country &&
                 (() => {
                   const states = State.getStatesOfCountry(formData.country);
@@ -431,6 +406,36 @@ export default function CustomerFormDialog({
                     </>
                   );
                 })()}
+
+              {/*
+                Phone sits after country / state / city: the dial-code prefix is
+                derived from the selected country, so the country must be chosen
+                before a number can be typed.
+              */}
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                  Phone Number
+                </Label>
+                <div className="flex items-center h-12 rounded-xl bg-muted/50 border border-transparent focus-within:ring-2 focus-within:ring-blue-400 focus-within:bg-card focus-within:border-transparent transition-all overflow-hidden relative shadow-sm">
+                  <div className="flex items-center gap-1.5 px-3 h-full bg-blue-50 border-r border-blue-100 shrink-0 min-w-[64px] justify-center">
+                    {formData.country && (
+                      <span className="text-base leading-none select-none">
+                        {isoToFlag(formData.country)}
+                      </span>
+                    )}
+                    <span className="text-xs font-mono font-bold text-blue-600 whitespace-nowrap select-none">
+                      {dialCode || '+--'}
+                    </span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={rawPhone}
+                    onChange={(e) => setRawPhone(e.target.value)}
+                    placeholder={dialCode ? '5555 6666' : 'select country first'}
+                    className="flex-1 h-full px-4 bg-transparent outline-none border-none text-sm text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">

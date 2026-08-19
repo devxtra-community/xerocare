@@ -1099,31 +1099,6 @@ function VendorFormModal({
                   className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
                 />
               </div>
-
-              {/* Phone with dial-code prefix */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Phone
-                </label>
-                <div className="flex h-11 rounded-xl bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
-                  <div className="flex items-center px-3 bg-blue-50 border-r border-blue-100 text-xs font-mono font-bold text-blue-600 whitespace-nowrap shrink-0 min-w-[52px] justify-center">
-                    {form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
-                      ? COUNTRY_DIAL_CODES[form.countryCode]
-                      : '+--'}
-                  </div>
-                  <input
-                    type="tel"
-                    placeholder={
-                      form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
-                        ? 'number'
-                        : 'select country first'
-                    }
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    className="flex-1 h-full px-3 bg-transparent text-sm outline-none placeholder:text-gray-300"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -1270,6 +1245,38 @@ function VendorFormModal({
                   </div>
                 </>
               )}
+
+              {/*
+                Phone lives at the end of Location, not up in Basic Information:
+                the dial-code prefix is derived from the selected country, so the
+                country has to be picked before the number can be entered.
+              */}
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  Phone{' '}
+                  <span className="text-blue-400 normal-case font-normal">
+                    (code auto from country)
+                  </span>
+                </label>
+                <div className="flex h-11 rounded-xl bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
+                  <div className="flex items-center px-3 bg-blue-50 border-r border-blue-100 text-xs font-mono font-bold text-blue-600 whitespace-nowrap shrink-0 min-w-[52px] justify-center">
+                    {form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
+                      ? COUNTRY_DIAL_CODES[form.countryCode]
+                      : '+--'}
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder={
+                      form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
+                        ? 'number'
+                        : 'select country first'
+                    }
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    className="flex-1 h-full px-3 bg-transparent text-sm outline-none placeholder:text-gray-300"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

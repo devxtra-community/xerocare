@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { COUNTRY_OPTIONS } from '@/lib/countryOptions';
+import {
+  COUNTRY_OPTIONS,
+  applyDialCode,
+  countryFromPhone,
+  dialCodeFor,
+} from '@/lib/countryOptions';
 import { convertLead, Lead } from '@/lib/lead';
 import { toast } from 'sonner';
 
@@ -45,6 +50,23 @@ export function LeadConversionDialog({
 
   const isNameMissing = !lead?.name;
   const isContactMissing = !lead?.email && !lead?.phone;
+  const dialCode = dialCodeFor(country);
+
+  // Seed from the lead each time the dialog opens: an existing number also tells
+  // us the country, so the dial-code prefix stays consistent with what is shown.
+  useEffect(() => {
+    if (!open) return;
+    const existingPhone = lead?.phone ?? '';
+    setPhone(existingPhone);
+    setCountry(countryFromPhone(existingPhone));
+  }, [open, lead]);
+
+  /** Country drives the dial code, so re-prefix the number whenever it changes. */
+  const handleCountryChange = (iso2: string) => {
+    setCountry(iso2);
+    if (lead?.phone) return; // number came from the lead and is read-only
+    setPhone((prev) => applyDialCode(prev, dialCodeFor(iso2)));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +86,8 @@ export function LeadConversionDialog({
       const payload: ConversionPayload = {};
       if (isNameMissing || name) payload.name = name || lead.name;
       if (email) payload.email = email;
-      if (phone) payload.phone = phone;
+      // Seeded from the lead, so only send a number the user actually changed.
+      if (phone && phone !== lead.phone) payload.phone = phone;
       if (country) payload.country = country;
       if (address) payload.address = address;
 
@@ -170,25 +193,26 @@ export function LeadConversionDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              defaultValue={lead.phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 234 567 890"
-              readOnly={!!lead.phone}
-              className={lead.phone ? 'bg-slate-100' : ''}
-            />
-          </div>
-
-          <div className="grid gap-2">
             <Label htmlFor="country">Country</Label>
             <SearchableSelect
               options={COUNTRY_OPTIONS}
               value={country}
-              onValueChange={setCountry}
+              onValueChange={handleCountryChange}
               placeholder="Select country (optional)"
               emptyText="No country found."
+            />
+          </div>
+
+          {/* Phone follows Country — picking the country prefills its dial code. */}
+          <div className="grid gap-2">
+            <Label htmlFor="phone">Phone</Label>
+            <Input
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={dialCode ? `${dialCode} 50 123 4567` : 'Select a country first'}
+              readOnly={!!lead.phone}
+              className={lead.phone ? 'bg-slate-100' : ''}
             />
           </div>
 
