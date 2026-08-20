@@ -195,6 +195,27 @@ export class BillingCalculationService {
     const effectiveColor = colorUsage + (input.usage.extraColorA4 || 0);
 
     for (const rule of rules) {
+      // Separate A3/A4 pricing: bill each page size at its own rate rather than folding
+      // A3 into A4-equivalents via a3Multiplier. The A3 rate already carries the size
+      // premium, so applying the multiplier as well would charge it twice.
+      if (rule.separateA3Pricing) {
+        const bwA4 = Math.max(0, input.usage.bwA4) + (input.usage.extraBwA4 || 0);
+        const bwA3 = Math.max(0, input.usage.bwA3);
+        const clrA4 = Math.max(0, input.usage.colorA4) + (input.usage.extraColorA4 || 0);
+        const clrA3 = Math.max(0, input.usage.colorA3);
+
+        amount += rule.bwSlabRanges
+          ? this.calculateSlabAmount(bwA4, rule.bwSlabRanges)
+          : bwA4 * Number(rule.bwExcessRate || 0);
+        amount += bwA3 * Number(rule.bwA3ExcessRate || 0);
+
+        amount += rule.colorSlabRanges
+          ? this.calculateSlabAmount(clrA4, rule.colorSlabRanges)
+          : clrA4 * Number(rule.colorExcessRate || 0);
+        amount += clrA3 * Number(rule.colorA3ExcessRate || 0);
+        continue;
+      }
+
       // B&W Slabs
       if (rule.bwSlabRanges) {
         amount += this.calculateSlabAmount(effectiveBw, rule.bwSlabRanges);

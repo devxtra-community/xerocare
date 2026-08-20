@@ -19,6 +19,7 @@ import {
 import StatCard from '@/components/StatCard';
 import Image from 'next/image';
 import { formatCurrency } from '@/lib/format';
+import { resolveImageUrl } from '@/lib/imageUrl';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -136,7 +137,7 @@ export default function ProductDetailPage() {
             <div className="bg-card rounded-xl shadow-sm overflow-hidden border border-blue-100/30">
               <div className="aspect-square relative flex items-center justify-center bg-muted/50">
                 <Image
-                  src={product.imageUrl}
+                  src={resolveImageUrl(product.imageUrl)}
                   alt={product.name}
                   fill
                   className="object-contain p-4"

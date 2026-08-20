@@ -783,6 +783,10 @@ export default function UsageRecordingModal({
       if (!ruleItem) return { charge: 0, totalDelta: 0, limit: 0, rate: 0 };
 
       let totalDeltaEquiv: number;
+      // Per-size deltas, kept alongside the A4-equivalent total for contracts that price
+      // A3 and A4 separately (see separateA3Pricing). Only meaningful for BW/COLOR.
+      let sizeDeltaA4 = 0;
+      let sizeDeltaA3 = 0;
       if (type === 'COMBO' && colorCountA4 !== undefined) {
         // Compute BW and Color deltas independently to avoid cross-contamination
         const bwDeltaA4 = Math.max(0, countA4 - prevA4) + (replacedDeltasToInclude?.bwA4 || 0);
@@ -812,10 +816,37 @@ export default function UsageRecordingModal({
               : 0;
         const deltaA4 = Math.max(0, countA4 - prevA4) + rA4;
         const deltaA3 = Math.max(0, countA3 - prevA3) + rA3;
+        // Discount copies are entered without a page size, so they come off the cheaper
+        // A4 leg first and only spill onto A3 once A4 is exhausted — matching the
+        // backend's splitPerSizeNet so the estimate can't drift from the recorded charge.
+        sizeDeltaA4 = Math.max(0, deltaA4 - discountCopies);
+        sizeDeltaA3 = Math.max(0, deltaA3 - Math.max(0, discountCopies - deltaA4));
         totalDeltaEquiv = Math.max(0, deltaA4 + deltaA3 * 2 - discountCopies);
       }
 
       if (rentType?.includes('CPC')) {
+        // Separate A3/A4 pricing: A3 pages bill 1:1 at their own rate rather than being
+        // folded into A4-equivalents. The A3 rate already carries the size premium.
+        if (ruleItem.separateA3Pricing && (type === 'BW' || type === 'COLOR')) {
+          const a4Slabs = parseSlabs(
+            type === 'BW' ? ruleItem.bwSlabRanges : ruleItem.colorSlabRanges,
+          );
+          const a4Rate = Number(
+            (type === 'BW' ? ruleItem.bwExcessRate : ruleItem.colorExcessRate) || 0,
+          );
+          const a3Rate = Number(
+            (type === 'BW' ? ruleItem.bwA3ExcessRate : ruleItem.colorA3ExcessRate) || 0,
+          );
+          const a4Charge =
+            a4Slabs.length > 0 ? calculateSlabCharge(sizeDeltaA4, a4Slabs) : sizeDeltaA4 * a4Rate;
+          return {
+            charge: a4Charge + sizeDeltaA3 * a3Rate,
+            totalDelta: sizeDeltaA4 + sizeDeltaA3,
+            limit: 0,
+            rate: 0, // Two rates in play
+          };
+        }
+
         const slabs = parseSlabs(
           type === 'BW'
             ? ruleItem.bwSlabRanges

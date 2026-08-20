@@ -14,6 +14,11 @@ export interface InvoiceItem {
   bwExcessRate?: number;
   colorExcessRate?: number;
   combinedExcessRate?: number;
+  // Separate A3/A4 pricing (CPC only). When set, A3 pages bill 1:1 at their own rate
+  // instead of being converted into A4-equivalent clicks via a3Multiplier.
+  separateA3Pricing?: boolean;
+  bwA3ExcessRate?: number;
+  colorA3ExcessRate?: number;
   // Slabs
   bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;
   colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
@@ -328,6 +333,9 @@ export interface UsageRecord {
   bwExcessRate?: number;
   colorExcessRate?: number;
   combinedExcessRate?: number;
+  separateA3Pricing?: boolean;
+  bwA3ExcessRate?: number;
+  colorA3ExcessRate?: number;
   items?: Array<{
     allocationId: string;
     allocation?: {
@@ -398,6 +406,9 @@ export interface CreateInvoicePayload {
     bwExcessRate?: number;
     colorExcessRate?: number;
     combinedExcessRate?: number;
+    separateA3Pricing?: boolean;
+    bwA3ExcessRate?: number;
+    colorA3ExcessRate?: number;
     bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;
     colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
     comboSlabRanges?: Array<{ from: number; to: number; rate: number }>;

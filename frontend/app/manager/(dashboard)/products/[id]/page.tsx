@@ -26,6 +26,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 import Barcode from 'react-barcode';
+import { resolveImageUrl } from '@/lib/imageUrl';
 
 interface ProductFeature {
   subHeading: string;
@@ -215,7 +216,7 @@ export default function ProductDetailPage() {
               {product.imageUrl ? (
                 <>
                   <Image
-                    src={product.imageUrl}
+                    src={resolveImageUrl(product.imageUrl)}
                     alt={product.name}
                     fill
                     className="object-contain p-4"

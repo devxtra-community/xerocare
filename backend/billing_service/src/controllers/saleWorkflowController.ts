@@ -254,9 +254,8 @@ export const signContractCustomerByUpload = async (
     const uploadedFile = req.file as (Express.MulterS3.File & { key: string }) | undefined;
     if (!uploadedFile) throw new AppError('Signed document file is required', 400);
 
-    const R2_BASE_URL =
-      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
-    const documentUrl = `${R2_BASE_URL}/${uploadedFile.key}`;
+    // Signed customer agreements are private — store the key, sign on read.
+    const documentUrl = uploadedFile.key;
 
     const repo = Source.getRepository(ContractAgreement);
     const agreement = await repo.findOne({ where: { invoiceId: id } });
@@ -1482,9 +1481,8 @@ export const generateSalePaymentReceipt = async (
       }),
     );
 
-    const R2_BASE_URL =
-      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
-    const receiptUrl = `${R2_BASE_URL}/${key}`;
+    // Receipts are private — store the key; readers get a signed URL.
+    const receiptUrl = key;
 
     // Persist URL on the payment record
     request.receiptUrl = receiptUrl;
@@ -1583,7 +1581,7 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
     }),
   );
 
-  const receiptUrl = `${process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev'}/${key}`;
+  const receiptUrl = key;
   const repo = Source.getRepository(SalePaymentRequest);
   request.receiptUrl = receiptUrl;
   await repo.save(request);
