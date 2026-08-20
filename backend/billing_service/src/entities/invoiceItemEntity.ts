@@ -37,6 +37,20 @@ export class InvoiceItem {
   @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
   combinedExcessRate?: number;
 
+  // --- Separate A3 / A4 Pricing (CPC only) ---
+  // When true, an A3 page is NOT converted into A4-equivalent clicks via a3Multiplier.
+  // A4 pages bill at bwExcessRate / colorExcessRate (or their slab ranges) and A3 pages
+  // bill 1:1 at their own rate below. The A3 rate IS the size premium — applying the
+  // multiplier on top of it would charge the premium twice.
+  @Column({ type: 'boolean', nullable: true, default: false })
+  separateA3Pricing?: boolean;
+
+  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
+  bwA3ExcessRate?: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 4, nullable: true })
+  colorA3ExcessRate?: number;
+
   // --- CPC Slabs (JSON) ---
   @Column({ type: 'json', nullable: true })
   bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;

@@ -113,6 +113,15 @@ interface SaleItem {
   bwExcessRate?: string;
   colorExcessRate?: string;
   combinedExcessRate?: string;
+  // Separate A3/A4 pricing (Lease FSM + CPC only). When on, the A3 rate fields below
+  // replace the a3Multiplier conversion — A3 pages bill 1:1 at their own rate.
+  separateA3Pricing?: boolean;
+  bwA3ExcessRate?: string;
+  colorA3ExcessRate?: string;
+  // Transient: set once the user edits an A3 rate by hand, which stops it from being
+  // re-derived when the matching A4 rate changes. Never sent to the backend.
+  bwA3RateTouched?: boolean;
+  colorA3RateTouched?: boolean;
   bwSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   colorSlabRanges?: Array<{ from: string; to: string; rate: string }>;
   comboSlabRanges?: Array<{ from: string; to: string; rate: string }>;
@@ -251,6 +260,19 @@ const handleDecimalInput = (val: string): string | undefined => {
   if (val === '') return '';
   if (/^\d*\.?\d*$/.test(val)) return val;
   return undefined;
+};
+
+// Clicks an A3 page costs relative to an A4 one. Matches the backend's default
+// a3Multiplier, so seeding an A3 rate this way starts the quote at exactly the money
+// the multiplier would have billed before the rates were split.
+const A3_RATE_FACTOR = 2;
+
+// Seeds an A3 excess rate from its A4 counterpart. Returns the field untouched (blank)
+// when the A4 rate isn't a usable number yet, rather than writing a misleading 0.
+const deriveA3Rate = (a4Rate?: string): string => {
+  const base = Number(a4Rate);
+  if (!a4Rate || Number.isNaN(base) || base <= 0) return '';
+  return String(Number((base * A3_RATE_FACTOR).toFixed(4)));
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -692,6 +714,13 @@ export default function EmployeeQuotationTable() {
             item.colorExcessRate !== undefined ? String(item.colorExcessRate) : undefined,
           combinedExcessRate:
             item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : undefined,
+          separateA3Pricing: !!item.separateA3Pricing,
+          bwA3ExcessRate:
+            item.bwA3ExcessRate !== undefined ? String(item.bwA3ExcessRate) : undefined,
+          colorA3ExcessRate:
+            item.colorA3ExcessRate !== undefined ? String(item.colorA3ExcessRate) : undefined,
+          bwA3RateTouched: item.bwA3ExcessRate !== undefined,
+          colorA3RateTouched: item.colorA3ExcessRate !== undefined,
 
           bwSlabRanges: mappedSlabs(item.bwSlabRanges),
           colorSlabRanges: mappedSlabs(item.colorSlabRanges),
@@ -1567,6 +1596,13 @@ function QuotationFormModal({
             item.colorExcessRate !== undefined ? String(item.colorExcessRate) : undefined,
           combinedExcessRate:
             item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : undefined,
+          separateA3Pricing: !!item.separateA3Pricing,
+          bwA3ExcessRate:
+            item.bwA3ExcessRate !== undefined ? String(item.bwA3ExcessRate) : undefined,
+          colorA3ExcessRate:
+            item.colorA3ExcessRate !== undefined ? String(item.colorA3ExcessRate) : undefined,
+          bwA3RateTouched: item.bwA3ExcessRate !== undefined,
+          colorA3RateTouched: item.colorA3ExcessRate !== undefined,
 
           bwSlabRanges: mappedSlabs(item.bwSlabRanges),
           colorSlabRanges: mappedSlabs(item.colorSlabRanges),
@@ -2213,15 +2249,46 @@ function QuotationFormModal({
         ['bwIncludedLimit', 'colorIncludedLimit', 'combinedIncludedLimit'].includes(field as string)
       ) {
         items[index] = { ...item, [field]: Number(value) };
+      } else if (field === 'separateA3Pricing') {
+        const on = !!value;
+        // Seed each A3 rate from its A4 rate the first time the toggle goes on, so the
+        // quote starts at the same money the a3Multiplier would have produced. Rates the
+        // user has already typed are left alone.
+        items[index] = {
+          ...item,
+          separateA3Pricing: on,
+          bwA3ExcessRate:
+            on && !item.bwA3RateTouched ? deriveA3Rate(item.bwExcessRate) : item.bwA3ExcessRate,
+          colorA3ExcessRate:
+            on && !item.colorA3RateTouched
+              ? deriveA3Rate(item.colorExcessRate)
+              : item.colorA3ExcessRate,
+        };
+      } else if (field === 'bwA3ExcessRate' || field === 'colorA3ExcessRate') {
+        // Typing in an A3 rate pins it — later A4 edits stop overwriting it.
+        items[index] = {
+          ...item,
+          [field]: value,
+          ...(field === 'bwA3ExcessRate'
+            ? { bwA3RateTouched: true }
+            : { colorA3RateTouched: true }),
+        };
+      } else if (field === 'bwExcessRate' || field === 'colorExcessRate') {
+        const isBw = field === 'bwExcessRate';
+        const pinned = isBw ? item.bwA3RateTouched : item.colorA3RateTouched;
+        items[index] = {
+          ...item,
+          [field]: value,
+          ...(item.separateA3Pricing && !pinned
+            ? isBw
+              ? { bwA3ExcessRate: deriveA3Rate(String(value)) }
+              : { colorA3ExcessRate: deriveA3Rate(String(value)) }
+            : {}),
+        };
       } else if (
-        [
-          'bwExcessRate',
-          'colorExcessRate',
-          'combinedExcessRate',
-          'bwRateUpTo100k',
-          'colorRateUpTo100k',
-          'comboRateUpTo100k',
-        ].includes(field as string)
+        ['combinedExcessRate', 'bwRateUpTo100k', 'colorRateUpTo100k', 'comboRateUpTo100k'].includes(
+          field as string,
+        )
       ) {
         items[index] = { ...item, [field]: value };
       } else if (
@@ -2490,6 +2557,18 @@ function QuotationFormModal({
                     rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
                       ? Number(it.combinedExcessRate) || 0
                       : 0,
+                  // Separate A3/A4 pricing is a CPC-only plan shape (see the toggle in the
+                  // Lease FSM form) — send the flag off for every other billing type so a
+                  // plan switched away from CPC can't keep billing on stale A3 rates.
+                  separateA3Pricing: rentType === 'CPC' ? !!it.separateA3Pricing : false,
+                  bwA3ExcessRate:
+                    rentType === 'CPC' && it.separateA3Pricing
+                      ? Number(it.bwA3ExcessRate) || 0
+                      : undefined,
+                  colorA3ExcessRate:
+                    rentType === 'CPC' && it.separateA3Pricing
+                      ? Number(it.colorA3ExcessRate) || 0
+                      : undefined,
                   bwSlabRanges:
                     rentType === 'CPC' || rentType === 'CPC_COMBO'
                       ? [
@@ -2563,6 +2642,18 @@ function QuotationFormModal({
                   rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
                     ? Number(it.combinedExcessRate) || 0
                     : 0,
+                // Separate A3/A4 pricing is a CPC-only plan shape (see the toggle in the
+                // Lease FSM form) — send the flag off for every other billing type so a
+                // plan switched away from CPC can't keep billing on stale A3 rates.
+                separateA3Pricing: rentType === 'CPC' ? !!it.separateA3Pricing : false,
+                bwA3ExcessRate:
+                  rentType === 'CPC' && it.separateA3Pricing
+                    ? Number(it.bwA3ExcessRate) || 0
+                    : undefined,
+                colorA3ExcessRate:
+                  rentType === 'CPC' && it.separateA3Pricing
+                    ? Number(it.colorA3ExcessRate) || 0
+                    : undefined,
                 bwSlabRanges:
                   rentType === 'CPC' || rentType === 'CPC_COMBO'
                     ? [
@@ -3915,6 +4006,38 @@ function QuotationFormModal({
                                 </button>
                               </div>
                             </div>
+                            {/* Separate A3/A4 excess pricing — CPC only. Fixed plans price
+                                against an included allowance counted in A4-equivalents, so
+                                splitting the rate there has no unambiguous meaning. */}
+                            {leaseType === 'FSM' && rentType === 'CPC' && (
+                              <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-purple-100 shadow-sm">
+                                <div className="min-w-0">
+                                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                                    A3 / A4 Pricing
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-bold italic mt-0.5">
+                                    {m.separateA3Pricing
+                                      ? 'A3 pages bill 1:1 at their own rate (no 2x conversion)'
+                                      : `A3 pages bill as ${A3_RATE_FACTOR} A4 clicks at the A4 rate`}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateItem(index, 'separateA3Pricing', !m.separateA3Pricing)
+                                  }
+                                  className={`shrink-0 text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tight transition-all shadow-sm ${
+                                    m.separateA3Pricing
+                                      ? 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-700'
+                                      : 'bg-white text-slate-500 border border-slate-200 hover:border-purple-300 hover:text-purple-600'
+                                  }`}
+                                >
+                                  {m.separateA3Pricing
+                                    ? '\u2713 Separate A3 Rates ON'
+                                    : '+ Separate A3 Rates'}
+                                </button>
+                              </div>
+                            )}
                             {/* Dynamic Pricing Inputs for Lease FSM */}
                             {leaseType === 'FSM' && rentType !== 'FIXED_FLAT' && (
                               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-purple-100 shadow-sm">
@@ -3969,7 +4092,9 @@ function QuotationFormModal({
                                 {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                   <div className="space-y-1">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      B/W Excess Rate
+                                      {m.separateA3Pricing && rentType === 'CPC'
+                                        ? 'B/W A4 Rate'
+                                        : 'B/W Excess Rate'}
                                     </label>
                                     <Input
                                       type="text"
@@ -3984,10 +4109,30 @@ function QuotationFormModal({
                                     />
                                   </div>
                                 )}
+                                {rentType === 'CPC' && m.separateA3Pricing && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
+                                      B/W A3 Rate
+                                    </label>
+                                    <Input
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder="Rate"
+                                      value={m.bwA3ExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined) updateItem(index, 'bwA3ExcessRate', v);
+                                      }}
+                                      className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
+                                    />
+                                  </div>
+                                )}
                                 {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
                                   <div className="space-y-1">
                                     <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Color Excess Rate
+                                      {m.separateA3Pricing && rentType === 'CPC'
+                                        ? 'Color A4 Rate'
+                                        : 'Color Excess Rate'}
                                     </label>
                                     <Input
                                       type="text"
@@ -4000,6 +4145,25 @@ function QuotationFormModal({
                                           updateItem(index, 'colorExcessRate', v);
                                       }}
                                       className="h-8 text-[11px] font-bold"
+                                    />
+                                  </div>
+                                )}
+                                {rentType === 'CPC' && m.separateA3Pricing && (
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
+                                      Color A3 Rate
+                                    </label>
+                                    <Input
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder="Rate"
+                                      value={m.colorA3ExcessRate ?? ''}
+                                      onChange={(e) => {
+                                        const v = handleDecimalInput(e.target.value);
+                                        if (v !== undefined)
+                                          updateItem(index, 'colorA3ExcessRate', v);
+                                      }}
+                                      className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
                                     />
                                   </div>
                                 )}
