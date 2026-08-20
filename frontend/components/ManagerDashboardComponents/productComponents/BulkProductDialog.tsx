@@ -80,6 +80,7 @@ export function BulkProductDialog({
     max_discount_amount: string;
     MFD: string;
     product_status: BulkProductRow['product_status'];
+    imageUrl: string;
   }>({
     warehouse_id: '',
     vendor_id: '',
@@ -91,7 +92,11 @@ export function BulkProductDialog({
     max_discount_amount: '',
     MFD: '',
     product_status: 'AVAILABLE',
+    imageUrl: '',
   });
+  // Same-batch units share one product photo; upload it once here instead of
+  // per row. Kept separate from `rows` so the upload spinner is dialog-level.
+  const [bulkImageUploading, setBulkImageUploading] = useState(false);
 
   const loadDependencies = async () => {
     const [vResult, wResult, lResult, mResult, bResult] = await Promise.allSettled([
@@ -159,6 +164,9 @@ export function BulkProductDialog({
       setFile(null);
       setExpandedRows({});
       setSelectedRows(new Set());
+      // A photo from a previous batch must not leak into the next one
+      setBulkFill((p) => ({ ...p, imageUrl: '' }));
+      setBulkImageUploading(false);
       const prepareInitialData = async () => {
         const { loadedModels, loadedVendors } = await loadDependencies();
 
@@ -738,6 +746,64 @@ export function BulkProductDialog({
                     <SelectItem value="DAMAGED">Damaged</SelectItem>
                   </SelectContent>
                 </Select>
+              </BulkFillField>
+
+              <BulkFillField label="Product Image">
+                <div className="flex items-center gap-2 border border-input rounded-md p-1.5 bg-card h-9">
+                  {bulkFill.imageUrl ? (
+                    <div className="relative h-6 w-6 rounded overflow-hidden border group shrink-0">
+                      <img
+                        src={bulkFill.imageUrl}
+                        alt="Preview"
+                        className="object-cover h-full w-full"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkFill((p) => ({ ...p, imageUrl: '' }));
+                          applyBulkField('imageUrl', '');
+                        }}
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                        title="Remove image from selected rows"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-6 w-6 rounded border flex items-center justify-center text-[8px] text-gray-400 bg-slate-50 shrink-0">
+                      {bulkImageUploading ? '...' : 'No'}
+                    </div>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={bulkImageUploading}
+                    onChange={async (e) => {
+                      const input = e.target;
+                      const selected = input.files?.[0];
+                      if (!selected) return;
+                      setBulkImageUploading(true);
+                      try {
+                        const res = await productService.uploadProductImage(selected);
+                        if (res.success && res.imageUrl) {
+                          setBulkFill((p) => ({ ...p, imageUrl: res.imageUrl }));
+                          applyBulkField('imageUrl', res.imageUrl);
+                          toast.success('Image applied to selected rows');
+                        } else {
+                          toast.error('Image upload failed');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        toast.error('Failed to upload image');
+                      } finally {
+                        setBulkImageUploading(false);
+                        // Allow re-picking the same file after a failed upload
+                        input.value = '';
+                      }
+                    }}
+                    className="w-44 h-6 border-0 shadow-none p-0 text-[10px] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                  />
+                </div>
               </BulkFillField>
             </div>
           </div>
