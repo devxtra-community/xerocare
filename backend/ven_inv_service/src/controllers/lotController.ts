@@ -8,6 +8,7 @@ import { ShipmentStatus } from '../entities/enums/shipmentStatus';
 
 const lotService = new LotService();
 import { getRabbitChannel } from '../config/rabbitmq';
+import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
  * Creates a new lot.
@@ -376,9 +377,9 @@ export const uploadLotDocument = async (req: Request, res: Response, next: NextF
     }
 
     const file = req.file as unknown as
-      | { location?: string; originalname?: string; mimetype?: string; size?: number }
+      | { key?: string; originalname?: string; mimetype?: string; size?: number }
       | undefined;
-    if (!file?.location) {
+    if (!file?.key) {
       throw new AppError('No file uploaded', 400);
     }
 
@@ -395,14 +396,19 @@ export const uploadLotDocument = async (req: Request, res: Response, next: NextF
       documentType,
       documentName,
       notes: req.body.notes ? String(req.body.notes).trim() : undefined,
-      fileUrl: file.location,
+      // Lot documents are private: store the object key and hand out a
+      // short-lived signed URL at read time.
+      fileUrl: file.key,
       fileName: file.originalname || 'document',
       mimeType: file.mimetype,
       fileSize: file.size,
       uploadedBy: req.user?.userId,
     });
 
-    res.status(201).json({ success: true, data: document });
+    res.status(201).json({
+      success: true,
+      data: { ...document, fileUrl: (await r2SignedGetUrl(document.fileUrl)) ?? document.fileUrl },
+    });
   } catch (err) {
     next(err);
   }
@@ -422,7 +428,13 @@ export const getLotDocuments = async (req: Request, res: Response, next: NextFun
     }
 
     const documents = await lotService.getLotDocuments(id);
-    res.status(200).json({ success: true, data: documents });
+    const signed = await Promise.all(
+      documents.map(async (doc) => ({
+        ...doc,
+        fileUrl: (await r2SignedGetUrl(doc.fileUrl)) ?? doc.fileUrl,
+      })),
+    );
+    res.status(200).json({ success: true, data: signed });
   } catch (err) {
     next(err);
   }

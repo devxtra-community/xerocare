@@ -30,6 +30,7 @@ import { modelService, Model } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { resolveImageUrl } from '@/lib/imageUrl';
 
 interface BulkProductDialogProps {
   open: boolean;
@@ -753,7 +754,7 @@ export function BulkProductDialog({
                   {bulkFill.imageUrl ? (
                     <div className="relative h-6 w-6 rounded overflow-hidden border group shrink-0">
                       <img
-                        src={bulkFill.imageUrl}
+                        src={resolveImageUrl(bulkFill.imageUrl)}
                         alt="Preview"
                         className="object-cover h-full w-full"
                       />
@@ -1223,7 +1224,7 @@ export function BulkProductDialog({
                               {row.imageUrl ? (
                                 <div className="relative h-12 w-12 rounded overflow-hidden border group shrink-0">
                                   <img
-                                    src={row.imageUrl}
+                                    src={resolveImageUrl(row.imageUrl)}
                                     alt="Preview"
                                     className="object-cover h-full w-full"
                                   />

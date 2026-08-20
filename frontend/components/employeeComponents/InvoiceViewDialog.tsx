@@ -50,6 +50,7 @@ import LeasePremiumQuotation from '../../public/quatationLayouts/leasequatation/
 import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayout';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { resolveImageUrl } from '@/lib/imageUrl';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
@@ -1202,7 +1203,7 @@ export function InvoiceViewDialog({
                       ) : (
                         enrichedItems.map((item, idx) => {
                           const detail = item.metadata;
-                          const image = detail?.imageUrl || detail?.image_url;
+                          const image = resolveImageUrl(detail?.imageUrl || detail?.image_url);
                           const productName =
                             detail?.name || detail?.part_name || item.description || 'N/A';
                           const productDesc =

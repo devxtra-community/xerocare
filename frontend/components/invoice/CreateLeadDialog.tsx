@@ -12,20 +12,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { COUNTRY_PHONE_OPTIONS, dialCodeFor, isoToFlag } from '@/lib/countryOptions';
 import { Loader2 } from 'lucide-react';
 import { createLead, Lead } from '@/lib/lead';
 import { toast } from 'sonner';
 
-const COUNTRY_CODES = [
-  { code: '+974', flag: '🇶🇦', name: 'Qatar', native: 'قطر' },
-  { code: '+971', flag: '🇦🇪', name: 'UAE', native: 'الإمارات' },
-  { code: '+91', flag: '🇮🇳', name: 'India', native: 'भारत' },
-  { code: '+966', flag: '🇸🇦', name: 'Saudi Arabia', native: 'السعودية' },
-  { code: '+968', flag: '🇴🇲', name: 'Oman', native: 'عُمان' },
-  { code: '+965', flag: '🇰🇼', name: 'Kuwait', native: 'الكويت' },
-  { code: '+973', flag: '🇧🇭', name: 'Bahrain', native: 'البحرين' },
-];
+/** Fallback country when the branch has none — keeps the previous +974 default. */
+const DEFAULT_COUNTRY = 'QA';
 
 interface CreateLeadDialogProps {
   open: boolean;
@@ -41,10 +35,11 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [countryCode, setCountryCode] = useState('+974');
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [rawPhone, setRawPhone] = useState('');
   const [location, setLocation] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const dialCode = dialCodeFor(country);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +57,10 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
 
     setLoading(true);
     try {
-      const finalPhone = rawPhone.trim() ? `${countryCode} ${rawPhone.trim()}` : undefined;
+      const dialCode = dialCodeFor(country);
+      const finalPhone = rawPhone.trim()
+        ? `${dialCode ? `${dialCode} ` : ''}${rawPhone.trim()}`.trim()
+        : undefined;
       const newLead = await createLead({
         name: name.trim(),
         email: email.trim() || undefined,
@@ -76,7 +74,7 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
       // Reset form states
       setName('');
       setEmail('');
-      setCountryCode('+974');
+      setCountry(DEFAULT_COUNTRY);
       setRawPhone('');
       setLocation('');
       setErrorMessage(null);
@@ -129,35 +127,33 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
             />
           </div>
 
+          {/*
+            Country comes before the number: the dial-code prefix shown inside the
+            phone box is derived from it, so it has to be picked first.
+          */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-bold text-slate-500 uppercase">Country</Label>
+            <SearchableSelect
+              options={COUNTRY_PHONE_OPTIONS}
+              value={country}
+              onValueChange={setCountry}
+              placeholder="Select country"
+              emptyText="No country found."
+              disabled={loading}
+              className="h-10 w-full justify-between rounded-xl border-slate-200"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="lead-phone" className="text-xs font-bold text-slate-500 uppercase">
                 Phone Number
               </Label>
               <div className="flex items-center h-10 rounded-xl border border-slate-200 focus-within:ring-2 focus-within:ring-primary/20 transition-all overflow-hidden relative bg-white">
-                <Select value={countryCode} onValueChange={setCountryCode} disabled={loading}>
-                  <SelectTrigger className="h-full border-none bg-transparent hover:bg-slate-50 focus:ring-0 focus-visible:ring-0 shadow-none px-2.5 flex gap-1 items-center shrink-0 w-auto rounded-none rounded-l-xl transition-colors">
-                    <span className="text-lg leading-none select-none">
-                      {COUNTRY_CODES.find((c) => c.code === countryCode)?.flag || '🇶🇦'}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent
-                    className="rounded-xl border border-slate-100 shadow-xl max-h-[300px]"
-                    position="popper"
-                  >
-                    {COUNTRY_CODES.map((c) => (
-                      <SelectItem key={c.code} value={c.code} className="cursor-pointer">
-                        <div className="flex items-center gap-2 py-0.5">
-                          <span className="text-base">{c.flag}</span>
-                          <span className="font-semibold text-slate-700 text-xs">{c.name}</span>
-                          <span className="text-slate-400 text-[10px] font-semibold ml-auto pr-2">
-                            {c.code}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-1.5 h-full px-2.5 shrink-0 select-none">
+                  {country && <span className="text-lg leading-none">{isoToFlag(country)}</span>}
+                  <span className="text-xs font-semibold text-slate-500">{dialCode || '+--'}</span>
+                </div>
 
                 <div className="h-5 w-[1px] bg-slate-200 shrink-0" />
 
@@ -166,7 +162,7 @@ export function CreateLeadDialog({ open, onOpenChange, onCreated }: CreateLeadDi
                   type="tel"
                   value={rawPhone}
                   onChange={(e) => setRawPhone(e.target.value)}
-                  placeholder="5555 1234"
+                  placeholder={dialCode ? '5555 1234' : 'select country first'}
                   disabled={loading}
                   className="flex-1 h-full px-3 bg-transparent outline-none border-none text-xs text-slate-800 placeholder:text-slate-400 font-medium"
                 />

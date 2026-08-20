@@ -16,6 +16,7 @@ import {
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 import { uploadProductImage } from '../middlewares/uploadProductImage';
+import { r2PublicUrl } from '../utils/r2Url';
 import { Source } from '../config/db';
 
 /**
@@ -141,8 +142,10 @@ productRoute.post(
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
-    const file = req.file as unknown as { location?: string };
-    return res.status(200).json({ success: true, imageUrl: file.location || '' });
+    const file = req.file as unknown as { key?: string };
+    // Never return `file.location` — that is the private S3 API endpoint and a
+    // browser <img> cannot load it. Product images live under a public prefix.
+    return res.status(200).json({ success: true, imageUrl: r2PublicUrl(file.key) || '' });
   },
 );
 
