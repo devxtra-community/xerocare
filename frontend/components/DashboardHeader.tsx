@@ -10,7 +10,7 @@ import { getProfile, logout } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { formatNotificationTime } from '@/lib/format';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +32,7 @@ export interface Notification {
   type: string;
   data: Record<string, unknown>;
   is_read: boolean;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 /**
@@ -225,7 +225,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                         {notification.title}
                       </span>
                       <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        {formatNotificationTime(notification.createdAt)}
                       </span>
                     </div>
                     <p className="text-xs text-gray-600 line-clamp-2">{notification.message}</p>
