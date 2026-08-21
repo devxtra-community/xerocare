@@ -16,7 +16,7 @@ import {
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware } from '../middlewares/roleMiddleware';
 import { uploadProductImage } from '../middlewares/uploadProductImage';
-import { r2PublicUrl } from '../utils/r2Url';
+import { r2ViewUrl } from '../utils/r2Url';
 import { Source } from '../config/db';
 
 /**
@@ -138,14 +138,19 @@ productRoute.post(
   authMiddleware,
   roleMiddleware(['ADMIN', 'MANAGER']),
   uploadProductImage.single('image'),
-  (req, res) => {
+  async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
     const file = req.file as unknown as { key?: string };
     // Never return `file.location` — that is the private S3 API endpoint and a
-    // browser <img> cannot load it. Product images live under a public prefix.
-    return res.status(200).json({ success: true, imageUrl: r2PublicUrl(file.key) || '' });
+    // browser <img> cannot load it. `imageUrl` is for showing the upload right
+    // away; `imageKey` is what gets persisted.
+    return res.status(200).json({
+      success: true,
+      imageUrl: (await r2ViewUrl(file.key)) || '',
+      imageKey: file.key || '',
+    });
   },
 );
 

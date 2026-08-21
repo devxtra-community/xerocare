@@ -21,6 +21,20 @@ import { r2 } from '../config/r2';
 import { createSalePaymentRequest } from '../services/salePaymentRequestService';
 
 import { logger } from '../config/logger';
+import { r2SignedGetUrl } from '../utils/r2Url';
+
+/**
+ * Signed agreements are private: the row stores an object key, so responses
+ * carry a short-lived signed link instead of an unfetchable raw key.
+ */
+const withSignedAgreementDoc = async <T extends { customerSignedDocumentUrl?: string }>(
+  agreement: T,
+): Promise<T> => ({
+  ...agreement,
+  customerSignedDocumentUrl:
+    (await r2SignedGetUrl(agreement.customerSignedDocumentUrl)) ??
+    agreement.customerSignedDocumentUrl,
+});
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -68,7 +82,7 @@ export const getContractAgreement = async (req: Request, res: Response, next: Ne
     const repo = Source.getRepository(ContractAgreement);
 
     const agreement = await repo.findOne({ where: { invoiceId: id } });
-    res.json({ success: true, data: agreement });
+    res.json({ success: true, data: agreement ? await withSignedAgreementDoc(agreement) : null });
   } catch (err) {
     next(err);
   }
@@ -151,7 +165,9 @@ export const createOrGetContractAgreement = async (
 
       try {
         await repo.save(agreement);
-        return res.status(201).json({ success: true, data: agreement });
+        return res
+          .status(201)
+          .json({ success: true, data: await withSignedAgreementDoc(agreement) });
       } catch (err) {
         const dbErr = err as Error & { code?: string };
         if (dbErr.code !== '23505') throw err;
@@ -195,7 +211,7 @@ export const signContractEmployee = async (req: Request, res: Response, next: Ne
     agreement.signatureStatus = customerHasSigned ? 'FULLY_SIGNED' : 'EMPLOYEE_SIGNED';
 
     await repo.save(agreement);
-    res.json({ success: true, data: agreement });
+    res.json({ success: true, data: await withSignedAgreementDoc(agreement) });
   } catch (err) {
     next(err);
   }
@@ -228,7 +244,7 @@ export const signContractCustomerInPerson = async (
       : 'CUSTOMER_SIGNED';
 
     await repo.save(agreement);
-    res.json({ success: true, data: agreement });
+    res.json({ success: true, data: await withSignedAgreementDoc(agreement) });
   } catch (err) {
     next(err);
   }
@@ -273,7 +289,7 @@ export const signContractCustomerByUpload = async (
       : 'CUSTOMER_SIGNED';
 
     await repo.save(agreement);
-    res.json({ success: true, data: agreement });
+    res.json({ success: true, data: await withSignedAgreementDoc(agreement) });
   } catch (err) {
     next(err);
   }
@@ -388,15 +404,16 @@ export const getInstallationRequestsForBranch = async (
   next: NextFunction,
 ) => {
   try {
-    const { branchId, role } = req.user!;
+    const { branchId } = req.user!;
     const repo = Source.getRepository(InstallationRequest);
 
     const where: FindOptionsWhere<InstallationRequest> = { branchId };
 
-    // Technicians see only their own
-    if (role === 'TECHNICIAN') {
-      where.technicianId = req.user!.userId;
-    }
+    // NOTE: this used to narrow the list to `where.technicianId = userId` when
+    // `role === 'TECHNICIAN'`. TECHNICIAN is not, and never was, an EmployeeRole
+    // (ADMIN | HR | MANAGER | EMPLOYEE | FINANCE), so that branch never ran and every
+    // employee has always seen the whole branch's requests. Dropped rather than
+    // re-pointed at employeeJob, which would silently change who sees what.
 
     const requests = await repo.find({
       where,
@@ -1380,7 +1397,11 @@ export const generateSalePaymentReceipt = async (
 
     // Return existing receipt URL if already generated
     if (request.receiptUrl) {
-      return res.json({ success: true, data: { receiptUrl: request.receiptUrl } });
+      // Stored value is an object key (or a legacy URL) — hand out a signed link.
+      return res.json({
+        success: true,
+        data: { receiptUrl: (await r2SignedGetUrl(request.receiptUrl)) ?? request.receiptUrl },
+      });
     }
 
     // Generate PDF receipt with pdfkit
@@ -1488,7 +1509,7 @@ export const generateSalePaymentReceipt = async (
     request.receiptUrl = receiptUrl;
     await repo.save(request);
 
-    res.json({ success: true, data: { receiptUrl } });
+    res.json({ success: true, data: { receiptUrl: await r2SignedGetUrl(receiptUrl) } });
   } catch (err) {
     next(err);
   }
@@ -1496,8 +1517,12 @@ export const generateSalePaymentReceipt = async (
 
 // ─── Receipt Notifications ────────────────────────────────────────────────────
 
+/** SigV4 caps signed links at 7 days; customer-facing receipts use the max. */
+const CUSTOMER_LINK_TTL = 60 * 60 * 24 * 7;
+
 async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
-  if (request.receiptUrl) return request.receiptUrl;
+  if (request.receiptUrl)
+    return (await r2SignedGetUrl(request.receiptUrl, CUSTOMER_LINK_TTL)) ?? request.receiptUrl;
 
   const { default: PDFDocument } = await import('pdfkit');
   const doc = new PDFDocument({ margin: 50, size: 'A5' });
@@ -1585,7 +1610,7 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
   const repo = Source.getRepository(SalePaymentRequest);
   request.receiptUrl = receiptUrl;
   await repo.save(request);
-  return receiptUrl;
+  return (await r2SignedGetUrl(receiptUrl, CUSTOMER_LINK_TTL)) ?? receiptUrl;
 }
 
 async function fetchCustomerContact(

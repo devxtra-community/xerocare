@@ -33,6 +33,9 @@ export function resolveImageUrl(value?: string | null): string {
 
   try {
     const url = new URL(raw);
+    // A pre-signed link is already valid and its signature covers the exact
+    // host and path — rewriting it would invalidate it.
+    if (url.searchParams.has('X-Amz-Signature')) return raw;
     if (!isR2Host(url.hostname) || !PUBLIC_BASE) return raw;
 
     const segments = url.pathname.replace(/^\/+/, '').split('/');

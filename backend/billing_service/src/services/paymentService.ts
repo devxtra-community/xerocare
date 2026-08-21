@@ -5,6 +5,7 @@ import { Invoice } from '../entities/invoiceEntity';
 import { AppError } from '../errors/appError';
 import { BillingService } from './billingService';
 import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
+import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
  * Normalized payment record served to the frontend. Merges the current
@@ -96,32 +97,36 @@ export class PaymentService {
     ]);
 
     const merged: PaymentRecord[] = [
-      ...legacyRows.map((p) => ({
-        id: p.id,
-        invoiceId: p.invoiceId,
-        amountPaid: Number(p.amountPaid),
-        paymentMode: p.paymentMode as string,
-        paymentDate: p.paymentDate,
-        referenceNumber: p.referenceNumber,
-        remarks: p.remarks,
-        receiptUrl: p.receiptUrl,
-        recordedBy: p.recordedBy,
-        createdAt: p.createdAt,
-      })),
-      ...txns.map((t) => ({
-        id: t.id,
-        invoiceId: t.invoiceId,
-        amountPaid: Number(t.amount),
-        paymentMode: t.paymentMode,
-        paymentDate: t.transactionDate,
-        referenceNumber: t.referenceNumber,
-        remarks: t.remarks,
-        receiptUrl: t.receiptUrl,
-        recordedBy: t.recordedBy,
-        createdAt: t.createdAt,
-        currencyCode: t.currencyCode,
-        exchangeRateSnapshot: t.exchangeRateSnapshot ? Number(t.exchangeRateSnapshot) : undefined,
-      })),
+      ...(await Promise.all(
+        legacyRows.map(async (p) => ({
+          id: p.id,
+          invoiceId: p.invoiceId,
+          amountPaid: Number(p.amountPaid),
+          paymentMode: p.paymentMode as string,
+          paymentDate: p.paymentDate,
+          referenceNumber: p.referenceNumber,
+          remarks: p.remarks,
+          receiptUrl: await r2SignedGetUrl(p.receiptUrl),
+          recordedBy: p.recordedBy,
+          createdAt: p.createdAt,
+        })),
+      )),
+      ...(await Promise.all(
+        txns.map(async (t) => ({
+          id: t.id,
+          invoiceId: t.invoiceId,
+          amountPaid: Number(t.amount),
+          paymentMode: t.paymentMode,
+          paymentDate: t.transactionDate,
+          referenceNumber: t.referenceNumber,
+          remarks: t.remarks,
+          receiptUrl: await r2SignedGetUrl(t.receiptUrl),
+          recordedBy: t.recordedBy,
+          createdAt: t.createdAt,
+          currencyCode: t.currencyCode,
+          exchangeRateSnapshot: t.exchangeRateSnapshot ? Number(t.exchangeRateSnapshot) : undefined,
+        })),
+      )),
     ];
 
     return merged.sort(

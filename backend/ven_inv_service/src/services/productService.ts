@@ -10,6 +10,7 @@ import { LotService } from './lotService';
 import { LotItemType } from '../entities/lotItemEntity';
 import { LotStatus } from '../entities/lotEntity';
 import { getCached, setCached, deleteCached, getMultipleCached } from '../utils/cacheUtil';
+import { extractR2Key } from '../utils/r2Url';
 
 /**
  * Safely parses an MFD value which may be a Date, ISO string, or Excel serial number.
@@ -122,7 +123,7 @@ export class ProductService {
           hs_code: row.hs_code,
           warranty: row.warranty,
           consumables: row.consumables,
-          imageUrl: row.imageUrl,
+          imageUrl: extractR2Key(row.imageUrl),
           features: row.features,
           created_by: createdBy,
         });

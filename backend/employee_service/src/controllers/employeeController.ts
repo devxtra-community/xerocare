@@ -79,9 +79,9 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
 
     const profileImageKey = files?.profile_image?.[0]?.key ?? null;
 
-    const profileImageUrl = profileImageKey
-      ? `${process.env.R2_PUBLIC_URL}/${profileImageKey}`
-      : null;
+    // Store the object key; the response middleware renders it into a public
+    // or signed URL, so a bucket swap never orphans the reference.
+    const profileImageUrl = profileImageKey;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
 
@@ -239,9 +239,9 @@ export const updateEmployee = async (req: Request, res: Response, next: NextFunc
     };
 
     const profileImageKey = files?.profile_image?.[0]?.key ?? null;
-    const profileImageUrl = profileImageKey
-      ? `${process.env.R2_PUBLIC_URL}/${profileImageKey}`
-      : null;
+    // Store the object key; the response middleware renders it into a public
+    // or signed URL, so a bucket swap never orphans the reference.
+    const profileImageUrl = profileImageKey;
 
     const idProofKey = files?.id_proof?.[0]?.key ?? null;
 

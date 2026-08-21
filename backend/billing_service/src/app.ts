@@ -27,6 +27,8 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(httpLogger);
+// Rewrites stored file keys into loadable (public or signed) URLs on the way out
+app.use(signFileUrls);
 
 import creditNoteRouter from './routes/creditNoteRoutes';
 import accountsRouter from './routes/accountsRoutes';
@@ -34,6 +36,7 @@ import adminAccountsRouter from './routes/adminAccountsRoutes';
 import expenseRequestRouter from './routes/expenseRequestRoutes';
 import targetRouter from './routes/targetRoutes';
 import saleWorkflowRouter from './routes/saleWorkflowRoutes';
+import { signFileUrls } from './middlewares/signFileUrls';
 
 /**
  * Routing: Directing users to the right department.
