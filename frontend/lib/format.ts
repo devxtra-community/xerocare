@@ -1,3 +1,4 @@
+import { formatDistanceToNow } from 'date-fns';
 import { getActiveCurrency } from './currency';
 
 /**
@@ -30,4 +31,15 @@ export function formatCompactNumber(num: number | string): string {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value);
+}
+
+/**
+ * Relative time for notification feeds ("3 hours ago").
+ * Missing or unparseable timestamps fall back to a label instead of "Invalid Date".
+ */
+export function formatNotificationTime(value?: string | null): string {
+  const date = value ? new Date(value) : null;
+  return date && !isNaN(date.getTime())
+    ? formatDistanceToNow(date, { addSuffix: true })
+    : 'Unknown date';
 }
