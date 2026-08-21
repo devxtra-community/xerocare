@@ -29,11 +29,10 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
     }
 
     const receiptFile = req.file as MulterS3File | undefined;
-    // `.location` is the private R2 S3-API endpoint (requires SigV4 auth to GET).
-    // Public access goes through the bucket's r2.dev public URL instead.
-    const R2_BASE_URL =
-      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
-    const receiptUrl = receiptFile ? `${R2_BASE_URL}/${receiptFile.key}` : undefined;
+    // Payment receipts are private: persist the object key. Readers get a
+    // short-lived signed link (`.location` and public URLs are both unusable —
+    // the former needs SigV4, the latter is not served for this bucket).
+    const receiptUrl = receiptFile?.key;
 
     const payment = await paymentService.recordPayment({
       invoiceId,

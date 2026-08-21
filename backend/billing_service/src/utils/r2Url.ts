@@ -14,6 +14,7 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { r2 } from '../config/r2';
+import { logger } from '../config/logger';
 
 /** Prefixes whose objects are readable without a signature. */
 export const PUBLIC_PREFIXES = ['products/', 'spare-parts/'] as const;
@@ -71,11 +72,44 @@ export function normalizePublicUrl(urlOrKey?: string | null): string | undefined
   return key ? r2PublicUrl(key) : undefined;
 }
 
-/** Default lifetime for a signed link — long enough to open, short enough not to leak. */
-const SIGNED_URL_TTL = 60 * 15;
+/**
+ * Default lifetime for a signed link. Long enough that images embedded in a
+ * dashboard left open (profile photos, product shots) don't rot mid-session,
+ * short enough that a leaked link expires the same working day.
+ */
+const SIGNED_URL_TTL = 60 * 60 * 6;
 
 /**
- * Signed GET link for a private object. Accepts a bare key or any legacy stored
+ * Whether R2_PUBLIC_URL actually serves this bucket.
+ *
+ * Swapping the bucket without updating R2_PUBLIC_URL leaves every public link
+ * pointing at a hostname that 404s, which is invisible server-side. Probe once
+ * per process with a key we know exists; if the public host does not serve it,
+ * fall back to signed links instead of handing out dead URLs.
+ */
+let publicBaseUsable: Promise<boolean> | undefined;
+
+const probePublicBase = async (knownKey: string): Promise<boolean> => {
+  const url = r2PublicUrl(knownKey);
+  if (!url) return false;
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    if (response.ok) return true;
+    logger.error(
+      `R2_PUBLIC_URL (${publicBase()}) returned ${response.status} for an object that exists in ` +
+        `bucket ${process.env.R2_BUCKET}. Falling back to signed URLs — update R2_PUBLIC_URL to ` +
+        `this bucket's public development URL.`,
+    );
+    return false;
+  } catch (error) {
+    logger.error('R2 public URL probe failed, falling back to signed URLs', error);
+    return false;
+  }
+};
+
+/**
+ * Link for displaying a stored file: a public link when the bucket serves one,
+ * a short-lived signed link otherwise. Accepts a bare key or any legacy stored
  * URL, so rows written before keys were stored keep working.
  */
 export async function r2SignedGetUrl(
@@ -84,12 +118,24 @@ export async function r2SignedGetUrl(
 ): Promise<string | undefined> {
   const key = extractR2Key(urlOrKey);
   if (!key) return undefined;
-  if (isPublicKey(key)) return r2PublicUrl(key);
+  // Public-prefix objects only get a plain link when a public base is actually
+  // configured and verified; otherwise sign, so images still load while the
+  // bucket's public URL is unset, wrong, or being re-pointed.
+  if (isPublicKey(key) && publicBase()) {
+    publicBaseUsable ??= probePublicBase(key);
+    if (await publicBaseUsable) return r2PublicUrl(key);
+  }
 
   return getSignedUrl(r2, new GetObjectCommand({ Bucket: process.env.R2_BUCKET!, Key: key }), {
     expiresIn,
   });
 }
+
+/**
+ * The URL a client should use to display a stored file — public link for public
+ * prefixes, signed link otherwise. Accepts legacy URLs from the old bucket.
+ */
+export const r2ViewUrl = r2SignedGetUrl;
 
 /**
  * Signed PUT link so the browser can upload straight to R2 (needs a CORS rule

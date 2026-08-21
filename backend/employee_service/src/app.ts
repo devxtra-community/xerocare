@@ -16,6 +16,7 @@ import { httpLogger } from './middleware/httplogger';
 import healthRouter from './routes/health';
 import { logger } from './config/logger';
 import { errorHandler } from './middleware/errorHandler';
+import { signFileUrls } from './middleware/signFileUrls';
 
 /**
  * This is the main engine for the Employee Service.
@@ -56,6 +57,8 @@ process.on('unhandledRejection', (reason) => {
  * - /notifications: Sending messages to staff members.
  */
 app.use(httpLogger);
+// Rewrites stored file keys into loadable (public or signed) URLs on the way out
+app.use(signFileUrls);
 app.use('/', healthRouter);
 app.use('/auth', authRouter);
 app.use('/employee', employeeRouter);
