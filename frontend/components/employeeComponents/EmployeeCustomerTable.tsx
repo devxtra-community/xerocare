@@ -281,17 +281,25 @@ export default function EmployeeCustomerTable() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {isManager && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
-                            onClick={() => router.push(`/manager/customers/${customer.id}`)}
-                            title="360° Profile"
-                          >
-                            <LayoutList className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50"
+                          onClick={() =>
+                            router.push(
+                              isManager
+                                ? `/manager/customers/${customer.id}`
+                                : `/employee/customers/${customer.id}/360`,
+                            )
+                          }
+                          title={
+                            isManager
+                              ? '360° Profile (branch-wide)'
+                              : '360° Profile (your transactions)'
+                          }
+                        >
+                          <LayoutList className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

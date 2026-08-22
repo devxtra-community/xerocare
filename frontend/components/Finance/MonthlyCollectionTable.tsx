@@ -35,7 +35,13 @@ import UsageHistoryDialog from './UsageHistoryDialog';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getActiveCurrency } from '@/lib/currency';
-import { recordSalePayment } from '@/lib/saleWorkflow';
+import {
+  recordSalePayment,
+  generateAdvanceBill,
+  getAdvanceBillStatus,
+  AdvanceBillStatus,
+} from '@/lib/saleWorkflow';
+import { BillModal } from './BillModal';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -47,7 +53,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
+import {
+  fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  CashBankAccount,
+} from '@/lib/finance/accountsApi';
 /**
  * Table displaying monthly collection alerts for active contracts.
  * Shows pending usage recording, invoicing, and final summary actions.
@@ -72,6 +82,12 @@ export default function MonthlyCollectionTable({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyContractId, setHistoryContractId] = useState<string>('');
   const [contractItems, setContractItems] = useState<Record<string, string>>({});
+  const [advanceBillStatusMap, setAdvanceBillStatusMap] = useState<
+    Record<string, AdvanceBillStatus>
+  >({});
+  const [viewingAdvanceBillId, setViewingAdvanceBillId] = useState<string | null>(null);
+  const [advanceBillInitialTab, setAdvanceBillInitialTab] = useState<'view' | 'send'>('view');
+  const [generatingAdvanceBillFor, setGeneratingAdvanceBillFor] = useState<string | null>(null);
 
   // Replace Machine modal state
   const [replaceAllocData, setReplaceAllocData] = useState<{
@@ -149,6 +165,36 @@ export default function MonthlyCollectionTable({
       fetchContractItems();
     }
   }, [alerts]);
+
+  // Batched — one call for every row's Advance Bill eligibility/status, not one per row.
+  useEffect(() => {
+    if (alerts.length === 0) {
+      setAdvanceBillStatusMap({});
+      return;
+    }
+    getAdvanceBillStatus(alerts.map((a) => a.contractId))
+      .then(setAdvanceBillStatusMap)
+      .catch(() => setAdvanceBillStatusMap({}));
+  }, [alerts]);
+
+  const handleGenerateOrViewAdvanceBill = async (alertItem: CollectionAlert) => {
+    const existing = advanceBillStatusMap[alertItem.contractId];
+    if (existing?.advanceBillId) {
+      setAdvanceBillInitialTab('view');
+      setViewingAdvanceBillId(existing.advanceBillId);
+      return;
+    }
+    setGeneratingAdvanceBillFor(alertItem.contractId);
+    try {
+      const bill = await generateAdvanceBill(alertItem.contractId);
+      setAdvanceBillInitialTab('send');
+      setViewingAdvanceBillId(bill.id);
+    } catch (err) {
+      toast.error('Failed to generate Advance Bill', { description: getApiErrorMessage(err) });
+    } finally {
+      setGeneratingAdvanceBillFor(null);
+    }
+  };
 
   const handleRecordUsage = (alertItem: CollectionAlert) => {
     setSelectedContract(alertItem);
@@ -393,6 +439,27 @@ export default function MonthlyCollectionTable({
             <Eye className="h-4 w-4" />
           </Button>
 
+          {advanceBillStatusMap[alertItem.contractId]?.hasAdvancePayment && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => handleGenerateOrViewAdvanceBill(alertItem)}
+              disabled={generatingAdvanceBillFor === alertItem.contractId}
+              className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-full transition-all"
+              title={
+                advanceBillStatusMap[alertItem.contractId]?.advanceBillId
+                  ? 'View Advance Bill'
+                  : 'Generate Advance Bill'
+              }
+            >
+              {generatingAdvanceBillFor === alertItem.contractId ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+
           {alertItem.type === 'USAGE_PENDING' && (
             <>
               <Button
@@ -487,6 +554,9 @@ export default function MonthlyCollectionTable({
         <UsageRecordingModal
           isOpen={isModalOpen}
           onClose={() => {
+            console.debug(
+              '[MonthlyCollectionTable] UsageRecordingModal onClose fired — tearing down',
+            );
             setIsModalOpen(false);
             setEditingInvoice(null);
             setSelectedContract(null);
@@ -586,7 +656,10 @@ export default function MonthlyCollectionTable({
               </Label>
               <Select
                 value={collectMode}
-                onValueChange={(v) => setCollectMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')}
+                onValueChange={(v) => {
+                  setCollectMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE');
+                  setCollectAccountId('');
+                }}
               >
                 <SelectTrigger className="h-9 text-sm font-bold">
                   <SelectValue />
@@ -599,25 +672,33 @@ export default function MonthlyCollectionTable({
               </Select>
             </div>
             {(collectMode === 'CASH' || collectMode === 'BANK_TRANSFER') &&
-              collectAccounts.length > 0 && (
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Account
-                  </Label>
-                  <Select value={collectAccountId} onValueChange={setCollectAccountId}>
-                    <SelectTrigger className="h-9 text-sm font-bold">
-                      <SelectValue placeholder="Select account..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {collectAccounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              (() => {
+                const matching = filterAccountsByPaymentMode(collectAccounts, collectMode);
+                return (
+                  matching.length > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                        Account
+                      </Label>
+                      <Select value={collectAccountId} onValueChange={setCollectAccountId}>
+                        <SelectTrigger className="h-9 text-sm font-bold">
+                          <SelectValue placeholder="Select account..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {matching.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name} — {a.currency}{' '}
+                              {Number(a.currentBalance).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                );
+              })()}
             {collectMode === 'CHEQUE' && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -720,6 +801,18 @@ export default function MonthlyCollectionTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {viewingAdvanceBillId && (
+        <BillModal
+          usageRecordId={viewingAdvanceBillId}
+          open={!!viewingAdvanceBillId}
+          onClose={() => setViewingAdvanceBillId(null)}
+          onUpdated={() =>
+            getAdvanceBillStatus(alerts.map((a) => a.contractId)).then(setAdvanceBillStatusMap)
+          }
+          initialTab={advanceBillInitialTab}
+        />
+      )}
     </>
   );
 }

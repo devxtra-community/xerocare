@@ -14,6 +14,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Product } from '@/lib/product';
@@ -27,6 +34,7 @@ interface Customer {
   name: string;
   email: string;
   phone?: string;
+  customerType?: 'B2B' | 'B2C';
 }
 
 interface DirectSaleFormModalProps {
@@ -50,6 +58,8 @@ interface SaleItem {
   modelId?: string;
   taxRate?: number;
   maxDiscount?: number;
+  wholesalePrice?: number;
+  retailPrice?: number;
 }
 
 export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFormModalProps) {
@@ -57,6 +67,9 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState('');
+  // B2B → wholesale_price, B2C → sale_price/base_price — same tiers and same
+  // reasoning as the Quotation form's Transaction Type selector.
+  const [transactionType, setTransactionType] = useState<'B2B' | 'B2C'>('B2C');
 
   const [items, setItems] = useState<SaleItem[]>([]);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -126,7 +139,9 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
         max_discount_amount?: string | number;
       };
       description = sp.part_name || '';
-      unitPrice = Number(sp.base_price) || 0;
+      const retailPrice = Number(sp.base_price) || 0;
+      const wholesalePrice = Number(sp.wholesale_price) || 0;
+      unitPrice = transactionType === 'B2B' && wholesalePrice > 0 ? wholesalePrice : retailPrice;
 
       // Fetch stock for spare part
       fetchSparePartStock(sp.id);
@@ -144,12 +159,16 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           sku: sp.sku || sp.item_code || '',
           taxRate: Number(sp.tax_rate) || 0,
           maxDiscount: Number(sp.max_discount_amount) || 0,
+          wholesalePrice,
+          retailPrice,
         },
       ]);
     } else {
       const pr = selected as Product;
       description = pr.name || '';
-      unitPrice = pr.sale_price || 0;
+      const retailPrice = pr.sale_price || 0;
+      const wholesalePrice = pr.wholesale_price || 0;
+      unitPrice = transactionType === 'B2B' && wholesalePrice > 0 ? wholesalePrice : retailPrice;
 
       // Fetch available serials/products for this model ID
       try {
@@ -181,10 +200,28 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           modelId: pr.model?.id,
           taxRate: Number(pr.tax_rate) || 0,
           maxDiscount: Number(pr.max_discount_amount) || 0,
+          wholesalePrice,
+          retailPrice,
         },
       ]);
     }
   };
+
+  // When Transaction Type is switched after items are already in the cart, reprice
+  // every item to its matching tier — same behavior as the Quotation form. Direct
+  // Sale has no manual/custom line-item concept (every item comes from the catalog
+  // via handleAddItem or barcode scan), so this applies unconditionally.
+  useEffect(() => {
+    setItems((prev) =>
+      prev.map((item) => {
+        const newPrice =
+          transactionType === 'B2B' && (item.wholesalePrice ?? 0) > 0
+            ? item.wholesalePrice!
+            : (item.retailPrice ?? item.unitPrice);
+        return { ...item, unitPrice: newPrice, discount: 0 };
+      }),
+    );
+  }, [transactionType]);
 
   const handleBarcodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -627,10 +664,35 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
             <SearchableSelect
               options={customerOptions}
               value={customerId}
-              onValueChange={setCustomerId}
+              onValueChange={(id) => {
+                setCustomerId(id);
+                // Pre-fill transaction type from the customer's stored default, same
+                // as the Quotation form — still freely overridable below.
+                const selected = customers.find((c) => c.id === id);
+                setTransactionType(selected?.customerType === 'B2B' ? 'B2B' : 'B2C');
+              }}
               placeholder="Search and select customer..."
               className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
             />
+          </div>
+
+          {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price/base_price */}
+          <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">
+              Transaction Type
+            </h3>
+            <Select
+              value={transactionType}
+              onValueChange={(v) => setTransactionType(v as 'B2B' | 'B2C')}
+            >
+              <SelectTrigger className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="B2C">B2C — Business to Customer (Retail Price)</SelectItem>
+                <SelectItem value="B2B">B2B — Business to Business (Wholesale Price)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Item Selection & Barcode Scanner */}

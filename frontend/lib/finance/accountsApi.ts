@@ -705,6 +705,18 @@ export async function fetchManualPayables(params?: {
   return res.data?.data ?? [];
 }
 
+// Domestic input VAT the business owes vendors — the same figure the Balance
+// Sheet/Chart of Accounts fold into Accounts Payable (2001), surfaced here so
+// the Payable page's own total can reconcile with them instead of omitting it.
+export async function fetchInputVatPayable(): Promise<{
+  amount: number;
+  currency: string;
+  dataWarning: string | null;
+}> {
+  const res = await api.get(`${BASE}/payables/input-vat-summary`);
+  return res.data?.data ?? { amount: 0, currency: 'AED', dataWarning: null };
+}
+
 export async function createManualPayable(data: Partial<ManualPayable>): Promise<ManualPayable> {
   const res = await api.post(`${BASE}/payables`, data);
   return res.data?.data;
@@ -2315,3 +2327,42 @@ export const depositGuaranteeCheque = (
 
 export const deleteGuaranteeCheque = (id: string) =>
   api.delete(`${BASE}/guarantee-cheques/${id}`).then((r) => r.data);
+
+// ─── Payment Mode ⟷ Account-Type helpers ───────────────────────────────────────
+// Shared by every dialog that pairs a Payment Mode selector with a "Pay/Paid
+// From Account" selector (Vendor Payment, Expense approval, Sale/Rent/Lease
+// collection, Payable/Receivable manual payments, ...) so the account list is
+// always narrowed to the type the mode actually requires, and mirrors the
+// backend's own accountTypeForMode() in cashbookService.ts exactly: CASH stays
+// CASH, everything else (Bank Transfer, Credit Card, Online Payment, ...) needs
+// a BANK account.
+
+export function accountTypeForPaymentMode(mode: string | undefined | null): 'CASH' | 'BANK' {
+  return (mode ?? '').trim().toUpperCase() === 'CASH' ? 'CASH' : 'BANK';
+}
+
+/** Narrows an account list to only the accounts valid for the selected payment mode. */
+export function filterAccountsByPaymentMode<T extends { type: string }>(
+  accounts: T[],
+  mode: string | undefined | null,
+): T[] {
+  const required = accountTypeForPaymentMode(mode);
+  return accounts.filter((a) => a.type === required);
+}
+
+/**
+ * Returns a clear, user-facing error if `amount` exceeds what the selected account
+ * actually holds, or null if the payment is coverable (or there's nothing to check
+ * yet). Only meaningful for outgoing payments — never call this for a receipt.
+ */
+export function insufficientBalanceError(
+  amount: number,
+  account: { name?: string; currentBalance: number | string; currency?: string } | undefined | null,
+): string | null {
+  if (!account || !(amount > 0)) return null;
+  const available = Number(account.currentBalance);
+  if (amount > available + 0.01) {
+    return `This amount exceeds your account balance. Available balance: ${account.currency ?? 'AED'} ${available.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Please choose a different account or reduce the amount.`;
+  }
+  return null;
+}

@@ -57,6 +57,8 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
+import { getUserFromToken } from '@/lib/auth';
+import { EmployeeJob } from '@/lib/employeeJob';
 
 interface SaleContractRow extends SaleContract {
   payments?: SalePaymentRequest[];
@@ -66,6 +68,13 @@ interface SaleContractRow extends SaleContract {
 
 export default function SaleContractsPage() {
   const currency = getActiveCurrency();
+  // Vendor purchasing/contact info isn't relevant to servicing a customer's
+  // contract, so it's always hidden on this Service Desk page. Lot info is only
+  // additionally hidden for Service Technicians specifically.
+  const [isServiceTechnician, setIsServiceTechnician] = useState(false);
+  useEffect(() => {
+    setIsServiceTechnician(getUserFromToken()?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN);
+  }, []);
   const [contracts, setContracts] = useState<SaleContractRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -698,6 +707,8 @@ export default function SaleContractsPage() {
         productId={viewProductId}
         open={!!viewProductId}
         onClose={() => setViewProductId(null)}
+        hideVendorDetails
+        hideLotDetails={isServiceTechnician}
       />
 
       {/* Installation Request Modal */}

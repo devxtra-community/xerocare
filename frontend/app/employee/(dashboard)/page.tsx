@@ -238,11 +238,17 @@ export default function EmployeeDashboardPage() {
         {isUsageModalOpen && selectedContract && (
           <UsageRecordingModal
             isOpen={isUsageModalOpen}
-            onClose={() => setIsUsageModalOpen(false)}
+            onClose={() => {
+              setIsUsageModalOpen(false);
+              setSelectedContract(null);
+            }}
             contractId={selectedContract.id}
             customerName={selectedContract.customerName}
             onSuccess={() => {
-              setIsUsageModalOpen(false);
+              // Refresh only — do not close here. onSuccess fires as soon as the
+              // record is saved, before the modal has shown its own receipt/next
+              // step; closing here fights that and (via the render gate above)
+              // fully unmounts the modal mid-flow instead of letting it finish.
               fetchContracts();
             }}
           />

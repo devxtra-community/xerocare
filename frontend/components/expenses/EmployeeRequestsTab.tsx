@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Eye, CheckCircle2, XCircle, X, FileText, Search } from 'lucide-react';
 import {
@@ -12,7 +12,12 @@ import {
   type ExpenseRequest,
   type ExpenseRequestSummary,
 } from '@/lib/employeeExpenses';
-import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import {
+  fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  accountTypeForPaymentMode,
+  insufficientBalanceError,
+} from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
@@ -63,15 +68,22 @@ export function ViewApproveModal({
   onClose,
 }: {
   expense: ExpenseRequest;
-  accounts: { id: string; name: string; type: string }[];
+  accounts: { id: string; name: string; type: string; currentBalance: number; currency: string }[];
   onClose: () => void;
 }) {
   const qc = useQueryClient();
   const [mode, setMode] = useState<'view' | 'approve' | 'reject'>('view');
   const [payNow, setPayNow] = useState(true);
+  const [paymentMode, setPaymentMode] = useState('Bank Transfer');
   const [paidFromAccount, setPaidFromAccount] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
+
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, paymentMode);
+  const selectedAccount = accounts.find((a) => a.id === paidFromAccount);
+  const balanceError = payNow
+    ? insufficientBalanceError(Number(expense.amount), selectedAccount)
+    : null;
 
   const isPurchaseRequest = expense.requestSource === 'MANAGER_PURCHASE';
   // Show the purchase-details box for any request tied to a purchase (including
@@ -88,6 +100,16 @@ export function ViewApproveModal({
     qc.invalidateQueries({ queryKey: ['purchases-ap'] });
   };
 
+  // Drop a now-invalid account selection whenever the payment mode changes (or the
+  // account list first loads) rather than leaving a mismatched one selected — this is
+  // exactly the gap that let a Cash account sit selected for an action that turned out
+  // to require Bank, only caught after submit by the backend's own error.
+  useEffect(() => {
+    if (matchingAccounts.some((a) => a.id === paidFromAccount)) return;
+    setPaidFromAccount(matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMode, accounts]);
+
   const approveMut = useMutation({
     mutationFn: () =>
       isPurchaseRequest
@@ -95,6 +117,7 @@ export function ViewApproveModal({
         : approveExpenseRequest(expense.id, {
             paid_from_account: payNow ? paidFromAccount : undefined,
             payment_reference: payNow ? paymentReference : undefined,
+            payment_mode: payNow ? paymentMode : undefined,
           }),
     onSuccess: () => {
       if (isPurchaseRequest) {
@@ -363,20 +386,53 @@ export function ViewApproveModal({
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">
-                      Paid From Account *
+                      Payment Mode *
                     </label>
-                    <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                    <Select value={paymentMode} onValueChange={setPaymentMode}>
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select account..." />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {accounts.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({a.type})
+                        {PAYMENT_MODES.filter((m) => m !== 'Cheque').map((m) => (
+                          <SelectItem key={m} value={m}>
+                            {m}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Paid From Account *
+                    </label>
+                    {matchingAccounts.length === 0 ? (
+                      <p className="text-xs font-medium text-red-600 mt-1">
+                        No{' '}
+                        {accountTypeForPaymentMode(paymentMode) === 'CASH'
+                          ? 'Cash in Hand'
+                          : 'Bank'}{' '}
+                        account exists for this branch.
+                      </p>
+                    ) : (
+                      <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select account..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {matchingAccounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name} ({a.type}) — {a.currency}{' '}
+                              {Number(a.currentBalance).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {balanceError && (
+                      <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">
@@ -437,7 +493,10 @@ export function ViewApproveModal({
           {mode === 'approve' && (
             <Button
               onClick={() => approveMut.mutate()}
-              disabled={isProcessing || (!isPurchaseRequest && payNow && !paidFromAccount)}
+              disabled={
+                isProcessing ||
+                (!isPurchaseRequest && payNow && (!paidFromAccount || !!balanceError))
+              }
               className="bg-emerald-600 text-white hover:bg-emerald-700"
             >
               {approveMut.isPending
@@ -491,7 +550,7 @@ export function PayModal({
   onClose,
 }: {
   expense: ExpenseRequest;
-  accounts: { id: string; name: string; type: string }[];
+  accounts: { id: string; name: string; type: string; currentBalance: number; currency: string }[];
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -505,6 +564,20 @@ export function PayModal({
   const [notes, setNotes] = useState('');
 
   const isCheque = paymentMode === 'Cheque';
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, paymentMode);
+  const selectedAccount = accounts.find((a) => a.id === paidFromAccount);
+  const balanceError = isCheque
+    ? null
+    : insufficientBalanceError(Number(expense.amount), selectedAccount);
+
+  // Drop a now-invalid account selection whenever the mode changes rather than
+  // leaving a mismatched one selected.
+  useEffect(() => {
+    if (isCheque) return;
+    if (matchingAccounts.some((a) => a.id === paidFromAccount)) return;
+    setPaidFromAccount(matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMode, accounts]);
 
   const payMut = useMutation({
     mutationFn: () =>
@@ -531,13 +604,17 @@ export function PayModal({
       }
       onClose();
     },
-    onError: () => toast.error('Failed to record payment'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to record payment';
+      toast.error(msg);
+    },
   });
 
-  const selectedAccount = accounts.find((a) => a.id === paidFromAccount);
   const canSubmit = isCheque
     ? !!(chequeNumber && chequeBankName && chequeDueDate)
-    : !!paidFromAccount;
+    : !!paidFromAccount && !balanceError;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -584,18 +661,31 @@ export function PayModal({
               <label className="text-xs font-medium text-muted-foreground">
                 Paid From Account *
               </label>
-              <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select account..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {matchingAccounts.length === 0 ? (
+                <p className="text-xs font-medium text-red-600 mt-1">
+                  No {accountTypeForPaymentMode(paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
+                  account exists for this branch.
+                </p>
+              ) : (
+                <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {matchingAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} ({a.type}) — {a.currency}{' '}
+                        {Number(a.currentBalance).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {balanceError && (
+                <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+              )}
             </div>
           )}
 
@@ -719,7 +809,13 @@ export default function EmployeeRequestsTab() {
     queryFn: () => fetchCashBankAccounts(),
     staleTime: 60_000,
   });
-  const accounts = accountsRaw as { id: string; name: string; type: string }[];
+  const accounts = accountsRaw as {
+    id: string;
+    name: string;
+    type: string;
+    currentBalance: number;
+    currency: string;
+  }[];
 
   // MANAGER_PURCHASE requests are handled in Accounts Payable → Payments tab
   const employeeOnly = useMemo(

@@ -177,6 +177,9 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
               ? '4007 Spare Parts Sales Revenue'
               : '4003 Sales Revenue';
     const dateStr = inv.createdAt?.slice(0, 10) ?? '';
+    const invTotal = Number(inv.totalAmount || 0);
+    const invTax = Number(inv.taxAmount || 0);
+
     rows.push({
       date: dateStr,
       account: '1003 Accounts Receivable',
@@ -184,7 +187,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       description: `Invoice ${inv.invoiceNumber} — ${inv.customerName}`,
       source: 'AR Invoice',
       sourceId: inv.id,
-      debit: inv.totalAmount,
+      debit: invTotal,
       credit: 0,
       currency: inv.currency,
       customerName: inv.customerName,
@@ -198,12 +201,12 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       source: 'AR Invoice',
       sourceId: inv.id,
       debit: 0,
-      credit: inv.totalAmount,
+      credit: invTotal - invTax,
       currency: inv.currency,
       customerName: inv.customerName,
       incomeSubType: subType,
     });
-    if ((inv.taxAmount ?? 0) > 0)
+    if (invTax > 0)
       rows.push({
         date: dateStr,
         account: '2003 VAT / Tax Payable',
@@ -212,7 +215,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         source: 'AR Invoice',
         sourceId: inv.id,
         debit: 0,
-        credit: inv.taxAmount ?? 0,
+        credit: invTax,
         currency: inv.currency,
         customerName: inv.customerName,
         incomeSubType: subType,
@@ -234,6 +237,8 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
     // settled that invoice, not just its original revenue-recognition rows.
     const incomeSubType = matchedInvoice ? classifyIncomeSubType(matchedInvoice) : undefined;
     const dateStr = p.paymentDate?.slice(0, 10) ?? '';
+    const pAmt = Number(p.amount || 0);
+
     rows.push({
       date: dateStr,
       account: cashAcc,
@@ -241,7 +246,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       description: `Payment received — ${p.method}`,
       source: 'Payment',
       sourceId: p.id,
-      debit: p.amount,
+      debit: pAmt,
       credit: 0,
       currency: p.currency,
       customerName,
@@ -255,7 +260,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       source: 'Payment',
       sourceId: p.id,
       debit: 0,
-      credit: p.amount,
+      credit: pAmt,
       currency: p.currency,
       customerName,
       incomeSubType,
@@ -281,6 +286,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
     const vendorName = p.vendor?.name ?? '';
     const cur = p.currencyCode ?? currency;
     const origin = p.purchaseOrigin as 'DOMESTIC' | 'INTERNATIONAL' | undefined;
+    const pTotal = Number(p.totalAmount ?? 0);
 
     rows.push({
       date: dateStr,
@@ -303,7 +309,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       source: 'Purchase Order',
       sourceId: p.id,
       debit: 0,
-      credit: p.totalAmount ?? 0,
+      credit: pTotal,
       currency: cur,
       vendorName,
       purchaseOrigin: origin,
@@ -372,6 +378,8 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
   // ── Payroll ──────────────────────────────────────────────────────────────────
   payroll.forEach((p) => {
     const dateStr = `${p.year}-${String(p.month).padStart(2, '0')}-28`;
+    const pSalary = Number(p.netSalary || 0);
+
     rows.push({
       date: dateStr,
       account: '5006 Employee Salary Expense',
@@ -379,7 +387,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       description: `Payroll ${p.year}-${String(p.month).padStart(2, '0')}`,
       source: 'Payroll',
       sourceId: p.id,
-      debit: p.netSalary,
+      debit: pSalary,
       credit: 0,
       currency,
     });
@@ -391,7 +399,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       source: 'Payroll',
       sourceId: p.id,
       debit: 0,
-      credit: p.netSalary,
+      credit: pSalary,
       currency,
     });
   });
@@ -412,6 +420,8 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       const desc = `Vendor payment — ${vendorName}${r.purchaseRef ? ` (${r.purchaseRef})` : ''}`;
       const origin = r.purchaseOrigin as 'DOMESTIC' | 'INTERNATIONAL' | undefined;
       const cashCode = isCash(r.paymentMode) ? '1001' : '1002';
+      const rAmt = Number(r.amount || 0);
+
       rows.push({
         date: dateStr,
         account: '2001 Accounts Payable',
@@ -419,7 +429,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         description: desc,
         source: 'Vendor Payment',
         sourceId: r.id,
-        debit: r.amount,
+        debit: rAmt,
         credit: 0,
         currency: r.currency,
         vendorName,
@@ -433,7 +443,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         source: 'Vendor Payment',
         sourceId: r.id,
         debit: 0,
-        credit: r.amount,
+        credit: rAmt,
         currency: r.currency,
         vendorName,
         purchaseOrigin: origin,
@@ -448,6 +458,8 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
     .forEach((c) => {
       const dateStr = (c.clearedDate ?? c.depositDate ?? c.dueDate ?? '').slice(0, 10);
       const desc = `Cheque ${c.chequeNo} cleared — ${c.partyName}`;
+      const cAmt = Number(c.amount || 0);
+
       if (c.type === 'RECEIVED') {
         rows.push({
           date: dateStr,
@@ -456,7 +468,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
           description: desc,
           source: 'Cheque',
           sourceId: c.id,
-          debit: c.amount,
+          debit: cAmt,
           credit: 0,
           currency,
           customerName: c.partyName,
@@ -469,7 +481,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
           source: 'Cheque',
           sourceId: c.id,
           debit: 0,
-          credit: c.amount,
+          credit: cAmt,
           currency,
           customerName: c.partyName,
         });
@@ -493,7 +505,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         description: desc,
         source: 'Cheque',
         sourceId: c.id,
-        debit: c.amount,
+        debit: cAmt,
         credit: 0,
         currency,
         vendorName: linkedExpense ? undefined : c.partyName,
@@ -506,7 +518,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         source: 'Cheque',
         sourceId: c.id,
         debit: 0,
-        credit: c.amount,
+        credit: cAmt,
         currency,
         vendorName: linkedExpense ? undefined : c.partyName,
       });
@@ -521,6 +533,8 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
       const acc = EXPENSE_CATEGORY_ACCOUNT[e.category] ?? DEFAULT_EXPENSE_ACCOUNT;
       const desc = e.description || `${e.category} expense`;
       const cashCode = isCash(e.paymentMode) ? '1001' : '1002';
+      const eAmt = Number(e.amount || 0);
+
       rows.push({
         date: dateStr,
         account: `${acc.code} ${acc.name}`,
@@ -528,7 +542,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         description: desc,
         source: 'Expense',
         sourceId: e.id,
-        debit: e.amount,
+        debit: eAmt,
         credit: 0,
         currency: e.currency,
       });
@@ -540,7 +554,7 @@ export function buildGlEntries(src: GLSources): GLEntry[] {
         source: 'Expense',
         sourceId: e.id,
         debit: 0,
-        credit: e.amount,
+        credit: eAmt,
         currency: e.currency,
       });
     });

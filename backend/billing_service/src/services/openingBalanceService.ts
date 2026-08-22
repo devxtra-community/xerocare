@@ -14,7 +14,7 @@ import { Like } from 'typeorm';
 import { getFinanceEmployeesByBranch } from './billingHelpers';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { logAudit } from './auditLogService';
-import { postCashbookEntry } from './cashbookService';
+import { postCashbookEntry, requireCashAccount } from './cashbookService';
 import { todayInBusinessTz } from '../utils/businessDate';
 
 export interface CreateOpeningBalanceEntryDto {
@@ -527,6 +527,20 @@ export class OpeningBalanceService {
 
     const entryRepo = this.entryRepo;
 
+    // Fail before writing anything: a non-cheque payment must resolve to a real,
+    // correctly-typed account for this branch. This used to only be checked inside
+    // the cashbook posting below, AFTER the payment/ledger/entry were already
+    // committed in the transaction — a mismatched account was logged and swallowed,
+    // leaving the entry showing settled with no real cash movement behind it.
+    const isChequeUpfront = dto.paymentMode.toLowerCase() === 'cheque';
+    if (!isChequeUpfront) {
+      await requireCashAccount(Source, {
+        branchId: entry.branchId,
+        paymentMode: dto.paymentMode,
+        explicitAccountId: dto.paidToAccount,
+      });
+    }
+
     let savedPayment!: PaymentTransaction;
 
     await Source.transaction(async (em) => {
@@ -572,9 +586,11 @@ export class OpeningBalanceService {
       await entryRepo.save(entry);
     });
 
-    // 5. Post to cashbook — best-effort after transaction commits
-    const isCheque = dto.paymentMode.toLowerCase() === 'cheque';
-    try {
+    // 5. Post to cashbook. Type/branch were validated upfront (above); only a
+    // genuine, unexpected error can reach here now, so it's allowed to propagate
+    // rather than being logged and hidden behind a "success" response.
+    const isCheque = isChequeUpfront;
+    {
       if (isCheque) {
         const { Cheque } = await import('../entities/chequeEntity');
         const chequeRepo = Source.getRepository(Cheque);
@@ -625,8 +641,6 @@ export class OpeningBalanceService {
           sourceId: savedPayment.id,
         });
       }
-    } catch (cashErr) {
-      logger.error('Failed to post opening balance payment to cashbook', cashErr);
     }
 
     await logAudit(

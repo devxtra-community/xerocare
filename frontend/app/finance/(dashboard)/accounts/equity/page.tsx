@@ -25,10 +25,13 @@ import {
   fetchEquityStatement,
   fetchBalanceSheet,
   fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  insufficientBalanceError,
   CREATABLE_EQUITY_TYPES,
   type EquityEntry,
   type EquityType,
   type EquityReserveSource,
+  type CashBankAccount,
 } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
@@ -77,7 +80,7 @@ const TYPE_BADGE: Record<string, string> = {
 
 interface ModalProps {
   entry?: EquityEntry | null;
-  cashAccounts: { id: string; name: string }[];
+  cashAccounts: CashBankAccount[];
   onClose: () => void;
   onSave: (data: Partial<EquityEntry>) => void;
   saving: boolean;
@@ -148,6 +151,29 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
   // in Accounts → Cheques — so this type/mode combination skips the linked-account
   // picker entirely in favor of the cheque-detail fields below.
   const isCheque = showPaymentMode && form.paymentMode === 'CHEQUE';
+  // Only types with a visible Payment Mode selector (Share Capital / Owner
+  // Contribution / Dividend / Withdrawal) get their account list narrowed by it —
+  // Reserves/Other have no mode field at all, so there's nothing to mismatch and the
+  // full list stays available exactly as before.
+  const matchingAccounts = showPaymentMode
+    ? filterAccountsByPaymentMode(cashAccounts, form.paymentMode)
+    : cashAccounts;
+  const selectedCashAccount = cashAccounts.find((a) => a.id === form.linkedCashAccountId);
+  const balanceError =
+    isDividend || isWithdrawal
+      ? insufficientBalanceError(parseFloat(form.amount) || 0, selectedCashAccount)
+      : null;
+
+  useEffect(() => {
+    if (!showPaymentMode) return;
+    if (
+      form.linkedCashAccountId === '' ||
+      matchingAccounts.some((a) => a.id === form.linkedCashAccountId)
+    )
+      return;
+    set('linkedCashAccountId', '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentMode, cashAccounts]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +190,9 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
         toast.error('Cheque number, bank name, cheque date and due date are all required');
         return;
       }
+    } else if (balanceError) {
+      toast.error(balanceError);
+      return;
     } else if (!form.linkedCashAccountId && !confirmNonCash) {
       toast.error(
         'Confirm this entry has no cash/bank movement, or link a Cash/Bank Account above',
@@ -474,12 +503,18 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">— none —</option>
-                {cashAccounts.map((a) => (
+                {matchingAccounts.map((a) => (
                   <option key={a.id} value={a.id}>
-                    {a.name}
+                    {a.name} — {a.currency}{' '}
+                    {Number(a.currentBalance).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
                   </option>
                 ))}
               </select>
+              {balanceError && (
+                <p className="mt-1 text-xs font-medium text-red-600">{balanceError}</p>
+              )}
               {!form.linkedCashAccountId && (
                 <label className="mt-2 flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                   <input
@@ -518,7 +553,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !!balanceError}
               className="flex-1 bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save Entry'}
@@ -595,7 +630,12 @@ export default function EquityPage() {
       toast.success('Equity entry created');
       setModal(null);
     },
-    onError: () => toast.error('Failed to create equity entry'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to create equity entry';
+      toast.error(msg);
+    },
   });
 
   const updateMut = useMutation({

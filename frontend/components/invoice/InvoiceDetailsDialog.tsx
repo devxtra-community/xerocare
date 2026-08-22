@@ -1841,16 +1841,18 @@ export function InvoiceDetailsDialog({
         </div>
       </DialogContent>
 
-      <UsageRecordingModal
-        isOpen={isUsageModalOpen}
-        onClose={() => setIsUsageModalOpen(false)}
-        contractId={currentInvoice.referenceContractId || currentInvoice.id}
-        customerName={currentInvoice.customerName}
-        onSuccess={() => {
-          handleSelectInvoice(currentInvoice.id); // Refresh current view
-        }}
-        invoice={undefined}
-      />
+      {isUsageModalOpen && (
+        <UsageRecordingModal
+          isOpen={isUsageModalOpen}
+          onClose={() => setIsUsageModalOpen(false)}
+          contractId={currentInvoice.referenceContractId || currentInvoice.id}
+          customerName={currentInvoice.customerName}
+          onSuccess={() => {
+            handleSelectInvoice(currentInvoice.id); // Refresh current view
+          }}
+          invoice={undefined}
+        />
+      )}
 
       {replacingAllocation && (
         <ReplaceDeviceModal

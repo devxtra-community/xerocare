@@ -68,6 +68,13 @@ export interface RequireCashAccountParams {
   actionLabel?: string;
   /** Forces CASH or BANK regardless of paymentMode — e.g. cheques always need BANK. */
   requiredType?: 'CASH' | 'BANK';
+  /**
+   * The amount this action is about to DEDUCT from the resolved account (a payment
+   * going out — vendor payment, expense, sale-collection approval, refund, ...).
+   * When given, the account's currentBalance must cover it or this throws. Omit for
+   * actions that only ever increase a balance (receipts) — there's nothing to check.
+   */
+  amountToDeduct?: number;
 }
 
 /**
@@ -86,9 +93,22 @@ export async function requireCashAccount(
   db: EntityManager | DataSource,
   params: RequireCashAccountParams,
 ): Promise<CashBankAccount> {
-  const { branchId, paymentMode, explicitAccountId, actionLabel, requiredType } = params;
+  const { branchId, paymentMode, explicitAccountId, actionLabel, requiredType, amountToDeduct } =
+    params;
   const type = requiredType ?? accountTypeForMode(paymentMode);
   const repo = db.getRepository(CashBankAccount);
+
+  const checkBalance = (account: CashBankAccount) => {
+    if (amountToDeduct === undefined) return;
+    const available = Number(account.currentBalance);
+    if (amountToDeduct > available + 0.01) {
+      throw new AppError(
+        `This amount exceeds your account balance. Available balance: ${account.currency ?? 'AED'} ${available.toFixed(2)}. Please choose a different account or reduce the amount.`,
+        400,
+      );
+    }
+  };
+
   if (explicitAccountId) {
     const account = await repo.findOne({ where: { id: explicitAccountId, branchId } });
     if (!account) {
@@ -105,6 +125,7 @@ export async function requireCashAccount(
         400,
       );
     }
+    checkBalance(account);
     return account;
   }
   const account = await repo
@@ -118,6 +139,7 @@ export async function requireCashAccount(
   if (!account) {
     throw new AppError(missingAccountMessage(type, actionLabel), 400);
   }
+  checkBalance(account);
   return account;
 }
 
@@ -158,6 +180,7 @@ export async function postCashbookEntry(input: PostCashbookEntryInput): Promise<
       branchId: input.branchId,
       paymentMode: input.paymentMode,
       explicitAccountId: input.accountId,
+      amountToDeduct: input.entryType === 'PAYMENT' ? input.amount : undefined,
     });
 
     const entry = entryRepo.create({

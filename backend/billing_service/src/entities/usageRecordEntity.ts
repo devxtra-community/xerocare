@@ -123,6 +123,59 @@ export class UsageRecord {
   @Column({ type: 'timestamp', nullable: true })
   whatsappSentAt?: Date;
 
+  // ─── Bill creation + customer approval (Stage A) ─────────────────────────────
+  // A UsageRecord doubles as the period's Bill. It must be Customer Approved
+  // (via the remote link or a Finance manual override with a note) before any
+  // payment collection may be recorded against it — see collectPendingUsagePayment.
+  @Column({ type: 'varchar', default: 'PENDING_APPROVAL' })
+  billStatus!: string; // PENDING_APPROVAL | CUSTOMER_APPROVED | CUSTOMER_REJECTED
+
+  // Distinguishes a periodic usage Bill (billingPeriodStart/End is a real period, meter
+  // readings apply) from an Advance Bill (wraps the contract's already-collected
+  // RENT_ADVANCE/LEASE_ADVANCE SalePaymentRequest for customer sign-off only — no period,
+  // no readings; billingPeriodStart/End is set to the advance's paymentDate as a
+  // placeholder so the NOT NULL columns stay meaningful). Reuses the exact same entity/
+  // approval-pipeline for both rather than a parallel implementation.
+  @Column({ type: 'varchar', default: 'USAGE' })
+  billType!: string; // USAGE | ADVANCE
+
+  @Column({ type: 'uuid', nullable: true })
+  billCreatedByEmployeeId?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  billCreatedByName?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  billSentAt?: Date;
+
+  // Remote signing token (mirrors ContractAgreement's signing-token fields)
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  signingToken?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  signingTokenExpiresAt?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  signingTokenUsed!: boolean;
+
+  @Column({ type: 'varchar', nullable: true })
+  customerApprovedByName?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  customerApprovedAt?: Date;
+
+  @Column({ type: 'varchar', nullable: true })
+  customerApprovalMethod?: string; // REMOTE_LINK | FINANCE_MANUAL
+
+  @Column({ type: 'text', nullable: true })
+  customerApprovalNote?: string; // required attestation when FINANCE_MANUAL
+
+  @Column({ type: 'text', nullable: true })
+  customerRejectionReason?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  customerRejectedAt?: Date;
+
   @OneToMany(() => UsageRecordItem, (item) => item.usageRecord)
   items!: UsageRecordItem[];
 }

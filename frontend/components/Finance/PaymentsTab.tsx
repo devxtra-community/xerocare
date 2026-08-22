@@ -751,7 +751,15 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
       {viewingReq && (
         <ViewApproveModal
           expense={viewingReq}
-          accounts={cashAccountsRaw as { id: string; name: string; type: string }[]}
+          accounts={
+            cashAccountsRaw as {
+              id: string;
+              name: string;
+              type: string;
+              currentBalance: number;
+              currency: string;
+            }[]
+          }
           onClose={() => setViewingReq(null)}
         />
       )}

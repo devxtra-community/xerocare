@@ -295,8 +295,8 @@ export default function GeneralLedgerPage() {
     expenseEntries,
   ]);
 
-  const totalDebit = filtered.reduce((s, e) => s + e.debit, 0);
-  const totalCredit = filtered.reduce((s, e) => s + e.credit, 0);
+  const totalDebit = filtered.reduce((s, e) => s + Number(e.debit || 0), 0);
+  const totalCredit = filtered.reduce((s, e) => s + Number(e.credit || 0), 0);
 
   const uniqueAccounts = useMemo(() => {
     const set = new Set(entries.map((e) => e.account.slice(0, 4)));

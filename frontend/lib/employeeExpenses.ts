@@ -95,7 +95,12 @@ export const submitExpenseRequest = (id: string): Promise<ExpenseRequest> =>
 
 export const approveExpenseRequest = (
   id: string,
-  data?: { paid_from_account?: string; payment_reference?: string; notes?: string },
+  data?: {
+    paid_from_account?: string;
+    payment_reference?: string;
+    payment_mode?: string;
+    notes?: string;
+  },
 ): Promise<ExpenseRequest> => api.post(`${BASE}/${id}/approve`, data).then((r) => r.data.data);
 
 export const rejectExpenseRequest = (

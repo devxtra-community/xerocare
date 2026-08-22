@@ -13,7 +13,11 @@ import {
   recordOpeningBalancePayment,
   RecordOpeningBalancePaymentDto,
 } from '@/lib/openingBalance';
-import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import {
+  fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  type CashBankAccount,
+} from '@/lib/finance/accountsApi';
 import { getCustomers, Customer, createCustomer, CreateCustomerData } from '@/lib/customer';
 import { getUserFromToken } from '@/lib/auth';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -70,7 +74,7 @@ export default function OpeningBalancePage() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentEntry, setPaymentEntry] = useState<OpeningBalanceEntry | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [cashAccounts, setCashAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [cashAccounts, setCashAccounts] = useState<CashBankAccount[]>([]);
   const [paymentForm, setPaymentForm] = useState<RecordOpeningBalancePaymentDto>({
     amount: 0,
     paymentMode: 'CASH',
@@ -83,6 +87,20 @@ export default function OpeningBalancePage() {
     notes: '',
     paidToAccount: '',
   });
+  const matchingPaymentAccounts = filterAccountsByPaymentMode(
+    cashAccounts,
+    paymentForm.paymentMode,
+  );
+  useEffect(() => {
+    if (paymentForm.paymentMode === 'CHEQUE') return;
+    if (
+      paymentForm.paidToAccount === '' ||
+      matchingPaymentAccounts.some((a) => a.id === paymentForm.paidToAccount)
+    )
+      return;
+    setPaymentForm((f) => ({ ...f, paidToAccount: '' }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentForm.paymentMode, cashAccounts]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,9 +155,7 @@ export default function OpeningBalancePage() {
     });
     try {
       const accounts = await fetchCashBankAccounts();
-      setCashAccounts(
-        accounts.map((a: { id: string; name: string }) => ({ id: a.id, name: a.name })),
-      );
+      setCashAccounts(accounts);
     } catch {
       setCashAccounts([]);
     }
@@ -1232,7 +1248,7 @@ export default function OpeningBalancePage() {
                 />
               </div>
 
-              {cashAccounts.length > 0 && (
+              {paymentForm.paymentMode !== 'CHEQUE' && matchingPaymentAccounts.length > 0 && (
                 <div className="space-y-1.5 col-span-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     Cash / Bank Account
@@ -1245,9 +1261,12 @@ export default function OpeningBalancePage() {
                     className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
                   >
                     <option value="">Select account (optional)</option>
-                    {cashAccounts.map((a) => (
+                    {matchingPaymentAccounts.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.name}
+                        {a.name} — {a.currency}{' '}
+                        {Number(a.currentBalance).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
                       </option>
                     ))}
                   </select>

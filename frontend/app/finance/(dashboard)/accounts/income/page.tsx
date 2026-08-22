@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getUserFromToken } from '@/lib/auth';
 import { Plus, Search, Filter, CheckCircle, Trash2, Pencil, X, Wallet, Eye } from 'lucide-react';
@@ -13,7 +13,9 @@ import {
   deleteIncomeEntry,
   fetchCashBankAccounts,
   fetchChartOfAccountsStructure,
+  filterAccountsByPaymentMode,
   type IncomeEntry,
+  type CashBankAccount,
 } from '@/lib/finance/accountsApi';
 import { IncomeEntryDetailModal } from '@/components/accounts/IncomeEntryDetailModal';
 import { formatCurrency } from '@/lib/format';
@@ -227,7 +229,7 @@ function ReceiveIncomeModal({
   onReceived,
 }: {
   entry: IncomeEntry;
-  accounts: { id: string; name: string; type: string }[];
+  accounts: CashBankAccount[];
   onClose: () => void;
   onReceived: () => void;
 }) {
@@ -238,6 +240,14 @@ function ReceiveIncomeModal({
   const [chequeBankName, setChequeBankName] = useState('');
 
   const isCheque = receivedMode === 'Cheque';
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, receivedMode);
+
+  useEffect(() => {
+    if (isCheque) return;
+    if (receivedTo === '' || matchingAccounts.some((a) => a.id === receivedTo)) return;
+    setReceivedTo('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receivedMode, accounts]);
 
   const receiveMut = useMutation({
     mutationFn: () =>
@@ -256,7 +266,12 @@ function ReceiveIncomeModal({
       );
       onReceived();
     },
-    onError: () => toast.error('Failed to mark as received'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to mark as received';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -300,9 +315,12 @@ function ReceiveIncomeModal({
                   <SelectValue placeholder="Auto (branch default by mode)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
+                  {matchingAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.type})
+                      {a.name} ({a.type}) — {a.currency}{' '}
+                      {Number(a.currentBalance).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
                     </SelectItem>
                   ))}
                 </SelectContent>

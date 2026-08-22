@@ -2,13 +2,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, FileSignature, CheckCircle2, AlertTriangle, Building2, User } from 'lucide-react';
+import { Loader2, FileSignature, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ESignatureCanvas } from '@/components/employeeComponents/ESignatureCanvas';
-import { getContractForSigning, signContractRemote } from '@/lib/saleWorkflow';
+import { ContractDocumentBody } from '@/components/employeeComponents/ContractDocumentBody';
+import {
+  getContractForSigning,
+  signContractRemote,
+  type ContractAgreement,
+  type ContractForSigning,
+} from '@/lib/saleWorkflow';
 import { getApiErrorMessage } from '@/lib/apiError';
+import { getActiveCurrency } from '@/lib/currency';
 
 type PageState = 'loading' | 'ready' | 'signing' | 'done' | 'error';
 
@@ -17,7 +24,7 @@ export default function RemoteSigningPage() {
   const token = params?.token as string;
 
   const [state, setState] = useState<PageState>('loading');
-  const [contract, setContract] = useState<Record<string, unknown> | null>(null);
+  const [contract, setContract] = useState<ContractForSigning | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [sigData, setSigData] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
@@ -30,8 +37,8 @@ export default function RemoteSigningPage() {
   const loadContract = async () => {
     try {
       const data = await getContractForSigning(token);
-      setContract(data as Record<string, unknown>);
-      setCustomerName((data.customerName as string) || '');
+      setContract(data);
+      setCustomerName(data.agreement.customerName || '');
       setState('ready');
     } catch (err) {
       setErrorMsg(getApiErrorMessage(err));
@@ -64,8 +71,8 @@ export default function RemoteSigningPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-slate-50 p-4 sm:p-8">
+      <div className="w-full max-w-2xl mx-auto">
         {/* Logo / Brand */}
         <div className="text-center mb-6">
           <div className="h-12 w-12 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -76,7 +83,7 @@ export default function RemoteSigningPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl p-6 space-y-5">
+        <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 space-y-6">
           {/* Loading */}
           {state === 'loading' && (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
@@ -122,82 +129,24 @@ export default function RemoteSigningPage() {
             </div>
           )}
 
-          {/* Ready to Sign */}
+          {/* Ready to Sign — full contract document, same as the employee-facing view */}
           {(state === 'ready' || state === 'signing') && contract && (
             <>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-3">
-                  Contract Details
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
-                      <Building2 size={9} /> Dealer
-                    </p>
-                    <p className="text-sm font-black text-slate-700">
-                      {String(contract.dealerName || '')}
-                    </p>
-                    {!!contract.dealerAddress && (
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {String(contract.dealerAddress)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1">
-                      <User size={9} /> Customer
-                    </p>
-                    <p className="text-sm font-black text-slate-700">
-                      {String(contract.customerName || '')}
-                    </p>
-                  </div>
+              {contract.invoice ? (
+                <div className="border border-slate-200 rounded-2xl p-4 sm:p-6 overflow-x-auto">
+                  <ContractDocumentBody
+                    invoice={contract.invoice}
+                    agreement={contract.agreement as ContractAgreement}
+                    currency={getActiveCurrency()}
+                  />
                 </div>
-                <div className="mt-2 p-2 bg-indigo-50 rounded-xl flex gap-3 text-center">
-                  <div className="flex-1">
-                    <p className="text-[9px] font-bold text-indigo-400">Agreement No.</p>
-                    <p className="text-xs font-black text-indigo-700">
-                      {String(contract.agreementNumber || '')}
-                    </p>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[9px] font-bold text-indigo-400">Date</p>
-                    <p className="text-xs font-black text-indigo-700">
-                      {contract.contractDate
-                        ? new Date(String(contract.contractDate)).toLocaleDateString('en-GB')
-                        : '—'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Terms preview */}
-              {contract.termsAndConditions && (
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                    Terms & Conditions
-                  </p>
-                  <div className="p-3 bg-slate-50 rounded-xl max-h-36 overflow-y-auto">
-                    <pre className="text-[10px] text-slate-600 whitespace-pre-wrap font-sans leading-relaxed">
-                      {String(contract.termsAndConditions)}
-                    </pre>
-                  </div>
+              ) : (
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-100 text-center text-xs text-amber-700 font-bold">
+                  Contract details could not be fully loaded — please contact the dealer if this
+                  persists.
                 </div>
               )}
 
-              {/* Employee already signed indicator */}
-              {contract.employeeSignedAt && (
-                <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-xl text-emerald-700">
-                  <CheckCircle2 size={14} />
-                  <p className="text-[11px] font-black">
-                    Dealer signed on{' '}
-                    {new Date(String(contract.employeeSignedAt)).toLocaleDateString()}
-                    {!!contract.employeeSignedByName &&
-                      ` — ${String(contract.employeeSignedByName)}`}
-                  </p>
-                </div>
-              )}
-
-              {/* Customer name field */}
               <div>
                 <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
                   Your Full Name *

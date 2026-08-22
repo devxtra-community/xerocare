@@ -22,15 +22,7 @@ import {
 } from '@/lib/invoice';
 import { Product, getProductById } from '@/lib/product';
 import { toast } from 'sonner';
-import {
-  Loader2,
-  Calendar,
-  Coins,
-  Mail,
-  MessageSquare,
-  FileDown,
-  ExternalLink,
-} from 'lucide-react';
+import { Loader2, Calendar, Coins } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,15 +30,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 
 import { getActiveCurrency } from '@/lib/currency';
-import { getUserFromToken } from '@/lib/auth';
-import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
-import {
-  type SalePaymentRequest,
-  generateSalePaymentReceipt,
-  sendReceiptEmail,
-  sendReceiptWhatsApp,
-} from '@/lib/saleWorkflow';
-import { getApiErrorMessage } from '@/lib/apiError';
+import { BillModal } from './BillModal';
 interface UsageInvoiceItem extends InvoiceItem {
   allocationId?: string;
   allocation?: {
@@ -188,49 +172,25 @@ export default function UsageRecordingModal({
   });
   const [file, setFile] = useState<File | null>(null);
 
-  // Collection for this period — always visible (no more opt-in checkbox). Left blank
-  // means "collect the full computed amount"; typed lower (including 0) means a partial
-  // or fully-deferred collection, with the shortfall surfacing on the Pending Payments tab.
-  const [amountCollected, setAmountCollected] = useState('');
-  const [paymentMode, setPaymentMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
-  const [paymentReferenceNumber, setPaymentReferenceNumber] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [chequeNumber, setChequeNumber] = useState('');
-  const [chequeBankName, setChequeBankName] = useState('');
-  const [chequeDueDate, setChequeDueDate] = useState('');
-  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
-  const [cashAccountId, setCashAccountId] = useState('');
-  const [cashAccounts, setCashAccounts] = useState<CashBankAccount[]>([]);
-
-  // Finance-only: the PENDING SalePaymentRequest just created, offered for an immediate
-  // receipt before the modal closes (Employee has no receipt responsibility for periodic
-  // Rent/Lease collections — only the advance, handled elsewhere).
-  const [justCollected, setJustCollected] = useState<SalePaymentRequest | null>(null);
-  const currentUser = React.useMemo(() => getUserFromToken(), []);
-  const isFinanceContext =
-    currentUser?.role === 'FINANCE' ||
-    currentUser?.role === 'ADMIN' ||
-    currentUser?.role === 'MANAGER';
+  // The just-created bill's usage record id — opens BillModal (send/approve) right after
+  // a successful submit. This is the entire post-submit hand-off now: submitting usage no
+  // longer collects payment, it only creates the bill for Stage A approval (see BillModal).
+  const [createdBillId, setCreatedBillId] = useState<string | null>(null);
 
   const isSimplifiedLease = contract?.saleType === 'LEASE' && contract?.leaseType !== 'FSM';
 
   React.useEffect(() => {
     if (!isOpen) {
+      console.debug('[UsageRecordingModal] isOpen prop went false — resetting local state', {
+        hadCreatedBillId: createdBillId,
+      });
       setShowPreview(false);
       // setRecordedUsageData(null);
       isInitialized.current = false;
-      setJustCollected(null);
-      setAmountCollected('');
-      setCashAccountId('');
+      setCreatedBillId(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  React.useEffect(() => {
-    if (!isOpen || !isFinanceContext) return;
-    fetchCashBankAccounts({ skipErrorToast: true })
-      .then(setCashAccounts)
-      .catch(() => {});
-  }, [isOpen, isFinanceContext]);
 
   // Hook Ordering Fix: Define memoized values used in effects first
   const prevUsage = React.useMemo(() => {
@@ -567,21 +527,6 @@ export default function UsageRecordingModal({
         colorA4Count: String(aggClrA4),
         colorA3Count: String(aggClrA3),
       }));
-
-      // Pre-fill this period's payment mode from the contract's stable default (set once
-      // from the advance payment at signing) — Finance can still freely override it below.
-      // Bank name carries over as a convenience; cheque number/due date are always left
-      // blank since each period is a genuinely new physical cheque.
-      if (contract.preferredPaymentMode) {
-        setPaymentMode(
-          contract.preferredPaymentMode === 'CREDIT_CARD'
-            ? 'BANK_TRANSFER'
-            : contract.preferredPaymentMode,
-        );
-        if (contract.preferredPaymentMode === 'CHEQUE' && contract.preferredChequeBankName) {
-          setChequeBankName(contract.preferredChequeBankName);
-        }
-      }
 
       isInitialized.current = true;
     }
@@ -1076,23 +1021,6 @@ export default function UsageRecordingModal({
       }
     }
 
-    const resolvedCollected = amountCollected === '' ? estimatedCost : Number(amountCollected || 0);
-
-    if (resolvedCollected < 0) {
-      errors.push('Amount collected cannot be negative');
-    }
-    if (resolvedCollected > estimatedCost + 0.01) {
-      errors.push(
-        `Amount collected cannot exceed this period's total (${formatCurrency(estimatedCost, currency)})`,
-      );
-    }
-    if (resolvedCollected > 0 && paymentMode === 'CHEQUE') {
-      if (!chequeNumber) errors.push('Cheque number is required for cheque payments');
-      if (!chequeBankName) errors.push('Cheque bank name is required for cheque payments');
-      if (!chequeDate) errors.push('Cheque date is required for cheque payments');
-      if (!chequeDueDate) errors.push('Cheque due date is required for cheque payments');
-    }
-
     if (errors.length > 0) {
       errors.forEach((e) => toast.error(e));
       return false;
@@ -1163,14 +1091,23 @@ export default function UsageRecordingModal({
             formData.discountType === 'COPIES' ? Number(formData.discountColorCopies) : 0,
           items: formData.items,
         });
-        toast.success('Usage record updated successfully');
+        toast.success("Bill updated — it now needs the customer's approval again");
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
         queryClient.invalidateQueries({ queryKey: ['usage-history', contractId] });
         queryClient.invalidateQueries({
           queryKey: ['invoice', contractId || editingInvoice?.referenceContractId],
         });
         onSuccess();
-        onClose();
+
+        console.debug(
+          '[UsageRecordingModal] handleSubmit success (edit) — handing off to BillModal',
+          {
+            usageRecordId: editingInvoice.id,
+          },
+        );
+        // Correcting a bill (typically after a customer dispute) resets it back through
+        // Stage A's approval step server-side — hand off to BillModal so it can be resent.
+        setCreatedBillId(editingInvoice.id);
       } else {
         const payload = new FormData();
         payload.append('contractId', contractId);
@@ -1241,43 +1178,25 @@ export default function UsageRecordingModal({
           payload.append('file', file);
         }
 
-        const resolvedCollected =
-          amountCollected === '' ? estimatedCost : Number(amountCollected || 0);
-        payload.append('amountCollected', String(resolvedCollected));
-        payload.append('paymentMode', paymentMode);
-        payload.append('paymentDate', paymentDate);
-        if (paymentMode === 'CHEQUE') {
-          payload.append('chequeNumber', chequeNumber);
-          payload.append('chequeBankName', chequeBankName);
-          payload.append('chequeDueDate', chequeDueDate);
-          payload.append('chequeDate', chequeDate);
-        } else {
-          if (paymentReferenceNumber) {
-            payload.append('paymentReferenceNumber', paymentReferenceNumber);
-          }
-          if (cashAccountId) {
-            payload.append('cashAccountId', cashAccountId);
-          }
-        }
-
         const result = await recordUsage(payload);
-        toast.success('Usage recorded successfully');
+        toast.success('Bill created for this period');
 
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
         queryClient.invalidateQueries({ queryKey: ['usage-history', contractId] });
         queryClient.invalidateQueries({ queryKey: ['invoice', contractId] });
         onSuccess();
 
-        // Finance can send a receipt for what they just collected immediately, regardless
-        // of Accounts approval — same decoupled-receipt-from-approval principle already
-        // established for Sale. Employee has no receipt responsibility for periodic
-        // Rent/Lease collections (advance only, handled elsewhere), so the modal simply
-        // closes for them as before.
-        if (isFinanceContext && result.salePaymentRequest) {
-          setJustCollected(result.salePaymentRequest);
-        } else {
-          onClose();
-        }
+        console.debug(
+          '[UsageRecordingModal] handleSubmit success (create) — handing off to BillModal',
+          {
+            usageRecordId: result.usage.id,
+          },
+        );
+
+        // Usage submission only creates the bill now — payment collection is a separate
+        // Stage B step, gated on the customer approving this bill. Hand off to BillModal
+        // so whoever just submitted can immediately send it for approval.
+        setCreatedBillId(result.usage.id);
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
@@ -1293,47 +1212,6 @@ export default function UsageRecordingModal({
     }
   };
 
-  const [generatingReceipt, setGeneratingReceipt] = useState(false);
-  const [sendingReceiptVia, setSendingReceiptVia] = useState<'email' | 'whatsapp' | null>(null);
-
-  const handleGenerateCollectionReceipt = async () => {
-    if (!justCollected) return;
-    setGeneratingReceipt(true);
-    try {
-      if (justCollected.receiptUrl) {
-        window.open(justCollected.receiptUrl, '_blank');
-        return;
-      }
-      const { receiptUrl } = await generateSalePaymentReceipt(justCollected.id);
-      setJustCollected((prev) => (prev ? { ...prev, receiptUrl } : prev));
-      window.open(receiptUrl, '_blank');
-    } catch (err) {
-      toast.error('Failed to generate receipt', { description: getApiErrorMessage(err) });
-    } finally {
-      setGeneratingReceipt(false);
-    }
-  };
-
-  const handleSendCollectionReceipt = async (channel: 'email' | 'whatsapp') => {
-    if (!justCollected) return;
-    setSendingReceiptVia(channel);
-    try {
-      const result =
-        channel === 'email'
-          ? await sendReceiptEmail(justCollected.id)
-          : await sendReceiptWhatsApp(justCollected.id);
-      toast.success(`Receipt sent via ${channel === 'email' ? 'email' : 'WhatsApp'}`, {
-        description: `Sent to ${result.recipient}`,
-      });
-    } catch (err) {
-      toast.error(`Failed to send receipt via ${channel}`, {
-        description: getApiErrorMessage(err),
-      });
-    } finally {
-      setSendingReceiptVia(null);
-    }
-  };
-
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
@@ -1342,14 +1220,45 @@ export default function UsageRecordingModal({
 
   return (
     <>
-      {/* justCollected excluded here so the form closes the instant the "Collected" receipt
-          dialog below opens — otherwise both are mounted and open at once (this dialog stays
-          open since onClose() is deliberately withheld until the receipt is dismissed), which
-          reads as a second form popping up right after submit. PendingUsagePaymentsTable's
-          near-identical flow avoids this by closing its own dialog before opening the receipt
-          one; this is the same fix, just via the open condition since onClose here also tears
-          down the parent's selected-contract state (see MonthlyCollectionTable). */}
-      <Dialog open={isOpen && !showPreview && !justCollected} onOpenChange={onClose}>
+      {/* createdBillId excluded here so the form closes the instant BillModal opens below —
+          otherwise both would be mounted and open at once, reading as a second form popping
+          up right after submit. Same fix as the other modals in this codebase that hand off
+          to a follow-up dialog: exclude from the open condition, gate the next one on
+          non-null state, never force-close via onSuccess.
+
+          THE ACTUAL AUTO-REOPEN BUG (root-caused here, previous attempts patched other
+          symptoms of the same handoff without touching this line): `open` above is a
+          COMPOUND expression, not the raw `isOpen` prop — every other Dialog in this
+          codebase wires `onOpenChange={onClose}` directly to a SIMPLE `open={isOpen}`,
+          where a Radix-initiated close (Escape / overlay click / outside focus) and "the
+          parent should reset its state" are the same event. Here they are not: the instant
+          setCreatedBillId(...) runs, `open` flips to false on its own (via !createdBillId)
+          while BillModal mounts as a sibling Dialog in the very same render. Radix's
+          dismissable layer for THIS dialog can observe that transition (BillModal's own
+          focus-trap grabbing focus counts as "focus left this layer") and call
+          onOpenChange(false) itself — which, wired straight to onClose, ran the PARENT's
+          real close handler (MonthlyCollectionTable: setIsModalOpen(false) +
+          setSelectedContract(null)), unmounting this whole component — BillModal included,
+          since it lives inside this same subtree below. The next "Record Usage" click then
+          mounts a brand-new instance, which reads as the form "auto-reopening" right after
+          submit. Fix: only forward a dismiss to the parent when it reflects a genuine exit,
+          not the internal createdBillId handoff. */}
+      <Dialog
+        open={isOpen && !showPreview && !createdBillId}
+        onOpenChange={(next) => {
+          if (next) return;
+          if (createdBillId) {
+            console.debug(
+              '[UsageRecordingModal] onOpenChange(false) suppressed during BillModal handoff',
+              { createdBillId },
+            );
+            return;
+          }
+
+          console.debug('[UsageRecordingModal] onOpenChange(false) forwarded to parent onClose');
+          onClose();
+        }}
+      >
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto rounded-[1.5rem] p-6 sm:p-10">
           <DialogHeader>
             <DialogTitle>Record Usage for {customerName}</DialogTitle>
@@ -2890,148 +2799,8 @@ export default function UsageRecordingModal({
               </div>
             )}
 
-            <div className="space-y-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
-              <Label className="text-sm font-semibold text-slate-700">
-                Collection for This Period
-              </Label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-600">Amount Collected</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={amountCollected}
-                    onChange={(e) => setAmountCollected(e.target.value)}
-                    placeholder={estimatedCost.toFixed(2)}
-                  />
-                  {(() => {
-                    const collected =
-                      amountCollected === '' ? estimatedCost : Number(amountCollected || 0);
-                    const remaining = Math.max(0, estimatedCost - collected);
-                    return remaining > 0.01 ? (
-                      <p className="text-[11px] text-amber-600">
-                        {formatCurrency(remaining, currency)} will remain pending for this period,
-                        tracked on the Pending Payments tab.
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-slate-400">
-                        Leave blank to collect the full amount shown above.
-                      </p>
-                    );
-                  })()}
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-600">Payment Mode</Label>
-                  <select
-                    value={paymentMode}
-                    onChange={(e) =>
-                      setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')
-                    }
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="CASH">Cash</option>
-                    <option value="BANK_TRANSFER">Bank Transfer</option>
-                    <option value="CHEQUE">Cheque</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-slate-600">Payment Date</Label>
-                  <Input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                  />
-                </div>
-
-                {paymentMode === 'CHEQUE' ? (
-                  <>
-                    <div className="space-y-2 sm:col-span-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
-                      Creates a PENDING cheque record. Cash at Bank increases only when it&apos;s
-                      deposited in Accounts → Cheques.
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-slate-600">Cheque Number</Label>
-                      <Input
-                        value={chequeNumber}
-                        onChange={(e) => setChequeNumber(e.target.value)}
-                        placeholder="e.g. CHQ-001234"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-slate-600">
-                        Name of the Bank
-                      </Label>
-                      <Input
-                        value={chequeBankName}
-                        onChange={(e) => setChequeBankName(e.target.value)}
-                        placeholder="e.g. Emirates NBD"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-slate-600">
-                        Cheque Date <span className="font-normal">(on the cheque)</span>
-                      </Label>
-                      <Input
-                        type="date"
-                        value={chequeDate}
-                        onChange={(e) => setChequeDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-slate-600">
-                        Cheque Due Date
-                      </Label>
-                      <Input
-                        type="date"
-                        value={chequeDueDate}
-                        onChange={(e) => setChequeDueDate(e.target.value)}
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-semibold text-slate-600">
-                        Reference Number (Optional)
-                      </Label>
-                      <Input
-                        value={paymentReferenceNumber}
-                        onChange={(e) => setPaymentReferenceNumber(e.target.value)}
-                        placeholder="e.g. TXN-123456"
-                      />
-                    </div>
-                    {cashAccounts.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-slate-600">
-                          Cash/Bank Account (Optional)
-                        </Label>
-                        <select
-                          value={cashAccountId}
-                          onChange={(e) => setCashAccountId(e.target.value)}
-                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                          <option value="">Select account...</option>
-                          {cashAccounts.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label>
-                {isSimplifiedLease
-                  ? 'Payment Screenshot (Required for verification)'
-                  : 'Meter Image (Required for verification)'}
-              </Label>
+              <Label>Meter Image (Required for verification)</Label>
               <Input type="file" accept="image/*" onChange={handleFileChange} />
             </div>
 
@@ -3095,94 +2864,16 @@ export default function UsageRecordingModal({
         />
       )} */}
 
-      {justCollected && (
-        <Dialog
-          open={!!justCollected}
-          onOpenChange={(v) => {
-            if (!v) {
-              setJustCollected(null);
-              onClose();
-            }
+      {createdBillId && (
+        <BillModal
+          usageRecordId={createdBillId}
+          open={!!createdBillId}
+          onClose={() => {
+            setCreatedBillId(null);
+            onClose();
           }}
-        >
-          <DialogContent className="sm:max-w-sm rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
-            <DialogTitle className="sr-only">Collection Recorded</DialogTitle>
-            <div className="bg-linear-to-r from-emerald-600 to-emerald-500 p-5 text-white">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <Coins size={18} />
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
-                    Collected
-                  </p>
-                  <p className="text-base font-black">
-                    {formatCurrency(justCollected.amount, justCollected.currency)}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-500">
-                {justCollected.requestNo} has been submitted to Accounts for approval. You can send
-                the customer a receipt now — it won&apos;t move Cash in Hand/Bank or the
-                invoice&apos;s Paid figure until Accounts actually approves it.
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1 h-9 text-xs font-bold gap-1"
-                  onClick={handleGenerateCollectionReceipt}
-                  disabled={generatingReceipt}
-                >
-                  {generatingReceipt ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : justCollected.receiptUrl ? (
-                    <ExternalLink className="h-4 w-4" />
-                  ) : (
-                    <FileDown className="h-4 w-4" />
-                  )}
-                  {justCollected.receiptUrl ? 'View Receipt' : 'Generate Receipt'}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-9 w-9 p-0"
-                  onClick={() => handleSendCollectionReceipt('email')}
-                  disabled={sendingReceiptVia === 'email'}
-                  title="Email receipt to customer"
-                >
-                  {sendingReceiptVia === 'email' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Mail className="h-4 w-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-9 w-9 p-0"
-                  onClick={() => handleSendCollectionReceipt('whatsapp')}
-                  disabled={sendingReceiptVia === 'whatsapp'}
-                  title="WhatsApp receipt to customer"
-                >
-                  {sendingReceiptVia === 'whatsapp' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <MessageSquare className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <Button
-                className="w-full h-9 text-xs font-black bg-slate-800 hover:bg-slate-900"
-                onClick={() => {
-                  setJustCollected(null);
-                  onClose();
-                }}
-              >
-                Done
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+          initialTab="send"
+        />
       )}
     </>
   );

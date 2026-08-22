@@ -1,8 +1,18 @@
 import api from './api';
 import { Invoice } from './invoice';
 import { Lead } from './lead';
+import { Bill } from './saleWorkflow';
 
-export interface SalePaymentRequest {
+/** Every entity type in the 360° profile carries this — who created/handled it, and
+ *  when. `createdByRole` is this app's closest analog to "department" (Employee/
+ *  Finance/Manager/Admin) — there's no separate department field anywhere in this
+ *  system, role is the classifier already used everywhere else for this. */
+export interface CreatedByInfo {
+  createdAt?: string;
+  createdByRole?: string;
+}
+
+export interface SalePaymentRequest extends CreatedByInfo {
   id: string;
   requestNo: string;
   invoiceId: string;
@@ -31,14 +41,20 @@ export interface SalePaymentRequest {
   updatedAt: string;
 }
 
-export interface AgreementSummary {
+export interface AgreementSummary extends CreatedByInfo {
   id: string;
   invoiceId: string;
   agreementNumber: string;
   signatureStatus: string;
   employeeSignedAt?: string | null;
   customerSignedAt?: string | null;
+  createdByEmployeeName?: string;
 }
+
+/** A Rent/Lease Bill (UsageRecord) as shown in the 360° profile. */
+export type Customer360Bill = Bill & CreatedByInfo;
+
+export type Customer360Invoice = Invoice & CreatedByInfo;
 
 export interface Customer360Summary {
   totalInvoiced: number;
@@ -46,12 +62,14 @@ export interface Customer360Summary {
   totalOutstanding: number;
   contractCount: number;
   paymentCount: number;
+  billCount: number;
 }
 
 export interface Customer360Profile {
-  invoices: Invoice[];
+  invoices: Customer360Invoice[];
   payments: SalePaymentRequest[];
   agreements: AgreementSummary[];
+  bills: Customer360Bill[];
   summary: Customer360Summary;
 }
 
@@ -66,6 +84,15 @@ export async function getCustomer360Profile(
   const response = await api.get<{ success: boolean; data: Customer360Profile }>(
     `/b/accounts/customers/${customerId}/profile`,
     { params },
+  );
+  return response.data.data;
+}
+
+/** Employee-side, personal-only: only this employee's own quotations/contracts/bills/
+ *  payments/agreements for this customer, within their own branch. */
+export async function getMyCustomer360Profile(customerId: string): Promise<Customer360Profile> {
+  const response = await api.get<{ success: boolean; data: Customer360Profile }>(
+    `/b/customers/${customerId}/my-360-profile`,
   );
   return response.data.data;
 }

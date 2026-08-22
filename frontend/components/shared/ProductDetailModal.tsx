@@ -111,9 +111,21 @@ interface Props {
   productId: string | null;
   open: boolean;
   onClose: () => void;
+  /** Service Desk doesn't need vendor contact info (name/contact person/phone/email)
+   * surfaced here — it's purchasing/inventory data, not relevant to servicing a
+   * customer's contract. Other callers (inventory/purchasing views) leave this off. */
+  hideVendorDetails?: boolean;
+  /** Service Technicians additionally don't need lot/purchasing info either. */
+  hideLotDetails?: boolean;
 }
 
-export function ProductDetailModal({ productId, open, onClose }: Props) {
+export function ProductDetailModal({
+  productId,
+  open,
+  onClose,
+  hideVendorDetails = false,
+  hideLotDetails = false,
+}: Props) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -337,7 +349,7 @@ export function ProductDetailModal({ productId, open, onClose }: Props) {
               )}
 
               {/* ── Vendor Details ── */}
-              {product.vendor && vendorName && (
+              {!hideVendorDetails && product.vendor && vendorName && (
                 <div className="bg-white rounded-xl border border-slate-100 p-4">
                   <SectionLabel icon={Users} label="Vendor Details" />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -350,7 +362,7 @@ export function ProductDetailModal({ productId, open, onClose }: Props) {
               )}
 
               {/* ── Lot Information ── */}
-              {product.lot && (
+              {!hideLotDetails && product.lot && (
                 <div className="bg-white rounded-xl border border-slate-100 p-4">
                   <SectionLabel icon={Box} label="Lot Information" />
                   <div className="grid grid-cols-2 gap-x-4 gap-y-3">

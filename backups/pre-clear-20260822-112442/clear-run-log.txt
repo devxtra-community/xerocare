@@ -1,0 +1,121 @@
+================================================================
+xerocare_billing — clearing 45 tables
+================================================================
+TRUNCATE TABLE
+Post-clear counts (all should be 0):
+  account_reconciliations                       0
+  asset_depreciation_register                   0
+  audit_logs                                    0
+  cash_bank_accounts                            0
+  cashbook_entries                              0
+  chart_of_accounts                             0
+  cheque_status_history                         0
+  cheques                                       0
+  contract_agreements                           0
+  country_tax_rules                             0
+  credit_notes                                  0
+  depreciation_brand_rules                      0
+  depreciation_journal_entries                  0
+  depreciation_model_rules                      0
+  device_meter_readings                         0
+  employee_expense_requests                     0
+  employee_target_achievements                  0
+  employee_targets                              0
+  equity_entries                                0
+  exchange_rates                                0
+  expense_entries                               0
+  guarantee_cheques                             0
+  income_entries                                0
+  installation_requests                         0
+  invoice_items                                 0
+  invoice_ledger                                0
+  invoices                                      0
+  machine_swap_requests                         0
+  manual_journal_entries                        0
+  manual_payables                               0
+  manual_receivables                            0
+  migration_markers                             0
+  opening_balance_entries                       0
+  owners                                        0
+  payable_payments                              0
+  payment_ledgers                               0
+  payment_transactions                          0
+  product_allocations                           0
+  quotation_template_assignments                0
+  receivable_payments                           0
+  return_credits                                0
+  sale_payment_requests                         0
+  spare_part_credit_notes                       0
+  usage_record_items                            0
+  usage_records                                 0
+  vat_remittances                               0
+
+================================================================
+xerocare_vendor — clearing 38 tables (branches included this time)
+================================================================
+TRUNCATE TABLE
+Post-clear counts (all should be 0):
+  branches                                      0
+  brands                                        0
+  consumable_yield_history                      0
+  contract_meter_readings                       0
+  employee_managers                             0
+  exchange_rates                                0
+  inventory_reservations                        0
+  lot_documents                                 0
+  lot_items                                     0
+  lots                                          0
+  machine_service_history                       0
+  model                                         0
+  processed_invoice_items                       0
+  products                                      0
+  purchase_costs                                0
+  purchase_payments                             0
+  purchases                                     0
+  rfq_items                                     0
+  rfq_vendor_items                              0
+  rfq_vendors                                   0
+  rfqs                                          0
+  service_contracts                             0
+  service_diagnoses                             0
+  service_estimate_items                        0
+  service_estimate_revisions                    0
+  service_estimates                             0
+  service_part_usage_logs                       0
+  service_reports                               0
+  service_ticket_activities                     0
+  service_ticket_items                          0
+  service_tickets                               0
+  spare_part_inventories                        0
+  spare_parts                                   0
+  spare_parts_models                            0
+  stock_transfer_items                          0
+  stock_transfers                               0
+  vendor_requests                               0
+  vendors                                       0
+  warehouses                                    0
+
+================================================================
+xerocare_employee — clearing 6 of 7 tables (admin preserved)
+================================================================
+TRUNCATE TABLE
+Post-clear counts (all should be 0):
+  auth                                          0
+  employee                                      0
+  leave_applications                            0
+  notifications                                 0
+  payrolls                                      0
+  branches_mirror                               0
+Preserved (not touched):
+  admin                                         1
+
+================================================================
+xerocare_crm — clearing customers
+================================================================
+TRUNCATE TABLE
+Post-clear counts (all should be 0):
+  customers                                     0
+
+================================================================
+Clear complete.
+================================================================

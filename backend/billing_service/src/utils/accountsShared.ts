@@ -239,6 +239,84 @@ async function internalGet<T>(url: string): Promise<T | null> {
   }
 }
 
+// ─── Input VAT / Reverse Charge VAT credit breakdown ──────────────────────────
+//
+// Single source of truth for the domestic-input-VAT-owed-to-vendors figure that
+// both the Balance Sheet (2001 Accounts Payable / 2003 VAT Payable) and the
+// Payable page must agree on. Previously this logic lived inline inside
+// computeBalanceSheet only, so the Payable page had no way to include it and
+// showed a lower total than the Balance Sheet/Chart of Accounts for the exact
+// same branch.
+export interface VatCreditBreakdown {
+  // VAT the vendor charged us on a domestic purchase — part of that vendor's
+  // invoice, so it belongs in Accounts Payable until we pay it off.
+  domesticInputVat: number;
+  // VAT we self-assess on an import — raises an output-VAT liability of the
+  // same size as the input credit claimed for it, netting to zero.
+  reverseChargeVatSelfAssessed: number;
+  // domesticInputVat + reverseChargeVatSelfAssessed — the credit netted against
+  // Output VAT collected to get VAT Payable.
+  inputVatReclaimable: number;
+  dataWarning: string | null;
+  currencyWarnings: string[];
+}
+
+export async function getVatCreditBreakdown(
+  invUrl: string,
+  branchQs: string,
+  baseCurrency: string,
+  rates: Map<string, number>,
+): Promise<VatCreditBreakdown> {
+  const vatCreditData = await internalGet<{
+    currencyGroups: {
+      currencyCode: string;
+      inputVatAmount: number;
+      reverseChargeVatAmount: number;
+    }[];
+  }>(`${invUrl}/purchases/internal/cost-report${branchQs}`);
+
+  let inputVatReclaimable = 0;
+  let domesticInputVat = 0;
+  let reverseChargeVatSelfAssessed = 0;
+  const currencyWarnings: string[] = [];
+  let dataWarning: string | null = null;
+
+  if (vatCreditData === null) {
+    dataWarning =
+      '2003: Inventory service unavailable — Input/Reverse Charge VAT could not be fetched. VAT Payable will be overstated.';
+  } else {
+    for (const grp of vatCreditData.currencyGroups ?? []) {
+      const ivResult = convertAmt(grp.inputVatAmount, grp.currencyCode, baseCurrency, rates);
+      const rcResult = convertAmt(
+        grp.reverseChargeVatAmount,
+        grp.currencyCode,
+        baseCurrency,
+        rates,
+      );
+      if (ivResult.warning) {
+        if (!currencyWarnings.includes(ivResult.warning)) currencyWarnings.push(ivResult.warning);
+      } else {
+        inputVatReclaimable += ivResult.value;
+        domesticInputVat += ivResult.value;
+      }
+      if (rcResult.warning) {
+        if (!currencyWarnings.includes(rcResult.warning)) currencyWarnings.push(rcResult.warning);
+      } else {
+        inputVatReclaimable += rcResult.value;
+        reverseChargeVatSelfAssessed += rcResult.value;
+      }
+    }
+  }
+
+  return {
+    domesticInputVat,
+    reverseChargeVatSelfAssessed,
+    inputVatReclaimable,
+    dataWarning,
+    currencyWarnings,
+  };
+}
+
 // ─── Branch SQL helper ────────────────────────────────────────────────────────
 
 /**
@@ -1051,24 +1129,37 @@ export async function computeBalanceSheet(
                CASE
                  -- A RENT/LEASE contract reuses one invoice for its whole life, so
                  -- totalAmount is a running contract figure, NOT what the customer
-                 -- currently owes. Revenue for these is recognised per billed period
-                 -- from usage_records; booking AR off totalAmount therefore recorded a
-                 -- receivable larger than the revenue ever recognised against it, and
-                 -- the difference had no counterpart anywhere.
-                 -- (Observed: a 3-month contract showed AR 2,100 against 1,100 of
-                 -- recognised revenue — a 1,000 hole that persisted until the contract
-                 -- ended.) Mirror the revenue basis exactly: advance + what has actually
-                 -- been billed.
+                 -- currently owes. Booking AR off totalAmount therefore recorded a
+                 -- receivable larger than what was ever billed, with no counterpart
+                 -- anywhere. Rebuilt from the real, per-period figures instead:
+                 --   Advance: the actual SalePaymentRequest amount collected at
+                 --     signing — already VAT-inclusive (grossed up in
+                 --     salePaymentRequestService.ts) — not invoice.advanceAmount,
+                 --     which is the net figure entered at quotation time and understates
+                 --     what the customer was actually billed by the VAT portion.
+                 --   Periodic: SUM(usage_records.totalCharge) for USAGE-type bills —
+                 --     the real, VAT-inclusive, discount-netted total each Bill and
+                 --     Usage History already show — not monthlyRent + exceededCharge,
+                 --     which is the pre-VAT taxable base and understated every
+                 --     Rent/Lease receivable by its VAT amount. ADVANCE-type bills are
+                 --     excluded from this sum since the advance is already counted via
+                 --     adv.amount above; including both would double-count it.
                  WHEN i."saleType" IN ('RENT', 'LEASE')
-                   THEN COALESCE(i."advanceAmount", 0) + COALESCE(ur.billed, 0)
+                   THEN COALESCE(adv.amount, i."advanceAmount", 0) + COALESCE(ur.billed, 0)
                  ELSE i."totalAmount"
                END - COALESCE(pt.paid, 0)
              ), 0) AS amount
       FROM invoices i
       LEFT JOIN (
-        SELECT "contractId",
-               SUM(COALESCE("monthlyRent", 0) + COALESCE("exceededCharge", 0)) AS billed
+        SELECT DISTINCT ON ("invoiceId") "invoiceId", amount
+        FROM sale_payment_requests
+        WHERE "paymentContext" IN ('RENT_ADVANCE', 'LEASE_ADVANCE')
+        ORDER BY "invoiceId", "createdAt" ASC
+      ) adv ON adv."invoiceId" = i.id
+      LEFT JOIN (
+        SELECT "contractId", SUM(COALESCE("totalCharge", 0)) AS billed
         FROM usage_records
+        WHERE "billType" IS DISTINCT FROM 'ADVANCE'
         GROUP BY "contractId"
       ) ur ON ur."contractId" = i.id
       LEFT JOIN (
@@ -1390,47 +1481,23 @@ export async function computeBalanceSheet(
   // Previously vatPayable only subtracted remittances from Output VAT collected, never
   // netting the input VAT the business is entitled to reclaim — overstating what's owed
   // to the tax authority by the full amount of that credit.
-  const vatCreditData = await internalGet<{
-    currencyGroups: {
-      currencyCode: string;
-      inputVatAmount: number;
-      reverseChargeVatAmount: number;
-    }[];
-  }>(`${invUrl}/purchases/internal/cost-report`);
-  let inputVatReclaimable = 0;
+  //
+  // Was previously fetched with no branchQs on this one call (every other cross-service
+  // call in this function scopes by branch) — a single-branch Balance Sheet silently
+  // pulled in every OTHER branch's input VAT too. Now shared via getVatCreditBreakdown
+  // so the Payable page can pull the exact same, correctly-scoped figure.
+  const vatCredit = await getVatCreditBreakdown(invUrl, branchQs, baseCurrency, rates);
+  const inputVatReclaimable = vatCredit.inputVatReclaimable;
   // Split out so each half can be posted to its correct counterpart below:
   //  - domesticInputVat is VAT the vendor actually charged us, so it is part of what we
   //    owe that vendor and belongs in Accounts Payable.
   //  - reverseChargeVatSelfAssessed is VAT we charge ourselves on an import; it must
   //    raise an output-VAT liability as well as the input credit, netting to zero.
-  let domesticInputVat = 0;
-  let reverseChargeVatSelfAssessed = 0;
-  if (vatCreditData === null) {
-    dataWarnings.push(
-      '2003: Inventory service unavailable — Input/Reverse Charge VAT could not be fetched. VAT Payable will be overstated.',
-    );
-  } else {
-    for (const grp of vatCreditData.currencyGroups ?? []) {
-      const ivResult = convertAmt(grp.inputVatAmount, grp.currencyCode, baseCurrency, rates);
-      const rcResult = convertAmt(
-        grp.reverseChargeVatAmount,
-        grp.currencyCode,
-        baseCurrency,
-        rates,
-      );
-      if (ivResult.warning) {
-        if (!currencyWarnings.includes(ivResult.warning)) currencyWarnings.push(ivResult.warning);
-      } else {
-        inputVatReclaimable += ivResult.value;
-        domesticInputVat += ivResult.value;
-      }
-      if (rcResult.warning) {
-        if (!currencyWarnings.includes(rcResult.warning)) currencyWarnings.push(rcResult.warning);
-      } else {
-        inputVatReclaimable += rcResult.value;
-        reverseChargeVatSelfAssessed += rcResult.value;
-      }
-    }
+  const domesticInputVat = vatCredit.domesticInputVat;
+  const reverseChargeVatSelfAssessed = vatCredit.reverseChargeVatSelfAssessed;
+  if (vatCredit.dataWarning) dataWarnings.push(vatCredit.dataWarning);
+  for (const w of vatCredit.currencyWarnings) {
+    if (!currencyWarnings.includes(w)) currencyWarnings.push(w);
   }
 
   const vatCollected = aggByCurrency(vatCollectedRows, baseCurrency, rates, currencyWarnings);
@@ -1447,6 +1514,25 @@ export async function computeBalanceSheet(
   // for it, and we owe the vendor the same amount. Booking only the credit left an asset
   // with no matching liability.
   accountsPayable += domesticInputVat;
+
+  // Cheques Payable — ISSUED cheques not yet cleared. Mirrors "1011 Cheques in Hand"
+  // above for the opposite direction: issuing a vendor cheque (Manager/Employee
+  // purchase-payment flows, or a manual Payable/Expense settlement) is deliberately
+  // recorded as owed but not yet a cash movement — the bank isn't debited, and (per the
+  // Manager/Employee purchase flows) the PurchasePayment that reduces the vendor's own
+  // Outstanding isn't recorded either, until the cheque actually clears. Nothing counted
+  // that real, standing liability in the meantime, so issuing a cheque made a payable
+  // vanish with no counterpart for the whole window before it clears.
+  const chequesPayableRows = await db.query<{ amount: string }[]>(`
+    SELECT COALESCE(SUM(amount), 0) AS amount
+    FROM cheques
+    WHERE type = 'ISSUED'
+      AND status = 'PENDING'
+      ${bSql('cheques', 'branch_id')}
+  `);
+  const chequesPayable = Number(chequesPayableRows[0]?.amount ?? 0);
+  accountsPayable += chequesPayable;
+
   // Reverse charge is self-assessed: the import raises an output-VAT liability of the
   // same size as the input credit claimed for it, so the two cancel. Counting only the
   // credit understated VAT owed by the full reverse-charge amount.

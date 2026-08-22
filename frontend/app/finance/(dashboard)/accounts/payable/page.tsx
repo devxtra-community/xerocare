@@ -26,8 +26,13 @@ import {
   fetchExpenseEntries,
   payExpenseEntry,
   fetchVendorStatement,
+  fetchInputVatPayable,
+  filterAccountsByPaymentMode,
+  accountTypeForPaymentMode,
+  insufficientBalanceError,
   type ManualPayable,
   type ExpenseEntry,
+  type CashBankAccount,
 } from '@/lib/finance/accountsApi';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import {
@@ -226,13 +231,13 @@ function PaymentModal({
   onClose,
 }: {
   payable: ManualPayable;
-  accounts: { id: string; name: string }[];
+  accounts: CashBankAccount[];
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
     paymentDate: today,
     amount: payable.outstanding.toString(),
-    paidFromAccount: accounts[0]?.id ?? '',
+    paidFromAccount: '',
     paymentMode: 'Bank Transfer',
     referenceNo: '',
     chequeNumber: '',
@@ -242,6 +247,21 @@ function PaymentModal({
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const isCheque = form.paymentMode === 'Cheque';
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, form.paymentMode);
+  const selectedAccount = accounts.find((a) => a.id === form.paidFromAccount);
+  const balanceError = isCheque
+    ? null
+    : insufficientBalanceError(parseFloat(form.amount) || 0, selectedAccount);
+
+  // Default to (and re-default on mode change, dropping a now-invalid pick) the first
+  // account matching the currently-selected mode rather than any account at all.
+  useEffect(() => {
+    if (isCheque) return;
+    if (matchingAccounts.some((a) => a.id === form.paidFromAccount)) return;
+    set('paidFromAccount', matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentMode, accounts]);
+
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: () =>
@@ -256,7 +276,12 @@ function PaymentModal({
       qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
       onClose();
     },
-    onError: () => toast.error('Failed to record payment'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to record payment';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -298,18 +323,35 @@ function PaymentModal({
           {!isCheque && (
             <div>
               <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
-              <Select value={form.paidFromAccount} onValueChange={(v) => set('paidFromAccount', v)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {matchingAccounts.length === 0 ? (
+                <p className="text-xs font-medium text-red-600 mt-1">
+                  No{' '}
+                  {accountTypeForPaymentMode(form.paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
+                  account exists for this branch.
+                </p>
+              ) : (
+                <Select
+                  value={form.paidFromAccount}
+                  onValueChange={(v) => set('paidFromAccount', v)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {matchingAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} — {a.currency}{' '}
+                        {Number(a.currentBalance).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {balanceError && (
+                <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+              )}
             </div>
           )}
           <div>
@@ -383,7 +425,15 @@ function PaymentModal({
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending} className="flex-1">
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={
+              mut.isPending ||
+              !!balanceError ||
+              (!isCheque && (matchingAccounts.length === 0 || !form.paidFromAccount))
+            }
+            className="flex-1"
+          >
             {mut.isPending ? 'Saving...' : 'Record'}
           </Button>
         </div>
@@ -398,16 +448,26 @@ function ExpensePaymentModal({
   onClose,
 }: {
   expense: ExpenseEntry & { outstanding: number };
-  accounts: { id: string; name: string }[];
+  accounts: CashBankAccount[];
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
     paymentDate: today,
-    paidFrom: accounts[0]?.id ?? '',
+    paidFrom: '',
     paymentMode: 'Cash',
     referenceNo: '',
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, form.paymentMode);
+  const selectedAccount = accounts.find((a) => a.id === form.paidFrom);
+  const balanceError = insufficientBalanceError(Number(expense.outstanding), selectedAccount);
+
+  useEffect(() => {
+    if (matchingAccounts.some((a) => a.id === form.paidFrom)) return;
+    set('paidFrom', matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentMode, accounts]);
+
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: () => payExpenseEntry(expense.id, form),
@@ -418,7 +478,12 @@ function ExpensePaymentModal({
       qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
       onClose();
     },
-    onError: () => toast.error('Failed to record expense payment'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to record expense payment';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -449,18 +514,32 @@ function ExpensePaymentModal({
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Pay From Account</label>
-            <Select value={form.paidFrom} onValueChange={(v) => set('paidFrom', v)}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {matchingAccounts.length === 0 ? (
+              <p className="text-xs font-medium text-red-600 mt-1">
+                No{' '}
+                {accountTypeForPaymentMode(form.paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
+                account exists for this branch.
+              </p>
+            ) : (
+              <Select value={form.paidFrom} onValueChange={(v) => set('paidFrom', v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {matchingAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name} — {a.currency}{' '}
+                      {Number(a.currentBalance).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {balanceError && (
+              <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Payment Mode</label>
@@ -492,7 +571,7 @@ function ExpensePaymentModal({
           </Button>
           <Button
             onClick={() => mut.mutate()}
-            disabled={mut.isPending || !form.paidFrom}
+            disabled={mut.isPending || !form.paidFrom || !!balanceError}
             className="flex-1"
           >
             {mut.isPending ? 'Processing...' : 'Pay Now'}
@@ -683,9 +762,16 @@ export default function AccountsPayablePage() {
     staleTime: 60_000,
   });
 
-  // Merge purchase orders + manual payables + approved expense entries. Manual
-  // payables linked to a PO (linkedPurchaseId) are excluded — that PO's own
-  // outstanding balance already covers it, so including both would double-count.
+  const { data: inputVatPayable } = useQuery({
+    queryKey: ['input-vat-payable'],
+    queryFn: () => fetchInputVatPayable(),
+    staleTime: 30_000,
+  });
+
+  // Merge purchase orders + manual payables + approved expense entries + domestic
+  // input VAT owed to vendors. Manual payables linked to a PO (linkedPurchaseId)
+  // are excluded — that PO's own outstanding balance already covers it, so
+  // including both would double-count.
   const allPayables = useMemo(() => {
     // Only include vendor purchases that still have an outstanding balance.
     // Fully-paid purchases have remainingAmount=0 and should not appear in AP.
@@ -707,11 +793,46 @@ export default function AccountsPayablePage() {
         aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
         isPurchase: true,
         isExpense: false,
+        isVat: false,
         source: 'Purchase Order' as const,
       }));
     const fromManual = manualPayables
       .filter((p) => !p.linkedPurchaseId)
-      .map((p) => ({ ...p, isPurchase: false, isExpense: false, source: 'Manual Entry' as const }));
+      .map((p) => ({
+        ...p,
+        isPurchase: false,
+        isExpense: false,
+        isVat: false,
+        source: 'Manual Entry' as const,
+      }));
+    // Domestic input VAT vendors charged us — no per-purchase breakdown is available
+    // (the source endpoint returns one aggregate per currency), so this shows as a
+    // single line rather than one row per purchase, and carries no Record Payment
+    // action since there's no per-purchase VAT settlement to record against.
+    const fromInputVat =
+      inputVatPayable && inputVatPayable.amount > 0
+        ? [
+            {
+              id: 'input-vat-payable',
+              referenceNo: 'VAT-INPUT',
+              type: 'OTHER' as const,
+              payableTo: 'Vendors — Input VAT',
+              amount: inputVatPayable.amount,
+              currency: inputVatPayable.currency,
+              issueDate: today,
+              dueDate: today,
+              amountPaid: 0,
+              outstanding: inputVatPayable.amount,
+              status: 'PENDING',
+              branchId: currentUser?.branchId ?? '',
+              aging: 'Current',
+              isPurchase: false,
+              isExpense: false,
+              isVat: true,
+              source: 'Input VAT' as const,
+            },
+          ]
+        : [];
     const fromExpenses = approvedExpenses.map((e) => ({
       id: e.id,
       referenceNo: e.expenseNo,
@@ -728,11 +849,19 @@ export default function AccountsPayablePage() {
       aging: e.date ? agingBucket(String(e.date)) : 'Current',
       isPurchase: false,
       isExpense: true,
+      isVat: false,
       source: 'Accrued Expense' as const,
       _raw: e,
     }));
-    return [...fromManual, ...fromExpenses, ...fromPurchases];
-  }, [purchases, manualPayables, approvedExpenses, currency]);
+    return [...fromManual, ...fromExpenses, ...fromPurchases, ...fromInputVat];
+  }, [
+    purchases,
+    manualPayables,
+    approvedExpenses,
+    inputVatPayable,
+    currentUser?.branchId,
+    currency,
+  ]);
 
   const filtered = useMemo(
     () =>
@@ -829,13 +958,16 @@ export default function AccountsPayablePage() {
     return { byType, topVendors, monthly };
   }, [allPayables]);
 
-  // Real vendors only — Accrued Expense rows are internal payees, not vendors,
-  // so they're excluded from the Vendor Statement picker.
+  // Real vendors only — Accrued Expense rows are internal payees and the Input VAT
+  // row is an aggregate across every vendor, not a single one, so both are excluded
+  // from the Vendor Statement picker.
   const vendorNames = useMemo(
     () =>
       [
         ...new Set(
-          allPayables.filter((p) => p.source !== 'Accrued Expense').map((p) => p.payableTo),
+          allPayables
+            .filter((p) => p.source !== 'Accrued Expense' && !p.isVat)
+            .map((p) => p.payableTo),
         ),
       ]
         .filter(Boolean)
@@ -873,7 +1005,9 @@ export default function AccountsPayablePage() {
 
   const handleGenerateStatementClick = () => {
     const uniqueVisible = [
-      ...new Set(filtered.filter((p) => p.source !== 'Accrued Expense').map((p) => p.payableTo)),
+      ...new Set(
+        filtered.filter((p) => p.source !== 'Accrued Expense' && !p.isVat).map((p) => p.payableTo),
+      ),
     ].filter(Boolean);
     if (uniqueVisible.length === 1) {
       generateVendorStatement(uniqueVisible[0] as string);
@@ -1139,6 +1273,7 @@ export default function AccountsPayablePage() {
                       <SelectItem value="Purchase Order">Purchase Order</SelectItem>
                       <SelectItem value="Manual Entry">Manual Entry</SelectItem>
                       <SelectItem value="Accrued Expense">Accrued Expense</SelectItem>
+                      <SelectItem value="Input VAT">Input VAT</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1298,7 +1433,9 @@ export default function AccountsPayablePage() {
                                 ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                                 : p.source === 'Manual Entry'
                                   ? 'bg-slate-100 text-slate-700 border-slate-200'
-                                  : 'bg-purple-50 text-purple-700 border-purple-200'
+                                  : p.source === 'Input VAT'
+                                    ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                    : 'bg-purple-50 text-purple-700 border-purple-200'
                             }`}
                           >
                             {p.source}
@@ -1338,21 +1475,30 @@ export default function AccountsPayablePage() {
                         </TableCell>
                         <TableCell className="pr-4">
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => {
-                                if (p.isExpense) {
-                                  const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
-                                  setViewingExpense(raw);
-                                } else {
-                                  setViewingRow({ type: p.isPurchase ? 'PO' : 'MANUAL', id: p.id });
-                                }
-                              }}
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                              title="View full details"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                            {!p.isPurchase && (p.outstanding ?? 0) > 0 && (
+                            {p.isVat ? (
+                              <span className="text-[10px] text-muted-foreground italic pl-1.5">
+                                Aggregate — no per-purchase detail
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (p.isExpense) {
+                                    const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
+                                    setViewingExpense(raw);
+                                  } else {
+                                    setViewingRow({
+                                      type: p.isPurchase ? 'PO' : 'MANUAL',
+                                      id: p.id,
+                                    });
+                                  }
+                                }}
+                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                title="View full details"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {!p.isPurchase && !p.isVat && (p.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => {
                                   if (p.isExpense) {

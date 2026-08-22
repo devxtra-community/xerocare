@@ -51,6 +51,29 @@ function selectPricingRule<
   return candidates.find(carriesPlan) ?? candidates[0];
 }
 
+async function fetchEmployeeName(employeeId: string): Promise<string> {
+  try {
+    const { sign } = await import('jsonwebtoken');
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+    const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const res = await fetch(`${empUrl}/employee/${employeeId}`, {
+      headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
+    });
+    if (!res.ok) return 'Employee';
+    const data = await res.json();
+    const emp = data.data ?? data;
+    const first = emp.first_name || emp.firstName || '';
+    const last = emp.last_name || emp.lastName || '';
+    return `${first} ${last}`.trim() || emp.email || 'Employee';
+  } catch {
+    return 'Employee';
+  }
+}
+
 export class UsageService {
   private usageRepo = new UsageRepository();
   private invoiceRepo = new InvoiceRepository();
@@ -81,24 +104,6 @@ export class UsageService {
       endColorA4: number;
       endColorA3: number;
     }>;
-    /**
-     * Payment collected for this billing period at the same time the bill is generated.
-     * This period's charge is always accrued onto the contract's totalAmount; the amount
-     * collected (which may be less than the full charge — a partial collection, or 0 for
-     * a fully deferred period) is submitted as a PENDING SalePaymentRequest, going through
-     * the exact same Accounts-approval gate as every other collection. Defaults to the
-     * full period charge when omitted, for backward-compatible callers.
-     */
-    amountCollected?: number;
-    paymentMode?: string;
-    paymentReferenceNumber?: string;
-    paymentDate?: string;
-    chequeNumber?: string;
-    chequeBankName?: string;
-    chequeDueDate?: string;
-    /** The date physically written on the cheque — independent of chequeDueDate. */
-    chequeDate?: string;
-    cashAccountId?: string;
     recordedBy?: string;
   }) {
     // 1. Fetch Contract
@@ -118,6 +123,12 @@ export class UsageService {
     if (contract.contractStatus === 'COMPLETED') {
       throw new AppError('Contract already completed. No further recording allowed.', 400);
     }
+
+    // Who created this bill — shown on the document and to Accounts, mirrors
+    // ContractAgreement.createdByEmployeeName.
+    const billCreatedByName = payload.recordedBy
+      ? await fetchEmployeeName(payload.recordedBy)
+      : 'Employee';
 
     // Strict Period Overflow Check
     const newEnd = new Date(payload.billingPeriodEnd);
@@ -474,11 +485,17 @@ export class UsageService {
         );
         const finalPeriodTax = this.computePeriodTax(finalPeriodChargeBase, contract);
         const finalPeriodCharge = finalPeriodTax.totalWithTax;
-        contract.totalAmount = finalPeriodCharge;
-        // This final settlement figure replaces (not accrues) the contract's totalAmount,
-        // so taxAmount is replaced to match rather than accrued — keeping them consistent
-        // for the Output Tax / VAT Payable reports, which derive taxableAmount from the two.
-        contract.taxAmount = finalPeriodTax.taxAmount;
+        // Accrue onto the running total exactly like every non-final period does below
+        // (see the "Accrue this period's charge onto the contract's running total" branch)
+        // — the shared recordPayment() overpayment guard compares a new SalePaymentRequest
+        // against this cumulative totalAmount. This used to REPLACE totalAmount with just
+        // the final period's charge, discarding every prior period's accrued total: a
+        // contract that had already collected N periods' worth of payments then looked,
+        // to the overpay guard, like it only ever owed the final period's charge — so
+        // requesting that final period's own (correct, incremental) amount was rejected
+        // as "overpaying" by exactly what had already been legitimately collected earlier.
+        contract.totalAmount = Number(contract.totalAmount || 0) + finalPeriodCharge;
+        contract.taxAmount = Number(contract.taxAmount || 0) + finalPeriodTax.taxAmount;
 
         contract.grossAmount = monthlyRent + exceededCharge; // Show full amount as Gross
         contract.discountAmount =
@@ -512,6 +529,9 @@ export class UsageService {
           discountBwCopies: payload.discountBwCopies || 0,
           discountColorCopies: payload.discountColorCopies || 0,
           discountAmount: payload.discountAmount || 0,
+          billStatus: 'PENDING_APPROVAL',
+          billCreatedByEmployeeId: payload.recordedBy,
+          billCreatedByName,
         });
         await queryRunner.manager.save(usage);
 
@@ -526,19 +546,6 @@ export class UsageService {
         }
 
         await queryRunner.commitTransaction();
-
-        // Collect payment for this final period — must run after commit so the invoice/
-        // usage rows are visible to the query. Creates a PENDING SalePaymentRequest (same
-        // Accounts-approval gate as every other collection) rather than settling directly;
-        // returns null if nothing was collected this visit (amountCollected <= 0).
-        const finalSalePaymentRequest = await this.collectUsageBillPayment(
-          contract,
-          finalPeriodCharge,
-          usage.id,
-          usage.billingPeriodStart,
-          usage.billingPeriodEnd,
-          payload,
-        );
 
         // 🚀 Post-transaction: Handle Product Allocations for RENT Contracts
         if (contract.saleType === SaleType.RENT) {
@@ -587,7 +594,7 @@ export class UsageService {
           colorA3: totalEndColorA3 || payload.colorA3Count,
         });
 
-        return { usage, salePaymentRequest: finalSalePaymentRequest };
+        return { usage };
       } catch (error) {
         await queryRunner.rollbackTransaction();
         logger.error('Record Usage Transaction failed', { error, contractId: contract.id });
@@ -628,6 +635,9 @@ export class UsageService {
         discountBwCopies: payload.discountBwCopies || 0,
         discountColorCopies: payload.discountColorCopies || 0,
         discountAmount: payload.discountAmount || 0,
+        billStatus: 'PENDING_APPROVAL',
+        billCreatedByEmployeeId: payload.recordedBy,
+        billCreatedByName,
       });
       await this.usageRepo.save(usage);
 
@@ -648,23 +658,13 @@ export class UsageService {
       // is created). This does not touch the pricing/usage calculation above — it only
       // accrues what was already computed (now VAT-inclusive). taxAmount is accrued
       // alongside it so the Output Tax report and VAT Payable (2003), which both read
-      // Invoice.totalAmount/taxAmount directly, stay correct as periods accumulate.
+      // Invoice.totalAmount/taxAmount directly, stay correct as periods accumulate. This
+      // also makes the bill's amount Outstanding immediately on creation — Stage B
+      // payment collection is now a fully separate step, gated on customer approval of
+      // this bill (see collectPendingUsagePayment).
       contract.totalAmount = Number(contract.totalAmount || 0) + periodCharge;
       contract.taxAmount = Number(contract.taxAmount || 0) + periodTax.taxAmount;
       await this.invoiceRepo.saveInvoice(contract);
-
-      // Collect payment for this period — creates a PENDING SalePaymentRequest (same
-      // Accounts-approval gate as every other collection) rather than settling directly;
-      // returns null if nothing was collected this visit (amountCollected <= 0), leaving
-      // the full charge outstanding and visible on the Pending Payments tab.
-      const salePaymentRequest = await this.collectUsageBillPayment(
-        contract,
-        periodCharge,
-        usage.id,
-        usage.billingPeriodStart,
-        usage.billingPeriodEnd,
-        payload,
-      );
 
       // Return next period for UI convenience
       const nextPeriod = this.calculateNextPeriod(contract, new Date(payload.billingPeriodEnd));
@@ -677,7 +677,7 @@ export class UsageService {
         colorA3: totalEndColorA3 || payload.colorA3Count,
       });
 
-      return { usage, nextPeriod, salePaymentRequest };
+      return { usage, nextPeriod };
     }
   }
 
@@ -741,89 +741,6 @@ export class UsageService {
     const taxPercent = Number(contract.taxPercent || 0);
     const taxAmount = taxPercent > 0 ? Math.round(taxableAmount * taxPercent) / 100 : 0;
     return { taxableAmount, taxAmount, totalWithTax: taxableAmount + taxAmount, taxPercent };
-  }
-
-  // Helper: human-readable billing period label used in the cheque sourceLabel — works
-  // uniformly for Monthly ("Aug 2026"), Quarterly/Half-Yearly/Yearly ("Jul 2026 to Sep 2026")
-  // since it's derived from the actual period dates, not the cycle type.
-  private formatPeriodLabel(start: Date, end: Date): string {
-    const fmt = (d: Date) =>
-      new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
-    const startLabel = fmt(start);
-    const endLabel = fmt(end);
-    return startLabel === endLabel ? startLabel : `${startLabel} to ${endLabel}`;
-  }
-
-  // Submits whatever was collected for this period as a PENDING SalePaymentRequest —
-  // the same Accounts-approval gate every other collection goes through (advance,
-  // Monthly Collection's final-invoice "Collect", InvoiceAccountView). Previously this
-  // called billingService.recordPayment() directly, settling the money immediately with
-  // no approval step and no SalePaymentRequest row at all — invisible to Accounts
-  // Receipts and to receipt generation, both of which key off that table. The amount
-  // collected may be less than periodChargeAmount (a partial collection) or 0 (fully
-  // deferred); either way the shortfall stays implicitly tracked as
-  // periodChargeAmount minus whatever SalePaymentRequests end up linked to this
-  // usageRecordId (see getPendingUsagePayments), so it surfaces on the Pending
-  // Payments tab rather than silently sitting inside contract.totalAmount unresolved.
-  private async collectUsageBillPayment(
-    contract: Invoice,
-    periodChargeAmount: number,
-    usageRecordId: string,
-    billingPeriodStart: Date,
-    billingPeriodEnd: Date,
-    payload: {
-      amountCollected?: number;
-      paymentMode?: string;
-      paymentReferenceNumber?: string;
-      paymentDate?: string;
-      chequeNumber?: string;
-      chequeBankName?: string;
-      chequeDueDate?: string;
-      chequeDate?: string;
-      cashAccountId?: string;
-      recordedBy?: string;
-    },
-  ) {
-    const amount =
-      payload.amountCollected !== undefined && payload.amountCollected !== null
-        ? Number(payload.amountCollected)
-        : periodChargeAmount;
-
-    if (amount <= 0) return null; // fully deferred this visit — nothing to submit
-
-    if (amount > periodChargeAmount + 0.01) {
-      throw new AppError(
-        `Amount collected (${amount}) cannot exceed this period's charge (${periodChargeAmount})`,
-        400,
-      );
-    }
-    if (!payload.paymentMode) {
-      throw new AppError('Payment mode is required when collecting an amount', 400);
-    }
-
-    // Dynamic import avoids a circular dependency — BillingService already constructs
-    // UsageService (`private usageService = new UsageService()`), so a static top-level
-    // import here would fail. Same pattern already used elsewhere in this codebase for
-    // breaking circular references (e.g. Cheque/PaymentLedger imports in billingService.ts).
-    const { createSalePaymentRequest } = await import('./salePaymentRequestService');
-
-    return createSalePaymentRequest({
-      invoiceId: contract.id,
-      branchId: contract.branchId,
-      userId: payload.recordedBy || 'system',
-      amount,
-      paymentMode: payload.paymentMode,
-      paymentDate: payload.paymentDate ? new Date(payload.paymentDate) : new Date(),
-      referenceNumber: payload.chequeNumber || payload.paymentReferenceNumber,
-      remarks: `Usage bill — ${this.formatPeriodLabel(billingPeriodStart, billingPeriodEnd)}`,
-      cashAccountId: payload.cashAccountId,
-      chequeNumber: payload.chequeNumber,
-      chequeBankName: payload.chequeBankName,
-      chequeDueDate: payload.chequeDueDate ? new Date(payload.chequeDueDate) : undefined,
-      chequeDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
-      paymentContext: contract.saleType === SaleType.RENT ? 'RENT_PERIODIC' : 'LEASE_PERIODIC',
-      usageRecordId,
-    });
   }
 
   // Helper: Next Period
@@ -1483,45 +1400,7 @@ export class UsageService {
       colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
     }
 
-    const discountBw = payload.discountBwCopies ?? usage.discountBwCopies ?? 0;
-    const discountColor = payload.discountColorCopies ?? usage.discountColorCopies ?? 0;
-    const discountAmt = payload.discountAmount ?? usage.discountAmount ?? 0;
-
-    const monthlyBw = Math.max(0, bwA4Delta + bwA3Delta * 2);
-    const monthlyColor = Math.max(0, colorA4Delta + colorA3Delta * 2);
-    const monthlyNormalized = monthlyBw + monthlyColor;
-
-    let exceededTotal = 0;
-    let exceededCharge = 0;
-
-    if (rule) {
-      if (contract.rentType === 'FIXED_LIMIT') {
-        const bwExceeded = Math.max(0, monthlyBw - (rule.bwIncludedLimit || 0));
-        const colorExceeded = Math.max(0, monthlyColor - (rule.colorIncludedLimit || 0));
-        exceededTotal = bwExceeded + colorExceeded;
-        const bwCharge = bwExceeded * Number(rule.bwExcessRate || 0);
-        const colorCharge = colorExceeded * Number(rule.colorExcessRate || 0);
-        exceededCharge = bwCharge + colorCharge;
-      } else if (contract.rentType === 'FIXED_COMBO') {
-        const combinedLimit =
-          rule.combinedIncludedLimit ||
-          (rule.bwIncludedLimit || 0) + (rule.colorIncludedLimit || 0);
-        const totalMonthly = monthlyBw + monthlyColor;
-        exceededTotal = Math.max(0, totalMonthly - combinedLimit);
-        exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
-      } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
-        exceededTotal = Math.max(0, monthlyNormalized - discountBw - discountColor);
-        const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
-        const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
-        const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
-        exceededCharge =
-          rule.comboSlabRanges && rule.comboSlabRanges.length > 0
-            ? comboCharge
-            : bwCharge + colorCharge;
-      }
-    }
-
-    // Finalize charges
+    // Finalize readings
     usage.bwA4Count = payload.bwA4Count;
     usage.bwA3Count = payload.bwA3Count;
     usage.colorA4Count = payload.colorA4Count;
@@ -1530,7 +1409,15 @@ export class UsageService {
       usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
     }
 
-    // Update UsageRecordItems and pre-emptively update ProductAllocations based on payload.items
+    // Update UsageRecordItems and pre-emptively update ProductAllocations based on payload.items.
+    // This MUST run before the charge calculation below — it's the block that actually
+    // resolves bwA4Delta/bwA3Delta/colorA4Delta/colorA3Delta to their real per-machine values
+    // whenever items are supplied (i.e. every multi-device contract, and the frontend's normal
+    // single-device path too). Charges were previously computed from the deltas as they stood
+    // right after the block above — which for an items-based payload is always 0, since that
+    // branch explicitly defers the real numbers to here — so exceededCharge/exceededTotal (and
+    // therefore totalCharge) were silently calculated from zero usage and saved as such, even
+    // though the correct per-machine deltas were computed and persisted correctly right below.
     if (payload.items && payload.items.length > 0) {
       const existingItems = await this.invoiceRepo.manager.find(UsageRecordItem, {
         where: { usageRecordId: usage.id },
@@ -1590,6 +1477,44 @@ export class UsageService {
       }
     }
 
+    const discountBw = payload.discountBwCopies ?? usage.discountBwCopies ?? 0;
+    const discountColor = payload.discountColorCopies ?? usage.discountColorCopies ?? 0;
+    const discountAmt = payload.discountAmount ?? usage.discountAmount ?? 0;
+
+    const monthlyBw = Math.max(0, bwA4Delta + bwA3Delta * 2);
+    const monthlyColor = Math.max(0, colorA4Delta + colorA3Delta * 2);
+    const monthlyNormalized = monthlyBw + monthlyColor;
+
+    let exceededTotal = 0;
+    let exceededCharge = 0;
+
+    if (rule) {
+      if (contract.rentType === 'FIXED_LIMIT') {
+        const bwExceeded = Math.max(0, monthlyBw - (rule.bwIncludedLimit || 0));
+        const colorExceeded = Math.max(0, monthlyColor - (rule.colorIncludedLimit || 0));
+        exceededTotal = bwExceeded + colorExceeded;
+        const bwCharge = bwExceeded * Number(rule.bwExcessRate || 0);
+        const colorCharge = colorExceeded * Number(rule.colorExcessRate || 0);
+        exceededCharge = bwCharge + colorCharge;
+      } else if (contract.rentType === 'FIXED_COMBO') {
+        const combinedLimit =
+          rule.combinedIncludedLimit ||
+          (rule.bwIncludedLimit || 0) + (rule.colorIncludedLimit || 0);
+        const totalMonthly = monthlyBw + monthlyColor;
+        exceededTotal = Math.max(0, totalMonthly - combinedLimit);
+        exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
+      } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
+        exceededTotal = Math.max(0, monthlyNormalized - discountBw - discountColor);
+        const bwCharge = this.calculateSlabCharge(monthlyBw, rule.bwSlabRanges);
+        const colorCharge = this.calculateSlabCharge(monthlyColor, rule.colorSlabRanges);
+        const comboCharge = this.calculateSlabCharge(monthlyNormalized, rule.comboSlabRanges);
+        exceededCharge =
+          rule.comboSlabRanges && rule.comboSlabRanges.length > 0
+            ? comboCharge
+            : bwCharge + colorCharge;
+      }
+    }
+
     usage.bwA4Delta = bwA4Delta;
     usage.bwA3Delta = bwA3Delta;
     usage.colorA4Delta = colorA4Delta;
@@ -1601,10 +1526,54 @@ export class UsageService {
     usage.discountColorCopies = discountColor;
     usage.discountAmount = discountAmt;
 
-    usage.totalCharge = Math.max(
+    // Capture before overwriting — contract.totalAmount/taxAmount were already accrued
+    // with the OLD figures when this bill was first created (recordUsage), and never
+    // revisited since. Correcting a bill (typically after a customer dispute) must move
+    // Outstanding by exactly the difference, not leave the stale original amount sitting
+    // there or double-count the new one.
+    const previousTotalCharge = Number(usage.totalCharge || 0);
+    const previousTaxAmount = Number(usage.taxAmount || 0);
+
+    const periodChargeBase = Math.max(
       0,
       Number(usage.monthlyRent) + exceededCharge - Number(usage.advanceAdjusted || 0) - discountAmt,
     );
+    // recordUsage() layers VAT on top of the period charge before persisting totalCharge
+    // (it's the VAT-inclusive figure the customer is actually billed, and what the
+    // frontend's own live preview calculates and shows before Save). This correction path
+    // computed totalCharge from periodChargeBase directly, with no VAT layered on at all —
+    // so an edited bill's saved total was always short of the tax-inclusive figure the user
+    // just saw calculated on screen, and taxableAmount/taxAmount stayed frozen at whatever
+    // they were the last time this row went through recordUsage (or a previous edit).
+    const periodTax = this.computePeriodTax(periodChargeBase, contract);
+
+    usage.taxableAmount = periodTax.taxableAmount;
+    usage.taxAmount = periodTax.taxAmount;
+    usage.taxPercent = periodTax.taxPercent || undefined;
+    usage.totalCharge = periodTax.totalWithTax;
+
+    const chargeDelta = Number(usage.totalCharge) - previousTotalCharge;
+    const taxDelta = Number(usage.taxAmount) - previousTaxAmount;
+    if (chargeDelta !== 0 || taxDelta !== 0) {
+      contract.totalAmount = Number(contract.totalAmount || 0) + chargeDelta;
+      contract.taxAmount = Number(contract.taxAmount || 0) + taxDelta;
+      await this.invoiceRepo.saveInvoice(contract);
+    }
+
+    // A correction resets the bill back through Stage A's approval step — the customer
+    // must review and approve the corrected figure, same as a brand-new bill. Applies
+    // whether the previous state was a dispute (the expected trigger for an edit) or an
+    // already-approved bill being corrected for some other reason.
+    usage.billStatus = 'PENDING_APPROVAL';
+    usage.customerApprovedByName = undefined;
+    usage.customerApprovedAt = undefined;
+    usage.customerApprovalMethod = undefined;
+    usage.customerApprovalNote = undefined;
+    usage.customerRejectionReason = undefined;
+    usage.customerRejectedAt = undefined;
+    usage.signingToken = undefined;
+    usage.signingTokenExpiresAt = undefined;
+    usage.signingTokenUsed = false;
 
     return this.usageRepo.save(usage);
   }

@@ -19,6 +19,8 @@ import {
   Upload,
   FileText,
   ExternalLink,
+  Mail,
+  MessageSquare,
 } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/apiError';
 import {
@@ -29,6 +31,8 @@ import {
   signContractCustomerByUpload,
   generateSigningToken,
   getContractAgreement,
+  sendContractAgreementEmail,
+  sendContractAgreementWhatsApp,
 } from '@/lib/saleWorkflow';
 import { ESignatureCanvas } from './ESignatureCanvas';
 import { ContractDocumentBody, defaultTermsForType } from './ContractDocumentBody';
@@ -67,6 +71,7 @@ export function ContractAgreementModal({
   const [customerSigData, setCustomerSigData] = useState<string | null>(null);
   const [remoteLink, setRemoteLink] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [sendingAgreementVia, setSendingAgreementVia] = useState<'email' | 'whatsapp' | null>(null);
 
   // Upload method state
   const [customerSignMethod, setCustomerSignMethod] = useState<'CAPTURE' | 'UPLOAD'>('CAPTURE');
@@ -126,7 +131,10 @@ export function ContractAgreementModal({
       setAgreement(updated);
       toast.success('Employee signature saved');
       onSigned?.(updated);
-      setTab('view');
+      // Forward to the next step in the sequence (Document → Employee Sign →
+      // Customer Sign), not back to Document — Customer Sign / Remote Link stay
+      // one click away either way since the tab strip itself is never gated.
+      setTab('customer-sign');
     } catch (err) {
       toast.error('Failed to save signature', { description: getApiErrorMessage(err) });
     } finally {
@@ -201,6 +209,33 @@ export function ContractAgreementModal({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // Available from any tab, not just Remote Link — Finance/Employee shouldn't have
+  // to navigate there just to send the customer a copy of the document. Reuses the
+  // same signing-link mechanism (fresh 72-hour token each send), so a customer who
+  // hasn't signed yet can review and sign from the emailed/WhatsApped link too.
+  const handleSendAgreement = async (channel: 'email' | 'whatsapp') => {
+    setSendingAgreementVia(channel);
+    try {
+      const result =
+        channel === 'email'
+          ? await sendContractAgreementEmail(invoice.id)
+          : await sendContractAgreementWhatsApp(invoice.id);
+      // A fresh 72-hour token is minted server-side on every send, superseding
+      // whatever the Remote Link tab was already displaying — keep it in sync so
+      // "Copy Link" / "Send via WhatsApp" there never point at a now-invalid link.
+      setRemoteLink(result.link);
+      toast.success(`Agreement sent via ${channel === 'email' ? 'email' : 'WhatsApp'}`, {
+        description: `Sent to ${result.recipient}`,
+      });
+    } catch (err) {
+      toast.error(`Failed to send agreement via ${channel}`, {
+        description: getApiErrorMessage(err),
+      });
+    } finally {
+      setSendingAgreementVia(null);
+    }
   };
 
   const statusBadge = (status: string) => {
@@ -591,19 +626,19 @@ export function ContractAgreementModal({
                           <p className="text-[10px] text-slate-400 font-bold text-center">
                             Link expires in 72 hours • Single use
                           </p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={copyLink}
-                              className="text-[10px] font-black uppercase tracking-widest h-9"
+                              className="text-[10px] font-black uppercase tracking-widest h-9 px-2"
                             >
                               <Copy size={12} className="mr-1" />
-                              Copy Link
+                              Copy
                             </Button>
                             <Button
                               size="sm"
-                              className="text-[10px] font-black uppercase tracking-widest h-9 bg-slate-800 text-white hover:bg-slate-900"
+                              className="text-[10px] font-black uppercase tracking-widest h-9 px-2 bg-slate-800 text-white hover:bg-slate-900"
                               onClick={() => {
                                 const wa = `https://wa.me/?text=${encodeURIComponent(
                                   `Please sign your contract agreement: ${remoteLink}`,
@@ -612,9 +647,26 @@ export function ContractAgreementModal({
                               }}
                             >
                               <Send size={12} className="mr-1" />
-                              Send via WhatsApp
+                              WhatsApp
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={sendingAgreementVia !== null}
+                              className="text-[10px] font-black uppercase tracking-widest h-9 px-2 bg-indigo-600 text-white hover:bg-indigo-700"
+                              onClick={() => handleSendAgreement('email')}
+                            >
+                              {sendingAgreementVia === 'email' ? (
+                                <Loader2 size={12} className="animate-spin mr-1" />
+                              ) : (
+                                <Mail size={12} className="mr-1" />
+                              )}
+                              Email
                             </Button>
                           </div>
+                          <p className="text-[10px] text-slate-400 text-center leading-relaxed">
+                            Email sends the same link to the customer&apos;s address on file — no
+                            need to leave this screen.
+                          </p>
                         </div>
                       )}
                     </>
@@ -625,7 +677,39 @@ export function ContractAgreementModal({
           ) : null}
         </div>
 
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-2 shrink-0 print:hidden">
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 print:hidden">
+          {agreement && (
+            <div className="flex items-center gap-1 mr-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSendAgreement('email')}
+                disabled={sendingAgreementVia !== null}
+                className="h-9 w-9 p-0 text-slate-500"
+                title="Email agreement to customer"
+              >
+                {sendingAgreementVia === 'email' ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Mail size={14} />
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSendAgreement('whatsapp')}
+                disabled={sendingAgreementVia !== null}
+                className="h-9 w-9 p-0 text-emerald-600"
+                title="WhatsApp agreement to customer"
+              >
+                {sendingAgreementVia === 'whatsapp' ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <MessageSquare size={14} />
+                )}
+              </Button>
+            </div>
+          )}
           <Button
             variant="ghost"
             onClick={onClose}

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { sign } from 'jsonwebtoken';
-import { FindOptionsWhere } from 'typeorm';
+import { FindOptionsWhere, In } from 'typeorm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
@@ -19,6 +19,7 @@ import { Cheque } from '../entities/chequeEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { r2 } from '../config/r2';
 import { createSalePaymentRequest } from '../services/salePaymentRequestService';
+import { requireCashAccount } from '../services/cashbookService';
 
 import { logger } from '../config/logger';
 
@@ -280,6 +281,44 @@ export const signContractCustomerByUpload = async (
   }
 };
 
+// Shared by the HTTP handler below and the email/WhatsApp senders further down —
+// both need a fresh 72-hour signing link, not just the manual "Generate Signing
+// Link" button in the Remote Link tab.
+async function issueSigningToken(agreement: ContractAgreement): Promise<{ token: string }> {
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
+  agreement.signingToken = token;
+  agreement.signingTokenExpiresAt = expiresAt;
+  agreement.signingTokenUsed = false;
+  await Source.getRepository(ContractAgreement).save(agreement);
+
+  return { token };
+}
+
+// Single source of truth for the base URL every customer-facing remote link (Contract
+// Agreement signing, Bill approval — Receipt already uses R2_PUBLIC_URL directly and
+// doesn't go through here) is built from. Previously each link builder had its own
+// `process.env.FRONTEND_URL || 'http://localhost:3000'` fallback, and FRONTEND_URL was
+// never actually set in any environment — every emailed link silently pointed at
+// localhost:3000, unreachable from a customer's phone (ERR_CONNECTION_REFUSED) with no
+// warning anywhere. Falling back to localhost now logs loudly on every use so this can
+// never again ship silently broken.
+function publicAppUrl(): string {
+  const base = process.env.PUBLIC_APP_URL;
+  if (base) return base.replace(/\/$/, '');
+  logger.error(
+    'PUBLIC_APP_URL is not set — customer-facing links are falling back to localhost:3000, ' +
+      'which is unreachable from anywhere but this machine. Set PUBLIC_APP_URL to the real, ' +
+      'publicly-reachable application URL.',
+  );
+  return 'http://localhost:3000';
+}
+
+function signingLinkUrl(token: string): string {
+  return `${publicAppUrl()}/public/contract/sign/${token}`;
+}
+
 export const generateSigningToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -290,15 +329,140 @@ export const generateSigningToken = async (req: Request, res: Response, next: Ne
     if (!agreement) throw new AppError('Contract agreement not found', 404);
     if (agreement.branchId !== branchId) throw new AppError('Access denied', 403);
 
-    const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+    const { token } = await issueSigningToken(agreement);
+    res.json({ success: true, data: { token, expiresAt: agreement.signingTokenExpiresAt } });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    agreement.signingToken = token;
-    agreement.signingTokenExpiresAt = expiresAt;
-    agreement.signingTokenUsed = false;
-    await repo.save(agreement);
+// Emails the customer a link to review (and remotely sign, if not yet signed) the
+// contract agreement — reuses the same 72-hour signing link as the Remote Link tab,
+// so this and "Generate Signing Link" are two doors into the same mechanism rather
+// than a second implementation. Available regardless of signature status: Finance/
+// Employee may want to send the document for the customer's records even after
+// it's fully signed, not just while a signature is still pending.
+export const sendContractAgreementEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const { branchId } = req.user!;
+    const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
 
-    res.json({ success: true, data: { token, expiresAt } });
+    const repo = Source.getRepository(ContractAgreement);
+    const agreement = await repo.findOne({ where: { invoiceId: id } });
+    if (!agreement) throw new AppError('Contract agreement not found', 404);
+    if (agreement.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    // Prefer a live CRM lookup over agreement.customerEmail, which is only a copy
+    // taken at agreement-creation time — if the customer's email is corrected in
+    // their real Customer record afterward, this send would otherwise silently
+    // keep mailing the old address forever. Falls back to the cached copy only
+    // if CRM has nothing (unreachable, no customerId on this contract, etc.).
+    let recipient = recipientOverride?.trim();
+    if (!recipient) {
+      const invoiceForContact = await Source.getRepository(Invoice).findOne({
+        where: { id: agreement.invoiceId },
+        select: ['customerId'],
+      });
+      const contact = await fetchCustomerContact(invoiceForContact?.customerId);
+      recipient = contact?.email || agreement.customerEmail;
+    }
+    if (!recipient)
+      throw new AppError('Customer email not found. Please provide a recipient email.', 400);
+
+    const { token } = await issueSigningToken(agreement);
+    const link = signingLinkUrl(token);
+    const isFullySigned = agreement.signatureStatus === 'FULLY_SIGNED';
+
+    const htmlBody = `
+<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+  <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:28px 32px;color:#fff">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;opacity:.75;text-transform:uppercase;letter-spacing:.1em">Contract Agreement</p>
+    <h1 style="margin:0 0 4px;font-size:22px;font-weight:900;letter-spacing:-.5px">${agreement.agreementNumber}</h1>
+    <p style="margin:0;font-size:13px;opacity:.8">${agreement.dealerName}</p>
+  </div>
+  <div style="padding:28px 32px">
+    <p style="margin:0 0 20px;font-size:14px;color:#374151">Dear <strong>${agreement.customerName}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#374151">
+      ${
+        isFullySigned
+          ? `Please find your fully signed contract agreement with <strong>${agreement.dealerName}</strong> below, for your records.`
+          : `Your contract agreement with <strong>${agreement.dealerName}</strong> is ready for review${agreement.customerSignatureData ? '' : ' and signature'}.`
+      }
+    </p>
+    <div style="margin-top:8px;text-align:center">
+      <a href="${link}" target="_blank" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:12px 28px;border-radius:8px">${isFullySigned ? 'View Signed Agreement' : 'Review & Sign Agreement'}</a>
+    </div>
+    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;text-align:center">This link is valid for 72 hours.</p>
+  </div>
+</div>`;
+
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+    await NotificationPublisher.publishEmailRequest({
+      recipient,
+      subject: `Contract Agreement — ${agreement.agreementNumber}`,
+      body: htmlBody,
+      invoiceId: agreement.invoiceId,
+      attachmentUrl: link,
+    });
+
+    logger.info(`[ContractAgreement] Email queued for ${agreement.agreementNumber} → ${recipient}`);
+    // Return the link actually used — a fresh token is minted on every send, which
+    // supersedes whatever the Remote Link tab may already be displaying. The caller
+    // uses this to keep that display in sync rather than silently going stale.
+    res.json({ success: true, data: { message: 'Agreement email queued', recipient, link } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const sendContractAgreementWhatsApp = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const { branchId } = req.user!;
+    const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
+
+    const repo = Source.getRepository(ContractAgreement);
+    const agreement = await repo.findOne({ where: { invoiceId: id } });
+    if (!agreement) throw new AppError('Contract agreement not found', 404);
+    if (agreement.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    const recipient = recipientOverride?.trim() || agreement.customerPhone;
+    if (!recipient)
+      throw new AppError('Customer phone not found. Please provide a recipient number.', 400);
+
+    const { token } = await issueSigningToken(agreement);
+    const link = signingLinkUrl(token);
+    const isFullySigned = agreement.signatureStatus === 'FULLY_SIGNED';
+
+    const body =
+      `Dear ${agreement.customerName},\n\n` +
+      (isFullySigned
+        ? `Your fully signed contract agreement with ${agreement.dealerName} is ready.\n\n`
+        : `Your contract agreement with ${agreement.dealerName} is ready for review${agreement.customerSignatureData ? '' : ' and signature'}.\n\n`) +
+      `Agreement No: ${agreement.agreementNumber}\n\n` +
+      `${isFullySigned ? 'View' : 'Review & sign'}: ${link}\n\n` +
+      `Link valid for 72 hours.`;
+
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+    await NotificationPublisher.publishWhatsappRequest({
+      recipient,
+      body,
+      invoiceId: agreement.invoiceId,
+    });
+
+    logger.info(
+      `[ContractAgreement] WhatsApp queued for ${agreement.agreementNumber} → ${recipient}`,
+    );
+    res.json({ success: true, data: { message: 'Agreement WhatsApp queued', recipient, link } });
   } catch (err) {
     next(err);
   }
@@ -333,6 +497,20 @@ export const signContractRemote = async (req: Request, res: Response, next: Next
 
     await repo.save(agreement);
 
+    // Let the employee who created this contract know without them having to keep
+    // reopening it to check — mirrors the reminder pattern in cron.ts.
+    if (agreement.createdByEmployeeId) {
+      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+      await NotificationPublisher.publishInAppRequest({
+        recipientId: agreement.createdByEmployeeId,
+        title: 'Customer signed contract agreement',
+        message: `${agreement.customerSignedByName || agreement.customerName} has signed agreement ${agreement.agreementNumber}.`,
+        type: 'SUCCESS',
+        referenceId: agreement.invoiceId,
+        referenceType: 'CONTRACT',
+      }).catch((err) => logger.error('Failed to publish contract-signed notification', { err }));
+    }
+
     // Return minimal data for the public confirmation page
     res.json({
       success: true,
@@ -361,21 +539,609 @@ export const getContractForSigning = async (req: Request, res: Response, next: N
       throw new AppError('This signing link has expired', 410);
     }
 
-    // Return safe subset — no internal IDs
+    // Previously returned a hand-picked "safe subset" of the agreement alone — no
+    // linked invoice at all, so the customer never saw the actual contract (equipment,
+    // pricing/rent/lease terms, advance/deposit, warranty), only a name/date summary
+    // card. This is the customer's own contract behind a private, single-use,
+    // 72-hour token, so there's no more reason to withhold it here than there is from
+    // the authenticated employee-facing view rendering the identical
+    // ContractDocumentBody — only truly internal identifiers (employee/branch/creator
+    // ids) are left out.
+    const invoice = await Source.getRepository(Invoice).findOne({
+      where: { id: agreement.invoiceId },
+      relations: ['items', 'productAllocations'],
+    });
+
+    const agreementSafe: Partial<ContractAgreement> = { ...agreement };
+    delete agreementSafe.id;
+    delete agreementSafe.branchId;
+    delete agreementSafe.createdByEmployeeId;
+    delete agreementSafe.employeeSignedById;
+    delete agreementSafe.signingToken;
+
     res.json({
       success: true,
       data: {
-        agreementNumber: agreement.agreementNumber,
-        contractDate: agreement.contractDate,
-        customerName: agreement.customerName,
-        customerAddress: agreement.customerAddress,
-        dealerName: agreement.dealerName,
-        dealerAddress: agreement.dealerAddress,
-        termsAndConditions: agreement.termsAndConditions,
-        employeeSignedAt: agreement.employeeSignedAt,
-        employeeSignedByName: agreement.employeeSignedByName,
+        agreement: agreementSafe,
+        invoice,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Bill (UsageRecord) creation + customer approval — Stage A ────────────────
+// Mirrors the Contract Agreement signing-token/remote-approval mechanism above,
+// but anchored to a UsageRecord (one per billing period, doubling as that
+// period's Bill) rather than a dedicated agreement entity.
+
+function billSigningLinkUrl(token: string): string {
+  return `${publicAppUrl()}/public/bill/sign/${token}`;
+}
+
+async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: string }> {
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+
+  usage.signingToken = token;
+  usage.signingTokenExpiresAt = expiresAt;
+  usage.signingTokenUsed = false;
+  await Source.getRepository(UsageRecord).save(usage);
+
+  return { token };
+}
+
+async function loadBillForBranch(usageRecordId: string, branchId: string) {
+  const usage = await Source.getRepository(UsageRecord).findOne({
+    where: { id: usageRecordId },
+    relations: ['items'],
+  });
+  if (!usage) throw new AppError('Bill not found', 404);
+  const invoice = await Source.getRepository(Invoice).findOne({ where: { id: usage.contractId } });
+  if (!invoice) throw new AppError('Contract not found', 404);
+  if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
+  return { usage, invoice };
+}
+
+function billPeriodLabel(usage: UsageRecord): string {
+  const fmt = (d: Date) =>
+    new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+  const start = fmt(usage.billingPeriodStart);
+  const end = fmt(usage.billingPeriodEnd);
+  return start === end ? start : `${start} to ${end}`;
+}
+
+export const getBill = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId, role } = req.user!;
+    const { usage, invoice } = await loadBillForBranch(req.params.id as string, branchId).catch(
+      async (err) => {
+        if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) throw err;
+        // ADMIN/SUPER_ADMIN can view any branch's bill — retry without the branch check.
+        const usage = await Source.getRepository(UsageRecord).findOne({
+          where: { id: req.params.id as string },
+          relations: ['items'],
+        });
+        if (!usage) throw new AppError('Bill not found', 404);
+        const invoice = await Source.getRepository(Invoice).findOne({
+          where: { id: usage.contractId },
+        });
+        if (!invoice) throw new AppError('Contract not found', 404);
+        return { usage, invoice };
+      },
+    );
+
+    // Advance Bills wrap an already-collected RENT_ADVANCE/LEASE_ADVANCE payment — the
+    // document needs its amount/mode/date/status, not just the bill's own approval state.
+    let advancePayment: SalePaymentRequest | null = null;
+    if (usage.billType === 'ADVANCE') {
+      advancePayment = await Source.getRepository(SalePaymentRequest).findOne({
+        where: {
+          invoiceId: usage.contractId,
+          paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']),
+        },
+        order: { createdAt: 'ASC' },
+      });
+    }
+
+    res.json({ success: true, data: { usage, invoice, advancePayment } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Get-or-create an Advance Bill — wraps the contract's already-collected RENT_ADVANCE/
+// LEASE_ADVANCE SalePaymentRequest for customer sign-off. Same UsageRecord table/
+// approval-pipeline as a periodic usage Bill, just billType='ADVANCE' and no period/
+// readings. Idempotent: returns the existing one if Finance clicks "Generate" again.
+export const generateAdvanceBill = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const contractId = req.params.contractId as string;
+    const { userId, branchId } = req.user!;
+
+    const invoice = await Source.getRepository(Invoice).findOne({ where: { id: contractId } });
+    if (!invoice) throw new AppError('Contract not found', 404);
+    if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    const usageRepo = Source.getRepository(UsageRecord);
+    const existing = await usageRepo.findOne({ where: { contractId, billType: 'ADVANCE' } });
+    if (existing) {
+      return res.json({ success: true, data: existing });
+    }
+
+    const advancePayment = await Source.getRepository(SalePaymentRequest).findOne({
+      where: { invoiceId: contractId, paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']) },
+      order: { createdAt: 'ASC' },
+    });
+    if (!advancePayment) {
+      throw new AppError('No advance payment has been recorded for this contract yet', 400);
+    }
+
+    const billCreatedByName = await fetchEmployeeName(userId);
+    const advanceDate = new Date(advancePayment.paymentDate);
+
+    const usage = usageRepo.create({
+      contract: { id: contractId } as Invoice,
+      billType: 'ADVANCE',
+      billingPeriodStart: advanceDate,
+      billingPeriodEnd: advanceDate,
+      totalCharge: Number(advancePayment.amount),
+      taxableAmount: Number(advancePayment.taxableAmount ?? advancePayment.amount),
+      taxAmount: Number(advancePayment.taxAmount ?? 0),
+      taxPercent: advancePayment.taxPercent ?? undefined,
+      reportedBy: 'EMPLOYEE' as UsageRecord['reportedBy'],
+      billStatus: 'PENDING_APPROVAL',
+      billCreatedByEmployeeId: userId,
+      billCreatedByName,
+    });
+    await usageRepo.save(usage);
+
+    res.status(201).json({ success: true, data: usage });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Batch check for the Finance Rent/Lease page's "Generate Advance Bill" button — whether
+// each contract has an advance payment recorded at all, and whether an Advance Bill
+// already exists for it (and its status), without one round trip per row.
+export const getAdvanceBillStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId } = req.user!;
+    const contractIds = String(req.query.contractIds ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (contractIds.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+
+    const invoices = await Source.getRepository(Invoice).find({
+      where: { id: In(contractIds), branchId },
+      select: ['id'],
+    });
+    const scopedIds = invoices.map((i) => i.id);
+    if (scopedIds.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+
+    const [advancePayments, advanceBills] = await Promise.all([
+      Source.getRepository(SalePaymentRequest).find({
+        where: { invoiceId: In(scopedIds), paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']) },
+      }),
+      Source.getRepository(UsageRecord).find({
+        where: { contractId: In(scopedIds), billType: 'ADVANCE' },
+      }),
+    ]);
+    const hasAdvanceSet = new Set(advancePayments.map((p) => p.invoiceId));
+    const billByContractId = new Map(advanceBills.map((b) => [b.contractId, b]));
+
+    const result: Record<
+      string,
+      { hasAdvancePayment: boolean; advanceBillId?: string; advanceBillStatus?: string }
+    > = {};
+    for (const contractId of scopedIds) {
+      const bill = billByContractId.get(contractId);
+      result[contractId] = {
+        hasAdvancePayment: hasAdvanceSet.has(contractId),
+        advanceBillId: bill?.id,
+        advanceBillStatus: bill?.billStatus,
+      };
+    }
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// "Edit & Resend" for a disputed Advance Bill — unlike a periodic usage Bill, there is
+// nothing to recompute here: the amount is the real, already-collected payment, and
+// letting Finance change it via this endpoint would bypass the actual payment-correction
+// channel. So this just resets the approval trail so a corrected send can go out again —
+// the same field-reset updateUsageRecord already does for the USAGE case.
+export const resetBillForResend = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId } = req.user!;
+    const { usage } = await loadBillForBranch(req.params.id as string, branchId);
+    if (usage.billType !== 'ADVANCE') {
+      throw new AppError(
+        'Only Advance Bills can be reset this way — edit a usage Bill via its reading-correction flow instead',
+        400,
+      );
+    }
+
+    usage.billStatus = 'PENDING_APPROVAL';
+    usage.customerApprovedByName = undefined;
+    usage.customerApprovedAt = undefined;
+    usage.customerApprovalMethod = undefined;
+    usage.customerApprovalNote = undefined;
+    usage.customerRejectionReason = undefined;
+    usage.customerRejectedAt = undefined;
+    usage.signingToken = undefined;
+    usage.signingTokenExpiresAt = undefined;
+    usage.signingTokenUsed = false;
+    await Source.getRepository(UsageRecord).save(usage);
+
+    res.json({ success: true, data: usage });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const generateBillSigningToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId } = req.user!;
+    const { usage } = await loadBillForBranch(req.params.id as string, branchId);
+    const { token } = await issueBillSigningToken(usage);
+    res.json({ success: true, data: { token, expiresAt: usage.signingTokenExpiresAt } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const sendBillEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId } = req.user!;
+    const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
+    const { usage, invoice } = await loadBillForBranch(req.params.id as string, branchId);
+
+    // Live CRM lookup first — see the identical comment in sendContractAgreementEmail
+    // for why (the Contract Agreement's cached customerEmail this used to read
+    // straight from can go stale). Falls back to that cached copy if CRM has
+    // nothing.
+    let recipient = recipientOverride?.trim();
+    if (!recipient) {
+      const contact = await fetchCustomerContact(invoice.customerId);
+      recipient = contact?.email;
+    }
+    if (!recipient) {
+      const agreement = await Source.getRepository(ContractAgreement).findOne({
+        where: { invoiceId: usage.contractId },
+      });
+      recipient = agreement?.customerEmail;
+    }
+    if (!recipient)
+      throw new AppError('Customer email not found. Please provide a recipient email.', 400);
+
+    const { token } = await issueBillSigningToken(usage);
+    const link = billSigningLinkUrl(token);
+    const periodLabel = billPeriodLabel(usage);
+
+    const htmlBody = `
+<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+  <div style="background:linear-gradient(135deg,#0d9488,#059669);padding:28px 32px;color:#fff">
+    <p style="margin:0 0 4px;font-size:11px;font-weight:700;opacity:.75;text-transform:uppercase;letter-spacing:.1em">Bill for ${periodLabel}</p>
+    <h1 style="margin:0 0 4px;font-size:22px;font-weight:900;letter-spacing:-.5px">${invoice.invoiceNumber}</h1>
+  </div>
+  <div style="padding:28px 32px">
+    <p style="margin:0 0 20px;font-size:14px;color:#374151">Dear <strong>${invoice.customerName || 'Customer'}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#374151">
+      Your bill for the period <strong>${periodLabel}</strong> is ready for review — total amount
+      <strong>${Number(usage.totalCharge).toFixed(2)}</strong>.
+    </p>
+    <div style="margin-top:8px;text-align:center">
+      <a href="${link}" target="_blank" style="display:inline-block;background:#059669;color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:12px 28px;border-radius:8px">Review & Approve Bill</a>
+    </div>
+    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;text-align:center">This link is valid for 72 hours.</p>
+  </div>
+</div>`;
+
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+    await NotificationPublisher.publishEmailRequest({
+      recipient,
+      subject: `Bill for ${periodLabel} — ${invoice.invoiceNumber}`,
+      body: htmlBody,
+      invoiceId: invoice.id,
+      attachmentUrl: link,
+    });
+
+    usage.billSentAt = new Date();
+    await Source.getRepository(UsageRecord).save(usage);
+
+    logger.info(`[Bill] Email queued for usage record ${usage.id} → ${recipient}`);
+    res.json({ success: true, data: { message: 'Bill email queued', recipient, link } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const sendBillWhatsApp = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { branchId } = req.user!;
+    const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
+    const { usage, invoice } = await loadBillForBranch(req.params.id as string, branchId);
+
+    const agreement = await Source.getRepository(ContractAgreement).findOne({
+      where: { invoiceId: usage.contractId },
+    });
+    const recipient = recipientOverride?.trim() || agreement?.customerPhone;
+    if (!recipient)
+      throw new AppError('Customer phone not found. Please provide a recipient number.', 400);
+
+    const { token } = await issueBillSigningToken(usage);
+    const link = billSigningLinkUrl(token);
+    const periodLabel = billPeriodLabel(usage);
+
+    const body =
+      `Dear ${invoice.customerName || 'Customer'},\n\n` +
+      `Your bill for ${periodLabel} is ready for review — total amount ${Number(usage.totalCharge).toFixed(2)}.\n\n` +
+      `Invoice: ${invoice.invoiceNumber}\n\n` +
+      `Review & approve: ${link}\n\n` +
+      `Link valid for 72 hours.`;
+
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+    await NotificationPublisher.publishWhatsappRequest({ recipient, body, invoiceId: invoice.id });
+
+    usage.billSentAt = new Date();
+    await Source.getRepository(UsageRecord).save(usage);
+
+    logger.info(`[Bill] WhatsApp queued for usage record ${usage.id} → ${recipient}`);
+    res.json({ success: true, data: { message: 'Bill WhatsApp queued', recipient, link } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Public endpoint — get bill data for the approval page
+export const getBillForSigning = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.params.token as string;
+    const repo = Source.getRepository(UsageRecord);
+    const usage = await repo.findOne({ where: { signingToken: token }, relations: ['items'] });
+    if (!usage) throw new AppError('Invalid or expired bill link', 404);
+    if (usage.signingTokenUsed) throw new AppError('This bill link has already been used', 410);
+    if (usage.signingTokenExpiresAt && usage.signingTokenExpiresAt < new Date()) {
+      throw new AppError('This bill link has expired', 410);
+    }
+
+    const invoice = await Source.getRepository(Invoice).findOne({
+      where: { id: usage.contractId },
+      relations: ['items', 'productAllocations'],
+    });
+
+    const usageSafe: Partial<UsageRecord> = { ...usage };
+    delete usageSafe.id;
+    delete usageSafe.billCreatedByEmployeeId;
+    delete usageSafe.signingToken;
+
+    let advancePayment: SalePaymentRequest | null = null;
+    if (usage.billType === 'ADVANCE') {
+      advancePayment = await Source.getRepository(SalePaymentRequest).findOne({
+        where: {
+          invoiceId: usage.contractId,
+          paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']),
+        },
+        order: { createdAt: 'ASC' },
+      });
+    }
+
+    res.json({ success: true, data: { usage: usageSafe, invoice, advancePayment } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Public endpoint — customer approves the bill via the remote link
+export const approveBillRemote = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.params.token as string;
+    const { customerName, signatureData } = req.body;
+    if (!customerName?.trim()) throw new AppError('Your name is required', 400);
+
+    const repo = Source.getRepository(UsageRecord);
+    const usage = await repo.findOne({ where: { signingToken: token } });
+    if (!usage) throw new AppError('Invalid or expired bill link', 404);
+    if (usage.signingTokenUsed) throw new AppError('This bill link has already been used', 410);
+    if (usage.signingTokenExpiresAt && usage.signingTokenExpiresAt < new Date()) {
+      throw new AppError('This bill link has expired', 410);
+    }
+
+    usage.billStatus = 'CUSTOMER_APPROVED';
+    usage.customerApprovedByName = customerName.trim();
+    usage.customerApprovedAt = new Date();
+    usage.customerApprovalMethod = 'REMOTE_LINK';
+    usage.customerApprovalNote = signatureData ? undefined : usage.customerApprovalNote;
+    usage.signingTokenUsed = true;
+    await repo.save(usage);
+
+    await notifyBillCreatorOfCustomerDecision(usage, 'APPROVED');
+
+    res.json({
+      success: true,
+      data: { billingPeriodEnd: usage.billingPeriodEnd, approvedAt: usage.customerApprovedAt },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Let the Finance user who created this bill know as soon as the customer acts on it
+// remotely — mirrors signContractRemote's notification and the cron.ts reminder pattern.
+// Best-effort: a failure here must never roll back the customer's already-recorded
+// decision, so it's caught and logged rather than thrown.
+async function notifyBillCreatorOfCustomerDecision(
+  usage: UsageRecord,
+  decision: 'APPROVED' | 'DISPUTED',
+) {
+  if (!usage.billCreatedByEmployeeId) return;
+  try {
+    const invoice = await Source.getRepository(Invoice).findOne({
+      where: { id: usage.contractId },
+      select: ['invoiceNumber'],
+    });
+    const label = invoice?.invoiceNumber || usage.contractId;
+    const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
+    await NotificationPublisher.publishInAppRequest({
+      recipientId: usage.billCreatedByEmployeeId,
+      title: decision === 'APPROVED' ? 'Customer approved bill' : 'Customer disputed bill',
+      message:
+        decision === 'APPROVED'
+          ? `${usage.customerApprovedByName} approved the bill for contract ${label}.`
+          : `A customer disputed the bill for contract ${label}: "${usage.customerRejectionReason}"`,
+      type: decision === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+      referenceId: usage.contractId,
+      referenceType: 'CONTRACT',
+    });
+  } catch (err) {
+    logger.error('Failed to publish bill-decision notification', { err, usageId: usage.id });
+  }
+}
+
+// Public endpoint — customer disputes the bill via the remote link
+export const rejectBillRemote = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.params.token as string;
+    const { reason } = req.body;
+    if (!reason?.trim()) throw new AppError('A reason is required to dispute this bill', 400);
+
+    const repo = Source.getRepository(UsageRecord);
+    const usage = await repo.findOne({ where: { signingToken: token } });
+    if (!usage) throw new AppError('Invalid or expired bill link', 404);
+    if (usage.signingTokenUsed) throw new AppError('This bill link has already been used', 410);
+    if (usage.signingTokenExpiresAt && usage.signingTokenExpiresAt < new Date()) {
+      throw new AppError('This bill link has expired', 410);
+    }
+
+    usage.billStatus = 'CUSTOMER_REJECTED';
+    usage.customerRejectionReason = reason.trim();
+    usage.customerRejectedAt = new Date();
+    usage.signingTokenUsed = true;
+    await repo.save(usage);
+
+    await notifyBillCreatorOfCustomerDecision(usage, 'DISPUTED');
+
+    res.json({ success: true, data: { rejectedAt: usage.customerRejectedAt } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Finance/Admin/Manager manually marking a bill approved — for a customer's phone/
+// in-person confirmation that never went through the remote link. There is no
+// evidence-free override anywhere else in this codebase (the closest precedent,
+// Contract Agreement's UPLOAD method, always requires an uploaded file + note) — a
+// required note is the equivalent minimum bar here, since there's no document to
+// attach a bill approval to.
+export const markBillApprovedManually = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { role, branchId } = req.user!;
+    if (!['FINANCE', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(role)) {
+      throw new AppError('Insufficient role to approve a bill manually', 403);
+    }
+    const { customerName, approvalNote } = req.body;
+    if (!approvalNote?.trim()) {
+      throw new AppError(
+        'A note is required — document how/when the customer approved this bill',
+        400,
+      );
+    }
+
+    const { usage, invoice } = await loadBillForBranch(req.params.id as string, branchId);
+
+    usage.billStatus = 'CUSTOMER_APPROVED';
+    usage.customerApprovedByName = customerName?.trim() || invoice.customerName || 'Customer';
+    usage.customerApprovedAt = new Date();
+    usage.customerApprovalMethod = 'FINANCE_MANUAL';
+    usage.customerApprovalNote = approvalNote.trim();
+    await Source.getRepository(UsageRecord).save(usage);
+
+    res.json({ success: true, data: usage });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// All bills (UsageRecords) for one contract, with per-bill collected/pending amounts —
+// feeds the Accounts Receivable page's "View Bills" drilldown. Deliberately does not
+// change the AR page's own headline Outstanding row (see collectPendingUsagePayment's
+// approval gate and the plan notes on why totalAmount can't be safely redistributed
+// across periods after a final-month settlement).
+export const getBillsForContract = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const contractId = req.params.contractId as string;
+    const { branchId, role } = req.user!;
+
+    const invoice = await Source.getRepository(Invoice).findOne({ where: { id: contractId } });
+    if (!invoice) throw new AppError('Contract not found', 404);
+    if (invoice.branchId !== branchId && !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      throw new AppError('Access denied', 403);
+    }
+
+    const usageRecords = await Source.getRepository(UsageRecord)
+      .createQueryBuilder('ur')
+      .where('ur."contractId" = :contractId', { contractId })
+      .orderBy('ur."billingPeriodStart"', 'DESC')
+      .getMany();
+
+    if (usageRecords.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const usageRecordIds = usageRecords.map((u) => u.id);
+    const payments = await Source.getRepository(SalePaymentRequest)
+      .createQueryBuilder('spr')
+      .where('spr."usageRecordId" IN (:...ids)', { ids: usageRecordIds })
+      .getMany();
+
+    const givenByUsageRecord = new Map<string, number>();
+    for (const p of payments) {
+      if (p.status === 'REJECTED' || !p.usageRecordId) continue;
+      givenByUsageRecord.set(
+        p.usageRecordId,
+        (givenByUsageRecord.get(p.usageRecordId) || 0) + Number(p.amount),
+      );
+    }
+
+    const result = usageRecords.map((ur) => {
+      // Advance Bills don't go through Stage B collection at all — the advance was
+      // already collected via the separate RENT_ADVANCE/LEASE_ADVANCE payment flow, so
+      // there's nothing for "Add Collect Amount" to apply to here; showing it as fully
+      // pending (the SalePaymentRequest.usageRecordId join below never matches an advance
+      // payment, since that's linked by invoiceId/paymentContext instead) would be
+      // actively misleading and risk a double-collection click.
+      const isAdvance = ur.billType === 'ADVANCE';
+      const given = isAdvance ? Number(ur.totalCharge) : givenByUsageRecord.get(ur.id) || 0;
+      return {
+        usageRecordId: ur.id,
+        billType: ur.billType,
+        billingPeriodStart: ur.billingPeriodStart,
+        billingPeriodEnd: ur.billingPeriodEnd,
+        totalCharge: Number(ur.totalCharge),
+        amountGiven: given,
+        amountPending: isAdvance ? 0 : Math.max(0, Number(ur.totalCharge) - given),
+        billStatus: ur.billStatus,
+        billCreatedByName: ur.billCreatedByName,
+        customerApprovedByName: ur.customerApprovedByName,
+        customerApprovedAt: ur.customerApprovedAt,
+        customerApprovalMethod: ur.customerApprovalMethod,
+        customerRejectionReason: ur.customerRejectionReason,
+        createdAt: ur.createdAt,
+      };
+    });
+
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }
@@ -631,6 +1397,29 @@ export const getSalePaymentsForInvoice = async (
   }
 };
 
+// Attaches the linked Advance Bill's status (informational only — never gates the
+// payment's own approval) to each RENT_ADVANCE/LEASE_ADVANCE row, one batched query
+// covering every payment passed in rather than one per row.
+async function attachAdvanceBillStatus<T extends { invoiceId: string; paymentContext?: string }>(
+  payments: T[],
+): Promise<Array<T & { advanceBillId?: string; advanceBillStatus?: string }>> {
+  const advanceInvoiceIds = payments
+    .filter((p) => p.paymentContext === 'RENT_ADVANCE' || p.paymentContext === 'LEASE_ADVANCE')
+    .map((p) => p.invoiceId);
+  if (advanceInvoiceIds.length === 0) return payments;
+
+  const advanceBills = await Source.getRepository(UsageRecord).find({
+    where: { contractId: In(advanceInvoiceIds), billType: 'ADVANCE' },
+  });
+  const byContractId = new Map(advanceBills.map((b) => [b.contractId, b]));
+
+  return payments.map((p) => {
+    if (p.paymentContext !== 'RENT_ADVANCE' && p.paymentContext !== 'LEASE_ADVANCE') return p;
+    const bill = byContractId.get(p.invoiceId);
+    return { ...p, advanceBillId: bill?.id, advanceBillStatus: bill?.billStatus };
+  });
+}
+
 export const getPendingSalePayments = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { branchId, role } = req.user!;
@@ -644,7 +1433,7 @@ export const getPendingSalePayments = async (req: Request, res: Response, next: 
     }
 
     const payments = await qb.orderBy('spr."createdAt"', 'DESC').getMany();
-    res.json({ success: true, data: payments });
+    res.json({ success: true, data: await attachAdvanceBillStatus(payments) });
   } catch (err) {
     next(err);
   }
@@ -679,7 +1468,7 @@ export const getAllSalePaymentsForBranch = async (
     }
 
     const payments = await qb.orderBy('spr."createdAt"', 'DESC').getMany();
-    res.json({ success: true, data: payments });
+    res.json({ success: true, data: await attachAdvanceBillStatus(payments) });
   } catch (err) {
     next(err);
   }
@@ -779,10 +1568,23 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
     // Finance may supply the cash/bank account at approval time (for requests
     // where the employee didn't/couldn't select one at recording time).
     const approvingCashAccountId: string | undefined =
-      (req.body.cashAccountId as string | undefined) ?? request.cashAccountId ?? undefined;
+      ((req.body ?? {}).cashAccountId as string | undefined) ?? request.cashAccountId ?? undefined;
 
     if (['CASH', 'BANK_TRANSFER'].includes(request.paymentMode) && !approvingCashAccountId) {
       throw new AppError('Select a cash or bank account before approving this payment', 400);
+    }
+
+    // Fail before touching anything: a Cash-mode collection must land in a real CASH
+    // account and Bank Transfer in a real BANK account, belonging to this branch. The
+    // account resolution below used to be a bare findOne with no type/branch check at
+    // all, so a mismatched account (or one from a different branch) silently accepted
+    // the approval and posted the cashbook entry against whatever it found.
+    if (['CASH', 'BANK_TRANSFER'].includes(request.paymentMode)) {
+      await requireCashAccount(Source, {
+        branchId: request.branchId,
+        paymentMode: request.paymentMode,
+        explicitAccountId: approvingCashAccountId,
+      });
     }
 
     const reviewerName = await fetchEmployeeName(userId);
@@ -913,34 +1715,32 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
           logger.warn('Failed to create cheque entity for sale payment:', chequeErr);
         }
       } else if (approvingCashAccountId) {
-        // CASH / BANK_TRANSFER: post cashbook entry immediately
-        try {
-          const account = await queryRunner.manager.findOne(CashBankAccount, {
-            where: { id: approvingCashAccountId },
+        // CASH / BANK_TRANSFER: post cashbook entry immediately. Type and branch were
+        // already validated above — re-fetch through the queryRunner so the balance
+        // update below is part of this same transaction and rolls back with it.
+        const account = await queryRunner.manager.findOne(CashBankAccount, {
+          where: { id: approvingCashAccountId },
+        });
+        if (account) {
+          const entry = queryRunner.manager.create(CashbookEntry, {
+            referenceNo: `CE-${request.requestNo}`,
+            date: new Date(request.paymentDate),
+            accountId: approvingCashAccountId,
+            entryType: 'RECEIPT',
+            amount: request.amount,
+            category: 'SALE_COLLECTION',
+            description: `Sale payment — ${request.invoiceNumber} (${request.customerName})`,
+            linkedInvoiceId: request.invoiceId,
+            paymentMode: request.paymentMode,
+            createdBy: userId,
+            branchId: request.branchId,
+            sourceType: 'SALE_PAYMENT',
+            sourceId: savedTxn.id,
           });
-          if (account) {
-            const entry = queryRunner.manager.create(CashbookEntry, {
-              referenceNo: `CE-${request.requestNo}`,
-              date: new Date(request.paymentDate),
-              accountId: approvingCashAccountId,
-              entryType: 'RECEIPT',
-              amount: request.amount,
-              category: 'SALE_COLLECTION',
-              description: `Sale payment — ${request.invoiceNumber} (${request.customerName})`,
-              linkedInvoiceId: request.invoiceId,
-              paymentMode: request.paymentMode,
-              createdBy: userId,
-              branchId: request.branchId,
-              sourceType: 'SALE_PAYMENT',
-              sourceId: savedTxn.id,
-            });
-            await queryRunner.manager.save(CashbookEntry, entry);
+          await queryRunner.manager.save(CashbookEntry, entry);
 
-            account.currentBalance = Number(account.currentBalance) + Number(request.amount);
-            await queryRunner.manager.save(CashBankAccount, account);
-          }
-        } catch (cashErr) {
-          logger.warn('Failed to post cashbook entry for sale payment:', cashErr);
+          account.currentBalance = Number(account.currentBalance) + Number(request.amount);
+          await queryRunner.manager.save(CashBankAccount, account);
         }
       }
 
@@ -1219,6 +2019,12 @@ export const getPendingUsagePayments = async (req: Request, res: Response, next:
     const usageRecords = await Source.getRepository(UsageRecord)
       .createQueryBuilder('ur')
       .where('ur."contractId" IN (:...ids)', { ids: invoiceIds })
+      // Advance Bills never belong in this periodic-shortfall queue — they're settled
+      // through the separate RENT_ADVANCE/LEASE_ADVANCE payment flow entirely, so the
+      // "given" computation below (which only ever matches a SalePaymentRequest by
+      // usageRecordId, never by invoiceId+paymentContext) would otherwise show an
+      // already-collected advance as a full outstanding shortfall.
+      .andWhere(`ur."billType" = 'USAGE'`)
       .orderBy('ur."billingPeriodEnd"', 'DESC')
       .getMany();
 
@@ -1242,6 +2048,10 @@ export const getPendingUsagePayments = async (req: Request, res: Response, next:
     }
 
     const result = usageRecords
+      // Only bills the customer has actually approved belong in this "top up the
+      // shortfall" queue — an unapproved bill isn't collectible yet (see the same
+      // gate enforced server-side in collectPendingUsagePayment below).
+      .filter((ur) => ur.billStatus === 'CUSTOMER_APPROVED')
       .map((ur) => {
         const invoice = invoiceMap.get(ur.contractId);
         const given = givenByUsageRecord.get(ur.id) || 0;
@@ -1257,6 +2067,7 @@ export const getPendingUsagePayments = async (req: Request, res: Response, next:
           totalCharge: Number(ur.totalCharge),
           amountGiven: given,
           amountPending: pending,
+          billStatus: ur.billStatus,
           createdAt: ur.createdAt,
         };
       })
@@ -1306,6 +2117,25 @@ export const collectPendingUsagePayment = async (
     });
     if (!invoice) throw new AppError('Contract not found', 404);
     if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    // An Advance Bill is never collected through this path — the advance was already
+    // collected via the separate RENT_ADVANCE/LEASE_ADVANCE payment flow. There's no
+    // reachable UI button for this today (both queues that feed this endpoint already
+    // exclude ADVANCE rows), but guard it directly too rather than relying only on that.
+    if (usageRecord.billType === 'ADVANCE') {
+      throw new AppError(
+        'Advance Bills are not collected this way — the advance payment is handled separately',
+        400,
+      );
+    }
+
+    // Hard block: no collection may be recorded against a bill the customer hasn't
+    // approved yet. This is the single choke point for Stage B, so gating it here
+    // covers every caller (Pending Payments tab, the Receivable page's "Add Collect
+    // Amount", or any future one) — no need to duplicate the check elsewhere.
+    if (usageRecord.billStatus !== 'CUSTOMER_APPROVED') {
+      throw new AppError('This bill has not been approved by the customer yet', 400);
+    }
 
     const existing = await Source.getRepository(SalePaymentRequest).find({
       where: { usageRecordId },
@@ -1620,7 +2450,7 @@ export const sendSalePaymentReceiptEmail = async (
   try {
     const id = req.params.id as string;
     const { branchId, role } = req.user!;
-    const { recipient: recipientOverride } = req.body as { recipient?: string };
+    const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
 
     const repo = Source.getRepository(SalePaymentRequest);
     const request = await repo.findOne({ where: { id } });
@@ -1716,7 +2546,7 @@ export const sendSalePaymentReceiptWhatsApp = async (
   try {
     const id = req.params.id as string;
     const { branchId, role } = req.user!;
-    const { recipient: recipientOverride } = req.body as { recipient?: string };
+    const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
 
     const repo = Source.getRepository(SalePaymentRequest);
     const request = await repo.findOne({ where: { id } });

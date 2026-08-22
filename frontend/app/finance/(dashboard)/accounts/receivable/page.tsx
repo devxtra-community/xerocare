@@ -25,7 +25,10 @@ import {
   fetchReceivableCharts,
   fetchAccountsReceivableTransactions,
   fetchCustomerStatement,
+  filterAccountsByPaymentMode,
+  accountTypeForPaymentMode,
   type ManualReceivable,
+  type CashBankAccount,
 } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { SimpleLineChart, DonutChart, HorizontalBarChart } from '@/components/accounts/charts';
@@ -56,6 +59,7 @@ import { toast } from 'sonner';
 import StatementDialog, {
   type RunningBalanceStatementData,
 } from '@/components/shared/StatementDialog';
+import { BillsDrilldownModal } from '@/components/Finance/BillsDrilldownModal';
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
@@ -216,13 +220,13 @@ function PaymentModal({
   onClose,
 }: {
   receivable: ManualReceivable;
-  accounts: { id: string; name: string }[];
+  accounts: CashBankAccount[];
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
     paymentDate: today,
     amount: receivable.outstanding.toString(),
-    paidToAccount: accounts[0]?.id ?? '',
+    paidToAccount: '',
     paymentMode: 'Bank Transfer',
     referenceNo: '',
     chequeNumber: '',
@@ -233,6 +237,15 @@ function PaymentModal({
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const isCheque = form.paymentMode === 'Cheque';
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, form.paymentMode);
+
+  useEffect(() => {
+    if (isCheque) return;
+    if (matchingAccounts.some((a) => a.id === form.paidToAccount)) return;
+    set('paidToAccount', matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentMode, accounts]);
+
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: () =>
@@ -246,7 +259,12 @@ function PaymentModal({
       qc.invalidateQueries({ queryKey: ['manual-receivables'] });
       onClose();
     },
-    onError: () => toast.error('Failed to record payment'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to record payment';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -288,18 +306,29 @@ function PaymentModal({
           {!isCheque && (
             <div>
               <label className="text-xs font-medium text-muted-foreground">Paid To Account</label>
-              <Select value={form.paidToAccount} onValueChange={(v) => set('paidToAccount', v)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {matchingAccounts.length === 0 ? (
+                <p className="text-xs font-medium text-red-600 mt-1">
+                  No{' '}
+                  {accountTypeForPaymentMode(form.paymentMode) === 'CASH' ? 'Cash in Hand' : 'Bank'}{' '}
+                  account exists for this branch.
+                </p>
+              ) : (
+                <Select value={form.paidToAccount} onValueChange={(v) => set('paidToAccount', v)}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {matchingAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name} — {a.currency}{' '}
+                        {Number(a.currentBalance).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                        })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
           <div>
@@ -382,7 +411,13 @@ function PaymentModal({
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
-          <Button onClick={() => mut.mutate()} disabled={mut.isPending} className="flex-1">
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={
+              mut.isPending || (!isCheque && (matchingAccounts.length === 0 || !form.paidToAccount))
+            }
+            className="flex-1"
+          >
             {mut.isPending ? 'Saving...' : isCheque ? 'Record Cheque' : 'Record'}
           </Button>
         </div>
@@ -471,6 +506,10 @@ export default function AccountsReceivablePage() {
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
   const [statementData, setStatementData] = useState<RunningBalanceStatementData | null>(null);
   const [generatingStatement, setGeneratingStatement] = useState(false);
+  const [viewingBillsFor, setViewingBillsFor] = useState<{
+    contractId: string;
+    invoiceNumber: string;
+  } | null>(null);
 
   const currentUser = getUserFromToken();
   const { data: branches = [] } = useQuery({
@@ -1125,6 +1164,20 @@ export default function AccountsReceivablePage() {
                             >
                               <Eye className="h-3.5 w-3.5" />
                             </button>
+                            {r.isInvoice && (r.type === 'RENT' || r.type === 'LEASE') && (
+                              <button
+                                onClick={() =>
+                                  setViewingBillsFor({
+                                    contractId: r.id,
+                                    invoiceNumber: r.referenceNo,
+                                  })
+                                }
+                                className="p-1.5 rounded-md hover:bg-indigo-50 text-indigo-600"
+                                title="View Bills"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => setPayingFor(r as ManualReceivable)}
@@ -1163,6 +1216,13 @@ export default function AccountsReceivablePage() {
               sourceType={viewingRow.type}
               id={viewingRow.id}
               onClose={() => setViewingRow(null)}
+            />
+          )}
+          {viewingBillsFor && (
+            <BillsDrilldownModal
+              contractId={viewingBillsFor.contractId}
+              invoiceNumber={viewingBillsFor.invoiceNumber}
+              onClose={() => setViewingBillsFor(null)}
             />
           )}
           {showCustomerPicker && (

@@ -14,6 +14,7 @@ import {
   fetchCashBankAccounts,
   fetchCheques,
   CashBankAccount,
+  filterAccountsByPaymentMode,
   type Cheque,
 } from '@/lib/finance/accountsApi';
 import {
@@ -633,6 +634,28 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     );
   };
 
+  // Informational only — the Advance Bill's customer sign-off, shown alongside (never
+  // gating) the payment's own approval status above. Only ever set for RENT_ADVANCE/
+  // LEASE_ADVANCE rows, and only once an Advance Bill has actually been generated.
+  const advanceBillBadge = (payment: SalePaymentRequest) => {
+    if (!payment.advanceBillStatus) return null;
+    const map: Record<string, { label: string; color: string }> = {
+      PENDING_APPROVAL: { label: 'Bill: Pending', color: 'bg-amber-50 text-amber-600' },
+      CUSTOMER_APPROVED: { label: 'Bill: Approved', color: 'bg-emerald-50 text-emerald-600' },
+      CUSTOMER_REJECTED: { label: 'Bill: Disputed', color: 'bg-red-50 text-red-600' },
+    };
+    const cfg = map[payment.advanceBillStatus];
+    if (!cfg) return null;
+    return (
+      <span
+        className={`ml-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-current/10 ${cfg.color}`}
+        title="Advance Bill customer sign-off — separate from the payment approval status"
+      >
+        {cfg.label}
+      </span>
+    );
+  };
+
   const toggleCustomer = (name: string) => {
     setExpandedCustomers((prev) => {
       const next = new Set(prev);
@@ -1080,7 +1103,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <TableCell className="text-[11px] font-bold text-slate-500">
                         {pmt.recordedByEmployeeName}
                       </TableCell>
-                      <TableCell>{statusBadge(pmt.status)}</TableCell>
+                      <TableCell>
+                        {statusBadge(pmt.status)}
+                        {advanceBillBadge(pmt)}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
@@ -1321,16 +1347,18 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <SelectValue placeholder="Select cash / bank account…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {cashAccounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id} className="text-sm">
-                          <span className="block truncate">
-                            {acc.name} — {acc.currency}{' '}
-                            {Number(acc.currentBalance).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                            })}
-                          </span>
-                        </SelectItem>
-                      ))}
+                      {filterAccountsByPaymentMode(cashAccounts, actionTarget.paymentMode).map(
+                        (acc) => (
+                          <SelectItem key={acc.id} value={acc.id} className="text-sm">
+                            <span className="block truncate">
+                              {acc.name} — {acc.currency}{' '}
+                              {Number(acc.currentBalance).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>
+                          </SelectItem>
+                        ),
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1574,9 +1602,12 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <SelectValue placeholder="Select cash / bank account…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {cashAccounts.map((acc) => (
+                      {filterAccountsByPaymentMode(cashAccounts, directMode).map((acc) => (
                         <SelectItem key={acc.id} value={acc.id} className="text-xs font-bold">
-                          {acc.name}
+                          {acc.name} — {acc.currency}{' '}
+                          {Number(acc.currentBalance).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
                         </SelectItem>
                       ))}
                     </SelectContent>

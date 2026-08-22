@@ -38,9 +38,23 @@ function agingBucket(dateStr: string): string {
   return '90+ days';
 }
 
-// 1003 Accounts Receivable — same population as computeBalanceSheet's invoiceAR query
-// (status NOT IN excluded-list AND FINAL/active-PROFORMA, minus payments received),
-// row-level. No dueDate field exists on Invoice — aging is computed from createdAt.
+// 1003 Accounts Receivable — same population AND same per-invoice basis as
+// computeBalanceSheet's invoiceAR query (status NOT IN excluded-list AND
+// FINAL/active-PROFORMA, minus payments received), row-level. No dueDate
+// field exists on Invoice — aging is computed from createdAt.
+//
+// RENT/LEASE basis must mirror computeBalanceSheet exactly: a Rent/Lease
+// contract reuses one invoice for its whole life, so totalAmount is a running
+// contract figure, not what the customer currently owes. Using totalAmount
+// here (as this endpoint did previously) silently drifted from the Balance
+// Sheet's AR total — e.g. hiding a contract's real outstanding balance behind
+// a stale totalAmount that looked "overpaid", while another contract's
+// totalAmount overstated what was actually billed. Same advance+billed basis
+// as accountsShared.ts's invoiceARRows query — advance from the real,
+// VAT-inclusive SalePaymentRequest amount (not the net invoice.advanceAmount),
+// periodic from usage_records.totalCharge (VAT-inclusive and discount-netted,
+// not the pre-VAT monthlyRent + exceededCharge, which understated every
+// Rent/Lease receivable by its VAT amount).
 export const getAccountsReceivableTransactions = async (
   req: Request,
   res: Response,
@@ -67,9 +81,27 @@ export const getAccountsReceivableTransactions = async (
     >(`
       SELECT i.id, i."invoiceNumber", i.customer_name, i."saleType",
              TO_CHAR(i."createdAt", 'YYYY-MM-DD') AS "createdAt",
-             i.currency_code, i."branchId", i."totalAmount", COALESCE(pt.paid, 0) AS paid,
+             i.currency_code, i."branchId",
+             CASE
+               WHEN i."saleType" IN ('RENT', 'LEASE')
+                 THEN COALESCE(adv.amount, i."advanceAmount", 0) + COALESCE(ur.billed, 0)
+               ELSE i."totalAmount"
+             END AS "totalAmount",
+             COALESCE(pt.paid, 0) AS paid,
              i.is_opening_entry AS "isOpeningEntry"
       FROM invoices i
+      LEFT JOIN (
+        SELECT DISTINCT ON ("invoiceId") "invoiceId", amount
+        FROM sale_payment_requests
+        WHERE "paymentContext" IN ('RENT_ADVANCE', 'LEASE_ADVANCE')
+        ORDER BY "invoiceId", "createdAt" ASC
+      ) adv ON adv."invoiceId" = i.id
+      LEFT JOIN (
+        SELECT "contractId", SUM(COALESCE("totalCharge", 0)) AS billed
+        FROM usage_records
+        WHERE "billType" IS DISTINCT FROM 'ADVANCE'
+        GROUP BY "contractId"
+      ) ur ON ur."contractId" = i.id
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
           SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid

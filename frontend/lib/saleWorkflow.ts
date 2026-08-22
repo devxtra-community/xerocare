@@ -1,5 +1,6 @@
 import api from './api';
 import { toast } from 'sonner';
+import type { Invoice } from './invoice';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,11 @@ export interface SalePaymentRequest {
   paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
   /** Links a RENT_PERIODIC/LEASE_PERIODIC collection to the billing period it pays toward. */
   usageRecordId?: string;
+  /** Informational only, present for RENT_ADVANCE/LEASE_ADVANCE rows once an Advance
+   *  Bill exists — the customer's sign-off on the Bill, separate from and never gating
+   *  this payment's own approval status above. */
+  advanceBillId?: string;
+  advanceBillStatus?: BillStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -219,9 +225,40 @@ export const generateSigningToken = async (
   return res.data.data;
 };
 
-// Public (no auth header needed — for the remote signing page)
-export const getContractForSigning = async (token: string): Promise<Partial<ContractAgreement>> => {
-  const res = await api.get<ApiResponse<Partial<ContractAgreement>>>(`/b/contract/sign/${token}`);
+export const sendContractAgreementEmail = async (
+  invoiceId: string,
+  recipient?: string,
+): Promise<{ message: string; recipient: string; link: string }> => {
+  const res = await api.post<ApiResponse<{ message: string; recipient: string; link: string }>>(
+    `/b/invoices/${invoiceId}/contract-agreement/notify/email`,
+    recipient ? { recipient } : {},
+  );
+  return res.data.data;
+};
+
+export const sendContractAgreementWhatsApp = async (
+  invoiceId: string,
+  recipient?: string,
+): Promise<{ message: string; recipient: string; link: string }> => {
+  const res = await api.post<ApiResponse<{ message: string; recipient: string; link: string }>>(
+    `/b/invoices/${invoiceId}/contract-agreement/notify/whatsapp`,
+    recipient ? { recipient } : {},
+  );
+  return res.data.data;
+};
+
+// Public (no auth header needed — for the remote signing page). Returns the full
+// linked invoice alongside the agreement so the customer sees the actual contract
+// document (equipment, pricing/rent/lease terms, advance/deposit, warranty) via the
+// same ContractDocumentBody the authenticated employee-facing view renders, not
+// just a name/date summary.
+export interface ContractForSigning {
+  agreement: Partial<ContractAgreement>;
+  invoice: Invoice | null;
+}
+
+export const getContractForSigning = async (token: string): Promise<ContractForSigning> => {
+  const res = await api.get<ApiResponse<ContractForSigning>>(`/b/contract/sign/${token}`);
   return res.data.data;
 };
 
@@ -332,6 +369,7 @@ export interface PendingUsagePayment {
   totalCharge: number;
   amountGiven: number;
   amountPending: number;
+  billStatus?: BillStatus;
   createdAt: string;
 }
 
@@ -462,6 +500,214 @@ export const updateDeliveryStatus = async (
     `/b/sale-contracts/${contractId}/delivery-status`,
     { deliveryStatus },
   );
+  return res.data.data;
+};
+
+// ─── Bill (UsageRecord) creation + customer approval — Stage A ───────────────
+// A UsageRecord doubles as the period's Bill — submitting usage creates it (Outstanding
+// posts immediately), and it must be Customer Approved (remote link or a Finance manual
+// override with a required note) before any payment may be collected against it. See
+// collectPendingUsagePayment's hard gate.
+
+export type BillStatus = 'PENDING_APPROVAL' | 'CUSTOMER_APPROVED' | 'CUSTOMER_REJECTED';
+export type BillApprovalMethod = 'REMOTE_LINK' | 'FINANCE_MANUAL';
+/** USAGE = a periodic billing-period Bill (readings apply). ADVANCE = wraps the
+ *  contract's already-collected RENT_ADVANCE/LEASE_ADVANCE payment for customer sign-off
+ *  only — no period, no readings, same entity/pipeline either way. */
+export type BillType = 'USAGE' | 'ADVANCE';
+
+export interface Bill {
+  id: string;
+  contractId: string;
+  billType: BillType;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  bwA4Count: number;
+  bwA3Count: number;
+  colorA4Count: number;
+  colorA3Count: number;
+  bwA4Delta: number;
+  bwA3Delta: number;
+  colorA4Delta: number;
+  colorA3Delta: number;
+  exceededTotal: number;
+  exceededCharge: number;
+  monthlyRent: number;
+  advanceAdjusted: number;
+  totalCharge: number;
+  taxableAmount: number;
+  taxAmount: number;
+  taxPercent?: number;
+  discountBwCopies: number;
+  discountColorCopies: number;
+  discountAmount: number;
+  remarks?: string;
+  meterImageUrl?: string;
+  createdAt: string;
+  billStatus: BillStatus;
+  billCreatedByName?: string;
+  billSentAt?: string;
+  signingTokenExpiresAt?: string;
+  signingTokenUsed?: boolean;
+  customerApprovedByName?: string;
+  customerApprovedAt?: string;
+  customerApprovalMethod?: BillApprovalMethod;
+  customerApprovalNote?: string;
+  customerRejectionReason?: string;
+  customerRejectedAt?: string;
+  items?: Array<{
+    allocationId: string;
+    allocation?: { serialNumber: string; modelId: string };
+    startBwA4: number;
+    endBwA4: number;
+    deltaBwA4: number;
+    startBwA3: number;
+    endBwA3: number;
+    deltaBwA3: number;
+    startColorA4: number;
+    endColorA4: number;
+    deltaColorA4: number;
+    startColorA3: number;
+    endColorA3: number;
+    deltaColorA3: number;
+  }>;
+}
+
+export interface BillForContract {
+  usageRecordId: string;
+  billType: BillType;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  totalCharge: number;
+  amountGiven: number;
+  amountPending: number;
+  billStatus: BillStatus;
+  billCreatedByName?: string;
+  customerApprovedByName?: string;
+  customerApprovedAt?: string;
+  customerApprovalMethod?: BillApprovalMethod;
+  customerRejectionReason?: string;
+  createdAt: string;
+}
+
+export const getBill = async (
+  usageRecordId: string,
+): Promise<{ usage: Bill; invoice: Invoice; advancePayment: SalePaymentRequest | null }> => {
+  const res = await api.get<
+    ApiResponse<{ usage: Bill; invoice: Invoice; advancePayment: SalePaymentRequest | null }>
+  >(`/b/usage/${usageRecordId}/bill`);
+  return res.data.data;
+};
+
+/** Get-or-create the Advance Bill for a contract — idempotent, safe to call again. */
+export const generateAdvanceBill = async (contractId: string): Promise<Bill> => {
+  const res = await api.post<ApiResponse<Bill>>(`/b/usage/contract/${contractId}/advance-bill`);
+  return res.data.data;
+};
+
+/** "Edit & Resend" for a disputed Advance Bill — resets the approval trail only, never
+ *  the amount (that's the real collected payment, corrected elsewhere if ever needed). */
+export const resetBillForResend = async (usageRecordId: string): Promise<Bill> => {
+  const res = await api.post<ApiResponse<Bill>>(`/b/usage/${usageRecordId}/bill/reset-for-resend`);
+  return res.data.data;
+};
+
+export interface AdvanceBillStatus {
+  hasAdvancePayment: boolean;
+  advanceBillId?: string;
+  advanceBillStatus?: BillStatus;
+}
+
+export const getAdvanceBillStatus = async (
+  contractIds: string[],
+): Promise<Record<string, AdvanceBillStatus>> => {
+  if (contractIds.length === 0) return {};
+  const res = await api.get<ApiResponse<Record<string, AdvanceBillStatus>>>(
+    '/b/usage/advance-bill-status',
+    { params: { contractIds: contractIds.join(',') } },
+  );
+  return res.data.data;
+};
+
+export const getBillsForContract = async (contractId: string): Promise<BillForContract[]> => {
+  const res = await api.get<ApiResponse<BillForContract[]>>(
+    `/b/usage/by-contract/${contractId}/bills`,
+  );
+  return res.data.data;
+};
+
+export const generateBillSigningToken = async (
+  usageRecordId: string,
+): Promise<{ token: string; expiresAt: string }> => {
+  const res = await api.post<ApiResponse<{ token: string; expiresAt: string }>>(
+    `/b/usage/${usageRecordId}/bill/signing-token`,
+  );
+  return res.data.data;
+};
+
+export const sendBillEmail = async (
+  usageRecordId: string,
+  recipient?: string,
+): Promise<{ message: string; recipient: string; link: string }> => {
+  const res = await api.post<ApiResponse<{ message: string; recipient: string; link: string }>>(
+    `/b/usage/${usageRecordId}/bill/notify/email`,
+    recipient ? { recipient } : {},
+  );
+  return res.data.data;
+};
+
+export const sendBillWhatsApp = async (
+  usageRecordId: string,
+  recipient?: string,
+): Promise<{ message: string; recipient: string; link: string }> => {
+  const res = await api.post<ApiResponse<{ message: string; recipient: string; link: string }>>(
+    `/b/usage/${usageRecordId}/bill/notify/whatsapp`,
+    recipient ? { recipient } : {},
+  );
+  return res.data.data;
+};
+
+export const markBillApprovedManually = async (
+  usageRecordId: string,
+  data: { customerName?: string; approvalNote: string },
+): Promise<Bill> => {
+  const res = await api.post<ApiResponse<Bill>>(
+    `/b/usage/${usageRecordId}/bill/mark-approved`,
+    data,
+  );
+  return res.data.data;
+};
+
+// Public (no auth header needed — for the remote bill-approval page).
+export interface BillForSigning {
+  usage: Partial<Bill>;
+  invoice: Invoice | null;
+  advancePayment?: SalePaymentRequest | null;
+}
+
+export const getBillForSigning = async (token: string): Promise<BillForSigning> => {
+  const res = await api.get<ApiResponse<BillForSigning>>(`/b/bill/sign/${token}`);
+  return res.data.data;
+};
+
+export const approveBillRemote = async (
+  token: string,
+  customerName: string,
+): Promise<{ billingPeriodEnd: string; approvedAt: string }> => {
+  const res = await api.post<ApiResponse<{ billingPeriodEnd: string; approvedAt: string }>>(
+    `/b/bill/sign/${token}/approve`,
+    { customerName },
+  );
+  return res.data.data;
+};
+
+export const rejectBillRemote = async (
+  token: string,
+  reason: string,
+): Promise<{ rejectedAt: string }> => {
+  const res = await api.post<ApiResponse<{ rejectedAt: string }>>(`/b/bill/sign/${token}/reject`, {
+    reason,
+  });
   return res.data.data;
 };
 

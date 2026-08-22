@@ -11,12 +11,21 @@ import { Invoice } from '../entities/invoiceEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
+import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity';
+import { ExpenseEntry } from '../entities/expenseEntryEntity';
 import { requireCashAccount } from '../services/cashbookService';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { getBranchManager } from '../services/billingHelpers';
 import { logger } from '../config/logger';
+import { sign } from 'jsonwebtoken';
 
 const router = Router();
+
+function makeServiceToken() {
+  return sign({ userId: 'billing_service', role: 'ADMIN' }, process.env.ACCESS_SECRET as string, {
+    expiresIn: '1m',
+  });
+}
 
 async function sendNotification(employeeId: string, title: string, message: string) {
   try {
@@ -645,6 +654,79 @@ router.post('/:id/clear', async (req, res, next) => {
       await chqRepo.save(cheque);
       await logHistory(m, cheque.id, prevStatus, 'CLEARED', userId, notes);
     });
+
+    // An ISSUED cheque against a vendor purchase (Manager/Employee purchase-payment
+    // flows) never recorded a PurchasePayment when it was created — "Cheque at Clear"
+    // means the purchase's Outstanding must only actually drop now, not when the
+    // cheque was merely issued. Best-effort: the cash/cheque-status transaction above
+    // already committed and must not roll back over this cross-service call.
+    if (cheque.type === 'ISSUED' && cheque.sourceType === 'PURCHASE' && cheque.sourceReferenceId) {
+      try {
+        const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+        const serviceToken = makeServiceToken();
+        const venInvRes = await fetch(`${venInvUrl}/purchases/internal/record-payment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${serviceToken}`,
+            'x-internal-service': 'billing',
+          },
+          body: JSON.stringify({
+            purchaseId: cheque.sourceReferenceId,
+            branchId,
+            amount: Number(cheque.amount),
+            paymentMethod: 'Cheque',
+            description: `Vendor cheque cleared — ${cheque.partyName} #${cheque.chequeNo}`,
+            referenceNumber: cheque.chequeNo,
+            paymentDate: cheque.clearedDate,
+            createdBy: userId,
+          }),
+        });
+        if (!venInvRes.ok) {
+          const errText = await venInvRes.text();
+          logger.error(
+            '[cheques/clear] Failed to record PurchasePayment for cleared cheque — the cheque cleared and cash moved, but the purchase Outstanding was not reduced',
+            {
+              chequeId: cheque.id,
+              purchaseId: cheque.sourceReferenceId,
+              status: venInvRes.status,
+              errText,
+            },
+          );
+        }
+      } catch (err) {
+        logger.error(
+          '[cheques/clear] Failed to record PurchasePayment for cleared cheque — the cheque cleared and cash moved, but the purchase Outstanding was not reduced',
+          { chequeId: cheque.id, purchaseId: cheque.sourceReferenceId, err },
+        );
+      }
+    }
+
+    // Same "Cheque at Clear" rule for an Employee expense settled by cheque
+    // (payExpenseRequest): the linked ExpenseEntry was deliberately left 'APPROVED'
+    // (still showing as Outstanding on the Payable page) when the cheque was issued —
+    // it only actually becomes PAID now.
+    if (cheque.type === 'ISSUED' && cheque.sourceType === 'EXPENSE' && cheque.sourceReferenceId) {
+      try {
+        const expReq = await Source.getRepository(EmployeeExpenseRequest).findOne({
+          where: { id: cheque.sourceReferenceId },
+        });
+        if (expReq?.expenseEntryId) {
+          await Source.getRepository(ExpenseEntry).update(expReq.expenseEntryId, {
+            status: 'PAID',
+            paymentMode: 'Cheque',
+            paymentDate: cheque.clearedDate,
+            referenceNo: cheque.chequeNo,
+          });
+        }
+      } catch (err) {
+        logger.error('[cheques/clear] Failed to mark linked ExpenseEntry PAID for cleared cheque', {
+          chequeId: cheque.id,
+          expenseRequestId: cheque.sourceReferenceId,
+          err,
+        });
+      }
+    }
 
     res.json({ success: true, data: cheque });
   } catch (err) {

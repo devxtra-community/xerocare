@@ -24,10 +24,17 @@ import { calculateDepreciation, generateDepreciationSchedule } from '../utils/de
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
-import { computeProfitAndLoss, computeBalanceSheet, ALL_TIME_START } from '../utils/accountsShared';
+import {
+  computeProfitAndLoss,
+  computeBalanceSheet,
+  ALL_TIME_START,
+  getVatCreditBreakdown,
+  loadExchangeRates,
+} from '../utils/accountsShared';
 import { Cheque } from '../entities/chequeEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { ContractAgreement } from '../entities/contractAgreementEntity';
+import { UsageRecord } from '../entities/usageRecordEntity';
 
 // Nil UUID used as createdBy when no real user ID is available (cashbook_entries.createdBy UUID NOT NULL).
 const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
@@ -446,7 +453,14 @@ export const getDayBook = async (req: Request, res: Response, next: NextFunction
     const postedInvoiceTxIds = new Set<string>();
     const postedExpenseIds = new Set<string>();
     for (const e of cbEntries) {
-      if (e.sourceType === 'INVOICE_PAYMENT' && e.sourceId) postedInvoiceTxIds.add(e.sourceId);
+      // Both the legacy direct-invoice-payment path (sourceType INVOICE_PAYMENT) and the
+      // SalePaymentRequest-approval path (sourceType SALE_PAYMENT, see approveSalePayment)
+      // store the real PaymentTransaction id as sourceId — either one already mirrors that
+      // transaction in the cashbook, so both must suppress the synthetic row below or every
+      // SALE_PAYMENT collection (the entire Bill-collection flow) shows up twice: once as
+      // its real cashbook entry, once again as an "unmirrored" payment_transactions row.
+      if ((e.sourceType === 'INVOICE_PAYMENT' || e.sourceType === 'SALE_PAYMENT') && e.sourceId)
+        postedInvoiceTxIds.add(e.sourceId);
       if (e.sourceType === 'EXPENSE' && e.sourceId) postedExpenseIds.add(e.sourceId);
     }
 
@@ -681,6 +695,7 @@ export const createExpenseEntry = async (req: Request, res: Response, next: Next
         branchId: entry.branchId,
         paymentMode: entry.paymentMode,
         explicitAccountId: entry.paidFrom,
+        amountToDeduct: Number(entry.netAmount),
       });
     }
 
@@ -719,6 +734,7 @@ export const updateExpenseEntry = async (req: Request, res: Response, next: Next
         branchId: entry.branchId,
         paymentMode: entry.paymentMode,
         explicitAccountId: entry.paidFrom,
+        amountToDeduct: Number(entry.netAmount),
       });
     }
 
@@ -773,6 +789,7 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
         branchId: entry.branchId,
         paymentMode,
         explicitAccountId: paidFrom ?? entry.paidFrom,
+        amountToDeduct: Number(entry.netAmount),
       });
     }
 
@@ -830,6 +847,7 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
           branchId: saved.branchId,
           paymentMode: saved.paymentMode ?? undefined,
           explicitAccountId: saved.paidFrom ?? undefined,
+          amountToDeduct: Number(saved.netAmount),
         });
         account.currentBalance = Number(account.currentBalance) - Number(saved.netAmount);
         await manager.save(CashBankAccount, account);
@@ -1380,6 +1398,18 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
       throw new AppError('You do not have permission to record payment for this receivable', 403);
     }
 
+    // Fail before writing anything — same reasoning as recordPayablePayment: the
+    // account's type/branch must be valid for a Cash/Bank-mode receipt before the
+    // receivable is marked PAID/PARTIAL below.
+    const isChequeRcvUpfront = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
+    if (!isChequeRcvUpfront) {
+      await requireCashAccount(Source, {
+        branchId: receivable.branchId,
+        paymentMode: req.body.paymentMode,
+        explicitAccountId: req.body.paidToAccount,
+      });
+    }
+
     let saved!: ManualReceivable;
     let savedPayment!: ReceivablePayment;
     await Source.transaction(async (em) => {
@@ -1406,8 +1436,8 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
     //
     // CHEQUE: do NOT credit any account now — money hasn't cleared yet.
     // Create a PENDING RECEIVED cheque; Finance deposits → clears it in Accounts → Cheques.
-    const isChequeRcv = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
-    try {
+    const isChequeRcv = isChequeRcvUpfront;
+    {
       if (isChequeRcv) {
         const { Cheque } = await import('../entities/chequeEntity');
         const chequeRepo = Source.getRepository(Cheque);
@@ -1457,8 +1487,6 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
           sourceId: savedPayment.id,
         });
       }
-    } catch (postErr) {
-      logger.error('Failed to post receivable payment to cashbook', postErr);
     }
 
     res.json({ success: true, data: saved });
@@ -1495,6 +1523,48 @@ export const getManualPayables = async (req: Request, res: Response, next: NextF
     });
 
     res.json({ success: true, data: enriched });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// The Payable page's manual_payables + Purchase Order rows never included domestic
+// input VAT owed to vendors — the Balance Sheet/Chart of Accounts's Accounts Payable
+// (2001) does, via getVatCreditBreakdown, which is why the Payable page could show
+// 0.00 while CoA/Balance Sheet showed a real outstanding figure for the same branch.
+// Exposes that same figure so the Payable page can add it as its own line item
+// instead of re-deriving it with separate (and disconnected) logic.
+export const getInputVatPayableSummary = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const branchF = req.branchFilter ?? [];
+    const INV_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
+    let baseCurrency = 'AED';
+    if (branchF.length === 1) {
+      const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+      const info = await getBranchCurrencyInfo(branchF[0]);
+      baseCurrency = info?.currencyCode ?? 'AED';
+    }
+
+    const uuidRe = /^[0-9a-f-]{36}$/i;
+    const safeBranches = branchF.filter((b) => uuidRe.test(b));
+    const branchQs = safeBranches.length > 0 ? `?branchIds=${safeBranches.join(',')}` : '';
+
+    const rates = await loadExchangeRates(Source, baseCurrency);
+    const vatCredit = await getVatCreditBreakdown(INV_URL, branchQs, baseCurrency, rates);
+
+    res.json({
+      success: true,
+      data: {
+        amount: vatCredit.domesticInputVat,
+        currency: baseCurrency,
+        dataWarning: vatCredit.dataWarning,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -1550,6 +1620,21 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
       throw new AppError('You do not have permission to record payment for this payable', 403);
     }
 
+    // Fail before writing anything: a Cash/Bank-mode payment must resolve to a real,
+    // correctly-typed, sufficiently-funded account for this branch. This used to only
+    // be checked inside a "best-effort" try/catch AFTER the payable was already marked
+    // PAID/PARTIAL below — a mismatched account or insufficient balance was logged and
+    // swallowed, leaving the payable showing settled with no real cash movement.
+    const isChequePayUpfront = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
+    if (!isChequePayUpfront) {
+      await requireCashAccount(Source, {
+        branchId: payable.branchId,
+        paymentMode: req.body.paymentMode,
+        explicitAccountId: req.body.paidFromAccount,
+        amountToDeduct: Number(req.body.amount),
+      });
+    }
+
     let saved!: ManualPayable;
     let savedPayment!: PayablePayment;
     await Source.transaction(async (em) => {
@@ -1575,8 +1660,8 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     // (or, for cheques, a PENDING issued cheque that decreases cash only once cleared,
     // per the confirmed cheque daybook rule). Best-effort after commit; idempotent on
     // (sourceType, sourceId).
-    const isChequePay = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
-    try {
+    const isChequePay = isChequePayUpfront;
+    {
       if (isChequePay) {
         const chequeRepo = Source.getRepository(Cheque);
         const chequeNo = req.body.chequeNumber || req.body.referenceNo || `CHQ-PAY-${Date.now()}`;
@@ -1622,8 +1707,6 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
           sourceId: savedPayment.id,
         });
       }
-    } catch (postErr) {
-      logger.error('Failed to post payable payment to cashbook', postErr);
     }
 
     res.json({ success: true, data: saved });
@@ -1786,6 +1869,26 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
       entryCurrency = branchInfo?.currencyCode ?? 'AED';
     }
 
+    // Fail before writing anything: a non-cheque entry that names a cash/bank account
+    // must have that account be the right type, and — for an outflow (Dividend/
+    // Withdrawal) — actually hold enough to cover it. This used to only be checked
+    // inside postEquityCashEffect's own "best-effort" try/catch AFTER the entry was
+    // already saved and returned as success.
+    if (
+      !isChequeMode &&
+      req.body.linkedCashAccountId &&
+      (EQUITY_INFLOW_TYPES.includes(req.body.type) || EQUITY_OUTFLOW_TYPES.includes(req.body.type))
+    ) {
+      await requireCashAccount(Source, {
+        branchId: jwtBranchId,
+        paymentMode: req.body.paymentMode,
+        explicitAccountId: req.body.linkedCashAccountId,
+        amountToDeduct: EQUITY_OUTFLOW_TYPES.includes(req.body.type)
+          ? Number(req.body.amount)
+          : undefined,
+      });
+    }
+
     const entry = repo.create({
       ...req.body,
       currency: entryCurrency,
@@ -1795,11 +1898,7 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
     }) as unknown as EquityEntry;
     const savedEntry = await repo.save(entry);
 
-    try {
-      await postEquityCashEffect(savedEntry, req.body, jwtBranchId, userId);
-    } catch (postErr) {
-      logger.error('Failed to post equity entry cash/cheque effect', postErr);
-    }
+    await postEquityCashEffect(savedEntry, req.body, jwtBranchId, userId);
 
     res.status(201).json({ success: true, data: savedEntry });
   } catch (err) {
@@ -4352,71 +4451,204 @@ export const deleteCountryTaxRule = async (req: Request, res: Response, next: Ne
 
 // ─── CUSTOMER 360° PROFILE ───────────────────────────────────────────────────
 
+// Resolves an employee's display name + role (their "department" in this app's
+// vocabulary — the same word already used in Customer360View's header badge) for the
+// Customer 360° profile's per-row "created by" tags. Mirrors the existing
+// fetchEmployeeName pattern used elsewhere in this codebase (saleWorkflowController.ts,
+// salePaymentRequestService.ts) rather than a shared util, but keeps role too since
+// that's what this view needs and the plain name-only helper discards it.
+async function fetchEmployeeInfo(employeeId: string): Promise<{ name: string; role?: string }> {
+  try {
+    const { sign } = await import('jsonwebtoken');
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+    const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const res = await fetch(`${empUrl}/employee/${employeeId}`, {
+      headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
+    });
+    if (!res.ok) return { name: 'Employee' };
+    const data = await res.json();
+    const emp = data.data ?? data;
+    const first = emp.first_name || emp.firstName || '';
+    const last = emp.last_name || emp.lastName || '';
+    return { name: `${first} ${last}`.trim() || emp.email || 'Employee', role: emp.role };
+  } catch {
+    return { name: 'Employee' };
+  }
+}
+
+// Batch-resolves a set of employee ids into a name/role map — one call per unique
+// employee, not per row, however many contracts/payments/bills reference them.
+async function resolveEmployeeInfoMap(
+  employeeIds: Array<string | undefined | null>,
+): Promise<Map<string, { name: string; role?: string }>> {
+  const uniqueIds = Array.from(new Set(employeeIds.filter((id): id is string => !!id)));
+  const entries = await Promise.all(
+    uniqueIds.map(async (id) => [id, await fetchEmployeeInfo(id)] as const),
+  );
+  return new Map(entries);
+}
+
+// Shared by both the Manager/Finance/Admin branch-wide profile and the Employee
+// personal-only profile below. `employeeId` — when set — narrows EACH entity type by
+// its OWN creator/handler field (Invoice.createdBy, SalePaymentRequest
+// .recordedByEmployeeId, ContractAgreement.createdByEmployeeId, UsageRecord
+// .billCreatedByEmployeeId) independently, not by cascading through a personally-
+// filtered invoice-id list — so a payment this employee collected on a colleague's
+// contract for the same customer still counts as something they "personally handled",
+// matching the everyday meaning of that phrase rather than a stricter one nobody asked
+// for. branchFilter is always applied as the outer security boundary either way.
+async function buildCustomer360Profile(
+  customerId: string,
+  branchFilter: string[],
+  employeeId?: string,
+) {
+  const invoiceRepo = Source.getRepository(Invoice);
+  const paymentRepo = Source.getRepository(SalePaymentRequest);
+
+  // The employee's own invoices/quotations — this is what populates the Contracts and
+  // Quotations tabs.
+  const qb = invoiceRepo
+    .createQueryBuilder('i')
+    .leftJoinAndSelect('i.items', 'items')
+    .leftJoinAndSelect('i.creditNotes', 'cn')
+    .where('i.customerId = :customerId', { customerId });
+  applyBranchQB(qb as never, 'i', branchFilter);
+  if (employeeId) qb.andWhere('i.createdBy = :employeeId', { employeeId });
+  qb.orderBy('i.createdAt', 'DESC');
+  const invoices = await qb.getMany();
+
+  // Every invoice this customer has in scope (branch, not creator) — the join target
+  // for payments/agreements/bills, so each of those can be filtered by its own
+  // creator/handler field independent of who created the invoice itself.
+  const allInvoicesQb = invoiceRepo
+    .createQueryBuilder('i2')
+    .select(['i2.id'])
+    .where('i2.customerId = :customerId', { customerId });
+  applyBranchQB(allInvoicesQb as never, 'i2', branchFilter);
+  const allInvoiceIds = (await allInvoicesQb.getMany()).map((r) => r.id);
+
+  let payments: SalePaymentRequest[] = [];
+  let agreements: ContractAgreement[] = [];
+  let bills: UsageRecord[] = [];
+  if (allInvoiceIds.length > 0) {
+    const paymentsQb = paymentRepo
+      .createQueryBuilder('p')
+      .where('p.invoiceId IN (:...invoiceIds)', { invoiceIds: allInvoiceIds });
+    if (employeeId) paymentsQb.andWhere('p.recordedByEmployeeId = :employeeId', { employeeId });
+    paymentsQb.orderBy('p.createdAt', 'DESC');
+
+    const agreementsQb = Source.getRepository(ContractAgreement)
+      .createQueryBuilder('ca')
+      .select([
+        'ca.id',
+        'ca.invoiceId',
+        'ca.agreementNumber',
+        'ca.signatureStatus',
+        'ca.employeeSignedAt',
+        'ca.customerSignedAt',
+        'ca.createdByEmployeeId',
+        'ca.createdByEmployeeName',
+        'ca.createdAt',
+      ])
+      .where('ca.invoiceId IN (:...invoiceIds)', { invoiceIds: allInvoiceIds });
+    if (employeeId) agreementsQb.andWhere('ca.createdByEmployeeId = :employeeId', { employeeId });
+
+    const billsQb = Source.getRepository(UsageRecord)
+      .createQueryBuilder('ur')
+      .where('ur."contractId" IN (:...invoiceIds)', { invoiceIds: allInvoiceIds });
+    if (employeeId) billsQb.andWhere('ur."billCreatedByEmployeeId" = :employeeId', { employeeId });
+    billsQb.orderBy('ur."billingPeriodStart"', 'DESC');
+
+    [payments, agreements, bills] = await Promise.all([
+      paymentsQb.getMany(),
+      agreementsQb.getMany(),
+      billsQb.getMany(),
+    ]);
+  }
+
+  // "Created date/time + department" for every row — one batched employee lookup for
+  // however many unique employees are referenced across all four entity types, then
+  // attached to each row rather than re-fetched per row.
+  const employeeInfoMap = await resolveEmployeeInfoMap([
+    ...invoices.map((i) => i.createdBy),
+    ...payments.map((p) => p.recordedByEmployeeId),
+    ...agreements.map((a) => a.createdByEmployeeId),
+    ...bills.map((b) => b.billCreatedByEmployeeId),
+  ]);
+
+  const invoicesWithCreator = invoices.map((inv) => {
+    const info = employeeInfoMap.get(inv.createdBy);
+    return { ...inv, employeeName: info?.name, createdByRole: info?.role };
+  });
+  const paymentsWithCreator = payments.map((p) => ({
+    ...p,
+    createdByRole: employeeInfoMap.get(p.recordedByEmployeeId)?.role,
+  }));
+  const agreementsWithCreator = agreements.map((a) => ({
+    ...a,
+    createdByRole: employeeInfoMap.get(a.createdByEmployeeId)?.role,
+  }));
+  const billsWithCreator = bills.map((b) => ({
+    ...b,
+    createdByRole: b.billCreatedByEmployeeId
+      ? employeeInfoMap.get(b.billCreatedByEmployeeId)?.role
+      : undefined,
+  }));
+
+  const contracts = invoicesWithCreator.filter((i) => i.type !== 'QUOTATION');
+  const totalInvoiced = contracts.reduce((sum, i) => sum + Number(i.totalAmount ?? 0), 0);
+  const totalPaid = paymentsWithCreator
+    .filter((p) => p.status === 'APPROVED')
+    .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+  return {
+    invoices: invoicesWithCreator,
+    payments: paymentsWithCreator,
+    agreements: agreementsWithCreator,
+    bills: billsWithCreator,
+    summary: {
+      totalInvoiced,
+      totalPaid,
+      totalOutstanding: Math.max(0, totalInvoiced - totalPaid),
+      contractCount: contracts.length,
+      paymentCount: payments.length,
+      billCount: bills.length,
+    },
+  };
+}
+
 export const getCustomer360Profile = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { customerId } = req.params;
+    const customerId = req.params.customerId as string;
     const branchFilter = req.branchFilter ?? [];
+    const data = await buildCustomer360Profile(customerId, branchFilter);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    const invoiceRepo = Source.getRepository(Invoice);
-    const paymentRepo = Source.getRepository(SalePaymentRequest);
-
-    // Fetch all invoices for this customer, applying branch scope
-    const qb = invoiceRepo
-      .createQueryBuilder('i')
-      .leftJoinAndSelect('i.items', 'items')
-      .leftJoinAndSelect('i.creditNotes', 'cn')
-      .where('i.customerId = :customerId', { customerId });
-    applyBranchQB(qb as never, 'i', branchFilter);
-    qb.orderBy('i.createdAt', 'DESC');
-    const invoices = await qb.getMany();
-
-    const invoiceIds = invoices.map((inv) => inv.id);
-
-    let payments: SalePaymentRequest[] = [];
-    let agreements: ContractAgreement[] = [];
-    if (invoiceIds.length > 0) {
-      [payments, agreements] = await Promise.all([
-        paymentRepo
-          .createQueryBuilder('p')
-          .where('p.invoiceId IN (:...invoiceIds)', { invoiceIds })
-          .orderBy('p.createdAt', 'DESC')
-          .getMany(),
-        Source.getRepository(ContractAgreement)
-          .createQueryBuilder('ca')
-          .select([
-            'ca.id',
-            'ca.invoiceId',
-            'ca.agreementNumber',
-            'ca.signatureStatus',
-            'ca.employeeSignedAt',
-            'ca.customerSignedAt',
-          ])
-          .where('ca.invoiceId IN (:...invoiceIds)', { invoiceIds })
-          .getMany(),
-      ]);
+// Employee-side Customer 360° — personal-only: unlike the Manager/Finance/Admin route
+// above (branch-wide, gated to the accounts module), this shows only what the
+// requesting employee personally created/handled, and only within their own branch
+// (still enforced as the outer boundary — this is not an accounts-module route, so it
+// does not go through parseBranchFilter, but branch isolation is not relaxed).
+export const getMyCustomer360Profile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const customerId = req.params.customerId as string;
+    const { userId, branchId } = req.user!;
+    if (!branchId) {
+      throw new AppError(
+        'Your session has no branch assignment. Please log out and log in again.',
+        401,
+      );
     }
-
-    const contracts = invoices.filter((i) => i.type !== 'QUOTATION');
-    const totalInvoiced = contracts.reduce((sum, i) => sum + Number(i.totalAmount ?? 0), 0);
-    const totalPaid = payments
-      .filter((p) => p.status === 'APPROVED')
-      .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
-
-    res.json({
-      success: true,
-      data: {
-        invoices,
-        payments,
-        agreements,
-        summary: {
-          totalInvoiced,
-          totalPaid,
-          totalOutstanding: Math.max(0, totalInvoiced - totalPaid),
-          contractCount: contracts.length,
-          paymentCount: payments.length,
-        },
-      },
-    });
+    const data = await buildCustomer360Profile(customerId, [branchId], userId);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

@@ -38,6 +38,7 @@ import {
   createManualPayable,
   updateManualPayable,
   recordPayablePayment,
+  getInputVatPayableSummary,
   getEquityEntries,
   createEquityEntry,
   updateEquityEntry,
@@ -228,6 +229,7 @@ router.post('/payables', createManualPayable);
 router.put('/payables/:id', updateManualPayable);
 router.post('/payables/:id/payment', recordPayablePayment);
 router.get('/payables/charts', getPayableCharts);
+router.get('/payables/input-vat-summary', getInputVatPayableSummary);
 
 // Equity
 router.get('/equity/summary', getEquitySummary);

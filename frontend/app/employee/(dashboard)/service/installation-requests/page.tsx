@@ -47,8 +47,16 @@ import {
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 import { ChangeMachineModal } from '@/components/employeeComponents/ChangeMachineModal';
+import { getUserFromToken } from '@/lib/auth';
+import { EmployeeJob } from '@/lib/employeeJob';
 
 export default function InstallationRequestsPage() {
+  // Vendor purchasing/contact info isn't relevant here (Service Desk); Lot info is
+  // additionally hidden for Service Technicians specifically, who also use this page.
+  const [isServiceTechnician, setIsServiceTechnician] = useState(false);
+  useEffect(() => {
+    setIsServiceTechnician(getUserFromToken()?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN);
+  }, []);
   const [requests, setRequests] = useState<InstallationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -557,6 +565,8 @@ export default function InstallationRequestsPage() {
         productId={viewProductId}
         open={!!viewProductId}
         onClose={() => setViewProductId(null)}
+        hideVendorDetails
+        hideLotDetails={isServiceTechnician}
       />
 
       {swapTarget && (
@@ -698,18 +708,22 @@ export default function InstallationRequestsPage() {
           <DialogTitle className="sr-only">Initial Meter Readings</DialogTitle>
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-500 p-5 text-white">
+          <div className="bg-white border-b border-slate-100 p-5 text-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 text-blue-600">
                   <Gauge size={18} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
                     Initial Meter Readings
                   </p>
-                  <p className="text-base font-black">{readingTarget?.invoiceNumber}</p>
-                  <p className="text-[11px] opacity-80">{readingTarget?.customerName}</p>
+                  <p className="text-base font-black text-slate-800">
+                    {readingTarget?.invoiceNumber}
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-bold font-sans">
+                    {readingTarget?.customerName}
+                  </p>
                 </div>
               </div>
               <button
@@ -717,7 +731,7 @@ export default function InstallationRequestsPage() {
                   setReadingTarget(null);
                   setReadingContract(null);
                 }}
-                className="text-white/60 hover:text-white"
+                className="text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X size={16} />
               </button>

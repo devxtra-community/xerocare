@@ -1,5 +1,4 @@
 import api from './api';
-import type { SalePaymentRequest } from './saleWorkflow';
 
 export interface InvoiceItem {
   id?: string;
@@ -320,6 +319,8 @@ export interface UsageRecord {
   discountAmount?: number;
   discountBwCopies?: number;
   discountColorCopies?: number;
+  billStatus?: 'PENDING_APPROVAL' | 'CUSTOMER_APPROVED' | 'CUSTOMER_REJECTED';
+  customerRejectionReason?: string;
   // Extended pricing details for UI breakdown
   rentType?: string;
   bwFreeLimit?: number;
@@ -808,9 +809,6 @@ export const getCollectionAlerts = async (date?: string): Promise<CollectionAler
 export interface RecordUsageResult {
   usage: UsageRecord;
   nextPeriod?: { billingPeriodStart: string; billingPeriodEnd: string };
-  /** The PENDING SalePaymentRequest created for whatever was collected this visit —
-   *  null when amountCollected was 0 (fully deferred to the Pending Payments tab). */
-  salePaymentRequest?: SalePaymentRequest | null;
 }
 
 /**

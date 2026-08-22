@@ -425,62 +425,73 @@ export default function EmployeeQuotationTable() {
   );
 
   // Filter
-  const filtered = quotations.filter((q) => {
-    const s = search.toLowerCase();
+  // Memoized: this must NOT be a new array reference on every render. `paginated`
+  // below is a useMemo keyed on `filtered`, and the balance-fetching effect further
+  // down is keyed on `paginated` itself (not just the derived id string) — an
+  // unmemoized `.filter()` here made both recompute every render, which made that
+  // effect re-fire every render, whose own setState triggered the next render:
+  // an infinite loop hitting GET /payments/summary for the visible page's invoices
+  // many times per second, silently burning through the per-user rate-limit budget
+  // in the background for as long as this table stayed mounted (e.g. behind the
+  // New Quotation wizard) — the actual cause of "Too many requests" on submit.
+  const filtered = useMemo(() => {
+    return quotations.filter((q) => {
+      const s = search.toLowerCase();
 
-    // Search match
-    const searchMatch =
-      q.invoiceNumber?.toLowerCase().includes(s) ||
-      q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
-      q.customerName?.toLowerCase().includes(s) ||
-      getProductNames(q).toLowerCase().includes(s) ||
-      q.saleType?.toLowerCase().includes(s) ||
-      q.status?.toLowerCase().includes(s);
+      // Search match
+      const searchMatch =
+        q.invoiceNumber?.toLowerCase().includes(s) ||
+        q.invoiceNumber?.toLowerCase().replace('inv-', 'qty-').includes(s) ||
+        q.customerName?.toLowerCase().includes(s) ||
+        getProductNames(q).toLowerCase().includes(s) ||
+        q.saleType?.toLowerCase().includes(s) ||
+        q.status?.toLowerCase().includes(s);
 
-    // Conversion filter match
-    let conversionMatch = true;
-    const isExpired = q.expiryDate ? new Date(q.expiryDate) < new Date() : false;
-    if (conversionFilter === 'CONVERTED') {
-      conversionMatch = !!q.isConverted;
-    } else if (conversionFilter === 'NOT_CONVERTED') {
-      conversionMatch =
-        !q.isConverted &&
-        (['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
-          q.status,
-        ) ||
-          isExpired);
-    } else if (conversionFilter === 'PENDING') {
-      conversionMatch =
-        !q.isConverted &&
-        !isExpired &&
-        !['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
-          q.status,
-        );
-    } else if (conversionFilter === 'EXPIRED') {
-      conversionMatch = isExpired || q.status === 'EXPIRED';
-    }
+      // Conversion filter match
+      let conversionMatch = true;
+      const isExpired = q.expiryDate ? new Date(q.expiryDate) < new Date() : false;
+      if (conversionFilter === 'CONVERTED') {
+        conversionMatch = !!q.isConverted;
+      } else if (conversionFilter === 'NOT_CONVERTED') {
+        conversionMatch =
+          !q.isConverted &&
+          (['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
+            q.status,
+          ) ||
+            isExpired);
+      } else if (conversionFilter === 'PENDING') {
+        conversionMatch =
+          !q.isConverted &&
+          !isExpired &&
+          !['EXPIRED', 'CUSTOMER_REJECTED', 'FINANCE_REJECTED', 'RETAKEN', 'SUPERSEDED'].includes(
+            q.status,
+          );
+      } else if (conversionFilter === 'EXPIRED') {
+        conversionMatch = isExpired || q.status === 'EXPIRED';
+      }
 
-    // Status filter match
-    let statusMatch = true;
-    if (statusFilter === 'FINANCE_APPROVED') {
-      statusMatch = q.status === 'FINANCE_APPROVED';
-    } else if (statusFilter === 'SENT_TO_CUSTOMER') {
-      statusMatch = q.status === 'SENT' || q.status === 'SENT_TO_CUSTOMER';
-    }
+      // Status filter match
+      let statusMatch = true;
+      if (statusFilter === 'FINANCE_APPROVED') {
+        statusMatch = q.status === 'FINANCE_APPROVED';
+      } else if (statusFilter === 'SENT_TO_CUSTOMER') {
+        statusMatch = q.status === 'SENT' || q.status === 'SENT_TO_CUSTOMER';
+      }
 
-    // Date range match
-    let dateMatch = true;
-    if (startDate) {
-      dateMatch = dateMatch && new Date(q.createdAt) >= new Date(startDate);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      dateMatch = dateMatch && new Date(q.createdAt) <= end;
-    }
+      // Date range match
+      let dateMatch = true;
+      if (startDate) {
+        dateMatch = dateMatch && new Date(q.createdAt) >= new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        dateMatch = dateMatch && new Date(q.createdAt) <= end;
+      }
 
-    return searchMatch && conversionMatch && statusMatch && dateMatch;
-  });
+      return searchMatch && conversionMatch && statusMatch && dateMatch;
+    });
+  }, [quotations, search, conversionFilter, statusFilter, startDate, endDate, getProductNames]);
 
   useEffect(() => {
     setTotal(filtered.length);

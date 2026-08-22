@@ -28,12 +28,24 @@ import {
 } from '@/lib/invoice';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, History, Send, Mail, Eye, X, Image as ImageIcon, Edit } from 'lucide-react';
+import {
+  Loader2,
+  History,
+  Send,
+  Mail,
+  Eye,
+  X,
+  Image as ImageIcon,
+  Edit,
+  FileText,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import UsageRecordingModal from './UsageRecordingModal';
+import { BillModal } from './BillModal';
+import { getBillsForContract, type BillForContract } from '@/lib/saleWorkflow';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
@@ -64,6 +76,8 @@ export default function UsageHistoryDialog({
   const [editingRecord, setEditingRecord] = useState<UsageRecord | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [contract, setContract] = useState<Invoice | null>(null);
+  const [bills, setBills] = useState<BillForContract[]>([]);
+  const [viewingBillId, setViewingBillId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && contractId) {
@@ -86,9 +100,21 @@ export default function UsageHistoryDialog({
     }
   }, [isOpen, contractId]);
 
+  // Bill approval status + collected/pending per period — same source the Receivable
+  // page's "View Bills" drilldown uses, so this dialog can offer the same View
+  // Bill / Add Collect Amount actions without re-deriving the numbers differently.
+  const fetchBills = React.useCallback(() => {
+    if (isOpen && contractId) {
+      getBillsForContract(contractId)
+        .then(setBills)
+        .catch((err) => console.error('Failed to fetch bill statuses', err));
+    }
+  }, [isOpen, contractId]);
+
   useEffect(() => {
     fetchHistory();
-  }, [fetchHistory]);
+    fetchBills();
+  }, [fetchHistory, fetchBills]);
 
   const isCpc = contract?.rentType?.includes('CPC');
   const isEmiLease = contract?.saleType === 'LEASE' && contract?.leaseType === 'EMI';
@@ -168,6 +194,10 @@ export default function UsageHistoryDialog({
   }, [history.length, setTotal]);
 
   const paginatedHistory = history.slice((currentPage - 1) * limit, currentPage * limit);
+  const billByRecordId = React.useMemo(
+    () => new Map(bills.map((b) => [b.usageRecordId, b])),
+    [bills],
+  );
 
   return (
     <>
@@ -263,6 +293,7 @@ export default function UsageHistoryDialog({
                           ADVANCE
                         </TableHead>
                         <TableHead className="font-bold text-blue-400 text-right">TOTAL</TableHead>
+                        <TableHead className="font-bold text-white text-center">APPROVAL</TableHead>
                         <TableHead className="font-bold text-white text-center rounded-tr-[1.5rem]">
                           ACTION
                         </TableHead>
@@ -388,8 +419,52 @@ export default function UsageHistoryDialog({
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
+                            {(() => {
+                              const bill = billByRecordId.get(record.id);
+                              const status = bill?.billStatus || record.billStatus;
+                              const meta: Record<string, { label: string; className: string }> = {
+                                PENDING_APPROVAL: {
+                                  label: 'Pending',
+                                  className: 'bg-amber-100 text-amber-700',
+                                },
+                                CUSTOMER_APPROVED: {
+                                  label: 'Approved',
+                                  className: 'bg-emerald-100 text-emerald-700',
+                                },
+                                CUSTOMER_REJECTED: {
+                                  label: 'Disputed',
+                                  className: 'bg-red-100 text-red-700',
+                                },
+                              };
+                              const cfg = status ? meta[status] : undefined;
+                              return cfg ? (
+                                <Badge
+                                  className={`rounded-full px-2.5 py-1 text-[9px] font-black border-none shadow-sm ${cfg.className}`}
+                                  title={
+                                    status === 'CUSTOMER_REJECTED' && record.customerRejectionReason
+                                      ? record.customerRejectionReason
+                                      : undefined
+                                  }
+                                >
+                                  {cfg.label}
+                                </Badge>
+                              ) : (
+                                <span className="text-[10px] text-slate-300 italic">—</span>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-2">
                               <UsageDetailsModal record={record} />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 w-8 p-0 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+                                onClick={() => setViewingBillId(record.id)}
+                                title="View Bill"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
                               {record.meterImageUrl ? (
                                 <Button
                                   size="sm"
@@ -470,9 +545,27 @@ export default function UsageHistoryDialog({
           customerName={customerName}
           onSuccess={() => {
             fetchHistory();
+            fetchBills();
             onSuccess?.();
           }}
           invoice={editingRecord as unknown as Invoice}
+        />
+      )}
+
+      {viewingBillId && (
+        <BillModal
+          usageRecordId={viewingBillId}
+          open={!!viewingBillId}
+          onClose={() => setViewingBillId(null)}
+          onUpdated={fetchBills}
+          onEditRequested={(id) => {
+            const record = history.find((h) => h.id === id);
+            if (record) {
+              setViewingBillId(null);
+              setEditingRecord(record);
+              setIsEditModalOpen(true);
+            }
+          }}
         />
       )}
 

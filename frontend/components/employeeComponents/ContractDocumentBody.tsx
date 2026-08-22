@@ -153,9 +153,9 @@ function PartiesSection({
   return (
     <div>
       <SectionHeading>Parties to this Agreement</SectionHeading>
-      <div className="grid grid-cols-2 gap-0 border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 border border-slate-200">
         {/* Seller */}
-        <div className="p-3 border-r border-slate-200">
+        <div className="p-3 border-r-0 sm:border-r border-b sm:border-b-0 border-slate-200">
           <FieldLabel>Seller / Dealer</FieldLabel>
           <p className="text-sm font-black text-slate-800 mb-1">{agreement.dealerName}</p>
           {agreement.dealerAddress && (
@@ -342,7 +342,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
       <table className="w-full text-xs border border-slate-200 border-collapse">
         <tbody>
           <tr className="border-b border-slate-100">
-            <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Contract Start
             </td>
             <td className="px-3 py-2 font-semibold text-slate-800">
@@ -516,7 +516,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
       <table className="w-full text-xs border border-slate-200 border-collapse">
         <tbody>
           <tr className="border-b border-slate-100">
-            <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Lease Type
             </td>
             <td className="px-3 py-2 font-semibold text-slate-800">
@@ -724,7 +724,7 @@ function AdvanceSection({
           {hasAdvance && (
             <>
               <tr className="border-b border-slate-100">
-                <td className="px-3 py-2 w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   {advanceLabel}
                 </td>
                 <td className="px-3 py-2 font-black text-slate-800">
@@ -851,9 +851,9 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
   return (
     <div>
       <SectionHeading>Signatures</SectionHeading>
-      <div className="grid grid-cols-2 border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 border border-slate-200">
         {/* Seller */}
-        <div className="p-3 border-r border-slate-200">
+        <div className="p-3 border-r-0 sm:border-r border-b sm:border-b-0 border-slate-200">
           <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
             Seller Signature
           </p>

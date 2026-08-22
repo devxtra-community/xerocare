@@ -605,7 +605,13 @@ export default function EmployeeRentTable({
             invoice={contractInvoice}
             onClose={() => setContractInvoice(null)}
             onSigned={() => {
-              setContractInvoice(null);
+              // Refresh the underlying table's status/badges, but don't close the
+              // modal — onSigned fires after EVERY signature (employee, customer, or
+              // upload), not just the last one. Closing here raced with and completely
+              // masked ContractAgreementModal's own forward-navigation between tabs:
+              // the whole modal unmounted the instant Employee Sign was confirmed,
+              // before the user ever saw it advance to Customer Sign. The modal now
+              // only closes when the user explicitly clicks Close.
               fetchInvoices();
             }}
           />

@@ -35,11 +35,62 @@ import {
 import { Customer } from '@/lib/customer';
 import { Lead } from '@/lib/lead';
 import { Invoice } from '@/lib/invoice';
-import { Customer360Profile, SalePaymentRequest, AgreementSummary } from '@/lib/customer360';
+import {
+  Customer360Profile,
+  Customer360Invoice,
+  Customer360Bill,
+  SalePaymentRequest,
+  AgreementSummary,
+} from '@/lib/customer360';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { ContractAgreementModal } from '@/components/employeeComponents/ContractAgreementModal';
+import { BillModal } from '@/components/Finance/BillModal';
+import CreditNoteViewModal from '@/components/returns/CreditNoteViewModal';
+import type { CreditNoteRecord } from '@/lib/invoice';
 
-type Tab = 'quotations' | 'contracts' | 'payments' | 'returns';
+type Tab = 'quotations' | 'contracts' | 'bills' | 'payments' | 'returns';
+
+const DEPARTMENT_LABELS: Record<string, string> = {
+  EMPLOYEE: 'Employee',
+  FINANCE: 'Finance',
+  MANAGER: 'Manager',
+  ADMIN: 'Admin',
+  HR: 'HR',
+};
+
+const BILL_STATUS_META: Record<string, { label: string; className: string }> = {
+  PENDING_APPROVAL: {
+    label: 'Pending Approval',
+    className: 'bg-amber-50 text-amber-700 border-amber-100',
+  },
+  CUSTOMER_APPROVED: {
+    label: 'Customer Approved',
+    className: 'bg-green-50 text-green-700 border-green-100',
+  },
+  CUSTOMER_REJECTED: { label: 'Disputed', className: 'bg-red-50 text-red-700 border-red-100' },
+};
+
+function DepartmentBadge({ role }: { role?: string }) {
+  if (!role) return <span className="text-[10px] text-slate-300">—</span>;
+  return (
+    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-indigo-50 text-indigo-700 border-indigo-100">
+      {DEPARTMENT_LABELS[role] ?? role}
+    </span>
+  );
+}
+
+function CreatedAtCell({ date }: { date?: string }) {
+  if (!date) return <span className="text-[10px] text-slate-300">—</span>;
+  const d = new Date(date);
+  return (
+    <div className="text-xs text-slate-400 leading-tight">
+      <div>{d.toLocaleDateString()}</div>
+      <div className="text-[10px] text-slate-300">
+        {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+  );
+}
 
 const PAYMENT_CONTEXT_LABELS: Record<string, string> = {
   SALE: 'Sale',
@@ -98,6 +149,9 @@ interface Props {
   createdByName?: string;
   createdByRole?: string;
   backHref: string;
+  /** Shown as a banner under the header when this profile is scoped narrower than the
+   *  full branch history (e.g. the Employee personal-only view). */
+  scopeNotice?: string;
 }
 
 export default function Customer360View({
@@ -107,6 +161,7 @@ export default function Customer360View({
   createdByName,
   createdByRole,
   backHref,
+  scopeNotice,
 }: Props) {
   const router = useRouter();
   const currency = useBranchCurrency();
@@ -114,8 +169,12 @@ export default function Customer360View({
 
   // Contract Agreement modal state
   const [agreementInvoice, setAgreementInvoice] = useState<Invoice | null>(null);
+  // Bill modal state
+  const [viewingBillId, setViewingBillId] = useState<string | null>(null);
+  // Credit Note modal state
+  const [viewingCreditNote, setViewingCreditNote] = useState<CreditNoteRecord | null>(null);
 
-  const { invoices, payments, agreements, summary } = profile;
+  const { invoices, payments, agreements, bills, summary } = profile;
 
   // Build a quick lookup map: invoiceId → AgreementSummary
   const agreementByInvoiceId = new Map<string, AgreementSummary>(
@@ -125,12 +184,20 @@ export default function Customer360View({
   const quotations = invoices.filter((i) => i.type === 'QUOTATION');
   const contracts = invoices.filter((i) => i.type !== 'QUOTATION');
   const creditNotes = invoices.flatMap((inv) =>
-    (inv.creditNotes ?? []).map((cn) => ({ ...cn, invoiceNumber: inv.invoiceNumber })),
+    (inv.creditNotes ?? []).map((cn) => ({
+      ...cn,
+      invoiceId: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      customerName: customer.name,
+      customerId: customer.id,
+      branchId: inv.branchId,
+    })),
   );
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'contracts', label: 'Contracts', count: contracts.length },
     { id: 'quotations', label: 'Quotations', count: quotations.length },
+    { id: 'bills', label: 'Rent/Lease Bills', count: bills.length },
     { id: 'payments', label: 'Payments', count: payments.length },
     { id: 'returns', label: 'Returns / Credit Notes', count: creditNotes.length },
   ];
@@ -287,6 +354,13 @@ export default function Customer360View({
         )}
       </div>
 
+      {scopeNotice && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs text-amber-700 font-medium">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {scopeNotice}
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="border-b border-slate-200 flex overflow-x-auto">
@@ -328,10 +402,35 @@ export default function Customer360View({
           {activeTab === 'quotations' && (
             <QuotationsTab invoices={quotations} currency={currency} />
           )}
+          {activeTab === 'bills' && (
+            <BillsTab bills={bills} currency={currency} onViewBill={setViewingBillId} />
+          )}
           {activeTab === 'payments' && <PaymentsTab payments={payments} />}
-          {activeTab === 'returns' && <ReturnsTab creditNotes={creditNotes} currency={currency} />}
+          {activeTab === 'returns' && (
+            <ReturnsTab
+              creditNotes={creditNotes}
+              currency={currency}
+              onView={(cn) => setViewingCreditNote(cn as unknown as CreditNoteRecord)}
+            />
+          )}
         </div>
       </div>
+
+      {/* Bill Modal — reuses the existing component unchanged */}
+      {viewingBillId && (
+        <BillModal
+          usageRecordId={viewingBillId}
+          open={!!viewingBillId}
+          onClose={() => setViewingBillId(null)}
+        />
+      )}
+
+      {/* Credit Note Modal — reuses the existing component unchanged */}
+      <CreditNoteViewModal
+        record={viewingCreditNote}
+        open={!!viewingCreditNote}
+        onClose={() => setViewingCreditNote(null)}
+      />
 
       {/* Contract Agreement Modal — reuses the existing component unchanged */}
       {agreementInvoice && (
@@ -363,7 +462,7 @@ function ContractsTab({
   agreementByInvoiceId,
   onViewAgreement,
 }: {
-  invoices: Invoice[];
+  invoices: Customer360Invoice[];
   currency: string;
   agreementByInvoiceId: Map<string, AgreementSummary>;
   onViewAgreement: (inv: Invoice) => void;
@@ -385,7 +484,12 @@ function ContractsTab({
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">
             Agreement
           </TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Created</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Created Date/Time
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Department
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -449,8 +553,11 @@ function ContractsTab({
                   </span>
                 )}
               </TableCell>
-              <TableCell className="text-xs text-slate-400">
-                {new Date(inv.createdAt).toLocaleDateString()}
+              <TableCell>
+                <CreatedAtCell date={inv.createdAt} />
+              </TableCell>
+              <TableCell>
+                <DepartmentBadge role={inv.createdByRole} />
               </TableCell>
             </TableRow>
           );
@@ -460,7 +567,13 @@ function ContractsTab({
   );
 }
 
-function QuotationsTab({ invoices, currency }: { invoices: Invoice[]; currency: string }) {
+function QuotationsTab({
+  invoices,
+  currency,
+}: {
+  invoices: Customer360Invoice[];
+  currency: string;
+}) {
   if (invoices.length === 0)
     return <EmptyState icon={FileText} message="No quotations on record for this customer" />;
 
@@ -474,7 +587,12 @@ function QuotationsTab({ invoices, currency }: { invoices: Invoice[]; currency: 
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Created</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Created Date/Time
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Department
+          </TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">
             Converted
           </TableHead>
@@ -505,8 +623,11 @@ function QuotationsTab({ invoices, currency }: { invoices: Invoice[]; currency: 
             <TableCell className="font-semibold text-xs text-slate-700 font-mono">
               {currency} {Number(inv.totalAmount).toLocaleString()}
             </TableCell>
-            <TableCell className="text-xs text-slate-400">
-              {new Date(inv.createdAt).toLocaleDateString()}
+            <TableCell>
+              <CreatedAtCell date={inv.createdAt} />
+            </TableCell>
+            <TableCell>
+              <DepartmentBadge role={inv.createdByRole} />
             </TableCell>
             <TableCell className="text-xs">
               {inv.isConverted ? (
@@ -519,6 +640,102 @@ function QuotationsTab({ invoices, currency }: { invoices: Invoice[]; currency: 
             </TableCell>
           </TableRow>
         ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+function BillsTab({
+  bills,
+  currency,
+  onViewBill,
+}: {
+  bills: Customer360Bill[];
+  currency: string;
+  onViewBill: (usageRecordId: string) => void;
+}) {
+  if (bills.length === 0)
+    return <EmptyState icon={FileText} message="No Rent/Lease bills on record for this customer" />;
+
+  return (
+    <Table>
+      <TableHeader className="bg-slate-50">
+        <TableRow>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Period</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Bill Document
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Created Date/Time
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Department
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {bills.map((b) => {
+          const statusMeta = BILL_STATUS_META[b.billStatus] ?? {
+            label: b.billStatus,
+            className: 'bg-slate-50 text-slate-500 border-slate-100',
+          };
+          const isAdvance = b.billType === 'ADVANCE';
+          return (
+            <TableRow key={b.id} className="hover:bg-slate-50/50">
+              <TableCell>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    isAdvance
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                      : 'bg-slate-50 text-slate-600 border-slate-100'
+                  }`}
+                >
+                  {isAdvance ? 'Advance' : 'Usage'}
+                </span>
+              </TableCell>
+              <TableCell className="text-xs text-slate-600">
+                {isAdvance
+                  ? new Date(b.billingPeriodStart).toLocaleDateString()
+                  : `${new Date(b.billingPeriodStart).toLocaleDateString()} → ${new Date(b.billingPeriodEnd).toLocaleDateString()}`}
+              </TableCell>
+              <TableCell>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${statusMeta.className}`}
+                >
+                  {statusMeta.label}
+                </span>
+                {b.billStatus === 'CUSTOMER_REJECTED' && b.customerRejectionReason && (
+                  <p
+                    className="text-[10px] text-red-500 mt-0.5 max-w-48 truncate"
+                    title={b.customerRejectionReason}
+                  >
+                    {b.customerRejectionReason}
+                  </p>
+                )}
+              </TableCell>
+              <TableCell className="font-semibold text-xs text-slate-700 font-mono">
+                {currency} {Number(b.totalCharge).toLocaleString()}
+              </TableCell>
+              <TableCell>
+                <button
+                  onClick={() => onViewBill(b.id)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                >
+                  <FileText className="h-3.5 w-3.5" /> View Bill
+                </button>
+              </TableCell>
+              <TableCell>
+                <CreatedAtCell date={b.createdAt} />
+              </TableCell>
+              <TableCell>
+                <DepartmentBadge role={b.createdByRole} />
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -540,6 +757,15 @@ function PaymentsTab({ payments }: { payments: SalePaymentRequest[] }) {
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Date</TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Receipt</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Recorded By
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Created Date/Time
+          </TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Department
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -595,6 +821,13 @@ function PaymentsTab({ payments }: { payments: SalePaymentRequest[] }) {
                 <span className="text-[10px] text-slate-300">—</span>
               )}
             </TableCell>
+            <TableCell className="text-xs text-slate-600">{p.recordedByEmployeeName}</TableCell>
+            <TableCell>
+              <CreatedAtCell date={p.createdAt} />
+            </TableCell>
+            <TableCell>
+              <DepartmentBadge role={p.createdByRole} />
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -603,9 +836,23 @@ function PaymentsTab({ payments }: { payments: SalePaymentRequest[] }) {
 }
 
 type CreditNoteItem = NonNullable<Invoice['creditNotes']>[number];
-type CreditNoteRow = CreditNoteItem & { invoiceNumber: string };
+type CreditNoteRow = CreditNoteItem & {
+  invoiceId: string;
+  invoiceNumber: string;
+  customerName: string;
+  customerId: string;
+  branchId: string;
+};
 
-function ReturnsTab({ creditNotes, currency }: { creditNotes: CreditNoteRow[]; currency: string }) {
+function ReturnsTab({
+  creditNotes,
+  currency,
+  onView,
+}: {
+  creditNotes: CreditNoteRow[];
+  currency: string;
+  onView: (cn: CreditNoteRow) => void;
+}) {
   if (creditNotes.length === 0)
     return <EmptyState icon={RotateCcw} message="No returns or credit notes for this customer" />;
 
@@ -621,14 +868,27 @@ function ReturnsTab({ creditNotes, currency }: { creditNotes: CreditNoteRow[]; c
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Type</TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Amount</TableHead>
           <TableHead className="text-[11px] font-bold uppercase text-slate-500">Status</TableHead>
-          <TableHead className="text-[11px] font-bold uppercase text-slate-500">Date</TableHead>
+          <TableHead className="text-[11px] font-bold uppercase text-slate-500">
+            Created Date/Time
+          </TableHead>
+          <TableHead
+            className="text-[11px] font-bold uppercase text-slate-500"
+            title="Credit notes don't record a creator/department in this system"
+          >
+            Department
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {creditNotes.map((cn) => (
           <TableRow key={cn.id} className="hover:bg-slate-50/50">
-            <TableCell className="font-mono text-xs font-semibold text-slate-700">
-              {cn.creditNoteNo}
+            <TableCell className="font-mono text-xs font-semibold">
+              <button
+                onClick={() => onView(cn)}
+                className="text-indigo-600 hover:text-indigo-800 hover:underline"
+              >
+                {cn.creditNoteNo}
+              </button>
             </TableCell>
             <TableCell className="font-mono text-xs text-slate-500">{cn.invoiceNumber}</TableCell>
             <TableCell className="text-xs text-slate-700">
@@ -650,8 +910,11 @@ function ReturnsTab({ creditNotes, currency }: { creditNotes: CreditNoteRow[]; c
                 {cn.status}
               </span>
             </TableCell>
-            <TableCell className="text-xs text-slate-400">
-              {cn.createdAt ? new Date(cn.createdAt).toLocaleDateString() : '—'}
+            <TableCell>
+              <CreatedAtCell date={cn.createdAt} />
+            </TableCell>
+            <TableCell className="text-[10px] text-slate-300" title="Not tracked for credit notes">
+              —
             </TableCell>
           </TableRow>
         ))}

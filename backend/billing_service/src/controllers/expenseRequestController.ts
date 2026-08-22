@@ -528,6 +528,7 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
             branchId: request.branchId,
             paymentMode: request.paymentMode,
             explicitAccountId: accountId,
+            amountToDeduct: Number(request.amount),
           });
           account.currentBalance = Number(account.currentBalance) - Number(request.amount);
           await manager.save(CashBankAccount, account);
@@ -547,6 +548,58 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
           });
           await manager.save(CashbookEntry, cbEntry);
         });
+
+        // Record the PurchasePayment now — this is the moment cash actually left the
+        // account, which is also the moment the purchase's Outstanding should actually
+        // drop. Best-effort by design: the cash movement above is already committed and
+        // must not roll back over a cross-service call; a failure here is logged and
+        // leaves the purchase's own ledger correctable via ven_inv_service directly,
+        // rather than silently under-recording what Finance just paid.
+        if (request.purchaseId) {
+          try {
+            const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+            const serviceToken = makeServiceToken();
+            const venInvRes = await fetch(`${venInvUrl}/purchases/internal/record-payment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${serviceToken}`,
+                'x-internal-service': 'billing',
+              },
+              body: JSON.stringify({
+                purchaseId: request.purchaseId,
+                branchId: request.branchId,
+                amount: Number(request.amount),
+                paymentMethod: request.paymentMode,
+                description: `Vendor payment — ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
+                paymentDate: new Date().toISOString().split('T')[0],
+                createdBy: userId,
+                attachmentUrl: request.receiptUrl,
+              }),
+            });
+            if (venInvRes.ok) {
+              const venInvData = await venInvRes.json();
+              request.purchasePaymentId = venInvData.data?.id;
+              await Source.getRepository(EmployeeExpenseRequest).save(request);
+            } else {
+              const errText = await venInvRes.text();
+              logger.error(
+                '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
+                {
+                  requestId: request.id,
+                  purchaseId: request.purchaseId,
+                  status: venInvRes.status,
+                  errText,
+                },
+              );
+            }
+          } catch (err) {
+            logger.error(
+              '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
+              { requestId: request.id, purchaseId: request.purchaseId, err },
+            );
+          }
+        }
       }
 
       // Notify the Manager
@@ -563,9 +616,28 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
       return res.json({ success: true, data: updated });
     }
 
-    // ── EMPLOYEE_EXPENSE approval path (unchanged) ──────────────────────────────
-    const { paid_from_account, payment_reference, notes } = req.body ?? {};
+    // ── EMPLOYEE_EXPENSE approval path ──────────────────────────────────────────
+    const { paid_from_account, payment_reference, payment_mode, notes } = req.body ?? {};
     const payImmediately = !!paid_from_account;
+    // Payment mode was never accepted from the client here — the account resolution
+    // below then defaulted to requiring a BANK account regardless of what the caller
+    // actually picked (accountTypeForMode(undefined) → 'BANK'), and the ExpenseEntry's
+    // own paymentMode was hardcoded 'Cash' — so a Cash-mode payment failed with "a Bank
+    // account is required" while a genuinely-paid Cash entry still displayed as Bank
+    // nowhere reflecting what account was actually used. 'Bank Transfer' matches this
+    // path's pre-existing default requirement when the caller omits it.
+    const resolvedPaymentMode: string = payment_mode || 'Bank Transfer';
+
+    // Fail before writing anything: validate the account's type/branch (and, since
+    // this deducts money, that the account can actually cover it) up front.
+    if (payImmediately) {
+      await requireCashAccount(Source, {
+        branchId: request.branchId,
+        paymentMode: resolvedPaymentMode,
+        explicitAccountId: paid_from_account,
+        amountToDeduct: Number(request.amount),
+      });
+    }
 
     // Generate reference numbers BEFORE the transaction to avoid pool deadlock
     // (pool max=1 — calling Source.getRepository inside a transaction blocks the only connection)
@@ -609,7 +681,7 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
         status: payImmediately ? 'PAID' : 'APPROVED',
         approvedBy: userId,
         paidFrom: payImmediately ? paid_from_account : undefined,
-        paymentMode: payImmediately ? 'Cash' : undefined,
+        paymentMode: payImmediately ? resolvedPaymentMode : undefined,
         paymentDate: payImmediately ? new Date() : undefined,
         referenceNo: payment_reference || undefined,
         receiptUrl: request.receiptUrl,
@@ -624,10 +696,11 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
 
       // 4. If paying immediately: deduct from account + create cashbook entry
       if (payImmediately) {
-        // Used to skip the deduction and still mark the request/entry PAID when the
-        // account wasn't found — now blocks the whole approval instead.
+        // Type/branch/balance were already validated above; re-resolve through this
+        // transaction's manager so the deduction below rolls back with everything else.
         const account = await requireCashAccount(manager, {
           branchId: request.branchId,
+          paymentMode: resolvedPaymentMode,
           explicitAccountId: paid_from_account,
         });
         account.currentBalance = Number(account.currentBalance) - Number(request.amount);
@@ -642,7 +715,7 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
           category: 'Expense',
           description: `Employee expense: ${request.employeeName} - ${request.category}`,
           linkedExpenseId: savedEntry.id,
-          paymentMode: 'Cash',
+          paymentMode: resolvedPaymentMode,
           chequeNo: payment_reference || undefined,
           notes,
           createdBy: userId,
@@ -716,48 +789,14 @@ export const rejectExpenseRequest = async (req: Request, res: Response, next: Ne
     const saved = await repo.save(request);
 
     if (request.requestSource === 'MANAGER_PURCHASE') {
-      // Reverse the PurchasePayment that was recorded at submission to restore outstanding balance.
-      if (request.purchasePaymentId && request.branchId) {
-        try {
-          const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
-          const serviceToken = makeServiceToken();
-          const voidRes = await fetch(`${venInvUrl}/purchases/internal/void-payment`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${serviceToken}`,
-              'x-internal-service': 'billing',
-            },
-            body: JSON.stringify({
-              paymentId: request.purchasePaymentId,
-              branchId: request.branchId,
-            }),
-          });
-          if (!voidRes.ok) {
-            const errText = await voidRes.text();
-            logger.warn(
-              '[rejectExpenseRequest] ven_inv void-payment failed (non-critical):',
-              voidRes.status,
-              errText,
-            );
-          } else {
-            logger.info('[rejectExpenseRequest] PurchasePayment voided successfully', {
-              purchasePaymentId: request.purchasePaymentId,
-              requestNo: request.requestNo,
-            });
-          }
-        } catch (voidErr) {
-          logger.warn(
-            '[rejectExpenseRequest] Failed to void PurchasePayment (non-critical):',
-            voidErr,
-          );
-        }
-      }
-
+      // No PurchasePayment to reverse: it's now only ever recorded when Finance
+      // approves (Cash/Bank) or when the resulting cheque clears — a SUBMITTED
+      // request being rejected here never had one to begin with, so the purchase's
+      // Outstanding was never touched and needs no restoring.
       await sendNotification(
         request.employeeId,
         'Purchase Payment Rejected ❌',
-        `Your ${request.currency} ${Number(request.amount).toFixed(2)} payment request to ${request.vendorName || 'vendor'} was rejected. Reason: ${rejection_reason}. Outstanding balance on the purchase has been restored.`,
+        `Your ${request.currency} ${Number(request.amount).toFixed(2)} payment request to ${request.vendorName || 'vendor'} was rejected. Reason: ${rejection_reason}. No cash was moved and the purchase's outstanding balance is unchanged.`,
         'EXPENSE_REJECTED',
       );
     } else {
@@ -836,17 +875,18 @@ export const createManagerPurchasePaymentRequest = async (
     const empBranchId = empInfo?.branchId || branchId || '';
     const branchName = empInfo?.branchName || 'Unknown Branch';
 
-    // Block before touching ven_inv at all: cash doesn't move until Finance approves
-    // (that step already validates the account), but a Manager could otherwise submit
-    // a request naming no real account for a branch with none configured — the
-    // PurchasePayment would still get recorded (outstanding reduces) for a request
-    // that can never actually be approved. Cheque doesn't need this — it never enters
-    // the approval queue at all (see the paymentMethod branch below).
+    // Block before writing anything: cash doesn't move until Finance approves (that
+    // step already validates the account), but a Manager could otherwise submit a
+    // request naming no real account for a branch with none configured. Cheque
+    // doesn't need this — it never enters the approval queue at all (see below).
     if (paymentMethod !== 'Cheque') {
+      // Balance is checked again (authoritatively) at Finance's approval, since it can
+      // move between now and then — this is early feedback, not the only gate.
       await requireCashAccount(Source, {
         branchId: empBranchId,
         paymentMode: paymentMethod,
         explicitAccountId: paidFromAccountId,
+        amountToDeduct: Number(amount),
       });
     }
 
@@ -856,41 +896,30 @@ export const createManagerPurchasePaymentRequest = async (
       process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
     const proofUrl = proofFile?.key ? `${R2_BASE_URL}/${proofFile.key}` : undefined;
 
-    // Step 1: Record PurchasePayment in ven_inv immediately (outstanding reduces now).
-    // Cash is NOT moved yet — that happens when Finance approves.
-    const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
-    const serviceToken = makeServiceToken();
-    const venInvRes = await fetch(`${venInvUrl}/purchases/internal/record-payment`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${serviceToken}`,
-        'x-internal-service': 'billing',
-      },
-      body: JSON.stringify({
-        purchaseId,
-        branchId: empBranchId,
-        amount: parseFloat(String(amount)),
-        paymentMethod,
-        description:
-          description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
-        referenceNumber,
-        paymentDate: paymentDate || new Date().toISOString().split('T')[0],
-        createdBy: userId,
-        attachmentUrl: proofUrl,
-      }),
-    });
-
-    let purchasePaymentId: string | undefined;
+    // The PurchasePayment (which is what actually reduces the vendor's outstanding
+    // balance) is deliberately NOT recorded here. It used to be created immediately on
+    // submission — before Finance had approved anything and before any real cash had
+    // moved — so a purchase's Outstanding on the Payable page dropped (or, for a fully-
+    // covering request, disappeared entirely) the instant a Manager merely *asked* to
+    // pay it. A request Finance goes on to reject left that reduction in place until an
+    // explicit void-payment call reversed it — a window where the books were wrong by
+    // construction. Recording it only happens now at the point cash genuinely moves:
+    // Finance's approval for Cash/Bank (approveExpenseRequest), or the cheque actually
+    // clearing (chequesRoutes /:id/clear) for Cheque — see purchaseOrigin lookup below,
+    // which no longer depends on record-payment's response.
     let purchaseOrigin: string | undefined;
-    if (venInvRes.ok) {
-      const venInvData = await venInvRes.json();
-      purchasePaymentId = venInvData.data?.id;
-      purchaseOrigin = venInvData.data?.purchaseOrigin || undefined;
-    } else {
-      const errText = await venInvRes.text();
-      logger.warn('[ManagerPurchaseReq] ven_inv record-payment failed:', venInvRes.status, errText);
-      throw new AppError(`Failed to record purchase payment in inventory service: ${errText}`, 502);
+    try {
+      const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+      const serviceToken = makeServiceToken();
+      const purchaseRes = await fetch(`${venInvUrl}/purchases/${purchaseId}`, {
+        headers: { Authorization: `Bearer ${serviceToken}`, 'x-internal-service': 'billing' },
+      });
+      if (purchaseRes.ok) {
+        const purchaseData = await purchaseRes.json();
+        purchaseOrigin = (purchaseData.data ?? purchaseData)?.purchaseOrigin;
+      }
+    } catch {
+      /* origin enrichment is best-effort, same as the old record-payment response path */
     }
 
     // Step 2: Route by paymentMethod.
@@ -934,13 +963,11 @@ export const createManagerPurchasePaymentRequest = async (
       logger.info('[ManagerPurchaseReq] Cheque created directly (no approval queue)', {
         chequeNo,
         purchaseId,
-        purchasePaymentId,
         amount,
       });
       return res.status(201).json({
         success: true,
         data: {
-          purchasePaymentId,
           chequeNo,
           message:
             'PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
@@ -976,11 +1003,10 @@ export const createManagerPurchasePaymentRequest = async (
       receiptUrl: proofUrl,
       paymentMode: paymentMethod,
       paidFromAccountId: paidFromAccountId || undefined,
-      purchasePaymentId: purchasePaymentId || undefined,
       chequeNumber: chequeNumber || undefined,
       chequeBankName: chequeBankName || undefined,
       chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : undefined,
-      notes: `Manager purchase payment request. PurchasePayment recorded in ven_inv (ID: ${purchasePaymentId || 'N/A'}). Cash held pending Finance approval.`,
+      notes: `Manager purchase payment request. Outstanding on the purchase stays unchanged and no cash has moved yet — both happen together when Finance approves this request.`,
     });
 
     const saved = await repo.save(request);
@@ -1000,7 +1026,6 @@ export const createManagerPurchasePaymentRequest = async (
     logger.info('[ManagerPurchaseReq] Created successfully', {
       requestNo,
       purchaseId,
-      purchasePaymentId,
       amount,
       paymentMethod,
     });
@@ -1047,28 +1072,74 @@ export const createExpenseRequestFromPurchasePayment = async (
     const employeeName = empInfo?.name || 'Branch Manager';
     const branchName = empInfo?.branchName || 'Unknown Branch';
 
-    // Block before writing anything: this call represents cash already spent (Finance
-    // recording a direct purchase payment) — validate the destination account exists
-    // for this branch before the request row (and the ven_inv PurchasePayment that
-    // triggered this call) is left standing with no real cash movement behind it.
-    // Resolved here (once) and reused below, rather than a second lookup that
-    // silently skipped the deduction whenever paidFromAccountId wasn't given at all.
-    // NOTE: this comparison is deliberately left exact-case for now. Making it
-    // case-insensitive is correct in isolation — it stops a 'CHEQUE' payment being treated
-    // as cash and deducted before the cheque clears — but this path creates no Cheque row,
-    // so skipping the deduction removes one leg of the entry without adding the other:
-    // Accounts Payable falls with no cheque liability to replace it and the balance sheet
-    // breaks by the payment amount (measured: 2,000). The two changes must land together.
-    // See CHQ4 in docs/production-readiness-audit-2026-08-13.md for the full plan.
-    const resolvedAccount =
-      paymentMethod !== 'Cheque'
-        ? await requireCashAccount(Source, {
-            branchId,
-            paymentMode: paymentMethod,
-            explicitAccountId: paidFromAccountId,
-            actionLabel: 'recording a vendor purchase payment',
-          })
-        : null;
+    // CHQ4 (docs/production-readiness-audit-2026-08-13.md): this handler used to treat
+    // the payment as already-spent — deduct cash immediately, file the request as
+    // EMPLOYEE_EXPENSE for Finance's awareness only, no real approval gate — and never
+    // handled Cheque at all (an exact-case check meant 'CHEQUE'/'cheque' fell through
+    // to the cash branch, debiting the bank before the cheque had even cleared, with no
+    // Cheque record created anywhere). Now mirrors createManagerPurchasePaymentRequest
+    // exactly: Cheque creates a real ISSUED cheque and stops there (money moves at
+    // Clear); Cash/Bank goes into the same MANAGER_PURCHASE approval queue, and cash
+    // only actually moves — together with the PurchasePayment that reduces this
+    // purchase's Outstanding — when Finance approves it (approveExpenseRequest).
+    if (
+      String(paymentMethod ?? '')
+        .trim()
+        .toUpperCase() === 'CHEQUE'
+    ) {
+      const chequeRepo = Source.getRepository(Cheque);
+      const chequeNo = `CHQ-${Date.now()}`;
+      const cheque = chequeRepo.create({
+        chequeNo,
+        partyName: vendorName || 'Vendor',
+        amount: parseFloat(String(amount)),
+        dueDate: date ? new Date(date) : new Date(),
+        issueDate: date ? new Date(date) : new Date(),
+        type: 'ISSUED',
+        status: 'PENDING',
+        description:
+          description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+        branchId,
+        sourceType: 'PURCHASE',
+        sourceReferenceId: purchaseId,
+        sourceLabel: purchaseRef ? `Purchase ${purchaseRef}` : 'Purchase Order',
+        createdBy: employeeId,
+      });
+      await chequeRepo.save(cheque);
+
+      logger.info('[ExpenseRequest] Cheque created for purchase payment (no cash deducted)', {
+        chequeNo,
+        purchaseId,
+        amount,
+      });
+
+      const fmIdsChq = await findFinanceManagersOfBranch(branchId);
+      for (const fmId of fmIdsChq) {
+        await sendNotification(
+          fmId,
+          'Vendor Cheque Issued',
+          `${employeeName} issued a ${currency || 'AED'} ${Number(amount).toFixed(2)} cheque to ${vendorName || 'vendor'} (${purchaseRef || 'N/A'}). Go to Accounts → Cheques to track it through to clearance.`,
+          'EXPENSE_REQUEST',
+          '/finance/accounts/cheques',
+        );
+      }
+
+      return res.status(201).json({
+        success: true,
+        data: { chequeNo, message: 'PENDING cheque created — no cash moves until it clears.' },
+      });
+    }
+
+    // Cash / Bank: same early feedback as createManagerPurchasePaymentRequest — check
+    // now, authoritatively re-check at Finance's approval, since balance can move
+    // between now and then.
+    await requireCashAccount(Source, {
+      branchId,
+      paymentMode: paymentMethod,
+      explicitAccountId: paidFromAccountId,
+      actionLabel: 'recording a vendor purchase payment',
+      amountToDeduct: parseFloat(String(amount)),
+    });
 
     const requestNo = await generateRequestNo();
     const repo = Source.getRepository(EmployeeExpenseRequest);
@@ -1087,69 +1158,26 @@ export const createExpenseRequestFromPurchasePayment = async (
       amount: parseFloat(String(amount)),
       currency: currency || 'AED',
       receiptUrl: attachmentUrl || undefined,
-      // Keep requestSource = EMPLOYEE_EXPENSE (default): funds were already deducted
-      // below, so this must never enter the MANAGER_PURCHASE approve-deduct branch.
+      requestSource: 'MANAGER_PURCHASE',
       purchaseId: purchaseId || undefined,
       purchaseRef: purchaseRef || undefined,
       vendorName: vendorName || undefined,
       purchaseOrigin: purchaseOrigin || undefined,
       paymentMode: paymentMethod || undefined,
-      notes: `Auto-created from purchase payment. Ref: ${purchaseRef || 'N/A'}. Method: ${paymentMethod || 'N/A'}.`,
+      paidFromAccountId: paidFromAccountId || undefined,
+      notes: `Purchase payment request. Outstanding on the purchase stays unchanged and no cash has moved yet — both happen together when Finance approves this request.`,
       status: 'SUBMITTED',
       submittedAt: new Date(),
     });
 
     const saved = await repo.save(request);
 
-    // Immediately deduct from cash/bank account (bypasses MANAGER read-only restriction
-    // since this is a server-to-server internal call with no parseBranchFilter middleware).
-    // No longer best-effort — resolvedAccount was already validated to exist above, so
-    // this only fails on a genuine, unexpected error, which now correctly propagates
-    // instead of being logged as "non-critical" while the caller's notification (below)
-    // goes on to claim the amount was deducted.
-    if (resolvedAccount) {
-      const cbYear = new Date().getFullYear();
-      const cbCount = await Source.getRepository(CashbookEntry)
-        .createQueryBuilder('c')
-        .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
-        .getCount();
-      const cbRefNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
-
-      await Source.transaction(async (manager) => {
-        const accountRepo = manager.getRepository(CashBankAccount);
-        const account = await accountRepo.findOneOrFail({ where: { id: resolvedAccount.id } });
-        account.currentBalance = Number(account.currentBalance) - parseFloat(String(amount));
-        await manager.save(CashBankAccount, account);
-
-        const cbEntry = manager.create(CashbookEntry, {
-          referenceNo: cbRefNo,
-          date: date ? new Date(date) : new Date(),
-          accountId: account.id,
-          entryType: 'PAYMENT',
-          amount: parseFloat(String(amount)),
-          category: 'Vendor Purchase',
-          description: `Vendor payment: ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
-          paymentMode: paymentMethod || 'Cash',
-          notes: `Auto-deducted from purchase payment. Ref: ${purchaseRef || 'N/A'}.`,
-          createdBy: employeeId,
-          branchId,
-        });
-        await manager.save(CashbookEntry, cbEntry);
-      });
-
-      logger.info('[ExpenseRequest] Balance deducted immediately for purchase payment', {
-        accountId: resolvedAccount.id,
-        amount,
-        purchaseRef,
-      });
-    }
-
     const fmIds = await findFinanceManagersOfBranch(branchId);
     for (const fmId of fmIds) {
       await sendNotification(
         fmId,
-        'Purchase Payment — Review Required',
-        `${employeeName} paid ${currency || 'AED'} ${Number(amount).toFixed(2)} to ${vendorName || 'vendor'} (${purchaseRef || 'N/A'}) via ${paymentMethod || 'Cash'}. Amount already deducted from account.`,
+        'Purchase Payment — Approval Required',
+        `${employeeName} requests ${currency || 'AED'} ${Number(amount).toFixed(2)} payment to ${vendorName || 'vendor'} (${purchaseRef || 'N/A'}) via ${paymentMethod || 'Cash'}. Cash held until you approve.`,
         'EXPENSE_REQUEST',
         '/finance/accounts/expenses?tab=requests',
       );
@@ -1202,22 +1230,21 @@ export const payExpenseRequest = async (req: Request, res: Response, next: NextF
       throw new AppError('Only APPROVED requests can be paid', 400);
 
     if (isCheque) {
-      // Cheque path: mark paid, create PENDING ISSUED cheque — no balance movement until CLEARED
+      // Cheque path: mark the REQUEST paid (Finance has done its part — chosen and
+      // issued a settlement) but deliberately leave the linked ExpenseEntry at
+      // 'APPROVED', not 'PAID'. The Payable page's Outstanding comes from
+      // fetchExpenseEntries({status: 'APPROVED'}) — flipping it to PAID here (as this
+      // used to) made the expense vanish from Outstanding the instant a cheque was
+      // merely issued, while the cheque itself sat PENDING and no cash had actually
+      // moved. It only genuinely becomes PAID when the cheque clears — see the
+      // sourceType === 'EXPENSE' branch in chequesRoutes.ts's /:id/clear handler,
+      // which flips it then instead.
       await Source.transaction(async (manager) => {
         request.status = 'PAID';
         request.paidAt = new Date();
         request.paidFromAccount = undefined;
         request.paymentReference = cheque_number;
         await manager.save(EmployeeExpenseRequest, request);
-
-        if (request.expenseEntryId) {
-          await manager.update(ExpenseEntry, request.expenseEntryId, {
-            status: 'PAID',
-            paymentMode: 'Cheque',
-            paymentDate: new Date(),
-            referenceNo: cheque_number,
-          });
-        }
       });
 
       // Create PENDING ISSUED cheque record (non-fatal if it fails)
@@ -1281,6 +1308,7 @@ export const payExpenseRequest = async (req: Request, res: Response, next: NextF
           branchId: request.branchId,
           paymentMode: payment_mode,
           explicitAccountId: paid_from_account,
+          amountToDeduct: Number(request.amount),
         });
         account.currentBalance = Number(account.currentBalance) - Number(request.amount);
         await manager.save(CashBankAccount, account);

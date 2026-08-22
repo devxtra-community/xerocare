@@ -18,7 +18,13 @@ import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { useExchangeRateMap, formatDualCurrency } from '@/lib/dualCurrency';
 import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
-import { createCheque, fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import {
+  createCheque,
+  fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  accountTypeForPaymentMode,
+  insufficientBalanceError,
+} from '@/lib/finance/accountsApi';
 import { createManagerPurchasePaymentRequest } from '@/lib/employeeExpenses';
 import { getUserFromToken } from '@/lib/auth';
 
@@ -63,7 +69,9 @@ export default function AddPaymentModal({
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDueDate, setChequeDueDate] = useState('');
-  const [accounts, setAccounts] = useState<{ id: string; name: string; type: string }[]>([]);
+  const [accounts, setAccounts] = useState<
+    { id: string; name: string; type: string; currentBalance: number; currency: string }[]
+  >([]);
   const [paidFromAccount, setPaidFromAccount] = useState('');
   const [formData, setFormData] = useState<AddPaymentDto>({
     amount: 0,
@@ -79,15 +87,33 @@ export default function AddPaymentModal({
         .then((branch) => setCurrencyCode(branch?.currency_code || 'AED'))
         .catch(() => setCurrencyCode('AED'));
       fetchCashBankAccounts()
-        .then((accs) => {
-          setAccounts(accs);
-          if (accs.length > 0 && !paidFromAccount) setPaidFromAccount(accs[0].id);
-        })
+        .then((accs) => setAccounts(accs))
         .catch(() => setAccounts([]));
     } else {
       setAttachment(null);
+      setPaidFromAccount('');
     }
-  }, [open, paidFromAccount]);
+    // Only re-run on open/close — account selection itself is driven by the
+    // payment-method effect below, not by re-fetching.
+  }, [open]);
+
+  // Only ever offer accounts that match the selected Payment Method — Cash mode
+  // shows Cash-type accounts, everything else shows Bank-type accounts. Whenever the
+  // method changes (or the account list first loads), drop a now-invalid selection
+  // and default to the first matching account rather than leaving a stale, mismatched
+  // one selected.
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, formData.paymentMethod);
+  useEffect(() => {
+    if (matchingAccounts.some((a) => a.id === paidFromAccount)) return;
+    setPaidFromAccount(matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.paymentMethod, accounts]);
+
+  const selectedAccount = accounts.find((a) => a.id === paidFromAccount);
+  const balanceError =
+    formData.paymentMethod !== 'Cheque'
+      ? insufficientBalanceError(Number(formData.amount), selectedAccount)
+      : null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,6 +152,12 @@ export default function AddPaymentModal({
     const isCheque = formData.paymentMethod === 'Cheque';
     if (isCheque && (!chequeNumber || !chequeBankName || !chequeDueDate)) {
       toast.error('Cheque number, bank name, and due date are required for cheque payments');
+      setLoading(false);
+      return;
+    }
+
+    if (balanceError) {
+      toast.error(balanceError);
       setLoading(false);
       return;
     }
@@ -345,23 +377,39 @@ export default function AddPaymentModal({
               </Select>
             </div>
 
-            {formData.paymentMethod !== 'Cheque' && accounts.length > 0 && (
+            {formData.paymentMethod !== 'Cheque' && (
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-slate-500 uppercase">
                   Pay From Account
                 </Label>
-                <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
-                  <SelectTrigger className="h-10 text-xs border-slate-200">
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id} className="text-xs">
-                        {a.name} ({a.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {matchingAccounts.length === 0 ? (
+                  <p className="text-[11px] font-medium text-red-600">
+                    No{' '}
+                    {accountTypeForPaymentMode(formData.paymentMethod) === 'CASH'
+                      ? 'Cash in Hand'
+                      : 'Bank'}{' '}
+                    account exists for this branch. Add one under Cash &amp; Bank first.
+                  </p>
+                ) : (
+                  <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                    <SelectTrigger className="h-10 text-xs border-slate-200">
+                      <SelectValue placeholder="Select account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {matchingAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id} className="text-xs">
+                          {a.name} ({a.type}) — {a.currency}{' '}
+                          {Number(a.currentBalance).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {balanceError && (
+                  <p className="text-[11px] font-medium text-red-600">{balanceError}</p>
+                )}
               </div>
             )}
 
@@ -478,7 +526,11 @@ export default function AddPaymentModal({
             <Button
               type="submit"
               className="flex-1 bg-primary hover:bg-primary/90 font-bold"
-              disabled={loading}
+              disabled={
+                loading ||
+                !!balanceError ||
+                (formData.paymentMethod !== 'Cheque' && matchingAccounts.length === 0)
+              }
             >
               {loading
                 ? 'Submitting...'

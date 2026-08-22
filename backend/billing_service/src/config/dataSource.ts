@@ -1670,6 +1670,73 @@ async function runPreMigrations() {
           `duplicate contract_agreements rows for the same invoiceId need manual cleanup first: ${(err as Error).message}`,
       );
     }
+
+    // Bill creation + customer approval (Stage A of the Rent/Lease billing redesign) —
+    // a UsageRecord doubles as the period's Bill, so these columns mirror
+    // ContractAgreement's signing-token/approval-status shape rather than a new table.
+    await client.query(`
+      ALTER TABLE usage_records
+      ADD COLUMN IF NOT EXISTS "billStatus" VARCHAR NOT NULL DEFAULT 'PENDING_APPROVAL',
+      ADD COLUMN IF NOT EXISTS "billCreatedByEmployeeId" UUID NULL,
+      ADD COLUMN IF NOT EXISTS "billCreatedByName" VARCHAR NULL,
+      ADD COLUMN IF NOT EXISTS "billSentAt" TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS "signingToken" VARCHAR NULL,
+      ADD COLUMN IF NOT EXISTS "signingTokenExpiresAt" TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS "signingTokenUsed" BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS "customerApprovedByName" VARCHAR NULL,
+      ADD COLUMN IF NOT EXISTS "customerApprovedAt" TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS "customerApprovalMethod" VARCHAR NULL,
+      ADD COLUMN IF NOT EXISTS "customerApprovalNote" TEXT NULL,
+      ADD COLUMN IF NOT EXISTS "customerRejectionReason" TEXT NULL,
+      ADD COLUMN IF NOT EXISTS "customerRejectedAt" TIMESTAMP NULL;
+    `);
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "uniq_usage_records_signingToken"
+          ON usage_records ("signingToken") WHERE "signingToken" IS NOT NULL;
+      `);
+    } catch (err) {
+      logger.warn(
+        `Could not create uniq_usage_records_signingToken index: ${(err as Error).message}`,
+      );
+    }
+    logger.info('Bill approval columns ensured on usage_records.');
+
+    // Backfill: every usage_records row that existed BEFORE this feature shipped went
+    // through the old combined usage+collection flow — treat those as already approved
+    // so historical periods don't suddenly block collection topping-up
+    // (getPendingUsagePayments) behind an approval step that never existed when they
+    // were created. This must run exactly once, ever — a time-relative guard (e.g. "older
+    // than N minutes") is unsound here: billStatus is a real in-flight business state, and
+    // any bill genuinely still awaiting customer approval when the service happens to
+    // restart would otherwise get silently marked CUSTOMER_APPROVED with no customer
+    // action at all. A one-time marker table is the only correct guard.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS migration_markers (key VARCHAR PRIMARY KEY, "ranAt" TIMESTAMP NOT NULL DEFAULT NOW());
+    `);
+    const backfillMarker = await client.query(
+      `SELECT 1 FROM migration_markers WHERE key = 'usage_records_bill_status_backfill';`,
+    );
+    if (backfillMarker.rows.length === 0) {
+      await client.query(`
+        UPDATE usage_records
+        SET "billStatus" = 'CUSTOMER_APPROVED', "customerApprovalMethod" = 'FINANCE_MANUAL'
+        WHERE "billStatus" = 'PENDING_APPROVAL';
+      `);
+      await client.query(
+        `INSERT INTO migration_markers (key) VALUES ('usage_records_bill_status_backfill');`,
+      );
+      logger.info('Backfill: pre-existing usage_records marked CUSTOMER_APPROVED (one-time).');
+    }
+
+    // Advance Bill support — same UsageRecord table, distinguished from a periodic usage
+    // Bill by billType. Existing rows default to 'USAGE' (the column default already
+    // covers this; no backfill needed).
+    await client.query(`
+      ALTER TABLE usage_records
+      ADD COLUMN IF NOT EXISTS "billType" VARCHAR NOT NULL DEFAULT 'USAGE';
+    `);
+    logger.info('billType column ensured on usage_records.');
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

@@ -156,7 +156,13 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
     queryFn: () => fetchCashBankAccounts(),
     staleTime: 60_000,
   });
-  const accounts = accountsRaw as { id: string; name: string; type: string }[];
+  const accounts = accountsRaw as {
+    id: string;
+    name: string;
+    type: string;
+    currentBalance: number;
+    currency: string;
+  }[];
 
   // Only EMPLOYEE_EXPENSE requests (not MANAGER_PURCHASE which lives in Payments tab)
   const expenseRequests = useMemo(

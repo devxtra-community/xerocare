@@ -3530,6 +3530,13 @@ export class BillingService {
     }
     const isExemptDirectSaleCustomer = directSaleCustomer?.vatStatus === 'EXEMPT';
 
+    // Same catalogue price floor already enforced on the Quotation path (see
+    // createInvoice) — Direct Sale is a faster route to the same PRODUCT_SALE/
+    // SPAREPART_SALE/SALE outcome, not an exemption from the same pricing rules. Without
+    // this, Direct Sale had no floor at all: any employee could sell at any price, B2B
+    // wholesale or not, with zero server-side check.
+    await this.enforceCataloguePricing(payload.items, directSaleCustomer);
+
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
     let calculatedTotal = 0;
 

@@ -30,7 +30,11 @@ import {
   deleteExpenseEntry,
   fetchCashBankAccounts,
   fetchExpenseCharts,
+  filterAccountsByPaymentMode,
+  accountTypeForPaymentMode,
+  insufficientBalanceError,
   type ExpenseEntry,
+  type CashBankAccount,
 } from '@/lib/finance/accountsApi';
 import { fetchPurchases, fetchBranches, type PurchaseOrder } from '@/lib/finance/accounts';
 import { StackedBarChart, SimpleBarChart } from '@/components/accounts/charts';
@@ -145,7 +149,7 @@ function ExpenseModal({
   onSaved,
 }: {
   expense?: ExpenseEntry | null;
-  accounts: { id: string; name: string; type: string }[];
+  accounts: CashBankAccount[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -181,6 +185,20 @@ function ExpenseModal({
 
   const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, form.paymentMode);
+  const selectedAccount = accounts.find((a) => a.id === form.paidFrom);
+  const balanceError =
+    form.status === 'PAID'
+      ? insufficientBalanceError(parseFloat(form.amount) || 0, selectedAccount)
+      : null;
+
+  useEffect(() => {
+    if (form.status !== 'PAID') return;
+    if (matchingAccounts.some((a) => a.id === form.paidFrom)) return;
+    set('paidFrom', matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentMode, form.status, accounts]);
+
   const handleAmountChange = (val: string) => {
     const amount = parseFloat(val) || 0;
     const vatAmt = form.vatIncluded ? parseFloat(form.vatAmount) || 0 : 0;
@@ -215,7 +233,12 @@ function ExpenseModal({
       qc.invalidateQueries({ queryKey: ['expense-entries'] });
       onSaved();
     },
-    onError: () => toast.error('Failed to save expense'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to save expense';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -408,18 +431,34 @@ function ExpenseModal({
                     <label className="text-xs font-medium text-muted-foreground">
                       Paid From Account
                     </label>
-                    <Select value={form.paidFrom} onValueChange={(v) => set('paidFrom', v)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select account" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({a.type})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {matchingAccounts.length === 0 ? (
+                      <p className="text-xs font-medium text-red-600 mt-1">
+                        No{' '}
+                        {accountTypeForPaymentMode(form.paymentMode) === 'CASH'
+                          ? 'Cash in Hand'
+                          : 'Bank'}{' '}
+                        account exists for this branch.
+                      </p>
+                    ) : (
+                      <Select value={form.paidFrom} onValueChange={(v) => set('paidFrom', v)}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {matchingAccounts.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.name} ({a.type}) — {a.currency}{' '}
+                              {Number(a.currentBalance).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {balanceError && (
+                      <p className="text-xs font-medium text-red-600 mt-1">{balanceError}</p>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -494,7 +533,14 @@ function ExpenseModal({
               Next
             </Button>
           ) : (
-            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            <Button
+              onClick={() => saveMut.mutate()}
+              disabled={
+                saveMut.isPending ||
+                !!balanceError ||
+                (form.status === 'PAID' && matchingAccounts.length === 0)
+              }
+            >
               {saveMut.isPending ? 'Saving...' : expense ? 'Update' : 'Create'}
             </Button>
           )}
@@ -511,7 +557,7 @@ function PayExpenseModal({
   onPaid,
 }: {
   expense: ExpenseEntry;
-  accounts: { id: string; name: string; type: string }[];
+  accounts: CashBankAccount[];
   onClose: () => void;
   onPaid: () => void;
 }) {
@@ -523,6 +569,18 @@ function PayExpenseModal({
   const [chequeDueDate, setChequeDueDate] = useState('');
 
   const isCheque = paymentMode === 'Cheque';
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, paymentMode);
+  const selectedAccount = accounts.find((a) => a.id === paidFrom);
+  const balanceError = isCheque
+    ? null
+    : insufficientBalanceError(Number(expense.netAmount), selectedAccount);
+
+  useEffect(() => {
+    if (isCheque) return;
+    if (paidFrom === '' || matchingAccounts.some((a) => a.id === paidFrom)) return;
+    setPaidFrom('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMode, accounts]);
 
   const payMut = useMutation({
     mutationFn: () =>
@@ -542,7 +600,12 @@ function PayExpenseModal({
       );
       onPaid();
     },
-    onError: () => toast.error('Failed to mark as paid'),
+    onError: (err: unknown) => {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to mark as paid';
+      toast.error(msg);
+    },
   });
 
   return (
@@ -587,13 +650,17 @@ function PayExpenseModal({
                   <SelectValue placeholder="Auto (branch default by mode)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts.map((a) => (
+                  {matchingAccounts.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.name} ({a.type})
+                      {a.name} ({a.type}) — {a.currency}{' '}
+                      {Number(a.currentBalance).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {balanceError && <p className="text-xs font-medium text-red-600">{balanceError}</p>}
             </div>
           )}
           <div className="space-y-1.5">
@@ -653,7 +720,9 @@ function PayExpenseModal({
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white"
             disabled={
-              payMut.isPending || (isCheque && (!chequeNumber || !chequeBankName || !chequeDueDate))
+              payMut.isPending ||
+              !!balanceError ||
+              (isCheque && (!chequeNumber || !chequeBankName || !chequeDueDate))
             }
             onClick={() => payMut.mutate()}
           >

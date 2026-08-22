@@ -1,60 +1,50 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { usePagination } from '@/hooks/usePagination';
-import Pagination from '@/components/Pagination';
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
-  getPendingUsagePayments,
   collectPendingUsagePayment,
   generateSalePaymentReceipt,
   sendReceiptEmail,
   sendReceiptWhatsApp,
-  type PendingUsagePayment,
   type SalePaymentRequest,
 } from '@/lib/saleWorkflow';
-import { fetchCashBankAccounts, CashBankAccount } from '@/lib/finance/accountsApi';
 import {
-  Loader2,
-  RefreshCw,
-  PlusCircle,
-  Coins,
-  Mail,
-  MessageSquare,
-  FileDown,
-  ExternalLink,
-} from 'lucide-react';
+  fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  CashBankAccount,
+} from '@/lib/finance/accountsApi';
+import { Loader2, Coins, Mail, MessageSquare, FileDown, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getApiErrorMessage } from '@/lib/apiError';
 
-/**
- * Finance-side "Pending Payments" tab — one row per Rent/Lease billing period whose full
- * charge hasn't yet been submitted as collections (a partial collection's shortfall, or a
- * period recorded with nothing collected at all). "Add Pending Amount" collects a further
- * amount against that specific period, through the same Accounts-approval gate as every
- * other collection.
- */
-export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'LEASE' }) {
-  const currency = useBranchCurrency();
-  const [rows, setRows] = useState<PendingUsagePayment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
+export interface CollectionTarget {
+  usageRecordId: string;
+  invoiceNumber: string;
+  amountPending: number;
+}
 
-  const [target, setTarget] = useState<PendingUsagePayment | null>(null);
+interface Props {
+  target: CollectionTarget | null;
+  onClose: () => void;
+  /** Fires once the collection is submitted for approval — refresh-only. */
+  onCollected?: () => void;
+}
+
+/**
+ * Stage B collection form — shared by UsageHistoryDialog and BillsDrilldownModal (the AR
+ * "View Bills" drilldown), so both go through the exact same record → decoupled-receipt
+ * flow rather than separate copies of this dialog.
+ * "Submit for Approval" creates a PENDING SalePaymentRequest — the server enforces that the
+ * bill must be Customer Approved first (see collectPendingUsagePayment's gate).
+ */
+export function UsageBillCollectionDialog({ target, onClose, onCollected }: Props) {
+  const currency = useBranchCurrency();
   const [amount, setAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -71,36 +61,12 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
   const [generatingReceipt, setGeneratingReceipt] = useState(false);
   const [sendingReceiptVia, setSendingReceiptVia] = useState<'email' | 'whatsapp' | null>(null);
 
-  const fetchRows = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getPendingUsagePayments();
-      const filtered = mode ? data.filter((r) => r.saleType === mode) : data;
-      setRows(filtered);
-    } catch (err) {
-      toast.error('Failed to load pending payments', { description: getApiErrorMessage(err) });
-    } finally {
-      setLoading(false);
-    }
-  }, [mode]);
-
   useEffect(() => {
-    fetchRows();
-  }, [fetchRows]);
-
-  useEffect(() => {
-    setTotal(rows.length);
-  }, [rows.length, setTotal]);
-
-  const paginatedRows = rows.slice((page - 1) * limit, page * limit);
-
-  const openAddPending = async (row: PendingUsagePayment) => {
-    const accts = await fetchCashBankAccounts({ skipErrorToast: true }).catch(
-      () => [] as CashBankAccount[],
-    );
-    setCashAccounts(accts);
-    setTarget(row);
-    setAmount(String(row.amountPending.toFixed(2)));
+    if (!target) return;
+    fetchCashBankAccounts({ skipErrorToast: true })
+      .then(setCashAccounts)
+      .catch(() => setCashAccounts([]));
+    setAmount(String(target.amountPending.toFixed(2)));
     setPaymentMode('CASH');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setReferenceNumber('');
@@ -109,7 +75,7 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
     setChequeDueDate('');
     setChequeDate(new Date().toISOString().split('T')[0]);
     setCashAccountId('');
-  };
+  }, [target]);
 
   const handleCollect = async () => {
     if (!target || !amount) return;
@@ -131,14 +97,11 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
         chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
         chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
       });
-      toast.success('Pending amount recorded', {
-        description: 'Submitted to Accounts for approval.',
-      });
-      setTarget(null);
-      fetchRows();
+      toast.success('Collection recorded', { description: 'Submitted to Accounts for approval.' });
+      onCollected?.();
       setJustCollected(request);
     } catch (err) {
-      toast.error('Failed to record pending amount', { description: getApiErrorMessage(err) });
+      toast.error('Failed to record collection', { description: getApiErrorMessage(err) });
     } finally {
       setIsSaving(false);
     }
@@ -182,102 +145,18 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
-      </div>
-    );
-  }
+  const closeAll = () => {
+    setJustCollected(null);
+    onClose();
+  };
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">Pending Payments</h2>
-          <p className="text-sm text-slate-500">
-            Billing periods with a partial or fully uncollected shortfall
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchRows} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
-
-      <div className="overflow-hidden rounded-lg border border-slate-200">
-        <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead>INVOICE #</TableHead>
-              <TableHead>CUSTOMER</TableHead>
-              <TableHead>PERIOD</TableHead>
-              <TableHead>TYPE</TableHead>
-              <TableHead className="text-right">AMOUNT GIVEN</TableHead>
-              <TableHead className="text-right">AMOUNT PENDING</TableHead>
-              <TableHead className="text-right">ACTION</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginatedRows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-slate-500">
-                  No pending payments — every recorded period is fully collected.
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedRows.map((row) => (
-                <TableRow key={row.usageRecordId}>
-                  <TableCell className="font-medium">{row.invoiceNumber}</TableCell>
-                  <TableCell>{row.customerName || '—'}</TableCell>
-                  <TableCell className="text-sm">
-                    {format(new Date(row.billingPeriodStart), 'MMM dd, yyyy')} -<br />
-                    {format(new Date(row.billingPeriodEnd), 'MMM dd, yyyy')}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-[10px] font-black text-slate-500 uppercase">
-                      {row.saleType}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-emerald-600">
-                    {formatCurrency(row.amountGiven, currency)}
-                  </TableCell>
-                  <TableCell className="text-right font-bold text-amber-600">
-                    {formatCurrency(row.amountPending, currency)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-2 text-[10px] font-bold border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-1"
-                      onClick={() => openAddPending(row)}
-                      title="Add Pending Amount"
-                    >
-                      <PlusCircle className="h-3 w-3" />
-                      ADD PENDING AMOUNT
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {totalPages > 1 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          total={total}
-          limit={limit}
-          onPageChange={setPage}
-        />
-      )}
-
-      {/* Add Pending Amount dialog */}
-      <Dialog open={!!target} onOpenChange={(v) => !v && setTarget(null)}>
+      {/* justCollected excluded from this dialog's own open condition so it closes the
+          instant the receipt hand-off dialog below opens, instead of stacking both. */}
+      <Dialog open={!!target && !justCollected} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
-          <DialogTitle className="sr-only">Add Pending Amount</DialogTitle>
+          <DialogTitle className="sr-only">Add Collect Amount</DialogTitle>
           <div className="bg-linear-to-r from-amber-600 to-amber-500 p-5 text-white">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
@@ -285,7 +164,7 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
               </div>
               <div>
                 <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
-                  Add Pending Amount
+                  Add Collect Amount
                 </p>
                 <p className="text-base font-black">{target?.invoiceNumber}</p>
               </div>
@@ -325,9 +204,10 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
               </Label>
               <select
                 value={paymentMode}
-                onChange={(e) =>
-                  setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE')
-                }
+                onChange={(e) => {
+                  setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE');
+                  setCashAccountId('');
+                }}
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-bold"
               >
                 <option value="CASH">Cash</option>
@@ -392,33 +272,37 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
                     className="h-9 text-sm"
                   />
                 </div>
-                {cashAccounts.length > 0 && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                      Account (optional)
-                    </Label>
-                    <select
-                      value={cashAccountId}
-                      onChange={(e) => setCashAccountId(e.target.value)}
-                      className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-bold"
-                    >
-                      <option value="">Select...</option>
-                      {cashAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                {(() => {
+                  const matching = filterAccountsByPaymentMode(cashAccounts, paymentMode);
+                  return (
+                    matching.length > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                          Account (optional)
+                        </Label>
+                        <select
+                          value={cashAccountId}
+                          onChange={(e) => setCashAccountId(e.target.value)}
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-bold"
+                        >
+                          <option value="">Select...</option>
+                          {matching.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name} — {a.currency}{' '}
+                              {Number(a.currentBalance).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )
+                  );
+                })()}
               </div>
             )}
             <div className="flex gap-2 pt-1">
-              <Button
-                variant="outline"
-                className="flex-1 h-9 text-xs font-black"
-                onClick={() => setTarget(null)}
-              >
+              <Button variant="outline" className="flex-1 h-9 text-xs font-black" onClick={onClose}>
                 Cancel
               </Button>
               <Button
@@ -435,7 +319,7 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
 
       {/* Immediate receipt option after collecting — decoupled from Accounts approval */}
       {justCollected && (
-        <Dialog open={!!justCollected} onOpenChange={(v) => !v && setJustCollected(null)}>
+        <Dialog open={!!justCollected} onOpenChange={(v) => !v && closeAll()}>
           <DialogContent className="sm:max-w-sm rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
             <DialogTitle className="sr-only">Collection Recorded</DialogTitle>
             <div className="bg-linear-to-r from-emerald-600 to-emerald-500 p-5 text-white">
@@ -504,7 +388,7 @@ export default function PendingUsagePaymentsTable({ mode }: { mode?: 'RENT' | 'L
               </div>
               <Button
                 className="w-full h-9 text-xs font-black bg-slate-800 hover:bg-slate-900"
-                onClick={() => setJustCollected(null)}
+                onClick={closeAll}
               >
                 Done
               </Button>
