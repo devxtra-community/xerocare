@@ -23,17 +23,37 @@ interface RentAllocation {
   customerId: string;
 }
 
+const FETCH_RETRY_ATTEMPTS = 3;
+const FETCH_RETRY_DELAY_MS = 5000;
+
 // product_allocations & invoices live in billing_service's own database,
 // so they're fetched over HTTP rather than queried directly from here.
+// billing_service can still be mid-boot when this runs (both services start
+// together under PM2), so retry a few times before giving up for the day.
 async function fetchActiveRentAllocations(): Promise<RentAllocation[]> {
-  const resp = await fetch(`${BILLING_SERVICE_URL}/invoices/allocations/active-rent`, {
-    headers: { 'Content-Type': 'application/json', 'x-internal-service': 'ven-inv' },
-  });
-  if (!resp.ok) {
-    throw new Error(`billing_service returned ${resp.status} for active-rent allocations`);
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= FETCH_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const resp = await fetch(`${BILLING_SERVICE_URL}/invoices/allocations/active-rent`, {
+        headers: { 'Content-Type': 'application/json', 'x-internal-service': 'ven-inv' },
+      });
+      if (!resp.ok) {
+        throw new Error(`billing_service returned ${resp.status} for active-rent allocations`);
+      }
+      const body = (await resp.json()) as { success: boolean; data: RentAllocation[] };
+      return body.data;
+    } catch (err) {
+      lastError = err;
+      if (attempt < FETCH_RETRY_ATTEMPTS) {
+        logger.warn(
+          `[CRON-PM] billing_service unreachable (attempt ${attempt}/${FETCH_RETRY_ATTEMPTS}), retrying in ${FETCH_RETRY_DELAY_MS / 1000}s`,
+          err,
+        );
+        await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAY_MS));
+      }
+    }
   }
-  const body = (await resp.json()) as { success: boolean; data: RentAllocation[] };
-  return body.data;
+  throw lastError;
 }
 
 export async function runPreventativeMaintenanceJob() {
