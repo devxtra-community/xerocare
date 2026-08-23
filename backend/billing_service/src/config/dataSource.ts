@@ -1088,6 +1088,27 @@ async function runPreMigrations() {
     `);
     logger.info('Cheque cheque_date/deposit_date/cleared_date columns applied.');
 
+    // ─── Cheques: 2-date model — collected_date, cheque_date becomes the sole
+    // deposit/presentment-eligibility date, due_date deprecated ─────────────────
+    // "Cheque Date" was redefined to mean exactly what cheque_date already tracked
+    // (the earliest legally-presentable date) — due_date, the older, more general
+    // "expected settlement" field, is retired from active use. The column itself is
+    // kept (not dropped) purely to avoid a destructive migration / preserve any
+    // historical audit trail; every write path now sets it equal to cheque_date.
+    await client.query(`
+      ALTER TABLE cheques
+        ADD COLUMN IF NOT EXISTS collected_date DATE NULL;
+    `);
+    // Backfill: any pre-existing row where cheque_date is still null (predates that
+    // column, or was created before this field became mandatory) — due_date was the
+    // only date collected at the time, so it's the correct value to carry forward.
+    // collected_date has no reliable historical source and is deliberately left NULL,
+    // same as the cheque_date backfill above leaves gaps rather than inventing data.
+    await client.query(`
+      UPDATE cheques SET cheque_date = due_date WHERE cheque_date IS NULL;
+    `);
+    logger.info('Cheque collected_date column applied; cheque_date backfilled from due_date.');
+
     // ─── Tax Report: customer snapshot columns on invoices ─────────────────────
     await client.query(`
       ALTER TABLE invoices

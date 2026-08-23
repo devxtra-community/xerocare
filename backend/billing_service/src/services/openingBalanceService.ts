@@ -610,7 +610,9 @@ export class OpeningBalanceService {
               : new Date(dto.paymentDate || Date.now()),
             chequeDate: dto.chequeDate
               ? new Date(dto.chequeDate)
-              : new Date(dto.paymentDate || Date.now()),
+              : dto.chequeDueDate
+                ? new Date(dto.chequeDueDate)
+                : new Date(dto.paymentDate || Date.now()),
             issueDate: new Date(dto.paymentDate || Date.now()),
             type: 'RECEIVED',
             status: 'PENDING',

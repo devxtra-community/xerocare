@@ -5384,7 +5384,9 @@ export class BillingService {
                 : new Date(transaction.transactionDate),
               chequeDate: data.chequeDate
                 ? new Date(data.chequeDate)
-                : new Date(transaction.transactionDate),
+                : data.chequeDueDate
+                  ? new Date(data.chequeDueDate)
+                  : new Date(transaction.transactionDate),
               issueDate: new Date(transaction.transactionDate),
               type: 'RECEIVED',
               status: 'PENDING',

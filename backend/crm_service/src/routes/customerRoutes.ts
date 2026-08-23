@@ -44,8 +44,10 @@ router.put('/:id', requireRole('ADMIN', 'EMPLOYEE'), customerController.updateCu
 
 /**
  * Remove a customer from our active list.
- * Only an Administrator can perform this action for safety.
+ * Same as Update — ADMIN plus EMPLOYEE, with MANAGER inheriting EMPLOYEE-level
+ * routes via requireRole's inheritance rule. Was ADMIN-only, which is why Branch
+ * Managers and Employees both hit "Access denied: insufficient permissions" here.
  */
-router.delete('/:id', requireRole('ADMIN'), customerController.deleteCustomer);
+router.delete('/:id', requireRole('ADMIN', 'EMPLOYEE'), customerController.deleteCustomer);
 
 export default router;

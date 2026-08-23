@@ -817,6 +817,7 @@ export const payExpenseEntry = async (req: Request, res: Response, next: NextFun
               partyName: entry.description?.slice(0, 100) || entry.category,
               amount: Number(entry.netAmount),
               dueDate: new Date(chequeDueDate),
+              chequeDate: new Date(chequeDueDate),
               issueDate: saved.paymentDate ?? new Date(),
               type: 'ISSUED',
               status: 'PENDING',
@@ -1456,7 +1457,9 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
               : new Date(req.body.paymentDate || Date.now()),
             chequeDate: req.body.chequeDate
               ? new Date(req.body.chequeDate)
-              : new Date(req.body.paymentDate || Date.now()),
+              : req.body.chequeDueDate
+                ? new Date(req.body.chequeDueDate)
+                : new Date(req.body.paymentDate || Date.now()),
             issueDate: new Date(req.body.paymentDate || Date.now()),
             type: 'RECEIVED',
             status: 'PENDING',
@@ -1677,6 +1680,11 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
             dueDate: req.body.chequeDueDate
               ? new Date(req.body.chequeDueDate)
               : new Date(req.body.paymentDate || Date.now()),
+            chequeDate: req.body.chequeDate
+              ? new Date(req.body.chequeDate)
+              : req.body.chequeDueDate
+                ? new Date(req.body.chequeDueDate)
+                : new Date(req.body.paymentDate || Date.now()),
             issueDate: new Date(req.body.paymentDate || Date.now()),
             type: 'ISSUED',
             status: 'PENDING',

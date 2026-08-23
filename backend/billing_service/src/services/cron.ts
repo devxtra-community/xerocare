@@ -825,82 +825,28 @@ export function startReminderCronJobs() {
     orphanedPoReconciliationJob();
   });
 
-  // 4. Cheque Due Reminder (Daily): Run at 9:00 AM daily
-  cron.schedule('0 9 * * *', () => {
-    chequeDueReminderJob();
-  });
-
-  // 5. Cheque Date Reminder (Daily): Run at 9:00 AM daily
+  // 4. Cheque Date Reminder (Daily): Run at 9:00 AM daily
   cron.schedule('0 9 * * *', () => {
     chequeDateReminderJob();
   });
 }
 
 /**
- * Daily: notifies Finance (per-branch) 2 days before a not-yet-cleared cheque's due
- * date — both Received (from customers) and Issued (to vendors). Fires via the shared
- * in-app notification system (NotificationPublisher → domain_events → employee_service),
- * the same path ChequeNotificationBell's live "due soon" list already reads from, so
- * this doesn't create a second, disconnected notification mechanism. Naturally
- * idempotent: a cheque's dueDate matches "today + 2 days" on exactly one calendar day,
- * so re-running this job daily can't double-notify the same cheque.
+ * Daily: notifies Finance (per-branch, plus Manager) 2 days before a not-yet-cleared
+ * cheque's Cheque Date — the earliest date it can legally be deposited (RECEIVED) or
+ * presented for clearing (ISSUED). Fires via the shared in-app notification system
+ * (NotificationPublisher → domain_events → employee_service), the same path
+ * ChequeNotificationBell's live "due soon" list already reads from, so this doesn't
+ * create a second, disconnected notification mechanism. Naturally idempotent: a
+ * cheque's chequeDate matches "today + 2 days" on exactly one calendar day, so
+ * re-running this job daily can't double-notify the same cheque.
  *
- * Fires unconditionally, including when chequeDate equals dueDate (non-post-dated
- * cheque) — chequeDateReminderJob is the one that skips that overlap, so the pair
- * collapses into exactly this one notification rather than either zero or two.
- */
-export async function chequeDueReminderJob() {
-  logger.info('[CRON] Running Cheque Due Reminder Job...');
-  try {
-    const { Cheque } = await import('../entities/chequeEntity');
-    const chequeRepo = Source.getRepository(Cheque);
-
-    const target = new Date();
-    target.setDate(target.getDate() + 2);
-    const targetDateStr = target.toISOString().split('T')[0];
-
-    // Always fires unconditionally on the Due Date's own -2-day mark — including when
-    // chequeDate equals dueDate (non-post-dated cheque). The dedupe for that overlap
-    // lives on chequeDateReminderJob instead (it skips same-day cheques), so exactly
-    // one of the two jobs notifies on the shared day rather than neither or both.
-    const dueCheques = await chequeRepo
-      .createQueryBuilder('c')
-      .where('c.status IN (:...statuses)', { statuses: ['PENDING', 'DEPOSITED', 'ISSUED'] })
-      .andWhere('CAST(c.dueDate AS DATE) = :targetDate', { targetDate: targetDateStr })
-      .getMany();
-
-    logger.info(`[CRON] Found ${dueCheques.length} cheque(s) due in 2 days.`);
-
-    for (const cheque of dueCheques) {
-      const recipientIds = await getBranchChequeReminderRecipientIds(cheque.branchId);
-      if (recipientIds.length === 0) continue;
-
-      const direction = cheque.type === 'ISSUED' ? 'issued to' : 'received from';
-      for (const recipientId of recipientIds) {
-        await sendChequeReminderNotification(
-          recipientId,
-          'Cheque Due in 2 Days',
-          `Cheque #${cheque.chequeNo} (${direction} ${cheque.partyName}, ${Number(cheque.amount).toFixed(2)}) is due on ${targetDateStr} — ${cheque.type === 'ISSUED' ? 'ensure funds are available to clear it' : 'deposit it if you haven’t already'}.`,
-          cheque.id,
-        );
-      }
-    }
-  } catch (err) {
-    logger.error('[CRON] Cheque Due Reminder Job failed:', err);
-  }
-}
-
-/**
- * Daily: notifies the branch's Finance users plus Manager 2 days before a RECEIVED
- * cheque's own Cheque Date — the date it becomes valid/eligible to be taken to the
- * bank. A post-dated cheque (chequeDate later than the date it was physically
- * received) isn't presentable until its Cheque Date arrives, so this is a distinct
- * concern from the Due Date reminder above. Only fires for cheques not yet Deposited
- * (status = PENDING) — once deposited, it's no longer waiting to be taken to the
- * bank, so this stops on its own without any extra "already notified" bookkeeping.
- *
- * Skips cheques whose chequeDate equals dueDate — those are covered by
- * chequeDueReminderJob firing on the very same day, avoiding a duplicate pair.
+ * Replaces the old pair of chequeDueReminderJob (dueDate-based) and
+ * chequeDateReminderJob (chequeDate-based, RECEIVED-only) — "Cheque Date" was
+ * redefined to be the one concept both used to approximate from different fields, so
+ * running both now would double-notify every cheque (dueDate and chequeDate are kept
+ * equal on every write going forward — see chequesRoutes.ts). One job, one date,
+ * both directions.
  */
 export async function chequeDateReminderJob() {
   logger.info('[CRON] Running Cheque Date Reminder Job...');
@@ -912,26 +858,31 @@ export async function chequeDateReminderJob() {
     target.setDate(target.getDate() + 2);
     const targetDateStr = target.toISOString().split('T')[0];
 
-    const chequesBecomingValid = await chequeRepo
+    const dueCheques = await chequeRepo
       .createQueryBuilder('c')
-      .where('c.type = :type', { type: 'RECEIVED' })
-      .andWhere('c.status = :status', { status: 'PENDING' })
+      .where('c.status IN (:...statuses)', { statuses: ['PENDING', 'DEPOSITED', 'ISSUED'] })
       .andWhere('c.chequeDate IS NOT NULL')
       .andWhere('CAST(c.chequeDate AS DATE) = :targetDate', { targetDate: targetDateStr })
-      .andWhere('CAST(c.chequeDate AS DATE) != CAST(c.dueDate AS DATE)')
       .getMany();
 
-    logger.info(`[CRON] Found ${chequesBecomingValid.length} cheque(s) becoming valid in 2 days.`);
+    logger.info(
+      `[CRON] Found ${dueCheques.length} cheque(s) reaching their Cheque Date in 2 days.`,
+    );
 
-    for (const cheque of chequesBecomingValid) {
+    for (const cheque of dueCheques) {
       const recipientIds = await getBranchChequeReminderRecipientIds(cheque.branchId);
       if (recipientIds.length === 0) continue;
 
+      const direction = cheque.type === 'ISSUED' ? 'issued to' : 'received from';
+      const action =
+        cheque.type === 'ISSUED'
+          ? 'ensure funds are available to clear it'
+          : 'it can be deposited from that date';
       for (const recipientId of recipientIds) {
         await sendChequeReminderNotification(
           recipientId,
-          'Post-Dated Cheque Becomes Valid in 2 Days',
-          `Cheque #${cheque.chequeNo} received from ${cheque.partyName} (${Number(cheque.amount).toFixed(2)}) is dated ${targetDateStr} — it will be presentable at the bank from that date.`,
+          'Cheque Date in 2 Days',
+          `Cheque #${cheque.chequeNo} (${direction} ${cheque.partyName}, ${Number(cheque.amount).toFixed(2)}) reaches its Cheque Date on ${targetDateStr} — ${action}.`,
           cheque.id,
         );
       }

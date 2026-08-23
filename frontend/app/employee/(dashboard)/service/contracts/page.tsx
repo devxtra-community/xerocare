@@ -367,21 +367,26 @@ export default function ServiceContractsPage() {
 
   const handleCreateCustomer = async (data: Partial<CreateCustomerData>) => {
     try {
+      // Same fix as EmployeeCustomerTable's handleFormSubmit: forward customerType/
+      // vatStatus/exemptionReason (previously dropped, silently falling back to the
+      // B2C/UNREGISTERED_STANDARD column defaults regardless of what was actually
+      // selected in the dialog) and map status -> isActive (the real column).
       const payload: CreateCustomerData = {
         name: data.name!,
         email: data.email,
         phone: data.phone,
         address: data.address,
-        status: data.status,
         vatNumber: data.vatNumber,
+        vatStatus: data.vatStatus,
+        exemptionReason: data.exemptionReason,
+        customerType: data.customerType,
         country: data.country,
         stateProvince: data.stateProvince,
         city: data.city,
         bankName: data.bankName,
         bankAccountNumber: data.bankAccountNumber,
         bankAccounts: data.bankAccounts,
-        totalPurchase: 0,
-        source: 'DIRECT',
+        isActive: data.status !== 'INACTIVE',
       };
       const newCustomer = await createCustomer(payload);
       toast.success('Customer created successfully');

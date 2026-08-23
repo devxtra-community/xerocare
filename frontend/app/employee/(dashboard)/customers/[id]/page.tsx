@@ -78,19 +78,25 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const handleFormSubmit = async (data: Partial<CreateCustomerData>) => {
     if (!customer) return;
     try {
+      // Same fix as EmployeeCustomerTable's handleFormSubmit: forward customerType/
+      // vatStatus/exemptionReason (previously dropped here too) and map status ->
+      // isActive (the real column — `status` itself isn't a column on Customer).
       await updateCustomer(customer.id, {
         name: data.name,
         email: data.email,
         phone: data.phone,
         address: data.address,
-        status: data.status,
         vatNumber: data.vatNumber,
+        vatStatus: data.vatStatus,
+        exemptionReason: data.exemptionReason,
+        customerType: data.customerType,
         country: data.country,
         stateProvince: data.stateProvince,
         city: data.city,
         bankName: data.bankName,
         bankAccountNumber: data.bankAccountNumber,
         bankAccounts: data.bankAccounts,
+        isActive: data.status !== 'INACTIVE',
       });
       toast.success('Customer updated successfully');
       setDialogOpen(false);

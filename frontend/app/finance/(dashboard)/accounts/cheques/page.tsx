@@ -50,8 +50,8 @@ function AddChequeModal({
     bankName: '',
     partyName: '',
     amount: '',
-    dueDate: '',
     chequeDate: new Date().toISOString().slice(0, 10),
+    collectedDate: '',
     issueDate: '',
     type: defaultType,
     description: '',
@@ -64,7 +64,7 @@ function AddChequeModal({
       createCheque({
         ...form,
         amount: Number(form.amount),
-        chequeDate: isReceived ? form.chequeDate || undefined : undefined,
+        collectedDate: isReceived ? form.collectedDate || undefined : undefined,
         issueDate: !isReceived ? form.issueDate || undefined : undefined,
         description: form.description || undefined,
         accountId: form.accountId || undefined,
@@ -96,8 +96,7 @@ function AddChequeModal({
             if (!form.chequeNo.trim()) return toast.error('Cheque number required');
             if (!form.partyName.trim()) return toast.error('Party name required');
             if (!form.amount || Number(form.amount) <= 0) return toast.error('Amount must be > 0');
-            if (!form.dueDate) return toast.error('Due date required');
-            if (isReceived && !form.chequeDate) return toast.error('Cheque date required');
+            if (!form.chequeDate) return toast.error('Cheque date required');
             mut.mutate();
           }}
           className="p-6 space-y-4"
@@ -158,11 +157,14 @@ function AddChequeModal({
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-600">Due Date *</label>
+              <label className="text-xs font-medium text-gray-600">
+                Cheque Date *{' '}
+                <span className="font-normal">(earliest date it can be deposited)</span>
+              </label>
               <input
                 type="date"
-                value={form.dueDate}
-                onChange={(e) => set('dueDate', e.target.value)}
+                value={form.chequeDate}
+                onChange={(e) => set('chequeDate', e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -170,18 +172,12 @@ function AddChequeModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">
-                {isReceived ? (
-                  <>
-                    Cheque Date * <span className="font-normal">(date on the cheque)</span>
-                  </>
-                ) : (
-                  'Issue Date'
-                )}
+                {isReceived ? 'Cheque Collected Date' : 'Issue Date'}
               </label>
               <input
                 type="date"
-                value={isReceived ? form.chequeDate : form.issueDate}
-                onChange={(e) => set(isReceived ? 'chequeDate' : 'issueDate', e.target.value)}
+                value={isReceived ? form.collectedDate : form.issueDate}
+                onChange={(e) => set(isReceived ? 'collectedDate' : 'issueDate', e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

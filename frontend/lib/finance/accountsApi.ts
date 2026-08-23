@@ -1878,10 +1878,16 @@ export interface Cheque {
   bankName?: string;
   partyName: string;
   amount: number;
+  /** @deprecated kept only for backward compatibility — always equal to chequeDate now.
+   * Use chequeDate as the deposit/presentment-eligibility date. */
   dueDate: string;
-  /** The date physically written on the cheque — independent of dueDate (a
-   * post-dated cheque has chequeDate earlier than dueDate). */
+  /** THE deposit/presentment-eligibility date ("Cheque Date" in the UI) — the earliest
+   * date this cheque can legally be deposited (RECEIVED) or presented for clearing
+   * (ISSUED). */
   chequeDate?: string;
+  /** RECEIVED only: the date this cheque was physically collected from the customer —
+   * independent of chequeDate (often collected well before the date written on it). */
+  collectedDate?: string;
   issueDate?: string;
   /** Set when a RECEIVED cheque is deposited. */
   depositDate?: string;
@@ -1954,8 +1960,10 @@ export const createCheque = (body: {
   bankName?: string;
   partyName: string;
   amount: number;
-  dueDate: string;
+  /** @deprecated pass chequeDate instead — still accepted as a fallback. */
+  dueDate?: string;
   chequeDate?: string;
+  collectedDate?: string;
   issueDate?: string;
   type: 'RECEIVED' | 'ISSUED';
   description?: string;
@@ -1977,6 +1985,7 @@ export const updateCheque = (
       | 'amount'
       | 'dueDate'
       | 'chequeDate'
+      | 'collectedDate'
       | 'issueDate'
       | 'description'
       | 'accountId'

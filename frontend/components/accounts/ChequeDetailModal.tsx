@@ -67,17 +67,9 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
     { label: 'Bank', value: cheque.bankName ?? '—' },
     { label: 'Amount', value: formatCurrency(cheque.amount, currency) },
     {
-      label: cheque.type === 'RECEIVED' ? 'Cheque Date' : 'Issue Date',
-      value:
-        cheque.type === 'RECEIVED'
-          ? cheque.chequeDate
-            ? String(cheque.chequeDate).slice(0, 10)
-            : '—'
-          : cheque.issueDate
-            ? String(cheque.issueDate).slice(0, 10)
-            : '—',
+      label: 'Cheque Date',
+      value: cheque.chequeDate ? String(cheque.chequeDate).slice(0, 10) : '—',
     },
-    { label: 'Due Date', value: String(cheque.dueDate).slice(0, 10) },
     {
       label: 'Status',
       value: (
@@ -90,6 +82,19 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
       ),
     },
   ];
+  // RECEIVED: when it was physically collected from the customer — independent of
+  // Cheque Date (often collected well before the date written on it).
+  if (cheque.type === 'RECEIVED' && cheque.collectedDate) {
+    rows.splice(4, 0, {
+      label: 'Cheque Collected Date',
+      value: String(cheque.collectedDate).slice(0, 10),
+    });
+  }
+  // ISSUED: when we handed it to the vendor — a separate concept from Cheque Date
+  // (the earliest date the vendor can present it), unrelated to collection.
+  if (cheque.type === 'ISSUED' && cheque.issueDate) {
+    rows.splice(4, 0, { label: 'Issued To Vendor', value: String(cheque.issueDate).slice(0, 10) });
+  }
   if (cheque.depositDate) {
     rows.push({ label: 'Deposit Date', value: String(cheque.depositDate).slice(0, 10) });
   }
@@ -287,6 +292,15 @@ export function ChequeActionModal({
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if ((action === 'deposit' || action === 'clear') && cheque.chequeDate) {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const chequeDateStr = String(cheque.chequeDate).slice(0, 10);
+              if (todayStr < chequeDateStr) {
+                return toast.error(
+                  `This cheque cannot be ${action === 'clear' ? 'cleared' : 'deposited'} before ${chequeDateStr}.`,
+                );
+              }
+            }
             if (needsAccount && !accountId) return toast.error('Please select a bank account');
             if (requiresReason && !notes.trim())
               return toast.error('A reason is required for this action');

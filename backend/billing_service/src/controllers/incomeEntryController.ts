@@ -193,6 +193,7 @@ export const receiveIncomeEntry = async (req: Request, res: Response, next: Next
               partyName: entry.description?.slice(0, 100) || entry.category,
               amount: Number(entry.netAmount),
               dueDate: saved.receivedDate ?? new Date(),
+              chequeDate: saved.receivedDate ?? new Date(),
               issueDate: saved.receivedDate ?? new Date(),
               type: 'RECEIVED',
               status: 'PENDING',

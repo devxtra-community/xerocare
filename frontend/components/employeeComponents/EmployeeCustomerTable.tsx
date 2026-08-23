@@ -8,6 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,6 +26,7 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import {
   Customer,
+  CustomerType,
   getCustomers,
   createCustomer,
   updateCustomer,
@@ -38,6 +46,7 @@ export default function EmployeeCustomerTable() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | CustomerType>('ALL');
   const isManager = typeof window !== 'undefined' && getUserFromToken()?.role === 'MANAGER';
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -61,17 +70,19 @@ export default function EmployeeCustomerTable() {
     fetchCustomers();
   }, []);
 
-  const filteredCustomers = customers.filter(
-    (c) =>
+  const filteredCustomers = customers.filter((c) => {
+    const matchesSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.id.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+      c.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === 'ALL' || (c.customerType ?? 'B2C') === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   const { page, limit, total, setPage, setTotal, totalPages } = usePagination(10);
 
   useEffect(() => {
     setPage(1);
-  }, [searchTerm, setPage]);
+  }, [searchTerm, typeFilter, setPage]);
 
   useEffect(() => {
     setTotal(filteredCustomers.length);
@@ -115,31 +126,38 @@ export default function EmployeeCustomerTable() {
 
   const handleFormSubmit = async (data: Partial<CreateCustomerData>) => {
     try {
+      // Previously dropped customerType, vatStatus and exemptionReason entirely —
+      // the Add/Edit dialog's "Customer Type" selector correctly tracked B2B/B2C in
+      // its own state, but this payload never forwarded it, so every save silently
+      // fell back to the customerType column's DB default (B2C) regardless of what
+      // was picked. Also sent status/totalPurchase/source, none of which are real
+      // columns on Customer (only isActive is) — harmless for create, but fatal for
+      // update: TypeORM's repo.update() builds its SET clause from the given
+      // object's own keys and throws on one with no matching column, which is what
+      // produced "Internal server error" on every Update.
       const payload: CreateCustomerData = {
         name: data.name!,
         email: data.email,
         phone: data.phone,
         address: data.address,
-        status: data.status,
         vatNumber: data.vatNumber,
+        vatStatus: data.vatStatus,
+        exemptionReason: data.exemptionReason,
+        customerType: data.customerType,
         country: data.country,
         stateProvince: data.stateProvince,
         city: data.city,
         bankName: data.bankName,
         bankAccountNumber: data.bankAccountNumber,
         bankAccounts: data.bankAccounts,
-        totalPurchase: 0,
-        source: 'DIRECT',
       };
+      const isActive = data.status !== 'INACTIVE';
 
       if (selectedCustomer) {
-        await updateCustomer(selectedCustomer.id, {
-          ...payload,
-          status: data.status, // Ensure status is passed
-        });
+        await updateCustomer(selectedCustomer.id, { ...payload, isActive });
         toast.success('Customer updated successfully');
       } else {
-        await createCustomer(payload);
+        await createCustomer({ ...payload, isActive });
         toast.success('Customer created successfully');
       }
       fetchCustomers();
@@ -171,7 +189,7 @@ export default function EmployeeCustomerTable() {
       </div>
 
       <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
               Search Customers
@@ -185,6 +203,24 @@ export default function EmployeeCustomerTable() {
                 className="pl-9 h-9 text-xs"
               />
             </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+              Type
+            </label>
+            <Select
+              value={typeFilter}
+              onValueChange={(val) => setTypeFilter(val as 'ALL' | CustomerType)}
+            >
+              <SelectTrigger className="h-9 text-xs w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="B2B">B2B</SelectItem>
+                <SelectItem value="B2C">B2C</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
@@ -210,6 +246,7 @@ export default function EmployeeCustomerTable() {
                 <TableHead className="text-primary font-bold whitespace-nowrap">Name</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Email</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Phone</TableHead>
+                <TableHead className="text-primary font-bold whitespace-nowrap">Type</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">Status</TableHead>
                 <TableHead className="text-primary font-bold whitespace-nowrap">
                   Created At
@@ -222,13 +259,13 @@ export default function EmployeeCustomerTable() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     Loading...
                   </TableCell>
                 </TableRow>
               ) : paginatedCustomers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     No customers found.
                   </TableCell>
                 </TableRow>
@@ -250,6 +287,18 @@ export default function EmployeeCustomerTable() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {customer.phone || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="secondary"
+                        className={`font-semibold border-none ${
+                          (customer.customerType ?? 'B2C') === 'B2B'
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {customer.customerType ?? 'B2C'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge

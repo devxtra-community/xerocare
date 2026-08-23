@@ -1692,7 +1692,11 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
               partyName: request.customerName,
               amount: request.amount,
               dueDate: request.chequeDueDate ?? new Date(request.paymentDate),
-              chequeDate: request.chequeDate ?? undefined,
+              // Frontend callers only ever send chequeDueDate today (chequeDate is new) —
+              // fall back to it so the deposit/clear eligibility gate and the reminder
+              // cron (both keyed on chequeDate) still fire for these cheques.
+              chequeDate:
+                request.chequeDate ?? request.chequeDueDate ?? new Date(request.paymentDate),
               issueDate: new Date(request.paymentDate),
               type: 'RECEIVED',
               status: 'PENDING',

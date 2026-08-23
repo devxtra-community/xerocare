@@ -23,15 +23,28 @@ export class Cheque {
   @Column({ name: 'amount', type: 'decimal', precision: 12, scale: 2 })
   amount!: number;
 
+  // Deprecated: kept only so the column stays populated for any code that still reads
+  // it and to avoid a destructive migration. No longer collected or shown as its own
+  // concept — chequeDate is now the single source of truth for "when can this cheque
+  // be presented," and every write path sets dueDate = chequeDate automatically.
   @Column({ name: 'due_date', type: 'date' })
   dueDate!: Date;
 
-  // The date physically written on the cheque — captured once at creation and never
-  // overwritten by later lifecycle actions (unlike the legacy issueDate column, which
-  // used to be silently reused for deposit/issue dates too). May differ from dueDate
-  // for a post-dated cheque.
+  // THE deposit/presentment-eligibility date — "Cheque Date" in the UI: the earliest
+  // date this cheque can legally be deposited (RECEIVED) or presented for clearing
+  // (ISSUED). Captured once at creation and never overwritten by later lifecycle
+  // actions (unlike the legacy issueDate column, which used to be silently reused for
+  // deposit/issue dates too). Required going forward — see the backfill in
+  // runPreMigrations for any pre-existing row where it was still null.
   @Column({ name: 'cheque_date', type: 'date', nullable: true })
   chequeDate?: Date;
+
+  // RECEIVED only: the date this cheque was physically collected from the customer —
+  // independent of chequeDate, since a post-dated cheque is often collected well
+  // before the date written on it. Not applicable to ISSUED cheques (issueDate below
+  // already covers "when we handed it to the vendor").
+  @Column({ name: 'collected_date', type: 'date', nullable: true })
+  collectedDate?: Date;
 
   @Column({ name: 'issue_date', type: 'date', nullable: true })
   issueDate?: Date;

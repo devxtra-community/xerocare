@@ -198,7 +198,7 @@ export const getCustomerStatement = async (req: Request, res: Response, next: Ne
               TO_CHAR("createdAt" AT TIME ZONE 'Asia/Kolkata' AT TIME ZONE 'Asia/Qatar', 'YYYY-MM-DD') AS "createdAt",
               "totalAmount", currency_code
        FROM invoices
-       WHERE LOWER(customer_name) = LOWER($1)
+       WHERE LOWER(TRIM(customer_name)) = LOWER(TRIM($1))
          AND status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
          AND (type = 'FINAL' OR (type = 'PROFORMA' AND status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')))
          AND "totalAmount" > 0
@@ -233,7 +233,7 @@ export const getCustomerStatement = async (req: Request, res: Response, next: Ne
     >(
       `SELECT id, "referenceNo", TO_CHAR("issueDate", 'YYYY-MM-DD') AS "issueDate", amount, currency
        FROM manual_receivables
-       WHERE LOWER("customerName") = LOWER($1) AND "linkedInvoiceId" IS NULL
+       WHERE LOWER(TRIM("customerName")) = LOWER(TRIM($1)) AND "linkedInvoiceId" IS NULL
          ${branchSql('manual_receivables', bParam)}`,
       [customerName],
     );
@@ -358,7 +358,7 @@ export const getVendorStatement = async (req: Request, res: Response, next: Next
     >(
       `SELECT id, "referenceNo", TO_CHAR("issueDate", 'YYYY-MM-DD') AS "issueDate", amount, currency
        FROM manual_payables
-       WHERE LOWER("payableTo") = LOWER($1) AND "linkedPurchaseId" IS NULL
+       WHERE LOWER(TRIM("payableTo")) = LOWER(TRIM($1)) AND "linkedPurchaseId" IS NULL
          ${branchSql('manual_payables', bParam)}`,
       [vendorName],
     );
@@ -420,7 +420,14 @@ export const getVendorStatement = async (req: Request, res: Response, next: Next
           }[];
         }>(`${INV_URL}/purchases?branchId=${branchId}`);
         for (const p of purchases?.data ?? []) {
-          if ((p.vendor?.name ?? '').toLowerCase() !== vendorName.toLowerCase()) continue;
+          // Vendor names can carry real trailing/leading whitespace from data entry
+          // (confirmed live: "epson trading and distributers " — trailing space).
+          // An exact (lowercased-only) match against the caller's trimmed vendorName
+          // then never matches, silently excluding every one of that vendor's
+          // purchases — which is also why currency below never got set from real
+          // data and fell through to the AED default. Trim both sides.
+          if ((p.vendor?.name ?? '').trim().toLowerCase() !== vendorName.trim().toLowerCase())
+            continue;
           const purchaseRef = `PO-${p.id.slice(0, 8).toUpperCase()}`;
           events.push({
             date: p.createdAt.slice(0, 10),

@@ -18,8 +18,21 @@ import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { getBranchManager } from '../services/billingHelpers';
 import { logger } from '../config/logger';
 import { sign } from 'jsonwebtoken';
+import { todayInBusinessTz } from '../utils/businessDate';
 
 const router = Router();
+
+// Shared by /:id/deposit and /:id/clear (both directions, per the confirmed scope) —
+// a cheque cannot legally be presented at the bank before its own Cheque Date. A
+// frontend disabled-button alone isn't enough (a direct API call would still slip
+// through), so this is the authoritative, server-side gate.
+function requireChequeDateReached(cheque: Cheque, actionLabel: 'deposited' | 'cleared') {
+  if (!cheque.chequeDate) return;
+  const chequeDateStr = String(cheque.chequeDate).slice(0, 10);
+  if (todayInBusinessTz() < chequeDateStr) {
+    throw new AppError(`This cheque cannot be ${actionLabel} before ${chequeDateStr}.`, 400);
+  }
+}
 
 function makeServiceToken() {
   return sign({ userId: 'billing_service', role: 'ADMIN' }, process.env.ACCESS_SECRET as string, {
@@ -376,6 +389,7 @@ router.post('/', async (req, res, next) => {
       amount,
       dueDate,
       chequeDate,
+      collectedDate,
       issueDate,
       type,
       description,
@@ -389,7 +403,11 @@ router.post('/', async (req, res, next) => {
     if (!chequeNo) throw new AppError('Cheque number is required', 400);
     if (!partyName) throw new AppError('Party name is required', 400);
     if (!amount || Number(amount) <= 0) throw new AppError('Amount must be > 0', 400);
-    if (!dueDate) throw new AppError('Due date is required', 400);
+    // Cheque Date (deposit/presentment-eligibility date) is the one required date now
+    // — dueDate is deprecated (see chequeEntity.ts) but still accepted as a fallback
+    // source so any caller not yet updated to send chequeDate keeps working unchanged.
+    const resolvedChequeDate = chequeDate || dueDate;
+    if (!resolvedChequeDate) throw new AppError('Cheque Date is required', 400);
 
     // A cheque must say what it is settling. Clearing one moves Cash at Bank, and the
     // other half of that entry comes from the source document — the invoice receivable it
@@ -417,11 +435,14 @@ router.post('/', async (req, res, next) => {
       bankName,
       partyName,
       amount: Number(amount),
-      dueDate,
-      // Cheque Date defaults to Due Date only when truly omitted (legacy callers that
-      // don't yet send it) — the date physically written on the cheque, independent of
-      // Due Date so a post-dated cheque (chequeDate < dueDate) is captured correctly.
-      chequeDate: chequeDate || dueDate,
+      // dueDate is deprecated and no longer independently settable — kept equal to
+      // chequeDate purely so the (still NOT NULL) column stays populated.
+      dueDate: resolvedChequeDate,
+      chequeDate: resolvedChequeDate,
+      // RECEIVED-only in practice (when physically collected from the customer) — left
+      // undefined for ISSUED cheques, which use issueDate for their own "handed to
+      // vendor" concept instead.
+      collectedDate: collectedDate || undefined,
       issueDate: issueDate || undefined,
       type: type || 'RECEIVED',
       status: 'PENDING',
@@ -462,6 +483,7 @@ router.patch('/:id', async (req, res, next) => {
       amount,
       dueDate,
       chequeDate,
+      collectedDate,
       issueDate,
       description,
       accountId,
@@ -471,8 +493,15 @@ router.patch('/:id', async (req, res, next) => {
     if (bankName !== undefined) cheque.bankName = bankName;
     if (partyName !== undefined) cheque.partyName = partyName;
     if (amount !== undefined) cheque.amount = Number(amount);
-    if (dueDate !== undefined) cheque.dueDate = dueDate;
-    if (chequeDate !== undefined) cheque.chequeDate = chequeDate;
+    // chequeDate (or the deprecated dueDate, still accepted as a fallback) drives both
+    // columns — see the create route above for why dueDate is kept in lockstep rather
+    // than independently editable.
+    const resolvedChequeDate = chequeDate ?? dueDate;
+    if (resolvedChequeDate !== undefined) {
+      cheque.chequeDate = resolvedChequeDate;
+      cheque.dueDate = resolvedChequeDate;
+    }
+    if (collectedDate !== undefined) cheque.collectedDate = collectedDate;
     if (issueDate !== undefined) cheque.issueDate = issueDate;
     if (description !== undefined) cheque.description = description;
     if (accountId !== undefined) cheque.accountId = accountId;
@@ -503,6 +532,7 @@ router.post('/:id/deposit', async (req, res, next) => {
       throw new AppError('Only RECEIVED cheques can be deposited', 400);
     if (cheque.status !== 'PENDING')
       throw new AppError('Only PENDING cheques can be deposited', 400);
+    requireChequeDateReached(cheque, 'deposited');
 
     // The account must be real, belong to this branch, and be a BANK account — a
     // stale/foreign/wrong-type id must never be silently accepted here, since it's
@@ -592,6 +622,7 @@ router.post('/:id/clear', async (req, res, next) => {
     if (!['DEPOSITED', 'ISSUED'].includes(cheque.status)) {
       throw new AppError('Only DEPOSITED or ISSUED cheques can be cleared', 400);
     }
+    requireChequeDateReached(cheque, 'cleared');
 
     const prevStatus = cheque.status;
 

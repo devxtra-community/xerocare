@@ -202,6 +202,12 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
     const submitted = purchaseRequests.filter((r) => r.status === 'SUBMITTED');
     const approved = purchaseRequests.filter((r) => r.status === 'APPROVED');
     const rejected = purchaseRequests.filter((r) => r.status === 'REJECTED');
+    // Cash/Bank purchase-payment requests skip APPROVED entirely — approveExpenseRequest
+    // takes them straight to PAID (cash deducted, PurchasePayment recorded, nothing left
+    // to separately "pay" later the way an APPROVED-then-paid Cheque request does). With
+    // no Paid bucket here, every such request — the majority of real ones, per the
+    // reported QAR 50,000 Bank Transfer example — had nowhere to be counted at all.
+    const paid = purchaseRequests.filter((r) => r.status === 'PAID');
     return {
       submitted: {
         count: submitted.length,
@@ -214,6 +220,10 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
       rejected: {
         count: rejected.length,
         total: rejected.reduce((s, r) => s + Number(r.amount), 0),
+      },
+      paid: {
+        count: paid.length,
+        total: paid.reduce((s, r) => s + Number(r.amount), 0),
       },
     };
   }, [purchaseRequests]);
@@ -254,7 +264,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="rounded-xl border p-3 bg-blue-50 border-blue-200 col-span-1">
           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
             Awaiting Approval
@@ -271,6 +281,15 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
           <p className="text-xl font-bold mt-0.5 text-emerald-700">{reqStats.approved.count}</p>
           <p className="text-xs font-semibold text-emerald-600">
             {formatCurrency(reqStats.approved.total, currency)}
+          </p>
+        </div>
+        <div className="rounded-xl border p-3 bg-teal-50 border-teal-200">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+            Requests Paid
+          </p>
+          <p className="text-xl font-bold mt-0.5 text-teal-700">{reqStats.paid.count}</p>
+          <p className="text-xs font-semibold text-teal-600">
+            {formatCurrency(reqStats.paid.total, currency)}
           </p>
         </div>
         <div className="rounded-xl border p-3 bg-red-50 border-red-200">

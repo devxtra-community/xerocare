@@ -133,9 +133,10 @@ export interface CreateCustomerData {
   email?: string;
   phone?: string;
   address?: string;
-  source?: string;
-  totalPurchase?: number;
+  /** Form-facing status string (used by CustomerFormDialog's own Select). The real
+   * persisted column is `isActive` below — set that when actually calling the API. */
   status?: 'ACTIVE' | 'INACTIVE';
+  isActive?: boolean;
   vatNumber?: string;
   vatStatus?: CustomerVatStatus;
   exemptionReason?: CustomerExemptionReason | null;
