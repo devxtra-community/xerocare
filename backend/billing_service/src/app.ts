@@ -11,6 +11,7 @@ import invoiceRouter from './routes/invoiceRoutes';
 import usageRouter from './routes/usageRoutes';
 import paymentRouter from './routes/paymentRoutes';
 import openingBalanceRouter from './routes/openingBalanceRoutes';
+import { signFileUrls } from './middlewares/signFileUrls';
 
 /**
  * This is the main engine for the Billing Service.
@@ -36,7 +37,6 @@ import adminAccountsRouter from './routes/adminAccountsRoutes';
 import expenseRequestRouter from './routes/expenseRequestRoutes';
 import targetRouter from './routes/targetRoutes';
 import saleWorkflowRouter from './routes/saleWorkflowRoutes';
-import { signFileUrls } from './middlewares/signFileUrls';
 
 /**
  * Routing: Directing users to the right department.
