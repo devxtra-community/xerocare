@@ -893,9 +893,8 @@ export const createManagerPurchasePaymentRequest = async (
 
     // Payment proof uploaded by the Manager (multipart `proof` field → R2).
     const proofFile = req.file as { key?: string } | undefined;
-    const R2_BASE_URL =
-      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
-    const proofUrl = proofFile?.key ? `${R2_BASE_URL}/${proofFile.key}` : undefined;
+    // Payment proofs are private — persist the object key and sign it on read.
+    const proofUrl = proofFile?.key;
 
     // The PurchasePayment (which is what actually reduces the vendor's outstanding
     // balance) is deliberately NOT recorded here. It used to be created immediately on

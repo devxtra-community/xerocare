@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { getProductById, getAllProducts } from '@/lib/product';
+import { resolveImageUrl } from '@/lib/imageUrl';
 import {
   Loader2,
   Package,
@@ -266,7 +267,7 @@ export function ProductDetailModal({
               {product.imageUrl ? (
                 <div className="rounded-xl overflow-hidden border border-slate-200 bg-white h-44 flex items-center justify-center">
                   <img
-                    src={product.imageUrl}
+                    src={resolveImageUrl(product.imageUrl)}
                     alt={product.name}
                     className="max-h-full max-w-full object-contain"
                   />

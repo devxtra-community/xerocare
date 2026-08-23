@@ -23,7 +23,7 @@ const requireUsageEntryPermission = (req: Request, res: Response, next: NextFunc
     return next();
   }
 
-  if (role === 'EMPLOYEE' && employeeJob === 'TECHNICIAN') {
+  if (role === 'EMPLOYEE' && employeeJob === 'SERVICE_TECHNICIAN') {
     return next();
   }
 

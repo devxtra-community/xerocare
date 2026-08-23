@@ -81,12 +81,13 @@ export class PurchaseController {
       const branchId = req.user?.branchId;
       if (!branchId) throw new AppError('Branch ID is required', 400);
 
-      const receiptFile = req.file as unknown as { location?: string } | undefined;
+      const receiptFile = req.file as unknown as { key?: string } | undefined;
 
       const paymentData = {
         ...req.body,
         createdBy: req.user?.userId,
-        attachmentUrl: receiptFile?.location,
+        // Private file: persist the object key, signed on read.
+        attachmentUrl: receiptFile?.key,
       };
 
       const payment = await purchaseService.addPayment(id, paymentData, branchId);
@@ -102,12 +103,13 @@ export class PurchaseController {
       const branchId = req.user?.branchId;
       if (!branchId) throw new AppError('Branch ID is required', 400);
 
-      const attachmentFile = req.file as unknown as { location?: string } | undefined;
+      const attachmentFile = req.file as unknown as { key?: string } | undefined;
 
       const costData = {
         ...req.body,
         createdBy: req.user?.userId,
-        attachmentUrl: attachmentFile?.location,
+        // Private file: persist the object key, signed on read.
+        attachmentUrl: attachmentFile?.key,
       };
 
       const cost = await purchaseService.addCost(id, costData, branchId);

@@ -573,6 +573,9 @@ export class BillingService {
       bwExcessRate?: number;
       colorExcessRate?: number;
       combinedExcessRate?: number;
+      separateA3Pricing?: boolean;
+      bwA3ExcessRate?: number;
+      colorA3ExcessRate?: number;
       // Slabs
       bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;
       colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
@@ -690,6 +693,9 @@ export class BillingService {
         invItem.bwExcessRate = item.bwExcessRate;
         invItem.colorExcessRate = item.colorExcessRate;
         invItem.combinedExcessRate = item.combinedExcessRate;
+        invItem.separateA3Pricing = item.separateA3Pricing;
+        invItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        invItem.colorA3ExcessRate = item.colorA3ExcessRate;
         invItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
         invItem.colorSlabRanges = appendOpenEndedSlab(item.colorSlabRanges, item.colorExcessRate);
         invItem.comboSlabRanges = appendOpenEndedSlab(
@@ -730,6 +736,9 @@ export class BillingService {
         invoiceItem.bwExcessRate = item.bwExcessRate;
         invoiceItem.colorExcessRate = item.colorExcessRate;
         invoiceItem.combinedExcessRate = item.combinedExcessRate;
+        invoiceItem.separateA3Pricing = item.separateA3Pricing;
+        invoiceItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        invoiceItem.colorA3ExcessRate = item.colorA3ExcessRate;
 
         invoiceItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
         invoiceItem.colorSlabRanges = appendOpenEndedSlab(
@@ -954,6 +963,9 @@ export class BillingService {
         bwExcessRate?: number;
         colorExcessRate?: number;
         combinedExcessRate?: number;
+        separateA3Pricing?: boolean;
+        bwA3ExcessRate?: number;
+        colorA3ExcessRate?: number;
         bwSlabRanges?: Array<{ from: number; to: number; rate: number }>;
         colorSlabRanges?: Array<{ from: number; to: number; rate: number }>;
         comboSlabRanges?: Array<{ from: number; to: number; rate: number }>;
@@ -1093,6 +1105,9 @@ export class BillingService {
         invItem.bwExcessRate = item.bwExcessRate;
         invItem.colorExcessRate = item.colorExcessRate;
         invItem.combinedExcessRate = item.combinedExcessRate;
+        invItem.separateA3Pricing = item.separateA3Pricing;
+        invItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        invItem.colorA3ExcessRate = item.colorA3ExcessRate;
         invItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
         invItem.colorSlabRanges = appendOpenEndedSlab(item.colorSlabRanges, item.colorExcessRate);
         invItem.comboSlabRanges = appendOpenEndedSlab(
@@ -1117,6 +1132,9 @@ export class BillingService {
         invoiceItem.bwExcessRate = item.bwExcessRate;
         invoiceItem.colorExcessRate = item.colorExcessRate;
         invoiceItem.combinedExcessRate = item.combinedExcessRate;
+        invoiceItem.separateA3Pricing = item.separateA3Pricing;
+        invoiceItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        invoiceItem.colorA3ExcessRate = item.colorA3ExcessRate;
         invoiceItem.bwSlabRanges = appendOpenEndedSlab(item.bwSlabRanges, item.bwExcessRate);
         invoiceItem.colorSlabRanges = appendOpenEndedSlab(
           item.colorSlabRanges,
@@ -3859,6 +3877,9 @@ export class BillingService {
         newItem.bwExcessRate = item.bwExcessRate;
         newItem.colorExcessRate = item.colorExcessRate;
         newItem.combinedExcessRate = item.combinedExcessRate;
+        newItem.separateA3Pricing = item.separateA3Pricing;
+        newItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        newItem.colorA3ExcessRate = item.colorA3ExcessRate;
         newItem.bwSlabRanges = item.bwSlabRanges;
         newItem.colorSlabRanges = item.colorSlabRanges;
         newItem.comboSlabRanges = item.comboSlabRanges;
@@ -4106,6 +4127,9 @@ export class BillingService {
         newItem.bwExcessRate = item.bwExcessRate;
         newItem.colorExcessRate = item.colorExcessRate;
         newItem.combinedExcessRate = item.combinedExcessRate;
+        newItem.separateA3Pricing = item.separateA3Pricing;
+        newItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        newItem.colorA3ExcessRate = item.colorA3ExcessRate;
         newItem.bwSlabRanges = item.bwSlabRanges;
         newItem.colorSlabRanges = item.colorSlabRanges;
         newItem.comboSlabRanges = item.comboSlabRanges;
@@ -4968,6 +4992,9 @@ export class BillingService {
         clonedItem.bwExcessRate = item.bwExcessRate;
         clonedItem.colorExcessRate = item.colorExcessRate;
         clonedItem.combinedExcessRate = item.combinedExcessRate;
+        clonedItem.separateA3Pricing = item.separateA3Pricing;
+        clonedItem.bwA3ExcessRate = item.bwA3ExcessRate;
+        clonedItem.colorA3ExcessRate = item.colorA3ExcessRate;
         clonedItem.bwSlabRanges = item.bwSlabRanges;
         clonedItem.colorSlabRanges = item.colorSlabRanges;
         clonedItem.comboSlabRanges = item.comboSlabRanges;

@@ -3,7 +3,7 @@ import { jwtDecode } from 'jwt-decode';
 import { EmployeeJob } from './employeeJob';
 import { FinanceJob } from './financeJob';
 import { setAccessTokenCookie, clearAccessTokenCookie } from './cookie-utils';
-import { clearActiveCurrency, initBranchCurrency } from './currency';
+import { clearActiveCurrency, clearBranchTaxPercent, initBranchCurrency } from './currency';
 import { clearActingBranch } from './adminBranch';
 
 export { setAccessTokenCookie, clearAccessTokenCookie };
@@ -123,6 +123,7 @@ export async function logout() {
       localStorage.clear();
       clearAccessTokenCookie();
       clearActiveCurrency();
+      clearBranchTaxPercent();
       clearActingBranch();
       return res;
     }

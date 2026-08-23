@@ -95,7 +95,7 @@ const requireInvoiceUsageUpdatePermission = (req: Request, res: Response, next: 
     return next();
   }
 
-  if (role === 'EMPLOYEE' && employeeJob === 'TECHNICIAN') {
+  if (role === 'EMPLOYEE' && employeeJob === 'SERVICE_TECHNICIAN') {
     return next();
   }
 

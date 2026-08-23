@@ -17,6 +17,29 @@ import { ProductAllocation, AllocationStatus } from '../entities/productAllocati
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { MoreThanOrEqual } from 'typeorm';
+import { r2SignedGetUrl } from '../utils/r2Url';
+
+/**
+ * Splits one colour channel's page deltas into billable A4 and A3 counts when the
+ * contract prices the two sizes separately.
+ *
+ * `discountCopies` is entered by Finance as a single figure per channel with no page
+ * size attached, so it has to be attributed. It comes off the A4 leg first and only
+ * spills onto A3 once A4 is exhausted — waiving the cheaper pages first is the reading
+ * that never over-credits the customer relative to a same-size waiver.
+ */
+function splitPerSizeNet(
+  a4Delta: number,
+  a3Delta: number,
+  discountCopies: number,
+): { a4: number; a3: number } {
+  const a4 = Math.max(0, a4Delta);
+  const a3 = Math.max(0, a3Delta);
+  const discount = Math.max(0, discountCopies);
+  const a4Net = Math.max(0, a4 - discount);
+  const a3Net = Math.max(0, a3 - Math.max(0, discount - a4));
+  return { a4: a4Net, a3: a3Net };
+}
 
 /**
  * Chooses the contract line that defines the billing plan.
@@ -414,6 +437,28 @@ export class UsageService {
             (payload.discountColorCopies || 0),
         );
         exceededCharge = exceededTotal * Number(rule.combinedExcessRate || rule.bwExcessRate || 0);
+      } else if (
+        contract.rentType === 'CPC' &&
+        rule.separateA3Pricing &&
+        (!rule.comboSlabRanges || rule.comboSlabRanges.length === 0)
+      ) {
+        // Separate A3/A4 pricing: A3 pages are billed 1:1 at their own rate instead of
+        // being folded into the A4-equivalent count at the a3Multiplier. The A3 rate is
+        // itself the size premium, so multiplying first would charge that premium twice.
+        // Per-size discounts come off the A4 leg first (the cheaper page), then A3.
+        const bwSizes = splitPerSizeNet(bwA4Delta, bwA3Delta, payload.discountBwCopies || 0);
+        const clrSizes = splitPerSizeNet(
+          colorA4Delta,
+          colorA3Delta,
+          payload.discountColorCopies || 0,
+        );
+
+        exceededTotal = bwSizes.a4 + bwSizes.a3 + clrSizes.a4 + clrSizes.a3;
+        exceededCharge =
+          this.calculateSlabCharge(bwSizes.a4, rule.bwSlabRanges) +
+          bwSizes.a3 * Number(rule.bwA3ExcessRate || 0) +
+          this.calculateSlabCharge(clrSizes.a4, rule.colorSlabRanges) +
+          clrSizes.a3 * Number(rule.colorA3ExcessRate || 0);
       } else if (contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO') {
         // For exceeded total count, we show the net (after discount) copies
         const bwNet = Math.max(0, monthlyBw - (payload.discountBwCopies || 0));
@@ -794,116 +839,106 @@ export class UsageService {
       combinedExcessRate: 0,
     }) as Partial<InvoiceItem>;
 
-    // Prepare R2 Base URL
-    const R2_BASE_URL =
-      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
-
     // Track previous readings for on-the-fly delta calculation (backwards compatibility)
     let lastBwA4 = pricingRule.initialBwCount || 0;
     let lastBwA3 = 0;
     let lastColorA4 = pricingRule.initialColorCount || 0;
     let lastColorA3 = 0;
 
-    const result = history.map((record) => {
-      // 3️⃣ Determine Free Limit (DELTA BASED)
-      let freeLimit: number = 0;
-      const isCPC = contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO';
+    const result = await Promise.all(
+      history.map(async (record) => {
+        // 3️⃣ Determine Free Limit (DELTA BASED)
+        let freeLimit: number = 0;
+        const isCPC = contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO';
 
-      if (!isCPC) {
-        freeLimit = Number(
-          pricingRule.combinedIncludedLimit ||
-            (pricingRule.bwIncludedLimit || 0) + (pricingRule.colorIncludedLimit || 0),
-        );
-      }
-
-      // 4️⃣ Normalize Monthly Usage (DELTA BASED - Fallback for legacy records)
-      const bwA4D = record.bwA4Delta || Math.max(0, record.bwA4Count - lastBwA4);
-      const bwA3D = record.bwA3Delta || Math.max(0, record.bwA3Count - lastBwA3);
-      const colorA4D = record.colorA4Delta || Math.max(0, record.colorA4Count - lastColorA4);
-      const colorA3D = record.colorA3Delta || Math.max(0, record.colorA3Count - lastColorA3);
-
-      const monthlyNormalized = bwA4D + bwA3D * 2 + (colorA4D + colorA3D * 2);
-      const totalUsage = monthlyNormalized;
-
-      // Update pointers for next record in ASC sequence
-      lastBwA4 = record.bwA4Count;
-      lastBwA3 = record.bwA3Count;
-      lastColorA4 = record.colorA4Count;
-      lastColorA3 = record.colorA3Count;
-
-      // 5️⃣ Use Stored Values (Source of Truth)
-      const exceededCount = Number(record.exceededTotal || 0);
-      const exceededCharge = Number(record.exceededCharge || 0);
-      const monthlyRent = Number(record.monthlyRent || 0);
-      const advanceAdjusted = Number(record.advanceAdjusted || 0);
-      const finalTotal = Number(record.totalCharge || 0);
-
-      // 6️⃣ Determine Rate (Derived for UI only)
-      let rate = 0;
-      if (exceededCount > 0) {
-        rate = exceededCharge / exceededCount;
-      }
-
-      // 8️⃣ Normalize Meter Image URL
-      let meterImageUrl = record.meterImageUrl;
-      if (meterImageUrl && !meterImageUrl.startsWith('http')) {
-        if (meterImageUrl.includes('cloudflarestorage.com')) {
-          const parts = meterImageUrl.split('/');
-          const filename = parts[parts.length - 1];
-          meterImageUrl = `${R2_BASE_URL}/${filename}`;
-        } else {
-          meterImageUrl = `${R2_BASE_URL}/${meterImageUrl}`;
+        if (!isCPC) {
+          freeLimit = Number(
+            pricingRule.combinedIncludedLimit ||
+              (pricingRule.bwIncludedLimit || 0) + (pricingRule.colorIncludedLimit || 0),
+          );
         }
-      }
 
-      return {
-        id: record.id,
-        periodStart: new Date(record.billingPeriodStart).toISOString().split('T')[0],
-        periodEnd: new Date(record.billingPeriodEnd).toISOString().split('T')[0],
-        freeLimit: isCPC ? 'Standard CPC' : freeLimit,
-        totalUsage,
-        exceededCount,
-        rate,
-        exceededAmount: exceededCharge,
-        rent: monthlyRent,
-        advanceAdjusted,
-        // Advance amount from the contract (total security deposit / advance)
-        advanceAmount: Number(contract.advanceAmount || 0),
-        // EMI per cycle
-        emiAmount: Number(
-          contract.monthlyEmiAmount || contract.monthlyLeaseAmount || contract.monthlyRent || 0,
-        ),
-        // The total value of the entire contract (e.g. 1.2M)
-        totalLeaseAmount: Number(contract.totalLeaseAmount || contract.totalAmount || 0),
-        finalTotal: finalTotal,
-        meterImageUrl,
-        emailSentAt: record.emailSentAt ? new Date(record.emailSentAt).toISOString() : undefined,
-        whatsappSentAt: record.whatsappSentAt
-          ? new Date(record.whatsappSentAt).toISOString()
-          : undefined,
-        bwA4Count: record.bwA4Count,
-        bwA3Count: record.bwA3Count,
-        colorA4Count: record.colorA4Count,
-        colorA3Count: record.colorA3Count,
-        bwA4Delta: bwA4D,
-        bwA3Delta: bwA3D,
-        colorA4Delta: colorA4D,
-        colorA3Delta: colorA3D,
-        remarks: record.remarks,
-        discountAmount: Number(record.discountAmount || 0),
-        discountBwCopies: Number(record.discountBwCopies || 0),
-        discountColorCopies: Number(record.discountColorCopies || 0),
-        items: record.items, // Ensure items are passed to the frontend for editing
-        // Detailed Breakdown for UI "View Details"
-        bwFreeLimit: Number(pricingRule.bwIncludedLimit || 0),
-        colorFreeLimit: Number(pricingRule.colorIncludedLimit || 0),
-        combinedFreeLimit: Number(pricingRule.combinedIncludedLimit || 0),
-        bwExcessRate: Number(pricingRule.bwExcessRate || 0),
-        colorExcessRate: Number(pricingRule.colorExcessRate || 0),
-        combinedExcessRate: Number(pricingRule.combinedExcessRate || 0),
-        rentType: contract.rentType,
-      };
-    });
+        // 4️⃣ Normalize Monthly Usage (DELTA BASED - Fallback for legacy records)
+        const bwA4D = record.bwA4Delta || Math.max(0, record.bwA4Count - lastBwA4);
+        const bwA3D = record.bwA3Delta || Math.max(0, record.bwA3Count - lastBwA3);
+        const colorA4D = record.colorA4Delta || Math.max(0, record.colorA4Count - lastColorA4);
+        const colorA3D = record.colorA3Delta || Math.max(0, record.colorA3Count - lastColorA3);
+
+        const monthlyNormalized = bwA4D + bwA3D * 2 + (colorA4D + colorA3D * 2);
+        const totalUsage = monthlyNormalized;
+
+        // Update pointers for next record in ASC sequence
+        lastBwA4 = record.bwA4Count;
+        lastBwA3 = record.bwA3Count;
+        lastColorA4 = record.colorA4Count;
+        lastColorA3 = record.colorA3Count;
+
+        // 5️⃣ Use Stored Values (Source of Truth)
+        const exceededCount = Number(record.exceededTotal || 0);
+        const exceededCharge = Number(record.exceededCharge || 0);
+        const monthlyRent = Number(record.monthlyRent || 0);
+        const advanceAdjusted = Number(record.advanceAdjusted || 0);
+        const finalTotal = Number(record.totalCharge || 0);
+
+        // 6️⃣ Determine Rate (Derived for UI only)
+        let rate = 0;
+        if (exceededCount > 0) {
+          rate = exceededCharge / exceededCount;
+        }
+
+        // 8️⃣ Meter photos are private: sign whatever is stored (key or a
+        // legacy URL from an older bucket) so the link actually resolves.
+        const meterImageUrl = (await r2SignedGetUrl(record.meterImageUrl)) ?? record.meterImageUrl;
+
+        return {
+          id: record.id,
+          periodStart: new Date(record.billingPeriodStart).toISOString().split('T')[0],
+          periodEnd: new Date(record.billingPeriodEnd).toISOString().split('T')[0],
+          freeLimit: isCPC ? 'Standard CPC' : freeLimit,
+          totalUsage,
+          exceededCount,
+          rate,
+          exceededAmount: exceededCharge,
+          rent: monthlyRent,
+          advanceAdjusted,
+          // Advance amount from the contract (total security deposit / advance)
+          advanceAmount: Number(contract.advanceAmount || 0),
+          // EMI per cycle
+          emiAmount: Number(
+            contract.monthlyEmiAmount || contract.monthlyLeaseAmount || contract.monthlyRent || 0,
+          ),
+          // The total value of the entire contract (e.g. 1.2M)
+          totalLeaseAmount: Number(contract.totalLeaseAmount || contract.totalAmount || 0),
+          finalTotal: finalTotal,
+          meterImageUrl,
+          emailSentAt: record.emailSentAt ? new Date(record.emailSentAt).toISOString() : undefined,
+          whatsappSentAt: record.whatsappSentAt
+            ? new Date(record.whatsappSentAt).toISOString()
+            : undefined,
+          bwA4Count: record.bwA4Count,
+          bwA3Count: record.bwA3Count,
+          colorA4Count: record.colorA4Count,
+          colorA3Count: record.colorA3Count,
+          bwA4Delta: bwA4D,
+          bwA3Delta: bwA3D,
+          colorA4Delta: colorA4D,
+          colorA3Delta: colorA3D,
+          remarks: record.remarks,
+          discountAmount: Number(record.discountAmount || 0),
+          discountBwCopies: Number(record.discountBwCopies || 0),
+          discountColorCopies: Number(record.discountColorCopies || 0),
+          items: record.items, // Ensure items are passed to the frontend for editing
+          // Detailed Breakdown for UI "View Details"
+          bwFreeLimit: Number(pricingRule.bwIncludedLimit || 0),
+          colorFreeLimit: Number(pricingRule.colorIncludedLimit || 0),
+          combinedFreeLimit: Number(pricingRule.combinedIncludedLimit || 0),
+          bwExcessRate: Number(pricingRule.bwExcessRate || 0),
+          colorExcessRate: Number(pricingRule.colorExcessRate || 0),
+          combinedExcessRate: Number(pricingRule.combinedExcessRate || 0),
+          rentType: contract.rentType,
+        };
+      }),
+    );
 
     return result.reverse(); // Return DESC order for UI
   }
@@ -949,19 +984,8 @@ export class UsageService {
       }
     }
 
-    // Normalize Image URL
-    const R2_BASE_URL =
-      process.env.R2_PUBLIC_URL || 'https://pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev';
-    let meterImageUrl = usage.meterImageUrl;
-    if (meterImageUrl && !meterImageUrl.startsWith('http')) {
-      if (meterImageUrl.includes('cloudflarestorage.com')) {
-        const parts = meterImageUrl.split('/');
-        const filename = parts[parts.length - 1];
-        meterImageUrl = `${R2_BASE_URL}/${filename}`;
-      } else {
-        meterImageUrl = `${R2_BASE_URL}/${meterImageUrl}`;
-      }
-    }
+    // Meter photos are private: hand out a short-lived signed URL.
+    const meterImageUrl = (await r2SignedGetUrl(usage.meterImageUrl)) ?? usage.meterImageUrl;
 
     // --- FETCH CUSTOMER DETAILS ---
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1400,7 +1424,7 @@ export class UsageService {
       colorA3Delta = Math.max(0, payload.colorA3Count - prevColorA3);
     }
 
-    // Finalize readings
+    // Finalize charges
     usage.bwA4Count = payload.bwA4Count;
     usage.bwA3Count = payload.bwA3Count;
     usage.colorA4Count = payload.colorA4Count;

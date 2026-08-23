@@ -61,7 +61,7 @@ export default function EmployeeDashboardPage() {
     const currentUser = getUserFromToken() as unknown as UserInfo | null;
     setUser(currentUser);
 
-    if (currentUser?.employeeJob === EmployeeJob.TECHNICIAN) {
+    if (currentUser?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN) {
       fetchContracts();
     }
   }, []);
@@ -72,7 +72,8 @@ export default function EmployeeDashboardPage() {
       c.customerName?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const isTechnician = user?.role === 'EMPLOYEE' && user?.employeeJob === EmployeeJob.TECHNICIAN;
+  const isTechnician =
+    user?.role === 'EMPLOYEE' && user?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN;
 
   if (isTechnician) {
     return (

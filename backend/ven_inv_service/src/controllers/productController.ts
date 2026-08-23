@@ -4,6 +4,7 @@ import { ProductService } from '../services/productService';
 import { logger } from '../config/logger';
 import { BulkProductRow } from '../dto/product.dto';
 import { MulterS3File } from '../types/multer-s3-file';
+import { r2ViewUrl } from '../utils/r2Url';
 import { ProductStatus } from '../entities/productEntity';
 import { Source } from '../config/db';
 import { Product } from '../entities/productEntity';
@@ -11,6 +12,18 @@ import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
 import { ServiceTicket } from '../entities/serviceTicketEntity';
 
 const service = new ProductService();
+
+/**
+ * Rewrites a product's stored image into a link the browser can load: a public
+ * link when the bucket exposes one, a signed link otherwise. Stored values may
+ * be legacy URLs from a previous bucket, so they are re-derived from the key.
+ */
+const withViewableImage = async <T extends { imageUrl?: string | null }>(
+  product: T,
+): Promise<T> => ({
+  ...product,
+  imageUrl: (await r2ViewUrl(product.imageUrl)) ?? product.imageUrl,
+});
 
 /**
  * Fast Add: Create many new products at once by providing a list.
@@ -93,8 +106,9 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
     }
 
     const file = req.file as MulterS3File;
-    const imageKey = file?.key ?? null;
-    const imageUrl = imageKey ? `${process.env.R2_PUBLIC_URL}/${imageKey}` : null;
+    // Persist the object key. Rendered URLs (public or signed) are derived on
+    // read, so swapping buckets or public hostnames never orphans a row.
+    const imageUrl = file?.key ?? null;
 
     logger.info('Adding new product:');
     const newproduct = await service.addProduct({
@@ -172,7 +186,7 @@ export const getallproducts = async (req: Request, res: Response) => {
 
     res.status(200).json({
       message: 'Fetched all products successfully',
-      data,
+      data: await Promise.all((data ?? []).map(withViewableImage)),
       total,
       page,
       limit,
@@ -228,8 +242,9 @@ export const updateproduct = async (req: Request, res: Response, next: NextFunct
 
     const file = req.file as MulterS3File;
     if (file && file.key) {
-      payload.imageUrl = `${process.env.R2_PUBLIC_URL}/${file.key}`;
+      payload.imageUrl = file.key;
     } else {
+      // No new upload in this request — leave the existing image untouched.
       payload.imageUrl = undefined;
     }
 
@@ -311,7 +326,7 @@ export const getproductbyid = async (req: Request, res: Response, next: NextFunc
 
     return res.status(200).json({
       success: true,
-      data: product,
+      data: await withViewableImage(product),
       message: 'Product fetched successfully',
     });
   } catch (err) {

@@ -12,9 +12,16 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      // Any R2 public bucket URL — pinning one bucket's hostname here broke
+      // every image the moment the bucket was swapped.
       {
         protocol: 'https',
-        hostname: 'pub-8bbb88e1d79042349d0bc47ad1f3eb23.r2.dev',
+        hostname: '*.r2.dev',
+      },
+      // Pre-signed links are served straight off the S3 API endpoint
+      {
+        protocol: 'https',
+        hostname: '*.r2.cloudflarestorage.com',
       },
     ],
   },

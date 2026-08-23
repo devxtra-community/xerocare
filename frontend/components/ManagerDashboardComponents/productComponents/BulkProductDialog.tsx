@@ -28,8 +28,11 @@ import { commonService, Vendor, Warehouse } from '@/services/commonService';
 import { lotService, Lot, LotItemType } from '@/lib/lot';
 import { modelService, Model } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
+import { getBranchTaxPercent } from '@/lib/currency';
+import { useBranchTax } from '@/hooks/useBranchTax';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { resolveImageUrl } from '@/lib/imageUrl';
 
 interface BulkProductDialogProps {
   open: boolean;
@@ -52,6 +55,9 @@ export function BulkProductDialog({
   initialLotId,
   initialItemId,
 }: BulkProductDialogProps) {
+  // Tax is a branch-level setting (configured when the branch is created), so
+  // every product booked here starts at the branch rate instead of 0.
+  const branchTaxPercent = useBranchTax();
   const [rows, setRows] = useState<Partial<BulkProductRow>[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -80,6 +86,7 @@ export function BulkProductDialog({
     max_discount_amount: string;
     MFD: string;
     product_status: BulkProductRow['product_status'];
+    imageUrl: string;
   }>({
     warehouse_id: '',
     vendor_id: '',
@@ -91,7 +98,11 @@ export function BulkProductDialog({
     max_discount_amount: '',
     MFD: '',
     product_status: 'AVAILABLE',
+    imageUrl: '',
   });
+  // Same-batch units share one product photo; upload it once here instead of
+  // per row. Kept separate from `rows` so the upload spinner is dialog-level.
+  const [bulkImageUploading, setBulkImageUploading] = useState(false);
 
   const loadDependencies = async () => {
     const [vResult, wResult, lResult, mResult, bResult] = await Promise.allSettled([
@@ -141,7 +152,9 @@ export function BulkProductDialog({
     MFD: '',
     purchase_price: 0,
     sale_price: 0,
-    tax_rate: 0,
+    // Read straight from the cache, not the hook value: rows are also built
+    // inside async callbacks that captured an older render.
+    tax_rate: getBranchTaxPercent(),
     // Colour-only or B&W-only machines are rare these days; default to a
     // dual-capable machine and let the user narrow it down per row.
     print_colour: 'BOTH',
@@ -159,6 +172,9 @@ export function BulkProductDialog({
       setFile(null);
       setExpandedRows({});
       setSelectedRows(new Set());
+      // A photo from a previous batch must not leak into the next one
+      setBulkFill((p) => ({ ...p, imageUrl: '' }));
+      setBulkImageUploading(false);
       const prepareInitialData = async () => {
         const { loadedModels, loadedVendors } = await loadDependencies();
 
@@ -229,6 +245,17 @@ export function BulkProductDialog({
       prepareInitialData();
     }
   }, [open, initialLotId, initialItemId]);
+
+  // The branch fetch can land after the dialog opened, so seed the Bulk Fill box
+  // and top up rows that are still on the default rate. Rows the user (or the
+  // Excel sheet) already gave a rate to are left alone.
+  useEffect(() => {
+    if (!open || !branchTaxPercent) return;
+    setBulkFill((prev) =>
+      prev.tax_rate === '' ? { ...prev, tax_rate: String(branchTaxPercent) } : prev,
+    );
+    setRows((prev) => prev.map((r) => (r.tax_rate ? r : { ...r, tax_rate: branchTaxPercent })));
+  }, [open, branchTaxPercent]);
 
   /**
    * Converts an Excel serial date number to a YYYY-MM-DD string.
@@ -428,7 +455,8 @@ export function BulkProductDialog({
         })(),
         purchase_price: Number(getVal(['purchase_price', 'Purchase Price', 'Cost'])) || 0,
         sale_price: Number(getVal(['sale_price', 'Price', 'Sale Price'])) || 0,
-        tax_rate: Number(getVal(['tax_rate', 'Tax Rate', 'Tax', 'Tax %'])) || 0,
+        // Sheet value wins; a blank Tax Rate column falls back to the branch rate.
+        tax_rate: Number(getVal(['tax_rate', 'Tax Rate', 'Tax', 'Tax %'])) || getBranchTaxPercent(),
         print_colour: printColour,
         max_discount_amount:
           Number(
@@ -506,18 +534,19 @@ export function BulkProductDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-card rounded-xl w-full max-w-[95vw] h-[85vh] flex flex-col shadow-2xl">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold flex items-center gap-2">
+      <div className="bg-card rounded-xl w-full max-w-[95vw] h-[95vh] flex flex-col shadow-2xl">
+        {/* Header carries the sheet actions too — keeps a full extra toolbar row
+            of vertical space for the product list. */}
+        <div className="p-4 border-b flex flex-wrap gap-3 justify-between items-center">
+          <h2 className="text-xl font-bold flex items-center gap-2 shrink-0">
             <Upload size={20} /> Bulk Product Upload
           </h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="p-4 bg-muted/50 border-b flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div className="flex gap-4 items-center w-full sm:w-auto">
+          <div className="flex gap-3 items-center ml-auto">
+            <span className="text-sm text-muted-foreground hidden md:inline">
+              {rows.length > 0
+                ? `${rows.length} rows loaded`
+                : 'Upload an Excel file to get started'}
+            </span>
             <div className="relative">
               <input
                 type="file"
@@ -528,24 +557,25 @@ export function BulkProductDialog({
               />
               <label
                 htmlFor="excel-upload"
-                className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                className="cursor-pointer flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
               >
-                <FileSpreadsheet size={18} />
+                <FileSpreadsheet size={16} />
                 Upload Excel
               </label>
             </div>
             <Button
               type="button"
               variant="outline"
+              size="sm"
               onClick={handleDownloadSample}
-              className="gap-2"
+              className="gap-2 h-9"
             >
-              <Download size={18} />
+              <Download size={16} />
               Download Sample
             </Button>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {rows.length > 0 ? `${rows.length} rows loaded` : 'Upload an Excel file to get started'}
+            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full">
+              <X size={20} />
+            </button>
           </div>
         </div>
 
@@ -642,7 +672,9 @@ export function BulkProductDialog({
                 />
               </BulkFillField>
 
-              <BulkFillField label="Tax Rate (%)">
+              <BulkFillField
+                label={branchTaxPercent ? 'Tax Rate (%) — from branch' : 'Tax Rate (%)'}
+              >
                 <Input
                   type="number"
                   step="0.01"
@@ -653,7 +685,7 @@ export function BulkProductDialog({
                     setBulkFill((p) => ({ ...p, tax_rate: raw }));
                     applyBulkField('tax_rate', Number(raw) || 0);
                   }}
-                  placeholder="0"
+                  placeholder={String(branchTaxPercent)}
                 />
               </BulkFillField>
 
@@ -738,6 +770,64 @@ export function BulkProductDialog({
                     <SelectItem value="DAMAGED">Damaged</SelectItem>
                   </SelectContent>
                 </Select>
+              </BulkFillField>
+
+              <BulkFillField label="Product Image">
+                <div className="flex items-center gap-2 border border-input rounded-md p-1.5 bg-card h-9">
+                  {bulkFill.imageUrl ? (
+                    <div className="relative h-6 w-6 rounded overflow-hidden border group shrink-0">
+                      <img
+                        src={resolveImageUrl(bulkFill.imageUrl)}
+                        alt="Preview"
+                        className="object-cover h-full w-full"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBulkFill((p) => ({ ...p, imageUrl: '' }));
+                          applyBulkField('imageUrl', '');
+                        }}
+                        className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+                        title="Remove image from selected rows"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-6 w-6 rounded border flex items-center justify-center text-[8px] text-gray-400 bg-slate-50 shrink-0">
+                      {bulkImageUploading ? '...' : 'No'}
+                    </div>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    disabled={bulkImageUploading}
+                    onChange={async (e) => {
+                      const input = e.target;
+                      const selected = input.files?.[0];
+                      if (!selected) return;
+                      setBulkImageUploading(true);
+                      try {
+                        const res = await productService.uploadProductImage(selected);
+                        if (res.success && res.imageUrl) {
+                          setBulkFill((p) => ({ ...p, imageUrl: res.imageUrl }));
+                          applyBulkField('imageUrl', res.imageUrl);
+                          toast.success('Image applied to selected rows');
+                        } else {
+                          toast.error('Image upload failed');
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        toast.error('Failed to upload image');
+                      } finally {
+                        setBulkImageUploading(false);
+                        // Allow re-picking the same file after a failed upload
+                        input.value = '';
+                      }
+                    }}
+                    className="w-44 h-6 border-0 shadow-none p-0 text-[10px] file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                  />
+                </div>
               </BulkFillField>
             </div>
           </div>
@@ -1157,7 +1247,7 @@ export function BulkProductDialog({
                               {row.imageUrl ? (
                                 <div className="relative h-12 w-12 rounded overflow-hidden border group shrink-0">
                                   <img
-                                    src={row.imageUrl}
+                                    src={resolveImageUrl(row.imageUrl)}
                                     alt="Preview"
                                     className="object-cover h-full w-full"
                                   />

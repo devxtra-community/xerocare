@@ -16,6 +16,7 @@ import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { InvoiceType } from '../entities/enums/invoiceType';
 import { BillType } from '../entities/enums/billType';
 import { ContractStatus } from '../entities/enums/contractStatus';
+import { r2SignedGetUrl } from '../utils/r2Url';
 
 const billingService = new BillingService();
 const reportService = new BillingReportService();
@@ -403,9 +404,11 @@ export const uploadContractConfirmation = async (
     if (!file) {
       throw new AppError('No file uploaded', 400);
     }
+    // `file.location` is the private S3 API endpoint and is not fetchable by a
+    // browser. Hand back the key (persist this) plus a signed URL to view now.
     return res.status(200).json({
       success: true,
-      data: { url: file.location },
+      data: { url: file.key, signedUrl: await r2SignedGetUrl(file.key) },
       message: 'Contract confirmation document uploaded successfully',
     });
   } catch (error) {

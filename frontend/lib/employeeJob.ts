@@ -3,7 +3,6 @@ export enum EmployeeJob {
   CRM = 'CRM',
   RENT_AND_LEASE = 'RENT_AND_LEASE',
   MANAGER = 'MANAGER',
-  TECHNICIAN = 'TECHNICIAN',
   SERVICE_HELP_DESK = 'SERVICE_HELP_DESK',
   SERVICE_TECHNICIAN = 'SERVICE_TECHNICIAN',
 }
@@ -13,7 +12,6 @@ export const EMPLOYEE_JOB_LABELS: Record<EmployeeJob, string> = {
   [EmployeeJob.CRM]: 'CRM',
   [EmployeeJob.RENT_AND_LEASE]: 'Rent & Lease',
   [EmployeeJob.MANAGER]: 'Manager',
-  [EmployeeJob.TECHNICIAN]: 'Technician',
   [EmployeeJob.SERVICE_HELP_DESK]: 'Service Help Desk',
   [EmployeeJob.SERVICE_TECHNICIAN]: 'Service Technician',
 };
@@ -24,9 +22,10 @@ export const EMPLOYEE_JOB_ACCESS: Record<EmployeeJob, string[]> = {
   [EmployeeJob.CRM]: ['crm', 'customers'],
   [EmployeeJob.RENT_AND_LEASE]: ['rent', 'lease', 'reading', 'billing'],
   [EmployeeJob.MANAGER]: ['*'], // Access all employee modules
-  [EmployeeJob.TECHNICIAN]: ['reading'],
   [EmployeeJob.SERVICE_HELP_DESK]: ['service', 'service_desk', 'customers', 'crm'],
-  [EmployeeJob.SERVICE_TECHNICIAN]: ['service'],
+  // Service technicians own meter readings as well as service tickets — the old
+  // standalone TECHNICIAN job was folded into this one.
+  [EmployeeJob.SERVICE_TECHNICIAN]: ['service', 'reading'],
 };
 
 // Helper function to check if a job has access to a module

@@ -20,6 +20,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import { getUserFromToken } from '@/lib/auth';
+import { resolveImageUrl } from '@/lib/imageUrl';
 
 /**
  * Manager Product Management Page.
@@ -198,7 +199,7 @@ export default function ManagerProduct() {
               p.imageUrl ? (
                 <div className="relative h-8 w-8 rounded overflow-hidden group cursor-pointer">
                   <Image
-                    src={p.imageUrl}
+                    src={resolveImageUrl(p.imageUrl)}
                     alt={p.name}
                     fill
                     className="object-cover"

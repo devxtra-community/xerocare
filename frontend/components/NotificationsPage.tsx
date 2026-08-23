@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
-import { formatDistanceToNow } from 'date-fns';
+import { formatNotificationTime } from '@/lib/format';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -15,7 +15,7 @@ interface Notification {
   type: string;
   data: Record<string, unknown> | null;
   is_read: boolean;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 const TYPE_ICONS: Record<string, string> = {
@@ -240,7 +240,7 @@ export default function NotificationsPage({ role }: { role: string }) {
                         {notif.title}
                       </span>
                       <span className="text-[10px] text-gray-400 whitespace-nowrap shrink-0 mt-0.5">
-                        {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
+                        {formatNotificationTime(notif.createdAt)}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">

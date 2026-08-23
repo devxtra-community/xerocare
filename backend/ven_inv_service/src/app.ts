@@ -25,6 +25,7 @@ import { httpLogger } from './middlewares/httpLogger';
 import serviceRouter from './routes/serviceRoutes';
 import stockTransferRouter from './routes/stockTransferRoutes';
 import taxReportRouter from './routes/taxReportRoutes';
+import { signFileUrls } from './middlewares/signFileUrls';
 
 /**
  * This is the main engine for the Vendor & Inventory Service.
@@ -41,6 +42,8 @@ const app = express();
  */
 app.use(express.json());
 app.use(httpLogger);
+// Rewrites stored file keys into loadable (public or signed) URLs on the way out
+app.use(signFileUrls);
 
 /**
  * Routing: Directing requests to the right department.

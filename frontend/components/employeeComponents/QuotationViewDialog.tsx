@@ -31,6 +31,7 @@ import {
 import { toast } from 'sonner';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { resolveImageUrl } from '@/lib/imageUrl';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
@@ -1857,7 +1858,9 @@ export function QuotationViewDialog({
                     <tbody className="divide-y-2 divide-red-50">
                       {enrichedItems.map((item, idx) => {
                         const detail = item.metadata;
-                        const image = detail?.imageUrl || detail?.image_url || detail?.image;
+                        const image = resolveImageUrl(
+                          detail?.imageUrl || detail?.image_url || detail?.image,
+                        );
                         const stripTags = (str: string) =>
                           str.replace(/\[[A-Z0-9]+:[^\]]*\]/g, '').trim();
                         const isManual =
