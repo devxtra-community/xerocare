@@ -1461,6 +1461,7 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
                 ? new Date(req.body.chequeDueDate)
                 : new Date(req.body.paymentDate || Date.now()),
             issueDate: new Date(req.body.paymentDate || Date.now()),
+            collectedDate: new Date(req.body.paymentDate || Date.now()),
             type: 'RECEIVED',
             status: 'PENDING',
             description: `Customer cheque — receivable ${receivable.customerName || receivable.id}`,
@@ -1801,6 +1802,7 @@ async function postEquityCashEffect(
       dueDate: body.chequeDueDate ? new Date(body.chequeDueDate as string) : new Date(entry.date),
       chequeDate: body.chequeDate ? new Date(body.chequeDate as string) : new Date(entry.date),
       issueDate: new Date(entry.date),
+      collectedDate: isInflow ? new Date(entry.date) : undefined,
       type: isInflow ? 'RECEIVED' : 'ISSUED',
       status: 'PENDING',
       description: `${typeLabel} — ${entry.description}`,

@@ -1714,6 +1714,13 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
               chequeDate:
                 request.chequeDate ?? request.chequeDueDate ?? new Date(request.paymentDate),
               issueDate: new Date(request.paymentDate),
+              // When physically collected from the customer — distinct from chequeDate
+              // (the earliest deposit-eligibility date, often later for a post-dated
+              // cheque). paymentDate is exactly that: the date Finance/the employee
+              // recorded receiving it. Was never set on this, the highest-volume
+              // RECEIVED-cheque creation path, leaving every Sale/Rent/Lease cheque's
+              // Collected Date blank.
+              collectedDate: new Date(request.paymentDate),
               type: 'RECEIVED',
               status: 'PENDING',
               description: `${chequeContextLabel} payment — ${request.invoiceNumber} (${request.customerName})`,

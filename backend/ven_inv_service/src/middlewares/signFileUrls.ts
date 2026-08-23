@@ -38,6 +38,11 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 async function rewrite(value: unknown, depth = 0): Promise<unknown> {
   if (depth > MAX_DEPTH || value === null || typeof value !== 'object') return value;
 
+  // Date has no own enumerable properties, so walking it as a plain object below
+  // collapses it to `{}`. Pass it through untouched so res.json's JSON.stringify
+  // serializes it the normal way (via Date.prototype.toJSON -> ISO string).
+  if (value instanceof Date) return value;
+
   if (Array.isArray(value)) {
     return Promise.all(value.map((entry) => rewrite(entry, depth + 1)));
   }

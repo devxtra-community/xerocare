@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   getAllSalePayments,
   approveSalePayment,
@@ -343,7 +343,6 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const [directChequeNo, setDirectChequeNo] = useState('');
   const [directChequeBank, setDirectChequeBank] = useState('');
   const [directChequeDate, setDirectChequeDate] = useState(new Date().toISOString().split('T')[0]);
-  const [directChequeDue, setDirectChequeDue] = useState('');
   const [isSavingDirect, setIsSavingDirect] = useState(false);
 
   // Customer view
@@ -369,10 +368,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     setDirectChequeNo('');
     setDirectChequeBank('');
     setDirectChequeDate(new Date().toISOString().split('T')[0]);
-    setDirectChequeDue('');
   };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [data, accounts] = await Promise.all([
@@ -386,13 +384,13 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [branchIds]);
 
   // Re-runs when Admin changes the branch selection; Finance passes no branchIds, so this
   // fires exactly once there, matching the previous behaviour.
   useEffect(() => {
     loadData();
-  }, [branchIds]);
+  }, [loadData]);
 
   const uniqueEmployees = useMemo(
     () =>
@@ -560,7 +558,6 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
         chequeNumber: directMode === 'CHEQUE' ? directChequeNo : undefined,
         chequeBankName: directMode === 'CHEQUE' ? directChequeBank : undefined,
         chequeDate: directMode === 'CHEQUE' ? directChequeDate : undefined,
-        chequeDueDate: directMode === 'CHEQUE' ? directChequeDue : undefined,
         paymentContext: 'SALE',
       });
       const accountToUse = directMode !== 'CHEQUE' ? directAccountId : undefined;
@@ -1640,25 +1637,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         className="h-9 border-slate-200 font-bold text-xs"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                        Cheque Date
+                        Cheque Date (earliest deposit/clear date)
                       </Label>
                       <Input
                         type="date"
                         value={directChequeDate}
                         onChange={(e) => setDirectChequeDate(e.target.value)}
-                        className="h-9 border-slate-200 font-bold text-xs"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                        Due Date
-                      </Label>
-                      <Input
-                        type="date"
-                        value={directChequeDue}
-                        onChange={(e) => setDirectChequeDue(e.target.value)}
                         className="h-9 border-slate-200 font-bold text-xs"
                       />
                     </div>

@@ -5415,6 +5415,7 @@ export class BillingService {
                   ? new Date(data.chequeDueDate)
                   : new Date(transaction.transactionDate),
               issueDate: new Date(transaction.transactionDate),
+              collectedDate: new Date(transaction.transactionDate),
               type: 'RECEIVED',
               status: 'PENDING',
               description: `Customer cheque payment — Invoice ${invoice.invoiceNumber}`,

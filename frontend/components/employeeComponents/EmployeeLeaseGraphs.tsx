@@ -80,16 +80,23 @@ export default function EmployeeLeaseGraphs({ invoices: propInvoices }: Employee
         }));
 
         leaseInvoices.forEach((inv) => {
+          if (!inv.createdAt) return;
           const date = new Date(inv.createdAt);
+          if (isNaN(date.getTime())) return;
 
           // Monthly logic (current year)
           if (date.getFullYear() === currentYear) {
-            mData[date.getMonth()].count++;
+            if (mData[date.getMonth()]) {
+              mData[date.getMonth()].count++;
+            }
           }
 
           // Daily logic (current month and year)
           if (date.getFullYear() === currentYear && date.getMonth() === currentMonth) {
-            dData[date.getDate() - 1].count++;
+            const dayIndex = date.getDate() - 1;
+            if (dData[dayIndex]) {
+              dData[dayIndex].count++;
+            }
           }
         });
 

@@ -41,6 +41,24 @@ import Pagination from '@/components/Pagination';
 import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { SalePaymentCollectionModal } from '../invoice/SalePaymentCollectionModal';
 
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions,
+  locales: string | string[] = 'en-US',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return d.toLocaleDateString(locales, options);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 interface EmployeeSalesTableProps {
   mode?: 'EMPLOYEE' | 'FINANCE';
 }
@@ -504,7 +522,7 @@ export default function EmployeeSalesTable({ mode = 'EMPLOYEE' }: EmployeeSalesT
                       })()}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
-                      {new Date(inv.createdAt).toLocaleDateString(undefined, {
+                      {safeFormatDate(inv.createdAt, {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
@@ -782,7 +800,7 @@ function QuotationConverterDialog({
                       {q.customerName || 'Walk-in'}
                     </p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                      {new Date(q.createdAt || '').toLocaleDateString('en-US', {
+                      {safeFormatDate(q.createdAt, {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',

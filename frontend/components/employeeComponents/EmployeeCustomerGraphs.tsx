@@ -75,11 +75,15 @@ export default function EmployeeCustomerGraphs() {
         }));
 
         customers.forEach((customer) => {
+          if (!customer.createdAt) return;
           const d = new Date(customer.createdAt);
+          if (isNaN(d.getTime())) return;
 
           // Populate Monthly Data
           const monthIndex = d.getMonth();
-          mData[monthIndex].customers++;
+          if (mData[monthIndex]) {
+            mData[monthIndex].customers++;
+          }
 
           // Populate Daily Data (only for current month/year)
           if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {

@@ -21,6 +21,23 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getApiErrorMessage } from '@/lib/apiError';
 
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  formatStr: string = 'MMM dd, yyyy',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return format(d, formatStr);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 interface Props {
   contractId: string;
   invoiceNumber: string;
@@ -140,14 +157,22 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                             </span>
                           </TableCell>
                           <TableCell className="text-sm">
-                            {isAdvance ? (
-                              format(new Date(b.billingPeriodStart), 'MMM dd, yyyy')
-                            ) : (
-                              <>
-                                {format(new Date(b.billingPeriodStart), 'MMM dd, yyyy')} -<br />
-                                {format(new Date(b.billingPeriodEnd), 'MMM dd, yyyy')}
-                              </>
-                            )}
+                            {isAdvance
+                              ? safeFormatDate(b.billingPeriodStart, 'MMM dd, yyyy')
+                              : (() => {
+                                  const startStr = safeFormatDate(
+                                    b.billingPeriodStart,
+                                    'MMM dd, yyyy',
+                                  );
+                                  const endStr = safeFormatDate(b.billingPeriodEnd, 'MMM dd, yyyy');
+                                  if (startStr === 'N/A' || endStr === 'N/A') return 'N/A';
+                                  return (
+                                    <>
+                                      {startStr} -<br />
+                                      {endStr}
+                                    </>
+                                  );
+                                })()}
                           </TableCell>
                           <TableCell>
                             <span

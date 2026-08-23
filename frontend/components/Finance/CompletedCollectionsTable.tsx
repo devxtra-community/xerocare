@@ -25,6 +25,23 @@ import ConsolidatedStatementDialog from './ConsolidatedStatementDialog';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  formatStr: string = 'MMM dd, yyyy',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return format(d, formatStr);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 /**
  * Table displaying completed rental and lease collections.
  * Allows viewing consolidated statements and sending final invoices.
@@ -149,12 +166,17 @@ export default function CompletedCollectionsTable({
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      {collection.effectiveFrom && collection.effectiveTo && (
-                        <>
-                          {format(new Date(collection.effectiveFrom), 'MMM dd, yyyy')} -<br />
-                          {format(new Date(collection.effectiveTo), 'MMM dd, yyyy')}
-                        </>
-                      )}
+                      {(() => {
+                        const startStr = safeFormatDate(collection.effectiveFrom, 'MMM dd, yyyy');
+                        const endStr = safeFormatDate(collection.effectiveTo, 'MMM dd, yyyy');
+                        if (startStr === 'N/A' || endStr === 'N/A') return 'N/A';
+                        return (
+                          <>
+                            {startStr} -<br />
+                            {endStr}
+                          </>
+                        );
+                      })()}
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium text-green-600">

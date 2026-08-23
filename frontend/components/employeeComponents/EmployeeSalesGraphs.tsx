@@ -256,15 +256,18 @@ export default function EmployeeSalesGraphs({
 
         salesInvoices.forEach((inv) => {
           if (inv.status === 'REFUNDED') return;
-
+          if (!inv.createdAt) return;
           const d = new Date(inv.createdAt);
+          if (isNaN(d.getTime())) return;
           const amount = parseFloat(String(inv.totalAmount)) || 0;
 
           // Populate Monthly Data
           // Note: If 'all' years selected, this aggregates all years into Jan-Dec buckets
           const monthIndex = d.getMonth();
-          mData[monthIndex].salesCount++;
-          mData[monthIndex].salesAmount += amount;
+          if (mData[monthIndex]) {
+            mData[monthIndex].salesCount++;
+            mData[monthIndex].salesAmount += amount;
+          }
 
           // Populate Daily Data (only for target month/year)
           // We use current month index, but apply it to the target year

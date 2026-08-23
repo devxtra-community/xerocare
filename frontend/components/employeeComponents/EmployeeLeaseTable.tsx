@@ -49,9 +49,28 @@ const calculateDays = (start: string | Date | undefined, end: string | Date | un
   if (!start || !end) return 0;
   const s = new Date(start);
   const e = new Date(end);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
   const diffTime = Math.abs(e.getTime() - s.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
+};
+
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions,
+  locales: string | string[] = 'en-US',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return d.toLocaleDateString(locales, options);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
 };
 
 interface EmployeeLeaseTableProps {
@@ -341,8 +360,7 @@ export default function EmployeeLeaseTable({
                     </TableCell>
                     <TableCell className="whitespace-nowrap">
                       <div className="text-[10px] font-bold text-slate-600">
-                        {inv.startDate ? new Date(inv.startDate).toLocaleDateString() : 'N/A'} —{' '}
-                        {inv.endDate ? new Date(inv.endDate).toLocaleDateString() : 'N/A'}
+                        {safeFormatDate(inv.startDate)} — {safeFormatDate(inv.endDate)}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -399,7 +417,7 @@ export default function EmployeeLeaseTable({
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-[11px] font-medium whitespace-nowrap">
-                      {new Date(inv.createdAt).toLocaleDateString(undefined, {
+                      {safeFormatDate(inv.createdAt, {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
@@ -679,7 +697,7 @@ function QuotationConverterDialog({
                       {q.customerName || 'Walk-in'}
                     </p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                      {new Date(q.createdAt || '').toLocaleDateString('en-US', {
+                      {safeFormatDate(q.createdAt, {
                         month: 'short',
                         day: 'numeric',
                         year: 'numeric',

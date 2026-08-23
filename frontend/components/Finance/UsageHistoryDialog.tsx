@@ -50,6 +50,24 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
 import { getActiveCurrency } from '@/lib/currency';
+
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  formatStr: string = 'MMM dd, yyyy',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return format(d, formatStr);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 interface UsageHistoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -184,7 +202,10 @@ export default function UsageHistoryDialog({
   };
 
   const formatDateLabel = (start: string, end: string) => {
-    return `${format(new Date(start), 'MMM dd')} - ${format(new Date(end), 'MMM dd, yyyy')}`;
+    const startStr = safeFormatDate(start, 'MMM dd');
+    const endStr = safeFormatDate(end, 'MMM dd, yyyy');
+    if (startStr === 'N/A' || endStr === 'N/A') return 'N/A';
+    return `${startStr} - ${endStr}`;
   };
 
   const { page: currentPage, limit, total, setPage, setTotal, totalPages } = usePagination(5);
@@ -311,7 +332,7 @@ export default function UsageHistoryDialog({
                                 {formatDateLabel(record.periodStart, record.periodEnd)}
                               </span>
                               <span className="text-[10px] text-slate-400 font-black uppercase mt-0.5">
-                                {format(new Date(record.periodStart), 'MMMM yyyy')}
+                                {safeFormatDate(record.periodStart, 'MMMM yyyy')}
                               </span>
                             </div>
                           </TableCell>
@@ -647,8 +668,8 @@ function UsageDetailsModal({ record }: { record: UsageRecord }) {
         <DialogHeader>
           <DialogTitle>Usage Breakdown</DialogTitle>
           <DialogDescription>
-            Period: {new Date(record.periodStart).toLocaleDateString()} -{' '}
-            {new Date(record.periodEnd).toLocaleDateString()}
+            Period: {safeFormatDate(record.periodStart, 'dd/MM/yyyy')} -{' '}
+            {safeFormatDate(record.periodEnd, 'dd/MM/yyyy')}
           </DialogDescription>
         </DialogHeader>
 

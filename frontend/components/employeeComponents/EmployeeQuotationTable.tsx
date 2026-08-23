@@ -249,7 +249,9 @@ function ConvertedBadge({ q }: { q: Invoice }) {
 
 const getRemainingDays = (expiryDate?: string | Date) => {
   if (!expiryDate) return 'N/A';
-  const diffTime = new Date(expiryDate).getTime() - new Date().getTime();
+  const parsed = new Date(expiryDate);
+  if (isNaN(parsed.getTime())) return 'N/A';
+  const diffTime = parsed.getTime() - new Date().getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays > 0 ? `${diffDays} days remaining` : 'Expired';
 };
@@ -273,6 +275,24 @@ const deriveA3Rate = (a4Rate?: string): string => {
   const base = Number(a4Rate);
   if (!a4Rate || Number.isNaN(base) || base <= 0) return '';
   return String(Number((base * A3_RATE_FACTOR).toFixed(4)));
+};
+
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions,
+  locales: string | string[] = 'en-US',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return d.toLocaleDateString(locales, options);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -502,13 +522,23 @@ export default function EmployeeQuotationTable() {
 
       // Date range match
       let dateMatch = true;
-      if (startDate) {
-        dateMatch = dateMatch && new Date(q.createdAt) >= new Date(startDate);
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        dateMatch = dateMatch && new Date(q.createdAt) <= end;
+      const createdTime = q.createdAt ? new Date(q.createdAt).getTime() : NaN;
+      if (!isNaN(createdTime)) {
+        if (startDate) {
+          const startD = new Date(startDate);
+          if (!isNaN(startD.getTime())) {
+            dateMatch = dateMatch && createdTime >= startD.getTime();
+          }
+        }
+        if (endDate) {
+          const endD = new Date(endDate);
+          if (!isNaN(endD.getTime())) {
+            endD.setHours(23, 59, 59, 999);
+            dateMatch = dateMatch && createdTime <= endD.getTime();
+          }
+        }
+      } else if (startDate || endDate) {
+        dateMatch = false;
       }
 
       return searchMatch && conversionMatch && statusMatch && dateMatch;
@@ -1022,7 +1052,7 @@ export default function EmployeeQuotationTable() {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm font-medium">
-                      {new Date(q.createdAt).toLocaleDateString(undefined, {
+                      {safeFormatDate(q.createdAt, {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
@@ -1039,13 +1069,11 @@ export default function EmployeeQuotationTable() {
                             : 'text-slate-700'
                         }
                       >
-                        {q.expiryDate
-                          ? new Date(q.expiryDate).toLocaleDateString(undefined, {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                            })
-                          : 'N/A'}
+                        {safeFormatDate(q.expiryDate, {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </span>
                     </TableCell>
                     <TableCell className="text-sm font-medium">

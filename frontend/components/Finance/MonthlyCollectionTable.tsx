@@ -58,6 +58,24 @@ import {
   filterAccountsByPaymentMode,
   CashBankAccount,
 } from '@/lib/finance/accountsApi';
+
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  formatStr: string = 'MMM dd, yyyy',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return format(d, formatStr);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 /**
  * Table displaying monthly collection alerts for active contracts.
  * Shows pending usage recording, invoicing, and final summary actions.
@@ -105,7 +123,6 @@ export default function MonthlyCollectionTable({
   const [collectRef, setCollectRef] = useState('');
   const [collectChequeNo, setCollectChequeNo] = useState('');
   const [collectChequeBankName, setCollectChequeBankName] = useState('');
-  const [collectChequeDueDate, setCollectChequeDueDate] = useState('');
   const [collectChequeDate, setCollectChequeDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -197,6 +214,9 @@ export default function MonthlyCollectionTable({
   };
 
   const handleRecordUsage = (alertItem: CollectionAlert) => {
+    console.debug('[MonthlyCollectionTable] handleRecordUsage — opening modal', {
+      contractId: alertItem.contractId,
+    });
     setSelectedContract(alertItem);
     setIsModalOpen(true);
   };
@@ -235,7 +255,6 @@ export default function MonthlyCollectionTable({
     setCollectRef('');
     setCollectChequeNo('');
     setCollectChequeBankName('');
-    setCollectChequeDueDate('');
     setCollectChequeDate(new Date().toISOString().split('T')[0]);
     setCollectAccountId('');
   };
@@ -253,7 +272,6 @@ export default function MonthlyCollectionTable({
         cashAccountId: collectAccountId || undefined,
         chequeNumber: collectMode === 'CHEQUE' ? collectChequeNo : undefined,
         chequeBankName: collectMode === 'CHEQUE' ? collectChequeBankName : undefined,
-        chequeDueDate: collectMode === 'CHEQUE' ? collectChequeDueDate : undefined,
         chequeDate: collectMode === 'CHEQUE' ? collectChequeDate : undefined,
         paymentContext: context,
       });
@@ -355,10 +373,14 @@ export default function MonthlyCollectionTable({
           alertItem.usageData?.billingPeriodStart &&
           alertItem.usageData?.billingPeriodEnd
         ) {
+          const startStr = safeFormatDate(alertItem.usageData.billingPeriodStart, 'MMM dd');
+          const endStr = safeFormatDate(alertItem.usageData.billingPeriodEnd, 'MMM dd, yyyy');
+          if (startStr === 'N/A' || endStr === 'N/A') {
+            return <span className="text-xs text-slate-400">N/A</span>;
+          }
           return (
             <div className="text-xs text-slate-600 font-semibold">
-              {format(new Date(alertItem.usageData.billingPeriodStart), 'MMM dd')} -{' '}
-              {format(new Date(alertItem.usageData.billingPeriodEnd), 'MMM dd, yyyy')}
+              {startStr} - {endStr}
             </div>
           );
         }
@@ -721,25 +743,14 @@ export default function MonthlyCollectionTable({
                     className="h-9 text-sm font-bold"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Cheque Date
+                    Cheque Date (earliest deposit/clear date)
                   </Label>
                   <Input
                     type="date"
                     value={collectChequeDate}
                     onChange={(e) => setCollectChequeDate(e.target.value)}
-                    className="h-9 text-sm font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Due Date
-                  </Label>
-                  <Input
-                    type="date"
-                    value={collectChequeDueDate}
-                    onChange={(e) => setCollectChequeDueDate(e.target.value)}
                     className="h-9 text-sm font-bold"
                   />
                 </div>

@@ -31,6 +31,24 @@ import { format } from 'date-fns';
 
 import { getActiveCurrency } from '@/lib/currency';
 import { BillModal } from './BillModal';
+
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  formatStr: string = 'MMM dd, yyyy',
+) => {
+  if (!dateVal) return '';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return '';
+    }
+    return format(d, formatStr);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return '';
+  }
+};
+
 interface UsageInvoiceItem extends InvoiceItem {
   allocationId?: string;
   allocation?: {
@@ -125,7 +143,7 @@ export default function UsageRecordingModal({
     enabled: !!(contractId || editingInvoice?.referenceContractId),
   });
 
-  const { data: history = [] } = useQuery({
+  const { data: history = [], isLoading: historyLoading } = useQuery({
     queryKey: ['usage-history', contractId],
     queryFn: () => getUsageHistory(contractId),
     enabled: !!contractId,
@@ -302,7 +320,17 @@ export default function UsageRecordingModal({
   ]);
 
   React.useEffect(() => {
-    if (isInitialized.current || !contract) return;
+    // `contract` and `history` are independent queries that resolve on their own schedule.
+    // `history` defaults to `[]` while its fetch is still in flight — indistinguishable from
+    // "genuinely no prior periods" — so gating only on `!contract` let this run the instant
+    // the (often faster) contract query resolved, with `history` still empty. That took the
+    // "no history" branch below (billingPeriodStart anchored to the contract's original
+    // effectiveFrom) even on a contract with months of real history, and since this effect
+    // never re-runs once isInitialized flips true, the wrong anchor stuck: prevUsage's date
+    // filter then compared every real prior period against the contract's original start
+    // instead of the last period's end, so it never matched anything — the previous period's
+    // reading silently never appeared as a reference, on a race, not a genuine first period.
+    if (isInitialized.current || !contract || historyLoading) return;
 
     if (editingInvoice) {
       // --- Initialization for EDITING ---
@@ -530,7 +558,7 @@ export default function UsageRecordingModal({
 
       isInitialized.current = true;
     }
-  }, [contract, history, editingInvoice, effectivePrevCounts, formData]);
+  }, [contract, history, historyLoading, editingInvoice, effectivePrevCounts, formData]);
 
   const replacedDeltas = React.useMemo(() => {
     const rItems = formData.items.filter((item) => {
@@ -1138,7 +1166,14 @@ export default function UsageRecordingModal({
         );
         // Correcting a bill (typically after a customer dispute) resets it back through
         // Stage A's approval step server-side — hand off to BillModal so it can be resent.
-        setCreatedBillId(editingInvoice.id);
+        // Deferred a tick: mounting BillModal's Dialog in the SAME commit that closes this
+        // one puts two Radix Dialog roots in the tree simultaneously — BillModal's focus
+        // trap grabbing focus can read, to this dialog's still-attached dismissable layer,
+        // as "focus left this layer", which forwards a stray close to the parent (see the
+        // onOpenChange guard below for the full mechanism). Letting this dialog's close
+        // commit and paint first, before BillModal mounts, removes the race outright rather
+        // than only suppressing its one known symptom.
+        setTimeout(() => setCreatedBillId(editingInvoice.id), 0);
       } else {
         const payload = new FormData();
         payload.append('contractId', contractId);
@@ -1227,7 +1262,8 @@ export default function UsageRecordingModal({
         // Usage submission only creates the bill now — payment collection is a separate
         // Stage B step, gated on the customer approving this bill. Hand off to BillModal
         // so whoever just submitted can immediately send it for approval.
-        setCreatedBillId(result.usage.id);
+        // Deferred a tick — see the matching comment on the edit branch above for why.
+        setTimeout(() => setCreatedBillId(result.usage.id), 0);
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
@@ -1245,8 +1281,15 @@ export default function UsageRecordingModal({
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB'); // dd/MM/yyyy
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) {
+        return 'N/A';
+      }
+      return date.toLocaleDateString('en-GB'); // dd/MM/yyyy
+    } catch {
+      return 'N/A';
+    }
   };
 
   return (
@@ -1302,11 +1345,7 @@ export default function UsageRecordingModal({
                 <div className="relative">
                   <Input
                     readOnly
-                    value={
-                      formData.billingPeriodStart
-                        ? format(new Date(formData.billingPeriodStart), 'dd/MM/yyyy')
-                        : ''
-                    }
+                    value={safeFormatDate(formData.billingPeriodStart, 'dd/MM/yyyy')}
                     placeholder="DD/MM/YYYY"
                     className="font-semibold"
                   />
@@ -1329,11 +1368,7 @@ export default function UsageRecordingModal({
                 <div className="relative">
                   <Input
                     readOnly
-                    value={
-                      formData.billingPeriodEnd
-                        ? format(new Date(formData.billingPeriodEnd), 'dd/MM/yyyy')
-                        : ''
-                    }
+                    value={safeFormatDate(formData.billingPeriodEnd, 'dd/MM/yyyy')}
                     placeholder="DD/MM/YYYY"
                     className="font-semibold"
                   />
@@ -2899,10 +2934,7 @@ export default function UsageRecordingModal({
         <BillModal
           usageRecordId={createdBillId}
           open={!!createdBillId}
-          onClose={() => {
-            setCreatedBillId(null);
-            onClose();
-          }}
+          onClose={onClose}
           initialTab="send"
         />
       )}

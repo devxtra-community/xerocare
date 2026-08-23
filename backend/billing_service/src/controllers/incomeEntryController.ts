@@ -195,6 +195,7 @@ export const receiveIncomeEntry = async (req: Request, res: Response, next: Next
               dueDate: saved.receivedDate ?? new Date(),
               chequeDate: saved.receivedDate ?? new Date(),
               issueDate: saved.receivedDate ?? new Date(),
+              collectedDate: saved.receivedDate ?? new Date(),
               type: 'RECEIVED',
               status: 'PENDING',
               description: `Income: ${entry.incomeNo} — ${entry.description?.slice(0, 200) || entry.category}`,

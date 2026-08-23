@@ -78,32 +78,52 @@ export default function EmployeeDashboardGraphs() {
 
         // Populate Customer Data
         customers.forEach((customer) => {
-          const monthIndex = new Date(customer.createdAt).getMonth();
-          custData[monthIndex].value++;
+          if (!customer.createdAt) return;
+          const date = new Date(customer.createdAt);
+          if (isNaN(date.getTime())) return;
+          const monthIndex = date.getMonth();
+          if (custData[monthIndex]) {
+            custData[monthIndex].value++;
+          }
         });
 
         // Populate Sales Data
         salesInvoices.forEach((inv) => {
-          const monthIndex = new Date(inv.createdAt).getMonth();
+          if (!inv.createdAt) return;
+          const date = new Date(inv.createdAt);
+          if (isNaN(date.getTime())) return;
+          const monthIndex = date.getMonth();
           const amount = parseFloat(String(inv.totalAmount)) || 0;
-          saleData[monthIndex].value += amount;
-          saleData[monthIndex].orderCount!++;
+          if (saleData[monthIndex]) {
+            saleData[monthIndex].value += amount;
+            saleData[monthIndex].orderCount!++;
+          }
         });
 
         // Populate Rent Data
         rentInvoices.forEach((inv) => {
-          const monthIndex = new Date(inv.createdAt).getMonth();
+          if (!inv.createdAt) return;
+          const date = new Date(inv.createdAt);
+          if (isNaN(date.getTime())) return;
+          const monthIndex = date.getMonth();
           const amount = parseFloat(String(inv.totalAmount)) || 0;
-          rntData[monthIndex].value += amount;
-          rntData[monthIndex].orderCount!++;
+          if (rntData[monthIndex]) {
+            rntData[monthIndex].value += amount;
+            rntData[monthIndex].orderCount!++;
+          }
         });
 
         // Populate Lease Data
         leaseInvoices.forEach((inv) => {
-          const monthIndex = new Date(inv.createdAt).getMonth();
+          if (!inv.createdAt) return;
+          const date = new Date(inv.createdAt);
+          if (isNaN(date.getTime())) return;
+          const monthIndex = date.getMonth();
           const amount = parseFloat(String(inv.totalAmount)) || 0;
-          lseData[monthIndex].value += amount;
-          lseData[monthIndex].orderCount!++;
+          if (lseData[monthIndex]) {
+            lseData[monthIndex].value += amount;
+            lseData[monthIndex].orderCount!++;
+          }
         });
 
         setCustomerData(custData);

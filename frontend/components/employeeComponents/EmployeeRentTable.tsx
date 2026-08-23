@@ -67,6 +67,23 @@ const getCleanProductName = (name: string) => {
   return clean.trim();
 };
 
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  formatStr: string = 'MMM dd, yyyy',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return format(d, formatStr);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 // ...
 
 interface EmployeeRentTableProps {
@@ -335,8 +352,8 @@ export default function EmployeeRentTable({
                       </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-medium">
-                      {inv.startDate ? format(new Date(inv.startDate), 'MMM dd, yyyy') : 'N/A'} -{' '}
-                      {inv.endDate ? format(new Date(inv.endDate), 'MMM dd, yyyy') : 'N/A'}
+                      {safeFormatDate(inv.startDate, 'MMM dd, yyyy')} -{' '}
+                      {safeFormatDate(inv.endDate, 'MMM dd, yyyy')}
                     </TableCell>
                     <TableCell className="text-xs font-bold text-slate-600">
                       {inv.leaseTenureMonths
@@ -345,6 +362,9 @@ export default function EmployeeRentTable({
                           ? (() => {
                               const start = new Date(inv.startDate);
                               const end = new Date(inv.endDate);
+                              if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                                return 'N/A';
+                              }
                               const months =
                                 (end.getFullYear() - start.getFullYear()) * 12 +
                                 (end.getMonth() - start.getMonth()) +
@@ -418,7 +438,7 @@ export default function EmployeeRentTable({
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground font-medium whitespace-nowrap">
-                      {inv.createdAt ? format(new Date(inv.createdAt), 'MMM dd, yyyy') : 'N/A'}
+                      {safeFormatDate(inv.createdAt, 'MMM dd, yyyy')}
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -735,11 +755,7 @@ function QuotationConverterDialog({
                       {q.customerName || 'Walk-in'}
                     </p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                      {new Date(q.createdAt || '').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                      {safeFormatDate(q.createdAt, 'MMM dd, yyyy')}
                     </p>
                   </div>
                   <div className="text-right">

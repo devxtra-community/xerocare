@@ -614,6 +614,7 @@ export class OpeningBalanceService {
                 ? new Date(dto.chequeDueDate)
                 : new Date(dto.paymentDate || Date.now()),
             issueDate: new Date(dto.paymentDate || Date.now()),
+            collectedDate: new Date(dto.paymentDate || Date.now()),
             type: 'RECEIVED',
             status: 'PENDING',
             description: `Customer cheque — opening balance entry ${entry.entryNumber}`,

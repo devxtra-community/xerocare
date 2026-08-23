@@ -37,6 +37,24 @@ import CustomerFormDialog from './CustomerFormDialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { toast } from 'sonner';
 
+const safeFormatDate = (
+  dateVal: string | number | Date | null | undefined,
+  options?: Intl.DateTimeFormatOptions,
+  locales: string | string[] = 'en-GB',
+) => {
+  if (!dateVal) return 'N/A';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) {
+      return 'N/A';
+    }
+    return d.toLocaleDateString(locales, options);
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 /**
  * Table displaying all customers managed by the employee.
  * Features search, filtering, and actions to add/edit/delete customers.
@@ -313,11 +331,15 @@ export default function EmployeeCustomerTable() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground font-medium text-sm whitespace-nowrap">
-                      {new Date(customer.createdAt).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
+                      {safeFormatDate(
+                        customer.createdAt,
+                        {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        },
+                        'en-GB',
+                      )}
                     </TableCell>
                     <TableCell className="text-right pr-4">
                       <div className="flex items-center justify-end gap-2">
