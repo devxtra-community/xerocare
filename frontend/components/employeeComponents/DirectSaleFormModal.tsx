@@ -10,6 +10,7 @@ import {
   Barcode,
   Warehouse,
   Loader2,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProductSelect, SelectableItem } from '@/components/invoice/ProductSelect';
@@ -28,11 +29,13 @@ import { SparePart } from '@/lib/spare-part';
 import { Invoice } from '@/lib/invoice';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { formatCurrency } from '@/lib/format';
+import CustomerFormDialog from './CustomerFormDialog';
+import { createCustomer, CreateCustomerData } from '@/lib/customer';
 
 interface Customer {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   customerType?: 'B2B' | 'B2C';
 }
@@ -67,6 +70,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState('');
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   // B2B → wholesale_price, B2C → sale_price/base_price — same tiers and same
   // reasoning as the Quotation form's Transaction Type selector.
   const [transactionType, setTransactionType] = useState<'B2B' | 'B2C'>('B2C');
@@ -81,7 +85,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('both');
   const [warrantyDurationValue, setWarrantyDurationValue] = useState('2');
   const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('years');
-  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('100000');
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('200000');
 
   const [availableProducts, setAvailableProducts] = useState<Record<string, Product[]>>({});
   const [sparePartStocks, setSparePartStocks] = useState<
@@ -115,6 +119,20 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     };
     fetchCustomers();
   }, []);
+
+  const handleCreateCustomer = async (data: Partial<CreateCustomerData>) => {
+    try {
+      const newCustomer = await createCustomer({ ...data, name: data.name! });
+      setCustomers((prev) => [...prev, newCustomer]);
+      setCustomerId(newCustomer.id);
+      setTransactionType(newCustomer.customerType === 'B2B' ? 'B2B' : 'B2C');
+      setAddCustomerOpen(false);
+      toast.success('Customer created successfully');
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create customer');
+    }
+  };
 
   const fetchSparePartStock = async (spId: string) => {
     try {
@@ -661,19 +679,32 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
             <h3 className="text-sm font-semibold text-slate-700 mb-3 uppercase tracking-wide">
               Customer Details
             </h3>
-            <SearchableSelect
-              options={customerOptions}
-              value={customerId}
-              onValueChange={(id) => {
-                setCustomerId(id);
-                // Pre-fill transaction type from the customer's stored default, same
-                // as the Quotation form — still freely overridable below.
-                const selected = customers.find((c) => c.id === id);
-                setTransactionType(selected?.customerType === 'B2B' ? 'B2B' : 'B2C');
-              }}
-              placeholder="Search and select customer..."
-              className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <SearchableSelect
+                  options={customerOptions}
+                  value={customerId}
+                  onValueChange={(id) => {
+                    setCustomerId(id);
+                    // Pre-fill transaction type from the customer's stored default, same
+                    // as the Quotation form — still freely overridable below.
+                    const selected = customers.find((c) => c.id === id);
+                    setTransactionType(selected?.customerType === 'B2B' ? 'B2B' : 'B2C');
+                  }}
+                  placeholder="Search and select customer..."
+                  className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddCustomerOpen(true)}
+                className="rounded-lg border-slate-300 gap-1.5 shrink-0"
+              >
+                <Plus size={16} />
+                New Customer
+              </Button>
+            </div>
           </div>
 
           {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price/base_price */}
@@ -1083,6 +1114,13 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
           </Button>
         </div>
       </div>
+
+      <CustomerFormDialog
+        open={addCustomerOpen}
+        onOpenChange={setAddCustomerOpen}
+        customer={null}
+        onSubmit={handleCreateCustomer}
+      />
     </div>
   );
 }

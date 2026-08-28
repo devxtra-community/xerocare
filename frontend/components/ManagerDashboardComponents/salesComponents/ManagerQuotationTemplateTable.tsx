@@ -960,16 +960,16 @@ function QuotationTemplateFormModal({
 
   // Warranty states
   const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>(
-    (template?.warrantyType as 'none' | 'duration' | 'copies' | 'both') || 'none',
+    (template?.warrantyType as 'none' | 'duration' | 'copies' | 'both') || 'both',
   );
   const [warrantyDurationValue, setWarrantyDurationValue] = useState(
-    template?.warrantyDurationValue ? String(template.warrantyDurationValue) : '',
+    template?.warrantyDurationValue ? String(template.warrantyDurationValue) : '2',
   );
   const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>(
-    (template?.warrantyDurationUnit as 'months' | 'years') || 'months',
+    (template?.warrantyDurationUnit as 'months' | 'years') || 'years',
   );
   const [warrantyCopyLimit, setWarrantyCopyLimit] = useState(
-    template?.warrantyCopyLimit ? String(template.warrantyCopyLimit) : '',
+    template?.warrantyCopyLimit ? String(template.warrantyCopyLimit) : '200000',
   );
 
   // ── SALE state ──────────────────────────────────────────────────────────
@@ -1913,7 +1913,14 @@ function QuotationTemplateFormModal({
                     </label>
                     <Select
                       value={leaseType}
-                      onValueChange={(val: 'EMI' | 'FSM') => setLeaseType(val)}
+                      onValueChange={(val: 'EMI' | 'FSM') => {
+                        setLeaseType(val);
+                        // FSM leases only offer CPC billing now — force off any
+                        // legacy FIXED_* default so the dropdown below stays valid.
+                        if (val === 'FSM' && rentType !== 'CPC' && rentType !== 'CPC_COMBO') {
+                          setRentType('CPC');
+                        }
+                      }}
                     >
                       <SelectTrigger className="text-xs h-9">
                         <SelectValue />
@@ -1983,11 +1990,6 @@ function QuotationTemplateFormModal({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="FIXED_LIMIT">Fixed Copies Limit (BW/CL)</SelectItem>
-                          <SelectItem value="FIXED_COMBO">Combined Copies Limit</SelectItem>
-                          <SelectItem value="FIXED_FLAT">
-                            Fixed Flat Rate (No Free Limit)
-                          </SelectItem>
                           <SelectItem value="CPC">
                             CPC Billing (No Rent, Charge per click)
                           </SelectItem>
