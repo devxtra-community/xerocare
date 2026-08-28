@@ -28,6 +28,7 @@ export interface SparePartInventoryItem {
   yield?: string;
   maxDiscountableAmount?: number;
   max_discount_amount?: number;
+  tax_rate?: number;
 }
 
 export interface PaginatedResponse<T> {

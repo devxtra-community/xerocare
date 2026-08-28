@@ -689,7 +689,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
         <div style={{ width: '240px', alignSelf: 'flex-start' }}>
           {[
             {
-              label: 'SUBTOTAL (BEFORE VAT)',
+              label: `SUBTOTAL (BEFORE ${(totals.vatName || 'VAT').toUpperCase()})`,
               value: totals.subTotal,
               num: totals.subTotal,
               bold: false,
@@ -710,7 +710,7 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
               bold: false,
             },
             {
-              label: 'GRAND TOTAL (INCLUDING VAT)',
+              label: `GRAND TOTAL (INCLUDING ${(totals.vatName || 'VAT').toUpperCase()})`,
               value: fmt(totals.total),
               num: totals.total,
               bold: true,

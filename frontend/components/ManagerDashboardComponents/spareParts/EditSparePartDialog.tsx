@@ -48,6 +48,8 @@ export default function EditSparePartDialog({
     id: string;
     model_name: string;
     model_no: string;
+    brandRelation?: { id: string; name: string };
+    brand?: { id: string; name: string };
   }
   interface Vendor {
     id: string;
@@ -297,7 +299,14 @@ export default function EditSparePartDialog({
                     label: 'Universal (No Model)',
                     description: 'Compatible with all models',
                   },
-                  ...models.map((m) => ({
+                  ...(formData.brand
+                    ? models.filter(
+                        (m) =>
+                          m.brandRelation?.name === formData.brand ||
+                          m.brand?.name === formData.brand,
+                      )
+                    : models
+                  ).map((m) => ({
                     value: m.id,
                     label: `${m.model_no} - ${m.model_name}`,
                     description: '',
@@ -306,6 +315,13 @@ export default function EditSparePartDialog({
                 placeholder="Select Models (Optional)"
                 emptyText="No models found."
               />
+            </div>
+            {/* Tax Rate — set from the branch's tax config at creation time and
+                not editable per part (see sparePartService.addSingleSparePart);
+                shown read-only here so it stays visible when reviewing an item. */}
+            <div className="space-y-2">
+              <Label>Tax Rate</Label>
+              <Input value={`${product.tax_rate ?? 0}%`} disabled className="bg-muted" />
             </div>
             {/* Description */}
             <div className="space-y-2 col-span-2">

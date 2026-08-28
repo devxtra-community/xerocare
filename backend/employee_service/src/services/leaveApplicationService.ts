@@ -37,11 +37,14 @@ export class LeaveApplicationService {
 
     const startDate = new Date(data.start_date);
     const endDate = new Date(data.end_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    if (startDate < today) {
-      throw new AppError('Start date cannot be in the past', 400);
+    // Compare as plain 'YYYY-MM-DD' calendar dates, not Date objects: data.start_date
+    // parses as UTC midnight, while a local `new Date()` clamped to midnight is in the
+    // server's timezone — in any zone ahead of UTC that made "today" compare as earlier
+    // than itself, letting same-day requests silently slip past this check.
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    if (data.start_date <= todayStr) {
+      throw new AppError('Leave must be requested at least one day in advance', 400);
     }
 
     if (endDate < startDate) {
@@ -257,6 +260,11 @@ export class LeaveApplicationService {
     await this.leaveRepo.updateStatus(leaveId, LeaveStatus.CANCELLED, employeeId);
 
     return this.leaveRepo.findById(leaveId);
+  }
+
+  async getEmployeeApprovedLeaveCountThisYear(employeeId: string): Promise<number> {
+    const year = new Date().getFullYear();
+    return this.leaveRepo.countApprovedByEmployeeIdInYear(employeeId, year);
   }
 
   async getLeaveStats(branchId?: string) {

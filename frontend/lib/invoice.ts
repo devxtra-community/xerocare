@@ -468,6 +468,33 @@ export const getBranchInvoices = async (): Promise<Invoice[]> => {
   return response.data.data;
 };
 
+export interface EmployeeActivityRow {
+  id: string;
+  invoiceNumber: string;
+  saleType: string;
+  status: string;
+  totalAmount: number;
+  currencyCode?: string;
+  customerName?: string | null;
+  createdAt: string;
+  returnCount: number;
+}
+
+/**
+ * Recent sale/rent/lease activity for one employee, most recent first —
+ * used by the employee detail page. MANAGER callers only ever see activity
+ * within their own branch (enforced server-side).
+ */
+export const getEmployeeRecentActivity = async (
+  employeeId: string,
+  limit = 15,
+): Promise<EmployeeActivityRow[]> => {
+  const response = await api.get(`/b/invoices/employee/${employeeId}/recent-activity`, {
+    params: { limit },
+  });
+  return response.data.data;
+};
+
 /**
  * Creates a new invoice, quotation, or contract record.
  * @param payload Creation data including customer, items, and sale type

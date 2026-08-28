@@ -11,7 +11,10 @@ export const EMPLOYEE_JOB_LABELS: Record<EmployeeJob, string> = {
   [EmployeeJob.SALES]: 'Sales',
   [EmployeeJob.CRM]: 'CRM',
   [EmployeeJob.RENT_AND_LEASE]: 'Rent & Lease',
-  [EmployeeJob.MANAGER]: 'Manager',
+  // Not the branch-level MANAGER account role — this is an EMPLOYEE-role job
+  // (e.g. runs the sales/rent-lease floor). Labeled distinctly so it never
+  // reads as the actual branch Manager in employee lists.
+  [EmployeeJob.MANAGER]: 'Employee Manager',
   [EmployeeJob.SERVICE_HELP_DESK]: 'Service Help Desk',
   [EmployeeJob.SERVICE_TECHNICIAN]: 'Service Technician',
 };

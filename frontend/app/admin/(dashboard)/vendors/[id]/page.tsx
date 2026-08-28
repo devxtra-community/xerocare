@@ -16,10 +16,24 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/StatCard';
 import VendorTransactionsTable from '@/components/AdminDahboardComponents/VendorComponents/VendorTransactionsTable';
-import { getVendorById, getVendorRequests, Vendor as ApiVendor, VendorRequest } from '@/lib/vendor';
+import {
+  getVendorById,
+  getVendorRequests,
+  updateVendor,
+  Vendor as ApiVendor,
+  BankAccount as ApiBankAccount,
+  VendorRequest,
+} from '@/lib/vendor';
 import { toast } from 'sonner';
 import { Globe, Landmark } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
+import {
+  VendorFormModal,
+  type VendorFormData,
+  type Vendor as VendorFormVendor,
+} from '@/components/AdminDahboardComponents/VendorComponents/VendorTable';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getBankCodeLabel } from '@/lib/bankCodeType';
 
 import { getActiveCurrency } from '@/lib/currency';
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -29,25 +43,27 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const [requests, setRequests] = React.useState<VendorRequest[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [requestsLoading, setRequestsLoading] = React.useState(true);
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [viewAccount, setViewAccount] = React.useState<ApiBankAccount | null>(null);
+
+  const fetchData = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const vendorRes = await getVendorById(id);
+      if (vendorRes.success) {
+        setVendor(vendorRes.data);
+      } else {
+        toast.error('Failed to load vendor details');
+      }
+    } catch (error) {
+      console.error('Error fetching vendor:', error);
+      toast.error('Error loading vendor details');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const vendorRes = await getVendorById(id);
-        if (vendorRes.success) {
-          setVendor(vendorRes.data);
-        } else {
-          toast.error('Failed to load vendor details');
-        }
-      } catch (error) {
-        console.error('Error fetching vendor:', error);
-        toast.error('Error loading vendor details');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const fetchRequests = async () => {
       try {
         setRequestsLoading(true);
@@ -66,7 +82,33 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
       fetchData();
       fetchRequests();
     }
-  }, [id]);
+  }, [id, fetchData]);
+
+  const handleSave = async (data: VendorFormData) => {
+    try {
+      await updateVendor(id, {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        contactPerson: data.contactPerson,
+        status: data.status === 'Active' ? 'ACTIVE' : 'INACTIVE',
+        currency: data.currency,
+        countryCode: data.countryCode || undefined,
+        countryName: data.countryName || undefined,
+        stateProvince: data.stateProvince || undefined,
+        city: data.city || undefined,
+        vatNumber: data.vatNumber || undefined,
+        bankAccounts: data.bankAccounts || [],
+        branchId: data.branchId || null,
+      });
+      toast.success('Vendor profile updated');
+      setFormOpen(false);
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to update vendor:', error);
+      toast.error('Failed to update vendor profile');
+    }
+  };
 
   if (loading) {
     return (
@@ -125,6 +167,7 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
             <Button
               size="sm"
               className="h-8 text-[11px] rounded-lg bg-primary hover:bg-primary/90 text-white gap-1.5 font-semibold"
+              onClick={() => setFormOpen(true)}
             >
               <Edit className="h-3.5 w-3.5" /> EDIT PROFILE
             </Button>
@@ -257,9 +300,11 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
               ) : (
                 <div className="space-y-2">
                   {bankAccounts.map((acc, i) => (
-                    <div
+                    <button
+                      type="button"
                       key={i}
-                      className={`p-3 rounded-xl border ${acc.isPrimary ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 bg-gray-50/40'}`}
+                      onClick={() => setViewAccount(acc)}
+                      className={`w-full text-left p-3 rounded-xl border transition-colors hover:border-blue-300 ${acc.isPrimary ? 'border-blue-300 bg-blue-50/60' : 'border-gray-100 bg-gray-50/40'}`}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-foreground">{acc.bankName}</span>
@@ -273,33 +318,10 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
                       <p className="text-[11px] font-mono font-semibold text-gray-700 mt-0.5">
                         {acc.accountNumber}
                       </p>
-                      {(acc.swiftCode || acc.iban || acc.address || acc.routingNumber) && (
-                        <div className="flex flex-wrap gap-x-3 mt-1">
-                          {acc.swiftCode && (
-                            <span className="text-[10px] text-gray-400">
-                              SWIFT:{' '}
-                              <span className="font-mono text-gray-600">{acc.swiftCode}</span>
-                            </span>
-                          )}
-                          {acc.iban && (
-                            <span className="text-[10px] text-gray-400">
-                              IBAN: <span className="font-mono text-gray-600">{acc.iban}</span>
-                            </span>
-                          )}
-                          {acc.address && (
-                            <span className="text-[10px] text-gray-400">
-                              Address: <span className="text-gray-600">{acc.address}</span>
-                            </span>
-                          )}
-                          {acc.routingNumber && (
-                            <span className="text-[10px] text-gray-400">
-                              Routing:{' '}
-                              <span className="font-mono text-gray-600">{acc.routingNumber}</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                      <p className="text-[10px] text-blue-500 font-semibold mt-1">
+                        View full details →
+                      </p>
+                    </button>
                   ))}
                 </div>
               )}
@@ -319,6 +341,78 @@ export default function Page({ params }: { params: Promise<{ id: string }> }) {
           </div>
         </div>
       </div>
+
+      <VendorFormModal
+        initialData={
+          {
+            id: vendor.id,
+            name: vendor.name,
+            contactPerson: vendor.contactPerson || '',
+            phone: vendor.phone,
+            email: vendor.email,
+            totalOrders: vendor.totalOrders || 0,
+            purchaseValue: vendor.purchaseValue || 0,
+            outstandingAmount: vendor.outstandingAmount || 0,
+            status: vendor.status === 'ACTIVE' ? 'Active' : 'On Hold',
+            currency: vendor.currency || getActiveCurrency(),
+            countryCode: vendor.countryCode,
+            countryName: vendor.countryName,
+            stateProvince: vendor.stateProvince,
+            city: vendor.city,
+            bankAccounts: vendor.bankAccounts || [],
+            branchId: vendor.branchId ?? undefined,
+            branchName: vendor.branch?.name,
+            vatNumber: vendor.vatNumber,
+          } as VendorFormVendor
+        }
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onConfirm={handleSave}
+        isAdmin={true}
+      />
+
+      <Dialog open={!!viewAccount} onOpenChange={(o) => !o && setViewAccount(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-primary">Bank Account Details</DialogTitle>
+          </DialogHeader>
+          {viewAccount && (
+            <div className="space-y-3 text-sm">
+              {viewAccount.isPrimary && (
+                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 uppercase tracking-wide">
+                  Primary Account
+                </span>
+              )}
+              {[
+                ['Bank Name', viewAccount.bankName],
+                ['Account Holder', viewAccount.accountHolderName],
+                ['Account Number', viewAccount.accountNumber],
+                ['Account Type', viewAccount.accountType],
+                ['Branch', viewAccount.branch],
+                [getBankCodeLabel(viewAccount.bankCountry), viewAccount.iban],
+                ['SWIFT / BIC', viewAccount.swiftCode],
+                ['Routing Number', viewAccount.routingNumber],
+                ['Bank Address', viewAccount.address],
+                ['Currency', viewAccount.currency],
+              ]
+                .filter(([, value]) => !!value)
+                .map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="flex justify-between gap-4 border-b border-gray-50 pb-2"
+                  >
+                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                      {label}
+                    </span>
+                    <span className="text-xs font-semibold font-mono text-foreground text-right">
+                      {value}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

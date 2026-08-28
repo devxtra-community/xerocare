@@ -519,7 +519,9 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
               borderBottom: '1px solid #f1f5f9',
             }}
           >
-            <span style={{ color: mutedText, fontWeight: '400' }}>Subtotal (Before VAT)</span>
+            <span style={{ color: mutedText, fontWeight: '400' }}>
+              Subtotal (Before {totals.vatName || 'VAT'})
+            </span>
             <span style={{ fontWeight: '400' }}>
               {getActiveCurrency()} {fmt(totals.subTotal)}
             </span>
@@ -564,7 +566,7 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
             }}
           >
             <span style={{ fontSize: '16px', fontWeight: '800', color: textColor }}>
-              Grand Total (Including VAT)
+              Grand Total (Including {totals.vatName || 'VAT'})
             </span>
             <span style={{ fontSize: '24px', fontWeight: '900', color: purpleColor }}>
               {getActiveCurrency()} {fmt(totals.total)}

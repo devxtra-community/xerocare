@@ -166,7 +166,7 @@ function PartiesSection({
           )}
           {invoice.taxRegistrationNumber && (
             <p className="text-[10px] text-slate-400 mt-1.5">
-              VAT Reg. No.: {invoice.taxRegistrationNumber}
+              {invoice.taxName || 'VAT'} Reg. No.: {invoice.taxRegistrationNumber}
             </p>
           )}
           {invoice.employeeName && (
@@ -188,7 +188,7 @@ function PartiesSection({
           )}
           {agreement.customerVatNumber && (
             <p className="text-[10px] text-slate-400 mt-1.5">
-              VAT Reg. No.: {agreement.customerVatNumber}
+              {invoice.taxName || 'VAT'} Reg. No.: {agreement.customerVatNumber}
             </p>
           )}
         </div>
@@ -284,8 +284,10 @@ function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           )}
           {invoice.customerVatStatus === 'EXEMPT' && (
             <tr className="border-b border-slate-100">
-              <td className="px-3 py-2 text-slate-500 font-semibold">VAT</td>
-              <td className="px-3 py-2 text-right font-semibold text-slate-700">VAT Exempt</td>
+              <td className="px-3 py-2 text-slate-500 font-semibold">{invoice.taxName || 'VAT'}</td>
+              <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                {invoice.taxName || 'VAT'} Exempt
+              </td>
             </tr>
           )}
           <tr className="border-b border-slate-200 bg-slate-50">
@@ -396,7 +398,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               </tr>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                  Monthly Rate (Incl. VAT)
+                  Monthly Rate (Incl. {invoice.taxName || 'VAT'})
                 </td>
                 <td className="px-3 py-2 font-black text-slate-800">
                   {fmtAmt(monthlyRentInclTax, currency)}
@@ -563,7 +565,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                   </tr>
                   <tr className="border-b border-slate-100 bg-slate-50">
                     <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                      Monthly EMI (Incl. VAT)
+                      Monthly EMI (Incl. {invoice.taxName || 'VAT'})
                     </td>
                     <td className="px-3 py-2 font-black text-slate-800">
                       {fmtAmt(monthlyInclTax, currency)}
@@ -611,7 +613,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                   </tr>
                   <tr className="border-b border-slate-100 bg-slate-50">
                     <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                      Monthly Service Amount (Incl. VAT)
+                      Monthly Service Amount (Incl. {invoice.taxName || 'VAT'})
                     </td>
                     <td className="px-3 py-2 font-black text-slate-800">
                       {fmtAmt(monthlyInclTax, currency)}

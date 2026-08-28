@@ -1,12 +1,12 @@
 'use client';
 
-import { Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor } from 'lucide-react';
+import { Bell, HelpCircle, ChevronDown, Menu, LogOut, Key, Monitor, User } from 'lucide-react';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useEffect, useState } from 'react';
-import { getProfile, logout } from '@/lib/auth';
+import { getProfile, logout, getUserFromToken } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { toast } from 'sonner';
@@ -49,6 +49,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
     profile_image_url: '',
   });
 
+  const [rawRole, setRawRole] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -105,6 +106,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
       }
     };
     fetchProfile();
+    setRawRole(getUserFromToken()?.role || '');
     fetchNotifications();
     initBranchCurrency();
 
@@ -144,6 +146,21 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
         setSelectedPayrollId(payrollId);
         setIsSalaryDialogOpen(true);
       }
+    }
+  };
+
+  const handleSeeProfile = () => {
+    const tokenUser = getUserFromToken();
+    if (!tokenUser) return;
+
+    if (tokenUser.role === 'HR') {
+      router.push(`/hr/employees/${tokenUser.userId}`);
+    } else if (tokenUser.role === 'MANAGER') {
+      router.push(`/manager/employees/${tokenUser.userId}`);
+    } else if (tokenUser.role === 'EMPLOYEE') {
+      router.push('/employee/profile');
+    } else if (tokenUser.role === 'FINANCE') {
+      router.push('/finance/profile');
     }
   };
 
@@ -209,13 +226,19 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                 )}
               </div>
               <DropdownMenuSeparator />
-              {notifications.length === 0 ? (
-                <div className="p-8 text-center text-sm text-gray-500">No notifications yet</div>
-              ) : (
-                notifications.slice(0, 8).map((notification) => (
+              {(() => {
+                const unread = notifications.filter((n) => !n.is_read);
+                if (unread.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-sm text-gray-500">
+                      {notifications.length === 0 ? 'No notifications yet' : "You're all caught up"}
+                    </div>
+                  );
+                }
+                return unread.slice(0, 8).map((notification) => (
                   <DropdownMenuItem
                     key={notification.id}
-                    className={`flex flex-col items-start gap-1 p-4 cursor-pointer focus:bg-primary/5 ${!notification.is_read ? 'bg-primary/5' : ''}`}
+                    className={`flex flex-col items-start gap-1 p-4 cursor-pointer focus:bg-primary/5 focus:text-foreground ${!notification.is_read ? 'bg-primary/5' : ''}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex w-full items-center justify-between gap-2">
@@ -235,8 +258,8 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
                       </div>
                     )}
                   </DropdownMenuItem>
-                ))
-              )}
+                ));
+              })()}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="flex justify-center p-3 text-xs font-semibold text-primary cursor-pointer hover:bg-primary/5"
@@ -338,20 +361,32 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
               <DropdownMenuSeparator className="my-1 opacity-50" />
 
               <div className="space-y-1">
-                <DropdownMenuItem
-                  onClick={() => setIsSessionsDialogOpen(true)}
-                  className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
-                >
-                  <Monitor className="mr-3 h-4 w-4" />
-                  <span className="text-sm font-medium">Session Info</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsPasswordDialogOpen(true)}
-                  className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
-                >
-                  <Key className="mr-3 h-4 w-4" />
-                  <span className="text-sm font-medium">Change Password</span>
-                </DropdownMenuItem>
+                {rawRole === 'ADMIN' ? (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setIsSessionsDialogOpen(true)}
+                      className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
+                    >
+                      <Monitor className="mr-3 h-4 w-4" />
+                      <span className="text-sm font-medium">Session Info</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setIsPasswordDialogOpen(true)}
+                      className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
+                    >
+                      <Key className="mr-3 h-4 w-4" />
+                      <span className="text-sm font-medium">Change Password</span>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={handleSeeProfile}
+                    className="rounded-lg px-3 py-2.5 focus:bg-accent focus:text-accent-foreground cursor-pointer transition-colors"
+                  >
+                    <User className="mr-3 h-4 w-4" />
+                    <span className="text-sm font-medium">See Profile</span>
+                  </DropdownMenuItem>
+                )}
               </div>
 
               <DropdownMenuSeparator className="my-1 opacity-50" />

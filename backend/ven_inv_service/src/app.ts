@@ -127,7 +127,7 @@ const startServer = async () => {
     const { startFsmaBillingScheduler } = await import('./services/fsmaBillingJob');
     startFsmaBillingScheduler();
 
-    const PORT = process.env.PORT;
+    const PORT = process.env.VENDOR_PORT || process.env.PORT || 3003;
 
     // Start listening for requests from our staff
     app.listen(PORT, () => {

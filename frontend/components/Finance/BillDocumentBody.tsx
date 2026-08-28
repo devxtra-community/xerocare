@@ -348,7 +348,15 @@ function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
   );
 }
 
-function ChargesSection({ bill, currency }: { bill: Partial<Bill>; currency: string }) {
+function ChargesSection({
+  bill,
+  currency,
+  invoice,
+}: {
+  bill: Partial<Bill>;
+  currency: string;
+  invoice: Invoice;
+}) {
   const rows: Array<[string, number | undefined]> = [
     ['Base Rent', bill.monthlyRent],
     ['Excess Usage Charge', bill.exceededCharge],
@@ -377,7 +385,8 @@ function ChargesSection({ bill, currency }: { bill: Partial<Bill>; currency: str
         {Number(bill.taxAmount) > 0 && (
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 text-xs">
             <span className="text-slate-500">
-              VAT{bill.taxPercent ? ` (${bill.taxPercent}%)` : ''}
+              {invoice.taxName || 'VAT'}
+              {bill.taxPercent ? ` (${bill.taxPercent}%)` : ''}
             </span>
             <span className="font-bold text-slate-700">{fmtAmt(bill.taxAmount, currency)}</span>
           </div>
@@ -446,7 +455,7 @@ export function BillDocumentBody({ invoice, bill, currency, advancePayment }: Pr
         <>
           <ReadingsSection bill={bill} />
           <DocRule />
-          <ChargesSection bill={bill} currency={currency} />
+          <ChargesSection bill={bill} currency={currency} invoice={invoice} />
         </>
       )}
       <DocRule />

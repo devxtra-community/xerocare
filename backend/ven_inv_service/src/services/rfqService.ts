@@ -16,6 +16,7 @@ import * as ExcelJS from 'exceljs';
 import { logger } from '../config/logger';
 import { Vendor } from '../entities/vendorEntity';
 import { Branch } from '../entities/branchEntity';
+import { Warehouse } from '../entities/warehouseEntity';
 import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
 import { getExchangeRate, round2 } from '../utils/exchangeRate';
 
@@ -883,7 +884,7 @@ export class RfqService {
     };
   }
 
-  async awardVendor(rfqId: string, vendorId: string) {
+  async awardVendor(rfqId: string, vendorId: string, warehouseId: string) {
     return this.dataSource.transaction(async (manager) => {
       // Use pessimistic Write lock if supported, to strictly prevent concurrent award races
       const rfq = await manager.findOne(Rfq, {
@@ -894,6 +895,22 @@ export class RfqService {
       if (!rfq) throw new AppError('RFQ not found', 404);
       if (rfq.status !== RfqStatus.FULLY_QUOTED) {
         throw new AppError('RFQ must be fully quoted (all vendors responded) before award', 400);
+      }
+
+      // A delivery warehouse must be known at award time: it goes into the
+      // award email so the vendor knows where to ship, and downstream lot
+      // creation inherits it so a lot can never end up warehouse-less.
+      if (!warehouseId) {
+        throw new AppError(
+          'A delivery warehouse is required to award a vendor — the vendor needs to know where to ship the items.',
+          400,
+        );
+      }
+      const warehouse = await manager.findOne(Warehouse, {
+        where: { id: warehouseId, branchId: rfq.branch_id },
+      });
+      if (!warehouse) {
+        throw new AppError('Selected warehouse was not found for this branch.', 404);
       }
 
       const allVendors = await manager.find(RfqVendor, {
@@ -946,6 +963,9 @@ export class RfqService {
               email: vendor.vendor.email,
               vendorName: vendor.vendor.name,
               rfqNumber: rfq.rfq_number,
+              warehouseName: warehouse.warehouseName,
+              warehouseAddress: warehouse.address,
+              warehouseLocation: warehouse.location,
             });
           }
         } else {
@@ -974,6 +994,7 @@ export class RfqService {
 
       rfq.status = RfqStatus.AWARDED;
       rfq.awarded_vendor_id = targetVendor.vendor_id;
+      rfq.awarded_warehouse_id = warehouseId;
       await manager.save(rfq);
 
       logger.info('Purchase origin classified at award', {
@@ -1037,6 +1058,16 @@ export class RfqService {
         throw new AppError('RFQ must be awarded before creating lot', 400);
       }
 
+      // Normally already set by awardVendor; the explicit param only exists to
+      // recover RFQs awarded before this field existed, which have none.
+      const finalWarehouseId = warehouseId || rfq.awarded_warehouse_id;
+      if (!finalWarehouseId) {
+        throw new AppError(
+          'Warehouse is required to create a lot — this RFQ was awarded without a delivery warehouse set.',
+          400,
+        );
+      }
+
       const awardedVendor = await manager.findOne(RfqVendor, {
         where: { rfq_id: rfqId, status: RfqVendorStatus.AWARDED },
         relations: ['items', 'items.rfq_item'],
@@ -1066,7 +1097,7 @@ export class RfqService {
         totalAmount: round2(Number(awardedVendor.total_quoted_amount) * rate),
         status: LotStatus.PENDING,
         branch_id: rfq.branch_id,
-        warehouse_id: warehouseId,
+        warehouse_id: finalWarehouseId,
         createdBy: userId,
         notes: `Auto-generated from RFQ ${rfq.rfq_number}`,
         currencyCode: branchCurrency,
@@ -1102,6 +1133,22 @@ export class RfqService {
             ? quotedItem.rfq_item.custom_spare_part_name || undefined
             : undefined;
 
+        // A custom (not-yet-cataloged) spare part carries its brand on the RFQ
+        // item (brand_id or free-text custom_brand_name) — SparePart-linked
+        // items already expose brand via the sparePart relation, so this only
+        // needs resolving for the uncataloged case.
+        let brand: string | undefined;
+        if (itemType === LotItemType.SPARE_PART && !sparePartId) {
+          if (quotedItem.rfq_item.custom_brand_name) {
+            brand = quotedItem.rfq_item.custom_brand_name;
+          } else if (quotedItem.rfq_item.brand_id) {
+            const rfqItemBrand = await manager.findOne(Brand, {
+              where: { id: quotedItem.rfq_item.brand_id },
+            });
+            brand = rfqItemBrand?.name;
+          }
+        }
+
         // Final safety check before save to avoid constraint violation
         if (!modelId && !customProductName && !sparePartId && !customSparePartName) {
           throw new AppError(
@@ -1117,6 +1164,7 @@ export class RfqService {
           sparePartId,
           customProductName,
           customSparePartName,
+          brand,
           mpn: quotedItem.rfq_item.mpn,
           hsCode: quotedItem.rfq_item.hs_code,
           compatibleModels: quotedItem.rfq_item.compatible_models,

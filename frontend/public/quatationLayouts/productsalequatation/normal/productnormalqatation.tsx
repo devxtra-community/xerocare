@@ -396,7 +396,9 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               <th style={thStyle('center')}>Unit Price</th>
               <th style={thStyle('center')}>Discount</th>
               <th style={thStyle('center')}>
-                {lineItems[0]?.vatPercent ? `VAT (${lineItems[0].vatPercent}%)` : 'VAT'}
+                {lineItems[0]?.vatPercent
+                  ? `${totals.vatName || 'VAT'} (${lineItems[0].vatPercent}%)`
+                  : totals.vatName || 'VAT'}
               </th>
               <th style={{ ...thStyle('right') }}>Amount</th>
             </tr>
@@ -598,7 +600,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         <div style={{ width: '250px' }}>
           {[
             {
-              label: 'Subtotal (Before VAT)',
+              label: `Subtotal (Before ${totals.vatName || 'VAT'})`,
               // Net of discount — this layout has no separate discount row, and VAT
               // below is already computed on the discounted amount, so the subtotal
               // shown here must match that same base or the two figures won't reconcile.
@@ -611,7 +613,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               value: totals.vatTotal,
             },
             {
-              label: 'Grand Total (Including VAT)',
+              label: `Grand Total (Including ${totals.vatName || 'VAT'})`,
               value: totals.total,
               prefix: `${getActiveCurrency()} `,
               isBold: true,

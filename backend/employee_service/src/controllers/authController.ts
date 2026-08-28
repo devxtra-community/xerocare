@@ -1,12 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../errors/appError';
 import { AuthService } from '../services/authService';
-import { issueTokens } from '../services/tokenService';
+import { issueTokens, signAccessTokenForUser } from '../services/tokenService';
 import { OtpService } from '../services/otpService';
 import { OtpPurpose } from '../constants/otpPurpose';
 import { MagicLinkService } from '../services/magicLinkService';
 import { logger } from '../config/logger';
-import { REFRESH_COOKIE_NAME, clearCookieOptions } from '../config/cookieOptions';
+import {
+  REFRESH_COOKIE_NAME,
+  clearCookieOptions,
+  refreshCookieOptions,
+} from '../config/cookieOptions';
 
 const authService = new AuthService();
 const otpService = new OtpService();
@@ -58,7 +62,7 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
 
     const user = await authService.findUserByEmail(email);
 
-    const accessToken = await issueTokens(user, req, res);
+    const { accessToken } = await issueTokens(user, req, res);
     logger.info('login successfull');
 
     return res.json({
@@ -80,14 +84,29 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
  */
 export const refresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken) {
+    const oldRefreshToken = req.cookies.refreshToken;
+    if (!oldRefreshToken) {
       throw new Error('No refresh token');
     }
 
-    const user = await authService.refresh(refreshToken);
+    const result = await authService.refresh(oldRefreshToken);
 
-    const accessToken = await issueTokens(user, req, res);
+    if (result.reuseRefreshToken) {
+      // Racing duplicate of a request that already rotated this token a
+      // moment ago — mint a fresh access token off that same still-active
+      // session instead of rotating again (which would also mean a second,
+      // spurious "new login" alert email for the user).
+      const accessToken = signAccessTokenForUser(result.user);
+      res.cookie(REFRESH_COOKIE_NAME, result.reuseRefreshToken, refreshCookieOptions);
+      return res.json({
+        message: 'Access token refreshed',
+        accessToken,
+        success: true,
+      });
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await issueTokens(result.user, req, res);
+    await authService.linkSupersession(oldRefreshToken, newRefreshToken);
 
     return res.json({
       message: 'Access token refreshed',
@@ -247,7 +266,7 @@ export const verifyMagicLink = async (req: Request, res: Response, next: NextFun
       throw new Error('User not found');
     }
 
-    const accessToken = await issueTokens(user, req, res);
+    const { accessToken } = await issueTokens(user, req, res);
 
     return res.json({
       message: 'Login successful',

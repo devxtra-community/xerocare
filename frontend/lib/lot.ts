@@ -167,6 +167,8 @@ export interface LotItem {
   totalPrice: number;
   customProductName?: string;
   customSparePartName?: string;
+  /** Brand for a spare-part item with no catalog SparePart link (custom RFQ-quoted part). */
+  brand?: string;
   mpn?: string;
   hsCode?: string;
   compatibleModels?: string;

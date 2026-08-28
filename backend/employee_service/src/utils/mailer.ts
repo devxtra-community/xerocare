@@ -403,7 +403,14 @@ export async function sendRfqExcelMail(
   });
 }
 
-export async function sendRfqAwardedMail(to: string, vendorName: string, rfqNumber: string) {
+export async function sendRfqAwardedMail(
+  to: string,
+  vendorName: string,
+  rfqNumber: string,
+  warehouseName: string,
+  warehouseAddress: string,
+  warehouseLocation: string,
+) {
   const htmlContent = `
     <!DOCTYPE html>
     <html lang="en">
@@ -417,6 +424,7 @@ export async function sendRfqAwardedMail(to: string, vendorName: string, rfqNumb
         .content { padding: 40px; }
         .greeting { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
         .success-notice { background: #f0fdf4; padding: 16px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #22c55e; }
+        .delivery-notice { background: #eff6ff; padding: 16px; border-radius: 8px; margin-bottom: 30px; border-left: 4px solid #3b82f6; }
         .footer { padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; }
       </style>
     </head>
@@ -426,6 +434,14 @@ export async function sendRfqAwardedMail(to: string, vendorName: string, rfqNumb
         <div class="content">
           <div class="greeting">Congratulations ${vendorName},</div>
           <p>We are pleased to inform you that your quotation for RFQ <b>${rfqNumber}</b> has been accepted and awarded to your company.</p>
+          <div class="delivery-notice">
+            <strong>Ship items to:</strong>
+            <p style="margin: 8px 0 0;">
+              ${warehouseName}<br>
+              ${warehouseAddress}<br>
+              ${warehouseLocation}
+            </p>
+          </div>
           <div class="success-notice">
             <strong>Next Steps:</strong>
             <p>Our procurement team will be in touch shortly to finalize the fulfillment details.</p>

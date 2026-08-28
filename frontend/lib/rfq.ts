@@ -97,8 +97,8 @@ export async function getRfqComparison(id: string) {
   return res.data.data;
 }
 
-export async function awardVendor(id: string, vendorId: string) {
-  const res = await api.post(`/i/rfq/${id}/award/${vendorId}`);
+export async function awardVendor(id: string, vendorId: string, warehouseId: string) {
+  const res = await api.post(`/i/rfq/${id}/award/${vendorId}`, { warehouseId });
   return res.data;
 }
 

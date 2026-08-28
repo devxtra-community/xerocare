@@ -133,6 +133,27 @@ export const getLeaderboard = async (
   return res.data.data;
 };
 
+export interface EmployeeMonthlyActivity {
+  employeeId: string;
+  salesCount: number;
+  salesRevenue: number;
+  rentCount: number;
+  rentRevenue: number;
+  leaseCount: number;
+  leaseRevenue: number;
+  totalRevenue: number;
+}
+
+export const getBranchMonthlyActivity = async (
+  month: string,
+  params?: { branchId?: string },
+): Promise<EmployeeMonthlyActivity[]> => {
+  const res = await api.get('/b/targets/branch-activity/monthly', {
+    params: { month, branchId: params?.branchId },
+  });
+  return res.data.data;
+};
+
 export const getAdminOverview = async (params: {
   branchId?: string;
   month?: string;

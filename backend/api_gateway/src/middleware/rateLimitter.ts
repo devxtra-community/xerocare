@@ -79,7 +79,7 @@ export const otpVerifyLimiter = rateLimit({
   message: { message: 'Too many verification attempts, please try again after 10 minutes' },
 });
 
-export const loginLimiter = rateLimit({
+const realLoginLimiter = rateLimit({
   store: new RedisStore({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sendCommand: async (...args: string[]): Promise<any> => {
@@ -92,3 +92,10 @@ export const loginLimiter = rateLimit({
   max: 10,
   message: { message: 'Too many login attempts, please try again after 15 minutes' },
 });
+
+// Disabled outside production — local dev/testing repeatedly trips this and locks
+// out the only admin account for 15 minutes at a time.
+export const loginLimiter =
+  process.env.NODE_ENV === 'production'
+    ? realLoginLimiter
+    : (_req: Request, _res: unknown, next: () => void) => next();

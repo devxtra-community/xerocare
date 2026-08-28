@@ -21,6 +21,7 @@ import { modelService } from '@/services/modelService';
 import { brandService } from '@/services/brandService';
 import { Brand } from '@/lib/brand';
 import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
+import { getMyBranch } from '@/lib/branch';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface AddSparePartDialogProps {
@@ -63,6 +64,11 @@ export default function AddSparePartDialog({
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [lots, setLots] = useState<Lot[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [branchTax, setBranchTax] = useState<{
+    has_tax?: boolean;
+    tax_name?: string | null;
+    tax_percent?: number | null;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     part_name: '',
@@ -86,16 +92,22 @@ export default function AddSparePartDialog({
 
   const loadDependencies = async () => {
     try {
-      const [whRes, vendorRes, lotsRes, brandsRes] = await Promise.all([
+      const [whRes, vendorRes, lotsRes, brandsRes, branch] = await Promise.all([
         warehouseService.getWarehousesByBranch(),
         vendorService.getVendors(),
         lotService.getAllLots(),
         brandService.getAllBrands(),
+        getMyBranch({ silent: true }),
       ]);
       setWarehouses(whRes || []);
       setVendors(vendorRes || []);
       setLots(lotsRes.data || []);
       setBrands(brandsRes || []);
+      setBranchTax({
+        has_tax: branch.has_tax,
+        tax_name: branch.tax_name,
+        tax_percent: branch.tax_percent,
+      });
     } catch (error) {
       console.error('Failed to load dependencies', error);
     }
@@ -130,7 +142,10 @@ export default function AddSparePartDialog({
       const selectedLot = lots.find((l) => l.id === initialLotId);
       if (selectedLot) {
         const sparePartItems =
-          selectedLot.items?.filter((item) => item.itemType === 'SPARE_PART') || [];
+          selectedLot.items?.filter(
+            (item) =>
+              item.itemType === 'SPARE_PART' && item.receivedQuantity - item.usedQuantity > 0,
+          ) || [];
 
         const selectedItem = initialItemId
           ? sparePartItems.find((item) => item.id === initialItemId)
@@ -388,7 +403,11 @@ export default function AddSparePartDialog({
                   options={(() => {
                     const selectedLot = lots.find((l) => l.id === formData.lot_id);
                     const sparePartItems =
-                      selectedLot?.items?.filter((item) => item.itemType === 'SPARE_PART') || [];
+                      selectedLot?.items?.filter(
+                        (item) =>
+                          item.itemType === 'SPARE_PART' &&
+                          item.receivedQuantity - item.usedQuantity > 0,
+                      ) || [];
 
                     return sparePartItems.map((item) => {
                       const available = item.receivedQuantity - item.usedQuantity;
@@ -445,8 +464,6 @@ export default function AddSparePartDialog({
                 required
                 value={formData.part_name}
                 onChange={(e) => setFormData({ ...formData, part_name: e.target.value })}
-                disabled={!!selectedLotItemId && !isNoLot}
-                className={selectedLotItemId && !isNoLot ? 'bg-muted cursor-not-allowed' : ''}
               />
               {selectedLotItemId && !isNoLot && (
                 <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
@@ -457,8 +474,6 @@ export default function AddSparePartDialog({
               <Input
                 value={formData.mpn}
                 onChange={(e) => setFormData({ ...formData, mpn: e.target.value })}
-                disabled={!!selectedLotItemId && !isNoLot}
-                className={selectedLotItemId && !isNoLot ? 'bg-muted cursor-not-allowed' : ''}
                 placeholder="Enter MPN (Optional)"
               />
               {selectedLotItemId && !isNoLot && (
@@ -467,23 +482,19 @@ export default function AddSparePartDialog({
             </div>
             <div className="space-y-2">
               <Label>Brand</Label>
-              {selectedLotItemId && !isNoLot && formData.brand ? (
-                <>
-                  <Input value={formData.brand} disabled className="bg-muted cursor-not-allowed" />
-                  <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
-                </>
-              ) : (
-                <SearchableSelect
-                  value={formData.brand}
-                  onValueChange={(val) => setFormData({ ...formData, brand: val })}
-                  options={brands.map((brand) => ({
-                    value: brand.name,
-                    label: brand.name,
-                    description: brand.description || '',
-                  }))}
-                  placeholder="Select Brand"
-                  emptyText="No brands found."
-                />
+              <SearchableSelect
+                value={formData.brand}
+                onValueChange={(val) => setFormData({ ...formData, brand: val })}
+                options={brands.map((brand) => ({
+                  value: brand.name,
+                  label: brand.name,
+                  description: brand.description || '',
+                }))}
+                placeholder="Select Brand"
+                emptyText="No brands found."
+              />
+              {selectedLotItemId && !isNoLot && formData.brand && (
+                <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
               )}
             </div>
             <div className="space-y-2">
@@ -610,6 +621,20 @@ export default function AddSparePartDialog({
                 }
                 placeholder="0"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Tax Rate {branchTax?.tax_name ? `(${branchTax.tax_name})` : ''}</Label>
+              <Input
+                disabled
+                value={
+                  branchTax?.has_tax
+                    ? `${Number(branchTax.tax_percent ?? 0)}%`
+                    : 'No tax on this branch'
+                }
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Set from your branch&apos;s tax configuration
+              </p>
             </div>
             <div className="space-y-2 col-span-2">
               <BulletDescriptionInput

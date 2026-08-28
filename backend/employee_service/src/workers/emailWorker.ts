@@ -81,7 +81,14 @@ export const startWorker = async () => {
       }
 
       if (job.type === 'RFQ_AWARDED') {
-        await sendRfqAwardedMail(job.email, job.vendorName, job.rfqNumber);
+        await sendRfqAwardedMail(
+          job.email,
+          job.vendorName,
+          job.rfqNumber,
+          job.warehouseName,
+          job.warehouseAddress,
+          job.warehouseLocation,
+        );
         logger.info(`Successfully sent order confirmation mail to: ${job.email}`);
       }
 

@@ -1132,6 +1132,46 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           `);
           logger.info('Guaranteed lot_items.hs_code column exists.');
 
+          // --- Brand on lot items — a spare-part lot item quoted via RFQ as a
+          // custom (not-yet-cataloged) part carries brand_id/custom_brand_name
+          // on the RFQ item, but lot_items had nowhere to receive it, so it was
+          // silently dropped on RFQ-to-lot conversion and bulk spare-part
+          // upload couldn't auto-fill brand/model options from the lot. ---
+          await Source.query(`
+            ALTER TABLE lot_items ADD COLUMN IF NOT EXISTS brand VARCHAR(150);
+          `);
+          logger.info('Guaranteed lot_items.brand column exists.');
+
+          // --- One-time backfill: lots converted from an RFQ before the brand
+          // column above existed lost the brand their RFQ item had. Recover it
+          // by re-joining lot -> RFQ (via the "Auto-generated from RFQ <no>"
+          // note stamped at conversion) -> matching rfq_item by part name.
+          // Idempotent: only touches rows still missing brand. ---
+          const backfillResult = await Source.query(`
+            UPDATE lot_items li
+            SET brand = sub.resolved_brand
+            FROM (
+              SELECT li2.id AS lot_item_id, COALESCE(ri.custom_brand_name, b.name) AS resolved_brand
+              FROM lot_items li2
+              JOIN lots l ON l.id = li2.lot_id
+              JOIN rfqs r ON r.rfq_number = substring(l.notes FROM 'RFQ ([A-Za-z0-9-]+)$')
+              JOIN rfq_items ri ON ri.rfq_id = r.id
+                AND ri.custom_spare_part_name = li2.custom_spare_part_name
+              LEFT JOIN brands b ON b.id = ri.brand_id
+              WHERE li2.item_type = 'SPARE_PART'
+                AND li2.spare_part_id IS NULL
+                AND li2.brand IS NULL
+                AND l.notes LIKE 'Auto-generated from RFQ %'
+                AND (ri.custom_brand_name IS NOT NULL OR b.name IS NOT NULL)
+            ) sub
+            WHERE sub.lot_item_id = li.id;
+          `);
+          if (backfillResult?.[1]) {
+            logger.info(
+              `Backfilled brand on ${backfillResult[1]} pre-existing RFQ-converted lot items.`,
+            );
+          }
+
           // --- Receipt/screenshot attachment on vendor payments ---
           await Source.query(`
             ALTER TABLE purchase_payments ADD COLUMN IF NOT EXISTS attachment_url VARCHAR(500);
@@ -1230,6 +1270,34 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE lot_documents ADD COLUMN IF NOT EXISTS notes TEXT NULL;
         `);
         logger.info('Guaranteed lot_documents table exists.');
+
+        // ─── Vendor type: Distributor/Service were never used anywhere in the
+        // system (no workflow branched on them) — collapse to Supplier-only. ───
+        await Source.query(`UPDATE vendors SET type = 'Supplier' WHERE type <> 'Supplier';`);
+        await Source.query(`
+          DO $$
+          BEGIN
+            IF EXISTS (
+              SELECT 1 FROM pg_type t
+              JOIN pg_enum e ON e.enumtypid = t.oid
+              WHERE t.typname = 'vendors_type_enum' AND e.enumlabel = 'Distributor'
+            ) THEN
+              ALTER TYPE vendors_type_enum RENAME TO vendors_type_enum_old;
+              CREATE TYPE vendors_type_enum AS ENUM ('Supplier');
+              ALTER TABLE vendors ALTER COLUMN type DROP DEFAULT;
+              ALTER TABLE vendors ALTER COLUMN type TYPE vendors_type_enum USING type::text::vendors_type_enum;
+              ALTER TABLE vendors ALTER COLUMN type SET DEFAULT 'Supplier';
+              DROP TYPE vendors_type_enum_old;
+            END IF;
+          END $$;
+        `);
+        logger.info('Collapsed vendors.type enum to Supplier-only.');
+
+        // ─── RFQ: delivery warehouse chosen at award time ─────────────────────
+        await Source.query(`
+          ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS awarded_warehouse_id UUID NULL;
+        `);
+        logger.info('Guaranteed rfqs.awarded_warehouse_id column exists.');
       }
       return Source;
     } catch (error: unknown) {

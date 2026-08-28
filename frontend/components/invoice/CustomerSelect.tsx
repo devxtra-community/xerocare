@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getCustomers } from '@/lib/customer';
+import { getCustomers, createCustomer, CreateCustomerData } from '@/lib/customer';
 import { getLeads, Lead } from '@/lib/lead';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 import { LeadConversionDialog } from './LeadConversionDialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { CreateLeadDialog } from './CreateLeadDialog';
+import { toast } from 'sonner';
+import CustomerFormDialog from '@/components/employeeComponents/CustomerFormDialog';
 
 // Unified Selectable Entity
 export type SelectableCustomer = {
@@ -25,13 +27,16 @@ export type SelectableCustomer = {
 interface CustomerSelectProps {
   value?: string;
   onChange: (id: string, entity: SelectableCustomer) => void;
+  /** Quotations can only be raised for customers — hides leads and the lead
+   * flow entirely, offering "Add New Customer" instead. */
+  customersOnly?: boolean;
 }
 
 /**
  * Searchable select component for choosing a customer or a lead.
  * If a lead is selected who hasn't been converted to a customer yet, it triggers the conversion process.
  */
-export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
+export function CustomerSelect({ value, onChange, customersOnly = false }: CustomerSelectProps) {
   const [items, setItems] = useState<SelectableCustomer[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,12 +44,16 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [createLeadOpen, setCreateLeadOpen] = useState(false);
+  const [createCustomerOpen, setCreateCustomerOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [customersData, leadsData] = await Promise.all([getCustomers(), getLeads()]);
+        const [customersData, leadsData] = await Promise.all([
+          getCustomers(),
+          customersOnly ? Promise.resolve([]) : getLeads(),
+        ]);
 
         const unifiedCustomers: SelectableCustomer[] = customersData.map((c) => ({
           ...c,
@@ -76,7 +85,28 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
       }
     };
     fetchData();
-  }, []);
+  }, [customersOnly]);
+
+  const handleCreateCustomer = async (data: Partial<CreateCustomerData>) => {
+    try {
+      const newCustomer = await createCustomer({ ...data, name: data.name! });
+      const entity: SelectableCustomer = {
+        ...newCustomer,
+        id: newCustomer.id,
+        name: newCustomer.name,
+        phone: newCustomer.phone || '',
+        email: newCustomer.email || '',
+        type: 'CUSTOMER',
+      };
+      setItems((prev) => [...prev, entity]);
+      setCreateCustomerOpen(false);
+      toast.success('Customer created successfully');
+      onChange(entity.id, entity);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Failed to create customer');
+    }
+  };
 
   const handleValueChange = (val: string) => {
     const entity = items.find((item) => item.id === val);
@@ -117,40 +147,62 @@ export function CustomerSelect({ value, onChange }: CustomerSelectProps) {
             onValueChange={handleValueChange}
             options={options}
             loading={loading}
-            placeholder="Select Customer or Lead"
+            placeholder={customersOnly ? 'Select Customer' : 'Select Customer or Lead'}
             emptyText="No customers found."
           />
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setCreateLeadOpen(true)}
-          className="h-10 px-3 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
-        >
-          <Plus size={16} /> Create Lead
-        </Button>
+        {customersOnly ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCreateCustomerOpen(true)}
+            className="h-10 px-3 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
+          >
+            <Plus size={16} /> Add New Customer
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setCreateLeadOpen(true)}
+            className="h-10 px-3 rounded-xl border-dashed border-2 border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-all font-bold flex items-center gap-1.5 shrink-0"
+          >
+            <Plus size={16} /> Create Lead
+          </Button>
+        )}
       </div>
 
-      <CreateLeadDialog
-        open={createLeadOpen}
-        onOpenChange={setCreateLeadOpen}
-        onCreated={(newLead) => {
-          const selectableLead: SelectableCustomer = {
-            ...newLead,
-            id: newLead._id,
-            name: newLead.name || 'Unnamed Lead',
-            phone: newLead.phone,
-            email: newLead.email,
-            type: 'LEAD',
-            isCustomer: false,
-          };
+      {!customersOnly && (
+        <CreateLeadDialog
+          open={createLeadOpen}
+          onOpenChange={setCreateLeadOpen}
+          onCreated={(newLead) => {
+            const selectableLead: SelectableCustomer = {
+              ...newLead,
+              id: newLead._id,
+              name: newLead.name || 'Unnamed Lead',
+              phone: newLead.phone,
+              email: newLead.email,
+              type: 'LEAD',
+              isCustomer: false,
+            };
 
-          setItems((prev) => [...prev, selectableLead]);
+            setItems((prev) => [...prev, selectableLead]);
 
-          // Small delay or directly select the newly created lead
-          handleValueChange(selectableLead.id);
-        }}
-      />
+            // Small delay or directly select the newly created lead
+            handleValueChange(selectableLead.id);
+          }}
+        />
+      )}
+
+      {customersOnly && (
+        <CustomerFormDialog
+          open={createCustomerOpen}
+          onOpenChange={setCreateCustomerOpen}
+          customer={null}
+          onSubmit={handleCreateCustomer}
+        />
+      )}
 
       <LeadConversionDialog
         open={dialogOpen}

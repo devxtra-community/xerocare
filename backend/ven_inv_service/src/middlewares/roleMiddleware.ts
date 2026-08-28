@@ -30,3 +30,36 @@ export const roleMiddleware = (allowedRoles: string[]) => {
     next();
   };
 };
+
+/**
+ * Middleware to restrict access based on employeeJob or user role.
+ * ADMIN and MANAGER always have full access.
+ * Mirrors the API Gateway's requireServiceRole behaviour.
+ */
+export const requireServiceRole = (allowedJobs: string[], allowManagerAdmin = true) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError('Not authenticated', 401));
+    }
+
+    const { role, employeeJob } = req.user;
+
+    // ADMIN and MANAGER always have full access by default
+    if (
+      allowManagerAdmin &&
+      (role === 'ADMIN' || role === 'MANAGER' || employeeJob === 'MANAGER')
+    ) {
+      return next();
+    }
+
+    // Check if employee has one of the allowed jobs
+    if (
+      (role === 'EMPLOYEE' && employeeJob && allowedJobs.includes(employeeJob)) ||
+      (role === 'FINANCE' && allowedJobs.includes('FINANCE'))
+    ) {
+      return next();
+    }
+
+    return next(new AppError('Access denied: insufficient permissions', 403));
+  };
+};

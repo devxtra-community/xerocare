@@ -29,6 +29,12 @@ export class AuthService {
     return { user };
   }
 
+  // How long a just-rotated refresh token is still honoured for a racing
+  // duplicate request (two open tabs, or several API calls firing at once
+  // right as the access token expires). Anything older is treated as genuine
+  // reuse and rejected.
+  private static REFRESH_GRACE_MS = 10_000;
+
   /**
    * Refreshes an access token using a valid refresh token.
    */
@@ -43,14 +49,41 @@ export class AuthService {
       throw new AppError('Token not found', 401);
     }
 
+    if (storedToken.superseded_at) {
+      const ageMs = Date.now() - storedToken.superseded_at.getTime();
+      if (ageMs > AuthService.REFRESH_GRACE_MS || !storedToken.superseded_by_token) {
+        throw new AppError('Refresh token already used', 401);
+      }
+
+      // A duplicate request racing the one that already rotated this token —
+      // hand it the successor session instead of rejecting it.
+      const successor = await this.authRepo.findByToken(storedToken.superseded_by_token);
+      if (!successor) {
+        throw new AppError('Token not found', 401);
+      }
+
+      const user = successor.employee || successor.admin;
+      if (!user) {
+        throw new AppError('User not found for this token', 404);
+      }
+
+      return { user, reuseRefreshToken: successor.refresh_token };
+    }
+
     const user = storedToken.employee || storedToken.admin;
     if (!user) {
       throw new AppError('User not found for this token', 404);
     }
 
-    await this.authRepo.deleteToken(refreshToken);
+    return { user };
+  }
 
-    return user;
+  /**
+   * Marks a refresh token rotated once its successor has actually been
+   * issued (see `refresh()` / authController.refresh).
+   */
+  async linkSupersession(oldRefreshToken: string, newRefreshToken: string) {
+    await this.authRepo.markSuperseded(oldRefreshToken, newRefreshToken);
   }
 
   /**

@@ -20,6 +20,9 @@ export type EmailJob =
       email: string;
       vendorName: string;
       rfqNumber: string;
+      warehouseName: string;
+      warehouseAddress: string;
+      warehouseLocation: string;
     }
   | {
       type: 'RFQ_REJECTED';

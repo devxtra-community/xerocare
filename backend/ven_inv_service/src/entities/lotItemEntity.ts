@@ -81,6 +81,14 @@ export class LotItem {
   @Column({ name: 'custom_spare_part_name', type: 'varchar', nullable: true })
   customSparePartName?: string;
 
+  /**
+   * Brand for a spare-part item that has no catalog SparePart link (a custom
+   * RFQ-quoted part, or a manually created lot item) — SparePart.brand covers
+   * the catalog-linked case, this covers the uncataloged one.
+   */
+  @Column({ name: 'brand', type: 'varchar', nullable: true })
+  brand?: string;
+
   @Column({ name: 'mpn', type: 'varchar', nullable: true })
   mpn?: string;
 

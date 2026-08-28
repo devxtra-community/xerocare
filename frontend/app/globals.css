@@ -156,5 +156,42 @@
   html,
   body {
     @apply bg-background text-foreground overflow-x-hidden;
+    scrollbar-gutter: stable;
   }
+}
+
+/* Radix/react-remove-scroll-bar injects a runtime <style> forcing
+   body[data-scroll-locked] { margin-right: <gap>px !important } to fake-compensate
+   for the scrollbar it hides on dropdown/dialog open. scrollbar-gutter above already
+   reserves that space, so the extra margin only shows up as a dead strip on the right.
+   Higher specificity beats their same-specificity rule regardless of injection order. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
+/* Thin scrollbar everywhere (page body and the sidebar nav list) instead of
+   the OS/browser's classic full-width track with arrow buttons, which reads
+   as "always visible" even when a page barely overflows. overflow-auto
+   (set on these elements) already means no scrollbar renders at all once
+   content fits the viewport — this only changes how it looks when it does. */
+html,
+body,
+[data-slot='sidebar-content'] {
+  scrollbar-width: thin;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+[data-slot='sidebar-content']::-webkit-scrollbar {
+  width: 6px;
+}
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+[data-slot='sidebar-content']::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 9999px;
+}
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+[data-slot='sidebar-content']::-webkit-scrollbar-track {
+  background: transparent;
 }

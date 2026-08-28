@@ -14,6 +14,7 @@ import { Vendor } from './vendorEntity';
 import { RfqItem } from './rfqItemEntity';
 import { RfqVendor } from './rfqVendorEntity';
 import { PurchaseOrigin } from './enums/purchaseOrigin';
+import { Warehouse } from './warehouseEntity';
 
 export enum RfqStatus {
   DRAFT = 'DRAFT',
@@ -52,6 +53,17 @@ export class Rfq {
 
   @Column({ type: 'uuid', nullable: true })
   awarded_vendor_id?: string;
+
+  // Delivery warehouse chosen at award time — required by RfqService.awardVendor
+  // going forward, sent to the vendor in the award email, and inherited by
+  // createLotFromRfq so the lot is never created without one. Nullable at the
+  // DB level only because RFQs awarded before this field existed have none.
+  @Column({ type: 'uuid', nullable: true })
+  awarded_warehouse_id?: string;
+
+  @ManyToOne(() => Warehouse, { nullable: true })
+  @JoinColumn({ name: 'awarded_warehouse_id' })
+  awarded_warehouse?: Warehouse;
 
   // Snapshotted once at award time (see RfqService.awardVendor). Never recalculated.
   @Column({

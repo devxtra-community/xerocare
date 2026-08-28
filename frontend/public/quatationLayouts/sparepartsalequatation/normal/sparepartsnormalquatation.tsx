@@ -319,7 +319,9 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               <th style={thStyle('center')}>Unit Price</th>
               <th style={thStyle('center')}>Discount</th>
               <th style={thStyle('center')}>
-                {lineItems[0]?.vatPercent ? `VAT (${lineItems[0].vatPercent}%)` : 'VAT'}
+                {lineItems[0]?.vatPercent
+                  ? `${totals.vatName || 'VAT'} (${lineItems[0].vatPercent}%)`
+                  : totals.vatName || 'VAT'}
               </th>
               <th style={{ ...thStyle('right') }}>Amount</th>
             </tr>
@@ -450,7 +452,11 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
         )}
         <div style={{ width: '250px' }}>
           {[
-            { label: 'Subtotal (Before VAT)', value: totals.subTotal, num: totals.subTotal },
+            {
+              label: `Subtotal (Before ${totals.vatName || 'VAT'})`,
+              value: totals.subTotal,
+              num: totals.subTotal,
+            },
             ...(totals.discountTotal
               ? [
                   {
@@ -469,7 +475,7 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
               num: totals.vatTotal,
             },
             {
-              label: 'Grand Total (Including VAT)',
+              label: `Grand Total (Including ${totals.vatName || 'VAT'})`,
               value: totals.total,
               num: totals.total,
               prefix: `${getActiveCurrency()} `,

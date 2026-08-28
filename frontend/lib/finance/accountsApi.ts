@@ -2113,6 +2113,7 @@ export interface InputTaxInternationalRow {
   taxableAmount?: number;
   importVatReverseCharge?: number;
   taxPercent?: number;
+  taxName?: string;
   customsEntryNo?: string;
   customsDuty?: number;
   shippingCost?: number;

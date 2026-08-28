@@ -12,14 +12,32 @@ import {
   ShieldAlert,
   Download,
   AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
+import { getEmployeeLeaveCount } from '@/lib/leaveApplicationService';
+import { markLate, getEmployeeLateCount } from '@/lib/lateMarkService';
+import { getUserFromToken } from '@/lib/auth';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { SessionsDialog } from '@/components/SessionsDialog';
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog';
 
 interface EmployeeProfileProps {
   id: string;
@@ -35,6 +53,36 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
   const router = useRouter();
   const [emp, setEmp] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [leaveCount, setLeaveCount] = useState<number | null>(null);
+  const [lateCount, setLateCount] = useState<number | null>(null);
+  const [isMarkLateOpen, setIsMarkLateOpen] = useState(false);
+  const [lateDate, setLateDate] = useState('');
+  const [lateNote, setLateNote] = useState('');
+  const [isSubmittingLate, setIsSubmittingLate] = useState(false);
+  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+
+  const tokenUser = getUserFromToken();
+  const viewerRole = tokenUser?.role;
+  const isSelfView = tokenUser?.userId === id;
+  // ID proof documents stay HR/Admin/Manager-only server-side — hide the
+  // buttons for other viewers rather than let them hit a 403 on click.
+  const canViewDocs = viewerRole === 'ADMIN' || viewerRole === 'HR' || viewerRole === 'MANAGER';
+  const canMarkLate =
+    !isSelfView && (viewerRole === 'ADMIN' || viewerRole === 'HR' || viewerRole === 'MANAGER');
+
+  const loadStats = async () => {
+    try {
+      const [leaveRes, lateRes] = await Promise.all([
+        getEmployeeLeaveCount(id),
+        getEmployeeLateCount(id),
+      ]);
+      setLeaveCount(leaveRes.data.count);
+      setLateCount(lateRes.data.count);
+    } catch {
+      // Non-blocking — profile still renders without these stats
+    }
+  };
 
   useEffect(() => {
     const fetchEmployee = async () => {
@@ -51,7 +99,33 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
       }
     };
     fetchEmployee();
+    loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, router]);
+
+  const handleMarkLate = async () => {
+    if (!lateDate) {
+      toast.error('Please select a date');
+      return;
+    }
+
+    setIsSubmittingLate(true);
+    try {
+      await markLate({ employee_id: id, date: lateDate, note: lateNote || undefined });
+      toast.success('Employee marked late');
+      setIsMarkLateOpen(false);
+      setLateDate('');
+      setLateNote('');
+      loadStats();
+    } catch (err) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to mark employee late';
+      toast.error(message);
+    } finally {
+      setIsSubmittingLate(false);
+    }
+  };
 
   const handleDownloadIdProof = async () => {
     try {
@@ -82,6 +156,19 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
         <Button onClick={() => router.back()}>Go Back</Button>
       </div>
     );
+  }
+
+  let deptDisplay = 'Other';
+  if (emp.role === 'MANAGER') deptDisplay = 'Management';
+  else if (emp.role === 'HR') deptDisplay = 'Human Resources';
+  else if (emp.role === 'FINANCE') {
+    deptDisplay = emp.finance_job
+      ? FINANCE_JOB_LABELS[emp.finance_job as FinanceJob] || emp.finance_job
+      : 'Finance';
+  } else if (emp.role === 'EMPLOYEE') {
+    deptDisplay = emp.employee_job
+      ? EMPLOYEE_JOB_LABELS[emp.employee_job as EmployeeJob] || emp.employee_job
+      : 'Employee';
   }
 
   return (
@@ -115,10 +202,12 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           >
             {emp.status}
           </Badge>
-          <Button className="gap-2 h-9 font-medium px-4" onClick={handleDownloadIdProof}>
-            <Download className="h-4 w-4" />
-            Export Dossier
-          </Button>
+          {canViewDocs && (
+            <Button className="gap-2 h-9 font-medium px-4" onClick={handleDownloadIdProof}>
+              <Download className="h-4 w-4" />
+              Export Dossier
+            </Button>
+          )}
         </div>
       </div>
 
@@ -143,17 +232,32 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
             <div className="w-full grid grid-cols-2 gap-3 mb-6">
               <div className="bg-muted/50 p-3 rounded-lg border border-gray-100 flex flex-col items-center text-center">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Leaves
+                  Leaves (This Year)
                 </span>
-                <span className="text-lg font-bold text-primary">04</span>
+                <span className="text-lg font-bold text-primary">
+                  {leaveCount === null ? '—' : String(leaveCount).padStart(2, '0')}
+                </span>
               </div>
               <div className="bg-muted/50 p-3 rounded-lg border border-gray-100 flex flex-col items-center text-center">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Late
+                  Late (This Year)
                 </span>
-                <span className="text-lg font-bold text-primary">02</span>
+                <span className="text-lg font-bold text-primary">
+                  {lateCount === null ? '—' : String(lateCount).padStart(2, '0')}
+                </span>
               </div>
             </div>
+
+            {canMarkLate && (
+              <Button
+                variant="outline"
+                className="w-full gap-2 h-9 text-xs mb-6 -mt-3"
+                onClick={() => setIsMarkLateOpen(true)}
+              >
+                <Clock className="h-3.5 w-3.5" />
+                Mark Late
+              </Button>
+            )}
 
             <div className="w-full space-y-4 pt-4 border-t border-gray-100">
               <div className="flex items-center gap-3">
@@ -173,9 +277,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-400 font-medium uppercase">Department</span>
-                  <span className="text-sm font-medium text-primary">
-                    {emp.branch?.name || 'Main Operations'}
-                  </span>
+                  <span className="text-sm font-medium text-primary">{deptDisplay}</span>
                 </div>
               </div>
             </div>
@@ -191,13 +293,33 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
                 Employee has standard access to the {emp.role?.toLowerCase()} dashboard and internal
                 logistics tools.
               </p>
-              <Button
-                variant="outline"
-                className="w-full h-8 text-xs"
-                onClick={handleDownloadIdProof}
-              >
-                Verify Primary Document
-              </Button>
+              {canViewDocs && (
+                <Button
+                  variant="outline"
+                  className="w-full h-8 text-xs"
+                  onClick={handleDownloadIdProof}
+                >
+                  Verify Primary Document
+                </Button>
+              )}
+              {isSelfView && (
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => setIsSessionsOpen(true)}
+                  >
+                    Session Info
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => setIsPasswordOpen(true)}
+                  >
+                    Change Password
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -249,6 +371,50 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
           </div>
         </div>
       </div>
+
+      <Dialog open={isMarkLateOpen} onOpenChange={setIsMarkLateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark {emp.first_name || 'Employee'} Late</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="late-date">Date</Label>
+              <Input
+                id="late-date"
+                type="date"
+                value={lateDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setLateDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="late-note">Note (optional)</Label>
+              <Textarea
+                id="late-note"
+                placeholder="e.g. Arrived 45 minutes after shift start"
+                value={lateNote}
+                onChange={(e) => setLateNote(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMarkLateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMarkLate} disabled={isSubmittingLate}>
+              {isSubmittingLate ? 'Marking...' : 'Mark Late'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {isSelfView && (
+        <>
+          <SessionsDialog open={isSessionsOpen} onOpenChange={setIsSessionsOpen} />
+          <ChangePasswordDialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen} />
+        </>
+      )}
     </div>
   );
 }

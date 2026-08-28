@@ -136,6 +136,16 @@ export const leaderboard = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const branchMonthlyActivity = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { month } = req.query;
+    const rows = await targetService.branchMonthlyActivity(req.branchFilter ?? [], month as string);
+    res.status(200).json({ success: true, data: rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const adminOverview = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = requireUser(req);

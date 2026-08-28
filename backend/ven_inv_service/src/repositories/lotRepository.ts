@@ -182,6 +182,7 @@ export class LotRepository {
             }
 
             lotItem.sparePartId = sparePart.id;
+            lotItem.brand = brand;
           } else {
             throw new AppError(
               'Spare Part requires either sparePartId or both brand and partName',

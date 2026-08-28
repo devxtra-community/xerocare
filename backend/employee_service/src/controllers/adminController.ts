@@ -14,7 +14,7 @@ export const adminLogin = async (req: Request, res: Response, next: NextFunction
   try {
     const admin = await adminService.login(req.body);
 
-    const accessToken = await issueTokens(admin, req, res);
+    const { accessToken } = await issueTokens(admin, req, res);
 
     return res.json({
       message: 'Admin login successfully',

@@ -15,11 +15,28 @@ import {
   User,
   GraduationCap,
   Loader2,
+  Clock,
+  Undo2,
 } from 'lucide-react';
 import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
+import { getEmployeeRecentActivity, EmployeeActivityRow } from '@/lib/invoice';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { EMPLOYEE_JOB_LABELS, EmployeeJob } from '@/lib/employeeJob';
+import { FINANCE_JOB_LABELS, FinanceJob } from '@/lib/financeJob';
+import { getUserFromToken } from '@/lib/auth';
+import { SessionsDialog } from '@/components/SessionsDialog';
+import { ChangePasswordDialog } from '@/components/ChangePasswordDialog';
 import { toast } from 'sonner';
+
+const SALE_TYPE_LABELS: Record<string, string> = {
+  SALE: 'Sale',
+  PRODUCT_SALE: 'Sale',
+  SPAREPART_SALE: 'Spare Part Sale',
+  RENT: 'Rent',
+  LEASE: 'Lease',
+  SERVICE: 'Service',
+};
 
 export default function EmployeeProfilePage() {
   const currency = useBranchCurrency();
@@ -30,6 +47,12 @@ export default function EmployeeProfilePage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewingDoc, setViewingDoc] = useState(false);
+  const [activity, setActivity] = useState<EmployeeActivityRow[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [isSessionsOpen, setIsSessionsOpen] = useState(false);
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+
+  const isSelfView = getUserFromToken()?.userId === id;
 
   useEffect(() => {
     async function fetchEmployee() {
@@ -50,6 +73,23 @@ export default function EmployeeProfilePage() {
     }
     if (id) {
       fetchEmployee();
+    }
+  }, [id]);
+
+  useEffect(() => {
+    async function fetchActivity() {
+      try {
+        setActivityLoading(true);
+        const rows = await getEmployeeRecentActivity(id);
+        setActivity(rows);
+      } catch (err) {
+        console.error('Failed to load employee activity:', err);
+      } finally {
+        setActivityLoading(false);
+      }
+    }
+    if (id) {
+      fetchActivity();
     }
   }, [id]);
 
@@ -103,8 +143,15 @@ export default function EmployeeProfilePage() {
   let deptDisplay = 'Other';
   if (employee.role === 'MANAGER') deptDisplay = 'Management';
   else if (employee.role === 'HR') deptDisplay = 'Human Resources';
-  else if (employee.role === 'FINANCE') deptDisplay = employee.finance_job || 'Finance';
-  else if (employee.role === 'EMPLOYEE') deptDisplay = employee.employee_job || 'Employee';
+  else if (employee.role === 'FINANCE') {
+    deptDisplay = employee.finance_job
+      ? FINANCE_JOB_LABELS[employee.finance_job as FinanceJob] || employee.finance_job
+      : 'Finance';
+  } else if (employee.role === 'EMPLOYEE') {
+    deptDisplay = employee.employee_job
+      ? EMPLOYEE_JOB_LABELS[employee.employee_job as EmployeeJob] || employee.employee_job
+      : 'Employee';
+  }
 
   const joiningDate = employee.createdAt
     ? new Date(employee.createdAt).toLocaleDateString('en-US', {
@@ -203,6 +250,30 @@ export default function EmployeeProfilePage() {
               )}
             </div>
           </div>
+
+          {isSelfView && (
+            <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" /> Account
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  className="h-9 text-xs"
+                  onClick={() => setIsSessionsOpen(true)}
+                >
+                  Session Info
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-9 text-xs"
+                  onClick={() => setIsPasswordOpen(true)}
+                >
+                  Change Password
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* WORK INFO */}
@@ -235,8 +306,70 @@ export default function EmployeeProfilePage() {
               </div>
             </div>
           </div>
+
+          <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
+            <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-6 pb-3 border-b border-gray-100">
+              <Clock className="h-4 w-4 text-muted-foreground" /> Recent Activity
+            </h4>
+            {activityLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : activity.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No sales, rent, or lease activity yet.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {activity.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between gap-4 py-3 border-b border-gray-50 last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700">
+                          {SALE_TYPE_LABELS[a.saleType] || a.saleType}
+                        </span>
+                        {a.returnCount > 0 && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-600">
+                            <Undo2 className="h-3 w-3" />
+                            {a.returnCount > 1 ? `${a.returnCount} Returns` : 'Returned'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-foreground truncate mt-1">
+                        {a.customerName || a.invoiceNumber}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {a.invoiceNumber} &middot;{' '}
+                        {new Date(a.createdAt).toLocaleDateString('en-US', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-semibold text-primary">
+                        {formatCurrency(a.totalAmount, a.currencyCode || currency)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{a.status}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {isSelfView && (
+        <>
+          <SessionsDialog open={isSessionsOpen} onOpenChange={setIsSessionsOpen} />
+          <ChangePasswordDialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen} />
+        </>
+      )}
     </div>
   );
 }

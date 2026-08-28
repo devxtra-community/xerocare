@@ -17,6 +17,12 @@ const managerOrAdmin = requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN);
 // contract used across the rest of Accounts.
 router.get('/leaderboard', managerOrAdmin, parseBranchFilter, targetController.leaderboard);
 router.get(
+  '/branch-activity/monthly',
+  managerOrAdmin,
+  parseBranchFilter,
+  targetController.branchMonthlyActivity,
+);
+router.get(
   '/achievement/monthly',
   managerOrAdmin,
   parseBranchFilter,

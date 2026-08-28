@@ -6,6 +6,7 @@ import adminRouter from './routes/adminRouter';
 import employeeRouter from './routes/employeeRouter';
 import authRouter from './routes/authRouter';
 import leaveApplicationRouter from './routes/leaveApplicationRouter';
+import lateMarkRouter from './routes/lateMarkRouter';
 import payrollRouter from './routes/payrollRouter';
 import notificationRouter from './routes/notificationRouter';
 import cookieParser from 'cookie-parser';
@@ -64,6 +65,7 @@ app.use('/auth', authRouter);
 app.use('/employee', employeeRouter);
 app.use('/admin', adminRouter);
 app.use('/leave-applications', leaveApplicationRouter);
+app.use('/late-marks', lateMarkRouter);
 app.use('/payroll', payrollRouter);
 app.use('/notifications', notificationRouter);
 

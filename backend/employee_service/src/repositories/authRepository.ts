@@ -44,6 +44,18 @@ export class AuthRepository {
   }
 
   /**
+   * Flags a refresh token as rotated instead of deleting it outright, so a
+   * request racing the rotation can still be resolved for a short grace
+   * window (see AuthService.refresh()).
+   */
+  async markSuperseded(oldToken: string, newToken: string) {
+    return this.authRepo.update(
+      { refresh_token: oldToken },
+      { superseded_at: new Date(), superseded_by_token: newToken },
+    );
+  }
+
+  /**
    * Deletes all other tokens for a user except the current one.
    */
   async deleteOtherTokens(userId: string, currentToken: string) {

@@ -121,19 +121,19 @@ const menuItems = [
     title: 'Service',
     icon: ClipboardList,
     href: '/employee/service',
-    modules: ['service_desk'],
+    modules: ['service', 'service_desk'],
   },
   {
     title: 'Service Contracts',
     icon: FileText,
     href: '/employee/service/contracts',
-    modules: ['service_desk'],
+    modules: ['service', 'service_desk'],
   },
   {
     title: 'Customer Contracts',
     icon: FileSignature,
     href: '/employee/service/sale-contracts',
-    modules: ['service_desk'],
+    modules: ['service', 'service_desk'],
   },
   {
     title: 'Installation Requests',

@@ -2054,6 +2054,17 @@ export class ServiceController {
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      // Only allow starting repair for FREE_SERVICE or CUSTOMER_APPROVED tickets
+      if (
+        ticket.status !== ServiceTicketStatus.FREE_SERVICE &&
+        ticket.status !== ServiceTicketStatus.CUSTOMER_APPROVED
+      ) {
+        throw new AppError(
+          `Cannot start repair: ticket must be in CUSTOMER_APPROVED or FREE_SERVICE status (current: ${ticket.status})`,
+          400,
+        );
+      }
+
       ticket.status = ServiceTicketStatus.IN_PROGRESS;
       ticket.repairStartedAt = new Date();
       await ticketRepo.save(ticket);

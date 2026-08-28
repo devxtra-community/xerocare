@@ -26,6 +26,7 @@ import { brandService } from '@/services/brandService';
 import { modelService } from '@/services/modelService';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { getMyBranch } from '@/lib/branch';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface BulkSparePartDialogProps {
@@ -99,13 +100,21 @@ export default function BulkSparePartDialog({
   const [lots, setLots] = useState<Lot[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
+  const [branchTax, setBranchTax] = useState<{
+    has_tax?: boolean;
+    tax_name?: string | null;
+    tax_percent?: number | null;
+  } | null>(null);
 
   const getLotSparePartItems = (lotId?: string): LotSparePartOption[] => {
     if (!lotId) return [];
     const lot = lots.find((l) => l.id === lotId);
     if (!lot) return [];
     return lot.items
-      .filter((item) => item.itemType === LotItemType.SPARE_PART)
+      .filter(
+        (item) =>
+          item.itemType === LotItemType.SPARE_PART && item.receivedQuantity - item.usedQuantity > 0,
+      )
       .map((item) => {
         const sp = item.sparePart;
         const sku = sp?.sku || '';
@@ -114,10 +123,13 @@ export default function BulkSparePartDialog({
           id: item.id,
           sku,
           partName,
-          brand: sp?.brand || '',
+          brand: sp?.brand || item.brand || '',
           modelIds: sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'],
           purchasePrice: item.unitPrice || sp?.purchase_price || 0,
-          basePrice: sp?.base_price || item.unitPrice || 0,
+          // Selling price is intentionally NOT defaulted from unitPrice (purchase
+          // cost) — the two are unrelated, and copying one into the other used to
+          // silently pre-fill an incorrect selling price the user rarely noticed.
+          basePrice: item.sellingPrice || sp?.base_price || 0,
           wholesalePrice: sp?.wholesale_price || 0,
           mpn: item.mpn || sp?.mpn || '',
           label: `${sku || 'NEW'} - ${partName}`,
@@ -128,18 +140,24 @@ export default function BulkSparePartDialog({
 
   const loadDependencies = async () => {
     try {
-      const [v, w, l, b, m] = await Promise.all([
+      const [v, w, l, b, m, branch] = await Promise.all([
         vendorService.getVendors(),
         warehouseService.getWarehousesByBranch(),
         lotService.getAllLots(),
         brandService.getAllBrands(),
         modelService.getAllModels({ limit: 1000 }),
+        getMyBranch({ silent: true }),
       ]);
       setVendors(v || []);
       setWarehouses(w || []);
       setLots(l.data || []);
       setBrands(b || []);
       setModels(m.data || []);
+      setBranchTax({
+        has_tax: branch.has_tax,
+        tax_name: branch.tax_name,
+        tax_percent: branch.tax_percent,
+      });
     } catch {
       toast.error('Failed to load dependencies');
     }
@@ -181,7 +199,11 @@ export default function BulkSparePartDialog({
     if (open && initialLotId && lots.length > 0) {
       const lot = lots.find((l) => l.id === initialLotId);
       if (lot && lot.items) {
-        let itemsToFill = lot.items.filter((item) => item.itemType === LotItemType.SPARE_PART);
+        let itemsToFill = lot.items.filter(
+          (item) =>
+            item.itemType === LotItemType.SPARE_PART &&
+            item.receivedQuantity - item.usedQuantity > 0,
+        );
         if (initialItemId) {
           itemsToFill = itemsToFill.filter((item) => item.id === initialItemId);
         }
@@ -193,12 +215,12 @@ export default function BulkSparePartDialog({
             _selectedLotItemId: item.id,
             sku: sp?.sku || '',
             part_name: sp?.part_name || item.customSparePartName || '',
-            brand: sp?.brand || '',
+            brand: sp?.brand || item.brand || '',
             model_ids: sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'],
             purchase_price: Number(item.unitPrice) || Number(sp?.purchase_price) || 0,
-            base_price: Number(sp?.base_price) || Number(item.unitPrice) || 0,
+            base_price: Number(item.sellingPrice) || Number(sp?.base_price) || 0,
             wholesale_price: Number(sp?.wholesale_price) || 0,
-            quantity: Math.max(1, item.receivedQuantity - item.usedQuantity),
+            quantity: item.receivedQuantity - item.usedQuantity,
             vendor_id: lot.vendorId || lot.vendor?.id || '',
             warehouse_id: lot.warehouse_id || '',
             mpn: item.mpn || sp?.mpn || '',
@@ -381,7 +403,9 @@ export default function BulkSparePartDialog({
   };
 
   const handleSubmit = async () => {
-    const validRows = rows.filter((r) => r.part_name && r.sku);
+    // SKU is optional here on purpose — the backend auto-generates one via
+    // generateSku() when it's omitted (sparePartService.ts addSingleSparePart).
+    const validRows = rows.filter((r) => r.part_name);
 
     if (!rows.some((r) => r.lot_id)) {
       toast.error('Please assign a Lot to at least one spare part row before uploading');
@@ -389,7 +413,7 @@ export default function BulkSparePartDialog({
     }
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid spare part with SKU and Name');
+      toast.error('Please add at least one valid spare part with a Name');
       return;
     }
 
@@ -692,7 +716,7 @@ export default function BulkSparePartDialog({
 
                         {/* Right column */}
                         <div className="space-y-4">
-                          <Field label="SKU *">
+                          <Field label="SKU">
                             <Input
                               value={row.sku || ''}
                               onChange={(e) => updateRow(i, 'sku', e.target.value)}
@@ -793,6 +817,19 @@ export default function BulkSparePartDialog({
                               />
                             </Field>
                           </div>
+
+                          <Field
+                            label={`Tax Rate ${branchTax?.tax_name ? `(${branchTax.tax_name})` : ''}`}
+                          >
+                            <Input
+                              disabled
+                              value={
+                                branchTax?.has_tax
+                                  ? `${Number(branchTax.tax_percent ?? 0)}%`
+                                  : 'No tax on this branch'
+                              }
+                            />
+                          </Field>
 
                           <Field label="Yield Specification">
                             <Input

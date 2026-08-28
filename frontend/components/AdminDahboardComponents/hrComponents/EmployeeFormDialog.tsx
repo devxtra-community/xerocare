@@ -44,6 +44,7 @@ export default function EmployeeFormDialog({
     first_name: '',
     last_name: '',
     email: '',
+    phone: '',
     role: 'EMPLOYEE',
     employee_job: '' as EmployeeJob | '',
     finance_job: '' as FinanceJob | '',
@@ -105,6 +106,7 @@ export default function EmployeeFormDialog({
         first_name: initialData.first_name || '',
         last_name: initialData.last_name || '',
         email: initialData.email || '',
+        phone: initialData.phone || '',
         role: initialData.role || 'EMPLOYEE',
         employee_job: (initialData as Employee & { employee_job?: EmployeeJob }).employee_job || '',
         finance_job: (initialData as Employee & { finance_job?: FinanceJob }).finance_job || '',
@@ -122,6 +124,7 @@ export default function EmployeeFormDialog({
         first_name: '',
         last_name: '',
         email: '',
+        phone: '',
         role: 'EMPLOYEE',
         employee_job: '',
         finance_job: '',
@@ -183,6 +186,7 @@ export default function EmployeeFormDialog({
       data.append('first_name', formData.first_name);
       data.append('last_name', formData.last_name);
       data.append('email', formData.email);
+      data.append('phone', formData.phone);
       data.append('role', formData.role);
       if (formData.employee_job) {
         data.append('employee_job', formData.employee_job);
@@ -294,6 +298,21 @@ export default function EmployeeFormDialog({
                 required
                 disabled={!!initialData}
                 className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Phone Number
+              </label>
+              <Input
+                name="phone"
+                type="tel"
+                placeholder="+1 234 567 8900"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>
 
