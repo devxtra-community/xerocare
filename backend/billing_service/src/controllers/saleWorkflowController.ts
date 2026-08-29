@@ -9,17 +9,24 @@ import { ContractAgreement } from '../entities/contractAgreementEntity';
 import { InstallationRequest } from '../entities/installationRequestEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { DeliveryStatus } from '../entities/enums/deliveryStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
+import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 import { InvoiceLedger } from '../entities/invoiceLedgerEntity';
 import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
 import { Cheque } from '../entities/chequeEntity';
+import {
+  GuaranteeCheque,
+  GuaranteeChequeStatus,
+  GuaranteeChequePurpose,
+} from '../entities/guaranteeChequeEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { r2 } from '../config/r2';
 import { createSalePaymentRequest } from '../services/salePaymentRequestService';
-import { requireCashAccount } from '../services/cashbookService';
+import { requireCashAccount, postCashbookEntry } from '../services/cashbookService';
 
 import { logger } from '../config/logger';
 import { r2SignedGetUrl } from '../utils/r2Url';
@@ -613,7 +620,14 @@ async function loadBillForBranch(usageRecordId: string, branchId: string) {
     relations: ['items'],
   });
   if (!usage) throw new AppError('Bill not found', 404);
-  const invoice = await Source.getRepository(Invoice).findOne({ where: { id: usage.contractId } });
+  // 'items' + 'productAllocations' — the Advance Bill needs the machine's initial reading
+  // (BillDocumentBody's ContractDetailsSection), which lives on productAllocations; this
+  // was missing entirely here (unlike getBillForSigning's equivalent query, which already
+  // fetches both), so the Finance-facing Bill view had no reading data to show at all.
+  const invoice = await Source.getRepository(Invoice).findOne({
+    where: { id: usage.contractId },
+    relations: ['items', 'productAllocations'],
+  });
   if (!invoice) throw new AppError('Contract not found', 404);
   if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
   return { usage, invoice };
@@ -641,26 +655,58 @@ export const getBill = async (req: Request, res: Response, next: NextFunction) =
         if (!usage) throw new AppError('Bill not found', 404);
         const invoice = await Source.getRepository(Invoice).findOne({
           where: { id: usage.contractId },
+          relations: ['items', 'productAllocations'],
         });
         if (!invoice) throw new AppError('Contract not found', 404);
         return { usage, invoice };
       },
     );
 
-    // Advance Bills wrap an already-collected RENT_ADVANCE/LEASE_ADVANCE payment — the
-    // document needs its amount/mode/date/status, not just the bill's own approval state.
+    // Advance/Security Deposit Bills wrap an already-collected RENT_ADVANCE/LEASE_ADVANCE
+    // or RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT payment — the document needs its
+    // amount/mode/date/status, not just the bill's own approval state. Field stays named
+    // advancePayment for both billTypes — see BillDocumentBody's Props comment.
+    //
+    // An ADVANCE bill also carries the deposit payment (if one exists) as depositPayment —
+    // a deposit is shown as a section within the First Month Advance Bill now, not as its
+    // own separate document, so viewing the Advance Bill needs both regardless of billType.
+    // totalCharge/taxableAmount on `usage` stay advance-only throughout — the deposit is
+    // display-only here, never folded into the bill's own charged amount (it's a refundable
+    // liability, not revenue; see the AR-exclusion comments in accountsShared.ts for why
+    // that separation matters elsewhere too).
     let advancePayment: SalePaymentRequest | null = null;
+    let depositPayment: SalePaymentRequest | null = null;
     if (usage.billType === 'ADVANCE') {
+      [advancePayment, depositPayment] = await Promise.all([
+        Source.getRepository(SalePaymentRequest).findOne({
+          where: {
+            invoiceId: usage.contractId,
+            paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']),
+          },
+          order: { createdAt: 'ASC' },
+        }),
+        Source.getRepository(SalePaymentRequest).findOne({
+          where: {
+            invoiceId: usage.contractId,
+            paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
+            status: In(['PENDING', 'APPROVED']),
+          },
+          order: { createdAt: 'ASC' },
+        }),
+      ]);
+    } else if (usage.billType === 'SECURITY_DEPOSIT') {
+      // Deposit-only edge case (no advance was ever collected on this contract) — the
+      // standalone Security Deposit Bill flow still exists for exactly this.
       advancePayment = await Source.getRepository(SalePaymentRequest).findOne({
         where: {
           invoiceId: usage.contractId,
-          paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']),
+          paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
         },
         order: { createdAt: 'ASC' },
       });
     }
 
-    res.json({ success: true, data: { usage, invoice, advancePayment } });
+    res.json({ success: true, data: { usage, invoice, advancePayment, depositPayment } });
   } catch (err) {
     next(err);
   }
@@ -771,18 +817,146 @@ export const getAdvanceBillStatus = async (req: Request, res: Response, next: Ne
   }
 };
 
-// "Edit & Resend" for a disputed Advance Bill — unlike a periodic usage Bill, there is
-// nothing to recompute here: the amount is the real, already-collected payment, and
-// letting Finance change it via this endpoint would bypass the actual payment-correction
-// channel. So this just resets the approval trail so a corrected send can go out again —
-// the same field-reset updateUsageRecord already does for the USAGE case.
+// Get-or-create a Security Deposit Bill — mirrors generateAdvanceBill exactly, wrapping
+// the contract's already-collected RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT
+// SalePaymentRequest instead. Same UsageRecord table/approval-pipeline, just
+// billType='SECURITY_DEPOSIT' and no period/readings. Idempotent.
+export const generateSecurityDepositBill = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const contractId = req.params.contractId as string;
+    const { userId, branchId } = req.user!;
+
+    const invoice = await Source.getRepository(Invoice).findOne({ where: { id: contractId } });
+    if (!invoice) throw new AppError('Contract not found', 404);
+    if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
+
+    const usageRepo = Source.getRepository(UsageRecord);
+    const existing = await usageRepo.findOne({
+      where: { contractId, billType: 'SECURITY_DEPOSIT' },
+    });
+    if (existing) {
+      return res.json({ success: true, data: existing });
+    }
+
+    const depositPayment = await Source.getRepository(SalePaymentRequest).findOne({
+      where: {
+        invoiceId: contractId,
+        paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
+      },
+      order: { createdAt: 'ASC' },
+    });
+    if (!depositPayment) {
+      throw new AppError(
+        'No security deposit payment has been recorded for this contract yet',
+        400,
+      );
+    }
+
+    const billCreatedByName = await fetchEmployeeName(userId);
+    const depositDate = new Date(depositPayment.paymentDate);
+
+    const usage = usageRepo.create({
+      contract: { id: contractId } as Invoice,
+      billType: 'SECURITY_DEPOSIT',
+      billingPeriodStart: depositDate,
+      billingPeriodEnd: depositDate,
+      totalCharge: Number(depositPayment.amount),
+      taxableAmount: Number(depositPayment.taxableAmount ?? depositPayment.amount),
+      taxAmount: Number(depositPayment.taxAmount ?? 0),
+      taxPercent: depositPayment.taxPercent ?? undefined,
+      reportedBy: 'EMPLOYEE' as UsageRecord['reportedBy'],
+      billStatus: 'PENDING_APPROVAL',
+      billCreatedByEmployeeId: userId,
+      billCreatedByName,
+    });
+    await usageRepo.save(usage);
+
+    res.status(201).json({ success: true, data: usage });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Batch check for the "Generate Security Deposit Bill" button — mirrors
+// getAdvanceBillStatus — whether each contract has a security deposit payment recorded
+// at all, and whether a Security Deposit Bill already exists for it (and its status).
+export const getSecurityDepositBillStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { branchId } = req.user!;
+    const contractIds = String(req.query.contractIds ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (contractIds.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+
+    const invoices = await Source.getRepository(Invoice).find({
+      where: { id: In(contractIds), branchId },
+      select: ['id'],
+    });
+    const scopedIds = invoices.map((i) => i.id);
+    if (scopedIds.length === 0) {
+      return res.json({ success: true, data: {} });
+    }
+
+    const [depositPayments, depositBills] = await Promise.all([
+      Source.getRepository(SalePaymentRequest).find({
+        where: {
+          invoiceId: In(scopedIds),
+          paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
+        },
+      }),
+      Source.getRepository(UsageRecord).find({
+        where: { contractId: In(scopedIds), billType: 'SECURITY_DEPOSIT' },
+      }),
+    ]);
+    const hasDepositSet = new Set(depositPayments.map((p) => p.invoiceId));
+    const billByContractId = new Map(depositBills.map((b) => [b.contractId, b]));
+
+    const result: Record<
+      string,
+      {
+        hasSecurityDepositPayment: boolean;
+        securityDepositBillId?: string;
+        securityDepositBillStatus?: string;
+      }
+    > = {};
+    for (const contractId of scopedIds) {
+      const bill = billByContractId.get(contractId);
+      result[contractId] = {
+        hasSecurityDepositPayment: hasDepositSet.has(contractId),
+        securityDepositBillId: bill?.id,
+        securityDepositBillStatus: bill?.billStatus,
+      };
+    }
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// "Edit & Resend" for a disputed Advance or Security Deposit Bill — unlike a periodic
+// usage Bill, there is nothing to recompute here: the amount is the real, already-collected
+// payment, and letting Finance change it via this endpoint would bypass the actual
+// payment-correction channel. So this just resets the approval trail so a corrected send
+// can go out again — the same field-reset updateUsageRecord already does for the USAGE case.
 export const resetBillForResend = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { branchId } = req.user!;
     const { usage } = await loadBillForBranch(req.params.id as string, branchId);
-    if (usage.billType !== 'ADVANCE') {
+    if (usage.billType !== 'ADVANCE' && usage.billType !== 'SECURITY_DEPOSIT') {
       throw new AppError(
-        'Only Advance Bills can be reset this way — edit a usage Bill via its reading-correction flow instead',
+        'Only Advance or Security Deposit Bills can be reset this way — edit a usage Bill via its reading-correction flow instead',
         400,
       );
     }
@@ -941,18 +1115,42 @@ export const getBillForSigning = async (req: Request, res: Response, next: NextF
     delete usageSafe.billCreatedByEmployeeId;
     delete usageSafe.signingToken;
 
+    // See getBill's matching comment — an ADVANCE bill carries the deposit payment (if
+    // any) as depositPayment now too, since it's shown within this same document.
     let advancePayment: SalePaymentRequest | null = null;
+    let depositPayment: SalePaymentRequest | null = null;
     if (usage.billType === 'ADVANCE') {
+      [advancePayment, depositPayment] = await Promise.all([
+        Source.getRepository(SalePaymentRequest).findOne({
+          where: {
+            invoiceId: usage.contractId,
+            paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']),
+          },
+          order: { createdAt: 'ASC' },
+        }),
+        Source.getRepository(SalePaymentRequest).findOne({
+          where: {
+            invoiceId: usage.contractId,
+            paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
+            status: In(['PENDING', 'APPROVED']),
+          },
+          order: { createdAt: 'ASC' },
+        }),
+      ]);
+    } else if (usage.billType === 'SECURITY_DEPOSIT') {
       advancePayment = await Source.getRepository(SalePaymentRequest).findOne({
         where: {
           invoiceId: usage.contractId,
-          paymentContext: In(['RENT_ADVANCE', 'LEASE_ADVANCE']),
+          paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
         },
         order: { createdAt: 'ASC' },
       });
     }
 
-    res.json({ success: true, data: { usage: usageSafe, invoice, advancePayment } });
+    res.json({
+      success: true,
+      data: { usage: usageSafe, invoice, advancePayment, depositPayment },
+    });
   } catch (err) {
     next(err);
   }
@@ -1130,14 +1328,15 @@ export const getBillsForContract = async (req: Request, res: Response, next: Nex
     }
 
     const result = usageRecords.map((ur) => {
-      // Advance Bills don't go through Stage B collection at all — the advance was
-      // already collected via the separate RENT_ADVANCE/LEASE_ADVANCE payment flow, so
-      // there's nothing for "Add Collect Amount" to apply to here; showing it as fully
-      // pending (the SalePaymentRequest.usageRecordId join below never matches an advance
-      // payment, since that's linked by invoiceId/paymentContext instead) would be
-      // actively misleading and risk a double-collection click.
-      const isAdvance = ur.billType === 'ADVANCE';
-      const given = isAdvance ? Number(ur.totalCharge) : givenByUsageRecord.get(ur.id) || 0;
+      // Advance and Security Deposit Bills don't go through Stage B collection at all —
+      // that money was already collected via the separate RENT_ADVANCE/LEASE_ADVANCE or
+      // RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT payment flow, so there's nothing for
+      // "Add Collect Amount" to apply to here; showing it as fully pending (the
+      // SalePaymentRequest.usageRecordId join below never matches either payment, since
+      // both are linked by invoiceId/paymentContext instead) would be actively misleading
+      // and risk a double-collection click.
+      const isWrappedPayment = ur.billType === 'ADVANCE' || ur.billType === 'SECURITY_DEPOSIT';
+      const given = isWrappedPayment ? Number(ur.totalCharge) : givenByUsageRecord.get(ur.id) || 0;
       return {
         usageRecordId: ur.id,
         billType: ur.billType,
@@ -1145,7 +1344,7 @@ export const getBillsForContract = async (req: Request, res: Response, next: Nex
         billingPeriodEnd: ur.billingPeriodEnd,
         totalCharge: Number(ur.totalCharge),
         amountGiven: given,
-        amountPending: isAdvance ? 0 : Math.max(0, Number(ur.totalCharge) - given),
+        amountPending: isWrappedPayment ? 0 : Math.max(0, Number(ur.totalCharge) - given),
         billStatus: ur.billStatus,
         billCreatedByName: ur.billCreatedByName,
         customerApprovedByName: ur.customerApprovedByName,
@@ -1216,13 +1415,51 @@ export const getInstallationRequestsForBranch = async (
         });
       }
     }
+
+    // Enrich with security deposit status — powers the Technician's "Collect Security
+    // Deposit" action, which should only ever show when the contract actually requires
+    // one and it hasn't already been recorded (by the Employee at conversion, or by
+    // anyone else since). Batched the same way as the allocation lookup above.
+    const rentLeaseIds = requests
+      .filter((r) => r.saleType === 'RENT' || r.saleType === 'LEASE')
+      .map((r) => r.invoiceId)
+      .filter(Boolean);
+    const depositAmountMap = new Map<string, number>();
+    const depositCollectedSet = new Set<string>();
+    if (rentLeaseIds.length > 0) {
+      const [invoices, depositPayments] = await Promise.all([
+        Source.getRepository(Invoice).find({
+          where: { id: In(rentLeaseIds) },
+          select: ['id', 'securityDepositAmount'],
+        }),
+        Source.getRepository(SalePaymentRequest).find({
+          where: {
+            invoiceId: In(rentLeaseIds),
+            paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
+            status: In(['PENDING', 'APPROVED']),
+          },
+        }),
+      ]);
+      for (const inv of invoices) {
+        if (Number(inv.securityDepositAmount) > 0) {
+          depositAmountMap.set(inv.id, Number(inv.securityDepositAmount));
+        }
+      }
+      for (const p of depositPayments) {
+        depositCollectedSet.add(p.invoiceId);
+      }
+    }
+
     const enriched = requests.map((r) => {
       const alloc = allocationMap.get(r.invoiceId);
+      const requiredDeposit = depositAmountMap.get(r.invoiceId) ?? 0;
       return {
         ...r,
         currentProductId: alloc?.productId ?? null,
         currentSerialNumber: alloc?.serialNumber ?? null,
         currentModelId: alloc?.modelId ?? null,
+        securityDepositAmount: requiredDeposit,
+        securityDepositCollected: depositCollectedSet.has(r.invoiceId),
       };
     });
     res.json({ success: true, data: enriched });
@@ -1372,6 +1609,49 @@ export const stopInstallation = async (req: Request, res: Response, next: NextFu
       }
       if (items.length > 0) await itemRepo.save(items);
 
+      // ALSO sync ProductAllocation — InvoiceItem.initialBwCount above is display/legacy
+      // metadata only. The actual per-period usage calculation (usageService.ts's
+      // allocation-based path, which every Rent/Lease contract with allocated machines
+      // goes through) reads its starting reading from
+      // ProductAllocation.initialBwA4/initialBwA3/initialColorA4/initialColorA3 — a
+      // separate row created at machine-allocation time, usually before the technician
+      // ever visits site, so it normally still holds Finance's placeholder/zero reading
+      // from activation. Writing only to InvoiceItem left the technician's real reading
+      // invisible to both the actual bill calculation and the Finance Usage form's
+      // preview (which independently falls back to ProductAllocation for the same
+      // reason) — this is the fix.
+      // Only overwrite an allocation that hasn't been billed yet (current === initial,
+      // i.e. no usage period has advanced it) — protects an already-active contract's
+      // billing history if this ever ran late.
+      const allocRepo = Source.getRepository(ProductAllocation);
+      const allocations = await allocRepo.find({
+        where: { contractId: request.invoiceId, status: AllocationStatus.ALLOCATED },
+      });
+      const untouchedAllocations = allocations.filter(
+        (a) =>
+          a.currentBwA4 === a.initialBwA4 &&
+          a.currentBwA3 === a.initialBwA3 &&
+          a.currentColorA4 === a.initialColorA4 &&
+          a.currentColorA3 === a.initialColorA3,
+      );
+      for (const alloc of untouchedAllocations) {
+        if (bwCount != null) alloc.initialBwA4 = alloc.currentBwA4 = Number(bwCount);
+        if (bwA3Count != null) alloc.initialBwA3 = alloc.currentBwA3 = Number(bwA3Count);
+        if (colorCount != null) alloc.initialColorA4 = alloc.currentColorA4 = Number(colorCount);
+        if (colorA3Count != null)
+          alloc.initialColorA3 = alloc.currentColorA3 = Number(colorA3Count);
+      }
+      if (untouchedAllocations.length > 0) await allocRepo.save(untouchedAllocations);
+      if (untouchedAllocations.length < allocations.length) {
+        logger.warn(
+          'stopInstallation: skipped syncing initial reading onto allocation(s) already advanced by billing',
+          {
+            invoiceId: request.invoiceId,
+            skipped: allocations.length - untouchedAllocations.length,
+          },
+        );
+      }
+
       // Audit trail on the installation request
       const enteredByName = await fetchEmployeeName(userId);
       request.initialReadingEnteredAt = new Date();
@@ -1507,6 +1787,7 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       chequeDate,
       collectLater,
       paymentContext,
+      isSecurityDeposit,
     } = req.body;
 
     const request = await createSalePaymentRequest({
@@ -1520,6 +1801,7 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       remarks,
       cashAccountId,
       chequeNumber,
+      isSecurityDeposit: !!isSecurityDeposit,
       chequeBankName,
       chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : undefined,
       chequeDate: chequeDate ? new Date(chequeDate) : undefined,
@@ -1533,27 +1815,44 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
     // worth at once), so this only surfaces a warning for whoever's recording it to
     // double-check, rather than hard-blocking at creation the way approval does.
     // Wrapped so a failure here can never break request creation itself.
+    //
+    // A security deposit is never compared here: it's a refundable liability, not part
+    // of invoice.totalAmount (the contract's accrued revenue) at all — the same reason
+    // it's excluded from every AR/receivable sum elsewhere (accountsShared.ts,
+    // lineItemDrilldownController.ts). Comparing a deposit's amount against "remaining
+    // balance on the invoice" produced a false-positive overpay warning on essentially
+    // every normal deposit collection on a contract whose advance/rent was already paid
+    // up (remaining == 0, so ANY deposit amount looked like an overpay). Existing deposit
+    // rows are excluded from `committed` too, so they can't produce a false positive on
+    // a real advance/periodic request either.
     let overpayWarning: string | undefined;
-    try {
-      const invoice = await Source.getRepository(Invoice).findOne({ where: { id } });
-      if (invoice) {
-        const existing = await Source.getRepository(SalePaymentRequest).find({
-          where: { invoiceId: id },
-        });
-        const committed = existing
-          .filter((r) => r.id !== request.id && (r.status === 'APPROVED' || r.status === 'PENDING'))
-          .reduce((s, r) => s + Number(r.amount), 0);
-        const remaining = Number(invoice.totalAmount || 0) - committed;
-        if (Number(request.amount) > remaining + 0.1) {
-          overpayWarning =
-            `This amount (${request.currency} ${Number(request.amount).toFixed(2)}) is more than the ` +
-            `${request.currency} ${Math.max(0, remaining).toFixed(2)} currently remaining on this invoice, ` +
-            `after already-approved and other pending requests. Double-check it's correct — it will still ` +
-            `need Accounts' approval, and won't post if it turns out to overpay.`;
+    if (!request.isSecurityDeposit) {
+      try {
+        const invoice = await Source.getRepository(Invoice).findOne({ where: { id } });
+        if (invoice) {
+          const existing = await Source.getRepository(SalePaymentRequest).find({
+            where: { invoiceId: id },
+          });
+          const committed = existing
+            .filter(
+              (r) =>
+                r.id !== request.id &&
+                !r.isSecurityDeposit &&
+                (r.status === 'APPROVED' || r.status === 'PENDING'),
+            )
+            .reduce((s, r) => s + Number(r.amount), 0);
+          const remaining = Number(invoice.totalAmount || 0) - committed;
+          if (Number(request.amount) > remaining + 0.1) {
+            overpayWarning =
+              `This amount (${request.currency} ${Number(request.amount).toFixed(2)}) is more than the ` +
+              `${request.currency} ${Math.max(0, remaining).toFixed(2)} currently remaining on this invoice, ` +
+              `after already-approved and other pending requests. Double-check it's correct — it will still ` +
+              `need Accounts' approval, and won't post if it turns out to overpay.`;
+          }
         }
+      } catch {
+        // Never let warning computation break request creation.
       }
-    } catch {
-      // Never let warning computation break request creation.
     }
 
     res.status(201).json({ success: true, data: request, warning: overpayWarning });
@@ -1626,6 +1925,10 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
         recordedBy: userId,
         remarks: request.remarks || `Sale payment approved — ${request.requestNo}`,
         currencyCode: request.currency,
+        // Carried through so the receivable queries can drop deposit receipts from
+        // "paid" — see PaymentTransaction.isSecurityDeposit. Without it a deposit
+        // reduced the customer's outstanding balance despite never being part of it.
+        isSecurityDeposit: request.isSecurityDeposit === true,
       });
       const savedTxn = await queryRunner.manager.save(PaymentTransaction, txn);
 
@@ -1651,39 +1954,108 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
       });
       if (!inv) throw new AppError('Invoice not found for this payment request', 404);
 
-      let ledger = await queryRunner.manager.findOne(InvoiceLedger, {
-        where: { invoiceId: request.invoiceId },
-      });
-      if (!ledger) {
-        ledger = queryRunner.manager.create(InvoiceLedger, {
-          invoiceId: request.invoiceId,
-          totalAmount: Number(inv.totalAmount),
-          paidAmount: 0,
-          balanceAmount: Number(inv.totalAmount),
+      // A security deposit is never posted to InvoiceLedger — that ledger tracks the
+      // contract's accrued revenue receivable (invoice.totalAmount), which a deposit was
+      // never part of. Folding it into paidAmount here silently inflated "paid" with
+      // money that isn't revenue, and — far worse — on any contract whose advance/rent
+      // was already fully paid (paidAmount == totalAmount, the ordinary state of an
+      // active contract) it made the overpayment guard below unconditionally reject
+      // EVERY deposit approval with "would overpay the invoice", since paidAmount + the
+      // deposit always exceeded totalAmount. The deposit itself is still fully tracked —
+      // via the SalePaymentRequest row (status/amount) and, once approved, the
+      // GuaranteeCheque or cashbook entry below — just never through this ledger.
+      if (!request.isSecurityDeposit) {
+        let ledger = await queryRunner.manager.findOne(InvoiceLedger, {
+          where: { invoiceId: request.invoiceId },
         });
-      } else {
-        ledger.totalAmount = Number(inv.totalAmount);
-      }
-      {
-        const newPaidAmount = Number(ledger.paidAmount) + Number(request.amount);
-        const totalAmount = Number(ledger.totalAmount);
-        // Allow a tiny floating-point tolerance (0.1 currency units) but block genuine overpayment
-        if (newPaidAmount > totalAmount + 0.1) {
-          throw new AppError(
-            `Approving this payment would overpay the invoice. ` +
-              `Current paid: ${ledger.paidAmount}, This payment: ${request.amount}, ` +
-              `Invoice total: ${totalAmount}. Reject this request if it is a duplicate.`,
-            400,
-          );
+        if (!ledger) {
+          ledger = queryRunner.manager.create(InvoiceLedger, {
+            invoiceId: request.invoiceId,
+            totalAmount: Number(inv.totalAmount),
+            paidAmount: 0,
+            balanceAmount: Number(inv.totalAmount),
+          });
+        } else {
+          ledger.totalAmount = Number(inv.totalAmount);
         }
-        ledger.paidAmount = newPaidAmount;
+        {
+          const newPaidAmount = Number(ledger.paidAmount) + Number(request.amount);
+          const totalAmount = Number(ledger.totalAmount);
+          // Allow a tiny floating-point tolerance (0.1 currency units) but block genuine overpayment
+          if (newPaidAmount > totalAmount + 0.1) {
+            throw new AppError(
+              `Approving this payment would overpay the invoice. ` +
+                `Current paid: ${ledger.paidAmount}, This payment: ${request.amount}, ` +
+                `Invoice total: ${totalAmount}. Reject this request if it is a duplicate.`,
+              400,
+            );
+          }
+          ledger.paidAmount = newPaidAmount;
 
-        ledger.balanceAmount = Math.max(0, totalAmount - newPaidAmount);
-        await queryRunner.manager.save(InvoiceLedger, ledger);
+          ledger.balanceAmount = Math.max(0, totalAmount - newPaidAmount);
+          await queryRunner.manager.save(InvoiceLedger, ledger);
+
+          // A direct sale is only PAID once Accounts has actually approved the money.
+          // createDirectSale deliberately leaves an employee-collected sale at SENT
+          // (outstanding) precisely so this approval is what settles it — without this
+          // the sale would sit unpaid on the Sale list forever, even fully collected.
+          // Contracts are untouched: a Rent/Lease invoice stays ACTIVE_CONTRACT for its
+          // whole life and is never "paid off" by a single period's collection.
+          const DIRECT_SALE_TYPES = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'];
+          if (
+            DIRECT_SALE_TYPES.includes(String(inv.saleType)) &&
+            inv.status !== InvoiceStatus.PAID &&
+            newPaidAmount >= totalAmount - 0.01
+          ) {
+            inv.status = InvoiceStatus.PAID;
+            await queryRunner.manager.save(Invoice, inv);
+          }
+        }
       }
 
       // 4. Post cashbook entry for Cash/Bank; create Cheque entity for CHEQUE mode
-      if (request.paymentMode === 'CHEQUE') {
+      if (request.paymentMode === 'CHEQUE' && request.isSecurityDeposit) {
+        // Security deposit cheques are a guarantee, not a payment — they never move
+        // Cash at Bank, and their lifecycle is Received -> Deposited (bank confirms) or
+        // Returned (refunded to the customer), not Deposited -> Cleared like a normal
+        // cheque. Route to the dedicated GuaranteeCheque entity/section instead of the
+        // regular Cheque table this branch used to fall into unconditionally — that had
+        // filed every deposit cheque in the ordinary cheque register, invisible from the
+        // Guarantee Cheques page Finance actually manages them from.
+        try {
+          if (!inv.customerId) {
+            throw new Error('Invoice has no customerId — cannot create GuaranteeCheque');
+          }
+          const gcRepo = Source.getRepository(GuaranteeCheque);
+          const existing = await gcRepo.findOne({
+            where: { chequeNumber: request.chequeNumber!, branchId: request.branchId },
+          });
+          if (!existing) {
+            const gc = queryRunner.manager.create(GuaranteeCheque, {
+              customerId: inv.customerId,
+              customerName: request.customerName,
+              contractInvoiceId: request.invoiceId,
+              contractReference: request.invoiceNumber,
+              chequeNumber: request.chequeNumber!,
+              amount: Number(request.amount),
+              currencyCode: request.currency,
+              bankName: request.chequeBankName || 'N/A',
+              receivedDate: new Date(request.paymentDate),
+              purpose: GuaranteeChequePurpose.PERFORMANCE_SECURITY,
+              status: GuaranteeChequeStatus.RECEIVED,
+              branchId: request.branchId,
+              createdBy: userId,
+              notes: `Security deposit — ${request.invoiceNumber} (${request.customerName})`,
+            });
+            await queryRunner.manager.save(GuaranteeCheque, gc);
+          }
+        } catch (gcErr) {
+          logger.warn(
+            'Failed to create guarantee cheque entity for security deposit payment:',
+            gcErr,
+          );
+        }
+      } else if (request.paymentMode === 'CHEQUE') {
         // CHEQUE: create a received-cheque entity so it enters the deposit/clear lifecycle
         try {
           const chequeRepo = Source.getRepository(Cheque);
@@ -1807,6 +2179,88 @@ export const rejectSalePayment = async (req: Request, res: Response, next: NextF
     request.reviewedByName = reviewerName;
     request.reviewedAt = new Date();
     request.rejectionReason = rejectionReason;
+    await repo.save(request);
+
+    res.json({ success: true, data: request });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Security Deposit refund (Cash/Bank only) ─────────────────────────────────
+// A Cheque-collected deposit is a GuaranteeCheque and is refunded by returning that
+// cheque instead (Accounts → Guarantee Cheques → Mark as Returned) — that path already
+// reverses any deposited-to-bank balance itself, see guaranteeChequesRoutes.ts's
+// /:id/return. This endpoint only ever handles the Cash/Bank case, which previously had
+// no refund path at all: an approved deposit's cash sat in the account balance forever
+// with no way to record giving it back to the customer.
+export const refundSecurityDeposit = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { userId, branchId, role } = req.user!;
+    const { accountId, refundDate, remarks } = req.body;
+
+    if (!['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      throw new AppError('Only Finance can refund security deposits', 403);
+    }
+
+    const repo = Source.getRepository(SalePaymentRequest);
+    const request = await repo.findOne({ where: { id } });
+    if (!request) throw new AppError('Payment request not found', 404);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && request.branchId !== branchId) {
+      throw new AppError('Access denied', 403);
+    }
+    if (!request.isSecurityDeposit) {
+      throw new AppError('This payment is not a security deposit', 400);
+    }
+    if (request.status !== 'APPROVED') {
+      throw new AppError(
+        `Cannot refund a ${request.status} security deposit — it must be Approved (i.e. actually collected) first`,
+        400,
+      );
+    }
+    if ((request.paymentMode ?? '').toUpperCase() === 'CHEQUE') {
+      throw new AppError(
+        'This deposit was collected by cheque — return it from Accounts → Guarantee Cheques instead of refunding it here.',
+        400,
+      );
+    }
+    if (request.isRefunded) {
+      throw new AppError('This security deposit has already been refunded', 400);
+    }
+    if (!accountId) {
+      throw new AppError('Select a Cash/Bank account to refund the deposit from', 400);
+    }
+
+    const refunderName = await fetchEmployeeName(userId);
+
+    // postCashbookEntry validates the account belongs to this branch, matches the
+    // required Cash/Bank type, and has enough balance to cover the refund — throws
+    // before anything is written if any of that fails. It also moves currentBalance
+    // and is idempotent on (sourceType, sourceId), so a retried request can't refund
+    // the same deposit's cash twice even if this handler is somehow called again.
+    await postCashbookEntry({
+      date: refundDate || new Date(),
+      entryType: 'PAYMENT',
+      amount: Number(request.amount),
+      category: 'SECURITY_DEPOSIT_REFUND',
+      branchId: request.branchId,
+      createdBy: userId,
+      paymentMode: request.paymentMode,
+      accountId,
+      description:
+        remarks?.trim() ||
+        `Security Deposit refund — ${request.invoiceNumber} (${request.customerName})`,
+      linkedInvoiceId: request.invoiceId,
+      sourceType: 'SECURITY_DEPOSIT_REFUND',
+      sourceId: request.id,
+    });
+
+    request.isRefunded = true;
+    request.refundedAt = new Date();
+    request.refundedById = userId;
+    request.refundedByName = refunderName;
+    request.refundCashAccountId = accountId;
     await repo.save(request);
 
     res.json({ success: true, data: request });
@@ -2145,13 +2599,14 @@ export const collectPendingUsagePayment = async (
     if (!invoice) throw new AppError('Contract not found', 404);
     if (invoice.branchId !== branchId) throw new AppError('Access denied', 403);
 
-    // An Advance Bill is never collected through this path — the advance was already
-    // collected via the separate RENT_ADVANCE/LEASE_ADVANCE payment flow. There's no
-    // reachable UI button for this today (both queues that feed this endpoint already
-    // exclude ADVANCE rows), but guard it directly too rather than relying only on that.
-    if (usageRecord.billType === 'ADVANCE') {
+    // An Advance or Security Deposit Bill is never collected through this path — that
+    // money was already collected via the separate RENT_ADVANCE/LEASE_ADVANCE or
+    // RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT payment flow. There's no reachable UI
+    // button for this today (both queues that feed this endpoint already exclude these
+    // rows), but guard it directly too rather than relying only on that.
+    if (usageRecord.billType === 'ADVANCE' || usageRecord.billType === 'SECURITY_DEPOSIT') {
       throw new AppError(
-        'Advance Bills are not collected this way — the advance payment is handled separately',
+        'Advance and Security Deposit Bills are not collected this way — that payment is handled separately',
         400,
       );
     }

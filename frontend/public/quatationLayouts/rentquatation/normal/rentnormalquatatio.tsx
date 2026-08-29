@@ -30,12 +30,24 @@ export interface RentLineItem {
 export interface RentAgreementDetails {
   rentType: string;
   period: string;
+  /** Billing method label — "Monthly Advance" (paid up front each cycle) or
+   *  "Month-End (Arrears)" (billed after the period completes). */
+  billingType?: string;
   advance: number;
   deposit: number;
   duration: string;
   monthlyRentAmount: number;
   discountPercent?: number;
   discountedMonthlyRent?: number;
+  contractRentalValue?: number;
+  initialAmountPayable?: number;
+}
+
+export interface AccessoryLineItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  imageUrl?: string;
 }
 
 export interface RentNormalQuotationProps {
@@ -63,6 +75,9 @@ export interface RentNormalQuotationProps {
   };
   lineItems?: RentLineItem[];
   agreementDetails?: RentAgreementDetails;
+  /** Extras supplied with the machine (stand, tray, stapler unit, etc.) — real priced
+   *  items, billed once alongside the first payment, never metered. */
+  accessories?: AccessoryLineItem[];
   totals?: {
     subTotal: number;
     tax: number;
@@ -141,6 +156,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
     duration: '12 Months',
     monthlyRentAmount: 1500,
   },
+  accessories = [],
   totals = {
     subTotal: 1500.0,
     tax: 0.0,
@@ -153,6 +169,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
       (it.colorSlabs?.length || 0) > 0 ||
       (it.comboSlabs?.length || 0) > 0,
   );
+  const accessoryTotal = accessories.reduce((s, a) => s + a.qty * a.unitPrice, 0);
 
   return (
     <div
@@ -554,6 +571,79 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         </table>
       </div>
 
+      {/* ─── ACCESSORIES ─── */}
+      {accessories.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <div
+            style={{
+              fontSize: '13px',
+              fontWeight: '300',
+              color: ACCENT,
+              textTransform: 'uppercase',
+              borderBottom: `1px solid ${ACCENT}`,
+              paddingBottom: '5px',
+              marginBottom: '10px',
+            }}
+          >
+            Accessories
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr
+                style={{
+                  borderTop: '2.5px solid #000',
+                  borderBottom: '2.5px solid #000',
+                }}
+              >
+                <th style={{ ...thStyle(), width: '70px' }}></th>
+                <th style={thStyle()}>Description</th>
+                <th style={thStyle('center')}>Qty</th>
+                <th style={thStyle('right')}>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accessories.map((a, idx) => (
+                <tr
+                  key={idx}
+                  style={{
+                    backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
+                    borderBottom: '1px solid #eee',
+                  }}
+                >
+                  <td style={{ padding: '8px 10px' }}>
+                    {a.imageUrl ? (
+                      <img
+                        src={a.imageUrl}
+                        alt={a.description}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          objectFit: 'contain',
+                          display: 'block',
+                        }}
+                      />
+                    ) : null}
+                  </td>
+                  <td style={{ ...tdStyle('left'), fontWeight: '300' }}>{a.description}</td>
+                  <td style={tdStyle('center')}>{a.qty}</td>
+                  <td style={{ ...tdStyle('right'), fontWeight: '300' }}>
+                    {getActiveCurrency()} {fmt(a.qty * a.unitPrice)}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan={3} style={{ ...tdStyle('right'), fontWeight: '700', color: ACCENT }}>
+                  Accessories Total
+                </td>
+                <td style={{ ...tdStyle('right'), fontWeight: '700', color: ACCENT }}>
+                  {getActiveCurrency()} {fmt(accessoryTotal)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* ─── SLAB RATE TABLES ─── */}
       {hasSlabs && (
         <div style={{ marginBottom: '24px' }}>
@@ -850,38 +940,125 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           <thead>
             <tr style={{ backgroundColor: '#f9f9f9', color: ACCENT }}>
               <th style={thStyle('left', ACCENT)}>Rent Type</th>
+              <th style={thStyle('center', ACCENT)}>Billing Type</th>
               <th style={thStyle('center', ACCENT)}>Period</th>
-              <th style={thStyle('center', ACCENT)}>Advance / Deposit</th>
+              <th style={thStyle('center', ACCENT)}>Monthly Rent</th>
+              <th style={thStyle('center', ACCENT)}>First Month Advance</th>
               <th style={thStyle('center', ACCENT)}>Months Count</th>
-              <th style={thStyle('center', ACCENT)}>Discount</th>
-              <th style={thStyle('right', ACCENT)}>Monthly Rent</th>
+              <th style={thStyle('right', ACCENT)}>Contract Rental Value</th>
             </tr>
           </thead>
           <tbody>
             <tr style={{ borderBottom: '1px solid #eee' }}>
               <td style={tdStyle('left')}>{agreementDetails.rentType}</td>
+              <td style={{ ...tdStyle('center'), fontWeight: '300' }}>
+                {agreementDetails.billingType || 'Monthly Advance'}
+              </td>
               <td style={tdStyle('center')}>{agreementDetails.period}</td>
-              <td style={tdStyle('center')}>
-                {getActiveCurrency()}{' '}
-                {fmt(agreementDetails.advance || agreementDetails.deposit || 0)}
-              </td>
-              <td style={tdStyle('center')}>{agreementDetails.duration}</td>
-              <td style={tdStyle('center')}>
-                {agreementDetails.discountPercent && agreementDetails.discountPercent > 0 ? (
-                  <span style={{ color: '#16a34a', fontWeight: '300' }}>
-                    {agreementDetails.discountPercent}%
-                  </span>
-                ) : (
-                  '0%'
-                )}
-              </td>
-              <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
+              <td style={{ ...tdStyle('center'), fontWeight: '300', color: ACCENT }}>
                 {getActiveCurrency()}{' '}
                 {fmt(agreementDetails.discountedMonthlyRent || agreementDetails.monthlyRentAmount)}
+              </td>
+              <td style={tdStyle('center')}>
+                {getActiveCurrency()} {fmt(agreementDetails.advance || 0)}
+              </td>
+              <td style={tdStyle('center')}>{agreementDetails.duration}</td>
+              <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
+                {getActiveCurrency()} {fmt(agreementDetails.contractRentalValue || 0)}
               </td>
             </tr>
           </tbody>
         </table>
+
+        {/* Security Deposit & Initial Payment */}
+        <div
+          style={{
+            marginTop: '16px',
+            padding: '12px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '6px',
+            border: '1px solid #e2e8f0',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '10px',
+              fontWeight: '700',
+              color: '#6366f1',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              marginBottom: '8px',
+            }}
+          >
+            Initial Payment Details
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+            <tbody>
+              {(agreementDetails.advance || 0) > 0 && (
+                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '4px 0', color: '#64748b' }}>
+                    First Month Advance Payment
+                  </td>
+                  <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                    {getActiveCurrency()} {fmt(agreementDetails.advance)}
+                  </td>
+                </tr>
+              )}
+              {!(agreementDetails.advance > 0) && (
+                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '4px 0', color: '#64748b' }}>First Month Advance</td>
+                  <td
+                    style={{
+                      padding: '4px 0',
+                      textAlign: 'right',
+                      color: '#94a3b8',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    Not Applicable (Postpaid)
+                  </td>
+                </tr>
+              )}
+              {(agreementDetails.deposit || 0) > 0 && (
+                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
+                  <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                    {getActiveCurrency()} {fmt(agreementDetails.deposit)}
+                  </td>
+                </tr>
+              )}
+              {(agreementDetails.deposit || 0) === 0 && (
+                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
+                  <td style={{ padding: '4px 0', textAlign: 'right', color: '#94a3b8' }}>None</td>
+                </tr>
+              )}
+              {accessoryTotal > 0 && (
+                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '4px 0', color: '#64748b' }}>Accessories</td>
+                  <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                    {getActiveCurrency()} {fmt(accessoryTotal)}
+                  </td>
+                </tr>
+              )}
+              <tr style={{ borderTop: '2px solid #333', fontWeight: '700' }}>
+                <td style={{ padding: '6px 0', color: '#1e293b', fontSize: '12px' }}>
+                  INITIAL AMOUNT PAYABLE
+                </td>
+                <td
+                  style={{
+                    padding: '6px 0',
+                    textAlign: 'right',
+                    color: '#6366f1',
+                    fontSize: '13px',
+                  }}
+                >
+                  {getActiveCurrency()} {fmt(agreementDetails.initialAmountPayable || 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ─── TOTALS ─── */}
@@ -895,69 +1072,82 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         }}
       >
         <div style={{ width: '250px' }}>
-          {[
-            { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
-            {
-              label: totals.taxPercent
-                ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
-                : totals.taxName || 'VAT Amount',
-              value: totals.tax,
-              num: totals.tax,
-            },
-            {
-              label: 'Grand Total',
-              value: totals.total,
-              num: totals.total,
-              prefix: `${getActiveCurrency()} `,
-              isBold: true,
-            },
-          ].map((row, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                padding: '8px 0',
-                borderBottom: i === 2 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
-              }}
-            >
+          {(() => {
+            // Only show a VAT/tax line when there's an actual tax story to tell — either
+            // a real rate/amount, or an explicit exemption label. A branch with no tax
+            // configured at all leaves taxPercent/taxName/tax all falsy, and previously
+            // still rendered a bare "VAT Amount 0.00" row, which reads as if tax was
+            // considered and zeroed rather than never applicable in the first place.
+            const showVat = totals.taxName === 'VAT Exempt' || !!totals.taxPercent || !!totals.tax;
+            const rows = [
+              { label: 'Subtotal', value: totals.subTotal, num: totals.subTotal },
+              ...(showVat
+                ? [
+                    {
+                      label: totals.taxPercent
+                        ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                        : totals.taxName || 'VAT Amount',
+                      value: totals.tax,
+                      num: totals.tax,
+                    },
+                  ]
+                : []),
+              {
+                label: 'Initial Amount Payable',
+                value: totals.total,
+                num: totals.total,
+                prefix: `${getActiveCurrency()} `,
+                isBold: true,
+              },
+            ];
+            return rows.map((row, i) => (
               <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span
-                  style={{
-                    fontSize: '12px',
-                    textTransform: 'uppercase',
-                    color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '400',
-                  }}
-                >
-                  {row.label}
-                </span>
-                <span
-                  style={{
-                    fontSize: '14px',
-                    color: row.isBold ? ACCENT : '#000',
-                    fontWeight: row.isBold ? '800' : '400',
-                  }}
-                >
-                  {row.prefix || ''}
-                  {fmt(row.value)}
-                </span>
-              </div>
-              <div
+                key={i}
                 style={{
-                  fontSize: '9px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                  marginTop: '1px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '8px 0',
+                  borderBottom: i === rows.length - 1 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
                 }}
               >
-                {numberToWords(row.num, getActiveCurrency())}
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      textTransform: 'uppercase',
+                      color: row.isBold ? ACCENT : '#000',
+                      fontWeight: row.isBold ? '800' : '400',
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '14px',
+                      color: row.isBold ? ACCENT : '#000',
+                      fontWeight: row.isBold ? '800' : '400',
+                    }}
+                  >
+                    {row.prefix || ''}
+                    {fmt(row.value)}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '9px',
+                    color: '#111827',
+                    fontStyle: 'italic',
+                    textAlign: 'right',
+                    marginTop: '1px',
+                  }}
+                >
+                  {numberToWords(row.num, getActiveCurrency())}
+                </div>
               </div>
-            </div>
-          ))}
+            ));
+          })()}
         </div>
       </div>
 

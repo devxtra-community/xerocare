@@ -30,7 +30,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 
 import { getActiveCurrency } from '@/lib/currency';
-import { BillModal } from './BillModal';
 
 const safeFormatDate = (
   dateVal: string | number | Date | null | undefined,
@@ -69,6 +68,7 @@ interface UsageInvoice extends Omit<Invoice, 'items'> {
   items?: UsageInvoiceItem[];
   periodStart?: string;
   periodEnd?: string;
+  readingTakenDate?: string;
   discountBwCopies?: number;
   discountColorCopies?: number;
   remarks?: string;
@@ -143,10 +143,22 @@ export default function UsageRecordingModal({
     enabled: !!(contractId || editingInvoice?.referenceContractId),
   });
 
-  const { data: history = [], isLoading: historyLoading } = useQuery({
+  const {
+    data: history = [],
+    isLoading: historyLoading,
+    isFetching: historyFetching,
+  } = useQuery({
     queryKey: ['usage-history', contractId],
     queryFn: () => getUsageHistory(contractId),
     enabled: !!contractId,
+    // A prior submission's own invalidateQueries call for this exact key can still be
+    // in flight when this component unmounts (submitting closes it immediately) —
+    // react-query's cache updates independently of component lifecycle, so it usually settles before
+    // the next mount, but isn't guaranteed to. 'always' means every fresh mount of this
+    // modal (a new "Record Usage" click) forces its own refetch rather than trusting
+    // whatever's already cached, so a stale response arriving after this mount can never
+    // win. See the isFetching guard below for the other half of this fix.
+    refetchOnMount: 'always',
   });
 
   const [loading, setLoading] = useState(false);
@@ -164,6 +176,7 @@ export default function UsageRecordingModal({
   const [formData, setFormData] = useState({
     billingPeriodStart: '',
     billingPeriodEnd: '',
+    readingTakenDate: new Date().toISOString().split('T')[0],
     bwA4Count: '',
     bwA3Count: '',
     colorA4Count: '',
@@ -190,24 +203,29 @@ export default function UsageRecordingModal({
   });
   const [file, setFile] = useState<File | null>(null);
 
-  // The just-created bill's usage record id — opens BillModal (send/approve) right after
-  // a successful submit. This is the entire post-submit hand-off now: submitting usage no
-  // longer collects payment, it only creates the bill for Stage A approval (see BillModal).
-  const [createdBillId, setCreatedBillId] = useState<string | null>(null);
+  // Latched the instant a submit succeeds and never cleared while this component stays
+  // mounted. The form's `open` below is AND-ed with it, so once this period has been
+  // submitted the form cannot render again for any reason — not a refetch, not a stray
+  // dismiss. "Submit closes the form, permanently" is stated here rather than left to
+  // emerge from some other condition happening to be false.
+  const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const isSimplifiedLease = contract?.saleType === 'LEASE' && contract?.leaseType !== 'FSM';
+  // Rolling-advance model (see the Rent Calculation Logic effect below): under ADVANCE
+  // billing, every non-final period's "Monthly Rent" charge is actually the NEXT
+  // period's rent, collected now as its advance — the period whose usage is being
+  // recorded here already had its own rent paid by the previous period's bill (or, for
+  // period 1, by the advance collected at signing). The label needs to say that,
+  // instead of implying this charge is for the period just measured.
+  const isArrearsBilling = contract?.paymentTiming === 'ARREARS';
 
   React.useEffect(() => {
     if (!isOpen) {
-      console.debug('[UsageRecordingModal] isOpen prop went false — resetting local state', {
-        hadCreatedBillId: createdBillId,
-      });
       setShowPreview(false);
       // setRecordedUsageData(null);
       isInitialized.current = false;
-      setCreatedBillId(null);
+      setHasSubmitted(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Hook Ordering Fix: Define memoized values used in effects first
@@ -220,7 +238,10 @@ export default function UsageRecordingModal({
   }, [history, formData.billingPeriodStart, editingInvoice]);
 
   const activeAllocationInitialCounts = React.useMemo(() => {
-    const allocs = contract?.productAllocations;
+    // Accessories are real serialized units too and get their own ProductAllocation row
+    // (see productAllocationEntity.ts's itemType comment) but are never metered — must
+    // be excluded from every "the machine's readings" calculation on this page.
+    const allocs = contract?.productAllocations?.filter((a) => a.itemType !== 'ACCESSORY');
     if (!allocs) return null;
     const activeAlloc = allocs.find((a) => a.status === 'ALLOCATED' && a.replacementOfAllocationId);
     if (!activeAlloc) return null;
@@ -232,17 +253,43 @@ export default function UsageRecordingModal({
     };
   }, [contract?.productAllocations]);
 
-  // Calculate Aggregated Initial Counts from ALL Product Items
+  // Calculate Aggregated Initial Counts — from ProductAllocation when the contract has
+  // allocated machines (the normal case), falling back to the legacy InvoiceItem fields
+  // only when it doesn't. This mirrors usageService.ts's own two branches exactly —
+  // that's the backend's actual source of truth for the real bill calculation, so this
+  // preview needs to read from the same place. It used to always read InvoiceItem's
+  // initialBwCount etc, which is separate, display-only metadata: a technician's
+  // installation reading (recorded after Finance had already activated the contract with
+  // a placeholder) could update that field while the real calculation kept using the
+  // stale ProductAllocation value — this preview would then show the corrected number
+  // while the bill it produced was computed from the wrong one.
   const calculatedInitialCounts = React.useMemo(() => {
-    if (!contract?.items) return { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 };
+    const allocs = (contract?.productAllocations || []).filter(
+      (a) => a.status === 'ALLOCATED' && a.itemType !== 'ACCESSORY',
+    );
+    if (allocs.length > 0) {
+      return allocs.reduce(
+        (acc, a) => ({
+          bwA4: acc.bwA4 + (a.initialBwA4 ?? 0),
+          bwA3: acc.bwA3 + (a.initialBwA3 ?? 0),
+          clrA4: acc.clrA4 + (a.initialColorA4 ?? 0),
+          clrA3: acc.clrA3 + (a.initialColorA3 ?? 0),
+        }),
+        { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 },
+      );
+    }
 
+    // Legacy fallback — contracts predating per-machine allocations.
+    if (!contract?.items) return { bwA4: 0, bwA3: 0, clrA4: 0, clrA3: 0 };
     let bwA4 = 0,
       bwA3 = 0,
       clrA4 = 0,
       clrA3 = 0;
     contract.items.forEach((item) => {
-      // Check for product items (Allocated items)
-      if (item.itemType === 'PRODUCT' || item.productId) {
+      if (
+        (item.itemType === 'PRODUCT' || item.productId) &&
+        (item.itemType as string) !== 'ACCESSORY'
+      ) {
         bwA4 += item.initialBwCount || 0;
         bwA3 += item.initialBwA3Count || 0;
         clrA4 += item.initialColorCount || 0;
@@ -253,9 +300,13 @@ export default function UsageRecordingModal({
   }, [contract]);
 
   const effectivePrevCounts = React.useMemo(() => {
-    // Determine active machine(s)
+    // Determine active machine(s) — excluding accessories, or an allocated accessory
+    // would count as a second "active machine" and wrongly push this into the
+    // multi-machine branch below.
     const activeAllocs =
-      contract?.productAllocations?.filter((a) => a.status === 'ALLOCATED') || [];
+      contract?.productAllocations?.filter(
+        (a) => a.status === 'ALLOCATED' && a.itemType !== 'ACCESSORY',
+      ) || [];
 
     const uniqueActiveSerials = new Set(activeAllocs.map((a) => a.serialNumber || a.id));
 
@@ -330,7 +381,16 @@ export default function UsageRecordingModal({
     // filter then compared every real prior period against the contract's original start
     // instead of the last period's end, so it never matched anything — the previous period's
     // reading silently never appeared as a reference, on a race, not a genuine first period.
-    if (isInitialized.current || !contract || historyLoading) return;
+    //
+    // historyLoading (isLoading) alone isn't enough: it's only true on this query's very
+    // first-ever fetch. Reopening "Record Usage" right after submitting reuses the same
+    // query key, which already has cached data from before — isLoading is false
+    // immediately even while a fresher refetch (isFetching) is still landing, so this used
+    // to initialize from whatever was cached a moment earlier: right after submitting
+    // period N, the very next open could still compute period N again instead of N+1.
+    // Waiting on historyFetching too means this always initializes from the refetch this
+    // same mount just kicked off (refetchOnMount: 'always' above), never a stale leftover.
+    if (isInitialized.current || !contract || historyLoading || historyFetching) return;
 
     if (editingInvoice) {
       // --- Initialization for EDITING ---
@@ -370,6 +430,8 @@ export default function UsageRecordingModal({
         ...prev,
         billingPeriodStart: start,
         billingPeriodEnd: end,
+        readingTakenDate:
+          (inv.readingTakenDate || '').split('T')[0] || new Date().toISOString().split('T')[0],
         bwA4Count: String(inv.bwA4Count || 0),
         bwA3Count: String(inv.bwA3Count || 0),
         colorA4Count: String(inv.colorA4Count || 0),
@@ -383,7 +445,9 @@ export default function UsageRecordingModal({
       }));
 
       const activeAllocs =
-        contract.productAllocations?.filter((pa) => pa.status === 'ALLOCATED') || [];
+        contract.productAllocations?.filter(
+          (pa) => pa.status === 'ALLOCATED' && pa.itemType !== 'ACCESSORY',
+        ) || [];
       const uniqueActiveSerials = new Set(activeAllocs.map((pa) => pa.serialNumber || pa.id));
       if (uniqueActiveSerials.size === 1) {
         const activeId = activeAllocs[0].id;
@@ -421,20 +485,26 @@ export default function UsageRecordingModal({
         if (!isNaN(nextStart.getTime()) && !isNaN(nextEnd.getTime())) {
           startStr = nextStart.toISOString().split('T')[0];
           endStr = nextEnd.toISOString().split('T')[0];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items = (last.items || []).map((item: any) => ({
-            allocationId: item.allocationId,
-            serialNumber: item.allocation?.serialNumber,
-            modelId: item.allocation?.modelId,
-            startBwA4: item.endBwA4 || 0,
-            endBwA4: item.endBwA4 || 0,
-            startBwA3: item.endBwA3 || 0,
-            endBwA3: item.endBwA3 || 0,
-            startColorA4: item.endColorA4 || 0,
-            endColorA4: item.endColorA4 || 0,
-            startColorA3: item.endColorA3 || 0,
-            endColorA3: item.endColorA3 || 0,
-          }));
+          items = (last.items || [])
+            // A prior period's own items can carry an accessory row (e.g. leaked in before
+            // the merge-loop filter below existed, on an old bill). Copying it forward
+            // blindly here would re-propagate it into every subsequent period forever — the
+            // merge loop's accessory skip never gets a chance to remove it, since an
+            // allocation "already in items" is left as-is, not re-validated.
+            .filter((item) => item.allocation?.itemType !== 'ACCESSORY')
+            .map((item) => ({
+              allocationId: item.allocationId,
+              serialNumber: item.allocation?.serialNumber,
+              modelId: item.allocation?.modelId,
+              startBwA4: item.endBwA4 || 0,
+              endBwA4: item.endBwA4 || 0,
+              startBwA3: item.endBwA3 || 0,
+              endBwA3: item.endBwA3 || 0,
+              startColorA4: item.endColorA4 || 0,
+              endColorA4: item.endColorA4 || 0,
+              startColorA3: item.endColorA3 || 0,
+              endColorA3: item.endColorA3 || 0,
+            }));
         }
       } else if (contract.effectiveFrom) {
         // Option B: Based on Contract Start
@@ -449,12 +519,27 @@ export default function UsageRecordingModal({
         }
       }
 
+      // Never propose a period that runs past the contract's end date. A rolled-forward
+      // month lands wherever the month lengths put it, which on the final period is
+      // routinely a few days beyond effectiveTo — and that both trips the "billing period
+      // end cannot exceed contract end date" check on submit and bills days the contract
+      // doesn't cover. Clamping makes the last period exactly the remaining term.
+      const contractEndStr = contract.effectiveTo ? String(contract.effectiveTo).split('T')[0] : '';
+      if (contractEndStr && endStr && endStr > contractEndStr) {
+        endStr = contractEndStr;
+      }
+
       // Merge with any current allocations not in history (or ALL if no history)
       if (contract.productAllocations) {
         const startPeriod = startStr ? new Date(startStr).getTime() : 0;
         const endPeriod = endStr ? new Date(endStr).getTime() : 0;
 
         contract.productAllocations.forEach((a) => {
+          // Accessories get their own ProductAllocation row (a real serialized unit,
+          // allocated the same way as the machine) but are never metered — they must
+          // never show up as a "Machine" needing readings here.
+          if (a.itemType === 'ACCESSORY') return;
+
           const alreadyInItems = items.find((it) => it.allocationId === a.id);
           if (alreadyInItems) {
             // When a machine that was billed in a previous period has since been REPLACED,
@@ -558,7 +643,15 @@ export default function UsageRecordingModal({
 
       isInitialized.current = true;
     }
-  }, [contract, history, historyLoading, editingInvoice, effectivePrevCounts, formData]);
+  }, [
+    contract,
+    history,
+    historyLoading,
+    historyFetching,
+    editingInvoice,
+    effectivePrevCounts,
+    formData,
+  ]);
 
   const replacedDeltas = React.useMemo(() => {
     const rItems = formData.items.filter((item) => {
@@ -704,7 +797,12 @@ export default function UsageRecordingModal({
 
   // Calculate Aggregated Initial Counts from ALL Product Items
 
-  // Detect Last Month (Strict Date Match)
+  // The contract's final billing period — i.e. the contract ends on or before this
+  // period does, so there is no period after it. Mirrors usageService.ts's own check
+  // exactly (see the long comment there): it used to demand the period end EXACTLY on
+  // effectiveTo, which drifts out of alignment the first time a short month re-anchors
+  // the cycle or the contract is extended, and once it does the last period quietly
+  // bills a full month of "next month's advance" for a contract that has no next month.
   const isLastMonth = React.useMemo(() => {
     if (!contract?.effectiveTo || !formData.billingPeriodEnd) return false;
     const contractEnd = new Date(contract.effectiveTo);
@@ -713,7 +811,7 @@ export default function UsageRecordingModal({
     const inputEnd = new Date(formData.billingPeriodEnd);
     inputEnd.setHours(0, 0, 0, 0);
 
-    return contractEnd.getTime() === inputEnd.getTime();
+    return inputEnd.getTime() >= contractEnd.getTime();
   }, [contract, formData.billingPeriodEnd]);
 
   const calculateSlabCharge = React.useCallback(
@@ -957,29 +1055,22 @@ export default function UsageRecordingModal({
       contract?.monthlyRent || contract?.monthlyLeaseAmount || contract?.monthlyEmiAmount || 0,
     );
 
-    // First Month: Rent is 0 (Collected via Advance/Deposit usually?) - respecting existing logic
-    const isFirstMonth = history.length === 0;
-
-    // STRICT FIX: Rent is ALWAYS applicable. No exceptions for first month.
+    // Rent is ALWAYS applicable except the final period under Advance billing (below) — no
+    // special-casing for the first period, its rent was already collected as the advance.
     let applicableRent = monthlyRentAmount;
 
-    // FINAL MONTH LOGIC: If it is the last month, rent is adjusted from Advance.
-    // So the customer arguably pays 0 "new" rent.
-    if (isLastMonth) {
-      applicableRent = 0;
+    // FINAL MONTH LOGIC: For ADVANCE billing, this period's rent was already paid by the
+    // prior period's bill (or, if this is also the first period, by the original advance
+    // collected at signing) — so only the newly-measured excess usage is payable here.
+    // Credit only what the advance actually covers, not always the full monthlyRentAmount
+    // — mirrors usageService.ts's same fix, so this live preview matches what actually gets
+    // stored once submitted, including for a contract whose advance wasn't exactly one
+    // period's rent. For ARREARS billing, rent is charged every period including the final
+    // one (no advance was collected).
+    if (isLastMonth && !isArrearsBilling) {
+      const advanceAdjusted = Math.min(monthlyRentAmount, Number(contract?.advanceAmount || 0));
+      applicableRent = Math.max(0, monthlyRentAmount - advanceAdjusted);
     }
-
-    // DEBUG LOGGING
-    console.log('DEBUG USAGE MODAL:', {
-      isLastMonth,
-      isFirstMonth,
-      monthlyRentAmount,
-      contractEnd: contract?.effectiveTo,
-      inputEnd: formData.billingPeriodEnd,
-      applicableRent,
-      finalVal,
-      total: (isNaN(finalVal) ? 0 : finalVal) + applicableRent,
-    });
 
     const usageCharge = isNaN(finalVal) ? 0 : finalVal;
     let netTotal = usageCharge + applicableRent;
@@ -1003,6 +1094,7 @@ export default function UsageRecordingModal({
     ruleItems,
     prevUsage,
     isLastMonth,
+    isArrearsBilling,
     calculatedInitialCounts.bwA4,
     calculatedInitialCounts.bwA3,
     calculatedInitialCounts.clrA4,
@@ -1087,6 +1179,19 @@ export default function UsageRecordingModal({
     return true;
   };
 
+  /**
+   * Submitting a period ends here: the record is saved and this form closes, full stop.
+   * It used to hand the new bill straight to a BillModal that popped up on top of the
+   * closing form — unasked-for, and the source of every "the form came back" report,
+   * since that dialog had to live inside this one. The bill still exists and is opened
+   * deliberately, from the contract's own bill/history actions, when Finance wants to
+   * send it for approval.
+   */
+  const finishSubmit = () => {
+    setHasSubmitted(true);
+    onClose();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateReadings()) return;
@@ -1143,6 +1248,7 @@ export default function UsageRecordingModal({
           colorA4Count: Number(formData.colorA4Count),
           colorA3Count: Number(formData.colorA3Count),
           billingPeriodEnd: formData.billingPeriodEnd,
+          readingTakenDate: formData.readingTakenDate,
           discountAmount: calculatedDiscountAmount,
           discountBwCopies:
             formData.discountType === 'COPIES' ? Number(formData.discountBwCopies) : 0,
@@ -1158,27 +1264,16 @@ export default function UsageRecordingModal({
         });
         onSuccess();
 
-        console.debug(
-          '[UsageRecordingModal] handleSubmit success (edit) — handing off to BillModal',
-          {
-            usageRecordId: editingInvoice.id,
-          },
-        );
         // Correcting a bill (typically after a customer dispute) resets it back through
-        // Stage A's approval step server-side — hand off to BillModal so it can be resent.
-        // Deferred a tick: mounting BillModal's Dialog in the SAME commit that closes this
-        // one puts two Radix Dialog roots in the tree simultaneously — BillModal's focus
-        // trap grabbing focus can read, to this dialog's still-attached dismissable layer,
-        // as "focus left this layer", which forwards a stray close to the parent (see the
-        // onOpenChange guard below for the full mechanism). Letting this dialog's close
-        // commit and paint first, before BillModal mounts, removes the race outright rather
-        // than only suppressing its one known symptom.
-        setTimeout(() => setCreatedBillId(editingInvoice.id), 0);
+        // Stage A's approval step server-side; resending it is a separate, deliberate
+        // action from the bill list. Nothing to open here — just close.
+        finishSubmit();
       } else {
         const payload = new FormData();
         payload.append('contractId', contractId);
         payload.append('billingPeriodStart', formData.billingPeriodStart);
         payload.append('billingPeriodEnd', formData.billingPeriodEnd);
+        payload.append('readingTakenDate', formData.readingTakenDate);
         payload.append('bwA4Count', String(formData.bwA4Count));
         payload.append('bwA3Count', String(formData.bwA3Count));
         payload.append('colorA4Count', String(formData.colorA4Count));
@@ -1244,7 +1339,7 @@ export default function UsageRecordingModal({
           payload.append('file', file);
         }
 
-        const result = await recordUsage(payload);
+        await recordUsage(payload);
         toast.success('Bill created for this period');
 
         queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -1252,18 +1347,9 @@ export default function UsageRecordingModal({
         queryClient.invalidateQueries({ queryKey: ['invoice', contractId] });
         onSuccess();
 
-        console.debug(
-          '[UsageRecordingModal] handleSubmit success (create) — handing off to BillModal',
-          {
-            usageRecordId: result.usage.id,
-          },
-        );
-
-        // Usage submission only creates the bill now — payment collection is a separate
-        // Stage B step, gated on the customer approving this bill. Hand off to BillModal
-        // so whoever just submitted can immediately send it for approval.
-        // Deferred a tick — see the matching comment on the edit branch above for why.
-        setTimeout(() => setCreatedBillId(result.usage.id), 0);
+        // The bill is created; sending it for approval and collecting against it are
+        // separate, deliberate steps taken from the contract's own actions. Just close.
+        finishSubmit();
       }
     } catch (error: unknown) {
       const err = error as { message?: string };
@@ -1294,42 +1380,22 @@ export default function UsageRecordingModal({
 
   return (
     <>
-      {/* createdBillId excluded here so the form closes the instant BillModal opens below —
-          otherwise both would be mounted and open at once, reading as a second form popping
-          up right after submit. Same fix as the other modals in this codebase that hand off
-          to a follow-up dialog: exclude from the open condition, gate the next one on
-          non-null state, never force-close via onSuccess.
-
-          THE ACTUAL AUTO-REOPEN BUG (root-caused here, previous attempts patched other
-          symptoms of the same handoff without touching this line): `open` above is a
-          COMPOUND expression, not the raw `isOpen` prop — every other Dialog in this
-          codebase wires `onOpenChange={onClose}` directly to a SIMPLE `open={isOpen}`,
-          where a Radix-initiated close (Escape / overlay click / outside focus) and "the
-          parent should reset its state" are the same event. Here they are not: the instant
-          setCreatedBillId(...) runs, `open` flips to false on its own (via !createdBillId)
-          while BillModal mounts as a sibling Dialog in the very same render. Radix's
-          dismissable layer for THIS dialog can observe that transition (BillModal's own
-          focus-trap grabbing focus counts as "focus left this layer") and call
-          onOpenChange(false) itself — which, wired straight to onClose, ran the PARENT's
-          real close handler (MonthlyCollectionTable: setIsModalOpen(false) +
-          setSelectedContract(null)), unmounting this whole component — BillModal included,
-          since it lives inside this same subtree below. The next "Record Usage" click then
-          mounts a brand-new instance, which reads as the form "auto-reopening" right after
-          submit. Fix: only forward a dismiss to the parent when it reflects a genuine exit,
-          not the internal createdBillId handoff. */}
+      {/* THE AUTO-REOPEN BUG, for the record. Every earlier attempt kept a BillModal
+          mounted inside this component and only rearranged WHEN the two dialogs swapped.
+          None of them could work: while a second dialog lives in this subtree, the
+          parent's `isOpen` has to stay stale-true for its whole lifetime (the parent
+          still believes the usage form is open) and this form's visibility is only a
+          derived expression over handoff ids — so a stray dismiss from either dialog, or
+          anything clearing those ids, put the FORM back on screen instead of closing it.
+          There is no second dialog here any more: submitting closes this form and that
+          is all it does. hasSubmitted latches that so the form cannot re-render even if
+          the parent is slow to unmount it. */}
       <Dialog
-        open={isOpen && !showPreview && !createdBillId}
+        open={isOpen && !showPreview && !hasSubmitted}
         onOpenChange={(next) => {
           if (next) return;
-          if (createdBillId) {
-            console.debug(
-              '[UsageRecordingModal] onOpenChange(false) suppressed during BillModal handoff',
-              { createdBillId },
-            );
-            return;
-          }
-
-          console.debug('[UsageRecordingModal] onOpenChange(false) forwarded to parent onClose');
+          // Already closing under our own steam — don't also forward a dismiss.
+          if (hasSubmitted) return;
           onClose();
         }}
       >
@@ -1387,37 +1453,75 @@ export default function UsageRecordingModal({
               </div>
             </div>
 
-            {/* Rent / EMI Section Display Only */}
-            {!contract?.rentType?.includes('CPC') && (
-              <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
-                <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                  <Coins size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
-                </h3>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-slate-600">
-                    {isSimplifiedLease
-                      ? 'Monthly EMI Amount'
-                      : 'Monthly Rent (Accrued until contract end)'}
-                  </span>
-                  <span className="text-sm font-bold text-slate-800">
-                    {(() => {
-                      const tenure = contract?.leaseTenureMonths || 0;
-                      const isFinalMonth = tenure > 0 && history.length + 1 === tenure;
-                      const amount = Number(
-                        contract?.monthlyRent ||
-                          contract?.monthlyLeaseAmount ||
-                          contract?.monthlyEmiAmount ||
-                          0,
-                      );
-
-                      if (isFinalMonth)
-                        return `${formatCurrency(0, currency)} (Adjusted from Advance)`;
-                      return formatCurrency(amount, currency);
-                    })()}
-                  </span>
-                </div>
+            <div className="space-y-2">
+              <Label>
+                Reading Taken Date{' '}
+                <span className="text-xs font-normal text-muted-foreground">
+                  (date the meter was actually read — may differ from Period End)
+                </span>
+              </Label>
+              <div className="relative">
+                <Input
+                  readOnly
+                  value={safeFormatDate(formData.readingTakenDate, 'dd/MM/yyyy')}
+                  placeholder="DD/MM/YYYY"
+                  className="font-semibold"
+                />
+                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="date"
+                  required
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  value={formData.readingTakenDate}
+                  onChange={(e) => setFormData({ ...formData, readingTakenDate: e.target.value })}
+                />
               </div>
-            )}
+            </div>
+
+            {/* Rent / EMI Section Display Only */}
+            {!contract?.rentType?.includes('CPC') &&
+              (() => {
+                // isLastMonth, not a tenure count. This used to read
+                // `leaseTenureMonths > 0 && history.length + 1 === tenure`, which is
+                // never true for a RENT contract (leaseTenureMonths is a Lease field and
+                // sits at 0), so a Rent contract's final period always displayed the
+                // full "Next Month's Advance" charge for a month that will never exist.
+                const amount = Number(
+                  contract?.monthlyRent ||
+                    contract?.monthlyLeaseAmount ||
+                    contract?.monthlyEmiAmount ||
+                    0,
+                );
+                // Under ADVANCE billing this charge is the NEXT period's rent, collected
+                // now as its advance — the period being recorded here already had its own
+                // rent paid by the previous bill (or, for period 1, by the advance
+                // collected at signing). The final period is the exception: there is no
+                // next period to collect for, and its own rent was already paid by the
+                // previous bill, so only usage is newly payable.
+                const label = isSimplifiedLease
+                  ? 'Monthly EMI Amount'
+                  : isLastMonth
+                    ? 'Monthly Rent (Final period — no advance taken)'
+                    : isArrearsBilling
+                      ? 'Monthly Rent (Accrued until contract end)'
+                      : "Monthly Rent (Next Month's Advance)";
+
+                return (
+                  <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-2">
+                    <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
+                      <Coins size={16} /> {isSimplifiedLease ? 'EMI Info' : 'Rent Info'}
+                    </h3>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-slate-600">{label}</span>
+                      <span className="text-sm font-bold text-slate-800">
+                        {isLastMonth && !isArrearsBilling
+                          ? `${formatCurrency(0, currency)} (Adjusted from Advance)`
+                          : formatCurrency(amount, currency)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
             {/* Last Month Alert */}
             {isLastMonth && !contract?.rentType?.includes('CPC') && (
@@ -1426,8 +1530,10 @@ export default function UsageRecordingModal({
                   <span className="text-amber-500 text-lg">⚠️</span> Last Month of Contract
                 </h3>
                 <p className="text-sm text-amber-800">
-                  This billing period matches the contract end date. The{' '}
-                  <strong>Advance Amount</strong> will be adjusted against this month&apos;s rent.
+                  The contract ends in this billing period, so{' '}
+                  <strong>no next-month advance is charged</strong> — only this period&apos;s usage.
+                  This month&apos;s rent is settled against the <strong>First Month Advance</strong>{' '}
+                  held since signing, and submitting this reading completes the contract.
                 </p>
                 <div className="flex flex-col gap-1 mt-2 text-sm bg-white/50 p-3 rounded-lg border border-amber-100">
                   <div className="flex justify-between">
@@ -2184,6 +2290,14 @@ export default function UsageRecordingModal({
                         {contract?.rentType?.replace('_', ' ') || 'N/A'}
                       </p>
                     </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        Reading Taken Date
+                      </p>
+                      <p className="text-xs font-semibold text-slate-600">
+                        {formatDate(formData.readingTakenDate)}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Dynamic Summary Rows */}
@@ -2638,7 +2752,15 @@ export default function UsageRecordingModal({
                   )}
 
                   <div className="pt-2 border-t border-slate-100 flex justify-between items-center mt-2 text-xs">
-                    <span className="text-slate-500">Monthly Rent</span>
+                    <span className="text-slate-500">
+                      {/* Under ADVANCE billing (and not the final period, which has its
+                          own "adjusted" framing below) this charge is next period's rent,
+                          collected now as its advance — not rent for the period whose
+                          usage was just measured. */}
+                      {!isArrearsBilling && !isLastMonth
+                        ? "Monthly Rent (Next Month's Advance)"
+                        : 'Monthly Rent'}
+                    </span>
                     <span className="font-bold text-slate-700">
                       {(() => {
                         const amount = Number(
@@ -2929,15 +3051,6 @@ export default function UsageRecordingModal({
           }}
         />
       )} */}
-
-      {createdBillId && (
-        <BillModal
-          usageRecordId={createdBillId}
-          open={!!createdBillId}
-          onClose={onClose}
-          initialTab="send"
-        />
-      )}
     </>
   );
 }

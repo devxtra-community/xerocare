@@ -538,23 +538,25 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
               - {getActiveCurrency()} {fmt(totals.discountTotal || 0)}
             </span>
           </div>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              padding: '8px 0',
-              borderBottom: '1px solid #f1f5f9',
-            }}
-          >
-            <span style={{ color: mutedText, fontWeight: '400' }}>
-              {totals.vatPercent
-                ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
-                : totals.vatName || 'VAT Amount'}
-            </span>
-            <span style={{ fontWeight: '400' }}>
-              {getActiveCurrency()} {fmt(totals.vatTotal)}
-            </span>
-          </div>
+          {(totals.vatName === 'VAT Exempt' || totals.vatPercent || totals.vatTotal) && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '8px 0',
+                borderBottom: '1px solid #f1f5f9',
+              }}
+            >
+              <span style={{ color: mutedText, fontWeight: '400' }}>
+                {totals.vatPercent
+                  ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                  : totals.vatName || 'VAT Amount'}
+              </span>
+              <span style={{ fontWeight: '400' }}>
+                {getActiveCurrency()} {fmt(totals.vatTotal)}
+              </span>
+            </div>
+          )}
           <div
             style={{
               display: 'flex',

@@ -352,6 +352,10 @@ export class BillingReportService {
       recordedMonths?: number;
       tenure?: number;
       contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+      /** For the Finance Rent/Lease table's "Collect Security Deposit" fallback — the
+       *  actual collected/not-yet-collected status comes from getSecurityDepositBillStatus
+       *  separately; this is only the contract's required amount, for prefilling. */
+      securityDepositAmount?: number;
       usageData?: {
         bwA4Count: number;
         bwA3Count: number;
@@ -383,6 +387,7 @@ export class BillingReportService {
           monthlyEmiAmount: contract.monthlyEmiAmount,
           recordedMonths: history.length,
           tenure: contract.leaseTenureMonths || 0,
+          securityDepositAmount: contract.securityDepositAmount,
         });
         continue;
       }
@@ -424,6 +429,7 @@ export class BillingReportService {
         monthlyEmiAmount: contract.monthlyEmiAmount,
         recordedMonths: history.length,
         tenure: contract.leaseTenureMonths || 0,
+        securityDepositAmount: contract.securityDepositAmount,
         usageData: {
           bwA4Count: 0,
           bwA3Count: 0,

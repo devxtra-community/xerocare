@@ -1032,7 +1032,11 @@ function QuotationTemplateFormModal({
       ? String(template.monthlyRent)
       : '',
   );
-  const [advanceAmount, setAdvanceAmount] = useState(
+  // Read-only: seeded from the template and never reassigned. The Security Deposit
+  // input used to write into this as well, conflating a refundable deposit with the
+  // first month's advance; removing that left nothing to set it, so the setter is gone
+  // rather than left dangling.
+  const [advanceAmount] = useState(
     template?.advanceAmount !== undefined && template?.advanceAmount !== null
       ? String(template.advanceAmount)
       : '',
@@ -2051,7 +2055,7 @@ function QuotationTemplateFormModal({
             {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  Advance / Caution Deposit
+                  First Month Advance Payment
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -2064,7 +2068,6 @@ function QuotationTemplateFormModal({
                       onChange={(e) => {
                         const val = e.target.value;
                         setSecurityDepositAmount(val);
-                        setAdvanceAmount(val);
                       }}
                       placeholder="e.g. 1000"
                       className="text-xs h-9 bg-white"

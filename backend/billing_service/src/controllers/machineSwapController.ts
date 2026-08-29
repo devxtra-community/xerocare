@@ -270,9 +270,20 @@ export const approveMachineSwap = async (req: Request, res: Response, next: Next
     await queryRunner.connect();
     await queryRunner.startTransaction();
     try {
-      // Close the old allocation
+      // Close the old allocation — matched by the specific unit being swapped
+      // (currentProductId, which the request already carries) rather than just "most
+      // recently allocated on this contract". A contract can have more than one
+      // simultaneously ALLOCATED row now that accessories are allocated the same way as
+      // the machine itself, so "most recent" could just as easily grab an accessory's
+      // allocation instead of the machine actually being swapped.
       const oldAllocation = await allocationRepo.findOne({
-        where: { contractId: swapRequest.contractId, status: AllocationStatus.ALLOCATED },
+        where: swapRequest.currentProductId
+          ? {
+              contractId: swapRequest.contractId,
+              productId: swapRequest.currentProductId,
+              status: AllocationStatus.ALLOCATED,
+            }
+          : { contractId: swapRequest.contractId, status: AllocationStatus.ALLOCATED },
         order: { startTimestamp: 'DESC' },
       });
 
@@ -289,6 +300,10 @@ export const approveMachineSwap = async (req: Request, res: Response, next: Next
         modelId: swapRequest.modelId,
         productId: swapRequest.requestedProductId,
         serialNumber: swapRequest.requestedSerialNumber,
+        // Carried over — a swap doesn't change whether the unit is a real machine or an
+        // accessory. Falls back to PRODUCT (the only kind ever swapped before
+        // accessories existed) if no old allocation was found to carry it from.
+        itemType: oldAllocation?.itemType ?? 'PRODUCT',
         status: AllocationStatus.ALLOCATED,
         startTimestamp: swapExecutedAt,
         replacementOfAllocationId: oldAllocation?.id,

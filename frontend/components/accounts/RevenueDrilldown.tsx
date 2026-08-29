@@ -21,6 +21,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // ─── Generic expandable drill-down tree ────────────────────────────────────────
 // One shared node/tree shape used by every Chart of Accounts section (Revenue,
@@ -291,18 +298,22 @@ export function DrilldownModal<T>({
             </>
           )}
           {isAdmin && (
-            <select
-              value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-              className="h-9 px-2 rounded-md border border-border text-sm bg-background"
+            <Select
+              value={branchFilter || '__ALL__'}
+              onValueChange={(v) => setBranchFilter(v === '__ALL__' ? '' : v)}
             >
-              <option value="">All Branches</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="h-9 border-orange-200 text-sm bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__ALL__">All Branches</SelectItem>
+                {branches.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
 

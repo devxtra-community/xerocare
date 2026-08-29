@@ -16,6 +16,7 @@ import { WarrantyType } from '../entities/enums/warrantyType';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
+import { PaymentTiming } from '../entities/enums/paymentTiming';
 import { MoreThanOrEqual } from 'typeorm';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
@@ -109,6 +110,7 @@ export class UsageService {
     contractId: string;
     billingPeriodStart: string;
     billingPeriodEnd: string;
+    readingTakenDate?: string;
     bwA4Count: number;
     bwA3Count: number;
     colorA4Count: number;
@@ -484,13 +486,28 @@ export class UsageService {
     // 8. Determine Rent & Final Month Logic
     // STRICT CHANGE: Store actual charged rent here based on strict logic
 
-    // Detect Last Month Properly (Strict Date Equality)
+    // Detect the contract's final billing period.
+    //
+    // This used to require STRICT equality — the period had to end on exactly
+    // effectiveTo — which almost never survives a real contract. Period boundaries are
+    // rolled forward as "previous end + 1 day, then + 1 month − 1 day", so a single
+    // short month permanently re-anchors the cycle (a 29th-to-28th contract that bills
+    // through February comes out on 1st-to-end-of-month from then on and can never land
+    // on the 28th again); extending a contract moves effectiveTo by whole months, which
+    // need not align with those boundaries either. Once the dates stopped matching, the
+    // final period silently billed as an ordinary one: it charged a full month's rent as
+    // the NEXT period's advance for a contract that has no next period, never credited
+    // the advance held since signing, and never marked the contract COMPLETED.
+    //
+    // The real question is not "does this period end on the end date" but "does the
+    // contract end on or before this period ends" — i.e. is there any period after this
+    // one. Answering that directly makes the check immune to all of the drift above.
     let isLastMonth = false;
     if (contract.effectiveTo) {
-      // Compare dates strictly (ignoring time components)
+      // Compare dates only, ignoring time components
       const payloadEnd = new Date(payload.billingPeriodEnd).setHours(0, 0, 0, 0);
       const contractEnd = new Date(contract.effectiveTo).setHours(0, 0, 0, 0);
-      isLastMonth = payloadEnd === contractEnd;
+      isLastMonth = payloadEnd >= contractEnd;
     }
 
     const monthlyRent = Number(
@@ -507,13 +524,33 @@ export class UsageService {
       await queryRunner.startTransaction();
 
       try {
-        // Rent Logic: Keep monthlyRent as is for UsageRecord/Gross Amount.
-        // Deduct it from Advance only for "Payable" calculation on the Invoice.
-        const advanceAdjusted = monthlyRent;
+        // Determine if this is Arrears billing (no advance to deduct)
+        const isArrears = contract.paymentTiming === PaymentTiming.ARREARS;
 
-        // Deduct from remaining Advance Amount on Contract
-        const currentAdvance = Number(contract.advanceAmount || 0);
-        contract.advanceAmount = currentAdvance - monthlyRent; // Remaining security deposit
+        // Rolling-advance model, confirmed: the ADVANCE collected at signing is period 1's
+        // rent, paid up front. Every period's bill after that (this "STANDARD MONTH LOGIC"
+        // branch, below) already charges monthlyRent + that period's excess — which, because
+        // monthlyRent is constant for the life of the contract, is numerically identical to
+        // "next period's rent, paid now" — so no separate forward-looking charge is needed
+        // there. The only period that must NOT re-charge rent is this one, the last: its
+        // rent was already paid by the PRIOR period's bill (or by the original advance, if
+        // this is also the first period), so only its excess usage is newly payable here.
+        //
+        // Credit only what the advance actually covers, not always exactly monthlyRent —
+        // this used to unconditionally deduct monthlyRent regardless of the real advance
+        // amount, so a contract whose advance was ever entered as something other than
+        // exactly one period's rent (a smaller partial advance, or a deliberately larger
+        // one) either over-credited money that was never actually paid, or silently
+        // stranded the excess with nothing left to apply it to once the contract completed.
+        const advanceAdjusted = isArrears
+          ? 0
+          : Math.min(monthlyRent, Number(contract.advanceAmount || 0));
+
+        // Deduct from remaining Advance Amount on Contract (ADVANCE billing only)
+        if (!isArrears) {
+          const currentAdvance = Number(contract.advanceAmount || 0);
+          contract.advanceAmount = currentAdvance - advanceAdjusted; // Remaining advance (0 in the normal case where advance == one period's rent)
+        }
 
         // Mark Contract as Completed
         contract.contractStatus = ContractStatus.COMPLETED;
@@ -552,6 +589,9 @@ export class UsageService {
           contract: { id: payload.contractId } as Invoice,
           billingPeriodStart: new Date(payload.billingPeriodStart),
           billingPeriodEnd: new Date(payload.billingPeriodEnd),
+          readingTakenDate: payload.readingTakenDate
+            ? new Date(payload.readingTakenDate)
+            : new Date(),
           bwA4Count: totalEndBwA4 || payload.bwA4Count,
           bwA3Count: totalEndBwA3 || payload.bwA3Count,
           colorA4Count: totalEndColorA4 || payload.colorA4Count,
@@ -659,6 +699,9 @@ export class UsageService {
         contract: { id: payload.contractId } as Invoice,
         billingPeriodStart: new Date(payload.billingPeriodStart),
         billingPeriodEnd: new Date(payload.billingPeriodEnd),
+        readingTakenDate: payload.readingTakenDate
+          ? new Date(payload.readingTakenDate)
+          : new Date(),
         bwA4Count: totalEndBwA4 || payload.bwA4Count,
         bwA3Count: totalEndBwA3 || payload.bwA3Count,
         colorA4Count: totalEndColorA4 || payload.colorA4Count,
@@ -894,6 +937,9 @@ export class UsageService {
           id: record.id,
           periodStart: new Date(record.billingPeriodStart).toISOString().split('T')[0],
           periodEnd: new Date(record.billingPeriodEnd).toISOString().split('T')[0],
+          readingTakenDate: record.readingTakenDate
+            ? new Date(record.readingTakenDate).toISOString().split('T')[0]
+            : undefined,
           freeLimit: isCPC ? 'Standard CPC' : freeLimit,
           totalUsage,
           exceededCount,
@@ -1324,6 +1370,7 @@ export class UsageService {
       colorA4Count: number;
       colorA3Count: number;
       billingPeriodEnd?: string;
+      readingTakenDate?: string;
       discountBwCopies?: number;
       discountColorCopies?: number;
       discountAmount?: number;
@@ -1431,6 +1478,9 @@ export class UsageService {
     usage.colorA3Count = payload.colorA3Count;
     if (payload.billingPeriodEnd) {
       usage.billingPeriodEnd = new Date(payload.billingPeriodEnd);
+    }
+    if (payload.readingTakenDate) {
+      usage.readingTakenDate = new Date(payload.readingTakenDate);
     }
 
     // Update UsageRecordItems and pre-emptively update ProductAllocations based on payload.items.

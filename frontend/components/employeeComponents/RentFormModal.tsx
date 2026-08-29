@@ -1032,7 +1032,7 @@ export default function RentFormModal({
                   )}
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Advance Amount
+                      First Month Advance Payment
                     </label>
                     <Input
                       type="text"
@@ -1068,7 +1068,7 @@ export default function RentFormModal({
                   </div>
                   <div className="space-y-2">
                     <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                      Advance ({currency})
+                      First Month Advance ({currency})
                     </label>
                     <Input
                       type="text"

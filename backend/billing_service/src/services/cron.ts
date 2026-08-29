@@ -8,7 +8,7 @@ import { getRabbitChannel } from '../config/rabbitmq';
 import { logger } from '../config/logger';
 import { BillingEventType } from '../events/billingEvents';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
-import { getBranchManagerEmail } from './billingHelpers';
+import { getBranchManagerEmail, getBranchStaffByRole } from './billingHelpers';
 import { In, Raw } from 'typeorm';
 import cron from 'node-cron';
 import { sign } from 'jsonwebtoken';
@@ -64,17 +64,18 @@ export async function expireContractsJob() {
         invoiceId: contract.id,
       });
 
-      // 2. In-app notification (WARNING)
-      const branchResult = await Source.query(
-        `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
-        [contract.branchId],
-      );
-      const managerId = branchResult?.[0]?.manager_id;
-      if (managerId) {
+      // 2. In-app notification — every Manager AND every Finance user at the branch.
+      // Finance is who actually acts on renewal (see the Ongoing Contracts page), so
+      // this can't be Manager-only the way it used to be.
+      const recipients30 = [
+        ...(await getBranchStaffByRole(contract.branchId, 'MANAGER')),
+        ...(await getBranchStaffByRole(contract.branchId, 'FINANCE')),
+      ];
+      for (const recipient of recipients30) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: managerId,
+          recipientId: recipient.id,
           title: 'Contract Expiring in 30 Days',
-          message: `Contract ${contract.invoiceNumber} will expire in 30 days.`,
+          message: `Contract ${contract.invoiceNumber} will expire in 30 days — its final billing period. Review it on Contract Renewals.`,
           type: 'WARNING',
           referenceId: contract.id,
           referenceType: 'CONTRACT',
@@ -124,17 +125,16 @@ export async function expireContractsJob() {
         invoiceId: contract.id,
       });
 
-      // 2. In-app notification (CRITICAL_WARNING)
-      const branchResult = await Source.query(
-        `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
-        [contract.branchId],
-      );
-      const managerId = branchResult?.[0]?.manager_id;
-      if (managerId) {
+      // 2. In-app notification — every Manager AND every Finance user at the branch.
+      const recipients7 = [
+        ...(await getBranchStaffByRole(contract.branchId, 'MANAGER')),
+        ...(await getBranchStaffByRole(contract.branchId, 'FINANCE')),
+      ];
+      for (const recipient of recipients7) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: managerId,
+          recipientId: recipient.id,
           title: 'Contract Expiring in 7 Days',
-          message: `Contract ${contract.invoiceNumber} will expire in 7 days.`,
+          message: `Contract ${contract.invoiceNumber} will expire in 7 days — decide renewal on Contract Renewals now.`,
           type: 'CRITICAL_WARNING',
           referenceId: contract.id,
           referenceType: 'CONTRACT',
@@ -174,15 +174,14 @@ export async function expireContractsJob() {
         invoiceId: contract.id,
       });
 
-      // 2. In-app notification (EXPIRY)
-      const branchResult = await Source.query(
-        `SELECT manager_id FROM branches WHERE id = $1 LIMIT 1`,
-        [contract.branchId],
-      );
-      const managerId = branchResult?.[0]?.manager_id;
-      if (managerId) {
+      // 2. In-app notification — every Manager AND every Finance user at the branch.
+      const recipientsExpired = [
+        ...(await getBranchStaffByRole(contract.branchId, 'MANAGER')),
+        ...(await getBranchStaffByRole(contract.branchId, 'FINANCE')),
+      ];
+      for (const recipient of recipientsExpired) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: managerId,
+          recipientId: recipient.id,
           title: 'Contract Expired',
           message: `Contract ${contract.invoiceNumber} has expired today.`,
           type: 'EXPIRY',

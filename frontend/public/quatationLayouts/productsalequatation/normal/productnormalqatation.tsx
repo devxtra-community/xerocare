@@ -596,73 +596,85 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         }}
       >
         <div style={{ width: '250px' }}>
-          {[
-            {
-              label: 'Subtotal (Before VAT)',
-              // Net of discount — this layout has no separate discount row, and VAT
-              // below is already computed on the discounted amount, so the subtotal
-              // shown here must match that same base or the two figures won't reconcile.
-              value: totals.subTotal - (totals.discountTotal || 0),
-            },
-            {
-              label: totals.vatPercent
-                ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
-                : totals.vatName || 'VAT Amount',
-              value: totals.vatTotal,
-            },
-            {
-              label: 'Grand Total (Including VAT)',
-              value: totals.total,
-              prefix: `${getActiveCurrency()} `,
-              isBold: true,
-            },
-          ].map((row, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                padding: '8px 0',
-                borderBottom: i === 2 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
-              }}
-            >
+          {(() => {
+            // Only show a VAT/tax line when there's an actual tax story to tell — either
+            // a real rate/amount, or an explicit exemption label. A branch with no tax
+            // configured at all leaves vatPercent/vatName/vatTotal all falsy.
+            const showVat =
+              totals.vatName === 'VAT Exempt' || !!totals.vatPercent || !!totals.vatTotal;
+            const rows = [
+              {
+                label: 'Subtotal (Before VAT)',
+                // Net of discount — this layout has no separate discount row, and VAT
+                // below is already computed on the discounted amount, so the subtotal
+                // shown here must match that same base or the two figures won't reconcile.
+                value: totals.subTotal - (totals.discountTotal || 0),
+              },
+              ...(showVat
+                ? [
+                    {
+                      label: totals.vatPercent
+                        ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                        : totals.vatName || 'VAT Amount',
+                      value: totals.vatTotal,
+                    },
+                  ]
+                : []),
+              {
+                label: 'Grand Total (Including VAT)',
+                value: totals.total,
+                prefix: `${getActiveCurrency()} `,
+                isBold: true,
+              },
+            ];
+            return rows.map((row, i) => (
               <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span
-                  style={{
-                    fontSize: '12px',
-                    textTransform: 'uppercase',
-                    color: row.isBold ? ACCENT : '#000',
-                    fontWeight: '300',
-                  }}
-                >
-                  {row.label}
-                </span>
-                <span
-                  style={{
-                    fontSize: '14px',
-                    color: row.isBold ? ACCENT : '#000',
-                    fontWeight: '300',
-                  }}
-                >
-                  {row.prefix || ''}
-                  {fmt(row.value)}
-                </span>
-              </div>
-              <div
+                key={i}
                 style={{
-                  fontSize: '10px',
-                  color: '#111827',
-                  fontStyle: 'italic',
-                  textAlign: 'right',
-                  marginTop: '2px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '8px 0',
+                  borderBottom: i === rows.length - 1 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
                 }}
               >
-                {numberToWords(row.value, getActiveCurrency())}
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      textTransform: 'uppercase',
+                      color: row.isBold ? ACCENT : '#000',
+                      fontWeight: '300',
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '14px',
+                      color: row.isBold ? ACCENT : '#000',
+                      fontWeight: '300',
+                    }}
+                  >
+                    {row.prefix || ''}
+                    {fmt(row.value)}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: '10px',
+                    color: '#111827',
+                    fontStyle: 'italic',
+                    textAlign: 'right',
+                    marginTop: '2px',
+                  }}
+                >
+                  {numberToWords(row.value, getActiveCurrency())}
+                </div>
               </div>
-            </div>
-          ))}
+            ));
+          })()}
 
           {totals.paid && (
             <div

@@ -41,6 +41,13 @@ import StatementDialog, { type StatementData } from '@/components/shared/Stateme
 import StatCard from '@/components/StatCard';
 import OwnerSelect from '@/components/finance/OwnerSelect';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   DonutChart,
   SimpleLineChart,
   SimpleBarChart,
@@ -260,17 +267,18 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-              <select
-                value={form.type}
-                onChange={(e) => set('type', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {EQUITY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {TYPE_LABELS[t] ?? t.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.type} onValueChange={(v) => set('type', v)}>
+                <SelectTrigger className="w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EQUITY_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {TYPE_LABELS[t] ?? t.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -356,14 +364,15 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Source</label>
-                <select
-                  value={form.reserveSource}
-                  onChange={(e) => set('reserveSource', e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="DIRECT_ENTRY">Direct Entry</option>
-                  <option value="FROM_RETAINED_EARNINGS">From Retained Earnings</option>
-                </select>
+                <Select value={form.reserveSource} onValueChange={(v) => set('reserveSource', v)}>
+                  <SelectTrigger className="w-full border-orange-200 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DIRECT_ENTRY">Direct Entry</SelectItem>
+                    <SelectItem value="FROM_RETAINED_EARNINGS">From Retained Earnings</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
@@ -393,17 +402,18 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
           {showPaymentMode && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Payment Mode</label>
-              <select
-                value={form.paymentMode}
-                onChange={(e) => set('paymentMode', e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PAYMENT_MODES.map((m) => (
-                  <option key={m} value={m}>
-                    {m.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
+              <Select value={form.paymentMode} onValueChange={(v) => set('paymentMode', v)}>
+                <SelectTrigger className="w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_MODES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m.replace(/_/g, ' ')}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
@@ -494,24 +504,29 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Linked Cash/Bank Account (auto-creates cashbook entry)
               </label>
-              <select
-                value={form.linkedCashAccountId}
-                onChange={(e) => {
-                  set('linkedCashAccountId', e.target.value);
-                  if (e.target.value) setConfirmNonCash(false);
+              <Select
+                value={form.linkedCashAccountId || '__NONE__'}
+                onValueChange={(v) => {
+                  const val = v === '__NONE__' ? '' : v;
+                  set('linkedCashAccountId', val);
+                  if (val) setConfirmNonCash(false);
                 }}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">— none —</option>
-                {matchingAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} — {a.currency}{' '}
-                    {Number(a.currentBalance).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__NONE__">— none —</SelectItem>
+                  {matchingAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name} — {a.currency}{' '}
+                      {Number(a.currentBalance).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {balanceError && (
                 <p className="mt-1 text-xs font-medium text-red-600">{balanceError}</p>
               )}
@@ -1047,20 +1062,21 @@ export default function EquityPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-gray-700">Year:</label>
-            <select
-              value={stmtYear}
-              onChange={(e) => setStmtYear(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {[0, 1, 2, 3].map((offset) => {
-                const y = String(new Date().getFullYear() - offset);
-                return (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                );
-              })}
-            </select>
+            <Select value={stmtYear} onValueChange={setStmtYear}>
+              <SelectTrigger className="border-orange-200 text-sm w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 1, 2, 3].map((offset) => {
+                  const y = String(new Date().getFullYear() - offset);
+                  return (
+                    <SelectItem key={y} value={y}>
+                      {y}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
 
           {statement && (

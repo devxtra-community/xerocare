@@ -30,6 +30,7 @@ import {
   recordSalePayment,
   approveSalePayment,
   rejectSalePayment,
+  refundSecurityDeposit,
   getSaleContracts,
   updateDeliveryStatus,
   getPendingUsagePayments,
@@ -51,6 +52,8 @@ import {
   generateAdvanceBill,
   resetBillForResend,
   getAdvanceBillStatus,
+  generateSecurityDepositBill,
+  getSecurityDepositBillStatus,
 } from '../controllers/saleWorkflowController';
 import { uploadSignedAgreementDoc } from '../middlewares/uploadMiddleware';
 
@@ -140,6 +143,14 @@ router.get('/usage/by-contract/:contractId/bills', authMiddleware, getBillsForCo
 router.post('/usage/contract/:contractId/advance-bill', authMiddleware, generateAdvanceBill);
 router.get('/usage/advance-bill-status', authMiddleware, getAdvanceBillStatus);
 
+// ─── Security Deposit Bill — same Bill entity/pipeline, billType='SECURITY_DEPOSIT' ──
+router.post(
+  '/usage/contract/:contractId/security-deposit-bill',
+  authMiddleware,
+  generateSecurityDepositBill,
+);
+router.get('/usage/security-deposit-bill-status', authMiddleware, getSecurityDepositBillStatus);
+
 // Public (no auth) — customer remote bill approval
 router.get('/bill/sign/:token', getBillForSigning);
 router.post('/bill/sign/:token/approve', approveBillRemote);
@@ -152,6 +163,7 @@ router.get('/invoices/:id/sale-payments', authMiddleware, getSalePaymentsForInvo
 router.post('/invoices/:id/sale-payments', authMiddleware, recordSalePayment);
 router.post('/sale-payments/:id/approve', authMiddleware, approveSalePayment);
 router.post('/sale-payments/:id/reject', authMiddleware, rejectSalePayment);
+router.post('/sale-payments/:id/refund-deposit', authMiddleware, refundSecurityDeposit);
 router.post('/sale-payments/:id/generate-receipt', authMiddleware, generateSalePaymentReceipt);
 router.post('/sale-payments/:id/notify/email', authMiddleware, sendSalePaymentReceiptEmail);
 router.post('/sale-payments/:id/notify/whatsapp', authMiddleware, sendSalePaymentReceiptWhatsApp);

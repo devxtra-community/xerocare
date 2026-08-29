@@ -15,7 +15,7 @@ import {
 import { purchaseService, AddPaymentDto } from '@/services/purchaseService';
 import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useExchangeRateMap, formatDualCurrency } from '@/lib/dualCurrency';
 import { CreditCard, Calendar, FileText, Hash, Paperclip, X } from 'lucide-react';
 import {
@@ -77,7 +77,6 @@ export default function AddPaymentModal({
     amount: 0,
     paymentMethod: 'Bank Transfer',
     description: '',
-    referenceNumber: '',
     paymentDate: new Date().toISOString().split('T')[0],
   });
 
@@ -195,7 +194,9 @@ export default function AddPaymentModal({
             chequeBankName: isCheque ? chequeBankName : undefined,
             chequeDueDate: isCheque ? chequeDueDate : undefined,
             description: formData.description || undefined,
-            referenceNumber: isCheque ? chequeNumber : formData.referenceNumber,
+            // Non-cheque: left undefined so the backend always generates it (Cash/Bank/
+            // Card/Online). Cheque: the cheque number is the reference.
+            referenceNumber: isCheque ? chequeNumber : undefined,
             paymentDate: formData.paymentDate,
             currency: currencyCode,
           },
@@ -217,7 +218,9 @@ export default function AddPaymentModal({
           purchaseId,
           {
             ...formData,
-            referenceNumber: isCheque ? chequeNumber : formData.referenceNumber,
+            // Non-cheque: left undefined so the backend always generates it (Cash/Bank/
+            // Card/Online). Cheque: the cheque number is the reference.
+            referenceNumber: isCheque ? chequeNumber : undefined,
             paidFromAccountId: !isCheque && paidFromAccount ? paidFromAccount : undefined,
           },
           attachment,
@@ -345,17 +348,16 @@ export default function AddPaymentModal({
                   onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
-                  <Hash size={12} /> Ref #
-                </Label>
-                <Input
-                  placeholder="TRX..."
-                  className="h-10 text-xs border-slate-200"
-                  value={formData.referenceNumber}
-                  onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
-                />
-              </div>
+              {formData.paymentMethod !== 'Cheque' && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                    <Hash size={12} /> Ref #
+                  </Label>
+                  <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                    Auto-generated — {autoReferencePreview(formData.paymentMethod)}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

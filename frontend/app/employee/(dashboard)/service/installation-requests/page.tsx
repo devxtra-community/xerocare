@@ -44,9 +44,11 @@ import {
   FileText,
   X,
   Warehouse as WarehouseIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 import { ChangeMachineModal } from '@/components/employeeComponents/ChangeMachineModal';
+import { CollectSecurityDepositModal } from '@/components/employeeComponents/CollectSecurityDepositModal';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
 
@@ -84,6 +86,9 @@ export default function InstallationRequestsPage() {
   // Contract view dialog
   const [viewContract, setViewContract] = useState<ContractAgreement | null>(null);
   const [contractLoading, setContractLoading] = useState<string | null>(null);
+
+  // Collect Security Deposit — shown when the Employee didn't collect it at conversion
+  const [depositTarget, setDepositTarget] = useState<InstallationRequest | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -500,6 +505,21 @@ export default function InstallationRequestsPage() {
                               <RefreshCcw size={13} />
                             </Button>
                           )}
+                          {/* Sometimes the Employee doesn't collect the deposit at conversion —
+                              this is the fallback so it's never left uncollected indefinitely. */}
+                          {isRentLease &&
+                            (req.securityDepositAmount ?? 0) > 0 &&
+                            !req.securityDepositCollected && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDepositTarget(req)}
+                                title="Collect Security Deposit"
+                                className="h-7 w-7 p-0 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
+                              >
+                                <ShieldCheck size={13} />
+                              </Button>
+                            )}
                           {req.status === 'ASSIGNED' && (
                             <Button
                               size="sm"
@@ -582,6 +602,20 @@ export default function InstallationRequestsPage() {
           currentSerialNumber={swapTarget.currentSerialNumber}
           currentModelId={swapTarget.currentModelId}
           onSwapRequested={loadData}
+        />
+      )}
+
+      {depositTarget && (
+        <CollectSecurityDepositModal
+          contractId={depositTarget.invoiceId}
+          customerName={depositTarget.customerName}
+          invoiceNumber={depositTarget.invoiceNumber}
+          defaultAmount={depositTarget.securityDepositAmount ?? 0}
+          onClose={() => setDepositTarget(null)}
+          onSuccess={() => {
+            setDepositTarget(null);
+            loadData();
+          }}
         />
       )}
 

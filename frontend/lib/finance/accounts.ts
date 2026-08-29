@@ -158,6 +158,13 @@ export const CHART_OF_ACCOUNTS: ChartAccount[] = [
     group: 'INCOME',
     description: 'Non-invoice cash income (e.g. scrap sale) — not tied to any Accounts Receivable',
   },
+  {
+    code: '4009',
+    name: 'Accessories Sales Revenue',
+    group: 'INCOME',
+    description:
+      'Accessory line items (stand, tray, stapler unit…) supplied alongside a machine — billed once, up front, with the first-month advance',
+  },
   // EXPENSES
   {
     code: '5001',

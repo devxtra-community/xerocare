@@ -701,14 +701,21 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
               bold: false,
               color: GOLD,
             },
-            {
-              label: totals.vatPercent
-                ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
-                : totals.vatName || 'VAT AMOUNT',
-              value: fmt(totals.vatTotal),
-              num: totals.vatTotal,
-              bold: false,
-            },
+            // Only show a VAT/tax line when there's an actual tax story to tell — either
+            // a real rate/amount, or an explicit exemption label. A branch with no tax
+            // configured at all leaves vatPercent/vatName/vatTotal all falsy.
+            ...(totals.vatName === 'VAT Exempt' || totals.vatPercent || totals.vatTotal
+              ? [
+                  {
+                    label: totals.vatPercent
+                      ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                      : totals.vatName || 'VAT AMOUNT',
+                    value: fmt(totals.vatTotal),
+                    num: totals.vatTotal,
+                    bold: false,
+                  },
+                ]
+              : []),
             {
               label: 'GRAND TOTAL (INCLUDING VAT)',
               value: fmt(totals.total),

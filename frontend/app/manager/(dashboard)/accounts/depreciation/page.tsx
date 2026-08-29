@@ -12,6 +12,13 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -151,18 +158,19 @@ export default function ManagerDepreciationPage() {
               className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select
-            value={catFilter}
-            onChange={(e) => setCatFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ALL">All Methods</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+          <Select value={catFilter} onValueChange={setCatFilter}>
+            <SelectTrigger className="border-orange-200 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Methods</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c.replace(/_/g, ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {isLoading ? (
           <div className="p-8 text-center text-gray-400">Loading…</div>

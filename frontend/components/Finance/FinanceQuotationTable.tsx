@@ -400,37 +400,26 @@ export default function FinanceQuotationTable({
 
       {/* Table */}
       <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
-        <div className="overflow-x-auto mb-4 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&_[data-slot=table-container]]:scrollbar-none [&_[data-slot=table-container]::-webkit-scrollbar]:hidden [&_[data-slot=table-container]]:[-ms-overflow-style:none] [&_[data-slot=table-container]]:[scrollbar-width:none]">
-          <Table className="w-full table-fixed">
-            <TableHeader className="bg-slate-50/50 border-b border-slate-100">
+        {/* Scrollbar left visible (as on the employee table): the columns are now sized
+            to their content rather than squeezed into fixed percentages, so on a narrow
+            screen there IS something to scroll to and hiding the bar would conceal it. */}
+        <div className="overflow-x-auto mb-4">
+          {/* Column widths are natural (min-w + scroll), not table-fixed percentages —
+              the fixed layout squeezed Customer and Created By to the point that every
+              real value rendered as an ellipsis ("NADHIL CUS…", "RIYAS EMPLOYEE M…").
+              Matches the employee Quotations table. */}
+          <Table className="min-w-[900px] sm:min-w-full">
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[11%] py-3 px-3">
-                  QT NUMBER
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[18%] py-3 px-3">
-                  PRODUCT
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
-                  CUSTOMER
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
-                  TYPE
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
-                  AMOUNT
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[12%] py-3 px-3">
-                  CREATED BY
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[14%] py-3 px-3">
-                  STATUS
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase w-[9%] py-3 px-3">
-                  DATE
-                </TableHead>
-                <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase text-center w-[9%] py-3 px-3">
-                  ACTIONS
-                </TableHead>
+                <TableHead className="text-primary font-bold">QT NUMBER</TableHead>
+                <TableHead className="text-primary font-bold">PRODUCT</TableHead>
+                <TableHead className="text-primary font-bold">CUSTOMER</TableHead>
+                <TableHead className="text-primary font-bold">TYPE</TableHead>
+                <TableHead className="text-primary font-bold">AMOUNT</TableHead>
+                <TableHead className="text-primary font-bold">CREATED BY</TableHead>
+                <TableHead className="text-primary font-bold">STATUS</TableHead>
+                <TableHead className="text-primary font-bold">DATE</TableHead>
+                <TableHead className="text-primary font-bold text-center">ACTIONS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -451,11 +440,12 @@ export default function FinanceQuotationTable({
                   return (
                     <TableRow
                       key={q.id}
-                      className={`${isPending ? 'bg-blue-50/20 hover:bg-blue-50/40' : index % 2 ? 'bg-slate-50/10' : 'bg-card'} hover:bg-slate-50/50 transition-colors border-b border-slate-100/50`}
+                      className={`${isPending ? 'bg-blue-50/30 hover:bg-blue-50/50' : index % 2 ? 'bg-blue-50/10' : 'bg-card'} hover:bg-muted/50 transition-colors`}
                     >
-                      <TableCell className="py-3 px-3">
-                        <div
-                          className={`${q.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED') ? 'text-rose-500' : 'text-blue-500'} font-semibold tracking-tight truncate text-xs`}
+                      <TableCell
+                        className={`${q.creditNotes?.some((cn) => cn.status === 'PRODUCT_REPLACED') ? 'text-rose-500' : 'text-blue-500'} font-bold tracking-tight`}
+                      >
+                        <span
                           title={(() => {
                             const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
                             if (cn) {
@@ -475,29 +465,22 @@ export default function FinanceQuotationTable({
                             }
                             return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
                           })()}
-                        </div>
+                        </span>
                       </TableCell>
-                      <TableCell className="py-3 px-3">
-                        <div
-                          className="font-semibold text-slate-700 truncate text-xs"
-                          title={getProductNames(q)}
-                        >
-                          {getProductNames(q) || '—'}
-                        </div>
+                      <TableCell
+                        className="font-semibold text-slate-700 max-w-[220px] truncate"
+                        title={getProductNames(q)}
+                      >
+                        {getProductNames(q) || '—'}
                       </TableCell>
-                      <TableCell className="py-3 px-3">
-                        <div
-                          className="font-bold text-slate-700 truncate text-xs"
-                          title={q.customerName || 'Walk-in'}
-                        >
-                          {q.customerName || 'Walk-in'}
-                        </div>
+                      <TableCell className="font-bold text-slate-700 whitespace-nowrap">
+                        {q.customerName || 'Walk-in'}
                       </TableCell>
-                      <TableCell className="py-3 px-3">
+                      <TableCell>
                         <TypeBadge type={q.saleType} />
                       </TableCell>
-                      <TableCell className="py-3 px-3">
-                        <div className="font-semibold text-foreground truncate text-xs">
+                      <TableCell>
+                        <div className="font-semibold text-foreground whitespace-nowrap">
                           {(() => {
                             const completedExchange = q.creditNotes?.find(
                               (cn) =>
@@ -525,15 +508,10 @@ export default function FinanceQuotationTable({
                           })()}
                         </div>
                       </TableCell>
-                      <TableCell className="py-3 px-3">
-                        <div
-                          className="text-slate-600 truncate text-xs"
-                          title={q.employeeName || '—'}
-                        >
-                          {q.employeeName || '—'}
-                        </div>
+                      <TableCell className="text-slate-600 whitespace-nowrap">
+                        {q.employeeName || '—'}
                       </TableCell>
-                      <TableCell className="py-3 px-3">
+                      <TableCell>
                         {(() => {
                           const cn = q.creditNotes?.find((c) => c.status === 'PRODUCT_REPLACED');
                           if (cn) {
@@ -545,16 +523,14 @@ export default function FinanceQuotationTable({
                           return <StatusBadge status={q.status} />;
                         })()}
                       </TableCell>
-                      <TableCell className="py-3 px-3">
-                        <div className="text-muted-foreground font-medium truncate text-xs">
-                          {new Date(q.createdAt).toLocaleDateString(undefined, {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </div>
+                      <TableCell className="text-muted-foreground text-sm font-medium whitespace-nowrap">
+                        {new Date(q.createdAt).toLocaleDateString(undefined, {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
                       </TableCell>
-                      <TableCell className="py-3 px-3 text-center">
+                      <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
                           {/* View */}
                           <Button

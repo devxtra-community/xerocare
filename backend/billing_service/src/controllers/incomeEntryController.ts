@@ -146,15 +146,23 @@ export const receiveIncomeEntry = async (req: Request, res: Response, next: Next
     if (entry.status !== 'APPROVED')
       throw new AppError('Income entry must be APPROVED before it can be received', 400);
 
-    const { receivedTo, receivedMode, receivedDate, referenceNo, chequeNumber, chequeBankName } =
-      req.body as {
-        receivedTo?: string;
-        receivedMode?: string;
-        receivedDate?: string;
-        referenceNo?: string;
-        chequeNumber?: string;
-        chequeBankName?: string;
-      };
+    const {
+      receivedTo,
+      receivedMode,
+      receivedDate,
+      referenceNo,
+      chequeNumber,
+      chequeBankName,
+      chequeDate,
+    } = req.body as {
+      receivedTo?: string;
+      receivedMode?: string;
+      receivedDate?: string;
+      referenceNo?: string;
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDate?: string;
+    };
 
     const isCheque = (receivedMode ?? '').trim().toLowerCase() === 'cheque';
 
@@ -192,8 +200,14 @@ export const receiveIncomeEntry = async (req: Request, res: Response, next: Next
               bankName: chequeBankName || undefined,
               partyName: entry.description?.slice(0, 100) || entry.category,
               amount: Number(entry.netAmount),
-              dueDate: saved.receivedDate ?? new Date(),
-              chequeDate: saved.receivedDate ?? new Date(),
+              // chequeDate is the deposit/presentment-eligibility date printed on the
+              // cheque — distinct from collectedDate (receivedDate), since a post-dated
+              // cheque is routinely received well before the date written on it. This
+              // used to always default to receivedDate with no way to override it,
+              // silently making every income cheque depositable immediately and
+              // defeating both the deposit gate and the 2-day reminder job.
+              dueDate: chequeDate ? new Date(chequeDate) : (saved.receivedDate ?? new Date()),
+              chequeDate: chequeDate ? new Date(chequeDate) : (saved.receivedDate ?? new Date()),
               issueDate: saved.receivedDate ?? new Date(),
               collectedDate: saved.receivedDate ?? new Date(),
               type: 'RECEIVED',

@@ -1,5 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import {
+  listOngoingContracts,
+  setRenewalDecision,
+  extendContractHandler,
+} from '../controllers/contractRenewalController';
+import {
   createQuotation,
   createDirectSale,
   updateQuotation,
@@ -468,6 +473,29 @@ router.post(
  * List all bills belonging to a specific office or branch.
  */
 router.get('/branch-invoices', authMiddleware, getBranchInvoices);
+
+/**
+ * Contract Renewal — Rent / Lease-FSM contracts entering (or past) their final
+ * billing period, for the Finance-side Contract Renewals page.
+ */
+router.get(
+  '/ongoing-contracts',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
+  listOngoingContracts,
+);
+router.post(
+  '/:id/renewal-decision',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
+  setRenewalDecision,
+);
+router.post(
+  '/:id/extend-contract',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE, EmployeeRole.MANAGER),
+  extendContractHandler,
+);
 
 /**
  * Look back at all the changes ever made to an invoice.

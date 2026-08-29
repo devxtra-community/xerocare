@@ -7,6 +7,13 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchBranches, type Branch } from '@/lib/finance/accounts';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface BranchFilterBarProps {
   onExport?: () => void;
@@ -330,24 +337,29 @@ export default function BranchFilterBar({ onExport, showPeriod = false }: Branch
 
       {/* ── Period picker ─────────────────────────────────────────────── */}
       {showPeriod && (
-        <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 hover:border-slate-300">
+        <div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400/20 hover:border-slate-300">
           <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
-          <select
+          <Select
             value={period}
-            onChange={(e) => {
-              setPeriod(e.target.value);
-              pushParams(selected, e.target.value);
+            onValueChange={(v) => {
+              setPeriod(v);
+              pushParams(selected, v);
             }}
-            aria-label="Reporting period"
-            className="cursor-pointer touch-manipulation appearance-none bg-transparent pr-5 font-semibold text-slate-700 outline-none"
           >
-            {PERIODS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none -ml-5 h-4 w-4 shrink-0 text-slate-400" />
+            <SelectTrigger
+              aria-label="Reporting period"
+              className="h-auto gap-1 border-0 bg-transparent p-0 font-semibold text-slate-700 shadow-none focus-visible:ring-0"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIODS.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 

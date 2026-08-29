@@ -14,6 +14,13 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { SimpleBarChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -155,18 +162,19 @@ function DepreciationContent() {
               className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select
-            value={methodFilter}
-            onChange={(e) => setMethodFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ALL">All Methods</option>
-            {methods.map((m) => (
-              <option key={m} value={m}>
-                {m.replace(/_/g, ' ')}
-              </option>
-            ))}
-          </select>
+          <Select value={methodFilter} onValueChange={setMethodFilter}>
+            <SelectTrigger className="border-orange-200 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Methods</SelectItem>
+              {methods.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m.replace(/_/g, ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {isLoading ? (
           <div className="p-8 text-center text-gray-400">Loading…</div>

@@ -4,6 +4,7 @@ import { PurchasePayment } from '../entities/purchasePaymentEntity';
 import { Purchase } from '../entities/purchaseEntity';
 import { AppError } from '../errors/appError';
 import { AddPaymentDto } from '../types/purchaseTypes';
+import { generatePaymentReference } from '../utils/paymentReferenceGenerator';
 
 export class PurchasePaymentRepository {
   private get repo() {
@@ -61,10 +62,19 @@ export class PurchasePaymentRepository {
       payment.amount = Number(data.amount);
       payment.paymentMethod = data.paymentMethod;
       payment.description = data.description;
-      payment.referenceNumber = data.referenceNumber;
-      payment.paymentDate = data.paymentDate || new Date();
+      // Normalized to a real Date instance (not left as the raw request-body string) —
+      // generatePaymentReference below calls .toISOString() on this immediately, before
+      // TypeORM's own string→Date conversion would otherwise happen at save time.
+      payment.paymentDate = data.paymentDate ? new Date(data.paymentDate) : new Date();
       payment.createdBy = data.createdBy;
       payment.attachmentUrl = data.attachmentUrl;
+
+      // Auto-generate the reference for Cash/Bank/Card/Online — Cheque keeps whatever
+      // was supplied (its Cheque Number, already passed through as referenceNumber by
+      // every caller). Overrides any caller-supplied value for non-Cheque modes, same
+      // "always the generated code, no override" policy as billing_service.
+      const generatedRef = await generatePaymentReference(data.paymentMethod, payment.paymentDate);
+      payment.referenceNumber = generatedRef ?? data.referenceNumber;
 
       return await manager.save(PurchasePayment, payment);
     });

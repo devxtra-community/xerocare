@@ -30,6 +30,7 @@ const REVENUE_LABELS: Record<string, string> = {
   SERVICE: 'Service Revenue (Chargeable)',
   AMC_SMA: 'AMC / SMA / FSMA Revenue',
   SPAREPART_SALE: 'Spare Parts Sales Revenue',
+  ACCESSORIES: 'Accessories Sales Revenue',
   USAGE: 'Usage / Copy Revenue (Overage)',
 };
 

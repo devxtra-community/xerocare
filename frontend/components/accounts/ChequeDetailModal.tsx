@@ -15,6 +15,13 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { toast } from 'sonner';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export const CHEQUE_TABLE_STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
@@ -320,19 +327,23 @@ export function ChequeActionModal({
           {needsAccount && (
             <div>
               <label className="text-xs font-medium text-gray-600">Bank Account *</label>
-              <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <Select
+                value={accountId || '__NONE__'}
+                onValueChange={(v) => setAccountId(v === '__NONE__' ? '' : v)}
               >
-                <option value="">Select account…</option>
-                {cashAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                    {a.bankName ? ` (${a.bankName})` : ''}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__NONE__">Select account…</SelectItem>
+                  {cashAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                      {a.bankName ? ` (${a.bankName})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           {needsDate && (

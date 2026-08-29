@@ -82,10 +82,20 @@ export class UsageRepository {
 
   /**
    * Retrieves usage history for a contract, ordered by billing period.
+   *
+   * Filtered to billType: 'USAGE' — an ADVANCE or SECURITY_DEPOSIT row in this same
+   * table isn't a billing period at all (no readings, billingPeriodStart/End is just
+   * the payment's date used as a placeholder — see the entity's billType comment), so
+   * leaving it in "usage history" made a contract's very first real period look like it
+   * had a prior period already on file: prevUsage picked up the advance-bill placeholder
+   * (all-zero readings, wrong dates) instead of correctly falling through to the
+   * contract's real Initial Reading from ProductAllocation. Every caller of this method
+   * wants real usage periods only — lease-tenure-completion checks, next-period-date
+   * calculation, and this prev-reading lookup all break the same way otherwise.
    */
   getUsageHistory(contractId: string, order: 'ASC' | 'DESC' = 'DESC') {
     return this.repo.find({
-      where: { contractId },
+      where: { contractId, billType: 'USAGE' },
       relations: ['items', 'items.allocation'],
       order: {
         billingPeriodStart: order,

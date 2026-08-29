@@ -73,6 +73,16 @@ export class PaymentTransaction {
   @Column({ name: 'is_reversed', type: 'boolean', default: false })
   isReversed!: boolean;
 
+  /** True when this receipt is refundable security-deposit money rather than payment
+   * against what the customer owes. The deposit is never part of the invoice's
+   * receivable (SECURITY_DEPOSIT bills are excluded from the billed side, and
+   * approveSalePayment keeps deposits out of InvoiceLedger entirely), so counting its
+   * receipt as "paid" understated every affected contract's outstanding balance by the
+   * deposit amount. Every outstanding/AR query filters on this; the row itself still
+   * exists as the deposit's auditable receipt and still posts to the cashbook. */
+  @Column({ name: 'is_security_deposit', type: 'boolean', default: false })
+  isSecurityDeposit!: boolean;
+
   @Column({ name: 'reversed_by_id', type: 'uuid', nullable: true })
   reversedById?: string;
 

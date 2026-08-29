@@ -32,6 +32,9 @@ export interface LeaseAgreementDetails {
   leaseType: string;
   rentType?: string; // FSM only: e.g. "FIXED LIMIT", "CPC"
   rentPeriod?: string; // FSM only: e.g. "MONTHLY"
+  /** Billing method label — "Monthly Advance" (paid up front each cycle) or
+   *  "Month-End (Arrears)" (billed after the period completes). */
+  billingType?: string;
   duration: string;
   advance: number;
   deposit: number;
@@ -40,10 +43,19 @@ export interface LeaseAgreementDetails {
   endDate: string;
   monthlyEmi: number; // periodic payment (monthly rent for FSM, EMI for EMI-type)
   totalLeaseValue?: number; // total lease value (FSM: total contract value; EMI: totalAmount)
+  contractRentalValue?: number;
+  initialAmountPayable?: number;
   warrantyType?: 'none' | 'duration' | 'copies' | 'both';
   warrantyDurationValue?: number;
   warrantyDurationUnit?: 'months' | 'years';
   warrantyCopyLimit?: number;
+}
+
+export interface AccessoryLineItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  imageUrl?: string;
 }
 
 export interface LeaseNormalQuotationProps {
@@ -69,6 +81,7 @@ export interface LeaseNormalQuotationProps {
   };
   lineItems?: LeaseLineItem[];
   leaseDetails?: LeaseAgreementDetails;
+  accessories?: AccessoryLineItem[];
   totals?: {
     subTotal: number;
     tax: number;
@@ -150,6 +163,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
     endDate: '13-05-2027',
     monthlyEmi: 0,
   },
+  accessories = [],
   totals = {
     subTotal: 0.0,
     tax: 0.0,
@@ -157,6 +171,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
   },
 }) => {
   const isFSM = leaseDetails.leaseType === 'FSM';
+  const accessoryTotal = accessories.reduce((s, a) => s + a.qty * a.unitPrice, 0);
   const hasSlabs = lineItems.some(
     (it) =>
       (it.bwSlabs?.length || 0) > 0 ||
@@ -591,6 +606,79 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
         </table>
       </div>
 
+      {/* ─── ACCESSORIES ─── */}
+      {accessories.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <div
+            style={{
+              fontSize: '13px',
+              fontWeight: '300',
+              color: ACCENT,
+              textTransform: 'uppercase',
+              borderBottom: `1px solid ${ACCENT}`,
+              paddingBottom: '5px',
+              marginBottom: '10px',
+            }}
+          >
+            Accessories
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr
+                style={{
+                  borderTop: '2.5px solid #000',
+                  borderBottom: '2.5px solid #000',
+                }}
+              >
+                <th style={{ ...thStyle('left', '#000'), width: '70px' }}></th>
+                <th style={thStyle('left', '#000')}>Description</th>
+                <th style={thStyle('center', '#000')}>Qty</th>
+                <th style={thStyle('right', '#000')}>Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accessories.map((a, idx) => (
+                <tr
+                  key={idx}
+                  style={{
+                    backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
+                    borderBottom: '1px solid #eee',
+                  }}
+                >
+                  <td style={{ padding: '8px 10px' }}>
+                    {a.imageUrl ? (
+                      <img
+                        src={a.imageUrl}
+                        alt={a.description}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          objectFit: 'contain',
+                          display: 'block',
+                        }}
+                      />
+                    ) : null}
+                  </td>
+                  <td style={{ ...tdStyle('left'), fontWeight: '300' }}>{a.description}</td>
+                  <td style={tdStyle('center')}>{a.qty}</td>
+                  <td style={{ ...tdStyle('right'), fontWeight: '300' }}>
+                    {getActiveCurrency()} {fmt(a.qty * a.unitPrice)}
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan={3} style={{ ...tdStyle('right'), fontWeight: '700', color: ACCENT }}>
+                  Accessories Total
+                </td>
+                <td style={{ ...tdStyle('right'), fontWeight: '700', color: ACCENT }}>
+                  {getActiveCurrency()} {fmt(accessoryTotal)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* ─── FSM: SLAB RATE TABLES ─── */}
       {isFSM && hasSlabs && (
         <div style={{ marginBottom: '24px' }}>
@@ -889,77 +977,263 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             <thead>
               <tr style={{ backgroundColor: '#f9f9f9', color: ACCENT }}>
                 <th style={thStyle('left', ACCENT)}>Lease Type</th>
-                <th style={thStyle('center', ACCENT)}>Pricing Model</th>
+                <th style={thStyle('center', ACCENT)}>Billing Type</th>
                 <th style={thStyle('center', ACCENT)}>Period</th>
-                <th style={thStyle('center', ACCENT)}>Advance / Deposit</th>
+                <th style={thStyle('center', ACCENT)}>Monthly Amount</th>
+                <th style={thStyle('center', ACCENT)}>First Month Advance</th>
                 <th style={thStyle('center', ACCENT)}>Duration</th>
-                <th style={thStyle('center', ACCENT)}>Discount</th>
-                <th style={thStyle('right', ACCENT)}>Monthly Amount</th>
+                <th style={thStyle('right', ACCENT)}>Contract Rental Value</th>
               </tr>
             </thead>
             <tbody>
               <tr style={{ borderBottom: '1px solid #eee' }}>
-                <td style={tdStyle('left')}>FSM</td>
-                <td style={tdStyle('center')}>{leaseDetails.rentType || 'FIXED LIMIT'}</td>
+                <td style={tdStyle('left')}>{leaseDetails.leaseType || 'FSM'}</td>
+                <td style={{ ...tdStyle('center'), fontWeight: '300' }}>
+                  {leaseDetails.billingType || 'Monthly Advance'}
+                </td>
                 <td style={tdStyle('center')}>{leaseDetails.rentPeriod || 'MONTHLY'}</td>
+                <td style={{ ...tdStyle('center'), fontWeight: '300', color: ACCENT }}>
+                  {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
+                </td>
                 <td style={tdStyle('center')}>
-                  {getActiveCurrency()} {fmt(leaseDetails.advance || leaseDetails.deposit || 0)}
+                  {getActiveCurrency()} {fmt(leaseDetails.advance || 0)}
                 </td>
                 <td style={tdStyle('center')}>{leaseDetails.duration}</td>
-                <td style={tdStyle('center')}>
-                  {leaseDetails.discountPercent && leaseDetails.discountPercent > 0 ? (
-                    <span style={{ color: '#16a34a', fontWeight: '300' }}>
-                      {leaseDetails.discountPercent}%
-                    </span>
-                  ) : (
-                    '0%'
-                  )}
-                </td>
                 <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
-                  {getActiveCurrency()} {fmt(leaseDetails.monthlyEmi)}
+                  {getActiveCurrency()} {fmt(leaseDetails.contractRentalValue || 0)}
+                </td>
+              </tr>
+            </tbody>
+
+            {/* Security Deposit & Initial Payment */}
+            <tbody>
+              <tr>
+                <td colSpan={7} style={{ padding: '12px 0 0 0' }}>
+                  <div
+                    style={{
+                      padding: '12px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        color: '#6366f1',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      Initial Payment Details
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                      <tbody>
+                        {(leaseDetails.advance || 0) > 0 && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '4px 0', color: '#64748b' }}>
+                              First Month Advance Payment
+                            </td>
+                            <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                              {getActiveCurrency()} {fmt(leaseDetails.advance)}
+                            </td>
+                          </tr>
+                        )}
+                        {!(leaseDetails.advance > 0) && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '4px 0', color: '#64748b' }}>
+                              First Month Advance
+                            </td>
+                            <td
+                              style={{
+                                padding: '4px 0',
+                                textAlign: 'right',
+                                color: '#94a3b8',
+                                fontStyle: 'italic',
+                              }}
+                            >
+                              Not Applicable (Postpaid)
+                            </td>
+                          </tr>
+                        )}
+                        {(leaseDetails.deposit || 0) > 0 && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
+                            <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                              {getActiveCurrency()} {fmt(leaseDetails.deposit)}
+                            </td>
+                          </tr>
+                        )}
+                        {(leaseDetails.deposit || 0) === 0 && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
+                            <td style={{ padding: '4px 0', textAlign: 'right', color: '#94a3b8' }}>
+                              None
+                            </td>
+                          </tr>
+                        )}
+                        {accessoryTotal > 0 && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '4px 0', color: '#64748b' }}>Accessories</td>
+                            <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                              {getActiveCurrency()} {fmt(accessoryTotal)}
+                            </td>
+                          </tr>
+                        )}
+                        <tr style={{ borderTop: '2px solid #333', fontWeight: '700' }}>
+                          <td style={{ padding: '6px 0', color: '#1e293b', fontSize: '12px' }}>
+                            INITIAL AMOUNT PAYABLE
+                          </td>
+                          <td
+                            style={{
+                              padding: '6px 0',
+                              textAlign: 'right',
+                              color: '#6366f1',
+                              fontSize: '13px',
+                            }}
+                          >
+                            {getActiveCurrency()} {fmt(leaseDetails.initialAmountPayable || 0)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </td>
               </tr>
             </tbody>
           </table>
         ) : (
-          /* EMI: keep the existing key-value grid */
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0 40px',
-              backgroundColor: '#ffffff',
-              padding: '6px 0',
-            }}
-          >
-            {[
-              { label: 'Lease Type', value: leaseDetails.leaseType },
-              { label: 'Tenure / Duration', value: leaseDetails.duration },
-              {
-                label: 'Advance / Deposit',
-                value: `${getActiveCurrency()} ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
-              },
-              { label: 'Contract Start Date', value: leaseDetails.startDate },
-              { label: 'Contract End Date', value: leaseDetails.endDate },
-              {
-                label: 'Monthly EMI Amount',
-                value: `${getActiveCurrency()} ${fmt(leaseDetails.monthlyEmi)}`,
-              },
-            ].map((item, id) => (
+          <>
+            {/* EMI: keep the existing key-value grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0 40px',
+                backgroundColor: '#ffffff',
+                padding: '6px 0',
+              }}
+            >
+              {[
+                { label: 'Lease Type', value: leaseDetails.leaseType },
+                { label: 'Billing Type', value: leaseDetails.billingType || 'Monthly Advance' },
+                { label: 'Tenure / Duration', value: leaseDetails.duration },
+                {
+                  label: 'Monthly EMI Amount',
+                  value: `${getActiveCurrency()} ${fmt(leaseDetails.monthlyEmi)}`,
+                },
+                {
+                  label: 'First Month Advance',
+                  value: `${getActiveCurrency()} ${fmt(leaseDetails.advance || 0)}`,
+                },
+                {
+                  label: 'Contract Rental Value',
+                  value: `${getActiveCurrency()} ${fmt(leaseDetails.contractRentalValue || 0)}`,
+                },
+                { label: 'Contract Start Date', value: leaseDetails.startDate },
+                { label: 'Contract End Date', value: leaseDetails.endDate },
+              ].map((item, id) => (
+                <div
+                  key={id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    padding: '8px 0',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}
+                >
+                  <span style={{ fontSize: '12px', color: '#666' }}>{item.label}</span>
+                  <span style={{ fontSize: '12px', fontWeight: '300' }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Security Deposit & Initial Payment for EMI */}
+            <div
+              style={{
+                marginTop: '12px',
+                padding: '12px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+              }}
+            >
               <div
-                key={id}
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '8px 0',
-                  borderBottom: '1px solid #f0f0f0',
+                  fontSize: '10px',
+                  fontWeight: '700',
+                  color: '#6366f1',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '8px',
                 }}
               >
-                <span style={{ fontSize: '12px', color: '#666' }}>{item.label}</span>
-                <span style={{ fontSize: '12px', fontWeight: '300' }}>{item.value}</span>
+                Initial Payment Details
               </div>
-            ))}
-          </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <tbody>
+                  {(leaseDetails.advance || 0) > 0 && (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '4px 0', color: '#64748b' }}>
+                        First Month Advance Payment
+                      </td>
+                      <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                        {getActiveCurrency()} {fmt(leaseDetails.advance)}
+                      </td>
+                    </tr>
+                  )}
+                  {!(leaseDetails.advance > 0) && (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '4px 0', color: '#64748b' }}>First Month Advance</td>
+                      <td
+                        style={{
+                          padding: '4px 0',
+                          textAlign: 'right',
+                          color: '#94a3b8',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        Not Applicable (Postpaid)
+                      </td>
+                    </tr>
+                  )}
+                  {(leaseDetails.deposit || 0) > 0 && (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
+                      <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
+                        {getActiveCurrency()} {fmt(leaseDetails.deposit)}
+                      </td>
+                    </tr>
+                  )}
+                  {(leaseDetails.deposit || 0) === 0 && (
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
+                      <td style={{ padding: '4px 0', textAlign: 'right', color: '#94a3b8' }}>
+                        None
+                      </td>
+                    </tr>
+                  )}
+                  <tr style={{ borderTop: '2px solid #333', fontWeight: '700' }}>
+                    <td style={{ padding: '6px 0', color: '#1e293b', fontSize: '12px' }}>
+                      INITIAL AMOUNT PAYABLE
+                    </td>
+                    <td
+                      style={{
+                        padding: '6px 0',
+                        textAlign: 'right',
+                        color: '#6366f1',
+                        fontSize: '13px',
+                      }}
+                    >
+                      {getActiveCurrency()} {fmt(leaseDetails.initialAmountPayable || 0)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* FSM: show start/end dates below the table */}
@@ -1095,22 +1369,24 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               </div>
             </div>
 
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                marginBottom: '8px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                <span style={{ color: '#666' }}>
-                  {totals.taxPercent
-                    ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
-                    : totals.taxName || 'VAT Amount'}
-                </span>
-                <span style={{ color: '#000', fontWeight: '300' }}>{fmt(totals.tax)}</span>
+            {(totals.taxName === 'VAT Exempt' || totals.taxPercent || totals.tax) && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  marginBottom: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: '#666' }}>
+                    {totals.taxPercent
+                      ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                      : totals.taxName || 'VAT Amount'}
+                  </span>
+                  <span style={{ color: '#000', fontWeight: '300' }}>{fmt(totals.tax)}</span>
+                </div>
               </div>
-            </div>
+            )}
 
             <div
               style={{
@@ -1127,7 +1403,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   fontWeight: '300',
                 }}
               >
-                <span>Grand Total</span>
+                <span>Initial Amount Payable</span>
                 <span>
                   {getActiveCurrency()} {fmt(totals.total)}
                 </span>

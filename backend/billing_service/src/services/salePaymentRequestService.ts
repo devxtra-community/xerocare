@@ -2,6 +2,7 @@ import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
 import { Invoice } from '../entities/invoiceEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
+import { generatePaymentReference } from './billingHelpers';
 
 async function fetchEmployeeName(employeeId: string): Promise<string> {
   try {
@@ -54,6 +55,9 @@ export interface CreateSalePaymentRequestParams {
   collectLater?: boolean;
   paymentContext?: string;
   usageRecordId?: string;
+  /** Identifies this payment as a refundable security deposit — separates it from
+   *  normal rent/sale revenue in Accounts so deposits are never treated as income. */
+  isSecurityDeposit?: boolean;
 }
 
 /**
@@ -89,22 +93,33 @@ export async function createSalePaymentRequest(
   if (!resolvedContext) {
     const saleType = (invoice.saleType || '').toUpperCase();
     if (saleType === 'RENT' || saleType === 'LEASE') {
-      const existingCount = await Source.getRepository(SalePaymentRequest).count({
-        where: { invoiceId },
-      });
-      if (saleType === 'RENT') {
-        resolvedContext = existingCount === 0 ? 'RENT_ADVANCE' : 'RENT_PERIODIC';
+      if (params.isSecurityDeposit) {
+        // A deposit is never the "advance" — must be checked before the
+        // existingCount-based advance-vs-periodic split below, which has no other way
+        // to tell a deposit apart from a real advance/periodic collection.
+        resolvedContext = saleType === 'RENT' ? 'RENT_SECURITY_DEPOSIT' : 'LEASE_SECURITY_DEPOSIT';
       } else {
-        resolvedContext = existingCount === 0 ? 'LEASE_ADVANCE' : 'LEASE_PERIODIC';
+        // Excludes security-deposit rows from the count: a deposit recorded before the
+        // real advance must not make this — the actual first non-deposit payment —
+        // look like a PERIODIC collection instead of the ADVANCE it is.
+        const existingCount = await Source.getRepository(SalePaymentRequest).count({
+          where: { invoiceId, isSecurityDeposit: false },
+        });
+        if (saleType === 'RENT') {
+          resolvedContext = existingCount === 0 ? 'RENT_ADVANCE' : 'RENT_PERIODIC';
+        } else {
+          resolvedContext = existingCount === 0 ? 'LEASE_ADVANCE' : 'LEASE_PERIODIC';
+        }
       }
     } else {
       resolvedContext = 'SALE';
     }
   }
 
-  const [requestNo, employeeName] = await Promise.all([
+  const [requestNo, employeeName, autoReferenceNumber] = await Promise.all([
     generateSalePaymentRequestNo(),
     fetchEmployeeName(userId),
+    generatePaymentReference(paymentMode, paymentDate),
   ]);
 
   // RENT_ADVANCE/LEASE_ADVANCE: the entered amount is the pre-tax advance (consistent
@@ -141,7 +156,13 @@ export async function createSalePaymentRequest(
     currency: invoice.currencyCode || 'AED',
     paymentMode,
     paymentDate,
-    referenceNumber: params.referenceNumber,
+    // Auto-generated for Cash/Bank/Card (CASH-20260828-014 style) — always wins over
+    // whatever the caller passed, per the "no manual override" decision: a real bank
+    // UTR/transaction ID belongs in `remarks` instead. Cheque is untouched (its Cheque
+    // Number field below already is its reference) — generatePaymentReference returns
+    // undefined for it, so this falls back to whatever the caller sent (normally
+    // nothing, for Cheque).
+    referenceNumber: autoReferenceNumber ?? params.referenceNumber,
     remarks: params.remarks,
     cashAccountId: paymentMode !== 'CHEQUE' ? params.cashAccountId : undefined,
     chequeNumber: params.chequeNumber,
@@ -149,6 +170,7 @@ export async function createSalePaymentRequest(
     chequeDueDate: params.chequeDueDate,
     chequeDate: params.chequeDate,
     collectLater: Boolean(params.collectLater),
+    isSecurityDeposit: Boolean(params.isSecurityDeposit),
     paymentContext: resolvedContext,
     usageRecordId: params.usageRecordId,
     taxableAmount,

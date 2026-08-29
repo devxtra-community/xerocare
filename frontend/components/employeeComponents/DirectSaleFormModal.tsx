@@ -27,7 +27,7 @@ import { Product } from '@/lib/product';
 import { SparePart } from '@/lib/spare-part';
 import { Invoice } from '@/lib/invoice';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, autoReferencePreview } from '@/lib/format';
 
 interface Customer {
   id: string;
@@ -946,15 +946,21 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Reference Number
+                  {paymentMode === 'CHEQUE' ? 'Cheque Number' : 'Reference Number'}
                 </label>
-                <input
-                  type="text"
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  placeholder="Txn ID, Cheque No..."
-                />
+                {paymentMode === 'CHEQUE' ? (
+                  <input
+                    type="text"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    placeholder="e.g., CHQ-001234"
+                  />
+                ) : (
+                  <div className="w-full h-9 flex items-center border border-dashed border-slate-300 rounded-lg px-3 text-sm text-slate-400 italic bg-slate-50">
+                    Auto-generated on save — {autoReferencePreview(paymentMode)}
+                  </div>
+                )}
               </div>
             </div>
 

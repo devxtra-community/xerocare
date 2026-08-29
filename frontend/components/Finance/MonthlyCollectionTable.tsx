@@ -24,6 +24,7 @@ import {
   PlusCircle,
   DollarSign,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -32,7 +33,7 @@ import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
 import ReplaceDeviceModal from './ReplaceDeviceModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getActiveCurrency } from '@/lib/currency';
 import {
@@ -40,8 +41,12 @@ import {
   generateAdvanceBill,
   getAdvanceBillStatus,
   AdvanceBillStatus,
+  generateSecurityDepositBill,
+  getSecurityDepositBillStatus,
+  SecurityDepositBillStatus,
 } from '@/lib/saleWorkflow';
 import { BillModal } from './BillModal';
+import { CollectSecurityDepositModal } from '../employeeComponents/CollectSecurityDepositModal';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -106,6 +111,24 @@ export default function MonthlyCollectionTable({
   const [viewingAdvanceBillId, setViewingAdvanceBillId] = useState<string | null>(null);
   const [advanceBillInitialTab, setAdvanceBillInitialTab] = useState<'view' | 'send'>('view');
   const [generatingAdvanceBillFor, setGeneratingAdvanceBillFor] = useState<string | null>(null);
+
+  const [securityDepositBillStatusMap, setSecurityDepositBillStatusMap] = useState<
+    Record<string, SecurityDepositBillStatus>
+  >({});
+  const [viewingSecurityDepositBillId, setViewingSecurityDepositBillId] = useState<string | null>(
+    null,
+  );
+  const [securityDepositBillInitialTab, setSecurityDepositBillInitialTab] = useState<
+    'view' | 'send'
+  >('view');
+  const [generatingSecurityDepositBillFor, setGeneratingSecurityDepositBillFor] = useState<
+    string | null
+  >(null);
+
+  // Fallback — visible only when the contract requires a deposit and neither the
+  // Employee (at conversion) nor the Technician (Installation Requests) has collected
+  // one yet. Reuses the exact same form/submission path as both of those.
+  const [depositCollectTarget, setDepositCollectTarget] = useState<CollectionAlert | null>(null);
 
   // Replace Machine modal state
   const [replaceAllocData, setReplaceAllocData] = useState<{
@@ -194,6 +217,17 @@ export default function MonthlyCollectionTable({
       .catch(() => setAdvanceBillStatusMap({}));
   }, [alerts]);
 
+  // Same batched pattern for Security Deposit Bill eligibility/status.
+  useEffect(() => {
+    if (alerts.length === 0) {
+      setSecurityDepositBillStatusMap({});
+      return;
+    }
+    getSecurityDepositBillStatus(alerts.map((a) => a.contractId))
+      .then(setSecurityDepositBillStatusMap)
+      .catch(() => setSecurityDepositBillStatusMap({}));
+  }, [alerts]);
+
   const handleGenerateOrViewAdvanceBill = async (alertItem: CollectionAlert) => {
     const existing = advanceBillStatusMap[alertItem.contractId];
     if (existing?.advanceBillId) {
@@ -210,6 +244,27 @@ export default function MonthlyCollectionTable({
       toast.error('Failed to generate Advance Bill', { description: getApiErrorMessage(err) });
     } finally {
       setGeneratingAdvanceBillFor(null);
+    }
+  };
+
+  const handleGenerateOrViewSecurityDepositBill = async (alertItem: CollectionAlert) => {
+    const existing = securityDepositBillStatusMap[alertItem.contractId];
+    if (existing?.securityDepositBillId) {
+      setSecurityDepositBillInitialTab('view');
+      setViewingSecurityDepositBillId(existing.securityDepositBillId);
+      return;
+    }
+    setGeneratingSecurityDepositBillFor(alertItem.contractId);
+    try {
+      const bill = await generateSecurityDepositBill(alertItem.contractId);
+      setSecurityDepositBillInitialTab('send');
+      setViewingSecurityDepositBillId(bill.id);
+    } catch (err) {
+      toast.error('Failed to generate Security Deposit Bill', {
+        description: getApiErrorMessage(err),
+      });
+    } finally {
+      setGeneratingSecurityDepositBillFor(null);
     }
   };
 
@@ -301,8 +356,12 @@ export default function MonthlyCollectionTable({
   const handleReplaceClick = async (alertItem: CollectionAlert) => {
     try {
       const inv = await getInvoiceById(alertItem.contractId);
+      // Excludes accessories — they get their own ProductAllocation row too (a real
+      // serialized unit, allocated the same way as the machine), but "Replace Device"
+      // must always target the actual rented/leased machine, never an accessory that
+      // happens to be allocated on the same contract.
       const activeAlloc = inv.productAllocations?.find(
-        (a) => a.status !== 'REPLACED' && a.status !== 'RETURNED',
+        (a) => a.status !== 'REPLACED' && a.status !== 'RETURNED' && a.itemType !== 'ACCESSORY',
       );
       if (!activeAlloc) {
         toast.error('No active machine allocation found for this contract');
@@ -470,8 +529,12 @@ export default function MonthlyCollectionTable({
               className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-full transition-all"
               title={
                 advanceBillStatusMap[alertItem.contractId]?.advanceBillId
-                  ? 'View Advance Bill'
-                  : 'Generate Advance Bill'
+                  ? securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment
+                    ? 'View Advance & Security Deposit Bill'
+                    : 'View Advance Bill'
+                  : securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment
+                    ? 'Generate Advance & Security Deposit Bill'
+                    : 'Generate Advance Bill'
               }
             >
               {generatingAdvanceBillFor === alertItem.contractId ? (
@@ -481,6 +544,44 @@ export default function MonthlyCollectionTable({
               )}
             </Button>
           )}
+
+          {/* A deposit collected alongside an advance now shows as a section within that
+              Advance Bill above — this standalone button is only for the edge case where
+              a deposit exists with no advance at all. */}
+          {securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment &&
+            !advanceBillStatusMap[alertItem.contractId]?.hasAdvancePayment && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleGenerateOrViewSecurityDepositBill(alertItem)}
+                disabled={generatingSecurityDepositBillFor === alertItem.contractId}
+                className="h-8 w-8 p-0 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-full transition-all"
+                title={
+                  securityDepositBillStatusMap[alertItem.contractId]?.securityDepositBillId
+                    ? 'View Security Deposit Bill'
+                    : 'Generate Security Deposit Bill'
+                }
+              >
+                {generatingSecurityDepositBillFor === alertItem.contractId ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+
+          {(alertItem.securityDepositAmount ?? 0) > 0 &&
+            !securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDepositCollectTarget(alertItem)}
+                className="h-8 w-8 p-0 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded-full transition-all"
+                title="Collect Security Deposit — not yet recorded for this contract"
+              >
+                <DollarSign className="h-4 w-4" />
+              </Button>
+            )}
 
           {alertItem.type === 'USAGE_PENDING' && (
             <>
@@ -758,14 +859,20 @@ export default function MonthlyCollectionTable({
             )}
             <div className="space-y-1">
               <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                Reference (optional)
+                Reference {collectMode === 'CHEQUE' ? '(optional)' : ''}
               </Label>
-              <Input
-                value={collectRef}
-                onChange={(e) => setCollectRef(e.target.value)}
-                placeholder="Ref / transaction ID"
-                className="h-9 text-sm"
-              />
+              {collectMode === 'CHEQUE' ? (
+                <Input
+                  value={collectRef}
+                  onChange={(e) => setCollectRef(e.target.value)}
+                  placeholder="Ref / transaction ID"
+                  className="h-9 text-sm"
+                />
+              ) : (
+                <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                  Auto-generated on save — {autoReferencePreview(collectMode)}
+                </div>
+              )}
             </div>
             <div className="flex gap-2 pt-1">
               <Button
@@ -822,6 +929,37 @@ export default function MonthlyCollectionTable({
             getAdvanceBillStatus(alerts.map((a) => a.contractId)).then(setAdvanceBillStatusMap)
           }
           initialTab={advanceBillInitialTab}
+        />
+      )}
+
+      {viewingSecurityDepositBillId && (
+        <BillModal
+          usageRecordId={viewingSecurityDepositBillId}
+          open={!!viewingSecurityDepositBillId}
+          onClose={() => setViewingSecurityDepositBillId(null)}
+          onUpdated={() =>
+            getSecurityDepositBillStatus(alerts.map((a) => a.contractId)).then(
+              setSecurityDepositBillStatusMap,
+            )
+          }
+          initialTab={securityDepositBillInitialTab}
+        />
+      )}
+
+      {depositCollectTarget && (
+        <CollectSecurityDepositModal
+          contractId={depositCollectTarget.contractId}
+          customerName={depositCollectTarget.customerName}
+          invoiceNumber={depositCollectTarget.invoiceNumber}
+          defaultAmount={depositCollectTarget.securityDepositAmount ?? 0}
+          onClose={() => setDepositCollectTarget(null)}
+          onSuccess={() => {
+            setDepositCollectTarget(null);
+            fetchAlerts();
+            getSecurityDepositBillStatus(alerts.map((a) => a.contractId)).then(
+              setSecurityDepositBillStatusMap,
+            );
+          }}
         />
       )}
     </>

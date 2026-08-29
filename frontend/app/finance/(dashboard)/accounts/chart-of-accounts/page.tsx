@@ -485,8 +485,27 @@ export default function ChartOfAccountsPage() {
                 </>
               )}
               <Row ab={income.serviceRevenue} />
-              <Row ab={income.usageRevenue} />
+              <DrilldownTree
+                node={{
+                  key: 'USAGE_REVENUE',
+                  label: income.usageRevenue.name,
+                  amount: income.usageRevenue.balance,
+                  viewable: true,
+                }}
+                currency={currency}
+                onView={(node) => setViewingLineItem({ section: 'INCOME', node })}
+              />
               <Row ab={income.amcSmaRevenue} />
+              <DrilldownTree
+                node={{
+                  key: 'ACCESSORIES_REVENUE',
+                  label: income.accessoriesRevenue.name,
+                  amount: income.accessoriesRevenue.balance,
+                  viewable: true,
+                }}
+                currency={currency}
+                onView={(node) => setViewingLineItem({ section: 'INCOME', node })}
+              />
               <DrilldownTree
                 node={{
                   key: 'OTHER_INCOME',

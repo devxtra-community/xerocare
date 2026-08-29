@@ -92,10 +92,18 @@ export function SalePaymentCollectionModal({
   const isSaleFamily = ['SALE', 'PRODUCT_SALE', 'SPAREPART_SALE'].includes(
     (saleType ?? 'SALE').toUpperCase(),
   );
+  // Same "already took the money in person" reasoning applies to a security deposit
+  // collected at signing as it does to the advance itself — both happen in the same
+  // sitting as this modal's advanceOnly view, so neither should wait on Finance's
+  // internal approval before the employee can hand over proof of payment.
+  const isImmediateReceiptContext = (pmt: SalePaymentRequest) =>
+    pmt.paymentContext === 'RENT_ADVANCE' ||
+    pmt.paymentContext === 'LEASE_ADVANCE' ||
+    !!pmt.isSecurityDeposit;
   const receiptAvailable = (pmt: SalePaymentRequest) => {
-    const isAdvance =
-      pmt.paymentContext === 'RENT_ADVANCE' || pmt.paymentContext === 'LEASE_ADVANCE';
-    return isSaleFamily || isAdvance ? pmt.status !== 'REJECTED' : pmt.status === 'APPROVED';
+    return isSaleFamily || isImmediateReceiptContext(pmt)
+      ? pmt.status !== 'REJECTED'
+      : pmt.status === 'APPROVED';
   };
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [payments, setPayments] = useState<SalePaymentRequest[]>([]);
@@ -112,10 +120,17 @@ export function SalePaymentCollectionModal({
         getSalePaymentsForInvoice(invoiceId),
       ]);
       setSummary(s);
+      // The security deposit is collected in the exact same sitting as the advance (see
+      // QuotationConversionFlow.tsx) even though it's recorded as its own SalePaymentRequest
+      // — leaving it out here meant the employee had collected e.g. 16,300 (advance +
+      // accessories + deposit) but this panel only ever showed/receipted 16,150 of it,
+      // with no way to see or receipt the deposit portion from this same modal at all.
       const filtered = advanceOnly
         ? p.filter(
             (pmt) =>
-              pmt.paymentContext === 'RENT_ADVANCE' || pmt.paymentContext === 'LEASE_ADVANCE',
+              pmt.paymentContext === 'RENT_ADVANCE' ||
+              pmt.paymentContext === 'LEASE_ADVANCE' ||
+              pmt.isSecurityDeposit,
           )
         : p;
       setPayments(filtered.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)));
@@ -172,6 +187,26 @@ export function SalePaymentCollectionModal({
 
   if (!open) return null;
 
+  // The deposit is real money the employee collected too, but it deliberately never
+  // touches invoice.totalAmount / the ledger getAccountSummary reads from (a deposit
+  // is a refundable liability, not revenue — see accountsShared.ts). Folded in only
+  // for this at-signing display so Total/Paid/Pending reflect what the employee
+  // actually handed over and can prove receipt for, without changing what counts as
+  // revenue anywhere else in the app (Balance Sheet, AR, etc. are untouched).
+  const depositPayments = advanceOnly ? payments.filter((p) => p.isSecurityDeposit) : [];
+  const depositTotal = depositPayments
+    .filter((p) => p.status !== 'REJECTED')
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const depositPaid = depositPayments
+    .filter((p) => p.status === 'APPROVED')
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+  const depositPending = depositTotal - depositPaid;
+  const hasDeposit = depositPayments.length > 0;
+
+  const displayTotal = (summary?.totalAmount ?? 0) + depositTotal;
+  const displayPaid = (summary?.totalPaid ?? 0) + depositPaid;
+  const displayPending = (summary?.pendingBalance ?? 0) + depositPending;
+
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -198,26 +233,36 @@ export function SalePaymentCollectionModal({
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                     <p className="text-[10px] font-black uppercase text-slate-400">Total</p>
                     <p className="text-lg font-bold text-slate-800">
-                      {formatCurrency(summary.totalAmount, summary.currency)}
+                      {formatCurrency(displayTotal, summary.currency)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                     <p className="text-[10px] font-black uppercase text-emerald-600">Paid</p>
                     <p className="text-lg font-bold text-emerald-700">
-                      {formatCurrency(summary.totalPaid, summary.currency)}
+                      {formatCurrency(displayPaid, summary.currency)}
                     </p>
                   </div>
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                     <p className="text-[10px] font-black uppercase text-amber-600">Pending</p>
                     <p className="text-lg font-bold text-amber-700">
-                      {formatCurrency(summary.pendingBalance, summary.currency)}
+                      {formatCurrency(displayPending, summary.currency)}
                     </p>
                   </div>
                 </div>
+                {hasDeposit && (
+                  <p className="text-[10px] text-slate-400 -mt-2">
+                    Includes {formatCurrency(depositTotal, summary.currency)} security deposit —
+                    refundable, held separately from rent/lease revenue.
+                  </p>
+                )}
 
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    {advanceOnly ? 'Advance Payment' : 'Collection History'}
+                    {advanceOnly
+                      ? hasDeposit
+                        ? 'Advance & Security Deposit'
+                        : 'Advance Payment'
+                      : 'Collection History'}
                   </p>
                   {/* Periodic Rent/Lease collections are recorded through Record Usage
                       (Finance), not this generic form — keeps this view strictly a
@@ -238,7 +283,28 @@ export function SalePaymentCollectionModal({
                     No collections recorded yet.
                   </p>
                 ) : (
-                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  // hasDeposit: the employee collected both in the same sitting (see
+                  // QuotationConversionFlow.tsx steps 4/5) — wrapping them as one visual
+                  // receipt block with a shared header + total makes that obvious, instead
+                  // of reading as two unrelated transactions. They stay two real, separate
+                  // SalePaymentRequest rows underneath (mode/date/status/receipt can
+                  // legitimately differ per component, e.g. a cheque deposit against a cash
+                  // advance) — Technician-side "deposit already collected" detection and
+                  // every Accounts/AR/Balance-Sheet distinction keyed off isSecurityDeposit
+                  // is untouched; only the presentation here is merged.
+                  <div
+                    className={`rounded-xl border overflow-hidden ${
+                      hasDeposit ? 'border-primary/30 bg-primary/2' : 'border-slate-200'
+                    }`}
+                  >
+                    {hasDeposit && (
+                      <div className="px-3 py-2 bg-primary/5 border-b border-primary/20 flex items-center gap-1.5">
+                        <Wallet size={12} className="text-primary" />
+                        <p className="text-[10px] font-black uppercase tracking-wide text-primary">
+                          Collected Together — First Month Advance &amp; Security Deposit
+                        </p>
+                      </div>
+                    )}
                     <table className="w-full text-xs">
                       <thead className="bg-slate-50 text-slate-500">
                         <tr className="text-[9px] font-black uppercase tracking-wide">
@@ -255,6 +321,11 @@ export function SalePaymentCollectionModal({
                           <tr key={pmt.id}>
                             <td className="px-3 py-2 font-mono font-bold text-slate-700">
                               {pmt.requestNo}
+                              {pmt.isSecurityDeposit && (
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-teal-100 text-teal-700">
+                                  Deposit
+                                </span>
+                              )}
                             </td>
                             <td className="px-3 py-2">{pmt.paymentMode.replace('_', ' ')}</td>
                             <td className="px-3 py-2 text-right font-bold">
@@ -339,6 +410,22 @@ export function SalePaymentCollectionModal({
                           </tr>
                         ))}
                       </tbody>
+                      {hasDeposit && (
+                        <tfoot>
+                          <tr className="border-t-2 border-primary/20 bg-primary/5">
+                            <td
+                              colSpan={2}
+                              className="px-3 py-2 text-right font-black text-primary uppercase text-[10px]"
+                            >
+                              Total Collected
+                            </td>
+                            <td className="px-3 py-2 text-right font-black text-primary">
+                              {formatCurrency(displayTotal, summary.currency)}
+                            </td>
+                            <td colSpan={3} />
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 )}

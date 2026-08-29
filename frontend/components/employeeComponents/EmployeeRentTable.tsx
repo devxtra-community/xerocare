@@ -12,6 +12,8 @@ import {
   Settings2,
   PenLine,
   Receipt,
+  ShieldCheck,
+  RefreshCw,
 } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getUserFromToken } from '@/lib/auth';
@@ -44,6 +46,16 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 import { ContractAgreementModal } from './ContractAgreementModal';
+import { BillModal } from '../Finance/BillModal';
+import {
+  generateAdvanceBill,
+  getAdvanceBillStatus,
+  AdvanceBillStatus,
+  generateSecurityDepositBill,
+  getSecurityDepositBillStatus,
+  SecurityDepositBillStatus,
+} from '@/lib/saleWorkflow';
+import { getApiErrorMessage } from '@/lib/apiError';
 import {
   Dialog,
   DialogContent,
@@ -120,6 +132,29 @@ export default function EmployeeRentTable({
   const [contractInvoice, setContractInvoice] = useState<Invoice | null>(null);
   // Advance payment receipt viewing (SalePaymentCollectionModal)
   const [collectionTarget, setCollectionTarget] = useState<Invoice | null>(null);
+
+  // Advance Bill / Security Deposit Bill generation — same batched pattern as Finance's
+  // MonthlyCollectionTable, so the Employee who actually collected either payment can
+  // generate its Bill immediately instead of waiting on Finance to do it.
+  const [advanceBillStatusMap, setAdvanceBillStatusMap] = useState<
+    Record<string, AdvanceBillStatus>
+  >({});
+  const [viewingAdvanceBillId, setViewingAdvanceBillId] = useState<string | null>(null);
+  const [advanceBillInitialTab, setAdvanceBillInitialTab] = useState<'view' | 'send'>('view');
+  const [generatingAdvanceBillFor, setGeneratingAdvanceBillFor] = useState<string | null>(null);
+
+  const [securityDepositBillStatusMap, setSecurityDepositBillStatusMap] = useState<
+    Record<string, SecurityDepositBillStatus>
+  >({});
+  const [viewingSecurityDepositBillId, setViewingSecurityDepositBillId] = useState<string | null>(
+    null,
+  );
+  const [securityDepositBillInitialTab, setSecurityDepositBillInitialTab] = useState<
+    'view' | 'send'
+  >('view');
+  const [generatingSecurityDepositBillFor, setGeneratingSecurityDepositBillFor] = useState<
+    string | null
+  >(null);
 
   const searchParams = useSearchParams();
   const convertId = searchParams.get('convert');
@@ -209,6 +244,64 @@ export default function EmployeeRentTable({
   }, [filteredInvoices.length, setTotal]);
 
   const paginatedInvoices = filteredInvoices.slice((page - 1) * limit, page * limit);
+
+  // Batched — one call for every visible row's Advance/Security Deposit Bill
+  // eligibility/status, not one per row.
+  useEffect(() => {
+    if (paginatedInvoices.length === 0) {
+      setAdvanceBillStatusMap({});
+      setSecurityDepositBillStatusMap({});
+      return;
+    }
+    const ids = paginatedInvoices.map((i) => i.id);
+    getAdvanceBillStatus(ids)
+      .then(setAdvanceBillStatusMap)
+      .catch(() => setAdvanceBillStatusMap({}));
+    getSecurityDepositBillStatus(ids)
+      .then(setSecurityDepositBillStatusMap)
+      .catch(() => setSecurityDepositBillStatusMap({}));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paginatedInvoices.map((i) => i.id).join(',')]);
+
+  const handleGenerateOrViewAdvanceBill = async (inv: Invoice) => {
+    const existing = advanceBillStatusMap[inv.id];
+    if (existing?.advanceBillId) {
+      setAdvanceBillInitialTab('view');
+      setViewingAdvanceBillId(existing.advanceBillId);
+      return;
+    }
+    setGeneratingAdvanceBillFor(inv.id);
+    try {
+      const bill = await generateAdvanceBill(inv.id);
+      setAdvanceBillInitialTab('send');
+      setViewingAdvanceBillId(bill.id);
+    } catch (err) {
+      toast.error('Failed to generate Advance Bill', { description: getApiErrorMessage(err) });
+    } finally {
+      setGeneratingAdvanceBillFor(null);
+    }
+  };
+
+  const handleGenerateOrViewSecurityDepositBill = async (inv: Invoice) => {
+    const existing = securityDepositBillStatusMap[inv.id];
+    if (existing?.securityDepositBillId) {
+      setSecurityDepositBillInitialTab('view');
+      setViewingSecurityDepositBillId(existing.securityDepositBillId);
+      return;
+    }
+    setGeneratingSecurityDepositBillFor(inv.id);
+    try {
+      const bill = await generateSecurityDepositBill(inv.id);
+      setSecurityDepositBillInitialTab('send');
+      setViewingSecurityDepositBillId(bill.id);
+    } catch (err) {
+      toast.error('Failed to generate Security Deposit Bill', {
+        description: getApiErrorMessage(err),
+      });
+    } finally {
+      setGeneratingSecurityDepositBillFor(null);
+    }
+  };
 
   const handleViewDetails = (id: string) => {
     const invoice = invoices.find((i) => i.id === id);
@@ -526,6 +619,56 @@ export default function EmployeeRentTable({
                           </Button>
                         )}
 
+                        {advanceBillStatusMap[inv.id]?.hasAdvancePayment && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleGenerateOrViewAdvanceBill(inv)}
+                            disabled={generatingAdvanceBillFor === inv.id}
+                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
+                            title={
+                              advanceBillStatusMap[inv.id]?.advanceBillId
+                                ? securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment
+                                  ? 'View Advance & Security Deposit Bill'
+                                  : 'View Advance Bill'
+                                : securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment
+                                  ? 'Generate Advance & Security Deposit Bill'
+                                  : 'Generate Advance Bill'
+                            }
+                          >
+                            {generatingAdvanceBillFor === inv.id ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <FileText className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+
+                        {/* A deposit collected alongside an advance now shows as a section
+                            within that Advance Bill above — this standalone button is only
+                            for the edge case where a deposit exists with no advance at all. */}
+                        {securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment &&
+                          !advanceBillStatusMap[inv.id]?.hasAdvancePayment && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleGenerateOrViewSecurityDepositBill(inv)}
+                              disabled={generatingSecurityDepositBillFor === inv.id}
+                              className="h-8 w-8 text-teal-500 hover:text-teal-600 hover:bg-teal-50"
+                              title={
+                                securityDepositBillStatusMap[inv.id]?.securityDepositBillId
+                                  ? 'View Security Deposit Bill'
+                                  : 'Generate Security Deposit Bill'
+                              }
+                            >
+                              {generatingSecurityDepositBillFor === inv.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
+
                         {/* Edit button removed to enforce quotation-to-transaction workflow */}
                       </div>
                     </TableCell>
@@ -645,6 +788,32 @@ export default function EmployeeRentTable({
             open={!!collectionTarget}
             onClose={() => setCollectionTarget(null)}
             advanceOnly
+          />
+        )}
+
+        {viewingAdvanceBillId && (
+          <BillModal
+            usageRecordId={viewingAdvanceBillId}
+            open={!!viewingAdvanceBillId}
+            onClose={() => setViewingAdvanceBillId(null)}
+            onUpdated={() =>
+              getAdvanceBillStatus(paginatedInvoices.map((i) => i.id)).then(setAdvanceBillStatusMap)
+            }
+            initialTab={advanceBillInitialTab}
+          />
+        )}
+
+        {viewingSecurityDepositBillId && (
+          <BillModal
+            usageRecordId={viewingSecurityDepositBillId}
+            open={!!viewingSecurityDepositBillId}
+            onClose={() => setViewingSecurityDepositBillId(null)}
+            onUpdated={() =>
+              getSecurityDepositBillStatus(paginatedInvoices.map((i) => i.id)).then(
+                setSecurityDepositBillStatusMap,
+              )
+            }
+            initialTab={securityDepositBillInitialTab}
           />
         )}
       </div>

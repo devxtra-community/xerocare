@@ -1,6 +1,9 @@
 import { sign } from 'jsonwebtoken';
 import { Invoice } from '../entities/invoiceEntity';
 import { SaleType } from '../entities/enums/saleType';
+import { Source } from '../config/dataSource';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
+import { PaymentTransaction } from '../entities/paymentTransactionEntity';
 
 interface EmployeeData {
   id: string;
@@ -341,4 +344,102 @@ export async function getBranchManagerEmail(branchId: string | undefined): Promi
     console.error('Error fetching branch manager email:', err);
     return null;
   }
+}
+
+/**
+ * Looks up every employee_service user with the given role at a branch — used for
+ * in-app notification fan-out (e.g. every Finance user at a branch, not just one).
+ *
+ * Replaces a direct `SELECT ... FROM branches` query that used to run against this
+ * service's OWN database — billing_service has no `branches` table at all (that's
+ * employee_service's), so that query threw "relation branches does not exist" on every
+ * single call. It was never caught per-recipient, only by one try/catch around the
+ * entire caller, so hitting it didn't just skip one notification — it silently aborted
+ * whatever loop/job called it partway through, for every contract still queued behind
+ * it. Routing through the same HTTP lookup getBranchManagerEmail already uses avoids
+ * that failure mode entirely.
+ */
+export async function getBranchStaffByRole(
+  branchId: string | undefined,
+  role: 'MANAGER' | 'FINANCE',
+): Promise<EmployeeData[]> {
+  if (!branchId) return [];
+  try {
+    const employeeServiceUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+    const token = sign(
+      { userId: 'billing_service', role: 'ADMIN' },
+      process.env.ACCESS_SECRET as string,
+      { expiresIn: '1m' },
+    );
+
+    const response = await fetch(`${employeeServiceUrl}/employee?role=${role}&limit=100`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) return [];
+    const json = await response.json();
+    const employees = json?.data?.employees || [];
+    return employees.filter((emp: EmployeeData) => emp.branch_id === branchId);
+  } catch (err) {
+    console.error(`Error fetching branch ${role} staff:`, err);
+    return [];
+  }
+}
+
+const REFERENCE_MODE_PREFIX: Record<string, string> = {
+  CASH: 'CASH',
+  BANK_TRANSFER: 'BANK',
+  CREDIT_CARD: 'CARD',
+};
+
+/**
+ * Auto-generates the payment "Reference Number" for Cash / Bank Transfer / Credit Card
+ * collections — every collecting form used to leave this as a free-text box the
+ * employee could fill in (or not), with no real link back to anything. Cheque payments
+ * are untouched: their Cheque Number field already IS their reference, so this returns
+ * undefined for CHEQUE (and for any other/unrecognised mode) and callers must leave
+ * whatever they already had for it.
+ *
+ * Format: <MODE>-<YYYYMMDD>-<seq>, e.g. "CASH-20260828-014" — the date is the
+ * payment's own paymentDate/transactionDate (when it was actually collected), not
+ * "now", so a backdated entry groups with that day's collections rather than today's.
+ * The sequence counts existing references matching that same mode+date prefix across
+ * BOTH payment tables (sale_payment_requests and payment_transactions — the two
+ * separate collection pipelines in this app, see recordPayment's and
+ * createSalePaymentRequest's own comments), so a same-day Cash collection recorded
+ * through either one never collides with the other.
+ *
+ * Count-based, not a real atomic sequence — mirrors generateSalePaymentRequestNo's own
+ * approach (the existing convention for these display identifiers, e.g. SPAY-2026-0016
+ * — not a uniqueness-critical key, so no retry-on-collision is needed here either).
+ */
+export async function generatePaymentReference(
+  paymentMode: string | undefined,
+  paymentDate: Date,
+): Promise<string | undefined> {
+  const prefix = REFERENCE_MODE_PREFIX[(paymentMode || '').toUpperCase()];
+  if (!prefix) return undefined;
+
+  const dateStr = paymentDate.toISOString().split('T')[0].replace(/-/g, '');
+  const likePattern = `${prefix}-${dateStr}-%`;
+
+  const [requestCount, transactionCount] = await Promise.all([
+    Source.getRepository(SalePaymentRequest)
+      .createQueryBuilder('r')
+      .where('r."referenceNumber" LIKE :p', { p: likePattern })
+      .getCount(),
+    // PaymentTransaction's DB columns are explicit snake_case (see
+    // paymentTransactionEntity.ts) — unlike SalePaymentRequest above, which is camelCase.
+    Source.getRepository(PaymentTransaction)
+      .createQueryBuilder('t')
+      .where('t."reference_number" LIKE :p', { p: likePattern })
+      .getCount(),
+  ]);
+
+  const seq = String(requestCount + transactionCount + 1).padStart(3, '0');
+  return `${prefix}-${dateStr}-${seq}`;
 }

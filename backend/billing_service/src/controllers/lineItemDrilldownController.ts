@@ -100,12 +100,18 @@ export const getAccountsReceivableTransactions = async (
         SELECT "contractId", SUM(COALESCE("totalCharge", 0)) AS billed
         FROM usage_records
         WHERE "billType" IS DISTINCT FROM 'ADVANCE'
+          AND "billType" IS DISTINCT FROM 'SECURITY_DEPOSIT'
         GROUP BY "contractId"
       ) ur ON ur."contractId" = i.id
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
+          -- is_security_deposit excluded: refundable caution money is not settlement of
+          -- the contract's receivable, and the billed side above already leaves
+          -- SECURITY_DEPOSIT bills out. Counting it here (and only here) made every
+          -- contract with a collected deposit look that much less outstanding than it is.
           SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
           FROM payment_transactions
+          WHERE is_security_deposit = FALSE
           GROUP BY "invoice_id"
           UNION ALL
           SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS paid
@@ -219,7 +225,8 @@ export const getCustomerStatement = async (req: Request, res: Response, next: Ne
         `SELECT invoice_id,
                 TO_CHAR(transaction_date AT TIME ZONE 'Asia/Kolkata' AT TIME ZONE 'Asia/Qatar', 'YYYY-MM-DD') AS date,
                 amount, reference_number AS reference
-         FROM payment_transactions WHERE invoice_id = ANY($1::uuid[])
+         FROM payment_transactions
+         WHERE invoice_id = ANY($1::uuid[]) AND is_security_deposit = FALSE
          UNION ALL
          SELECT "invoiceId" AS invoice_id, TO_CHAR("paymentDate", 'YYYY-MM-DD') AS date,
                 "amountPaid" AS amount, "referenceNumber" AS reference
@@ -665,46 +672,53 @@ export const getSecurityDepositTransactions = async (
     const bParam = safeBranches(branchF);
     const q = req.query as Record<string, string | undefined>;
 
+    // Sources from the actual APPROVED deposit payment (sale_payment_requests), not
+    // invoices.securityDepositAmount — that was the contract's quoted/planned deposit
+    // at quotation time, listed here regardless of whether it was ever actually
+    // collected (or was still PENDING Accounts approval). This "Received" drilldown must
+    // show what was really received: real amount/mode/date can also differ from the
+    // original quote if Finance/the Technician collected it later, for a different
+    // amount, via a different mode than what was originally planned.
     const rows = await Source.query<
       {
         id: string;
         invoiceNumber: string;
         customer_name: string | null;
-        createdAt: string;
-        securityDepositAmount: string;
-        securityDepositMode: string | null;
-        securityDepositReference: string | null;
-        securityDepositDate: string | null;
+        paymentDate: string;
+        amount: string;
+        paymentMode: string | null;
+        referenceNumber: string | null;
+        chequeNumber: string | null;
         currency_code: string | null;
         branchId: string;
         saleType: string;
       }[]
     >(`
-      SELECT id, "invoiceNumber", customer_name, TO_CHAR("createdAt", 'YYYY-MM-DD') AS "createdAt",
-             "securityDepositAmount", "securityDepositMode", "securityDepositReference",
-             TO_CHAR("securityDepositDate", 'YYYY-MM-DD') AS "securityDepositDate",
-             currency_code, "branchId", "saleType"
-      FROM invoices
-      WHERE "securityDepositAmount" > 0
-        AND "saleType" IN ('RENT', 'LEASE')
-        AND status NOT IN ('CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-        AND "deletedAt" IS NULL
-        ${branchSql('invoices', bParam)}
-      ORDER BY "createdAt" DESC
+      SELECT spr.id, i."invoiceNumber", i.customer_name,
+             TO_CHAR(spr."paymentDate", 'YYYY-MM-DD') AS "paymentDate",
+             spr.amount, spr."paymentMode", spr."referenceNumber", spr."chequeNumber",
+             i.currency_code, i."branchId", i."saleType"
+      FROM sale_payment_requests spr
+      JOIN invoices i ON i.id = spr."invoiceId"
+      WHERE spr.status = 'APPROVED'
+        AND spr."paymentContext" IN ('RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT')
+        AND i."deletedAt" IS NULL
+        ${branchSql('i', bParam)}
+      ORDER BY spr."paymentDate" DESC
     `);
 
     let mapped = rows.map((r) => ({
       id: r.id,
       invoiceNumber: r.invoiceNumber,
       customerName: r.customer_name ?? 'Unknown Customer',
-      date: r.createdAt,
-      amount: Number(r.securityDepositAmount),
+      date: r.paymentDate,
+      amount: Number(r.amount),
       currencyCode: r.currency_code ?? 'AED',
       branchId: r.branchId,
       saleType: r.saleType,
-      depositMode: r.securityDepositMode,
-      depositReference: r.securityDepositReference,
-      depositDate: r.securityDepositDate,
+      depositMode: r.paymentMode,
+      depositReference: r.referenceNumber ?? r.chequeNumber,
+      depositDate: r.paymentDate,
     }));
 
     if (q.customerName) {
@@ -857,6 +871,178 @@ export const getOtherIncomeTransactions = async (
       mapped = mapped.filter(
         (r) =>
           r.incomeNo.toLowerCase().includes(needle) || r.description.toLowerCase().includes(needle),
+      );
+    }
+    mapped = applyDateAmountFilters(mapped, q);
+
+    res.json({ success: true, data: mapped });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 4005 Usage / Copy Revenue — the per-period overage behind the headline, one row per
+// billed period across every Rent and Lease contract. Mirrors accountsShared.ts's own
+// 4005 query exactly: exceededCharge ONLY (base rent belongs to 4001/4002, and counting
+// it here would double every contract's monthly rent), recognized on billingPeriodStart
+// — the period the usage was RECORDED — for the same reason given there.
+//
+// Carries the copy counts and the free allowance alongside the money so the figure can
+// be read back to its source: which contract, which period, how many pages over the
+// included limit, and what that came to.
+export const getUsageRevenueTransactions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const branchF = req.branchFilter ?? [];
+    const bParam = safeBranches(branchF);
+    const q = req.query as Record<string, string | undefined>;
+
+    const rows = await Source.query<
+      {
+        id: string;
+        invoiceNumber: string;
+        customerName: string | null;
+        saleType: string;
+        billingPeriodStart: string;
+        billingPeriodEnd: string;
+        date: string;
+        bwA4Count: number;
+        bwA3Count: number;
+        colorA4Count: number;
+        colorA3Count: number;
+        exceededTotal: number;
+        monthlyRent: string;
+        amount: string;
+        currencyCode: string | null;
+        branchId: string;
+      }[]
+    >(`
+      SELECT u.id, inv."invoiceNumber", inv.customer_name AS "customerName", inv."saleType",
+             TO_CHAR(u."billingPeriodStart", 'YYYY-MM-DD') AS "billingPeriodStart",
+             TO_CHAR(u."billingPeriodEnd", 'YYYY-MM-DD') AS "billingPeriodEnd",
+             TO_CHAR(u."billingPeriodStart", 'YYYY-MM-DD') AS date,
+             u."bwA4Count", u."bwA3Count", u."colorA4Count", u."colorA3Count",
+             u."exceededTotal", u."monthlyRent",
+             COALESCE(u."exceededCharge", 0) AS amount,
+             inv.currency_code AS "currencyCode", inv."branchId"
+      FROM usage_records u
+      JOIN invoices inv ON inv.id = u."contractId"
+      WHERE COALESCE(u."exceededCharge", 0) <> 0
+        AND inv."deletedAt" IS NULL
+        ${branchSql('inv', bParam)}
+      ORDER BY u."billingPeriodStart" DESC
+    `);
+
+    let mapped = rows.map((r) => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      customerName: r.customerName ?? 'Unknown Customer',
+      saleType: r.saleType,
+      billingPeriodStart: r.billingPeriodStart,
+      billingPeriodEnd: r.billingPeriodEnd,
+      date: r.date,
+      bwA4Count: Number(r.bwA4Count),
+      bwA3Count: Number(r.bwA3Count),
+      colorA4Count: Number(r.colorA4Count),
+      colorA3Count: Number(r.colorA3Count),
+      exceededCopies: Number(r.exceededTotal),
+      monthlyRent: Number(r.monthlyRent),
+      amount: Number(r.amount),
+      currencyCode: r.currencyCode ?? 'AED',
+      branchId: r.branchId,
+    }));
+
+    if (q.search) {
+      const needle = q.search.toLowerCase();
+      mapped = mapped.filter(
+        (r) =>
+          r.invoiceNumber.toLowerCase().includes(needle) ||
+          r.customerName.toLowerCase().includes(needle),
+      );
+    }
+    mapped = applyDateAmountFilters(mapped, q);
+
+    res.json({ success: true, data: mapped });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// 4009 Accessories Sales Revenue — the accessory LINE ITEMS behind the headline, one row
+// per line. Mirrors accountsShared.ts's own 4009 query exactly (same itemType, same
+// invoice-status population, same quantity × unitPrice basis, same invoice-date
+// attribution) so the drill-down always sums back to the figure it was opened from.
+export const getAccessoriesRevenueTransactions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const branchF = req.branchFilter ?? [];
+    const bParam = safeBranches(branchF);
+    const q = req.query as Record<string, string | undefined>;
+
+    const rows = await Source.query<
+      {
+        id: string;
+        invoiceNumber: string;
+        customerName: string | null;
+        saleType: string;
+        description: string;
+        serialNumber: string | null;
+        quantity: string;
+        unitPrice: string;
+        amount: string;
+        date: string;
+        currencyCode: string | null;
+        branchId: string;
+      }[]
+    >(`
+      SELECT ii.id, i."invoiceNumber", i.customer_name AS "customerName", i."saleType",
+             COALESCE(NULLIF(ii.description, ''), 'Accessory') AS description,
+             ii."serialNumber",
+             COALESCE(ii.quantity, 0) AS quantity,
+             COALESCE(ii."unitPrice", 0) AS "unitPrice",
+             COALESCE(ii.quantity, 0) * COALESCE(ii."unitPrice", 0) AS amount,
+             TO_CHAR(i."createdAt", 'YYYY-MM-DD') AS date,
+             i.currency_code AS "currencyCode", i."branchId"
+      FROM invoice_items ii
+      JOIN invoices i ON i.id = ii."invoiceId"
+      WHERE ii."itemType" = 'ACCESSORY'
+        AND ii."deletedAt" IS NULL
+        AND i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+        AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT','INVOICED','PAID')))
+        AND i."deletedAt" IS NULL
+        ${branchSql('i', bParam)}
+      ORDER BY i."createdAt" DESC
+    `);
+
+    let mapped = rows.map((r) => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      customerName: r.customerName ?? 'Unknown Customer',
+      saleType: r.saleType,
+      description: r.description,
+      serialNumber: r.serialNumber,
+      quantity: Number(r.quantity),
+      unitPrice: Number(r.unitPrice),
+      amount: Number(r.amount),
+      date: r.date,
+      currencyCode: r.currencyCode ?? 'AED',
+      branchId: r.branchId,
+    }));
+
+    if (q.search) {
+      const needle = q.search.toLowerCase();
+      mapped = mapped.filter(
+        (r) =>
+          r.invoiceNumber.toLowerCase().includes(needle) ||
+          r.description.toLowerCase().includes(needle) ||
+          r.customerName.toLowerCase().includes(needle) ||
+          (r.serialNumber ?? '').toLowerCase().includes(needle),
       );
     }
     mapped = applyDateAmountFilters(mapped, q);
@@ -1025,7 +1211,9 @@ export const getReceivableRowDetail = async (req: Request, res: Response, next: 
         >(
           `SELECT id, TO_CHAR(transaction_date, 'YYYY-MM-DD') AS date, amount,
                   payment_mode AS mode, reference_number AS "referenceNumber"
-           FROM payment_transactions WHERE invoice_id = $1 ORDER BY transaction_date ASC`,
+           FROM payment_transactions
+           WHERE invoice_id = $1 AND is_security_deposit = FALSE
+           ORDER BY transaction_date ASC`,
           [id],
         ),
         Source.query<

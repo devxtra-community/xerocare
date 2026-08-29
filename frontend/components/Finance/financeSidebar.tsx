@@ -30,6 +30,7 @@ import {
   ArrowLeftRight,
   Coins,
   Layers,
+  CalendarClock,
 } from 'lucide-react';
 
 import {
@@ -117,6 +118,11 @@ const financeMenu: FinanceMenuGroup[] = [
         title: 'Lease',
         icon: Home,
         href: '/finance/lease',
+      },
+      {
+        title: 'Contract Renewals',
+        icon: CalendarClock,
+        href: '/finance/contract-renewals',
       },
       {
         title: 'Sale',

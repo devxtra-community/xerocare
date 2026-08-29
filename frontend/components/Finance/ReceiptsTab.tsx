@@ -5,6 +5,7 @@ import {
   getAllSalePayments,
   approveSalePayment,
   rejectSalePayment,
+  refundSecurityDeposit,
   recordSalePayment,
   sendReceiptEmail,
   sendReceiptWhatsApp,
@@ -73,9 +74,11 @@ import {
   Send,
   Filter,
   X,
+  ShieldCheck,
+  Undo2,
 } from 'lucide-react';
 import { SalePaymentReceiptView } from '@/components/finance/SalePaymentReceiptView';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
 type FilterTab = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL' | 'CUSTOMERS';
@@ -287,6 +290,37 @@ const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | null => {
   return null;
 };
 
+// The contract-type badge alone collapses RENT_ADVANCE, RENT_PERIODIC, and
+// RENT_SECURITY_DEPOSIT into the same "RENT" label — Accounts approving a payment here
+// couldn't tell a refundable deposit apart from an ordinary rent collection at a glance.
+// A deposit is never rent revenue (excluded from InvoiceLedger and every AR sum — see
+// accountsShared.ts), so it needs to be visibly distinct at the one place a human decides
+// whether to approve it.
+function PaymentTypeBadges({
+  paymentContext,
+  isSecurityDeposit,
+}: {
+  paymentContext?: string | null;
+  isSecurityDeposit?: boolean;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-600">
+        {ctxType(paymentContext) ?? '—'}
+      </span>
+      {isSecurityDeposit && (
+        <span
+          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-teal-50 text-teal-700"
+          title="Refundable security deposit — not rent/revenue"
+        >
+          <ShieldCheck size={9} />
+          Deposit
+        </span>
+      )}
+    </span>
+  );
+}
+
 /**
  * Shared Receipts view used by BOTH Finance and Admin.
  *
@@ -307,22 +341,37 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   // Secondary filters
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'SALE' | 'RENT' | 'LEASE'>('ALL');
   const [modeFilter, setModeFilter] = useState<'ALL' | 'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('ALL');
+  // Independent of typeFilter — a deposit is a modifier on a RENT/LEASE payment (see
+  // PaymentTypeBadges), not its own contract type, so it needs its own filter rather
+  // than being folded into the Type dropdown.
+  const [depositFilter, setDepositFilter] = useState<'ALL' | 'DEPOSIT_ONLY' | 'EXCLUDE_DEPOSIT'>(
+    'ALL',
+  );
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('ALL');
 
   const hasSecondaryFilters =
-    typeFilter !== 'ALL' || modeFilter !== 'ALL' || dateFrom || dateTo || employeeFilter !== 'ALL';
+    typeFilter !== 'ALL' ||
+    modeFilter !== 'ALL' ||
+    depositFilter !== 'ALL' ||
+    dateFrom ||
+    dateTo ||
+    employeeFilter !== 'ALL';
 
-  // Approve/reject state
+  // Approve/reject/refund state
   const [actionTarget, setActionTarget] = useState<SalePaymentRequest | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'view' | null>(null);
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'view' | 'refund' | null>(
+    null,
+  );
   const [rejectReason, setRejectReason] = useState('');
   const [isActing, setIsActing] = useState(false);
 
   // Cash/bank accounts
   const [cashAccounts, setCashAccounts] = useState<CashBankAccount[]>([]);
   const [approvingAccountId, setApprovingAccountId] = useState('');
+  const [refundAccountId, setRefundAccountId] = useState('');
+  const [refundRemarks, setRefundRemarks] = useState('');
 
   // Receipt view
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
@@ -481,6 +530,29 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     }
   };
 
+  const handleRefund = async () => {
+    if (!actionTarget || !refundAccountId) return;
+    setIsActing(true);
+    try {
+      await refundSecurityDeposit(actionTarget.id, {
+        accountId: refundAccountId,
+        remarks: refundRemarks.trim() || undefined,
+      });
+      toast.success('Security deposit refunded', {
+        description: `${actionTarget.currency} ${Number(actionTarget.amount).toFixed(2)} paid out to ${actionTarget.customerName}.`,
+      });
+      setActionTarget(null);
+      setActionType(null);
+      setRefundAccountId('');
+      setRefundRemarks('');
+      loadData();
+    } catch (err) {
+      toast.error('Failed to refund deposit', { description: getApiErrorMessage(err) });
+    } finally {
+      setIsActing(false);
+    }
+  };
+
   // What's already on record for the invoice picked in "Record Balance Payment" —
   // computed from the same `payments` list already loaded for the table, so a
   // Finance-recorded balance payment can't blindly overlap an employee-recorded
@@ -575,12 +647,22 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     }
   };
 
-  const filtered = useMemo(
+  // Every secondary filter (type, mode, deposit, date range, employee, search) but NOT
+  // the status tab — this is what the summary cards below are built from, so selecting
+  // e.g. an employee (or Deposits Only) narrows every card's count/amount, not just the
+  // table rows under whichever tab happens to be open.
+  const filteredBase = useMemo(
     () =>
       payments
-        .filter((p) => (tab === 'ALL' || tab === 'CUSTOMERS' ? true : p.status === tab))
         .filter((p) => typeFilter === 'ALL' || ctxType(p.paymentContext) === typeFilter)
         .filter((p) => modeFilter === 'ALL' || p.paymentMode === modeFilter)
+        .filter((p) =>
+          depositFilter === 'ALL'
+            ? true
+            : depositFilter === 'DEPOSIT_ONLY'
+              ? !!p.isSecurityDeposit
+              : !p.isSecurityDeposit,
+        )
         .filter((p) => !dateFrom || p.paymentDate >= dateFrom)
         .filter((p) => !dateTo || p.paymentDate <= dateTo)
         .filter((p) => employeeFilter === 'ALL' || p.recordedByEmployeeName === employeeFilter)
@@ -592,15 +674,31 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             p.customerName.toLowerCase().includes(search.toLowerCase()) ||
             p.recordedByEmployeeName.toLowerCase().includes(search.toLowerCase()),
         ),
-    [payments, tab, typeFilter, modeFilter, dateFrom, dateTo, employeeFilter, search],
+    [payments, typeFilter, modeFilter, depositFilter, dateFrom, dateTo, employeeFilter, search],
   );
 
+  const filtered = useMemo(
+    () =>
+      filteredBase.filter((p) => (tab === 'ALL' || tab === 'CUSTOMERS' ? true : p.status === tab)),
+    [filteredBase, tab],
+  );
+
+  const sumAmount = (list: SalePaymentRequest[]) =>
+    list.reduce((s, p) => s + Number(p.amount || 0), 0);
+
   const counts = {
-    PENDING: payments.filter((p) => p.status === 'PENDING').length,
-    APPROVED: payments.filter((p) => p.status === 'APPROVED').length,
-    REJECTED: payments.filter((p) => p.status === 'REJECTED').length,
-    ALL: payments.length,
+    PENDING: filteredBase.filter((p) => p.status === 'PENDING').length,
+    APPROVED: filteredBase.filter((p) => p.status === 'APPROVED').length,
+    REJECTED: filteredBase.filter((p) => p.status === 'REJECTED').length,
+    ALL: filteredBase.length,
     CUSTOMERS: 0,
+  };
+
+  const amounts = {
+    PENDING: sumAmount(filteredBase.filter((p) => p.status === 'PENDING')),
+    APPROVED: sumAmount(filteredBase.filter((p) => p.status === 'APPROVED')),
+    REJECTED: sumAmount(filteredBase.filter((p) => p.status === 'REJECTED')),
+    ALL: sumAmount(filteredBase),
   };
 
   const customerGroups = useMemo(() => {
@@ -649,6 +747,25 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
         title="Advance Bill customer sign-off — separate from the payment approval status"
       >
         {cfg.label}
+      </span>
+    );
+  };
+
+  // Only ever set on an APPROVED, Cash/Bank security deposit that's been paid back to
+  // the customer via refundSecurityDeposit — a Cheque deposit's refund shows up as its
+  // GuaranteeCheque going RETURNED instead (Accounts → Guarantee Cheques), never here.
+  const refundBadge = (payment: SalePaymentRequest) => {
+    if (!payment.isRefunded) return null;
+    return (
+      <span
+        className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-current/10 bg-teal-50 text-teal-600"
+        title={
+          payment.refundedAt
+            ? `Refunded ${new Date(payment.refundedAt).toLocaleDateString('en-GB')}${payment.refundedByName ? ` by ${payment.refundedByName}` : ''}`
+            : 'Refunded'
+        }
+      >
+        Refunded
       </span>
     );
   };
@@ -704,6 +821,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               color: 'text-amber-600',
               bg: 'bg-amber-50',
               count: counts.PENDING,
+              amount: amounts.PENDING,
             },
             {
               key: 'APPROVED',
@@ -712,6 +830,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               color: 'text-emerald-600',
               bg: 'bg-emerald-50',
               count: counts.APPROVED,
+              amount: amounts.APPROVED,
             },
             {
               key: 'REJECTED',
@@ -720,6 +839,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               color: 'text-red-500',
               bg: 'bg-red-50',
               count: counts.REJECTED,
+              amount: amounts.REJECTED,
             },
             {
               key: 'ALL',
@@ -728,6 +848,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               color: 'text-indigo-600',
               bg: 'bg-indigo-50',
               count: counts.ALL,
+              amount: amounts.ALL,
             },
             {
               key: 'CUSTOMERS',
@@ -736,9 +857,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               color: 'text-teal-600',
               bg: 'bg-teal-50',
               count: uniqueCustomers,
+              amount: undefined,
             },
           ] as const
-        ).map(({ key, label, icon: Icon, color, bg, count }) => (
+        ).map(({ key, label, icon: Icon, color, bg, count, amount }) => (
           <button
             key={key}
             onClick={() => setTab(key as FilterTab)}
@@ -751,6 +873,14 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               </p>
             </div>
             <p className={`text-2xl font-black ${color}`}>{count}</p>
+            {/* Reflects every active filter (employee, type, mode, deposit, date range) —
+                not just the raw count, so selecting e.g. an employee shows what they're
+                actually responsible for in each bucket, not the branch-wide total. */}
+            {hasSecondaryFilters && amount !== undefined && (
+              <p className={`text-[10px] font-bold mt-0.5 ${color} opacity-80`}>
+                {currency} {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </p>
+            )}
           </button>
         ))}
       </div>
@@ -772,7 +902,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
           <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">
             <Filter size={11} /> Filters
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {/* Type */}
             <div className="space-y-1">
               <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
@@ -810,6 +940,25 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   <SelectItem value="CASH">Cash</SelectItem>
                   <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
                   <SelectItem value="CHEQUE">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Deposit */}
+            <div className="space-y-1">
+              <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                Deposit
+              </label>
+              <Select
+                value={depositFilter}
+                onValueChange={(v) => setDepositFilter(v as typeof depositFilter)}
+              >
+                <SelectTrigger className="h-8 text-xs font-bold border-slate-200 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Payments</SelectItem>
+                  <SelectItem value="DEPOSIT_ONLY">Deposits Only</SelectItem>
+                  <SelectItem value="EXCLUDE_DEPOSIT">Excluding Deposits</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -863,6 +1012,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 onClick={() => {
                   setTypeFilter('ALL');
                   setModeFilter('ALL');
+                  setDepositFilter('ALL');
                   setDateFrom('');
                   setDateTo('');
                   setEmployeeFilter('ALL');
@@ -978,9 +1128,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                     </td>
                                     <td className="py-1.5 pr-4 font-bold">{pmt.invoiceNumber}</td>
                                     <td className="py-1.5 pr-4">
-                                      <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-600">
-                                        {ctxType(pmt.paymentContext) ?? '—'}
-                                      </span>
+                                      <PaymentTypeBadges
+                                        paymentContext={pmt.paymentContext}
+                                        isSecurityDeposit={pmt.isSecurityDeposit}
+                                      />
                                     </td>
                                     <td className="py-1.5 pr-4">
                                       {pmt.paymentMode.replace('_', ' ')}
@@ -994,7 +1145,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                     <td className="py-1.5 pr-4">
                                       {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
                                     </td>
-                                    <td className="py-1.5 pr-4">{statusBadge(pmt.status)}</td>
+                                    <td className="py-1.5 pr-4">
+                                      {statusBadge(pmt.status)}
+                                      {refundBadge(pmt)}
+                                    </td>
                                     <td className="py-1.5 text-right">
                                       <Button
                                         size="sm"
@@ -1081,9 +1235,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         {pmt.customerName}
                       </TableCell>
                       <TableCell>
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-600">
-                          {ctxType(pmt.paymentContext) ?? '—'}
-                        </span>
+                        <PaymentTypeBadges
+                          paymentContext={pmt.paymentContext}
+                          isSecurityDeposit={pmt.isSecurityDeposit}
+                        />
                       </TableCell>
                       <TableCell>
                         <span className="text-[10px] font-black text-slate-500 uppercase">
@@ -1103,6 +1258,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <TableCell>
                         {statusBadge(pmt.status)}
                         {advanceBillBadge(pmt)}
+                        {refundBadge(pmt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -1145,6 +1301,25 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                               </Button>
                             </>
                           )}
+                          {pmt.isSecurityDeposit &&
+                            pmt.status === 'APPROVED' &&
+                            pmt.paymentMode !== 'CHEQUE' &&
+                            !pmt.isRefunded && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setActionTarget(pmt);
+                                  setActionType('refund');
+                                  setRefundAccountId('');
+                                  setRefundRemarks('');
+                                }}
+                                className="h-7 w-7 p-0 text-teal-500 hover:bg-teal-50"
+                                title="Refund Security Deposit"
+                              >
+                                <Undo2 size={13} />
+                              </Button>
+                            )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1423,6 +1598,87 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
         </Dialog>
       )}
 
+      {/* Refund Security Deposit Dialog — Cash/Bank only; a Cheque deposit is refunded
+          by returning its GuaranteeCheque instead (Accounts → Guarantee Cheques). */}
+      {actionType === 'refund' && actionTarget && (
+        <Dialog
+          open
+          onOpenChange={() => {
+            if (!isActing) {
+              setActionType(null);
+              setRefundAccountId('');
+              setRefundRemarks('');
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
+            <DialogTitle className="text-lg font-black text-slate-800">
+              Refund Security Deposit
+            </DialogTitle>
+            <DialogDescription className="text-sm text-slate-500 leading-relaxed">
+              This will pay out{' '}
+              <span className="font-black text-teal-600">
+                {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
+              </span>{' '}
+              to <span className="font-black">{actionTarget.customerName}</span> and reduce the
+              selected account&apos;s balance by that amount. This cannot be undone.
+            </DialogDescription>
+            <div className="mt-3 space-y-1">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Refund From Account <span className="text-red-500">*</span>
+              </Label>
+              <Select value={refundAccountId} onValueChange={setRefundAccountId}>
+                <SelectTrigger className="h-9 w-full min-w-0 border-slate-200 text-sm font-bold overflow-hidden">
+                  <SelectValue placeholder="Select cash / bank account…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filterAccountsByPaymentMode(cashAccounts, actionTarget.paymentMode).map(
+                    (acc) => (
+                      <SelectItem key={acc.id} value={acc.id} className="text-sm">
+                        <span className="block truncate">
+                          {acc.name} — {acc.currency}{' '}
+                          {Number(acc.currentBalance).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </SelectItem>
+                    ),
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="mt-3">
+              <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                Remarks (optional)
+              </Label>
+              <Input
+                value={refundRemarks}
+                onChange={(e) => setRefundRemarks(e.target.value)}
+                placeholder="e.g., contract ended, no damages found..."
+                className="h-10 border-slate-200 font-bold text-sm"
+              />
+            </div>
+            <DialogFooter className="flex justify-between mt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setActionType(null)}
+                disabled={isActing}
+                className="text-[10px] font-black uppercase tracking-widest text-slate-400"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRefund}
+                disabled={isActing || !refundAccountId}
+                className="bg-teal-600 hover:bg-teal-700 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
+              >
+                {isActing ? <Loader2 size={14} className="animate-spin" /> : 'Refund'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Finance Direct Balance Payment Dialog */}
       <Dialog
         open={directPayOpen}
@@ -1656,12 +1912,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
                     Reference #
                   </Label>
-                  <Input
-                    value={directRef}
-                    onChange={(e) => setDirectRef(e.target.value)}
-                    placeholder="Transaction / Reference number"
-                    className="h-10 border-slate-200 font-bold text-xs"
-                  />
+                  <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                    Auto-generated on save — {autoReferencePreview(directMode)}
+                  </div>
                 </div>
               )}
               <div>

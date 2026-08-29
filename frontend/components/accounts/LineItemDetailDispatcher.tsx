@@ -17,7 +17,7 @@ import {
   SalaryPayableModal,
 } from './LiabilitiesDrilldown';
 import { EquityLineModal, RetainedEarningsModal } from './EquityDrilldown';
-import { OtherIncomeModal } from './IncomeDrilldown';
+import { OtherIncomeModal, AccessoriesRevenueModal, UsageRevenueModal } from './IncomeDrilldown';
 import {
   CashInHandModal,
   CashAtBankModal,
@@ -119,6 +119,8 @@ export function LineItemDetailDispatcher({
 
   if (section === 'INCOME') {
     if (node.key === 'OTHER_INCOME') return <OtherIncomeModal {...common} />;
+    if (node.key === 'ACCESSORIES_REVENUE') return <AccessoriesRevenueModal {...common} />;
+    if (node.key === 'USAGE_REVENUE') return <UsageRevenueModal {...common} />;
     return null;
   }
 

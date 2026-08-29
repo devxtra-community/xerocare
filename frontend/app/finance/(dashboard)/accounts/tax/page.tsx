@@ -31,6 +31,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import TaxDocumentDialog from '@/components/finance/TaxDocumentDialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Tab = 'output' | 'local' | 'international';
 
@@ -97,18 +104,22 @@ function FilterBar({
         onCustomChange={onCustomDateChange}
       />
       {isAdmin && (
-        <select
-          value={filters.branchIds ?? ''}
-          onChange={(e) => onChange({ branchIds: e.target.value || undefined })}
-          className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm h-10"
+        <Select
+          value={filters.branchIds || '__ALL__'}
+          onValueChange={(v) => onChange({ branchIds: v === '__ALL__' ? undefined : v })}
         >
-          <option value="">All Branches</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="border-orange-200 text-sm bg-white shadow-sm h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__ALL__">All Branches</SelectItem>
+            {branches.map((b) => (
+              <SelectItem key={b.id} value={b.id}>
+                {b.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
       <TaxLocationFilter
         value={{

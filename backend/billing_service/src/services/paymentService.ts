@@ -20,6 +20,10 @@ export interface PaymentRecord {
   paymentDate: Date;
   referenceNumber?: string;
   remarks?: string;
+  /** Refundable caution money rather than settlement — listed in payment history but
+   * never counted toward what the invoice has been paid. Only PaymentTransaction rows
+   * carry it; legacy PaymentLedger rows fall back to the remarks convention. */
+  isSecurityDeposit?: boolean;
   receiptUrl?: string;
   recordedBy?: string;
   createdAt: Date;
@@ -120,6 +124,7 @@ export class PaymentService {
           paymentDate: t.transactionDate,
           referenceNumber: t.referenceNumber,
           remarks: t.remarks,
+          isSecurityDeposit: t.isSecurityDeposit === true,
           receiptUrl: await r2SignedGetUrl(t.receiptUrl),
           recordedBy: t.recordedBy,
           createdAt: t.createdAt,
@@ -169,8 +174,15 @@ export class PaymentService {
 
     // Security deposits are shown in the ledger list but excluded from settlement
     // totals — they are refundable caution money, not payment against the invoice.
+    // The isSecurityDeposit flag is what actually catches workflow-approved deposits;
+    // the remarks string only ever matched the direct-recording path's wording, and is
+    // kept for legacy payment_ledgers rows, which carry no flag.
     const totalPaid = payments
-      .filter((p) => (p.remarks ?? '').trim().toLowerCase() !== 'security deposit')
+      .filter(
+        (p) =>
+          p.isSecurityDeposit !== true &&
+          (p.remarks ?? '').trim().toLowerCase() !== 'security deposit',
+      )
       .reduce((sum, p) => sum + toInvoiceCurrency(p), 0);
     const totalAmount = Number(invoice.totalAmount || 0);
     const pendingBalance = Math.max(0, Math.round((totalAmount - totalPaid) * 100) / 100);

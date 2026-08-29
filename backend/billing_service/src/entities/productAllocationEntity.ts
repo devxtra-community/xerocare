@@ -39,6 +39,16 @@ export class ProductAllocation {
   @Column({ type: 'varchar' })
   serialNumber!: string;
 
+  // The source InvoiceItem's itemType (PRODUCT | ACCESSORY) at the time this unit was
+  // allocated — every reader of a contract's productAllocations that means "the rented/
+  // leased machine(s)" (meter-reading forms, "Allocated Machine" contract-document rows,
+  // active-machine counts, ...) must exclude ACCESSORY rows here, or an allocated
+  // accessory (a real serialized unit picked via the same allocation flow, but never
+  // metered) gets miscounted as an extra machine. Defaults to PRODUCT: every row created
+  // before accessories could be allocated at all was always a real machine.
+  @Column({ type: 'varchar', default: 'PRODUCT' })
+  itemType!: string;
+
   @Column({
     type: 'enum',
     enum: AllocationStatus,

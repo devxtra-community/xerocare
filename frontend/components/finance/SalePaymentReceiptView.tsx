@@ -30,14 +30,18 @@ function modeLabel(mode: string) {
   return mode === 'BANK_TRANSFER' ? 'Bank Transfer' : mode === 'CASH' ? 'Cash' : 'Cheque';
 }
 
+const STATUS_BADGE_CLASS: Record<string, string> = {
+  PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
+  APPROVED: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  REJECTED: 'bg-red-50 text-red-700 border border-red-200',
+};
+
 type ReceiptType = 'SALE' | 'RENT' | 'LEASE' | 'OTHER';
 
 interface ContextMeta {
   title: string;
   subtitle: string;
   type: ReceiptType;
-  accentFrom: string;
-  accentTo: string;
   badge: string;
   badgeClass: string;
 }
@@ -49,18 +53,14 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         title: 'Sale Advance Payment',
         subtitle: 'Initial advance collected at contract conversion',
         type: 'SALE',
-        accentFrom: 'from-indigo-700',
-        accentTo: 'to-indigo-500',
         badge: 'SALE',
         badgeClass: 'bg-indigo-100 text-indigo-700',
       };
     case 'RENT_ADVANCE':
       return {
-        title: 'Rental Advance / Security Deposit',
-        subtitle: 'Initial advance or security deposit for rental contract',
+        title: 'First Month Advance Payment',
+        subtitle: 'Initial first month advance payment for rental contract',
         type: 'RENT',
-        accentFrom: 'from-blue-700',
-        accentTo: 'to-blue-500',
         badge: 'RENT · ADVANCE',
         badgeClass: 'bg-blue-100 text-blue-700',
       };
@@ -69,18 +69,22 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         title: 'Monthly Rental Collection',
         subtitle: 'Periodic rental payment collection',
         type: 'RENT',
-        accentFrom: 'from-blue-700',
-        accentTo: 'to-blue-500',
         badge: 'RENT · MONTHLY',
         badgeClass: 'bg-blue-100 text-blue-700',
       };
+    case 'RENT_SECURITY_DEPOSIT':
+      return {
+        title: 'Security Deposit Receipt',
+        subtitle: 'Refundable security deposit — not a rent payment',
+        type: 'RENT',
+        badge: 'RENT · SECURITY DEPOSIT',
+        badgeClass: 'bg-teal-100 text-teal-700',
+      };
     case 'LEASE_ADVANCE':
       return {
-        title: 'Lease Down Payment',
-        subtitle: 'Initial down payment for lease contract',
+        title: 'First Month Advance Payment',
+        subtitle: 'Initial first month advance payment for lease contract',
         type: 'LEASE',
-        accentFrom: 'from-violet-700',
-        accentTo: 'to-violet-500',
         badge: 'LEASE · ADVANCE',
         badgeClass: 'bg-violet-100 text-violet-700',
       };
@@ -89,18 +93,22 @@ function getContextMeta(ctx?: string | null): ContextMeta {
         title: 'Lease Installment Payment',
         subtitle: 'Periodic lease / EMI installment',
         type: 'LEASE',
-        accentFrom: 'from-violet-700',
-        accentTo: 'to-violet-500',
         badge: 'LEASE · INSTALLMENT',
         badgeClass: 'bg-violet-100 text-violet-700',
+      };
+    case 'LEASE_SECURITY_DEPOSIT':
+      return {
+        title: 'Security Deposit Receipt',
+        subtitle: 'Refundable security deposit — not a lease payment',
+        type: 'LEASE',
+        badge: 'LEASE · SECURITY DEPOSIT',
+        badgeClass: 'bg-teal-100 text-teal-700',
       };
     default:
       return {
         title: 'Payment Receipt',
         subtitle: 'Contract payment',
         type: 'OTHER',
-        accentFrom: 'from-slate-700',
-        accentTo: 'to-slate-500',
         badge: 'PAYMENT',
         badgeClass: 'bg-slate-100 text-slate-700',
       };
@@ -156,6 +164,7 @@ function RentSection({
     year: 'numeric',
   });
   const isAdvance = context === 'RENT_ADVANCE';
+  const isDeposit = context === 'RENT_SECURITY_DEPOSIT';
 
   const bwItem = invoice?.items?.find(
     (i) => (i.bwIncludedLimit ?? 0) > 0 || (i.bwExcessRate ?? 0) > 0,
@@ -165,22 +174,34 @@ function RentSection({
     : (invoice?.items?.find((i) => (i.unitPrice ?? 0) > 0)?.unitPrice ?? null);
 
   return (
-    <div className="p-3 bg-blue-50 rounded-xl space-y-2">
-      <p className="text-[9px] font-black uppercase tracking-widest text-blue-500">
+    <div className={`p-3 rounded-xl space-y-2 ${isDeposit ? 'bg-teal-50' : 'bg-blue-50'}`}>
+      <p
+        className={`text-[9px] font-black uppercase tracking-widest ${isDeposit ? 'text-teal-600' : 'text-blue-500'}`}
+      >
         Rental Details
       </p>
       <div className="grid grid-cols-2 gap-2 text-xs">
         <span className="text-slate-500 font-bold">Payment Type</span>
         <span className="text-right font-bold text-slate-700">
-          {isAdvance ? 'Security Deposit / Advance' : `Monthly Rental — ${billingMonth}`}
+          {isDeposit
+            ? 'Security Deposit (Refundable)'
+            : isAdvance
+              ? 'First Month Advance'
+              : `Monthly Rental — ${billingMonth}`}
         </span>
-        {!isAdvance && (
+        {isDeposit && (
+          <p className="col-span-2 text-[9px] text-teal-700 leading-relaxed">
+            This is a refundable guarantee, held separately from rent — it is returned per the terms
+            of your contract, not applied toward rent charges.
+          </p>
+        )}
+        {!isAdvance && !isDeposit && (
           <>
             <span className="text-slate-500 font-bold">Billing Period</span>
             <span className="text-right font-bold text-slate-700">{billingMonth}</span>
           </>
         )}
-        {monthlyRate != null && (
+        {monthlyRate != null && !isDeposit && (
           <>
             <span className="text-slate-500 font-bold">Monthly Rate</span>
             <span className="text-right font-black text-slate-800">
@@ -189,7 +210,7 @@ function RentSection({
           </>
         )}
         <span className="text-slate-500 font-bold">Amount Collected</span>
-        <span className="text-right font-black text-blue-700">
+        <span className={`text-right font-black ${isDeposit ? 'text-teal-700' : 'text-blue-700'}`}>
           {fmtAmt(Number(payment.amount), currency)}
         </span>
       </div>
@@ -209,6 +230,7 @@ function LeaseSection({
   context?: string | null;
 }) {
   const isAdvance = context === 'LEASE_ADVANCE';
+  const isDeposit = context === 'LEASE_SECURITY_DEPOSIT';
   const leaseType = invoice?.leaseType ?? 'EMI';
   const billingMonth = new Date(payment.paymentDate).toLocaleDateString('en-GB', {
     month: 'long',
@@ -216,8 +238,10 @@ function LeaseSection({
   });
 
   return (
-    <div className="p-3 bg-violet-50 rounded-xl space-y-2">
-      <p className="text-[9px] font-black uppercase tracking-widest text-violet-500">
+    <div className={`p-3 rounded-xl space-y-2 ${isDeposit ? 'bg-teal-50' : 'bg-violet-50'}`}>
+      <p
+        className={`text-[9px] font-black uppercase tracking-widest ${isDeposit ? 'text-teal-600' : 'text-violet-500'}`}
+      >
         Lease Details
       </p>
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -227,14 +251,24 @@ function LeaseSection({
         </span>
         <span className="text-slate-500 font-bold">Payment Type</span>
         <span className="text-right font-bold text-slate-700">
-          {isAdvance
-            ? 'Down Payment / Initial Deposit'
-            : leaseType === 'EMI'
-              ? `Monthly Installment — ${billingMonth}`
-              : `Service Period — ${billingMonth}`}
+          {isDeposit
+            ? 'Security Deposit (Refundable)'
+            : isAdvance
+              ? 'First Month Advance'
+              : leaseType === 'EMI'
+                ? `Monthly Installment — ${billingMonth}`
+                : `Service Period — ${billingMonth}`}
         </span>
+        {isDeposit && (
+          <p className="col-span-2 text-[9px] text-teal-700 leading-relaxed">
+            This is a refundable guarantee, held separately from lease payments — it is returned per
+            the terms of your contract, not applied toward lease charges.
+          </p>
+        )}
         <span className="text-slate-500 font-bold">Amount</span>
-        <span className="text-right font-black text-violet-700">
+        <span
+          className={`text-right font-black ${isDeposit ? 'text-teal-700' : 'text-violet-700'}`}
+        >
           {fmtAmt(Number(payment.amount), currency)}
         </span>
       </div>
@@ -253,22 +287,27 @@ export function SalePaymentReceiptView({
   return (
     <div ref={printRef} className="bg-white rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className={`bg-linear-to-r ${meta.accentFrom} ${meta.accentTo} p-5 text-white`}>
+      <div className="bg-white p-5 border-b border-slate-100">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-0.5">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5">
               Payment Receipt
             </p>
-            <p className="text-xl font-black">{payment.requestNo}</p>
-            <p className="text-xs opacity-80 font-bold mt-0.5">{meta.title}</p>
+            <p className="text-xl font-black text-slate-800">{payment.requestNo}</p>
+            <p className="text-xs font-bold mt-0.5 text-slate-500">{meta.title}</p>
           </div>
           <div className="text-right">
             <span
-              className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/20`}
+              className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                STATUS_BADGE_CLASS[payment.status] ??
+                'bg-slate-100 text-slate-600 border border-slate-200'
+              }`}
             >
               {payment.status}
             </span>
-            <p className="text-[10px] opacity-70 font-bold mt-1">{fmtDate(payment.paymentDate)}</p>
+            <p className="text-[10px] text-slate-400 font-bold mt-1">
+              {fmtDate(payment.paymentDate)}
+            </p>
           </div>
         </div>
       </div>

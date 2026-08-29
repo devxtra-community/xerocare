@@ -36,6 +36,13 @@ import {
   CHEQUE_TABLE_STATUS_BADGE as STATUS_BADGE,
   CHEQUE_STATUS_ICON as STATUS_ICON,
 } from '@/components/accounts/ChequeDetailModal';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type ActionType = 'deposit' | 'issue' | 'clear' | 'bounce' | 'cancel';
 
@@ -141,19 +148,23 @@ function ChequeActionModal({
           {needsAccount && (
             <div>
               <label className="text-xs font-medium text-gray-600">Bank Account *</label>
-              <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+              <Select
+                value={accountId || '__NONE__'}
+                onValueChange={(v) => setAccountId(v === '__NONE__' ? '' : v)}
               >
-                <option value="">Select account…</option>
-                {cashAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                    {a.bankName ? ` (${a.bankName})` : ''}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__NONE__">Select account…</SelectItem>
+                  {cashAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                      {a.bankName ? ` (${a.bankName})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           {needsDate && (
@@ -509,18 +520,19 @@ function AdminChequesContent() {
               className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm"
-          >
-            <option value="ALL">All Status</option>
-            {statusOptions.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="border-orange-200 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              {statusOptions.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <input
             type="date"
             value={dateFrom}

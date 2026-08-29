@@ -398,7 +398,7 @@ export default function ConsolidatedStatementDialog({
                               <TableRow className="bg-orange-50/30">
                                 <TableCell className="font-medium text-orange-700">
                                   <span className="text-sm font-bold uppercase tracking-tight">
-                                    Advance Amount (Adjustable)
+                                    First Month Advance Payment
                                   </span>
                                 </TableCell>
                                 {isCpc && <TableCell className="text-right">-</TableCell>}

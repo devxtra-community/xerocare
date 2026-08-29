@@ -121,6 +121,9 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
       securityDepositDate: req.body.securityDepositDate,
       securityDepositBank: req.body.securityDepositBank,
 
+      // Payment Timing
+      paymentTiming: req.body.paymentTiming,
+
       // Warranty Fields
       warrantyType: req.body.warrantyType,
       warrantyDurationValue: req.body.warrantyDurationValue,
@@ -204,6 +207,9 @@ export const updateQuotation = async (req: Request, res: Response, next: NextFun
       securityDepositReference: req.body.securityDepositReference,
       securityDepositDate: req.body.securityDepositDate,
       securityDepositBank: req.body.securityDepositBank,
+
+      // Payment Timing
+      paymentTiming: req.body.paymentTiming,
     });
 
     return res.status(200).json({
@@ -1256,6 +1262,9 @@ export const createDirectSale = async (req: Request, res: Response, next: NextFu
       ...payload,
       branchId: req.user.branchId,
       createdBy: req.user.userId,
+      // Decides whether a collection taken here needs Accounts' approval before it
+      // counts as settled — see createDirectSale's payment-recording branch.
+      createdByRole: req.user.role,
     });
 
     return res.status(201).json({ success: true, data: result });

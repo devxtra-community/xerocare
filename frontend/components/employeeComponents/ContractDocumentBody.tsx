@@ -26,6 +26,21 @@ function fmtAmt(n?: number | null, cur = 'QAR') {
   return `${cur} ${Number(n ?? 0).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Accessories (stand, tray, stapler unit, etc.) added alongside the Rent/Lease machine —
+// real priced items, billed once with the first month advance, never metered. Kept
+// separate from the machine/equipment rows below (which they'd otherwise pollute, since
+// they also carry a productId) and from the Initial Amount Payable total (which otherwise
+// silently omitted them).
+function getAccessoryItems(invoice: Invoice) {
+  return (invoice.items || []).filter((i) => (i.itemType as string) === 'ACCESSORY');
+}
+function getAccessoryTotal(invoice: Invoice) {
+  return getAccessoryItems(invoice).reduce(
+    (s, i) => s + Number(i.quantity || 0) * Number(i.unitPrice || 0),
+    0,
+  );
+}
+
 function planLabel(rentType?: string) {
   const map: Record<string, string> = {
     FIXED_LIMIT: 'Fixed Limit Plan',
@@ -199,54 +214,117 @@ function PartiesSection({
 
 // ─── Product / Equipment ──────────────────────────────────────────────────────
 
-function ProductSection({ invoice }: { invoice: Invoice }) {
+function ProductSection({ invoice, currency }: { invoice: Invoice; currency: string }) {
+  // Accessories carry a productId too (they're real catalog products) but aren't
+  // equipment being rented/leased — including them here used to both mislabel them as
+  // "Allocated Machine" hardware AND desync the index-based pairing with `allocations`
+  // below (an accessory taking a slot meant for the next real machine's serial number).
+  // `allocations` now filters on ProductAllocation's own itemType directly (see its
+  // entity comment) rather than relying only on the invoice.items side staying in sync.
   const productItems = (invoice.items || []).filter(
-    (i) => i.itemType === 'PRODUCT' || !!i.productId,
+    (i) => (i.itemType === 'PRODUCT' || !!i.productId) && (i.itemType as string) !== 'ACCESSORY',
   );
-  const allocations = (invoice.productAllocations || []).filter((a) => a.status === 'ALLOCATED');
-  if (productItems.length === 0 && allocations.length === 0) return null;
+  const allocations = (invoice.productAllocations || []).filter(
+    (a) => a.status === 'ALLOCATED' && a.itemType !== 'ACCESSORY',
+  );
+  const accessoryItems = getAccessoryItems(invoice);
+  const accessoryTotal = getAccessoryTotal(invoice);
+  if (productItems.length === 0 && allocations.length === 0 && accessoryItems.length === 0)
+    return null;
 
   return (
-    <div>
-      <SectionHeading>Equipment / Product Details</SectionHeading>
-      <table className="w-full text-xs border border-slate-200 border-collapse">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50">
-            <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
-              Description
-            </th>
-            <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
-              Serial No.
-            </th>
-            <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
-              Warranty
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {productItems.length > 0
-            ? productItems.map((item, idx) => {
-                const alloc = allocations[idx];
-                const serial = item.serialNumber || item.sn || alloc?.serialNumber || '—';
-                return (
-                  <tr key={idx} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-semibold text-slate-700">{item.description}</td>
-                    <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{serial}</td>
-                    <td className="px-3 py-2 text-[11px] text-slate-500">{item.warranty || '—'}</td>
-                  </tr>
-                );
-              })
-            : allocations.map((alloc, idx) => (
-                <tr key={idx} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-semibold text-slate-700">Allocated Machine</td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
-                    {alloc.serialNumber}
+    <div className="space-y-4">
+      {(productItems.length > 0 || allocations.length > 0) && (
+        <div>
+          <SectionHeading>Equipment / Product Details</SectionHeading>
+          <table className="w-full text-xs border border-slate-200 border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+                  Description
+                </th>
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+                  Serial No.
+                </th>
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
+                  Warranty
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {productItems.length > 0
+                ? productItems.map((item, idx) => {
+                    const alloc = allocations[idx];
+                    const serial = item.serialNumber || item.sn || alloc?.serialNumber || '—';
+                    return (
+                      <tr key={idx} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-semibold text-slate-700">
+                          {item.description}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[11px] text-slate-600">{serial}</td>
+                        <td className="px-3 py-2 text-[11px] text-slate-500">
+                          {item.warranty || '—'}
+                        </td>
+                      </tr>
+                    );
+                  })
+                : allocations.map((alloc, idx) => (
+                    <tr key={idx} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-semibold text-slate-700">Allocated Machine</td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
+                        {alloc.serialNumber}
+                      </td>
+                      <td className="px-3 py-2 text-[11px] text-slate-500">—</td>
+                    </tr>
+                  ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {accessoryItems.length > 0 && (
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-widest text-teal-600 mb-2">
+            Accessories Included
+          </p>
+          <table className="w-full text-xs border border-teal-100 border-collapse">
+            <thead>
+              <tr className="border-b border-teal-100 bg-teal-50/50">
+                <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
+                  Description
+                </th>
+                <th className="text-center px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
+                  Qty
+                </th>
+                <th className="text-right px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
+                  Price
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {accessoryItems.map((item, idx) => (
+                <tr key={idx} className="border-t border-teal-50">
+                  <td className="px-3 py-2 font-semibold text-slate-700">{item.description}</td>
+                  <td className="px-3 py-2 text-center text-slate-600">{item.quantity ?? 1}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-700">
+                    {fmtAmt((item.quantity ?? 1) * Number(item.unitPrice ?? 0), currency)}
                   </td>
-                  <td className="px-3 py-2 text-[11px] text-slate-500">—</td>
                 </tr>
               ))}
-        </tbody>
-      </table>
+              <tr className="border-t border-teal-200 bg-teal-50/30">
+                <td
+                  colSpan={2}
+                  className="px-3 py-2 text-right font-black text-teal-700 text-[11px] uppercase"
+                >
+                  Accessories Total
+                </td>
+                <td className="px-3 py-2 text-right font-black text-teal-700">
+                  {fmtAmt(accessoryTotal, currency)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -369,6 +447,14 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           </tr>
           <tr className="border-b border-slate-100">
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Payment Timing
+            </td>
+            <td className="px-3 py-2 font-semibold text-slate-800 uppercase">
+              {invoice.paymentTiming === 'ARREARS' ? 'Arrears (Postpaid)' : 'Advance'}
+            </td>
+          </tr>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Plan Type
             </td>
             <td className="px-3 py-2 font-semibold text-slate-800">
@@ -485,6 +571,158 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           )}
         </tbody>
       </table>
+
+      {/* Contract Rental Value */}
+      {invoice.effectiveFrom &&
+        invoice.effectiveTo &&
+        (() => {
+          const months = Math.round(
+            (new Date(invoice.effectiveTo).getTime() - new Date(invoice.effectiveFrom).getTime()) /
+              (1000 * 60 * 60 * 24 * 30.44),
+          );
+          const rentalValue = (invoice.monthlyRent || 0) * months;
+          const isArrears = invoice.paymentTiming === 'ARREARS';
+          const firstAdvance = isArrears ? 0 : Number(invoice.advanceAmount || 0);
+          const secDeposit = Number(invoice.securityDepositAmount || 0);
+          const accessoryTotal = getAccessoryTotal(invoice);
+          const initialPayable = firstAdvance + secDeposit + accessoryTotal;
+
+          // Build monthly schedule
+          const schedule = [];
+          if (months > 0) {
+            const start = new Date(invoice.effectiveFrom);
+            for (let i = 0; i < months; i++) {
+              const pStart = new Date(start);
+              pStart.setMonth(pStart.getMonth() + i);
+              const pEnd = new Date(pStart);
+              pEnd.setMonth(pEnd.getMonth() + 1);
+              pEnd.setDate(pEnd.getDate() - 1);
+              const actualEnd =
+                pEnd > new Date(invoice.effectiveTo) ? new Date(invoice.effectiveTo) : pEnd;
+              schedule.push({
+                month: i + 1,
+                label: pStart.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+                start: pStart,
+                end: actualEnd,
+                baseRent: invoice.monthlyRent || 0,
+              });
+            }
+          }
+
+          return (
+            <div className="mt-6">
+              <SectionHeading>Contract Financial Summary</SectionHeading>
+
+              {/* Contract Rental Value */}
+              <div className="mb-4">
+                <p className="text-[9px] font-black uppercase tracking-widest text-blue-600 mb-2">
+                  Contract Rental Value
+                </p>
+                <div className="bg-blue-50/50 rounded p-3 border border-blue-100">
+                  <div className="flex justify-between">
+                    <span className="text-xs text-slate-600">Monthly Rent × {months} Months</span>
+                    <span className="text-sm font-black text-blue-700">
+                      {fmtAmt(rentalValue, currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Initial Payment */}
+              <div className="mb-4">
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-2">
+                  Initial Payment
+                </p>
+                <div className="space-y-1">
+                  {!isArrears && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">First Month Advance Payment</span>
+                      <span className="font-semibold">{fmtAmt(firstAdvance, currency)}</span>
+                    </div>
+                  )}
+                  {isArrears && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">First Month Advance</span>
+                      <span className="text-slate-400 italic">Not Applicable (Postpaid)</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-600">Security Deposit</span>
+                    <span className="font-semibold">
+                      {secDeposit > 0 ? fmtAmt(secDeposit, currency) : 'None'}
+                    </span>
+                  </div>
+                  {accessoryTotal > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-600">Accessories</span>
+                      <span className="font-semibold">{fmtAmt(accessoryTotal, currency)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-xs font-black border-t border-emerald-200 pt-1">
+                    <span className="text-emerald-800 uppercase">Initial Amount Payable</span>
+                    <span className="text-emerald-700">{fmtAmt(initialPayable, currency)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Monthly Schedule */}
+              {schedule.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-violet-600 mb-2">
+                    Contract Rental Schedule
+                  </p>
+                  <table className="w-full text-xs border border-slate-200 border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50">
+                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          Period
+                        </th>
+                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          Start
+                        </th>
+                        <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          End
+                        </th>
+                        <th className="px-2 py-1 text-right text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          Base Rent
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedule.map((row) => (
+                        <tr key={row.month} className="border-b border-slate-100">
+                          <td className="px-2 py-1 font-semibold">
+                            Month {row.month} — {row.label}
+                          </td>
+                          <td className="px-2 py-1 text-slate-600">
+                            {fmtDate(row.start.toISOString())}
+                          </td>
+                          <td className="px-2 py-1 text-slate-600">
+                            {fmtDate(row.end.toISOString())}
+                          </td>
+                          <td className="px-2 py-1 text-right font-semibold">
+                            {fmtAmt(row.baseRent, currency)}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-blue-50/50">
+                        <td
+                          colSpan={3}
+                          className="px-2 py-1 text-right text-[9px] font-black uppercase tracking-widest text-blue-700"
+                        >
+                          Total Contract Rental Value
+                        </td>
+                        <td className="px-2 py-1 text-right text-xs font-black text-blue-700">
+                          {fmtAmt(rentalValue, currency)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
     </div>
   );
 }
@@ -675,7 +913,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
   );
 }
 
-// ─── Advance / Deposit ────────────────────────────────────────────────────────
+// ─── First Month Advance & Security Deposit ──────────────────────────────────
 
 function AdvanceSection({
   invoice,
@@ -688,9 +926,12 @@ function AdvanceSection({
 }) {
   const advance = Number(invoice.advanceAmount ?? 0);
   const secDeposit = Number(invoice.securityDepositAmount ?? 0);
+  const accessoryItems = getAccessoryItems(invoice);
+  const accessoryTotal = getAccessoryTotal(invoice);
   const hasAdvance = advance > 0;
   const hasDeposit = secDeposit > 0;
-  if (!hasAdvance && !hasDeposit) return null;
+  const hasAccessories = accessoryTotal > 0;
+  if (!hasAdvance && !hasDeposit && !hasAccessories) return null;
 
   // Rent/Lease advances are collected VAT-inclusive (see createSalePaymentRequest's
   // gross-up) — mirror that same figure here so the Contract Agreement, the receipt,
@@ -717,7 +958,8 @@ function AdvanceSection({
   return (
     <div>
       <SectionHeading>
-        {saleType === 'LEASE' ? 'Down Payment / Advance' : 'Advance & Deposit'}
+        {saleType === 'LEASE' ? 'Down Payment / Advance' : 'First Month Advance & Security Deposit'}
+        {hasAccessories ? ' & Accessories' : ''}
       </SectionHeading>
       <table className="w-full text-xs border border-slate-200 border-collapse">
         <tbody>
@@ -755,7 +997,7 @@ function AdvanceSection({
                   </td>
                 </tr>
               )}
-              <tr className={hasDeposit ? 'border-b border-slate-200' : ''}>
+              <tr className={hasDeposit || hasAccessories ? 'border-b border-slate-200' : ''}>
                 <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
                   {advanceNote}
                 </td>
@@ -782,9 +1024,28 @@ function AdvanceSection({
                   </td>
                 </tr>
               )}
-              <tr>
+              <tr className={hasAccessories ? 'border-b border-slate-200' : ''}>
                 <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
                   {depositNote}
+                </td>
+              </tr>
+            </>
+          )}
+          {hasAccessories && (
+            <>
+              <tr className="border-b border-slate-100 bg-teal-50/40">
+                <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-teal-600">
+                  Accessories ({accessoryItems.length})
+                </td>
+                <td className="px-3 py-2 font-black text-slate-800">
+                  {fmtAmt(accessoryTotal, currency)}
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
+                  Accessories are collected once, together with the{' '}
+                  {hasAdvance ? advanceLabel.toLowerCase() : 'first payment'} above — see Equipment
+                  / Product Details for the itemized list.
                 </td>
               </tr>
             </>
@@ -967,7 +1228,7 @@ export function ContractDocumentBody({ invoice, agreement, currency }: Props) {
       <DocRule />
 
       {/* ── Equipment ── */}
-      <ProductSection invoice={invoice} />
+      <ProductSection invoice={invoice} currency={currency} />
 
       <DocRule />
 
@@ -978,7 +1239,7 @@ export function ContractDocumentBody({ invoice, agreement, currency }: Props) {
 
       <DocRule />
 
-      {/* ── Advance / Deposit ── */}
+      {/* ── First Month Advance & Security Deposit ── */}
       <AdvanceSection invoice={invoice} saleType={saleType} currency={currency} />
 
       {/* ── Warranty ── */}

@@ -276,15 +276,16 @@ function CashBankContent() {
             />
           </div>
           {activeTab === 'accounts' && (
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Types</option>
-              <option value="CASH">Cash</option>
-              <option value="BANK">Bank</option>
-            </select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="border-orange-200 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="CASH">Cash</SelectItem>
+                <SelectItem value="BANK">Bank</SelectItem>
+              </SelectContent>
+            </Select>
           )}
         </div>
 

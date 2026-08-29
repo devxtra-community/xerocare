@@ -238,6 +238,7 @@ function ReceiveIncomeModal({
   const [receivedDate, setReceivedDate] = useState(today);
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
+  const [chequeDate, setChequeDate] = useState(today);
 
   const isCheque = receivedMode === 'Cheque';
   const matchingAccounts = filterAccountsByPaymentMode(accounts, receivedMode);
@@ -257,6 +258,7 @@ function ReceiveIncomeModal({
         receivedDate,
         chequeNumber: isCheque ? chequeNumber : undefined,
         chequeBankName: isCheque ? chequeBankName : undefined,
+        chequeDate: isCheque ? chequeDate : undefined,
       }),
     onSuccess: () => {
       toast.success(
@@ -328,7 +330,9 @@ function ReceiveIncomeModal({
             </div>
           )}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-600">Received Date</label>
+            <label className="text-xs font-semibold text-slate-600">
+              {isCheque ? 'Cheque Collected Date' : 'Received Date'}
+            </label>
             <input
               type="date"
               className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"
@@ -361,6 +365,18 @@ function ReceiveIncomeModal({
                   className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-600">
+                  Cheque Date * <span className="font-normal">(earliest deposit/clear date)</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={chequeDate}
+                  onChange={(e) => setChequeDate(e.target.value)}
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           )}
         </div>
@@ -370,7 +386,7 @@ function ReceiveIncomeModal({
           </Button>
           <Button
             className="bg-blue-600 hover:bg-blue-700 text-white"
-            disabled={receiveMut.isPending || (isCheque && !chequeNumber)}
+            disabled={receiveMut.isPending || (isCheque && (!chequeNumber || !chequeDate))}
             onClick={() => receiveMut.mutate()}
           >
             {receiveMut.isPending ? 'Saving...' : 'Mark Received'}

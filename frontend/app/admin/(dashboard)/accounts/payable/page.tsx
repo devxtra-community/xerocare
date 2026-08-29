@@ -341,15 +341,16 @@ function PayableContent() {
                   className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <select
-                value={sourceFilter}
-                onChange={(e) => setSourceFilter(e.target.value)}
-                className="text-sm border rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="ALL">All Sources</option>
-                <option value="Purchase Order">Purchase Order</option>
-                <option value="Manual Entry">Manual Entry</option>
-              </select>
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="text-sm border-orange-200 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Sources</SelectItem>
+                  <SelectItem value="Purchase Order">Purchase Order</SelectItem>
+                  <SelectItem value="Manual Entry">Manual Entry</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {isLoading ? (
               <div className="p-8 text-center text-gray-400">Loading…</div>

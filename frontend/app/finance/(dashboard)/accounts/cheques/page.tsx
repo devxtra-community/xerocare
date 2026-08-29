@@ -33,6 +33,13 @@ import {
   SaleTypeBadge,
   type ActionType,
 } from '@/components/accounts/ChequeDetailModal';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // ─── Add Cheque Modal ─────────────────────────────────────────────────────────
 function AddChequeModal({
@@ -104,14 +111,15 @@ function AddChequeModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Type *</label>
-              <select
-                value={form.type}
-                onChange={(e) => set('type', e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="RECEIVED">Received (from customer)</option>
-                <option value="ISSUED">Issued (to vendor)</option>
-              </select>
+              <Select value={form.type} onValueChange={(v) => set('type', v)}>
+                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="RECEIVED">Received (from customer)</SelectItem>
+                  <SelectItem value="ISSUED">Issued (to vendor)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">Cheque Number *</label>
@@ -183,19 +191,23 @@ function AddChequeModal({
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">Linked Account</label>
-              <select
-                value={form.accountId}
-                onChange={(e) => set('accountId', e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <Select
+                value={form.accountId || '__NONE__'}
+                onValueChange={(v) => set('accountId', v === '__NONE__' ? '' : v)}
               >
-                <option value="">None</option>
-                {cashAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                    {a.bankName ? ` (${a.bankName})` : ''}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 w-full border-orange-200 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__NONE__">None</SelectItem>
+                  {cashAccounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                      {a.bankName ? ` (${a.bankName})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div>
@@ -675,18 +687,19 @@ export default function ChequesPage() {
                 className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="ALL">All Status</option>
-              {statusOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="border-orange-200 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Status</SelectItem>
+                {statusOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <input
               type="date"
               value={dateFrom}

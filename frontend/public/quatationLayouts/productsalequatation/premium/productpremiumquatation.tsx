@@ -729,11 +729,18 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
               >
                 <span>Subtotal (Before VAT):</span>
                 <span>Discount:</span>
-                <span>
-                  {totals.vatPercent
-                    ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%):`
-                    : `${totals.vatName || 'VAT Amount'}:`}
-                </span>
+                {/* Only show a VAT/tax line when there's an actual tax story to tell —
+                    either a real rate/amount, or an explicit exemption label. A branch
+                    with no tax configured at all leaves vatPercent/vatName/vatTotal all
+                    falsy. Kept in sync with the matching value span below via the same
+                    condition, since the two columns pair up by position. */}
+                {(totals.vatName === 'VAT Exempt' || totals.vatPercent || totals.vatTotal) && (
+                  <span>
+                    {totals.vatPercent
+                      ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%):`
+                      : `${totals.vatName || 'VAT Amount'}:`}
+                  </span>
+                )}
               </div>
               <div
                 style={{
@@ -748,7 +755,9 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
               >
                 <span>{fmt(totals.subTotal)}</span>
                 <span style={{ color: ACCENT }}>- {fmt(totals.discountTotal || 0)}</span>
-                <span>{fmt(totals.vatTotal)}</span>
+                {(totals.vatName === 'VAT Exempt' || totals.vatPercent || totals.vatTotal) && (
+                  <span>{fmt(totals.vatTotal)}</span>
+                )}
               </div>
             </div>
 

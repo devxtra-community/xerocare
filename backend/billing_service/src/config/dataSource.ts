@@ -207,6 +207,19 @@ async function runPreMigrations() {
       }
     }
 
+    // Rent/Lease Accessories: a real priced line item (stand, tray, stapler unit, etc.)
+    // supplied alongside the metered machine, billed once with the first month advance —
+    // distinct from ItemType.PRODUCT (the machine itself, always 0-priced on Rent/Lease).
+    try {
+      await client.query(
+        `ALTER TYPE invoice_items_itemtype_enum ADD VALUE IF NOT EXISTS 'ACCESSORY';`,
+      );
+    } catch (err) {
+      logger.debug(
+        `Skipped adding 'ACCESSORY' to invoice_items_itemtype_enum: ${(err as Error).message}`,
+      );
+    }
+
     // Ensure billType enum exists
     await client.query(`
       DO $$ BEGIN
@@ -410,8 +423,38 @@ async function runPreMigrations() {
 
       // Add columns to invoice_ledger table
       await client.query(`
-        ALTER TABLE invoice_ledger 
+        ALTER TABLE invoice_ledger
         ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+      `);
+
+      // A security deposit is refundable caution money, NOT settlement of anything the
+      // customer owes — the receivable side already excludes it (SECURITY_DEPOSIT-type
+      // usage_records never enter the billed sum), but its PaymentTransaction was still
+      // counted on the paid side of every "what's still outstanding" query. That
+      // asymmetry silently understated each contract's outstanding balance by exactly
+      // the deposit amount. Flagging the transaction is what lets those queries drop it
+      // without losing the deposit as an auditable receipt.
+      await client.query(`
+        ALTER TABLE payment_transactions
+        ADD COLUMN IF NOT EXISTS is_security_deposit BOOLEAN NOT NULL DEFAULT FALSE;
+      `);
+      // Backfill: deposits arrive either through the sale-payment-request workflow
+      // (authoritative — isSecurityDeposit on the request that produced the txn) or
+      // through the older direct-recording path, which only ever marked them by writing
+      // 'Security Deposit' into remarks.
+      await client.query(`
+        UPDATE payment_transactions pt
+        SET is_security_deposit = TRUE
+        FROM sale_payment_requests spr
+        WHERE spr."paymentTransactionId" = pt.id
+          AND spr."isSecurityDeposit" = TRUE
+          AND pt.is_security_deposit = FALSE;
+      `);
+      await client.query(`
+        UPDATE payment_transactions
+        SET is_security_deposit = TRUE
+        WHERE is_security_deposit = FALSE
+          AND LOWER(TRIM(COALESCE(remarks, ''))) = 'security deposit';
       `);
 
       // Ensure opening_balance_entries_balance_type_enum exists
@@ -894,6 +937,7 @@ async function runPreMigrations() {
         ('4006', 'AMC / SMA Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
         ('4007', 'Spare Part Sales', 'INCOME', 'INCOME', 'SYSTEM', true, true),
         ('4008', 'Other Income', 'INCOME', 'INCOME', 'SYSTEM', true, true),
+        ('4009', 'Accessories Sales Revenue', 'INCOME', 'INCOME', 'SYSTEM', true, true),
         ('5001', 'Cost of Parts', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
         ('5002', 'Labour Cost', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
         ('5003', 'Depreciation Expense', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true),
@@ -1326,8 +1370,15 @@ async function runPreMigrations() {
     // Payments recorded through the legacy /payments/record path only wrote
     // payment_ledgers rows and never updated the ledger, so paid/balance amounts
     // under-reported. Recomputing from source tables is idempotent.
-    // Security deposits (remarks = 'security deposit') are refundable caution money
-    // held outside the invoice total, so they are excluded from all settlement sums.
+    // Security deposits are refundable caution money held outside the invoice total, so
+    // they are excluded from all settlement sums. payment_transactions states this on the
+    // row (is_security_deposit); the remarks test beside it is the legacy signal, kept for
+    // payment_ledgers, which has no such column. Matching ONLY on remarks was the actual
+    // cause of a recurring drift: deposits approved through the sale-payment workflow are
+    // remarked "Security Deposit collected — Invoice <no>", never the bare string, so this
+    // reconciliation folded them straight back into paid_amount on every single restart —
+    // re-breaking the ledger (and with it the overpayment guard, which then rejected the
+    // next legitimate collection) however many times it was corrected by hand.
     logger.info('Reconciling invoice_ledger from payment_transactions + payment_ledgers...');
     try {
       await client.query(`
@@ -1335,6 +1386,7 @@ async function runPreMigrations() {
           SELECT i.id AS invoice_id,
             COALESCE((SELECT SUM(pt.amount) FROM payment_transactions pt
               WHERE pt.invoice_id = i.id
+                AND pt.is_security_deposit = FALSE
                 AND (pt.remarks IS NULL OR LOWER(TRIM(pt.remarks)) != 'security deposit')), 0)
             + COALESCE((SELECT SUM(pl."amountPaid") FROM payment_ledgers pl
               WHERE pl."invoiceId" = i.id
@@ -1358,7 +1410,8 @@ async function runPreMigrations() {
         JOIN (
           SELECT invoice_id, SUM(total_paid) AS total_paid FROM (
             SELECT invoice_id, SUM(amount) AS total_paid FROM payment_transactions
-              WHERE (remarks IS NULL OR LOWER(TRIM(remarks)) != 'security deposit')
+              WHERE is_security_deposit = FALSE
+                AND (remarks IS NULL OR LOWER(TRIM(remarks)) != 'security deposit')
               GROUP BY invoice_id
             UNION ALL
             SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS total_paid FROM payment_ledgers
@@ -1387,6 +1440,7 @@ async function runPreMigrations() {
           AND (
             COALESCE((SELECT SUM(pt.amount) FROM payment_transactions pt
               WHERE pt.invoice_id = i.id
+                AND pt.is_security_deposit = FALSE
                 AND (pt.remarks IS NULL OR LOWER(TRIM(pt.remarks)) != 'security deposit')), 0)
             + COALESCE((SELECT SUM(pl."amountPaid") FROM payment_ledgers pl
               WHERE pl."invoiceId" = i.id
@@ -1636,6 +1690,31 @@ async function runPreMigrations() {
     `);
     logger.info('Backfill: contracts with an existing installation request marked DELIVERED.');
 
+    // Payment Timing: ADVANCE (default) vs ARREARS billing for Rent/Lease contracts.
+    // Existing contracts follow Advance Billing behavior, so they default to ADVANCE.
+    await client.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoices_paymenttiming_enum') THEN
+          CREATE TYPE invoices_paymenttiming_enum AS ENUM ('ADVANCE', 'ARREARS');
+        END IF;
+      END $$;
+    `);
+    await client.query(`
+      ALTER TABLE invoices
+      ADD COLUMN IF NOT EXISTS "paymentTiming" invoices_paymenttiming_enum NOT NULL DEFAULT 'ADVANCE';
+    `);
+    logger.info('Payment timing column (ADVANCE/ARREARS) ensured on invoices table.');
+
+    // Contract Renewal — Finance's decision (Renewal Approved / Contract Ended) recorded
+    // once a Rent/Lease-FSM contract enters its final billing period, plus who/when.
+    await client.query(`
+      ALTER TABLE invoices
+      ADD COLUMN IF NOT EXISTS "renewalDecision" varchar,
+      ADD COLUMN IF NOT EXISTS "renewalDecisionBy" varchar,
+      ADD COLUMN IF NOT EXISTS "renewalDecisionAt" timestamp;
+    `);
+    logger.info('Contract renewal decision columns ensured on invoices table.');
+
     // Links a periodic Rent/Lease sale-payment request back to the specific billing
     // period (usage_records row) it was collected against, so a partial collection's
     // shortfall can be tracked and topped up per-period (Pending Payments tab).
@@ -1665,6 +1744,33 @@ async function runPreMigrations() {
       ADD COLUMN IF NOT EXISTS "taxPercent" DECIMAL(5,2) NULL;
     `);
     logger.info('VAT breakdown columns ensured on usage_records and sale_payment_requests.');
+
+    // isSecurityDeposit — declared on SalePaymentRequestEntity (and read/written by
+    // every RENT/LEASE security-deposit collection path, and by approveSalePayment's
+    // GuaranteeCheque-vs-Cheque routing) but the column itself was never migrated onto
+    // this table. Every collection attempt was failing at INSERT with a raw
+    // "column does not exist" QueryFailedError — the entire security-deposit feature
+    // has been dead since it was added, on every branch that ever calls
+    // recordSalePayment with isSecurityDeposit: true.
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+      ADD COLUMN IF NOT EXISTS "isSecurityDeposit" BOOLEAN NOT NULL DEFAULT false;
+    `);
+    logger.info('isSecurityDeposit column ensured on sale_payment_requests table.');
+
+    // Security Deposit refund tracking — Cash/Bank deposits only (see
+    // refundSecurityDeposit in saleWorkflowController.ts). A Cheque deposit's refund is
+    // the existing GuaranteeCheque RECEIVED→RETURNED transition instead; these columns
+    // stay null for that path.
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+      ADD COLUMN IF NOT EXISTS "isRefunded" BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "refundedAt" TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS "refundedById" UUID NULL,
+      ADD COLUMN IF NOT EXISTS "refundedByName" VARCHAR NULL,
+      ADD COLUMN IF NOT EXISTS "refundCashAccountId" UUID NULL;
+    `);
+    logger.info('Security deposit refund columns ensured on sale_payment_requests table.');
 
     // Backfill: every existing usage_records row predates VAT layering, so its
     // totalCharge is entirely taxable base with zero tax — mirror that explicitly
@@ -1761,6 +1867,48 @@ async function runPreMigrations() {
       ADD COLUMN IF NOT EXISTS "billType" VARCHAR NOT NULL DEFAULT 'USAGE';
     `);
     logger.info('billType column ensured on usage_records.');
+
+    // Reading Taken Date — the actual date the meter reading was physically taken,
+    // distinct from billingPeriodEnd (the period's calendar end date). Backfill existing
+    // rows to their billingPeriodEnd so pre-existing bills still show a sensible date
+    // instead of blank.
+    await client.query(`
+      ALTER TABLE usage_records
+      ADD COLUMN IF NOT EXISTS "readingTakenDate" DATE;
+    `);
+    await client.query(`
+      UPDATE usage_records SET "readingTakenDate" = "billingPeriodEnd"
+      WHERE "readingTakenDate" IS NULL;
+    `);
+    logger.info('readingTakenDate column ensured (and backfilled) on usage_records.');
+
+    // ProductAllocation.itemType — see the entity's comment on this column for why every
+    // consumer of a contract's productAllocations needs it. Defaults (and is backfilled)
+    // to 'PRODUCT': every row that existed before accessories could be allocated at all
+    // was always a real machine.
+    await client.query(`
+      ALTER TABLE product_allocations
+      ADD COLUMN IF NOT EXISTS "itemType" VARCHAR NOT NULL DEFAULT 'PRODUCT';
+    `);
+    logger.info('itemType column ensured on product_allocations.');
+
+    // The column above defaults every pre-existing row to PRODUCT, which is wrong for
+    // any accessory that was already allocated before this column existed (allocating
+    // accessories shipped before the column that tracks which allocations ARE
+    // accessories did) — those rows need the correct value pulled from the InvoiceItem
+    // they were allocated for. Self-limiting WHERE clause, safe to run on every startup.
+    const accessoryBackfill = await client.query(`
+      UPDATE product_allocations pa
+      SET "itemType" = 'ACCESSORY'
+      FROM invoice_items ii
+      WHERE ii."productId" = pa."productId"
+        AND ii."invoiceId" = pa."contractId"
+        AND ii."itemType" = 'ACCESSORY'
+        AND pa."itemType" != 'ACCESSORY';
+    `);
+    logger.info(
+      `Backfill: ${accessoryBackfill.rowCount ?? 0} pre-existing accessory allocation(s) corrected from PRODUCT to ACCESSORY.`,
+    );
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;

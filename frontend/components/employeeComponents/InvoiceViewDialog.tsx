@@ -627,22 +627,63 @@ export function InvoiceViewDialog({
       };
     });
 
+  const isArrearsInvoice = invoice.paymentTiming === 'ARREARS';
+
+  // Contract duration
+  const contractMonthsInvoice =
+    invoice.effectiveFrom && invoice.effectiveTo
+      ? Math.round(
+          (new Date(invoice.effectiveTo).getTime() - new Date(invoice.effectiveFrom).getTime()) /
+            (1000 * 60 * 60 * 24 * 30.44),
+        )
+      : invoice.leaseTenureMonths || 0;
+
+  const contractRentalValueInvoice = (invoice.monthlyRent || 0) * contractMonthsInvoice;
+  const firstMonthAdvanceInvoice = isArrearsInvoice ? 0 : Number(invoice.advanceAmount || 0);
+  const securityDepositInvoice = Number(invoice.securityDepositAmount || 0);
+  const initialAmountPayableInvoice = firstMonthAdvanceInvoice + securityDepositInvoice;
+
+  const monthlyScheduleInvoice = (() => {
+    if (!invoice.effectiveFrom || !invoice.effectiveTo || contractMonthsInvoice <= 0) return [];
+    const schedule = [];
+    const start = new Date(invoice.effectiveFrom);
+    for (let i = 0; i < contractMonthsInvoice; i++) {
+      const periodStart = new Date(start);
+      periodStart.setMonth(periodStart.getMonth() + i);
+      const periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+      const actualEnd =
+        periodEnd > new Date(invoice.effectiveTo) ? new Date(invoice.effectiveTo) : periodEnd;
+      schedule.push({
+        month: i + 1,
+        label: periodStart.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+        start: periodStart,
+        end: actualEnd,
+        baseRent: invoice.monthlyRent || 0,
+      });
+    }
+    return schedule;
+  })();
+
   const rentAgreementDetails = {
     rentType: invoice.rentType?.replace(/_/g, ' ') || 'N/A',
     period: invoice.rentPeriod?.replace(/_/g, ' ') || 'MONTHLY',
-    advance: invoice.advanceAmount || 0,
-    deposit: invoice.securityDepositAmount || 0,
-    duration: `${invoice.leaseTenureMonths || 0} Months`,
+    advance: firstMonthAdvanceInvoice,
+    deposit: securityDepositInvoice,
+    duration: `${contractMonthsInvoice} Months`,
     monthlyRentAmount: invoice.monthlyRent || 0,
     discountPercent: invoice.discountPercent || 0,
     discountedMonthlyRent: (invoice.monthlyRent || 0) * (1 - (invoice.discountPercent || 0) / 100),
+    contractRentalValue: contractRentalValueInvoice,
+    initialAmountPayable: initialAmountPayableInvoice,
   };
 
   // Rent totals — use snapshotted taxPercent first, fall back to product metadata
   const rentTaxRate = resolvedTaxPercent;
-  const rentSubTotal =
-    Number(invoice.monthlyRent || 0) ||
-    (invoice.items || []).reduce((acc, it) => acc + (it.quantity || 0) * (it.unitPrice || 0), 0);
+  // Subtotal = Initial Amount Payable (First Month Advance + Security Deposit)
+  // NOT just monthlyRent — the customer's initial payment includes advance + deposit
+  const rentSubTotal = initialAmountPayableInvoice;
   const rentTaxAmount =
     invoice.taxAmount != null && Number(invoice.taxAmount) > 0
       ? Number(invoice.taxAmount)
@@ -707,6 +748,8 @@ export function InvoiceViewDialog({
     totalLeaseValue: isFsmLease
       ? Number(invoice.monthlyLeaseAmount || invoice.totalAmount || 0)
       : Number(invoice.totalAmount || 0),
+    contractRentalValue: (invoice.monthlyRent || 0) * (invoice.leaseTenureMonths || 0),
+    initialAmountPayable: firstMonthAdvanceInvoice + securityDepositInvoice,
   };
 
   // Lease totals — use snapshotted taxPercent first, fall back to product metadata
@@ -1413,15 +1456,10 @@ export function InvoiceViewDialog({
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                           <div>
                             <p className="text-[10px] font-black text-gray-500 uppercase">
-                              Advance / Deposit
+                              First Month Advance Payment
                             </p>
                             <p className="text-sm font-black text-black">
-                              {getActiveCurrency()}{' '}
-                              {(
-                                invoice.advanceAmount ||
-                                invoice.securityDepositAmount ||
-                                0
-                              ).toLocaleString()}
+                              {getActiveCurrency()} {(invoice.advanceAmount || 0).toLocaleString()}
                             </p>
                           </div>
                           <div>
@@ -1464,6 +1502,154 @@ export function InvoiceViewDialog({
                       </div>
                     </div>
                   </div>
+
+                  {/* Contract Rental Value & Initial Payment */}
+                  {(isRent || isLease) && contractMonthsInvoice > 0 && (
+                    <div className="px-12 py-6 bg-blue-50/30 border-t border-blue-100">
+                      <div className="grid grid-cols-2 gap-8">
+                        <div>
+                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-3">
+                            Contract Rental Value
+                          </p>
+                          <div className="bg-white rounded-lg p-4 border border-blue-100">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-[11px] text-slate-600">
+                                Monthly Rent × {contractMonthsInvoice} Months
+                              </span>
+                              <span className="text-[14px] font-black text-blue-700">
+                                {getActiveCurrency()}{' '}
+                                {contractRentalValueInvoice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 italic">
+                              Total base rental across all contract periods.
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">
+                            Initial Payment
+                          </p>
+                          <div className="bg-white rounded-lg p-4 border border-emerald-100 space-y-2">
+                            {!isArrearsInvoice && (
+                              <div className="flex justify-between">
+                                <span className="text-[11px] text-slate-600">
+                                  First Month Advance
+                                </span>
+                                <span className="text-[11px] font-semibold text-slate-900">
+                                  {getActiveCurrency()}{' '}
+                                  {firstMonthAdvanceInvoice.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                            {isArrearsInvoice && (
+                              <div className="flex justify-between">
+                                <span className="text-[11px] text-slate-600">
+                                  First Month Advance
+                                </span>
+                                <span className="text-[11px] text-slate-400 italic">
+                                  Not Applicable (Postpaid)
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex justify-between">
+                              <span className="text-[11px] text-slate-600">Security Deposit</span>
+                              <span className="text-[11px] font-semibold text-slate-900">
+                                {securityDepositInvoice > 0
+                                  ? `${getActiveCurrency()} ${securityDepositInvoice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  : 'None'}
+                              </span>
+                            </div>
+                            <div className="border-t border-emerald-200 pt-2 flex justify-between">
+                              <span className="text-[11px] font-black text-emerald-800 uppercase">
+                                Initial Amount Payable
+                              </span>
+                              <span className="text-[13px] font-black text-emerald-700">
+                                {getActiveCurrency()}{' '}
+                                {initialAmountPayableInvoice.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Monthly Schedule */}
+                      {monthlyScheduleInvoice.length > 0 && (
+                        <div className="mt-6">
+                          <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest mb-3">
+                            Contract Rental Schedule
+                          </p>
+                          <table className="w-full text-xs border border-slate-200 border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50">
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Period
+                                </th>
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Start Date
+                                </th>
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  End Date
+                                </th>
+                                <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Base Rent
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {monthlyScheduleInvoice.map((row) => (
+                                <tr key={row.month} className="border-b border-slate-100">
+                                  <td className="px-3 py-2 font-semibold text-slate-800">
+                                    Month {row.month} — {row.label}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-600">
+                                    {row.start.toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-600">
+                                    {row.end.toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                                    {getActiveCurrency()}{' '}
+                                    {row.baseRent.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr className="bg-blue-50/50">
+                                <td
+                                  colSpan={3}
+                                  className="px-3 py-2 text-right text-[11px] font-black uppercase tracking-widest text-blue-700"
+                                >
+                                  Total Contract Rental Value
+                                </td>
+                                <td className="px-3 py-2 text-right text-[13px] font-black text-blue-700">
+                                  {getActiveCurrency()}{' '}
+                                  {contractRentalValueInvoice.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="px-12 pb-10 pt-4 bg-white shrink-0 border-t-[2px] border-black mt-auto">
                     <div className="flex justify-between items-center py-6">

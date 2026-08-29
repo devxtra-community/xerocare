@@ -35,6 +35,9 @@ export interface LeaseAgreementDetails {
   leaseType: string;
   rentType?: string;
   rentPeriod?: string;
+  /** Billing method label — "Monthly Advance" (paid up front each cycle) or
+   *  "Month-End (Arrears)" (billed after the period completes). */
+  billingType?: string;
   duration: string;
   advance: number;
   deposit: number;
@@ -43,10 +46,19 @@ export interface LeaseAgreementDetails {
   endDate: string;
   monthlyEmi: number;
   totalLeaseValue?: number;
+  contractRentalValue?: number;
+  initialAmountPayable?: number;
   warrantyType?: 'none' | 'duration' | 'copies' | 'both';
   warrantyDurationValue?: number;
   warrantyDurationUnit?: 'months' | 'years';
   warrantyCopyLimit?: number;
+}
+
+export interface AccessoryLineItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  imageUrl?: string;
 }
 
 export interface LeasePremiumQuotationProps {
@@ -73,6 +85,7 @@ export interface LeasePremiumQuotationProps {
   };
   lineItems: LeaseLineItem[];
   leaseDetails: LeaseAgreementDetails;
+  accessories?: AccessoryLineItem[];
   totals: {
     subTotal: number;
     tax: number;
@@ -107,9 +120,11 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
   quotation,
   lineItems = [],
   leaseDetails,
+  accessories = [],
   totals,
 }) => {
   const isFSM = leaseDetails.leaseType === 'FSM';
+  const accessoryTotal = accessories.reduce((s, a) => s + a.qty * a.unitPrice, 0);
   const hasSlabs = lineItems.some(
     (it) =>
       (it.bwSlabs?.length || 0) > 0 ||
@@ -623,6 +638,84 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
         </div>
       </div>
 
+      {/* ─── ACCESSORIES ─── */}
+      {accessories.length > 0 && (
+        <div style={{ padding: '0 60px 30px' }}>
+          <div
+            style={{
+              background: CARD_GRAY,
+              borderRadius: '20px',
+              padding: '24px',
+              border: '1px solid rgba(255,255,255,0.05)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '11px',
+                color: ACCENT_COLOR,
+                fontWeight: '800',
+                textTransform: 'uppercase',
+                marginBottom: '16px',
+                letterSpacing: '1px',
+              }}
+            >
+              Accessories
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {accessories.map((a, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '8px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                  }}
+                >
+                  {a.imageUrl ? (
+                    <img
+                      src={a.imageUrl}
+                      alt={a.description}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        objectFit: 'contain',
+                        borderRadius: '6px',
+                        backgroundColor: '#fff',
+                      }}
+                    />
+                  ) : null}
+                  <div style={{ flex: 1, fontSize: '12px', fontWeight: '600' }}>
+                    {a.description} {a.qty > 1 ? `× ${a.qty}` : ''}
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: ACCENT_COLOR }}>
+                    {getActiveCurrency()} {fmt(a.qty * a.unitPrice)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: `1px solid ${ACCENT_COLOR}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: '11px', fontWeight: '700', color: TEXT_WHITE }}>
+                ACCESSORIES TOTAL
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: '900', color: ACCENT_COLOR }}>
+                {getActiveCurrency()} {fmt(accessoryTotal)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── 05. SLAB RATES (For CPC / Combined) ─── */}
       {isFSM && hasSlabs && (
         <div style={{ padding: '0 60px 20px' }}>
@@ -963,13 +1056,17 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {[
                 { l: 'Lease Type', v: leaseDetails.leaseType },
+                { l: 'Billing Type', v: leaseDetails.billingType || 'Monthly Advance' },
                 { l: 'Tenure / Duration', v: leaseDetails.duration },
                 {
-                  l: 'Advance / Deposit',
+                  l: 'First Month Advance',
                   v: `${getActiveCurrency()} ${fmt(leaseDetails.advance || leaseDetails.deposit || 0)}`,
                 },
                 { l: 'Start Date', v: leaseDetails.startDate || 'TBD' },
                 { l: 'End Date', v: leaseDetails.endDate || 'TBD' },
+                ...(accessoryTotal > 0
+                  ? [{ l: 'Accessories', v: `${getActiveCurrency()} ${fmt(accessoryTotal)}` }]
+                  : []),
               ].map((it, i) => (
                 <div key={i}>
                   <div
@@ -1013,23 +1110,25 @@ const LeasePremiumQuotation: React.FC<LeasePremiumQuotationProps> = ({
                 {getActiveCurrency()} {fmt(totals.subTotal)}
               </span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '11px',
-                color: TEXT_MUTED,
-              }}
-            >
-              <span>
-                {totals.taxPercent
-                  ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
-                  : totals.taxName || 'VAT Amount'}
-              </span>
-              <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
-                {getActiveCurrency()} {fmt(totals.tax)}
-              </span>
-            </div>
+            {(totals.taxName === 'VAT Exempt' || totals.taxPercent || totals.tax) && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '11px',
+                  color: TEXT_MUTED,
+                }}
+              >
+                <span>
+                  {totals.taxPercent
+                    ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                    : totals.taxName || 'VAT Amount'}
+                </span>
+                <span style={{ fontWeight: '400', color: TEXT_WHITE }}>
+                  {getActiveCurrency()} {fmt(totals.tax)}
+                </span>
+              </div>
+            )}
             <div
               style={{
                 display: 'flex',

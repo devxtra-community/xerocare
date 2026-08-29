@@ -19,7 +19,7 @@ import {
 } from '@/lib/finance/accountsApi';
 import { Loader2, Coins, Mail, MessageSquare, FileDown, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getApiErrorMessage } from '@/lib/apiError';
 
@@ -157,16 +157,16 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
       <Dialog open={!!target && !justCollected} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
           <DialogTitle className="sr-only">Add Collect Amount</DialogTitle>
-          <div className="bg-linear-to-r from-amber-600 to-amber-500 p-5 text-white">
+          <div className="bg-white p-5 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                <Coins size={18} />
+              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center">
+                <Coins size={18} className="text-slate-500" />
               </div>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
                   Add Collect Amount
                 </p>
-                <p className="text-base font-black">{target?.invoiceNumber}</p>
+                <p className="text-base font-black text-slate-800">{target?.invoiceNumber}</p>
               </div>
             </div>
           </div>
@@ -264,13 +264,11 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Reference (optional)
+                    Reference
                   </Label>
-                  <Input
-                    value={referenceNumber}
-                    onChange={(e) => setReferenceNumber(e.target.value)}
-                    className="h-9 text-sm"
-                  />
+                  <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                    Auto-generated on save — {autoReferencePreview(paymentMode)}
+                  </div>
                 </div>
                 {(() => {
                   const matching = filterAccountsByPaymentMode(cashAccounts, paymentMode);
@@ -306,7 +304,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                 Cancel
               </Button>
               <Button
-                className="flex-1 h-9 text-xs font-black bg-amber-600 hover:bg-amber-700"
+                className="flex-1 h-9 text-xs font-black bg-primary hover:bg-primary/90"
                 onClick={handleCollect}
                 disabled={isSaving || !amount}
               >

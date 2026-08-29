@@ -26,6 +26,13 @@ export interface RentLineItem {
   warranty?: string;
 }
 
+export interface AccessoryLineItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  imageUrl?: string;
+}
+
 export interface RentPremiumQuotationProps {
   billTo: {
     name: string;
@@ -43,15 +50,21 @@ export interface RentPremiumQuotationProps {
     contractEndDate?: string;
   };
   lineItems: RentLineItem[];
+  accessories?: AccessoryLineItem[];
   agreementDetails: {
     rentType: string;
     period: string;
+    /** Billing method label — "Monthly Advance" (paid up front each cycle) or
+     *  "Month-End (Arrears)" (billed after the period completes). */
+    billingType?: string;
     advance: number;
     deposit: number;
     duration: string;
     monthlyRentAmount: number;
     discountPercent: number;
     discountedMonthlyRent: number;
+    contractRentalValue?: number;
+    initialAmountPayable?: number;
   };
   totals: {
     subTotal: number;
@@ -76,11 +89,13 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
   billTo,
   quotation,
   lineItems = [],
+  accessories = [],
   agreementDetails,
   totals,
 }) => {
   const LOGO_PATH =
     '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png';
+  const accessoryTotal = accessories.reduce((s, a) => s + a.qty * a.unitPrice, 0);
 
   return (
     <div
@@ -660,6 +675,85 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
         </div>
       </div>
 
+      {/* ─── ACCESSORIES GLASS CARD ─── */}
+      {accessories.length > 0 && (
+        <div style={{ padding: '0 50px 30px', position: 'relative', zIndex: 1 }}>
+          <div
+            style={{
+              backgroundColor: CARD_GRAY,
+              border: '1px solid rgba(255,255,255,0.05)',
+              borderRadius: '20px',
+              padding: '24px',
+              backdropFilter: 'blur(10px)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '10px',
+                color: TEXT_MUTED,
+                fontWeight: '800',
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                marginBottom: '16px',
+              }}
+            >
+              Accessories
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {accessories.map((a, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '8px',
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                  }}
+                >
+                  {a.imageUrl ? (
+                    <img
+                      src={a.imageUrl}
+                      alt={a.description}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        objectFit: 'contain',
+                        borderRadius: '6px',
+                        backgroundColor: '#fff',
+                      }}
+                    />
+                  ) : null}
+                  <div style={{ flex: 1, fontSize: '12px', fontWeight: '600' }}>
+                    {a.description} {a.qty > 1 ? `× ${a.qty}` : ''}
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: ACCENT_COLOR }}>
+                    {getActiveCurrency()} {fmt(a.qty * a.unitPrice)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div
+              style={{
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: `1px solid ${ACCENT_COLOR}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>
+                ACCESSORIES TOTAL
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: '900', color: ACCENT_COLOR }}>
+                {getActiveCurrency()} {fmt(accessoryTotal)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── AGREEMENT DETAILS GLASS CARD ─── */}
       <div style={{ padding: '0 50px 40px', position: 'relative', zIndex: 1 }}>
         <div
@@ -689,11 +783,20 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
               {[
                 { label: 'RENT TYPE', value: agreementDetails.rentType },
+                { label: 'BILLING TYPE', value: agreementDetails.billingType || 'Monthly Advance' },
                 { label: 'PERIOD', value: agreementDetails.period },
+                {
+                  label: 'MONTHLY RENT',
+                  value: `${getActiveCurrency()} ${fmt(agreementDetails.monthlyRentAmount)}`,
+                },
+                {
+                  label: 'FIRST MONTH ADVANCE',
+                  value: `${getActiveCurrency()} ${fmt(agreementDetails.advance || 0)}`,
+                },
                 { label: 'MONTHS COUNT', value: agreementDetails.duration },
                 {
-                  label: 'ADVANCE / DEPOSIT',
-                  value: `${getActiveCurrency()} ${fmt(agreementDetails.advance || agreementDetails.deposit || 0)}`,
+                  label: 'CONTRACT RENTAL VALUE',
+                  value: `${getActiveCurrency()} ${fmt(agreementDetails.contractRentalValue || 0)}`,
                 },
                 { label: 'DISCOUNT', value: `${agreementDetails.discountPercent}%` },
                 { label: 'START DATE', value: quotation.contractStartDate || 'TBD' },
@@ -706,6 +809,85 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
                   <div style={{ fontSize: '13px', fontWeight: '600' }}>{d.value}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Security Deposit & Initial Payment */}
+            <div
+              style={{
+                marginTop: '15px',
+                padding: '12px',
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                borderRadius: '6px',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '9px',
+                  color: ACCENT_COLOR,
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '8px',
+                }}
+              >
+                Initial Payment Details
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px',
+                  fontSize: '11px',
+                }}
+              >
+                {(agreementDetails.advance || 0) > 0 ? (
+                  <div>
+                    <span style={{ color: TEXT_MUTED }}>First Month Advance:</span>{' '}
+                    <span style={{ fontWeight: '600' }}>
+                      {getActiveCurrency()} {fmt(agreementDetails.advance)}
+                    </span>
+                  </div>
+                ) : (
+                  <div>
+                    <span style={{ color: TEXT_MUTED }}>First Month Advance:</span>{' '}
+                    <span style={{ color: TEXT_MUTED, fontStyle: 'italic' }}>
+                      Not Applicable (Postpaid)
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: TEXT_MUTED }}>Security Deposit:</span>{' '}
+                  <span style={{ fontWeight: '600' }}>
+                    {(agreementDetails.deposit || 0) > 0
+                      ? `${getActiveCurrency()} ${fmt(agreementDetails.deposit)}`
+                      : 'None'}
+                  </span>
+                </div>
+                {accessoryTotal > 0 && (
+                  <div>
+                    <span style={{ color: TEXT_MUTED }}>Accessories:</span>{' '}
+                    <span style={{ fontWeight: '600' }}>
+                      {getActiveCurrency()} {fmt(accessoryTotal)}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  marginTop: '8px',
+                  paddingTop: '8px',
+                  borderTop: `1px solid ${ACCENT_COLOR}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>
+                  INITIAL AMOUNT PAYABLE
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: '900', color: ACCENT_COLOR }}>
+                  {getActiveCurrency()} {fmt(agreementDetails.initialAmountPayable || 0)}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -732,12 +914,14 @@ const RentPremiumQuotation: React.FC<RentPremiumQuotationProps> = ({
             >
               (Excluding Excess Usage)
             </div>
-            <div style={{ fontSize: '11px', color: TEXT_MUTED, marginTop: '10px' }}>
-              {totals.taxPercent
-                ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
-                : totals.taxName || 'VAT Amount'}
-              : {getActiveCurrency()} {fmt(totals.tax)}
-            </div>
+            {(totals.taxName === 'VAT Exempt' || totals.taxPercent || totals.tax) && (
+              <div style={{ fontSize: '11px', color: TEXT_MUTED, marginTop: '10px' }}>
+                {totals.taxPercent
+                  ? `${totals.taxName || 'VAT'} (${totals.taxPercent}%)`
+                  : totals.taxName || 'VAT Amount'}
+                : {getActiveCurrency()} {fmt(totals.tax)}
+              </div>
+            )}
             <div style={{ fontSize: '13px', color: '#fff', fontWeight: '800', marginTop: '4px' }}>
               Total (Incl. VAT): {getActiveCurrency()} {fmt(totals.total)}
             </div>

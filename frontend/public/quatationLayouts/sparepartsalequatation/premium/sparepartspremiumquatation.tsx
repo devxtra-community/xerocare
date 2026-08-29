@@ -57,6 +57,8 @@ export interface SparePartsPremiumQuotationProps {
   totals?: {
     subTotal: number;
     vatTotal: number;
+    vatPercent?: number;
+    vatName?: string;
     total: number;
     payment: number;
     balanceDue: number;
@@ -635,21 +637,25 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
                 - {getActiveCurrency()} {fmt(totals.discountTotal || 0)}
               </span>
             </div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '10px 0',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-              }}
-            >
-              <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
-                VAT AMOUNT
-              </span>
-              <span style={{ fontWeight: '400' }}>
-                {getActiveCurrency()} {fmt(totals.vatTotal)}
-              </span>
-            </div>
+            {(totals.vatName === 'VAT Exempt' || totals.vatPercent || totals.vatTotal) && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '10px 0',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
+                  {totals.vatPercent
+                    ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
+                    : totals.vatName || 'VAT AMOUNT'}
+                </span>
+                <span style={{ fontWeight: '400' }}>
+                  {getActiveCurrency()} {fmt(totals.vatTotal)}
+                </span>
+              </div>
+            )}
 
             <div
               style={{

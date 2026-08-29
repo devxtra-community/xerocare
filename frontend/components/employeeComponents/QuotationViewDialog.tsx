@@ -870,28 +870,93 @@ export function QuotationViewDialog({
       };
     });
 
+  const isArrears = quotation.paymentTiming === 'ARREARS';
+
+  // Accessories (stand, tray, stapler unit, etc.) added alongside the machine — real
+  // priced items, collected once with the first payment, never metered. productDetails
+  // is keyed by productId/modelId for every quotation.items entry regardless of
+  // itemType, so the accessory's own catalog image is already available here the same
+  // way the machine's is above.
+  const accessoryLineItems = (quotation.items || [])
+    .filter((it) => (it.itemType as string) === 'ACCESSORY')
+    .map((item) => {
+      const pMeta = productDetails[item.productId || ''] || productDetails[item.modelId || ''];
+      return {
+        description: item.description || 'Accessory',
+        qty: item.quantity || 1,
+        unitPrice: Number(item.unitPrice || 0),
+        imageUrl: pMeta?.imageUrl || pMeta?.image_url || pMeta?.image || '',
+      };
+    });
+  const accessoryTotal = accessoryLineItems.reduce((s, it) => s + it.qty * it.unitPrice, 0);
+
+  // Contract duration in months
+  const contractMonths =
+    quotation.effectiveFrom && quotation.effectiveTo
+      ? Math.round(
+          (new Date(quotation.effectiveTo).getTime() -
+            new Date(quotation.effectiveFrom).getTime()) /
+            (1000 * 60 * 60 * 24 * 30.44),
+        )
+      : 0;
+
+  // Contract Rental Value = Monthly Rent × Duration
+  const contractRentalValue = (quotation.monthlyRent || 0) * contractMonths;
+
+  // Initial Amount = First Month Advance (if ADVANCE) + Security Deposit + Accessories
+  // (accessories are collected once, together with this same first payment — see
+  // QuotationConversionFlow.tsx's recordSalePayment call).
+  const firstMonthAdvance = isArrears ? 0 : Number(quotation.advanceAmount || 0);
+  const securityDeposit = Number(quotation.securityDepositAmount || 0);
+  const initialAmountPayable = firstMonthAdvance + securityDeposit + accessoryTotal;
+
+  // Monthly schedule
+  const monthlySchedule = (() => {
+    if (!quotation.effectiveFrom || !quotation.effectiveTo || contractMonths <= 0) return [];
+    const schedule = [];
+    const start = new Date(quotation.effectiveFrom);
+    for (let i = 0; i < contractMonths; i++) {
+      const periodStart = new Date(start);
+      periodStart.setMonth(periodStart.getMonth() + i);
+      const periodEnd = new Date(periodStart);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+      // Don't exceed contract end date
+      const actualEnd =
+        periodEnd > new Date(quotation.effectiveTo) ? new Date(quotation.effectiveTo) : periodEnd;
+      schedule.push({
+        month: i + 1,
+        label: periodStart.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+        start: periodStart,
+        end: actualEnd,
+        baseRent: quotation.monthlyRent || 0,
+      });
+    }
+    return schedule;
+  })();
+
   const rentAgreementDetails = {
     rentType: quotation.rentType?.replace(/_/g, ' ') || 'N/A',
     period: quotation.rentPeriod?.replace(/_/g, ' ') || 'MONTHLY',
-    advance: quotation.advanceAmount || 0,
-    deposit: quotation.securityDepositAmount || 0,
-    duration:
-      quotation.effectiveFrom && quotation.effectiveTo
-        ? `${Math.round(
-            (new Date(quotation.effectiveTo).getTime() -
-              new Date(quotation.effectiveFrom).getTime()) /
-              (1000 * 60 * 60 * 24 * 30.44),
-          )} Months`
-        : 'N/A',
+    // Billing Type — Monthly Advance (rent paid up front each cycle) vs. Month-End /
+    // Arrears (rent billed after the period completes). See advance_vs_arrears_billing.md.
+    billingType: isArrears ? 'Month-End (Arrears)' : 'Monthly Advance',
+    advance: firstMonthAdvance,
+    deposit: securityDeposit,
+    duration: `${contractMonths} Months`,
     monthlyRentAmount: quotation.monthlyRent || 0,
     discountPercent: quotation.discountPercent || 0,
     discountedMonthlyRent:
       (quotation.monthlyRent || 0) * (1 - (quotation.discountPercent || 0) / 100),
+    contractRentalValue,
+    initialAmountPayable,
   };
 
   // Rent totals — use snapshotted taxPercent first, fall back to product metadata
   const rentTaxRate = resolvedTaxPercent;
-  const rentSubTotal = Number(quotation.monthlyRent || 0);
+  // Subtotal = Initial Amount Payable (First Month Advance + Security Deposit)
+  // NOT just monthlyRent — the customer's initial payment includes advance + deposit
+  const rentSubTotal = initialAmountPayable;
   const rentTaxAmount =
     quotation.taxAmount != null && Number(quotation.taxAmount) > 0
       ? Number(quotation.taxAmount)
@@ -1008,6 +1073,9 @@ export function QuotationViewDialog({
     // For FSM leases, also expose the rent-type pricing model
     rentType: isFsmLease ? (quotation.rentType || 'FIXED_LIMIT').replace(/_/g, ' ') : undefined,
     rentPeriod: isFsmLease ? (quotation.rentPeriod || 'MONTHLY').replace(/_/g, ' ') : undefined,
+    // Billing Type — Monthly Advance vs. Month-End / Arrears. See rentAgreementDetails
+    // above for the same field on Rent.
+    billingType: isArrears ? 'Month-End (Arrears)' : 'Monthly Advance',
     duration: `${quotation.leaseTenureMonths || 0} Months`,
     advance: quotation.advanceAmount || 0,
     deposit: quotation.securityDepositAmount || 0,
@@ -1027,6 +1095,8 @@ export function QuotationViewDialog({
     totalLeaseValue: isFsmLease
       ? quotation.monthlyLeaseAmount || quotation.totalAmount || 0
       : quotation.totalAmount || 0,
+    contractRentalValue: (quotation.monthlyRent || 0) * (quotation.leaseTenureMonths || 0),
+    initialAmountPayable: firstMonthAdvance + securityDeposit,
     warrantyType: quotation.warrantyType,
     warrantyDurationValue: quotation.warrantyDurationValue,
     warrantyDurationUnit: quotation.warrantyDurationUnit,
@@ -1239,6 +1309,7 @@ export function QuotationViewDialog({
                 quotation={templateQuotation}
                 lineItems={rentTemplateLineItems}
                 agreementDetails={rentAgreementDetails}
+                accessories={accessoryLineItems}
                 totals={{
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
@@ -1254,6 +1325,7 @@ export function QuotationViewDialog({
                 quotation={templateQuotation}
                 lineItems={rentTemplateLineItems}
                 agreementDetails={rentAgreementDetails}
+                accessories={accessoryLineItems}
                 totals={{
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
@@ -1269,6 +1341,7 @@ export function QuotationViewDialog({
                 quotation={templateQuotation}
                 lineItems={rentTemplateLineItems}
                 agreementDetails={rentAgreementDetails}
+                accessories={accessoryLineItems}
                 totals={{
                   subTotal: rentSubTotal,
                   tax: rentTaxAmount,
@@ -1284,6 +1357,7 @@ export function QuotationViewDialog({
                 quotation={templateQuotation}
                 lineItems={leaseTemplateLineItems}
                 leaseDetails={leaseAgreementDetails}
+                accessories={accessoryLineItems}
                 totals={{
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
@@ -1299,6 +1373,7 @@ export function QuotationViewDialog({
                 quotation={templateQuotation}
                 lineItems={leaseTemplateLineItems}
                 leaseDetails={leaseAgreementDetails}
+                accessories={accessoryLineItems}
                 totals={{
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
@@ -1314,6 +1389,7 @@ export function QuotationViewDialog({
                 quotation={templateQuotation}
                 lineItems={leaseTemplateLineItems}
                 leaseDetails={leaseAgreementDetails}
+                accessories={accessoryLineItems}
                 totals={{
                   subTotal: leaseSubTotal,
                   tax: leaseTaxAmount,
@@ -2339,14 +2415,25 @@ export function QuotationViewDialog({
                         </div>
                         <div>
                           <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
-                            Advance / Deposit
+                            Payment Timing
+                          </p>
+                          <p className="text-[12px] font-normal text-slate-800 uppercase leading-none mt-1">
+                            {quotation.paymentTiming === 'ARREARS'
+                              ? 'Arrears (Postpaid)'
+                              : 'Advance'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
+                            {quotation.paymentTiming === 'ARREARS'
+                              ? 'Initial Payment'
+                              : 'First Month Advance Payment'}
                           </p>
                           <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
                             {getActiveCurrency()}{' '}
-                            {(
-                              quotation.advanceAmount ||
-                              quotation.securityDepositAmount ||
-                              0
+                            {(quotation.paymentTiming === 'ARREARS'
+                              ? 0
+                              : quotation.advanceAmount || 0
                             ).toLocaleString()}
                           </p>
                         </div>
@@ -2421,14 +2508,25 @@ export function QuotationViewDialog({
                         </div>
                         <div>
                           <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
-                            Advance / Deposit
+                            Payment Timing
+                          </p>
+                          <p className="text-[12px] font-normal text-slate-800 uppercase leading-none mt-1">
+                            {quotation.paymentTiming === 'ARREARS'
+                              ? 'Arrears (Postpaid)'
+                              : 'Advance'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-normal text-slate-400 uppercase tracking-widest">
+                            {quotation.paymentTiming === 'ARREARS'
+                              ? 'Initial Payment'
+                              : 'First Month Advance Payment'}
                           </p>
                           <p className="text-[12px] font-normal text-slate-800 leading-none mt-1">
                             {getActiveCurrency()}{' '}
-                            {(
-                              quotation.advanceAmount ||
-                              quotation.securityDepositAmount ||
-                              0
+                            {(quotation.paymentTiming === 'ARREARS'
+                              ? 0
+                              : quotation.advanceAmount || 0
                             ).toLocaleString()}
                           </p>
                         </div>
@@ -2474,6 +2572,178 @@ export function QuotationViewDialog({
                             : quotation.monthlyEmiAmount || 0,
                         ).toLocaleString()}
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* --- Contract Rental Value & Initial Payment Breakdown --- */}
+                {(isRent || isLease) && contractMonths > 0 && (
+                  <div className="flex flex-col mt-8 pl-12 pr-0 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="border border-blue-700 rounded-3xl px-8 py-6 bg-white shadow-[0_20px_50px_-12px_rgba(30,64,175,0.1)]">
+                      <div className="flex items-center justify-between border-b border-blue-50 pb-3 mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 bg-blue-50 rounded-xl flex items-center justify-center">
+                            <span className="text-blue-600">📋</span>
+                          </div>
+                          <h3 className="text-xl font-normal text-slate-800 uppercase tracking-tighter">
+                            Contract Financial Summary
+                          </h3>
+                        </div>
+                      </div>
+
+                      {/* Contract Rental Value */}
+                      <div className="mb-6">
+                        <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-3">
+                          Contract Rental Value
+                        </p>
+                        <div className="bg-blue-50/50 rounded-xl p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-[12px] text-slate-600">
+                              Monthly Rent × {contractMonths} Months
+                            </span>
+                            <span className="text-[14px] font-bold text-slate-900">
+                              {getActiveCurrency()}{' '}
+                              {contractRentalValue.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 italic">
+                            Total base rental amount across all contract periods. Does not include
+                            Security Deposit or Excess Usage.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Initial Payment Breakdown */}
+                      <div className="mb-6">
+                        <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-3">
+                          Initial Payment
+                        </p>
+                        <div className="space-y-2">
+                          {!isArrears && (
+                            <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
+                              <span className="text-[12px] text-slate-600">
+                                First Month Advance Payment
+                              </span>
+                              <span className="text-[12px] font-semibold text-slate-900">
+                                {getActiveCurrency()}{' '}
+                                {firstMonthAdvance.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </span>
+                            </div>
+                          )}
+                          {isArrears && (
+                            <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
+                              <span className="text-[12px] text-slate-600">
+                                First Month Advance
+                              </span>
+                              <span className="text-[12px] font-semibold text-slate-400 italic">
+                                Not Applicable (Postpaid)
+                              </span>
+                            </div>
+                          )}
+                          {securityDeposit > 0 && (
+                            <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
+                              <span className="text-[12px] text-slate-600">Security Deposit</span>
+                              <span className="text-[12px] font-semibold text-slate-900">
+                                {getActiveCurrency()}{' '}
+                                {securityDeposit.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </span>
+                            </div>
+                          )}
+                          {securityDeposit === 0 && (
+                            <div className="flex justify-between items-center px-4 py-2 bg-slate-50 rounded-lg">
+                              <span className="text-[12px] text-slate-600">Security Deposit</span>
+                              <span className="text-[12px] text-slate-400">None</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center px-4 py-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                            <span className="text-[13px] font-bold text-emerald-800 uppercase">
+                              Initial Amount Payable
+                            </span>
+                            <span className="text-[16px] font-bold text-emerald-700">
+                              {getActiveCurrency()}{' '}
+                              {initialAmountPayable.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Monthly Schedule */}
+                      {monthlySchedule.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-bold text-violet-600 uppercase tracking-widest mb-3">
+                            Contract Rental Schedule
+                          </p>
+                          <table className="w-full text-xs border border-slate-200 border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50">
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Period
+                                </th>
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Start Date
+                                </th>
+                                <th className="px-3 py-2 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  End Date
+                                </th>
+                                <th className="px-3 py-2 text-right text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                  Base Rent
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {monthlySchedule.map((row) => (
+                                <tr key={row.month} className="border-b border-slate-100">
+                                  <td className="px-3 py-2 font-semibold text-slate-800">
+                                    Month {row.month} — {row.label}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-600">
+                                    {row.start.toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-600">
+                                    {row.end.toLocaleDateString('en-GB', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                                    {getActiveCurrency()}{' '}
+                                    {row.baseRent.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr className="bg-blue-50/50">
+                                <td
+                                  colSpan={3}
+                                  className="px-3 py-2 text-right text-[11px] font-black uppercase tracking-widest text-blue-700"
+                                >
+                                  Total Contract Rental Value
+                                </td>
+                                <td className="px-3 py-2 text-right text-[13px] font-black text-blue-700">
+                                  {getActiveCurrency()}{' '}
+                                  {contractRentalValue.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

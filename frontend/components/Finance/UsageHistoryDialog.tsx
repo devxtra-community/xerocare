@@ -582,9 +582,14 @@ export default function UsageHistoryDialog({
           onEditRequested={(id) => {
             const record = history.find((h) => h.id === id);
             if (record) {
+              // Same swap as the submit handoff, in the other direction: close this
+              // dialog first, mount the edit form only on a later commit, so the two
+              // never share one.
               setViewingBillId(null);
-              setEditingRecord(record);
-              setIsEditModalOpen(true);
+              setTimeout(() => {
+                setEditingRecord(record);
+                setIsEditModalOpen(true);
+              }, 0);
             }
           }}
         />

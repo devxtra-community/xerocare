@@ -13,7 +13,7 @@ import {
   InstallationRequest,
 } from '@/lib/saleWorkflow';
 import { Customer } from '@/lib/customer';
-import { Invoice } from '@/lib/invoice';
+import { Invoice, getInvoiceById } from '@/lib/invoice';
 import { getTechnicians, ServiceTechnicianInfo } from '@/lib/serviceTicket';
 import { ContractAgreementModal } from '@/components/employeeComponents/ContractAgreementModal';
 import { InvoiceAccountView } from '@/components/invoice/InvoiceAccountView';
@@ -90,9 +90,31 @@ export default function SaleContractsPage() {
   // Product detail modal
   const [viewProductId, setViewProductId] = useState<string | null>(null);
 
-  // Agreement modal
+  // Agreement modal — agreementTarget is the summary list row (id/name/type/total only);
+  // the document itself needs the full Invoice (effectiveFrom, rentPeriod, rentType,
+  // monthlyRent, items, ...), which the list row never carries. agreementInvoice holds
+  // that full fetch, loaded fresh each time the modal opens (see openAgreement below) —
+  // previously a hand-built stub of just 5 fields was passed straight to the document,
+  // so Contract Start / Billing Cycle / Plan Type / Monthly Rate all rendered blank/zero.
   const [agreementTarget, setAgreementTarget] = useState<SaleContractRow | null>(null);
+  const [agreementInvoice, setAgreementInvoice] = useState<Invoice | null>(null);
   const [agreementOpen, setAgreementOpen] = useState(false);
+  const [agreementLoading, setAgreementLoading] = useState(false);
+
+  const openAgreement = async (contract: SaleContractRow) => {
+    setAgreementTarget(contract);
+    setAgreementLoading(true);
+    try {
+      const full = await getInvoiceById(contract.id);
+      setAgreementInvoice(full);
+      setAgreementOpen(true);
+    } catch (err) {
+      toast.error('Failed to load contract details', { description: getApiErrorMessage(err) });
+      setAgreementTarget(null);
+    } finally {
+      setAgreementLoading(false);
+    }
+  };
 
   // Collection payment modal (Sale only — gated, goes to Finance queue)
   const [collectionInvoiceId, setCollectionInvoiceId] = useState<string | null>(null);
@@ -495,14 +517,16 @@ export default function SaleContractsPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => {
-                                  setAgreementTarget(contract);
-                                  setAgreementOpen(true);
-                                }}
+                                onClick={() => openAgreement(contract)}
+                                disabled={agreementLoading && agreementTarget?.id === contract.id}
                                 className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50"
                                 title="Contract Agreement"
                               >
-                                <FileSignature size={14} />
+                                {agreementLoading && agreementTarget?.id === contract.id ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <FileSignature size={14} />
+                                )}
                               </Button>
                             )}
                             {contract.deliveryStatus === 'DELIVERED' && (
@@ -677,23 +701,20 @@ export default function SaleContractsPage() {
         />
       )}
 
-      {/* Contract Agreement Modal (Rent/Lease only) */}
-      {agreementTarget && (
+      {/* Contract Agreement Modal (Rent/Lease only) — invoice is the full fetch from
+          openAgreement, not the summary list row (see the comment on agreementInvoice's
+          declaration for why that distinction matters). */}
+      {agreementTarget && agreementInvoice && (
         <ContractAgreementModal
           open={agreementOpen}
-          invoice={
-            {
-              id: agreementTarget.id,
-              invoiceNumber: agreementTarget.invoiceNumber,
-              customerName: agreementTarget.customerName,
-              saleType: agreementTarget.saleType,
-              totalAmount: agreementTarget.totalAmount,
-              items: [],
-            } as unknown as Invoice
-          }
+          invoice={agreementInvoice}
           customer={null}
           branchName="Xerocare"
-          onClose={() => setAgreementOpen(false)}
+          onClose={() => {
+            setAgreementOpen(false);
+            setAgreementTarget(null);
+            setAgreementInvoice(null);
+          }}
           onSigned={(ag) => {
             setContracts((prev) =>
               prev.map((c) => (c.id === agreementTarget.id ? { ...c, agreement: ag } : c)),
@@ -715,16 +736,18 @@ export default function SaleContractsPage() {
       <Dialog open={installOpen} onOpenChange={(v) => !v && setInstallOpen(false)}>
         <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
           <DialogTitle className="sr-only">Installation Request</DialogTitle>
-          <div className="bg-linear-to-r from-slate-700 to-slate-600 p-5 text-white">
+          <div className="bg-white p-5 border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center">
-                <Wrench size={18} />
+              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center">
+                <Wrench size={18} className="text-slate-600" />
               </div>
               <div>
-                <p className="text-[11px] font-black uppercase tracking-widest opacity-80">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
                   Installation Request
                 </p>
-                <p className="text-base font-black">{installTarget?.invoiceNumber}</p>
+                <p className="text-base font-black text-slate-800">
+                  {installTarget?.invoiceNumber}
+                </p>
               </div>
             </div>
           </div>

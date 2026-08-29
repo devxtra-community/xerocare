@@ -38,14 +38,18 @@ interface RawChartOfAccountRow {
 }
 
 export interface PnLResult {
-  // Revenue accounts 4001-4007
+  // Revenue accounts 4001-4009
   rentalRevenue: number;
   leaseRevenue: number;
-  salesRevenue: number; // SALE + PRODUCT_SALE only
+  salesRevenue: number; // SALE + PRODUCT_SALE only, net of accessory lines
   serviceRevenue: number;
   usageRevenue: number; // exceeded_charge only (overage beyond free quota)
   amcSmaRevenue: number;
   sparePartSalesRevenue: number;
+  /** 4009 — accessory line items across every invoice type. Not a saleType of its own:
+   *  an accessory is a priced line on someone else's invoice, which is why no other
+   *  account here could see it (and why, on Rent/Lease, none did). */
+  accessoriesRevenue: number;
   totalRevenue: number;
 
   // Expense accounts 5001-5015
@@ -401,6 +405,8 @@ export async function computeProfitAndLoss(
     customAccountsPL,
     mjRows,
     allTimeMjAmount,
+    accessoryRows,
+    allTimeAccessoryRows,
   ] = await Promise.all([
     // 4001 Rental Revenue — RENT contracts reuse a single invoice across their whole
     // lifecycle, so revenue can't be read from invoice.totalAmount filtered by
@@ -704,6 +710,64 @@ export async function computeProfitAndLoss(
       WHERE 1=1 ${bSqlAllMj}
       GROUP BY "chartOfAccountId"
     `),
+    // 4009 Accessories Sales Revenue — accessory LINE ITEMS (stand, tray, stapler unit,
+    // etc.) supplied alongside a machine. Every other revenue account here is keyed off
+    // an invoice's saleType, but an accessory is never an invoice of its own: it is a
+    // priced line on somebody else's, so no saleType-based account could ever see it.
+    //
+    // On a Rent/Lease contract that left it recognized NOWHERE. createDirectSale sets
+    // `totalAmount = advanceAmount + Σ(quantity × unitPrice)` for those, and since every
+    // machine line on a contract is priced at 0 (the machine is an allocation, not a
+    // sale) that sum IS the accessories subtotal — but 4001/4002 deliberately ignore
+    // totalAmount (it is a running contract figure) and rebuild revenue from
+    // advanceAmount plus each period's monthlyRent, neither of which contains a penny of
+    // it. The customer was billed for the accessory and it was carried as a receivable,
+    // with no revenue behind it — an unbalanced pair, not merely a reporting gap.
+    //
+    // Recognized at the invoice's own date: accessories are billed once, up front, with
+    // the first-month advance — they do not accrue per period.
+    //
+    // `bucket` tells the netting below which existing account (if any) has already
+    // counted this line, so reclassifying into 4009 never double-counts. Rent/Lease is
+    // the additive case; everything else is built from invoice.totalAmount, which
+    // already includes its accessory lines.
+    db.query<{ currency_code: string | null; bucket: string; amount: string }[]>(`
+      SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+             CASE
+               WHEN i."saleType" IN ('RENT', 'LEASE') THEN 'RENT_LEASE'
+               WHEN i."billType" IN ('AMC', 'FSMA', 'SMA') THEN 'AMC'
+               WHEN i."saleType" IN ('SALE', 'PRODUCT_SALE') THEN 'SALES'
+               WHEN i."saleType" = 'SPAREPART_SALE' THEN 'SPAREPART'
+               WHEN i."saleType" = 'SERVICE' THEN 'SERVICE'
+               ELSE 'OTHER'
+             END AS bucket,
+             COALESCE(SUM(COALESCE(ii.quantity, 0) * COALESCE(ii."unitPrice", 0)), 0) AS amount
+      FROM invoice_items ii
+      JOIN invoices i ON i.id = ii."invoiceId"
+      WHERE ii."itemType" = 'ACCESSORY'
+        AND ii."deletedAt" IS NULL
+        AND i.status NOT IN (${EXCL_STATUS})
+        AND ${VALID_INVOICES}
+        AND ${bizDate('i."createdAt"')} BETWEEN '${dateFrom}' AND '${dateTo}'
+        AND i."deletedAt" IS NULL
+        ${bSql}
+      GROUP BY i."currency_code", 2
+    `),
+    // Same, unbounded by period — feeds retained earnings (see allTimeRevenue below).
+    db.query<{ currency_code: string | null; bucket: string; amount: string }[]>(`
+      SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+             CASE WHEN i."saleType" IN ('RENT', 'LEASE') THEN 'RENT_LEASE' ELSE 'OTHER' END AS bucket,
+             COALESCE(SUM(COALESCE(ii.quantity, 0) * COALESCE(ii."unitPrice", 0)), 0) AS amount
+      FROM invoice_items ii
+      JOIN invoices i ON i.id = ii."invoiceId"
+      WHERE ii."itemType" = 'ACCESSORY'
+        AND ii."deletedAt" IS NULL
+        AND i.status NOT IN (${EXCL_STATUS})
+        AND ${VALID_INVOICES}
+        AND i."deletedAt" IS NULL
+        ${bSql}
+      GROUP BY i."currency_code", 2
+    `),
   ]);
 
   // Convert revenues with currency handling
@@ -711,12 +775,41 @@ export async function computeProfitAndLoss(
   const leaseRevenue = aggByCurrency(leaseRows, baseCurrency, rates, currencyWarnings);
   // Apply credit note adjustments (CREDIT_EXCHANGE net: replacementAmount - productAmount)
   const creditNoteAdj = Number(creditNoteRows[0]?.amount ?? 0);
-  const salesRevenue =
+  const salesRevenueGross =
     aggByCurrency(salesRows, baseCurrency, rates, currencyWarnings) + creditNoteAdj;
-  const serviceRevenue = aggByCurrency(serviceRows, baseCurrency, rates, currencyWarnings);
-  const amcSmaRevenue = aggByCurrency(amcRows, baseCurrency, rates, currencyWarnings);
-  const sparePartSalesRevenue = aggByCurrency(sparePartRows, baseCurrency, rates, currencyWarnings);
+  const serviceRevenueGross = aggByCurrency(serviceRows, baseCurrency, rates, currencyWarnings);
+  const amcSmaRevenueGross = aggByCurrency(amcRows, baseCurrency, rates, currencyWarnings);
+  const sparePartSalesRevenueGross = aggByCurrency(
+    sparePartRows,
+    baseCurrency,
+    rates,
+    currencyWarnings,
+  );
   const usageRevenue = aggByCurrency(usageRows, baseCurrency, rates, currencyWarnings);
+
+  // ─── 4009 Accessories Sales Revenue ─────────────────────────────────────────
+  // Total goes to its own account; each bucket is then removed from whichever account
+  // already contained it, so this is a reclassification for every invoice type EXCEPT
+  // Rent/Lease — there it is genuinely new revenue that nothing was recognizing (see
+  // the query's comment). Netting per bucket rather than off one account keeps each
+  // line honest: an accessory sold on a spare-part invoice must leave 4007, not 4003.
+  const accessoryByBucket = (
+    rows: { currency_code: string | null; bucket: string; amount: string }[],
+    bucket: string,
+  ) =>
+    aggByCurrency(
+      rows.filter((r) => r.bucket === bucket),
+      baseCurrency,
+      rates,
+      currencyWarnings,
+    );
+
+  const accessoriesRevenue = aggByCurrency(accessoryRows, baseCurrency, rates, currencyWarnings);
+  const salesRevenue = salesRevenueGross - accessoryByBucket(accessoryRows, 'SALES');
+  const serviceRevenue = serviceRevenueGross - accessoryByBucket(accessoryRows, 'SERVICE');
+  const amcSmaRevenue = amcSmaRevenueGross - accessoryByBucket(accessoryRows, 'AMC');
+  const sparePartSalesRevenue =
+    sparePartSalesRevenueGross - accessoryByBucket(accessoryRows, 'SPAREPART');
 
   // Expense categories from expense_entries
   const expMap: Record<string, number> = {};
@@ -937,6 +1030,7 @@ export async function computeProfitAndLoss(
     serviceRevenue +
     amcSmaRevenue +
     sparePartSalesRevenue +
+    accessoriesRevenue +
     usageRevenue +
     customIncomeTotal +
     otherIncome;
@@ -979,7 +1073,15 @@ export async function computeProfitAndLoss(
   const allTimeRevenue =
     aggByCurrency(allTimeRevRows, baseCurrency, rates, currencyWarnings) +
     allTimeCustomIncome +
-    allTimeCustomMjIncome;
+    allTimeCustomMjIncome +
+    // Rent/Lease accessories only. The all-time query above rebuilds Rent/Lease revenue
+    // from advance + billed periods instead of totalAmount (same reused-invoice problem
+    // as 4001/4002), so an accessory on a contract is missing from it exactly as it was
+    // missing from the period P&L. Every other sale type is summed from totalAmount,
+    // which already contains its accessory lines — adding those here would double them,
+    // and retained earnings feeds the balance sheet, so a double would show up as a
+    // trial-balance mismatch rather than a cosmetic one.
+    accessoryByBucket(allTimeAccessoryRows, 'RENT_LEASE');
   const allTimeExpenses = Number(allTimeExpAmount[0]?.amount ?? 0) + allTimeCustomMjExpense;
   const allTimeDepreciation = Number(allTimeDepAmount[0]?.amount ?? 0);
 
@@ -988,6 +1090,7 @@ export async function computeProfitAndLoss(
     leaseRevenue,
     salesRevenue,
     serviceRevenue,
+    accessoriesRevenue,
     usageRevenue,
     amcSmaRevenue,
     sparePartSalesRevenue,
@@ -1144,6 +1247,9 @@ export async function computeBalanceSheet(
                  --     Rent/Lease receivable by its VAT amount. ADVANCE-type bills are
                  --     excluded from this sum since the advance is already counted via
                  --     adv.amount above; including both would double-count it.
+                 --     SECURITY_DEPOSIT-type bills are excluded too, for a different
+                 --     reason: a deposit is a refundable liability, not contract revenue
+                 --     the customer owes — it must never inflate Receivable at all.
                  WHEN i."saleType" IN ('RENT', 'LEASE')
                    THEN COALESCE(adv.amount, i."advanceAmount", 0) + COALESCE(ur.billed, 0)
                  ELSE i."totalAmount"
@@ -1160,12 +1266,19 @@ export async function computeBalanceSheet(
         SELECT "contractId", SUM(COALESCE("totalCharge", 0)) AS billed
         FROM usage_records
         WHERE "billType" IS DISTINCT FROM 'ADVANCE'
+          AND "billType" IS DISTINCT FROM 'SECURITY_DEPOSIT'
         GROUP BY "contractId"
       ) ur ON ur."contractId" = i.id
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
+          -- is_security_deposit excluded, for the same reason SECURITY_DEPOSIT bills are
+          -- excluded from the billed side above: a deposit is a refundable liability, not
+          -- revenue the customer owes. Leaving it on the paid side while dropping it from
+          -- the owed side is what made this AR line understate Assets by every collected
+          -- deposit — the two halves have to agree.
           SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
           FROM payment_transactions
+          WHERE is_security_deposit = FALSE
           GROUP BY "invoice_id"
           UNION ALL
           SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS paid
@@ -1257,17 +1370,26 @@ export async function computeBalanceSheet(
       FROM vat_remittances
       WHERE 1=1 ${bSql('vat_remittances')}
     `),
-    // 2004 Security Deposits Received from customers — on active RENT/LEASE contracts
+    // 2004 Security Deposits Received from customers — the actual cash/cheque money
+    // received, not the contract's quoted requirement. This used to sum
+    // invoices.securityDepositAmount directly (every RENT/LEASE contract's stated
+    // deposit, whether it was ever collected or not) — that overstated this liability
+    // by the full deposit amount on any contract where the deposit was never actually
+    // collected (or was still PENDING Accounts approval), with no matching cash on the
+    // asset side to balance it. Sourcing from APPROVED RENT_SECURITY_DEPOSIT/
+    // LEASE_SECURITY_DEPOSIT SalePaymentRequest rows instead matches how every other
+    // "actually collected" figure on this statement is computed (see the customer
+    // advances query below, for the same reason).
     db.query<CcyRow[]>(`
-      SELECT COALESCE("currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM("securityDepositAmount"), 0) AS amount
-      FROM invoices
-      WHERE "securityDepositAmount" > 0
-        AND "saleType" IN ('RENT', 'LEASE')
-        AND status NOT IN ('CANCELLED', 'EXPIRED', 'RETAKEN', 'SUPERSEDED')
-        AND "deletedAt" IS NULL
-        ${bSql('invoices')}
-      GROUP BY "currency_code"
+      SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
+             COALESCE(SUM(spr.amount), 0) AS amount
+      FROM sale_payment_requests spr
+      JOIN invoices i ON i.id = spr."invoiceId"
+      WHERE spr.status = 'APPROVED'
+        AND spr."paymentContext" IN ('RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT')
+        AND i."deletedAt" IS NULL
+        ${bSql('i')}
+      GROUP BY i."currency_code"
     `),
     // Equity entries — grouped by currency too, so multi-currency entries (e.g. a PKR
     // opening-balance true-up alongside AED ones) get converted to baseCurrency instead

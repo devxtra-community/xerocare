@@ -39,7 +39,9 @@ import {
   emitSparePartReduce,
 } from '../events/publisher/inventoryEventPublisher';
 import { BillType } from '../entities/enums/billType';
-import { getBranchCurrencyInfo } from './billingHelpers';
+import { PaymentTiming } from '../entities/enums/paymentTiming';
+import { getBranchCurrencyInfo, generatePaymentReference } from './billingHelpers';
+import { createSalePaymentRequest } from './salePaymentRequestService';
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
   excessRate: number | undefined,
@@ -589,6 +591,9 @@ export class BillingService {
     securityDepositDate?: string;
     securityDepositBank?: string;
 
+    // Payment Timing
+    paymentTiming?: 'ADVANCE' | 'ARREARS';
+
     // Warranty Fields
     warrantyType?: string;
     warrantyDurationValue?: number;
@@ -659,6 +664,18 @@ export class BillingService {
           400,
         );
       }
+    }
+
+    // Security Deposit validation: amount > 0 requires a payment mode
+    if (
+      payload.securityDepositAmount !== undefined &&
+      Number(payload.securityDepositAmount) > 0 &&
+      !payload.securityDepositMode
+    ) {
+      throw new AppError(
+        'Security Deposit payment mode (Cash, Bank Transfer, or Cheque) is required when Security Deposit amount is greater than 0.',
+        400,
+      );
     }
 
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
@@ -791,6 +808,9 @@ export class BillingService {
       monthlyEmiAmount: payload.monthlyEmiAmount,
       monthlyLeaseAmount: payload.monthlyLeaseAmount,
 
+      // Payment Timing (ADVANCE or ARREARS)
+      paymentTiming: (payload.paymentTiming as PaymentTiming) ?? PaymentTiming.ADVANCE,
+
       // Security Deposit (NEW)
       securityDepositAmount: payload.securityDepositAmount
         ? Number(payload.securityDepositAmount)
@@ -836,11 +856,14 @@ export class BillingService {
         invoice.totalAmount = calculatedTotal - (invoice.discountAmount || 0);
       }
     } else if (payload.saleType === SaleType.LEASE) {
-      invoice.totalAmount = Number(payload.advanceAmount || 0);
+      // calculatedTotal is the sum of item quantity*unitPrice above — on Rent/Lease every
+      // machine line is priced at 0 (the machine is an allocation, not a sale), so this is
+      // exactly the Accessories subtotal (if any) and nothing else. Add it to the advance
+      // rather than replacing it — a contract can have both.
+      invoice.totalAmount = Number(payload.advanceAmount || 0) + calculatedTotal;
     } else {
-      // Rent
-      invoice.totalAmount =
-        calculatedTotal === 0 ? Number(payload.advanceAmount || 0) : calculatedTotal;
+      // Rent — same reasoning as Lease above.
+      invoice.totalAmount = Number(payload.advanceAmount || 0) + calculatedTotal;
     }
 
     // ─── Snapshot: customer info (fetched first — tax calc below needs to know
@@ -954,6 +977,8 @@ export class BillingService {
       maxDiscountAllowed?: number;
       branchId?: string;
       saleType?: SaleType;
+      // Payment Timing
+      paymentTiming?: 'ADVANCE' | 'ARREARS';
 
       pricingItems?: {
         description: string;
@@ -1030,6 +1055,8 @@ export class BillingService {
     }
     if (payload.branchId !== undefined) invoice.branchId = payload.branchId;
     if (payload.saleType !== undefined) invoice.saleType = payload.saleType;
+    if (payload.paymentTiming !== undefined)
+      invoice.paymentTiming = payload.paymentTiming as PaymentTiming;
 
     // Security Deposit Update
     if (payload.securityDepositAmount !== undefined) {
@@ -1180,9 +1207,10 @@ export class BillingService {
         invoice.totalAmount = calculatedTotal - (invoice.discountAmount || 0);
       }
     } else if (invoice.saleType === SaleType.LEASE) {
-      invoice.totalAmount = invoice.advanceAmount || 0;
-    } else {
-      // Rent
+      // calculatedTotal (below, mirrored from the Rent branch) is the sum of item
+      // quantity*unitPrice — every machine line is priced at 0 on Rent/Lease (an
+      // allocation, not a sale), so this is exactly the Accessories subtotal (if any).
+      // Add it to the advance rather than replacing it — a contract can have both.
       let calculatedTotal = 0;
       if (invoice.items && invoice.items.length > 0) {
         calculatedTotal = invoice.items.reduce(
@@ -1190,8 +1218,17 @@ export class BillingService {
           0,
         );
       }
-      invoice.totalAmount =
-        calculatedTotal === 0 ? Number(invoice.advanceAmount || 0) : calculatedTotal;
+      invoice.totalAmount = Number(invoice.advanceAmount || 0) + calculatedTotal;
+    } else {
+      // Rent — same reasoning as Lease above.
+      let calculatedTotal = 0;
+      if (invoice.items && invoice.items.length > 0) {
+        calculatedTotal = invoice.items.reduce(
+          (sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+          0,
+        );
+      }
+      invoice.totalAmount = Number(invoice.advanceAmount || 0) + calculatedTotal;
     }
 
     await this.invoiceRepo.save(invoice);
@@ -1974,6 +2011,10 @@ export class BillingService {
                 modelId: item.modelId,
                 productId: update.productId,
                 serialNumber: serialNo,
+                // ACCESSORY here, not just PRODUCT — every reader of productAllocations
+                // that means "the metered machine(s)" must filter this out (see the
+                // entity's comment on the column).
+                itemType: item.itemType,
                 status: AllocationStatus.ALLOCATED,
                 initialBwA4: 0,
                 initialBwA3: 0,
@@ -2195,29 +2236,60 @@ export class BillingService {
       const savedInvoice = await queryRunner.manager.save(invoice);
       await queryRunner.commitTransaction();
 
-      // Record deposit as a PaymentTransaction so it appears in cashbook / cheques page.
-      // Must run after commit so the invoice row is visible to recordPayment's query.
+      // Record Security Deposit — goes through the approval gate, NOT directly to cashbook.
+      // Cash/Bank: PENDING SalePaymentRequest (Accounts approval required)
+      // Cheque: GuaranteeCheque record (security/guarantee instrument)
       if (deposit && deposit.amount > 0) {
         try {
-          await this.recordPayment(
-            savedInvoice.id,
-            {
-              paymentMode: deposit.mode as string,
-              referenceNumber: deposit.reference,
+          const depositMode = (deposit.mode as string).toUpperCase();
+
+          if (depositMode === 'CHEQUE') {
+            // Security Cheque → GuaranteeCheque (NOT a normal rent cheque)
+            const { GuaranteeCheque, GuaranteeChequePurpose } =
+              await import('../entities/guaranteeChequeEntity');
+            const guaranteeChequeRepo = Source.getRepository(GuaranteeCheque);
+            const gc = guaranteeChequeRepo.create({
+              customerId: savedInvoice.customerId || '',
+              customerName: savedInvoice.customerName || 'Customer',
+              contractInvoiceId: savedInvoice.id,
+              contractReference: savedInvoice.invoiceNumber,
+              chequeNumber: deposit.reference || `GC-${Date.now()}`,
               amount: deposit.amount,
-              transactionDate: deposit.receivedDate || new Date().toISOString().split('T')[0],
+              currencyCode: savedInvoice.currencyCode || 'AED',
+              bankName: deposit.chequeBankName || 'Unknown',
+              receivedDate: deposit.receivedDate ? new Date(deposit.receivedDate) : new Date(),
+              purpose: GuaranteeChequePurpose.PERFORMANCE_SECURITY,
+              branchId: savedInvoice.branchId,
+              createdBy: userId || 'SYSTEM',
+              notes: `Security Deposit — ${savedInvoice.invoiceNumber}`,
+            });
+            await guaranteeChequeRepo.save(gc);
+            logger.info(
+              `Security Deposit Cheque recorded as GuaranteeCheque for contract ${savedInvoice.invoiceNumber}`,
+            );
+          } else {
+            // Cash or Bank Transfer → PENDING SalePaymentRequest (Accounts must approve)
+            const paymentContext =
+              savedInvoice.saleType === 'RENT' ? 'RENT_SECURITY_DEPOSIT' : 'LEASE_SECURITY_DEPOSIT';
+
+            await createSalePaymentRequest({
+              invoiceId: savedInvoice.id,
+              branchId: savedInvoice.branchId,
+              userId: userId || 'SYSTEM',
+              amount: deposit.amount,
+              paymentMode: depositMode,
+              paymentDate: deposit.receivedDate ? new Date(deposit.receivedDate) : new Date(),
+              referenceNumber: deposit.reference,
               remarks: 'Security Deposit',
-              // For CHEQUE mode: pass cheque details so a Cheque record is created
-              chequeNumber:
-                (deposit.mode as string) === 'CHEQUE' ? deposit.reference || undefined : undefined,
-              chequeBankName: deposit.chequeBankName,
-              chequeDueDate: deposit.chequeDueDate,
-              chequeDate: deposit.chequeDate,
-            },
-            userId,
-          );
+              paymentContext,
+              collectLater: true,
+            });
+            logger.info(
+              `Security Deposit (${depositMode}) SalePaymentRequest created as PENDING for contract ${savedInvoice.invoiceNumber}`,
+            );
+          }
         } catch (err) {
-          logger.error(`Failed to record deposit for contract ${savedInvoice.id}`, err);
+          logger.error(`Failed to record security deposit for contract ${savedInvoice.id}`, err);
         }
       }
 
@@ -2393,7 +2465,14 @@ export class BillingService {
     if (!invoice.items) return;
 
     for (const item of invoice.items) {
-      if (item.productId && item.itemType === 'PRODUCT') {
+      // ACCESSORY included alongside PRODUCT — an accessory allocated to a specific
+      // serialized unit (via allocateMachines) must have that unit's inventory status
+      // flip too, or it stays "AVAILABLE" and can be picked for another contract even
+      // though a ProductAllocation row already reserves it here.
+      if (
+        item.productId &&
+        (item.itemType === 'PRODUCT' || (item.itemType as string) === 'ACCESSORY')
+      ) {
         try {
           // Type-safe mapping for the inventory event
           const rawType = overrideStatus || invoice.saleType;
@@ -2670,7 +2749,10 @@ export class BillingService {
         .select('tx.invoice_id', 'invoiceId')
         .addSelect('SUM(tx.amount)', 'total')
         .where('tx.invoice_id IN (:...ids)', { ids: invoiceIds })
-        // Security deposits are refundable caution money, not invoice settlement
+        // Security deposits are refundable caution money, not invoice settlement.
+        // is_security_deposit is the reliable half — the remarks string only ever matched
+        // deposits recorded through the direct path, not the sale-payment workflow's.
+        .andWhere('tx.is_security_deposit = FALSE')
         .andWhere(`(tx.remarks IS NULL OR LOWER(TRIM(tx.remarks)) != 'security deposit')`)
         .groupBy('tx.invoice_id')
         .getRawMany<{ invoiceId: string; total: string }>(),
@@ -3256,6 +3338,9 @@ export class BillingService {
         modelId: oldAllocation.modelId,
         productId: newProductId,
         serialNumber: newSerialNumber,
+        // Carried over — replacing a unit doesn't change whether the line it's on is a
+        // real machine or an accessory.
+        itemType: oldAllocation.itemType,
         status: AllocationStatus.ALLOCATED,
         startTimestamp: ts,
         initialBwA4: newInitialMeter.bwA4 || 0,
@@ -3411,6 +3496,10 @@ export class BillingService {
   async createDirectSale(payload: {
     branchId: string;
     createdBy: string;
+    /** Role of whoever is creating the sale. Decides whether money collected here goes
+     *  straight to the cashbook or has to clear the Accounts Receipts approval queue
+     *  first — see the payment-recording branch at the end of this method. */
+    createdByRole?: string;
     customerId: string;
     saleType: SaleType;
     items: {
@@ -3650,6 +3739,9 @@ export class BillingService {
             modelId: item.modelId,
             productId: item.productId,
             serialNumber: item.serialNumber,
+            // Guaranteed PRODUCT — this whole branch is gated on item.itemType === 'PRODUCT'
+            // above; accessories are a Rent/Lease-only concept this Sale path never sees.
+            itemType: 'PRODUCT',
             status: AllocationStatus.ALLOCATED,
             initialBwA4: 0,
             initialBwA3: 0,
@@ -3704,8 +3796,15 @@ export class BillingService {
           savedInvoice.warrantyCopyLimit = payload.warrantyCopyLimit;
       }
 
+      // Money an employee collects is not settled until Accounts approves the receipt,
+      // so the invoice cannot be marked PAID here on their say-so — it stays SENT (i.e.
+      // outstanding) and only becomes PAID when approveSalePayment clears the request.
+      // Finance/Admin recording a sale ARE Accounts, so nothing is pending for them.
+      const needsReceiptApproval = !['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(
+        (payload.createdByRole || '').toUpperCase(),
+      );
       let paymentStatus = InvoiceStatus.SENT;
-      if (payload.paymentAmount && payload.paymentAmount > 0) {
+      if (payload.paymentAmount && payload.paymentAmount > 0 && !needsReceiptApproval) {
         if (payload.paymentAmount >= calculatedTotal - 0.01) {
           paymentStatus = InvoiceStatus.PAID;
         } else {
@@ -3722,21 +3821,46 @@ export class BillingService {
 
       await queryRunner.commitTransaction();
 
-      // Record the payment through the standard flow AFTER commit so it creates the
-      // PaymentTransaction, updates the InvoiceLedger and posts to the cashbook/day book.
-      // Best-effort: the sale itself must survive a payment-recording failure.
+      // Record the payment AFTER commit. Best-effort either way: the sale itself must
+      // survive a payment-recording failure.
+      //
+      // An employee's collection becomes a PENDING SalePaymentRequest, not an immediate
+      // PaymentTransaction. Calling recordPayment() directly — which is what this used to
+      // do for everyone — writes the transaction, the ledger and the cashbook entry on
+      // the spot, so a sale the employee said was paid in full showed up in Accounts as
+      // already settled, with zero outstanding in Receivables and no receipt for Finance
+      // to check. createSalePaymentRequest is the only path the Receipts approval queue
+      // and receipt generation key off (see its own doc comment); anything collected
+      // outside it is structurally invisible to both. Now the sale sits as outstanding
+      // in Receivables until Accounts approves the receipt, and approving it is what
+      // creates the transaction and turns it Paid.
       if (payload.paymentAmount && payload.paymentAmount > 0) {
         try {
-          await this.recordPayment(
-            savedInvoice.id,
-            {
-              paymentMode: payload.paymentMode!,
-              referenceNumber: payload.paymentReference,
+          if (needsReceiptApproval) {
+            const { createSalePaymentRequest } = await import('./salePaymentRequestService');
+            await createSalePaymentRequest({
+              invoiceId: savedInvoice.id,
+              branchId: payload.branchId,
+              userId: payload.createdBy,
               amount: Number(payload.paymentAmount),
-              remarks: 'Direct Sale Payment',
-            },
-            payload.createdBy,
-          );
+              paymentMode: payload.paymentMode!,
+              paymentDate: new Date(),
+              referenceNumber: payload.paymentReference,
+              remarks: 'Direct Sale Payment — collected at sale',
+              paymentContext: 'SALE',
+            });
+          } else {
+            await this.recordPayment(
+              savedInvoice.id,
+              {
+                paymentMode: payload.paymentMode!,
+                referenceNumber: payload.paymentReference,
+                amount: Number(payload.paymentAmount),
+                remarks: 'Direct Sale Payment',
+              },
+              payload.createdBy,
+            );
+          }
         } catch (err) {
           logger.error(
             `Failed to record payment for direct sale ${savedInvoice.invoiceNumber}`,
@@ -3753,8 +3877,14 @@ export class BillingService {
         emitSparePartReduce(reduction);
       }
 
-      // Notify branch manager if direct sale is unpaid/partial
-      if (paymentStatus !== InvoiceStatus.PAID && payload.branchId) {
+      // Notify branch manager if direct sale is genuinely unpaid/partial — measured on
+      // the money actually collected, not on paymentStatus. An employee's fully-collected
+      // sale now sits at SENT until Accounts approves the receipt, and calling that
+      // "created with outstanding payment" would be wrong: nothing is owed, the receipt
+      // is simply awaiting approval, and the manager would get an alert on every sale.
+      const amountCollectedNow = Number(payload.paymentAmount || 0);
+      const isGenuinelyUnpaid = amountCollectedNow < calculatedTotal - 0.01;
+      if (isGenuinelyUnpaid && payload.branchId) {
         try {
           const { NotificationPublisher } =
             await import('../events/publisher/notificationPublisher');
@@ -5207,8 +5337,15 @@ export class BillingService {
     ]);
     // Security deposits sit outside the invoice total (refundable caution money),
     // so they must never count toward invoice settlement.
-    const isDepositTxn = (remarks?: string) =>
+    //
+    // The remarks string is a legacy signal: only deposits recorded through the direct
+    // path ever carried it. Deposits approved through the sale-payment workflow get
+    // "Sale payment approved — SPAY-…" instead, so this test missed every one of them
+    // and let them count as settlement. PaymentTransaction now states the fact outright.
+    const isDepositByRemarks = (remarks?: string) =>
       (remarks ?? '').trim().toLowerCase() === 'security deposit';
+    const isDepositTxn = (t: { remarks?: string; isSecurityDeposit?: boolean }) =>
+      t.isSecurityDeposit === true || isDepositByRemarks(t.remarks);
 
     // A prior payment may have been recorded in a currency other than the
     // invoice's own (paid from a foreign-currency customer bank account) —
@@ -5230,7 +5367,7 @@ export class BillingService {
 
     const paidSoFar =
       priorTxns
-        .filter((t) => !isDepositTxn(t.remarks))
+        .filter((t) => !isDepositTxn(t))
         .reduce(
           (sum, t) =>
             sum +
@@ -5238,7 +5375,7 @@ export class BillingService {
           0,
         ) +
       legacyRows
-        .filter((p) => !isDepositTxn(p.remarks))
+        .filter((p) => !isDepositByRemarks(p.remarks))
         .reduce((sum, p) => sum + Number(p.amountPaid), 0);
 
     // This new payment may also be in a foreign currency — convert before comparing.
@@ -5264,11 +5401,18 @@ export class BillingService {
     const transaction = new PaymentTransaction();
     transaction.invoiceId = invoiceId;
     transaction.paymentMode = data.paymentMode;
-    transaction.referenceNumber = data.referenceNumber;
     transaction.amount = Number(data.amount);
     transaction.transactionDate = data.transactionDate
       ? new Date(data.transactionDate)
       : new Date();
+    // Auto-generated for Cash/Bank/Card (CASH-20260828-014 style) — always wins over
+    // whatever the caller passed, per the "no manual override" decision; see
+    // generatePaymentReference's own comment. Cheque is untouched (falls back to
+    // whatever the caller sent, normally nothing — its Cheque Number field is its
+    // reference instead).
+    transaction.referenceNumber =
+      (await generatePaymentReference(data.paymentMode, transaction.transactionDate)) ??
+      data.referenceNumber;
     transaction.recordedBy = userId;
     transaction.remarks = data.remarks || (isSecurityDeposit ? 'Security Deposit' : undefined);
     const paymentCurrency = data.currencyCode || invoice.currencyCode || undefined;
@@ -5288,8 +5432,8 @@ export class BillingService {
     // separately via securityDepositMode) since they aren't the recurring-billing mode.
     const isFirstRealPayment =
       !isSecurityDeposit &&
-      priorTxns.filter((t) => !isDepositTxn(t.remarks)).length === 0 &&
-      legacyRows.filter((p) => !isDepositTxn(p.remarks)).length === 0;
+      priorTxns.filter((t) => !isDepositTxn(t)).length === 0 &&
+      legacyRows.filter((p) => !isDepositByRemarks(p.remarks)).length === 0;
     if (isFirstRealPayment && !invoice.preferredPaymentMode) {
       invoice.preferredPaymentMode = data.paymentMode;
       if ((data.paymentMode ?? '').toUpperCase() === 'CHEQUE' && data.chequeBankName) {

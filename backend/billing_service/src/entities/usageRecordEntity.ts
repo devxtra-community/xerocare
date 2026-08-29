@@ -34,6 +34,14 @@ export class UsageRecord {
   @Column({ type: 'date' })
   billingPeriodEnd!: Date;
 
+  // The actual date the meter reading was physically taken/recorded by Finance or the
+  // technician — distinct from billingPeriodEnd (the period's calendar end date, which
+  // this often lags behind by a few days). Defaults to "today" at creation when Finance
+  // doesn't override it. Shown on the bill so the customer can see exactly when the
+  // reading it's based on was taken.
+  @Column({ type: 'date', nullable: true })
+  readingTakenDate?: Date;
+
   // Raw Readings (A4/A3 Separation)
   @Column({ type: 'int', default: 0 })
   bwA4Count!: number;
@@ -134,10 +142,16 @@ export class UsageRecord {
   // readings apply) from an Advance Bill (wraps the contract's already-collected
   // RENT_ADVANCE/LEASE_ADVANCE SalePaymentRequest for customer sign-off only — no period,
   // no readings; billingPeriodStart/End is set to the advance's paymentDate as a
-  // placeholder so the NOT NULL columns stay meaningful). Reuses the exact same entity/
-  // approval-pipeline for both rather than a parallel implementation.
+  // placeholder so the NOT NULL columns stay meaningful) or a Security Deposit Bill
+  // (identical shape, wrapping RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT instead —
+  // see generateSecurityDepositBill). Both non-USAGE types are excluded from every AR/
+  // receivable sum over this table (accountsShared.ts, lineItemDrilldownController.ts) —
+  // ADVANCE because it's counted separately via its own SalePaymentRequest join, and
+  // SECURITY_DEPOSIT because a deposit is a refundable liability, not revenue at all.
+  // Reuses the exact same entity/approval-pipeline for all three rather than a parallel
+  // implementation.
   @Column({ type: 'varchar', default: 'USAGE' })
-  billType!: string; // USAGE | ADVANCE
+  billType!: string; // USAGE | ADVANCE | SECURITY_DEPOSIT
 
   @Column({ type: 'uuid', nullable: true })
   billCreatedByEmployeeId?: string;

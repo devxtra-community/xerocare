@@ -364,7 +364,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
               <TableHead>Customer</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Amount</TableHead>
-              <TableHead>Advance Paid</TableHead>
+              <TableHead>First Month Advance</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Created By</TableHead>
               <TableHead className="text-center">Actions</TableHead>

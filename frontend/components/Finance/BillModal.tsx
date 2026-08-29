@@ -71,6 +71,7 @@ export function BillModal({
   const [bill, setBill] = useState<Bill | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [advancePayment, setAdvancePayment] = useState<SalePaymentRequest | null>(null);
+  const [depositPayment, setDepositPayment] = useState<SalePaymentRequest | null>(null);
   const [tab, setTab] = useState<BillTab>(initialTab);
   const [remoteLink, setRemoteLink] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
@@ -88,6 +89,7 @@ export function BillModal({
       setBill(data.usage);
       setInvoice(data.invoice);
       setAdvancePayment(data.advancePayment);
+      setDepositPayment(data.depositPayment);
     } catch (err) {
       toast.error('Failed to load bill', { description: getApiErrorMessage(err) });
     } finally {
@@ -166,7 +168,10 @@ export function BillModal({
     setIsSaving(true);
     try {
       const updated = await markBillApprovedManually(usageRecordId, {
-        customerName: approverName.trim() || undefined,
+        // Matches what's actually displayed in the field (see its value prop above) —
+        // sent explicitly rather than relying only on the backend's own fallback to
+        // invoice.customerName, so what gets recorded never drifts from what Finance saw.
+        customerName: approverName.trim() || invoice?.customerName || undefined,
         approvalNote: approvalNote.trim(),
       });
       setBill(updated);
@@ -197,7 +202,13 @@ export function BillModal({
               </div>
               <div>
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none mb-0.5">
-                  {bill?.billType === 'ADVANCE' ? 'Advance Bill' : 'Bill'}
+                  {bill?.billType === 'ADVANCE'
+                    ? depositPayment
+                      ? 'First Month Advance & Security Deposit Bill'
+                      : 'First Month Advance Bill'
+                    : bill?.billType === 'SECURITY_DEPOSIT'
+                      ? 'Security Deposit Bill'
+                      : 'Bill'}
                 </p>
                 <p className="text-sm font-black text-slate-800 leading-none">
                   {invoice?.invoiceNumber}
@@ -291,6 +302,7 @@ export function BillModal({
                       bill={bill}
                       currency={currency}
                       advancePayment={advancePayment}
+                      depositPayment={depositPayment}
                     />
                     <Button
                       variant="ghost"
@@ -427,9 +439,13 @@ export function BillModal({
                           Customer Name
                         </Label>
                         <Input
-                          value={approverName}
+                          // Pre-filled from the invoice's real customer name — was a
+                          // placeholder only, so the field looked filled in but was
+                          // actually empty until Finance retyped the name they could
+                          // already see. Still editable for the rare case someone other
+                          // than the primary contact gave the approval.
+                          value={approverName || invoice.customerName || ''}
                           onChange={(e) => setApproverName(e.target.value)}
-                          placeholder={invoice.customerName || 'Customer'}
                           className="h-10 font-bold border-slate-200"
                         />
                       </div>
@@ -466,7 +482,44 @@ export function BillModal({
           ) : null}
         </div>
 
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0 print:hidden">
+        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0 print:hidden">
+          {/* Send straight from the footer, on whichever tab is open — the Send/Link tab
+              makes you generate a link first, which is the right flow when you want the
+              URL in hand, but not when you just want the customer to get the bill. Both
+              of these go through the server, which resolves the customer's own email /
+              WhatsApp number and issues the signing link itself. */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!bill || sendingVia !== null}
+              onClick={() => handleSend('email')}
+              className="text-[10px] font-black uppercase tracking-widest h-9 px-3"
+              title="Email this bill to the customer"
+            >
+              {sendingVia === 'email' ? (
+                <Loader2 size={13} className="animate-spin mr-1.5" />
+              ) : (
+                <Mail size={13} className="mr-1.5" />
+              )}
+              Email
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!bill || sendingVia !== null}
+              onClick={() => handleSend('whatsapp')}
+              className="text-[10px] font-black uppercase tracking-widest h-9 px-3"
+              title="Send this bill to the customer on WhatsApp"
+            >
+              {sendingVia === 'whatsapp' ? (
+                <Loader2 size={13} className="animate-spin mr-1.5" />
+              ) : (
+                <Send size={13} className="mr-1.5" />
+              )}
+              WhatsApp
+            </Button>
+          </div>
           <Button
             variant="ghost"
             onClick={onClose}

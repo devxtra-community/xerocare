@@ -1781,7 +1781,7 @@ export function InvoiceDetailsDialog({
                                 ${inv.grossAmount ? `<p style="margin: 5px 0; color: #6b7280;">Gross Amount: <strong>${getActiveCurrency()} ${inv.grossAmount.toLocaleString()}</strong></p>` : ''}
                                 ${inv.discountAmount && inv.discountAmount > 0 ? `<p style="margin: 5px 0; color: #dc2626;">Discount Given: <strong>- ${getActiveCurrency()} ${inv.discountAmount.toLocaleString()}</strong> ${inv.discountPercent ? `(${inv.discountPercent}%)` : ''}</p>` : ''}
                                 <p style="font-size: 18px; margin: 5px 0;">Total Amount: <strong style="color: #1d4ed8;">${getActiveCurrency()} ${(inv.totalAmount || 0).toLocaleString()}</strong></p>
-                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">Advance Required: <strong>${getActiveCurrency()} ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
+                                ${inv.advanceAmount ? `<p style="margin: 5px 0; color: #059669;">First Month Advance: <strong>${getActiveCurrency()} ${inv.advanceAmount.toLocaleString()}</strong></p>` : ''}
                               </div>
 
                               <div style="margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #9ca3af; font-size: 12px;">

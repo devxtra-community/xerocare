@@ -29,6 +29,13 @@ import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -586,29 +593,31 @@ export default function OpeningBalancePage() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none"
-            >
-              <option value="ALL">All Types</option>
-              <option value="SALE_OUTSTANDING">Sale Outstanding</option>
-              <option value="RENT_CONTRACT">Rent Contract</option>
-              <option value="LEASE_CONTRACT">Lease Contract</option>
-              <option value="SERVICE_DEBT">Service Debt</option>
-              <option value="OTHER_DEBT">Other Outstanding</option>
-            </select>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="h-10 border-orange-200 text-xs font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="SALE_OUTSTANDING">Sale Outstanding</SelectItem>
+                <SelectItem value="RENT_CONTRACT">Rent Contract</SelectItem>
+                <SelectItem value="LEASE_CONTRACT">Lease Contract</SelectItem>
+                <SelectItem value="SERVICE_DEBT">Service Debt</SelectItem>
+                <SelectItem value="OTHER_DEBT">Other Outstanding</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <select
-            value={filterSettled}
-            onChange={(e) => setFilterSettled(e.target.value)}
-            className="h-10 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-xs font-medium text-slate-600 dark:text-slate-300 focus:outline-none"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="OUTSTANDING">Outstanding</option>
-            <option value="SETTLED">Fully Settled</option>
-          </select>
+          <Select value={filterSettled} onValueChange={setFilterSettled}>
+            <SelectTrigger className="h-10 border-orange-200 text-xs font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Statuses</SelectItem>
+              <SelectItem value="OUTSTANDING">Outstanding</SelectItem>
+              <SelectItem value="SETTLED">Fully Settled</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -709,22 +718,26 @@ export default function OpeningBalancePage() {
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                   Balance Type
                 </label>
-                <select
+                <Select
                   value={createFormData.balanceType}
-                  onChange={(e) =>
+                  onValueChange={(v) =>
                     setCreateFormData({
                       ...createFormData,
-                      balanceType: e.target.value as BalanceType,
+                      balanceType: v as BalanceType,
                     })
                   }
-                  className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 >
-                  <option value="SALE_OUTSTANDING">Sale Outstanding</option>
-                  <option value="RENT_CONTRACT">Rent Contract Migration</option>
-                  <option value="LEASE_CONTRACT">Lease Contract Migration</option>
-                  <option value="SERVICE_DEBT">Service Debt</option>
-                  <option value="OTHER_DEBT">Other Outstanding Debt</option>
-                </select>
+                  <SelectTrigger className="w-full h-11 border-orange-200 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SALE_OUTSTANDING">Sale Outstanding</SelectItem>
+                    <SelectItem value="RENT_CONTRACT">Rent Contract Migration</SelectItem>
+                    <SelectItem value="LEASE_CONTRACT">Lease Contract Migration</SelectItem>
+                    <SelectItem value="SERVICE_DEBT">Service Debt</SelectItem>
+                    <SelectItem value="OTHER_DEBT">Other Outstanding Debt</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Migrated At Date */}
@@ -1220,20 +1233,24 @@ export default function OpeningBalancePage() {
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                   Payment Mode
                 </label>
-                <select
+                <Select
                   value={paymentForm.paymentMode}
-                  onChange={(e) =>
+                  onValueChange={(v) =>
                     setPaymentForm({
                       ...paymentForm,
-                      paymentMode: e.target.value as RecordOpeningBalancePaymentDto['paymentMode'],
+                      paymentMode: v as RecordOpeningBalancePaymentDto['paymentMode'],
                     })
                   }
-                  className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
                 >
-                  <option value="CASH">Cash</option>
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                  <option value="CHEQUE">Cheque</option>
-                </select>
+                  <SelectTrigger className="w-full h-11 border-orange-200 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CASH">Cash</SelectItem>
+                    <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                    <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
@@ -1253,23 +1270,30 @@ export default function OpeningBalancePage() {
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                     Cash / Bank Account
                   </label>
-                  <select
-                    value={paymentForm.paidToAccount || ''}
-                    onChange={(e) =>
-                      setPaymentForm({ ...paymentForm, paidToAccount: e.target.value })
+                  <Select
+                    value={paymentForm.paidToAccount || '__NONE__'}
+                    onValueChange={(v) =>
+                      setPaymentForm({
+                        ...paymentForm,
+                        paidToAccount: v === '__NONE__' ? '' : v,
+                      })
                     }
-                    className="w-full h-11 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-primary/20 focus:outline-none"
                   >
-                    <option value="">Select account (optional)</option>
-                    {matchingPaymentAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} — {a.currency}{' '}
-                        {Number(a.currentBalance).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                        })}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-11 border-orange-200 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__NONE__">Select account (optional)</SelectItem>
+                      {matchingPaymentAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.name} — {a.currency}{' '}
+                          {Number(a.currentBalance).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

@@ -148,7 +148,11 @@ async function reverseInvoiceCreditForCheque(
 
       const allTxns = await txnRepo.find({ where: { invoiceId: cheque.sourceReferenceId } });
       const paidAmount = allTxns
-        .filter((t) => (t.remarks ?? '').trim().toLowerCase() !== 'security deposit')
+        .filter(
+          (t) =>
+            t.isSecurityDeposit !== true &&
+            (t.remarks ?? '').trim().toLowerCase() !== 'security deposit',
+        )
         .reduce((sum, t) => sum + Number(t.amount), 0);
 
       ledger.totalAmount = totalAmount;

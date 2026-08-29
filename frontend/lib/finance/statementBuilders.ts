@@ -97,6 +97,7 @@ export function buildChartOfAccountsStatement(
         row(data.income.usageRevenue),
         row(data.income.amcSmaRevenue),
         row(data.income.sparePartSales),
+        row(data.income.accessoriesRevenue),
         row(data.income.otherIncome),
         ...customRows(data.income.custom),
       ],

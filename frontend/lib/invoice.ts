@@ -2,7 +2,7 @@ import api from './api';
 
 export interface InvoiceItem {
   id?: string;
-  itemType?: 'PRICING_RULE' | 'PRODUCT' | 'SPAREPART';
+  itemType?: 'PRICING_RULE' | 'PRODUCT' | 'SPAREPART' | 'ACCESSORY';
   description: string;
   warranty?: string;
   // Fixed
@@ -160,6 +160,7 @@ export interface Invoice {
   monthlyLeaseAmount?: number;
   monthlyRent?: number;
   advanceAmount?: number;
+  paymentTiming?: 'ADVANCE' | 'ARREARS';
   // Stable default payment mode for this contract's recurring billing — set once from
   // the first payment ever recorded (the advance) and never overwritten afterward.
   preferredPaymentMode?: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD';
@@ -225,6 +226,7 @@ export interface Invoice {
   extraColorA4Count?: number;
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
+  readingTakenDate?: string;
   additionalCharges?: number;
   additionalChargesRemarks?: string;
   referenceContractId?: string; // Link to PROFORMA contract
@@ -260,6 +262,11 @@ export interface Invoice {
     modelId: string;
     serialNumber: string;
     status: string;
+    /** PRODUCT | ACCESSORY — the source InvoiceItem's itemType when this unit was
+     *  allocated. Anywhere this list means "the metered machine(s)" (meter-reading
+     *  forms, active-machine counts, "Allocated Machine" contract rows, ...) must
+     *  exclude 'ACCESSORY' rows, or an allocated accessory counts as an extra machine. */
+    itemType?: string;
     replacementOfAllocationId?: string;
     initialBwA4?: number;
     initialBwA3?: number;
@@ -301,6 +308,7 @@ export interface UsageRecord {
   id: string;
   periodStart: string;
   periodEnd: string;
+  readingTakenDate?: string;
   freeLimit: number | string;
   totalUsage: number;
   exceededCount: number;
@@ -342,6 +350,10 @@ export interface UsageRecord {
     allocation?: {
       serialNumber: string;
       modelId: string;
+      /** PRODUCT | ACCESSORY — accessories get a ProductAllocation row like any other
+       * serialized unit but are never metered, so they must be filtered out of anything
+       * that treats an item as a machine with readings. */
+      itemType?: string;
     };
     startBwA4: number;
     endBwA4: number;
@@ -387,6 +399,7 @@ export interface CreateInvoicePayload {
 
   monthlyRent?: number;
   advanceAmount?: number;
+  paymentTiming?: 'ADVANCE' | 'ARREARS';
   discountPercent?: number;
   discountAmount?: number;
   validityDays?: number;
@@ -421,7 +434,7 @@ export interface CreateInvoicePayload {
     quantity: number;
     unitPrice: number;
     discount?: number;
-    itemType?: 'PRODUCT' | 'PRICING_RULE' | 'SPAREPART';
+    itemType?: 'PRODUCT' | 'PRICING_RULE' | 'SPAREPART' | 'ACCESSORY';
     productId?: string;
     modelId?: string;
     warranty?: string;
@@ -466,6 +479,68 @@ export const getMyInvoices = async (): Promise<Invoice[]> => {
 export const getBranchInvoices = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices/branch-invoices');
   return response.data.data;
+};
+
+// ─── Contract Renewal ──────────────────────────────────────────────────────
+// Rent / Lease-FSM contracts entering (or past) their final billing period —
+// Finance's "does the customer want to renew?" decision + extension flow.
+
+export interface OngoingContractSummary {
+  id: string;
+  invoiceNumber: string;
+  saleType: 'RENT' | 'LEASE';
+  customerId?: string;
+  customerName?: string | null;
+  branchId?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  monthlyRent?: number;
+  rentPeriod?: string;
+  leaseType?: string;
+  contractStatus?: string;
+  status?: string;
+  renewalDecision?: 'RENEWAL_APPROVED' | 'CONTRACT_ENDED' | null;
+  renewalDecisionBy?: string;
+  renewalDecisionAt?: string;
+  cycleDays: number;
+  daysRemaining: number;
+  /** Billing periods already invoiced (real USAGE bills only). */
+  periodsBilled: number;
+  /** Periods still to bill before the contract's end date is reached. */
+  periodsRemaining: number;
+  periodsTotal: number;
+  /** End date of the latest period actually billed. */
+  billedThrough?: string;
+  isFullyBilled: boolean;
+  /** True once EITHER the calendar or the billing has reached the final period —
+   *  billing advances per meter reading, not on a timer, so the two drift apart. */
+  isLastPeriod: boolean;
+  lastPeriodReason?: 'CALENDAR' | 'BILLING';
+  isPastEnd: boolean;
+  machineDescriptions: string[];
+}
+
+export const getOngoingContracts = async (): Promise<OngoingContractSummary[]> => {
+  const response = await api.get('/b/invoices/ongoing-contracts');
+  return response.data.data;
+};
+
+export const setContractRenewalDecision = async (
+  contractId: string,
+  decision: 'RENEWAL_APPROVED' | 'CONTRACT_ENDED',
+): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${contractId}/renewal-decision`, { decision });
+  return response.data.data;
+};
+
+export const extendContract = async (
+  contractId: string,
+  extendByMonths: number,
+): Promise<{ invoice: Invoice; warning?: string }> => {
+  const response = await api.post(`/b/invoices/${contractId}/extend-contract`, {
+    extendByMonths,
+  });
+  return { invoice: response.data.data, warning: response.data.warning };
 };
 
 /**
@@ -777,6 +852,9 @@ export interface CollectionAlert {
   recordedMonths?: number;
   tenure?: number;
   contractStatus?: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  /** The contract's required deposit — 0/undefined if none. Whether it's actually been
+   *  collected comes from getSecurityDepositBillStatus separately. */
+  securityDepositAmount?: number;
 }
 
 export interface CompletedCollection {
@@ -803,6 +881,7 @@ export interface CompletedCollection {
   securityDepositBank?: string;
   securityDepositReference?: string;
   advanceAmount?: number;
+  paymentTiming?: 'ADVANCE' | 'ARREARS';
   discountAmount?: number;
   customerEmail?: string;
 }
@@ -944,6 +1023,7 @@ export const updateUsageRecord = async (
     colorA4Count: number;
     colorA3Count: number;
     billingPeriodEnd?: string;
+    readingTakenDate?: string;
     discountAmount?: number;
     discountBwCopies?: number;
     discountColorCopies?: number;

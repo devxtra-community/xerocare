@@ -23,6 +23,7 @@ import {
   Scan,
   Send,
   Wallet,
+  Package,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -95,6 +96,11 @@ interface SaleItem {
   maxDiscount: number;
   wholesalePrice?: number;
   retailPrice?: number;
+  // Added alongside a Rent/Lease machine, not as the machine itself — e.g. a stand, tray,
+  // or stapler unit supplied with the rented/leased device. Priced and billed once (with
+  // the first month advance), never metered — no reading/pricing-config UI is shown for it.
+  isAccessory?: boolean;
+  imageUrl?: string;
   isManual: boolean;
   productId?: string;
   sparePartId?: string;
@@ -1435,9 +1441,14 @@ function QuotationFormModal({
 
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
 
+  // ── PAYMENT TIMING state ───────────────────────────────────────────────
+  const [paymentTiming, setPaymentTiming] = useState<'ADVANCE' | 'ARREARS'>('ADVANCE');
+
   // ── SECURITY DEPOSIT state ──────────────────────────────────────────────
   const [securityDepositAmount, setSecurityDepositAmount] = useState('');
-  const [securityDepositMode, setSecurityDepositMode] = useState<'CASH' | 'CHEQUE'>('CASH');
+  const [securityDepositMode, setSecurityDepositMode] = useState<
+    'CASH' | 'CHEQUE' | 'BANK_TRANSFER'
+  >('CASH');
   const [securityDepositReference, setSecurityDepositReference] = useState('');
   const [securityDepositBank, setSecurityDepositBank] = useState('');
 
@@ -1551,6 +1562,8 @@ function QuotationFormModal({
     if (initialData.monthlyRent) setMonthlyRent(String(initialData.monthlyRent));
     if (initialData.advanceAmount) setAdvanceAmount(String(initialData.advanceAmount));
     if (initialData.discountPercent) setDiscountPercent(String(initialData.discountPercent));
+    if (initialData.paymentTiming)
+      setPaymentTiming(initialData.paymentTiming as 'ADVANCE' | 'ARREARS');
     if (initialData.effectiveFrom) {
       setEffectiveFrom(initialData.effectiveFrom.split('T')[0]);
     }
@@ -1582,7 +1595,10 @@ function QuotationFormModal({
     if (initialData.securityDepositAmount)
       setSecurityDepositAmount(String(initialData.securityDepositAmount));
     if (initialData.securityDepositMode) {
-      setSecurityDepositMode(initialData.securityDepositMode === 'CHEQUE' ? 'CHEQUE' : 'CASH');
+      const mode = initialData.securityDepositMode;
+      setSecurityDepositMode(
+        mode === 'CHEQUE' ? 'CHEQUE' : mode === 'BANK_TRANSFER' ? 'BANK_TRANSFER' : 'CASH',
+      );
     }
     if (initialData.securityDepositReference)
       setSecurityDepositReference(initialData.securityDepositReference);
@@ -1746,6 +1762,15 @@ function QuotationFormModal({
     return map;
   }, [saleItems]);
 
+  // Accessories supplied alongside a Rent/Lease machine — priced items, billed once with
+  // the first month advance, never metered. Kept in the same saleItems array as the
+  // machines (isAccessory flags which is which) so add/remove/update infra is shared.
+  const accessoryItems = useMemo(() => saleItems.filter((it) => it.isAccessory), [saleItems]);
+  const accessoryTotal = useMemo(
+    () => accessoryItems.reduce((s, it) => s + it.quantity * it.unitPrice, 0),
+    [accessoryItems],
+  );
+
   const [activeItemTab, setActiveItemTab] = useState<'PRODUCT' | 'SPAREPART'>('PRODUCT');
 
   // Synchronize activeItemTab with quotationType
@@ -1775,7 +1800,7 @@ function QuotationFormModal({
     setWarrantyType(durationMatch && maxPages ? 'both' : durationMatch ? 'duration' : 'copies');
   };
 
-  const addItem = (item: SelectableItem) => {
+  const addItem = (item: SelectableItem, asAccessory: boolean = false) => {
     let description = '',
       basePrice = 0,
       wholesalePrice = 0,
@@ -1845,11 +1870,15 @@ function QuotationFormModal({
         return (
           !existing.isManual &&
           existing.sparePartId === sparePartId &&
-          existing.itemType === 'SPAREPART'
+          existing.itemType === 'SPAREPART' &&
+          !!existing.isAccessory === asAccessory
         );
       } else {
         return (
-          !existing.isManual && existing.productId === productId && existing.itemType === 'PRODUCT'
+          !existing.isManual &&
+          existing.productId === productId &&
+          existing.itemType === 'PRODUCT' &&
+          !!existing.isAccessory === asAccessory
         );
       }
     });
@@ -1877,7 +1906,9 @@ function QuotationFormModal({
       return;
     }
 
-    if (!isSparePart) applyProductWarrantyDefaults(item as Product);
+    // An accessory's warranty metadata isn't the rented/leased machine's warranty — only
+    // let a real machine seed the quotation-level warranty defaults.
+    if (!isSparePart && !asAccessory) applyProductWarrantyDefaults(item as Product);
 
     setSaleItems((prev) => [
       ...prev,
@@ -1902,9 +1933,11 @@ function QuotationFormModal({
         comboSlabRanges: [],
         warranty,
         consumables,
+        isAccessory: asAccessory,
+        imageUrl: !isSparePart ? (item as Product).imageUrl : undefined,
       },
     ]);
-    toast.success(`Added ${description}`);
+    toast.success(asAccessory ? `Added accessory: ${description}` : `Added ${description}`);
   };
 
   const removeItem = (i: number) => setSaleItems((prev) => prev.filter((_, idx) => idx !== i));
@@ -2453,6 +2486,7 @@ function QuotationFormModal({
             ? Number(monthlyRent)
             : undefined,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
+        paymentTiming,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
         validityDays: validDays,
         effectiveFrom,
@@ -2465,6 +2499,20 @@ function QuotationFormModal({
         securityDepositBank,
 
         items: saleItems.map((it, idx) => {
+          // Accessories are real priced line items, not rate-config for a machine — send
+          // their actual price/productId through untouched, skip the STD/PRM/rate mapping
+          // below entirely (none of it applies to an accessory).
+          if (it.isAccessory) {
+            return {
+              description: it.description,
+              quantity: it.quantity,
+              unitPrice: Number(it.unitPrice) || 0,
+              itemType: 'ACCESSORY' as const,
+              productId: it.productId,
+              modelId: it.modelId,
+            };
+          }
+
           let desc = it.isManual
             ? [
                 it.brand,
@@ -2477,7 +2525,10 @@ function QuotationFormModal({
                 .join(' ')
             : it.description;
 
-          if (idx === 0) {
+          // STD/PRM layout style tags the first MACHINE, not the first array entry — an
+          // accessory added before the machine must not steal this prefix.
+          const firstMachineIdx = saleItems.findIndex((x) => !x.isAccessory);
+          if (idx === firstMachineIdx) {
             if (selectedLayoutStyle === 'standard') desc = `[STD] ${desc}`;
             else if (selectedLayoutStyle === 'premium') desc = `[PRM] ${desc}`;
           }
@@ -2517,6 +2568,7 @@ function QuotationFormModal({
         totalLeaseAmount: totalLeaseAmount ? Number(totalLeaseAmount) : 0,
         monthlyEmiAmount: monthlyEmiAmount ? Number(monthlyEmiAmount) : 0,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
+        paymentTiming,
 
         // Security Deposit
         securityDepositAmount: securityDepositAmount ? Number(securityDepositAmount) : undefined,
@@ -2553,6 +2605,20 @@ function QuotationFormModal({
         effectiveTo: effectiveTo || undefined,
         discountPercent: discountPercent ? Number(discountPercent) : undefined,
         items: saleItems.map((it, idx) => {
+          // Accessories are real priced line items, not rate-config for a machine — send
+          // their actual price/productId through untouched, skip the STD/PRM/FSM rate
+          // mapping below entirely (none of it applies to an accessory).
+          if (it.isAccessory) {
+            return {
+              description: it.description,
+              quantity: it.quantity,
+              unitPrice: Number(it.unitPrice) || 0,
+              itemType: 'ACCESSORY' as const,
+              productId: it.productId,
+              modelId: it.modelId,
+            };
+          }
+
           let desc = it.isManual
             ? [
                 it.brand,
@@ -2565,7 +2631,10 @@ function QuotationFormModal({
                 .join(' ')
             : it.description;
 
-          if (idx === 0) {
+          // STD/PRM layout style tags the first MACHINE, not the first array entry — an
+          // accessory added before the machine must not steal this prefix.
+          const firstMachineIdx = saleItems.findIndex((x) => !x.isAccessory);
+          if (idx === firstMachineIdx) {
             if (selectedLayoutStyle === 'standard') desc = `[STD] ${desc}`;
             else if (selectedLayoutStyle === 'premium') desc = `[PRM] ${desc}`;
           }
@@ -2653,86 +2722,88 @@ function QuotationFormModal({
         }),
         pricingItems:
           leaseType === 'FSM'
-            ? saleItems.map((it) => ({
-                description: it.isManual
-                  ? [
-                      it.brand,
-                      it.model,
-                      it.productName,
-                      it.hsCode ? `[HS: ${it.hsCode}]` : '',
-                      it.description ? `(${it.description})` : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
-                  : it.description,
-                bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
-                colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
-                combinedIncludedLimit:
-                  rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
-                bwExcessRate:
-                  rentType === 'FIXED_LIMIT' || rentType === 'CPC'
-                    ? Number(it.bwExcessRate) || 0
-                    : 0,
-                colorExcessRate:
-                  rentType === 'FIXED_LIMIT' || rentType === 'CPC'
-                    ? Number(it.colorExcessRate) || 0
-                    : 0,
-                combinedExcessRate:
-                  rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
-                    ? Number(it.combinedExcessRate) || 0
-                    : 0,
-                // Separate A3/A4 pricing is a CPC-only plan shape (see the toggle in the
-                // Lease FSM form) — send the flag off for every other billing type so a
-                // plan switched away from CPC can't keep billing on stale A3 rates.
-                separateA3Pricing: rentType === 'CPC' ? !!it.separateA3Pricing : false,
-                bwA3ExcessRate:
-                  rentType === 'CPC' && it.separateA3Pricing
-                    ? Number(it.bwA3ExcessRate) || 0
-                    : undefined,
-                colorA3ExcessRate:
-                  rentType === 'CPC' && it.separateA3Pricing
-                    ? Number(it.colorA3ExcessRate) || 0
-                    : undefined,
-                bwSlabRanges:
-                  rentType === 'CPC' || rentType === 'CPC_COMBO'
+            ? saleItems
+                .filter((it) => !it.isAccessory)
+                .map((it) => ({
+                  description: it.isManual
                     ? [
-                        ...(it.useBwRateUpTo100k && it.bwRateUpTo100k
-                          ? [{ from: 0, to: 100000, rate: Number(it.bwRateUpTo100k) }]
-                          : []),
-                        ...(it.bwSlabRanges || []).map((r) => ({
-                          from: Number(r.from) || 0,
-                          to: Number(r.to) || 0,
-                          rate: Number(r.rate) || 0,
-                        })),
-                      ].filter((s) => s.rate > 0)
-                    : undefined,
-                colorSlabRanges:
-                  rentType === 'CPC' || rentType === 'CPC_COMBO'
-                    ? [
-                        ...(it.useColorRateUpTo100k && it.colorRateUpTo100k
-                          ? [{ from: 0, to: 100000, rate: Number(it.colorRateUpTo100k) }]
-                          : []),
-                        ...(it.colorSlabRanges || []).map((r) => ({
-                          from: Number(r.from) || 0,
-                          to: Number(r.to) || 0,
-                          rate: Number(r.rate) || 0,
-                        })),
-                      ].filter((s) => s.rate > 0)
-                    : undefined,
-                comboSlabRanges:
-                  rentType === 'CPC' || rentType === 'CPC_COMBO'
-                    ? [
-                        ...(it.useComboRateUpTo100k && it.comboRateUpTo100k
-                          ? [{ from: 0, to: 100000, rate: Number(it.comboRateUpTo100k) }]
-                          : []),
-                        ...(it.comboSlabRanges || []).map((r) => ({
-                          from: Number(r.from) || 0,
-                          to: Number(r.to) || 0,
-                          rate: Number(r.rate) || 0,
-                        })),
-                      ].filter((s) => s.rate > 0)
-                    : undefined,
-              }))
+                        it.brand,
+                        it.model,
+                        it.productName,
+                        it.hsCode ? `[HS: ${it.hsCode}]` : '',
+                        it.description ? `(${it.description})` : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')
+                    : it.description,
+                  bwIncludedLimit: rentType === 'FIXED_LIMIT' ? it.bwIncludedLimit || 0 : 0,
+                  colorIncludedLimit: rentType === 'FIXED_LIMIT' ? it.colorIncludedLimit || 0 : 0,
+                  combinedIncludedLimit:
+                    rentType === 'FIXED_COMBO' ? it.combinedIncludedLimit || 0 : 0,
+                  bwExcessRate:
+                    rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+                      ? Number(it.bwExcessRate) || 0
+                      : 0,
+                  colorExcessRate:
+                    rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+                      ? Number(it.colorExcessRate) || 0
+                      : 0,
+                  combinedExcessRate:
+                    rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
+                      ? Number(it.combinedExcessRate) || 0
+                      : 0,
+                  // Separate A3/A4 pricing is a CPC-only plan shape (see the toggle in the
+                  // Lease FSM form) — send the flag off for every other billing type so a
+                  // plan switched away from CPC can't keep billing on stale A3 rates.
+                  separateA3Pricing: rentType === 'CPC' ? !!it.separateA3Pricing : false,
+                  bwA3ExcessRate:
+                    rentType === 'CPC' && it.separateA3Pricing
+                      ? Number(it.bwA3ExcessRate) || 0
+                      : undefined,
+                  colorA3ExcessRate:
+                    rentType === 'CPC' && it.separateA3Pricing
+                      ? Number(it.colorA3ExcessRate) || 0
+                      : undefined,
+                  bwSlabRanges:
+                    rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? [
+                          ...(it.useBwRateUpTo100k && it.bwRateUpTo100k
+                            ? [{ from: 0, to: 100000, rate: Number(it.bwRateUpTo100k) }]
+                            : []),
+                          ...(it.bwSlabRanges || []).map((r) => ({
+                            from: Number(r.from) || 0,
+                            to: Number(r.to) || 0,
+                            rate: Number(r.rate) || 0,
+                          })),
+                        ].filter((s) => s.rate > 0)
+                      : undefined,
+                  colorSlabRanges:
+                    rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? [
+                          ...(it.useColorRateUpTo100k && it.colorRateUpTo100k
+                            ? [{ from: 0, to: 100000, rate: Number(it.colorRateUpTo100k) }]
+                            : []),
+                          ...(it.colorSlabRanges || []).map((r) => ({
+                            from: Number(r.from) || 0,
+                            to: Number(r.to) || 0,
+                            rate: Number(r.rate) || 0,
+                          })),
+                        ].filter((s) => s.rate > 0)
+                      : undefined,
+                  comboSlabRanges:
+                    rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? [
+                          ...(it.useComboRateUpTo100k && it.comboRateUpTo100k
+                            ? [{ from: 0, to: 100000, rate: Number(it.comboRateUpTo100k) }]
+                            : []),
+                          ...(it.comboSlabRanges || []).map((r) => ({
+                            from: Number(r.from) || 0,
+                            to: Number(r.to) || 0,
+                            rate: Number(r.rate) || 0,
+                          })),
+                        ].filter((s) => s.rate > 0)
+                      : undefined,
+                }))
             : [],
       };
     }
@@ -2977,26 +3048,23 @@ function QuotationFormModal({
                 />
               </div>
 
-              {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price/base_price */}
+              {/* Transaction Type — B2B uses wholesale_price, B2C uses sale_price/base_price.
+                  No manual dropdown: the customer record already carries this classification
+                  (set on CustomerSelect above), so it's derived automatically and just shown
+                  here read-only for transparency rather than asked for again. */}
               {['PRODUCT_SALE', 'SPAREPART_SALE'].includes(quotationType) && (
                 <div className="bg-card p-5 rounded-xl border border-slate-100 shadow-sm space-y-2">
                   <label className="text-[11px] font-bold text-muted-foreground uppercase flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-400" /> Transaction Type
                   </label>
-                  <Select
-                    value={transactionType}
-                    onValueChange={(v) => setTransactionType(v as 'B2B' | 'B2C')}
-                  >
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="B2C">B2C — Business to Customer (Retail Price)</SelectItem>
-                      <SelectItem value="B2B">
-                        B2B — Business to Business (Wholesale Price)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="h-9 flex items-center px-3 rounded-md border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700">
+                    {transactionType === 'B2B'
+                      ? 'B2B — Business to Business (Wholesale Price)'
+                      : 'B2C — Business to Customer (Retail Price)'}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Set automatically from the customer&apos;s account type.
+                  </p>
                 </div>
               )}
 
@@ -3612,192 +3680,325 @@ function QuotationFormModal({
                       mode="PRODUCT"
                       selectedQuantities={selectedQuantities}
                       onSelect={(item) => {
-                        if (saleItems.find((x) => x.productId === item.id)) return;
+                        if (saleItems.find((x) => x.productId === item.id && !x.isAccessory))
+                          return;
                         addItem(item);
                       }}
                       placeholder="Select Product"
                     />
-                    {saleItems.length > 0 && (
+                    {saleItems.some((x) => !x.isAccessory) && (
                       <div className="space-y-4 mt-2">
-                        {saleItems.map((m, index) => (
-                          <div
-                            key={m.productId || index}
-                            className="flex flex-col gap-3 bg-orange-50 border border-orange-100 rounded-lg px-4 py-3"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-black text-slate-800">
-                                {m.description}
-                              </span>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  onClick={() => removeItem(index)}
-                                  className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                        {saleItems.map((m, index) => {
+                          if (m.isAccessory) return null;
+                          return (
+                            <div
+                              key={m.productId || index}
+                              className="flex flex-col gap-3 bg-orange-50 border border-orange-100 rounded-lg px-4 py-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-2 text-sm font-black text-slate-800">
+                                  {m.imageUrl ? (
+                                    <img
+                                      src={m.imageUrl}
+                                      alt={m.description}
+                                      className="w-8 h-8 rounded object-cover border border-orange-200 bg-white shrink-0"
+                                    />
+                                  ) : (
+                                    <span className="w-8 h-8 rounded bg-white border border-orange-200 flex items-center justify-center text-orange-300 shrink-0">
+                                      <Package size={14} />
+                                    </span>
+                                  )}
+                                  {m.description}
+                                </span>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => removeItem(index)}
+                                    className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               </div>
+
+                              {/* Dynamic Pricing Inputs Based on Rent Type */}
+                              {rentType !== 'FIXED_FLAT' && (
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-orange-100 shadow-sm">
+                                  {rentType === 'FIXED_LIMIT' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        B/W Limit
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Copies"
+                                        value={m.bwIncludedLimit || ''}
+                                        onChange={(e) =>
+                                          updateItem(index, 'bwIncludedLimit', e.target.value)
+                                        }
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {rentType === 'FIXED_COMBO' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Combo Limit
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Copies"
+                                        value={m.combinedIncludedLimit || ''}
+                                        onChange={(e) =>
+                                          updateItem(index, 'combinedIncludedLimit', e.target.value)
+                                        }
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {rentType === 'FIXED_LIMIT' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Color Limit
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Copies"
+                                        value={m.colorIncludedLimit || ''}
+                                        onChange={(e) =>
+                                          updateItem(index, 'colorIncludedLimit', e.target.value)
+                                        }
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        B/W Excess Rate
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.bwExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined) updateItem(index, 'bwExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Color Excess Rate
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.colorExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined)
+                                            updateItem(index, 'colorExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Combo Excess Rate
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.combinedExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined)
+                                            updateItem(index, 'combinedExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {/* Slab Rates UI for CPC */}
+                              {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
+                                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                                    <span>Slab Rates Configuration</span>
+                                  </label>
+
+                                  {rentType === 'CPC' && (
+                                    <div className="space-y-4 mt-2">
+                                      {/* B/W Slabs */}
+                                      {renderSlabSection(
+                                        index,
+                                        'Black & White Slabs',
+                                        'bwSlabRanges',
+                                        m.bwSlabRanges,
+                                        'useBwRateUpTo100k',
+                                        !!m.useBwRateUpTo100k,
+                                        'bwRateUpTo100k',
+                                        m.bwRateUpTo100k || '',
+                                      )}
+                                      {/* Color Slabs */}
+                                      {renderSlabSection(
+                                        index,
+                                        'Color Slabs',
+                                        'colorSlabRanges',
+                                        m.colorSlabRanges,
+                                        'useColorRateUpTo100k',
+                                        !!m.useColorRateUpTo100k,
+                                        'colorRateUpTo100k',
+                                        m.colorRateUpTo100k || '',
+                                      )}
+                                    </div>
+                                  )}
+                                  {rentType === 'CPC_COMBO' && (
+                                    <div className="space-y-4 mt-2">
+                                      {renderSlabSection(
+                                        index,
+                                        'Combined Slabs',
+                                        'comboSlabRanges',
+                                        m.comboSlabRanges,
+                                        'useComboRateUpTo100k',
+                                        !!m.useComboRateUpTo100k,
+                                        'comboRateUpTo100k',
+                                        m.comboRateUpTo100k || '',
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
-                            {/* Dynamic Pricing Inputs Based on Rent Type */}
-                            {rentType !== 'FIXED_FLAT' && (
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-orange-100 shadow-sm">
-                                {rentType === 'FIXED_LIMIT' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      B/W Limit
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Copies"
-                                      value={m.bwIncludedLimit || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'bwIncludedLimit', e.target.value)
-                                      }
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {rentType === 'FIXED_COMBO' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Combo Limit
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Copies"
-                                      value={m.combinedIncludedLimit || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'combinedIncludedLimit', e.target.value)
-                                      }
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {rentType === 'FIXED_LIMIT' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Color Limit
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Copies"
-                                      value={m.colorIncludedLimit || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'colorIncludedLimit', e.target.value)
-                                      }
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      B/W Excess Rate
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.bwExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined) updateItem(index, 'bwExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Color Excess Rate
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.colorExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined)
-                                          updateItem(index, 'colorExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Combo Excess Rate
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.combinedExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined)
-                                          updateItem(index, 'combinedExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
+                  {/* Accessories */}
+                  <div className="bg-card p-5 rounded-xl border border-teal-100 shadow-sm space-y-3">
+                    <label className="text-[11px] font-bold text-teal-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-teal-400" /> Accessories (Optional)
+                    </label>
+                    <p className="text-[10px] text-slate-400 -mt-1">
+                      Extra items supplied with the machine (stand, tray, stapler unit, etc.) —
+                      billed once with the first month advance. No meter reading applies.
+                    </p>
+                    <ProductSelect
+                      mode="PRODUCT"
+                      selectedQuantities={selectedQuantities}
+                      onSelect={(item) => {
+                        if (saleItems.find((x) => x.productId === item.id && x.isAccessory)) {
+                          toast.error(
+                            'This accessory is already added. Adjust its quantity below.',
+                          );
+                          return;
+                        }
+                        addItem(item, true);
+                      }}
+                      placeholder="Select Accessory Product"
+                    />
+                    {accessoryItems.length > 0 && (
+                      <div className="space-y-3 mt-2">
+                        {saleItems.map((m, index) => {
+                          if (!m.isAccessory) return null;
+                          return (
+                            <div
+                              key={m.productId || index}
+                              className="flex items-center gap-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-3"
+                            >
+                              {m.imageUrl ? (
+                                <img
+                                  src={m.imageUrl}
+                                  alt={m.description}
+                                  className="w-12 h-12 rounded-md object-cover border border-teal-200 bg-white shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-md bg-white border border-teal-200 flex items-center justify-center text-teal-300 shrink-0">
+                                  <Package size={18} />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-black text-slate-800 truncate">
+                                  {m.description}
+                                </p>
+                                <p className="text-[9px] font-bold text-teal-600 uppercase tracking-wider">
+                                  Accessory
+                                </p>
                               </div>
-                            )}
-                            {/* Slab Rates UI for CPC */}
-                            {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
-                              <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
-                                  <span>Slab Rates Configuration</span>
+                              <div className="w-14 space-y-1">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Qty
                                 </label>
-
-                                {rentType === 'CPC' && (
-                                  <div className="space-y-4 mt-2">
-                                    {/* B/W Slabs */}
-                                    {renderSlabSection(
-                                      index,
-                                      'Black & White Slabs',
-                                      'bwSlabRanges',
-                                      m.bwSlabRanges,
-                                      'useBwRateUpTo100k',
-                                      !!m.useBwRateUpTo100k,
-                                      'bwRateUpTo100k',
-                                      m.bwRateUpTo100k || '',
-                                    )}
-                                    {/* Color Slabs */}
-                                    {renderSlabSection(
-                                      index,
-                                      'Color Slabs',
-                                      'colorSlabRanges',
-                                      m.colorSlabRanges,
-                                      'useColorRateUpTo100k',
-                                      !!m.useColorRateUpTo100k,
-                                      'colorRateUpTo100k',
-                                      m.colorRateUpTo100k || '',
-                                    )}
-                                  </div>
-                                )}
-                                {rentType === 'CPC_COMBO' && (
-                                  <div className="space-y-4 mt-2">
-                                    {renderSlabSection(
-                                      index,
-                                      'Combined Slabs',
-                                      'comboSlabRanges',
-                                      m.comboSlabRanges,
-                                      'useComboRateUpTo100k',
-                                      !!m.useComboRateUpTo100k,
-                                      'comboRateUpTo100k',
-                                      m.comboRateUpTo100k || '',
-                                    )}
-                                  </div>
-                                )}
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={m.quantity}
+                                  onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                  className="h-8 text-[11px] font-bold"
+                                />
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <div className="w-20 space-y-1">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Rate ({currency})
+                                </label>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={m.basePrice}
+                                  readOnly={!m.isEditable}
+                                  onChange={(e) => {
+                                    const v = handleDecimalInput(e.target.value);
+                                    if (v !== undefined) updateItem(index, 'basePrice', v);
+                                  }}
+                                  className={`h-8 text-[11px] font-bold ${!m.isEditable ? 'bg-muted/50 text-muted-foreground' : ''}`}
+                                />
+                              </div>
+                              <div className="w-16 space-y-1">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Discount
+                                </label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={m.discount === 0 ? '' : m.discount}
+                                  placeholder="0"
+                                  onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                                  className="h-8 text-[11px] font-bold"
+                                />
+                              </div>
+                              <div className="w-20 space-y-1 text-right">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Net
+                                </label>
+                                <p className="h-8 flex items-center justify-end text-[11px] font-black text-teal-700">
+                                  {formatCurrency(m.quantity * m.unitPrice, currency)}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => removeItem(index)}
+                                className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded shrink-0"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                        <div className="flex justify-end">
+                          <p className="text-xs font-black text-teal-700">
+                            Accessories Total: {formatCurrency(accessoryTotal, currency)}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3822,25 +4023,34 @@ function QuotationFormModal({
                             className="h-9 text-sm"
                           />
                         </div>
-                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                            Advance / Caution Deposit ({currency})
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={advanceAmount}
-                            onChange={(e) => {
-                              const v = handleDecimalInput(e.target.value);
-                              if (v !== undefined) {
-                                setAdvanceAmount(v);
-                                setSecurityDepositAmount(v);
-                              }
-                            }}
-                            className="h-9 text-sm"
-                          />
-                        </div>
+                        {paymentTiming === 'ADVANCE' && (
+                          <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                              First Month Advance Payment ({currency})
+                            </label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={advanceAmount}
+                              onChange={(e) => {
+                                const v = handleDecimalInput(e.target.value);
+                                if (v !== undefined) setAdvanceAmount(v);
+                              }}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        )}
+                        {paymentTiming === 'ARREARS' && (
+                          <div className="bg-card p-4 rounded-xl border border-violet-100 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-violet-600 uppercase">
+                              Postpaid — No Advance Required
+                            </label>
+                            <p className="text-[10px] text-slate-400">
+                              First payment collected after the first billing period completes.
+                            </p>
+                          </div>
+                        )}
                         <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
                             Discount (%)
@@ -3855,6 +4065,104 @@ function QuotationFormModal({
                         </div>
                       </>
                     )}
+                  </div>
+
+                  {/* Security Deposit Section */}
+                  <div className="bg-card p-5 rounded-xl border border-amber-100 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Security Deposit
+                      (Optional)
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Security Deposit Amount ({currency})
+                        </label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={securityDepositAmount}
+                          onChange={(e) => {
+                            const v = handleDecimalInput(e.target.value);
+                            if (v !== undefined) setSecurityDepositAmount(v);
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      {securityDepositAmount && Number(securityDepositAmount) > 0 && (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              Payment Mode
+                            </label>
+                            <select
+                              value={securityDepositMode}
+                              onChange={(e) =>
+                                setSecurityDepositMode(e.target.value as 'CASH' | 'CHEQUE')
+                              }
+                              className="h-9 text-sm w-full rounded-md border border-slate-200 bg-white px-2"
+                            >
+                              <option value="CASH">Cash</option>
+                              <option value="BANK_TRANSFER">Bank Transfer</option>
+                              <option value="CHEQUE">Cheque</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              Reference / Cheque No
+                            </label>
+                            <Input
+                              type="text"
+                              placeholder="Optional"
+                              value={securityDepositReference}
+                              onChange={(e) => setSecurityDepositReference(e.target.value)}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment Timing */}
+                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Billing Method
+                        </label>
+                        <Select
+                          value={paymentTiming}
+                          onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
+                        >
+                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ADVANCE">
+                              Advance Billing (Advance Payment)
+                            </SelectItem>
+                            <SelectItem value="ARREARS">
+                              Arrears Billing (Postpaid Billing)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Description
+                        </label>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          {paymentTiming === 'ADVANCE'
+                            ? 'Customer pays upcoming period rent in advance + current excess usage each billing cycle.'
+                            : 'Customer pays current period rent + excess usage after the billing period completes.'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}
@@ -4020,264 +4328,398 @@ function QuotationFormModal({
                       mode="PRODUCT"
                       selectedQuantities={selectedQuantities}
                       onSelect={(item) => {
-                        if (saleItems.find((x) => x.productId === item.id)) return;
+                        if (saleItems.find((x) => x.productId === item.id && !x.isAccessory))
+                          return;
                         addItem(item);
                       }}
                       placeholder="Select Product"
                     />
-                    {saleItems.length > 0 && (
+                    {saleItems.some((x) => !x.isAccessory) && (
                       <div className="space-y-2 mt-2">
-                        {saleItems.map((m, index) => (
-                          <div
-                            key={m.productId || index}
-                            className="flex flex-col gap-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-black text-slate-800">
-                                {m.description}
-                              </span>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  onClick={() => removeItem(index)}
-                                  className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                        {saleItems.map((m, index) => {
+                          if (m.isAccessory) return null;
+                          return (
+                            <div
+                              key={m.productId || index}
+                              className="flex flex-col gap-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-2 text-sm font-black text-slate-800">
+                                  {m.imageUrl ? (
+                                    <img
+                                      src={m.imageUrl}
+                                      alt={m.description}
+                                      className="w-8 h-8 rounded object-cover border border-purple-200 bg-white shrink-0"
+                                    />
+                                  ) : (
+                                    <span className="w-8 h-8 rounded bg-white border border-purple-200 flex items-center justify-center text-purple-300 shrink-0">
+                                      <Package size={14} />
+                                    </span>
+                                  )}
+                                  {m.description}
+                                </span>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => removeItem(index)}
+                                    className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                            {/* Separate A3/A4 excess pricing — CPC only. Fixed plans price
+                              {/* Separate A3/A4 excess pricing — CPC only. Fixed plans price
                                 against an included allowance counted in A4-equivalents, so
                                 splitting the rate there has no unambiguous meaning. */}
-                            {leaseType === 'FSM' && rentType === 'CPC' && (
-                              <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-purple-100 shadow-sm">
-                                <div className="min-w-0">
-                                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
-                                    A3 / A4 Pricing
-                                  </p>
-                                  <p className="text-[9px] text-slate-400 font-bold italic mt-0.5">
+                              {leaseType === 'FSM' && rentType === 'CPC' && (
+                                <div className="flex items-center justify-between bg-white px-3 py-2 rounded border border-purple-100 shadow-sm">
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest">
+                                      A3 / A4 Pricing
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 font-bold italic mt-0.5">
+                                      {m.separateA3Pricing
+                                        ? 'A3 pages bill 1:1 at their own rate (no 2x conversion)'
+                                        : `A3 pages bill as ${A3_RATE_FACTOR} A4 clicks at the A4 rate`}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      updateItem(index, 'separateA3Pricing', !m.separateA3Pricing)
+                                    }
+                                    className={`shrink-0 text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tight transition-all shadow-sm ${
+                                      m.separateA3Pricing
+                                        ? 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-700'
+                                        : 'bg-white text-slate-500 border border-slate-200 hover:border-purple-300 hover:text-purple-600'
+                                    }`}
+                                  >
                                     {m.separateA3Pricing
-                                      ? 'A3 pages bill 1:1 at their own rate (no 2x conversion)'
-                                      : `A3 pages bill as ${A3_RATE_FACTOR} A4 clicks at the A4 rate`}
-                                  </p>
+                                      ? '\u2713 Separate A3 Rates ON'
+                                      : '+ Separate A3 Rates'}
+                                  </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateItem(index, 'separateA3Pricing', !m.separateA3Pricing)
-                                  }
-                                  className={`shrink-0 text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tight transition-all shadow-sm ${
-                                    m.separateA3Pricing
-                                      ? 'bg-purple-600 text-white border border-purple-500 hover:bg-purple-700'
-                                      : 'bg-white text-slate-500 border border-slate-200 hover:border-purple-300 hover:text-purple-600'
-                                  }`}
-                                >
-                                  {m.separateA3Pricing
-                                    ? '\u2713 Separate A3 Rates ON'
-                                    : '+ Separate A3 Rates'}
-                                </button>
-                              </div>
-                            )}
-                            {/* Dynamic Pricing Inputs for Lease FSM */}
-                            {leaseType === 'FSM' && rentType !== 'FIXED_FLAT' && (
-                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-purple-100 shadow-sm">
-                                {rentType === 'FIXED_LIMIT' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      B/W Limit
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Copies"
-                                      value={m.bwIncludedLimit || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'bwIncludedLimit', e.target.value)
-                                      }
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {rentType === 'FIXED_COMBO' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Combo Limit
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Copies"
-                                      value={m.combinedIncludedLimit || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'combinedIncludedLimit', e.target.value)
-                                      }
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {rentType === 'FIXED_LIMIT' && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Color Limit
-                                    </label>
-                                    <Input
-                                      type="number"
-                                      placeholder="Copies"
-                                      value={m.colorIncludedLimit || ''}
-                                      onChange={(e) =>
-                                        updateItem(index, 'colorIncludedLimit', e.target.value)
-                                      }
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      {m.separateA3Pricing && rentType === 'CPC'
-                                        ? 'B/W A4 Rate'
-                                        : 'B/W Excess Rate'}
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.bwExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined) updateItem(index, 'bwExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {rentType === 'CPC' && m.separateA3Pricing && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
-                                      B/W A3 Rate
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.bwA3ExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined) updateItem(index, 'bwA3ExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
-                                    />
-                                  </div>
-                                )}
-                                {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      {m.separateA3Pricing && rentType === 'CPC'
-                                        ? 'Color A4 Rate'
-                                        : 'Color Excess Rate'}
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.colorExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined)
-                                          updateItem(index, 'colorExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                                {rentType === 'CPC' && m.separateA3Pricing && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
-                                      Color A3 Rate
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.colorA3ExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined)
-                                          updateItem(index, 'colorA3ExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
-                                    />
-                                  </div>
-                                )}
-                                {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
-                                  <div className="space-y-1">
-                                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                                      Combo Excess Rate
-                                    </label>
-                                    <Input
-                                      type="text"
-                                      inputMode="decimal"
-                                      placeholder="Rate"
-                                      value={m.combinedExcessRate ?? ''}
-                                      onChange={(e) => {
-                                        const v = handleDecimalInput(e.target.value);
-                                        if (v !== undefined)
-                                          updateItem(index, 'combinedExcessRate', v);
-                                      }}
-                                      className="h-8 text-[11px] font-bold"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {/* Slab Rates UI for CPC */}
-                            {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
-                              <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
-                                  <span>Slab Rates Configuration</span>
-                                </label>
+                              )}
+                              {/* Dynamic Pricing Inputs for Lease FSM */}
+                              {leaseType === 'FSM' && rentType !== 'FIXED_FLAT' && (
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 bg-white p-3 rounded border border-purple-100 shadow-sm">
+                                  {rentType === 'FIXED_LIMIT' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        B/W Limit
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Copies"
+                                        value={m.bwIncludedLimit || ''}
+                                        onChange={(e) =>
+                                          updateItem(index, 'bwIncludedLimit', e.target.value)
+                                        }
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {rentType === 'FIXED_COMBO' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Combo Limit
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Copies"
+                                        value={m.combinedIncludedLimit || ''}
+                                        onChange={(e) =>
+                                          updateItem(index, 'combinedIncludedLimit', e.target.value)
+                                        }
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {rentType === 'FIXED_LIMIT' && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Color Limit
+                                      </label>
+                                      <Input
+                                        type="number"
+                                        placeholder="Copies"
+                                        value={m.colorIncludedLimit || ''}
+                                        onChange={(e) =>
+                                          updateItem(index, 'colorIncludedLimit', e.target.value)
+                                        }
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        {m.separateA3Pricing && rentType === 'CPC'
+                                          ? 'B/W A4 Rate'
+                                          : 'B/W Excess Rate'}
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.bwExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined) updateItem(index, 'bwExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {rentType === 'CPC' && m.separateA3Pricing && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
+                                        B/W A3 Rate
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.bwA3ExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined)
+                                            updateItem(index, 'bwA3ExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
+                                      />
+                                    </div>
+                                  )}
+                                  {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        {m.separateA3Pricing && rentType === 'CPC'
+                                          ? 'Color A4 Rate'
+                                          : 'Color Excess Rate'}
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.colorExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined)
+                                            updateItem(index, 'colorExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                  {rentType === 'CPC' && m.separateA3Pricing && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-purple-500 uppercase tracking-wider block">
+                                        Color A3 Rate
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.colorA3ExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined)
+                                            updateItem(index, 'colorA3ExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold border-purple-200 focus-visible:ring-purple-300"
+                                      />
+                                    </div>
+                                  )}
+                                  {(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO') && (
+                                    <div className="space-y-1">
+                                      <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                        Combo Excess Rate
+                                      </label>
+                                      <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="Rate"
+                                        value={m.combinedExcessRate ?? ''}
+                                        onChange={(e) => {
+                                          const v = handleDecimalInput(e.target.value);
+                                          if (v !== undefined)
+                                            updateItem(index, 'combinedExcessRate', v);
+                                        }}
+                                        className="h-8 text-[11px] font-bold"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {/* Slab Rates UI for CPC */}
+                              {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
+                                <div className="mt-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                                    <span>Slab Rates Configuration</span>
+                                  </label>
 
-                                {rentType === 'CPC' && (
-                                  <div className="space-y-4 mt-2">
-                                    {/* B/W Slabs */}
-                                    {renderSlabSection(
-                                      index,
-                                      'Black & White Slabs',
-                                      'bwSlabRanges',
-                                      m.bwSlabRanges,
-                                      'useBwRateUpTo100k',
-                                      !!m.useBwRateUpTo100k,
-                                      'bwRateUpTo100k',
-                                      m.bwRateUpTo100k || '',
-                                    )}
-                                    {/* Color Slabs */}
-                                    {renderSlabSection(
-                                      index,
-                                      'Color Slabs',
-                                      'colorSlabRanges',
-                                      m.colorSlabRanges,
-                                      'useColorRateUpTo100k',
-                                      !!m.useColorRateUpTo100k,
-                                      'colorRateUpTo100k',
-                                      m.colorRateUpTo100k || '',
-                                    )}
-                                  </div>
-                                )}
-                                {rentType === 'CPC_COMBO' && (
-                                  <div className="space-y-2 mt-2">
-                                    {renderSlabSection(
-                                      index,
-                                      'Combined Slabs',
-                                      'comboSlabRanges',
-                                      m.comboSlabRanges,
-                                      'useComboRateUpTo100k',
-                                      !!m.useComboRateUpTo100k,
-                                      'comboRateUpTo100k',
-                                      m.comboRateUpTo100k || '',
-                                    )}
-                                  </div>
-                                )}
+                                  {rentType === 'CPC' && (
+                                    <div className="space-y-4 mt-2">
+                                      {/* B/W Slabs */}
+                                      {renderSlabSection(
+                                        index,
+                                        'Black & White Slabs',
+                                        'bwSlabRanges',
+                                        m.bwSlabRanges,
+                                        'useBwRateUpTo100k',
+                                        !!m.useBwRateUpTo100k,
+                                        'bwRateUpTo100k',
+                                        m.bwRateUpTo100k || '',
+                                      )}
+                                      {/* Color Slabs */}
+                                      {renderSlabSection(
+                                        index,
+                                        'Color Slabs',
+                                        'colorSlabRanges',
+                                        m.colorSlabRanges,
+                                        'useColorRateUpTo100k',
+                                        !!m.useColorRateUpTo100k,
+                                        'colorRateUpTo100k',
+                                        m.colorRateUpTo100k || '',
+                                      )}
+                                    </div>
+                                  )}
+                                  {rentType === 'CPC_COMBO' && (
+                                    <div className="space-y-2 mt-2">
+                                      {renderSlabSection(
+                                        index,
+                                        'Combined Slabs',
+                                        'comboSlabRanges',
+                                        m.comboSlabRanges,
+                                        'useComboRateUpTo100k',
+                                        !!m.useComboRateUpTo100k,
+                                        'comboRateUpTo100k',
+                                        m.comboRateUpTo100k || '',
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Accessories */}
+                  <div className="bg-card p-5 rounded-xl border border-teal-100 shadow-sm space-y-3">
+                    <label className="text-[11px] font-bold text-teal-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-teal-400" /> Accessories (Optional)
+                    </label>
+                    <p className="text-[10px] text-slate-400 -mt-1">
+                      Extra items supplied with the machine (stand, tray, stapler unit, etc.) —
+                      billed once with the first month advance. No meter reading applies.
+                    </p>
+                    <ProductSelect
+                      mode="PRODUCT"
+                      selectedQuantities={selectedQuantities}
+                      onSelect={(item) => {
+                        if (saleItems.find((x) => x.productId === item.id && x.isAccessory)) {
+                          toast.error(
+                            'This accessory is already added. Adjust its quantity below.',
+                          );
+                          return;
+                        }
+                        addItem(item, true);
+                      }}
+                      placeholder="Select Accessory Product"
+                    />
+                    {accessoryItems.length > 0 && (
+                      <div className="space-y-3 mt-2">
+                        {saleItems.map((m, index) => {
+                          if (!m.isAccessory) return null;
+                          return (
+                            <div
+                              key={m.productId || index}
+                              className="flex items-center gap-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-3"
+                            >
+                              {m.imageUrl ? (
+                                <img
+                                  src={m.imageUrl}
+                                  alt={m.description}
+                                  className="w-12 h-12 rounded-md object-cover border border-teal-200 bg-white shrink-0"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-md bg-white border border-teal-200 flex items-center justify-center text-teal-300 shrink-0">
+                                  <Package size={18} />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-black text-slate-800 truncate">
+                                  {m.description}
+                                </p>
+                                <p className="text-[9px] font-bold text-teal-600 uppercase tracking-wider">
+                                  Accessory
+                                </p>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <div className="w-14 space-y-1">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Qty
+                                </label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={m.quantity}
+                                  onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                                  className="h-8 text-[11px] font-bold"
+                                />
+                              </div>
+                              <div className="w-20 space-y-1">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Rate ({currency})
+                                </label>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={m.basePrice}
+                                  readOnly={!m.isEditable}
+                                  onChange={(e) => {
+                                    const v = handleDecimalInput(e.target.value);
+                                    if (v !== undefined) updateItem(index, 'basePrice', v);
+                                  }}
+                                  className={`h-8 text-[11px] font-bold ${!m.isEditable ? 'bg-muted/50 text-muted-foreground' : ''}`}
+                                />
+                              </div>
+                              <div className="w-16 space-y-1">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Discount
+                                </label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={m.discount === 0 ? '' : m.discount}
+                                  placeholder="0"
+                                  onChange={(e) => updateItem(index, 'discount', e.target.value)}
+                                  className="h-8 text-[11px] font-bold"
+                                />
+                              </div>
+                              <div className="w-20 space-y-1 text-right">
+                                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  Net
+                                </label>
+                                <p className="h-8 flex items-center justify-end text-[11px] font-black text-teal-700">
+                                  {formatCurrency(m.quantity * m.unitPrice, currency)}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => removeItem(index)}
+                                className="text-slate-400 hover:text-red-600 transition-colors bg-white hover:bg-red-50 p-1 rounded shrink-0"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                        <div className="flex justify-end">
+                          <p className="text-xs font-black text-teal-700">
+                            Accessories Total: {formatCurrency(accessoryTotal, currency)}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -4368,25 +4810,34 @@ function QuotationFormModal({
                             />
                           </div>
                         )}
-                        <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
-                          <label className="text-[11px] font-bold text-muted-foreground uppercase">
-                            Advance / Caution Deposit ({currency})
-                          </label>
-                          <Input
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            value={advanceAmount}
-                            onChange={(e) => {
-                              const v = handleDecimalInput(e.target.value);
-                              if (v !== undefined) {
-                                setAdvanceAmount(v);
-                                setSecurityDepositAmount(v);
-                              }
-                            }}
-                            className="h-9 text-sm"
-                          />
-                        </div>
+                        {paymentTiming === 'ADVANCE' && (
+                          <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-muted-foreground uppercase">
+                              First Month Advance Payment ({currency})
+                            </label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={advanceAmount}
+                              onChange={(e) => {
+                                const v = handleDecimalInput(e.target.value);
+                                if (v !== undefined) setAdvanceAmount(v);
+                              }}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        )}
+                        {paymentTiming === 'ARREARS' && (
+                          <div className="bg-card p-4 rounded-xl border border-violet-100 shadow-sm space-y-2">
+                            <label className="text-[11px] font-bold text-violet-600 uppercase">
+                              Postpaid — No Advance Required
+                            </label>
+                            <p className="text-[10px] text-slate-400">
+                              First payment collected after the first billing period completes.
+                            </p>
+                          </div>
+                        )}
                         <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
                           <label className="text-[11px] font-bold text-muted-foreground uppercase">
                             Discount (%)
@@ -4401,6 +4852,104 @@ function QuotationFormModal({
                         </div>
                       </>
                     )}
+                  </div>
+
+                  {/* Security Deposit Section */}
+                  <div className="bg-card p-5 rounded-xl border border-amber-100 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-amber-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" /> Security Deposit
+                      (Optional)
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Security Deposit Amount ({currency})
+                        </label>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={securityDepositAmount}
+                          onChange={(e) => {
+                            const v = handleDecimalInput(e.target.value);
+                            if (v !== undefined) setSecurityDepositAmount(v);
+                          }}
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      {securityDepositAmount && Number(securityDepositAmount) > 0 && (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              Payment Mode
+                            </label>
+                            <select
+                              value={securityDepositMode}
+                              onChange={(e) =>
+                                setSecurityDepositMode(e.target.value as 'CASH' | 'CHEQUE')
+                              }
+                              className="h-9 text-sm w-full rounded-md border border-slate-200 bg-white px-2"
+                            >
+                              <option value="CASH">Cash</option>
+                              <option value="BANK_TRANSFER">Bank Transfer</option>
+                              <option value="CHEQUE">Cheque</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                              Reference / Cheque No
+                            </label>
+                            <Input
+                              type="text"
+                              placeholder="Optional"
+                              value={securityDepositReference}
+                              onChange={(e) => setSecurityDepositReference(e.target.value)}
+                              className="h-9 text-sm"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment Timing */}
+                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Billing Method
+                        </label>
+                        <Select
+                          value={paymentTiming}
+                          onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
+                        >
+                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ADVANCE">
+                              Advance Billing (Advance Payment)
+                            </SelectItem>
+                            <SelectItem value="ARREARS">
+                              Arrears Billing (Postpaid Billing)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Description
+                        </label>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          {paymentTiming === 'ADVANCE'
+                            ? 'Customer pays upcoming period rent in advance + current excess usage each billing cycle.'
+                            : 'Customer pays current period rent + excess usage after the billing period completes.'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Agreement Details (Shared for Rent/Lease) */}

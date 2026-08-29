@@ -123,6 +123,8 @@ import {
   getReceivableRowDetail,
   getPayableRowDetail,
   getOtherIncomeTransactions,
+  getAccessoriesRevenueTransactions,
+  getUsageRevenueTransactions,
   getCustomerStatement,
   getVendorStatement,
   getAccountStatement,
@@ -267,6 +269,8 @@ router.get('/line-items/accounts-receivable', getAccountsReceivableTransactions)
 router.get('/line-items/receivable-detail', getReceivableRowDetail);
 router.get('/line-items/payable-detail', getPayableRowDetail);
 router.get('/line-items/other-income', getOtherIncomeTransactions);
+router.get('/line-items/accessories-revenue', getAccessoriesRevenueTransactions);
+router.get('/line-items/usage-revenue', getUsageRevenueTransactions);
 router.get('/line-items/customer-statement', getCustomerStatement);
 router.get('/line-items/vendor-statement', getVendorStatement);
 router.get('/line-items/account-statement', getAccountStatement);

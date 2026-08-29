@@ -8,9 +8,16 @@ interface Props {
   invoice: Invoice;
   bill: Partial<Bill>;
   currency: string;
-  /** Present when bill.billType === 'ADVANCE' — the real collected payment this Bill
-   *  wraps for customer sign-off (amount/mode/date/status live here, not on the bill). */
+  /** Present when bill.billType is 'ADVANCE' or 'SECURITY_DEPOSIT' — the real collected
+   *  payment this Bill wraps for customer sign-off (amount/mode/date/status live here,
+   *  not on the bill itself). Named advancePayment for historical reasons; it now also
+   *  carries the security deposit payment for that billType. */
   advancePayment?: SalePaymentRequest | null;
+  /** Present alongside advancePayment when bill.billType is 'ADVANCE' and the contract
+   *  also has a security deposit on file — rendered as its own section within this same
+   *  First Month Advance Bill rather than as a separate bill/document. Never folded into
+   *  the bill's own charged total (a deposit is a refundable liability, not revenue). */
+  depositPayment?: SalePaymentRequest | null;
 }
 
 // ─── Utilities (mirrors ContractDocumentBody's formatting conventions) ────────
@@ -69,9 +76,26 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
   CUSTOMER_REJECTED: { label: 'Disputed', className: 'bg-red-50 text-red-700 border-red-200' },
 };
 
-function DocumentHeader({ invoice, bill }: { invoice: Invoice; bill: Partial<Bill> }) {
+function DocumentHeader({
+  invoice,
+  bill,
+  hasDeposit,
+}: {
+  invoice: Invoice;
+  bill: Partial<Bill>;
+  hasDeposit?: boolean;
+}) {
   const status = STATUS_META[bill.billStatus || 'PENDING_APPROVAL'];
   const isAdvance = bill.billType === 'ADVANCE';
+  const isSecurityDeposit = bill.billType === 'SECURITY_DEPOSIT';
+  const isWrappedPayment = isAdvance || isSecurityDeposit;
+  const docTitle = isAdvance
+    ? hasDeposit
+      ? 'Advance & Security Deposit Bill'
+      : 'Advance Bill'
+    : isSecurityDeposit
+      ? 'Security Deposit Bill'
+      : 'Bill';
   return (
     <div>
       <div className="flex items-start justify-between mb-5">
@@ -80,17 +104,17 @@ function DocumentHeader({ invoice, bill }: { invoice: Invoice; bill: Partial<Bil
             Xerocare Trading &amp; Services W.L.L
           </p>
           <p className="text-[10px] text-slate-400 leading-relaxed max-w-65">
-            {isAdvance ? 'Advance Bill for' : 'Bill for'} {invoice.customerName || 'Customer'}
+            {docTitle} for {invoice.customerName || 'Customer'}
           </p>
         </div>
         <div className="text-right">
           <p className="text-2xl font-black tracking-tight text-slate-800 uppercase leading-none">
-            {isAdvance ? 'Advance Bill' : 'Bill'}
+            {docTitle}
           </p>
           <p className="text-[10px] text-slate-400 mt-1">
             Contract: <span className="font-bold text-slate-600">{invoice.invoiceNumber}</span>
           </p>
-          {!isAdvance && (
+          {!isWrappedPayment && (
             <p className="text-[10px] text-slate-400">
               Period:{' '}
               <span className="font-bold text-slate-600">
@@ -140,10 +164,24 @@ function ContractDetailsSection({ invoice }: { invoice: Invoice }) {
       ? `${invoice.leaseTenureMonths} months`
       : '—'
     : (RENT_PERIOD_LABELS[invoice.rentPeriod || ''] ?? invoice.rentPeriod ?? '—');
-  const serials = (invoice.productAllocations ?? [])
-    .filter((a) => a.status === 'ALLOCATED')
-    .map((a) => a.serialNumber)
-    .filter(Boolean);
+  const activeAllocations = (invoice.productAllocations ?? []).filter(
+    (a) => a.status === 'ALLOCATED' && a.itemType !== 'ACCESSORY',
+  );
+  const serials = activeAllocations.map((a) => a.serialNumber).filter(Boolean);
+  // The reading the technician took at installation (or Finance entered at activation,
+  // if installed later) — the actual starting point the first bill's usage is measured
+  // from. Summed across every currently-allocated machine, matching how usageService.ts
+  // itself aggregates a multi-machine contract's totals.
+  const initialReading = activeAllocations.reduce(
+    (acc, a) => ({
+      bwA4: acc.bwA4 + (a.initialBwA4 ?? 0),
+      bwA3: acc.bwA3 + (a.initialBwA3 ?? 0),
+      colorA4: acc.colorA4 + (a.initialColorA4 ?? 0),
+      colorA3: acc.colorA3 + (a.initialColorA3 ?? 0),
+    }),
+    { bwA4: 0, bwA3: 0, colorA4: 0, colorA3: 0 },
+  );
+  const hasInitialReading = activeAllocations.length > 0;
 
   return (
     <div>
@@ -174,6 +212,18 @@ function ContractDetailsSection({ invoice }: { invoice: Invoice }) {
           <p className="text-xs font-bold text-slate-700 font-mono">{serials.join(', ')}</p>
         </div>
       )}
+      {hasInitialReading && (
+        <div className="border border-t-0 border-slate-200 p-3">
+          <FieldLabel>Initial Meter Reading (at installation)</FieldLabel>
+          <p className="text-xs font-bold text-slate-700">
+            B/W: {initialReading.bwA4.toLocaleString()}
+            {initialReading.bwA3 > 0 ? ` (+ ${initialReading.bwA3.toLocaleString()} A3)` : ''}
+            {' · '}
+            Color: {initialReading.colorA4.toLocaleString()}
+            {initialReading.colorA3 > 0 ? ` (+ ${initialReading.colorA3.toLocaleString()} A3)` : ''}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -181,15 +231,25 @@ function ContractDetailsSection({ invoice }: { invoice: Invoice }) {
 function AdvancePaymentSection({
   advancePayment,
   currency,
+  sectionLabel = 'Advance Payment',
+  footerNote = 'This Advance Bill documents the advance payment above for your records and approval — it is independent of Accounts’ internal approval of the payment itself.',
+  accessoryItems,
 }: {
   advancePayment?: SalePaymentRequest | null;
   currency: string;
+  sectionLabel?: string;
+  footerNote?: string;
+  /** Accessories (stand, tray, stapler unit, etc.) collected together with this payment —
+   *  rendered as a breakdown under the amount grid so the customer can see what the lump
+   *  sum above actually covers. Pre-tax figures — the Amount field above is the real,
+   *  tax-inclusive amount collected. */
+  accessoryItems?: { description: string; quantity?: number; unitPrice?: number }[];
 }) {
   if (!advancePayment) {
     return (
       <div>
-        <SectionHeading>Advance Payment</SectionHeading>
-        <p className="text-xs text-slate-400 italic">Advance payment details unavailable.</p>
+        <SectionHeading>{sectionLabel}</SectionHeading>
+        <p className="text-xs text-slate-400 italic">{sectionLabel} details unavailable.</p>
       </div>
     );
   }
@@ -204,7 +264,7 @@ function AdvancePaymentSection({
   const paymentStatus = PAYMENT_STATUS_META[advancePayment.status];
   return (
     <div>
-      <SectionHeading>Advance Payment</SectionHeading>
+      <SectionHeading>{sectionLabel}</SectionHeading>
       <div className="border border-slate-200">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-0">
           <div className="p-3 border-r border-b sm:border-b-0 border-slate-200">
@@ -245,10 +305,29 @@ function AdvancePaymentSection({
           )}
         </div>
       </div>
-      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
-        This Advance Bill documents the advance payment above for your records and approval — it is
-        independent of Accounts&apos; internal approval of the payment itself.
-      </p>
+      {accessoryItems && accessoryItems.length > 0 && (
+        <div className="border border-slate-200 border-t-0">
+          <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200">
+            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+              Includes Accessories (excl. tax — see Amount above for the tax-inclusive total)
+            </span>
+          </div>
+          {accessoryItems.map((it, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 last:border-b-0"
+            >
+              <span className="text-xs text-slate-600">
+                {it.description} {(it.quantity ?? 1) > 1 ? `× ${it.quantity}` : ''}
+              </span>
+              <span className="text-xs font-bold text-slate-700">
+                {fmtAmt((it.quantity ?? 1) * Number(it.unitPrice ?? 0), currency)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">{footerNote}</p>
     </div>
   );
 }
@@ -257,7 +336,14 @@ function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
   const items = bill.items || [];
   return (
     <div>
-      <SectionHeading>Meter Readings</SectionHeading>
+      <div className="flex items-start justify-between mb-3">
+        <SectionHeading>Meter Readings</SectionHeading>
+        {bill.readingTakenDate && (
+          <p className="text-[9px] font-bold text-slate-500">
+            Reading Taken: <span className="text-slate-700">{fmtDate(bill.readingTakenDate)}</span>
+          </p>
+        )}
+      </div>
       {items.length > 0 ? (
         <div className="overflow-x-auto border border-slate-200">
           <table className="w-full text-[10px]">
@@ -348,13 +434,33 @@ function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
   );
 }
 
-function ChargesSection({ bill, currency }: { bill: Partial<Bill>; currency: string }) {
+function ChargesSection({
+  bill,
+  currency,
+  paymentTiming,
+}: {
+  bill: Partial<Bill>;
+  currency: string;
+  paymentTiming?: 'ADVANCE' | 'ARREARS' | null;
+}) {
+  // Advance-billing model: the advance collected at signing prepays period 1's rent; every
+  // bill after that already prepays the UPCOMING period's rent alongside this period's
+  // actual excess usage (advanceAdjusted, present only on the final bill, is what credits
+  // back the one period that has nothing further to prepay). Label the rent line to match,
+  // so the customer isn't left wondering why a bill for period N's meter reading also
+  // charges what looks like a second rent payment.
+  const isAdvanceBilling = paymentTiming !== 'ARREARS';
+  const isFinalPeriodCredit = Number(bill.advanceAdjusted) > 0;
+  const rentLabel =
+    isAdvanceBilling && !isFinalPeriodCredit
+      ? 'Rent — Upcoming Period (paid in advance)'
+      : 'Base Rent';
   const rows: Array<[string, number | undefined]> = [
-    ['Base Rent', bill.monthlyRent],
+    [rentLabel, bill.monthlyRent],
     ['Excess Usage Charge', bill.exceededCharge],
   ];
-  if (Number(bill.advanceAdjusted) > 0)
-    rows.push(['Advance Adjusted', -Number(bill.advanceAdjusted)]);
+  if (isFinalPeriodCredit)
+    rows.push(['Advance Adjusted (final period — already prepaid)', -Number(bill.advanceAdjusted)]);
   if (Number(bill.discountAmount) > 0) rows.push(['Discount', -Number(bill.discountAmount)]);
 
   return (
@@ -429,24 +535,63 @@ function ApprovalSection({ bill }: { bill: Partial<Bill> }) {
   );
 }
 
-export function BillDocumentBody({ invoice, bill, currency, advancePayment }: Props) {
+export function BillDocumentBody({
+  invoice,
+  bill,
+  currency,
+  advancePayment,
+  depositPayment,
+}: Props) {
   const isAdvance = bill.billType === 'ADVANCE';
+  const isSecurityDeposit = bill.billType === 'SECURITY_DEPOSIT';
+  // A deposit collected alongside the advance shows as its own section within this same
+  // First Month Advance Bill — no separate Security Deposit Bill needed for that case.
+  // The standalone Security Deposit Bill (billType 'SECURITY_DEPOSIT') still exists for
+  // the deposit-only edge case: a contract with no advance but a deposit on file.
+  const showDepositSection = isAdvance && !!depositPayment;
+  // Accessories (stand, tray, stapler unit, etc.) added on the quotation alongside the
+  // machine — collected together with the advance, shown as a breakdown under it. Never
+  // relevant to the standalone Security Deposit Bill (a deposit isn't a purchase).
+  const accessoryItems = isAdvance
+    ? (invoice.items || []).filter((it) => (it.itemType as string) === 'ACCESSORY')
+    : [];
   return (
     <div className="space-y-5 text-slate-800 bg-white print:p-6">
-      <DocumentHeader invoice={invoice} bill={bill} />
+      <DocumentHeader invoice={invoice} bill={bill} hasDeposit={showDepositSection} />
       <CustomerSection invoice={invoice} />
       <DocRule />
-      {isAdvance ? (
+      {isAdvance || isSecurityDeposit ? (
         <>
           <ContractDetailsSection invoice={invoice} />
           <DocRule />
-          <AdvancePaymentSection advancePayment={advancePayment} currency={currency} />
+          <AdvancePaymentSection
+            advancePayment={advancePayment}
+            currency={currency}
+            sectionLabel={isSecurityDeposit ? 'Security Deposit' : 'Advance Payment'}
+            footerNote={
+              isSecurityDeposit
+                ? 'This Security Deposit Bill documents the deposit above for your records and approval — it is independent of Accounts’ internal approval of the payment itself. The deposit is refundable per the terms of your contract.'
+                : undefined
+            }
+            accessoryItems={accessoryItems}
+          />
+          {showDepositSection && (
+            <>
+              <DocRule />
+              <AdvancePaymentSection
+                advancePayment={depositPayment}
+                currency={currency}
+                sectionLabel="Security Deposit"
+                footerNote="This deposit is refundable per the terms of your contract, and is held separately from the advance rent above — it is not part of your rent charges."
+              />
+            </>
+          )}
         </>
       ) : (
         <>
           <ReadingsSection bill={bill} />
           <DocRule />
-          <ChargesSection bill={bill} currency={currency} />
+          <ChargesSection bill={bill} currency={currency} paymentTiming={invoice.paymentTiming} />
         </>
       )}
       <DocRule />

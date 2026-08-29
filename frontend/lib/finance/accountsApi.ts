@@ -1106,6 +1106,9 @@ export interface ChartOfAccountsResponse {
     amcSmaRevenue: AccountBalance;
     sparePartSales: AccountBalance;
     otherIncome: AccountBalance;
+    /** 4009 — accessory line items (stand, tray, stapler unit…) sold alongside a
+     *  machine. Not a saleType of its own, so no other income line can hold it. */
+    accessoriesRevenue: AccountBalance;
     custom: CustomAccountBalance[];
     totalIncome: number;
   };
@@ -1300,6 +1303,7 @@ export async function receiveIncomeEntry(
     referenceNo?: string;
     chequeNumber?: string;
     chequeBankName?: string;
+    chequeDate?: string;
   },
 ): Promise<IncomeEntry> {
   const res = await api.patch(`${BASE}/income/${id}/receive`, data);
@@ -1542,6 +1546,56 @@ export interface OtherIncomeRow {
   branchId: string;
   receivedMode: string | null;
 }
+
+export interface UsageRevenueRow {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  saleType: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  date: string;
+  bwA4Count: number;
+  bwA3Count: number;
+  colorA4Count: number;
+  colorA3Count: number;
+  /** Copies beyond the contract's included allowance — what the charge was billed on. */
+  exceededCopies: number;
+  monthlyRent: number;
+  amount: number;
+  currencyCode: string;
+  branchId: string;
+}
+
+export const fetchUsageRevenueTransactions = (params: LineItemFilterParams = {}) =>
+  api
+    .get<{ success: boolean; data: UsageRevenueRow[] }>(`${BASE}/line-items/usage-revenue`, {
+      params,
+    })
+    .then((r) => r.data.data);
+
+export interface AccessoriesRevenueRow {
+  id: string;
+  invoiceNumber: string;
+  customerName: string;
+  saleType: string;
+  description: string;
+  serialNumber: string | null;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  date: string;
+  currencyCode: string;
+  branchId: string;
+}
+
+export const fetchAccessoriesRevenueTransactions = (params: LineItemFilterParams = {}) =>
+  api
+    .get<{
+      success: boolean;
+      data: AccessoriesRevenueRow[];
+    }>(`${BASE}/line-items/accessories-revenue`, { params })
+    .then((r) => r.data.data);
 
 export const fetchOtherIncomeTransactions = (params: LineItemFilterParams = {}) =>
   api

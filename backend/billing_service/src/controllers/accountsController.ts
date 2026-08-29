@@ -2367,8 +2367,12 @@ export const getReceivableCharts = async (req: Request, res: Response, next: Nex
       FROM invoices i
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
+          -- Deposits excluded — see PaymentTransaction.isSecurityDeposit. They aren't
+          -- collections against what was issued, so they must not lift the collection
+          -- rate this chart plots.
           SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
           FROM payment_transactions
+          WHERE is_security_deposit = FALSE
           GROUP BY "invoice_id"
           UNION ALL
           SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS paid
@@ -2711,6 +2715,7 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       SERVICE: pl.serviceRevenue,
       AMC_SMA: pl.amcSmaRevenue,
       SPAREPART_SALE: pl.sparePartSalesRevenue,
+      ACCESSORIES: pl.accessoriesRevenue,
       USAGE: pl.usageRevenue,
       OTHER: pl.otherIncome,
     };
@@ -3674,6 +3679,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       amcSmaRevenue,
       usageRevenue,
       sparePartSalesRevenue,
+      accessoriesRevenue,
       costOfParts,
       labourCost,
       depreciationExpense,
@@ -3869,6 +3875,12 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             currency,
           ),
           otherIncome: makeAccountBalance('4008', 'Other Income', otherIncome, currency),
+          accessoriesRevenue: makeAccountBalance(
+            '4009',
+            'Accessories Sales Revenue',
+            accessoriesRevenue,
+            currency,
+          ),
           custom: shapeCustom(customIncome),
           totalIncome: +totalIncome.toFixed(2),
         },

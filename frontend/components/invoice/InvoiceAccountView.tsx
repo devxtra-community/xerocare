@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Plus, Receipt, AlertCircle, Paperclip, FileText } from 'lucide-react';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getCustomerById, type CustomerBankAccount } from '@/lib/customer';
 import { useExchangeRateMap, convertAmount, formatDualCurrency } from '@/lib/dualCurrency';
@@ -336,20 +336,20 @@ export function InvoiceAccountView({
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500">
-                      {paymentMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference Number (Optional)'}
+                      {paymentMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference Number'}
                     </label>
-                    <Input
-                      placeholder={
-                        paymentMode === 'CHEQUE' ? 'e.g., CHQ-001234' : 'e.g., TXN-123456'
-                      }
-                      required={paymentMode === 'CHEQUE'}
-                      value={paymentMode === 'CHEQUE' ? chequeNumber : referenceNumber}
-                      onChange={(e) =>
-                        paymentMode === 'CHEQUE'
-                          ? setChequeNumber(e.target.value)
-                          : setReferenceNumber(e.target.value)
-                      }
-                    />
+                    {paymentMode === 'CHEQUE' ? (
+                      <Input
+                        placeholder="e.g., CHQ-001234"
+                        required
+                        value={chequeNumber}
+                        onChange={(e) => setChequeNumber(e.target.value)}
+                      />
+                    ) : (
+                      <div className="h-9 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-xs text-slate-400 italic">
+                        Auto-generated on save — {autoReferencePreview(paymentMode)}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {(paymentMode === 'BANK_TRANSFER' || paymentMode === 'CHEQUE') &&

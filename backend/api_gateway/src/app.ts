@@ -229,6 +229,19 @@ app.all(
 app.all('/b/invoices/:id/sale-payments', createServiceProxy(BILLING_SERVICE_URL));
 app.all('/b/invoices/:id/installation-request', createServiceProxy(BILLING_SERVICE_URL));
 
+// Contract Renewals. These have to be pass-throughs, not local aggregator routes.
+// /ongoing-contracts in particular MUST be matched here: the local router below has no
+// route of its own for it, so it fell through to that router's catch-all GET '/:id'
+// (getInvoiceById with id="ongoing-contracts"). That handler still proxied to the right
+// billing URL and got the correct ARRAY back, then spread it into a single-invoice
+// object — `{ ...invoice, employeeName, branchName, ... }` — which turns an array into
+// `{ "0": {...}, employeeName: 'Unknown', ... }`. The Contract Renewals page received an
+// object where it expected a list and died on `contracts.filter is not a function`.
+// The two POSTs below had no local route at all and never reached billing.
+app.all('/b/invoices/ongoing-contracts', createServiceProxy(BILLING_SERVICE_URL));
+app.all('/b/invoices/:id/renewal-decision', createServiceProxy(BILLING_SERVICE_URL));
+app.all('/b/invoices/:id/extend-contract', createServiceProxy(BILLING_SERVICE_URL));
+
 /**
  * Invoice Management: Local Billing Routes
  * These routes handle financial documents (invoices).

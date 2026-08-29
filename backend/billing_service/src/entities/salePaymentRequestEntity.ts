@@ -102,6 +102,12 @@ export class SalePaymentRequest {
   @Column({ type: 'boolean', default: false })
   collectLater!: boolean;
 
+  // Security Deposit flag: identifies this payment as a refundable caution/security deposit
+  // collected during quotation conversion. This separates it from normal rent/sale revenue
+  // in Accounts, ensuring deposits are never treated as rental income.
+  @Column({ type: 'boolean', default: false })
+  isSecurityDeposit!: boolean;
+
   // Context distinguishes advance vs periodic collection for display in Accounts queue.
   // SALE | RENT_ADVANCE | RENT_PERIODIC | LEASE_ADVANCE | LEASE_PERIODIC
   @Column({ type: 'varchar', nullable: true })
@@ -128,6 +134,29 @@ export class SalePaymentRequest {
 
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   taxPercent?: number;
+
+  // Security Deposit refund — Cash/Bank deposits only (a Cheque deposit is refunded by
+  // returning the GuaranteeCheque instead, see guaranteeChequesRoutes.ts's /:id/return;
+  // that path never touches these fields). Set together, once, by refundSecurityDeposit —
+  // there is no un-refund action, matching every other one-way state transition on this
+  // entity (PENDING→APPROVED/REJECTED).
+  @Column({ type: 'boolean', default: false })
+  isRefunded!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  refundedAt?: Date;
+
+  @Column({ type: 'uuid', nullable: true })
+  refundedById?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  refundedByName?: string;
+
+  // Which Cash/Bank account the refund was paid out from — the CashbookEntry (and the
+  // account's currentBalance reduction) it produced is the actual accounting record;
+  // this is just for display back on this request.
+  @Column({ type: 'uuid', nullable: true })
+  refundCashAccountId?: string;
 
   @CreateDateColumn()
   createdAt!: Date;

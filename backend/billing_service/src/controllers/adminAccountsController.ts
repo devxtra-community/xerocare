@@ -142,7 +142,8 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
     const arRows = await Source.query<{ outstanding: string }[]>(
       `SELECT COALESCE(SUM(
          "totalAmount" - COALESCE(
-           (SELECT SUM(pt.amount) FROM payment_transactions pt WHERE pt."invoice_id" = i.id), 0
+           (SELECT SUM(pt.amount) FROM payment_transactions pt
+             WHERE pt."invoice_id" = i.id AND pt.is_security_deposit = FALSE), 0
          )
        ), 0) AS outstanding
        FROM invoices i
@@ -160,7 +161,8 @@ export const getConsolidatedKPIs = async (req: Request, res: Response, next: Nex
     const odRows = await Source.query<{ overdue: string }[]>(
       `SELECT COALESCE(SUM(
          "totalAmount" - COALESCE(
-           (SELECT SUM(pt.amount) FROM payment_transactions pt WHERE pt."invoice_id" = i.id), 0
+           (SELECT SUM(pt.amount) FROM payment_transactions pt
+             WHERE pt."invoice_id" = i.id AND pt.is_security_deposit = FALSE), 0
          )
        ), 0) AS overdue
        FROM invoices i

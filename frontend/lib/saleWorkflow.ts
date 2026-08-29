@@ -71,6 +71,12 @@ export interface InstallationRequest {
   status: 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED';
   createdAt: string;
   updatedAt: string;
+  /** RENT/LEASE only — the contract's required deposit, 0 if none is required. */
+  securityDepositAmount?: number;
+  /** True once a PENDING or APPROVED RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT
+   *  SalePaymentRequest exists for this contract — gates the "Collect Security Deposit"
+   *  action so it only shows when one is actually needed and missing. */
+  securityDepositCollected?: boolean;
 }
 
 export interface SalePaymentRequest {
@@ -101,7 +107,25 @@ export interface SalePaymentRequest {
   rejectionReason?: string;
   paymentTransactionId?: string;
   collectLater?: boolean;
-  paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
+  paymentContext?:
+    | 'SALE'
+    | 'RENT_ADVANCE'
+    | 'RENT_PERIODIC'
+    | 'RENT_SECURITY_DEPOSIT'
+    | 'LEASE_ADVANCE'
+    | 'LEASE_PERIODIC'
+    | 'LEASE_SECURITY_DEPOSIT';
+  /** Marks this as a refundable security deposit, not rent/revenue — excluded from
+   *  InvoiceLedger and every AR sum; CHEQUE mode routes to GuaranteeCheque, not the
+   *  regular Cheque table, on approval. */
+  isSecurityDeposit?: boolean;
+  /** Refund state — Cash/Bank security deposits only. A Cheque deposit is refunded by
+   *  returning its GuaranteeCheque instead, so these stay unset for that mode. */
+  isRefunded?: boolean;
+  refundedAt?: string;
+  refundedById?: string;
+  refundedByName?: string;
+  refundCashAccountId?: string;
   /** Links a RENT_PERIODIC/LEASE_PERIODIC collection to the billing period it pays toward. */
   usageRecordId?: string;
   /** Informational only, present for RENT_ADVANCE/LEASE_ADVANCE rows once an Advance
@@ -418,6 +442,7 @@ export const recordSalePayment = async (
     chequeDate?: string;
     collectLater?: boolean;
     paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
+    isSecurityDeposit?: boolean;
   },
 ): Promise<SalePaymentRequest> => {
   const res = await api.post<ApiResponse<SalePaymentRequest>>(
@@ -450,6 +475,20 @@ export const rejectSalePayment = async (
   const res = await api.post<ApiResponse<SalePaymentRequest>>(
     `/b/sale-payments/${requestId}/reject`,
     { rejectionReason },
+  );
+  return res.data.data;
+};
+
+/** Refund an APPROVED Cash/Bank security deposit — reduces the chosen account's balance
+ *  and posts a SECURITY_DEPOSIT_REFUND cashbook entry. Cheque-collected deposits are
+ *  refunded by returning the GuaranteeCheque instead (see guaranteeCheques.ts). */
+export const refundSecurityDeposit = async (
+  requestId: string,
+  data: { accountId: string; refundDate?: string; remarks?: string },
+): Promise<SalePaymentRequest> => {
+  const res = await api.post<ApiResponse<SalePaymentRequest>>(
+    `/b/sale-payments/${requestId}/refund-deposit`,
+    data,
   );
   return res.data.data;
 };
@@ -513,8 +552,10 @@ export type BillStatus = 'PENDING_APPROVAL' | 'CUSTOMER_APPROVED' | 'CUSTOMER_RE
 export type BillApprovalMethod = 'REMOTE_LINK' | 'FINANCE_MANUAL';
 /** USAGE = a periodic billing-period Bill (readings apply). ADVANCE = wraps the
  *  contract's already-collected RENT_ADVANCE/LEASE_ADVANCE payment for customer sign-off
- *  only — no period, no readings, same entity/pipeline either way. */
-export type BillType = 'USAGE' | 'ADVANCE';
+ *  only — no period, no readings, same entity/pipeline either way. SECURITY_DEPOSIT
+ *  mirrors ADVANCE exactly, wrapping the RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT
+ *  payment instead. */
+export type BillType = 'USAGE' | 'ADVANCE' | 'SECURITY_DEPOSIT';
 
 export interface Bill {
   id: string;
@@ -522,6 +563,9 @@ export interface Bill {
   billType: BillType;
   billingPeriodStart: string;
   billingPeriodEnd: string;
+  /** The date the meter reading was actually taken/recorded — distinct from
+   *  billingPeriodEnd (the period's calendar end date). */
+  readingTakenDate?: string;
   bwA4Count: number;
   bwA3Count: number;
   colorA4Count: number;
@@ -592,9 +636,22 @@ export interface BillForContract {
 
 export const getBill = async (
   usageRecordId: string,
-): Promise<{ usage: Bill; invoice: Invoice; advancePayment: SalePaymentRequest | null }> => {
+): Promise<{
+  usage: Bill;
+  invoice: Invoice;
+  advancePayment: SalePaymentRequest | null;
+  /** Present alongside advancePayment when the bill is billType 'ADVANCE' and a security
+   *  deposit was also collected — shown as a section within this same bill/document
+   *  rather than as a separate bill. */
+  depositPayment: SalePaymentRequest | null;
+}> => {
   const res = await api.get<
-    ApiResponse<{ usage: Bill; invoice: Invoice; advancePayment: SalePaymentRequest | null }>
+    ApiResponse<{
+      usage: Bill;
+      invoice: Invoice;
+      advancePayment: SalePaymentRequest | null;
+      depositPayment: SalePaymentRequest | null;
+    }>
   >(`/b/usage/${usageRecordId}/bill`);
   return res.data.data;
 };
@@ -624,6 +681,33 @@ export const getAdvanceBillStatus = async (
   if (contractIds.length === 0) return {};
   const res = await api.get<ApiResponse<Record<string, AdvanceBillStatus>>>(
     '/b/usage/advance-bill-status',
+    { params: { contractIds: contractIds.join(',') } },
+  );
+  return res.data.data;
+};
+
+/** Get-or-create the Security Deposit Bill for a contract — mirrors generateAdvanceBill,
+ *  sourced from the contract's already-collected RENT_SECURITY_DEPOSIT/
+ *  LEASE_SECURITY_DEPOSIT payment instead. Idempotent, safe to call again. */
+export const generateSecurityDepositBill = async (contractId: string): Promise<Bill> => {
+  const res = await api.post<ApiResponse<Bill>>(
+    `/b/usage/contract/${contractId}/security-deposit-bill`,
+  );
+  return res.data.data;
+};
+
+export interface SecurityDepositBillStatus {
+  hasSecurityDepositPayment: boolean;
+  securityDepositBillId?: string;
+  securityDepositBillStatus?: BillStatus;
+}
+
+export const getSecurityDepositBillStatus = async (
+  contractIds: string[],
+): Promise<Record<string, SecurityDepositBillStatus>> => {
+  if (contractIds.length === 0) return {};
+  const res = await api.get<ApiResponse<Record<string, SecurityDepositBillStatus>>>(
+    '/b/usage/security-deposit-bill-status',
     { params: { contractIds: contractIds.join(',') } },
   );
   return res.data.data;

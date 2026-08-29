@@ -22,6 +22,7 @@ import { BillType } from './enums/billType';
 import { CreditNote } from './creditNoteEntity';
 import { WarrantyType } from './enums/warrantyType';
 import { WarrantyDurationUnit } from './enums/warrantyDurationUnit';
+import { PaymentTiming } from './enums/paymentTiming';
 
 export enum SecurityDepositMode {
   CASH = 'CASH',
@@ -180,6 +181,20 @@ export class Invoice {
   advanceAmount?: number;
 
   /**
+   * Payment timing method for Rent/Lease contracts.
+   * ADVANCE = customer pays upcoming period's rent in advance + current excess
+   * ARREARS = customer pays after the period completes (rent + excess together)
+   * Defaults to ADVANCE for backward compatibility with existing contracts.
+   */
+  @Column({
+    type: 'enum',
+    enum: PaymentTiming,
+    default: PaymentTiming.ADVANCE,
+    nullable: true,
+  })
+  paymentTiming?: PaymentTiming;
+
+  /**
    * Stable default payment mode for this contract's recurring billing — set once from
    * the first payment ever recorded (the advance) and never overwritten afterward, so
    * Finance overriding one period's mode doesn't change what later periods default to.
@@ -230,6 +245,19 @@ export class Invoice {
 
   @Column({ type: 'timestamp', nullable: true })
   completedAt?: Date;
+
+  // --- Contract Renewal (Finance decision, entering the contract's final billing
+  // period) --- Applies to RENT and LEASE-FSM only; a Lease-EMI contract has no
+  // recurring usage-billed periods to renew the same way (fixed installment schedule
+  // instead), so it's excluded from this flow entirely.
+  @Column({ type: 'varchar', nullable: true })
+  renewalDecision?: 'RENEWAL_APPROVED' | 'CONTRACT_ENDED';
+
+  @Column({ nullable: true })
+  renewalDecisionBy?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  renewalDecisionAt?: Date;
 
   // --- Lease Fields ---
   @Column({
