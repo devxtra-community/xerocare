@@ -79,9 +79,11 @@ employeeRouter.get(
 );
 
 /**
- * Get the specific details of one staff member.
+ * Get the specific details of one staff member. Access control is inside the
+ * controller: ADMIN/HR/MANAGER can look up anyone, everyone else can only
+ * fetch their own record (e.g. the "My Profile" page).
  */
-employeeRouter.get('/:id', requireRole('ADMIN', 'HR', 'MANAGER'), getEmployeeById);
+employeeRouter.get('/:id', getEmployeeById);
 
 /**
  * Update the profile information for a staff member.

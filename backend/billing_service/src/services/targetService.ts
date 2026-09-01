@@ -32,6 +32,17 @@ export interface AchievementResult {
   records: AchievementRecord[];
 }
 
+export interface EmployeeMonthlyActivity {
+  employeeId: string;
+  salesCount: number;
+  salesRevenue: number;
+  rentCount: number;
+  rentRevenue: number;
+  leaseCount: number;
+  leaseRevenue: number;
+  totalRevenue: number;
+}
+
 const JOB_TARGET_TYPE_MAP: Record<string, TargetType> = {
   SALES: TargetType.SALES,
   RENT_AND_LEASE: TargetType.RENT_LEASE,
@@ -446,6 +457,94 @@ export class TargetService {
       (a, b) => Number(b.achievement.achievementPercent) - Number(a.achievement.achievementPercent),
     );
     return rows.map((row, index) => ({ rank: index + 1, ...row }));
+  }
+
+  /**
+   * Sales/rent/lease activity for EVERY employee who has at least one invoice
+   * in the branch for the month — including employees with no target assigned
+   * at all. Unlike calculateAchievement (which merges SALE+RENT+LEASE into one
+   * bucket per target), this splits them out per saleType so the "all
+   * employees" view on the targets page can show real activity even when
+   * nobody has set a target yet. Employees with zero invoices simply won't
+   * appear in the result; the caller merges this against the full employee
+   * roster and zero-fills the rest.
+   */
+  async branchMonthlyActivity(
+    branchFilter: string[],
+    month: string,
+  ): Promise<EmployeeMonthlyActivity[]> {
+    if (!month) throw new AppError('month is required', 400);
+    const { monthStart, monthEnd } = getMonthRange(month);
+
+    // Same three statuses calculateAchievement uses for both SALES and
+    // RENT_LEASE targets — a single shared filter is correct here too.
+    const statuses = [InvoiceStatus.PAID, InvoiceStatus.ACTIVE_CONTRACT, InvoiceStatus.INVOICED];
+
+    const qb = this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('invoice.createdBy', 'employeeId')
+      .addSelect('invoice.saleType', 'saleType')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('SUM(invoice.totalAmount)', 'revenue')
+      .where('invoice.status IN (:...statuses)', { statuses })
+      .andWhere('invoice.createdAt >= :monthStart AND invoice.createdAt < :monthEnd', {
+        monthStart,
+        monthEnd,
+      })
+      .groupBy('invoice.createdBy')
+      .addGroupBy('invoice.saleType');
+    applyBranchQB(qb as never, 'invoice', branchFilter);
+
+    const raw = await qb.getRawMany<{
+      employeeId: string;
+      saleType: SaleType;
+      count: string;
+      revenue: string;
+    }>();
+
+    const SALES_TYPES = new Set<SaleType>([
+      SaleType.SALE,
+      SaleType.PRODUCT_SALE,
+      SaleType.SPAREPART_SALE,
+    ]);
+
+    const byEmployee = new Map<string, EmployeeMonthlyActivity>();
+    const entryFor = (employeeId: string): EmployeeMonthlyActivity => {
+      let entry = byEmployee.get(employeeId);
+      if (!entry) {
+        entry = {
+          employeeId,
+          salesCount: 0,
+          salesRevenue: 0,
+          rentCount: 0,
+          rentRevenue: 0,
+          leaseCount: 0,
+          leaseRevenue: 0,
+          totalRevenue: 0,
+        };
+        byEmployee.set(employeeId, entry);
+      }
+      return entry;
+    };
+
+    for (const row of raw) {
+      const entry = entryFor(row.employeeId);
+      const count = Number(row.count) || 0;
+      const revenue = Number(row.revenue) || 0;
+      if (SALES_TYPES.has(row.saleType)) {
+        entry.salesCount += count;
+        entry.salesRevenue += revenue;
+      } else if (row.saleType === SaleType.RENT) {
+        entry.rentCount += count;
+        entry.rentRevenue += revenue;
+      } else if (row.saleType === SaleType.LEASE) {
+        entry.leaseCount += count;
+        entry.leaseRevenue += revenue;
+      }
+      entry.totalRevenue += revenue;
+    }
+
+    return [...byEmployee.values()];
   }
 
   async adminOverview(

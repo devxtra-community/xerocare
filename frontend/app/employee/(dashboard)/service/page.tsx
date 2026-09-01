@@ -3,17 +3,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getUserFromToken } from '@/lib/auth';
 import { getBranches, Branch } from '@/lib/branch';
-import { getCustomers, Customer } from '@/lib/customer';
+import { getCustomers, Customer, createCustomer } from '@/lib/customer';
 import { getLeads, Lead, createLead } from '@/lib/lead';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { getBrands, createBrand, Brand } from '@/lib/brand';
-import { getAllModels, addModel, Model } from '@/lib/model';
+import { getBrands, Brand } from '@/lib/brand';
+import { getAllModels, addModel, Model, CreateModelData, UpdateModelData } from '@/lib/model';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ArrivalDiagnosisDialog } from '@/components/ui/ArrivalDiagnosisDialog';
 import { Modal } from '@/components/ui/Modal';
 import { DetailDialog } from '@/components/ui/DetailDialog';
 import { useToast } from '@/components/ui/ToastProvider';
 import SendDocumentModal from '@/components/SendDocumentModal';
+import { AddBrandDialog } from '@/components/ManagerDashboardComponents/BrandComponents/AddBrandDialog';
+import { ModelFormModal } from '@/components/ManagerDashboardComponents/productComponents/ModelFormModal';
 import { Play, UserPlus, Send } from 'lucide-react';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import {
@@ -109,6 +112,9 @@ import {
   Calculator,
   Pencil,
   Pause,
+  Trash2,
+  Package,
+  Info,
 } from 'lucide-react';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -255,6 +261,14 @@ export default function ServiceDashboardPage() {
     technicianSignature: 'Technician Signed',
   });
 
+  // Arrival guard before the diagnosis timer starts (two-step confirm)
+  const [arrivalDialog, setArrivalDialog] = useState<{
+    ticketId: string;
+    ticketNo?: string;
+    location?: string | null;
+  } | null>(null);
+  const [startingDiagnosis, setStartingDiagnosis] = useState(false);
+
   // Confirm Dialog State
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
@@ -295,19 +309,7 @@ export default function ServiceDashboardPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [showCreateBrandModal, setShowCreateBrandModal] = useState(false);
-  const [brandForm, setBrandForm] = useState({ name: '', description: '' });
-  const [creatingBrandState, setCreatingBrandState] = useState(false);
-  const [brandError, setBrandError] = useState<string | null>(null);
-
   const [showCreateModelModal, setShowCreateModelModal] = useState(false);
-  const [modelForm, setModelForm] = useState({
-    model_no: '',
-    model_name: '',
-    brand_id: '',
-    description: '',
-  });
-  const [creatingModelState, setCreatingModelState] = useState(false);
-  const [modelError, setModelError] = useState<string | null>(null);
 
   // Form states
   const [newTicket, setNewTicket] = useState({
@@ -636,9 +638,9 @@ export default function ServiceDashboardPage() {
         setSubmitting(false);
       }
     } else {
-      // New Customer Lead Flow
+      // New Customer Flow — anyone we service becomes a customer, not a lead.
       if (!leadForm.name.trim() || !leadForm.phone.trim() || !leadForm.location.trim()) {
-        toast.error('Lead Name, Phone, and Location are required.');
+        toast.error('Customer Name, Phone, and Location are required.');
         return;
       }
       if (
@@ -664,19 +666,19 @@ export default function ServiceDashboardPage() {
 
       try {
         setSubmitting(true);
-        // Step 1: Create Lead in CRM
-        const created = await createLead({
+        // Step 1: Create the Customer — a service ticket means they're being
+        // serviced, which makes them a customer, not a CRM lead.
+        const created = await createCustomer({
           name: leadForm.name.trim(),
-          location: leadForm.location.trim(),
+          city: leadForm.location.trim(),
           email: leadForm.email.trim() || undefined,
           phone: leadForm.phone.trim(),
-          status: 'new',
         });
-        const leadId = created._id;
+        const customerId = created.id;
 
-        // Step 2: Create ticket with leadId
+        // Step 2: Create ticket with customerId
         const payload: Partial<ServiceTicket> = {
-          leadId,
+          customerId,
           productBrand: newTicket.productBrand.trim(),
           productModel: newTicket.productModel.trim(),
           productName: newTicket.productName.trim(),
@@ -693,13 +695,13 @@ export default function ServiceDashboardPage() {
         };
 
         await createServiceTicket(payload);
-        toast.success('Lead and service ticket created successfully!');
+        toast.success('Customer and service ticket created successfully!');
         setShowCreateModal(false);
         resetTicketForm();
         await fetchInitialData();
       } catch (error) {
-        console.error('Failed to create lead/ticket:', error);
-        toast.error('Error creating lead or service ticket.');
+        console.error('Failed to create customer/ticket:', error);
+        toast.error('Error creating customer or service ticket.');
       } finally {
         setSubmitting(false);
       }
@@ -741,91 +743,45 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleCreateBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!brandForm.name.trim()) return;
-    try {
-      setCreatingBrandState(true);
-      setBrandError(null);
-      const res = await createBrand({
-        name: brandForm.name.trim(),
-        description: brandForm.description.trim() || undefined,
-      });
-      // Refresh brand list
-      const resBrands = await getBrands().catch(() => ({ success: false, data: [] }));
-      const brandList = resBrands.success ? resBrands.data : [];
-      setBrands(brandList);
+  // Brand/model creation now delegates to the exact dialogs used on the
+  // Brand and Model management pages (AddBrandDialog / ModelFormModal).
+  // Those own their own fields, validation, and persistence — here we just
+  // refresh the local lists and, since the ticket form benefits from it,
+  // carry the newly created brand/model straight into the ticket fields.
+  const handleBrandCreated = async () => {
+    const prevNames = new Set(brands.map((b) => b.name));
+    const resBrands = await getBrands().catch(() => ({ success: false, data: [] }));
+    const brandList = resBrands.success ? resBrands.data : [];
+    setBrands(brandList);
 
-      const createdBrand = res.data || res;
-      setNewTicket((prev) => ({
-        ...prev,
-        productBrand: createdBrand.name || brandForm.name.trim(),
-      }));
-
-      setShowCreateBrandModal(false);
-      setBrandForm({ name: '', description: '' });
-      toastSuccess('Brand created successfully!');
-    } catch (error) {
-      console.error('Failed to create brand:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      const msg =
-        err?.response?.data?.message ||
-        'Failed to create brand. Please check if it already exists.';
-      setBrandError(msg);
-      toastError(msg);
-    } finally {
-      setCreatingBrandState(false);
+    const created = brandList.find((b: Brand) => !prevNames.has(b.name));
+    if (created) {
+      setNewTicket((prev) => ({ ...prev, productBrand: created.name }));
     }
   };
 
   const handleOpenCreateModel = () => {
-    const defaultBrand = brands.find((b) => b.name === newTicket.productBrand);
-    setModelForm({
-      model_no: '',
-      model_name: '',
-      brand_id: defaultBrand ? defaultBrand.id : '',
-      description: '',
-    });
-    setModelError(null);
     setShowCreateModelModal(true);
   };
 
-  const handleCreateModel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modelForm.model_name.trim() || !modelForm.model_no.trim() || !modelForm.brand_id) {
-      setModelError('Model Name, Model Number, and Brand are required.');
-      return;
-    }
+  const handleModelCreated = async (data: CreateModelData | UpdateModelData) => {
     try {
-      setCreatingModelState(true);
-      setModelError(null);
-      const created = await addModel({
-        model_name: modelForm.model_name.trim(),
-        model_no: modelForm.model_no.trim(),
-        brand_id: modelForm.brand_id,
-        description: modelForm.description.trim() || modelForm.model_name.trim(),
-      });
-      // Refetch models list
+      const created = await addModel(data as CreateModelData);
       const resModels = await getAllModels().catch(() => ({ data: [] }));
       setModels(resModels.data || []);
 
       setNewTicket((prev) => ({
         ...prev,
-        productModel: created.model_no || modelForm.model_no.trim(),
-        productName: created.model_name || modelForm.model_name.trim(),
+        productModel: created.model_no,
+        productName: created.model_name,
       }));
 
       setShowCreateModelModal(false);
-      setModelForm({ model_no: '', model_name: '', brand_id: '', description: '' });
       toastSuccess('Model created successfully!');
     } catch (error) {
       console.error('Failed to create model:', error);
       const err = error as { response?: { data?: { message?: string } } };
-      const msg = err?.response?.data?.message || 'Failed to create model. Please try again.';
-      setModelError(msg);
-      toastError(msg);
-    } finally {
-      setCreatingModelState(false);
+      toastError(err?.response?.data?.message || 'Failed to create model. Please try again.');
     }
   };
 
@@ -912,8 +868,8 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleDiagnose = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleDiagnose = async (e?: React.FormEvent, confirmed = false) => {
+    e?.preventDefault();
     if (!selectedTicket) return;
 
     // Discount applies to the whole estimate: parts + labour + transport +
@@ -956,6 +912,21 @@ export default function ServiceDashboardPage() {
         (diagnosisForm.visitChargePaymentMode !== 'CHEQUE' && !diagnosisForm.visitChargeAccountId))
     ) {
       toast.error('Select a payment mode and account before posting the visit charge to accounts.');
+      return;
+    }
+
+    // Final guard so an accidental tap on Submit can't lock in the estimate.
+    if (!confirmed) {
+      setConfirmConfig({
+        title: isRevision ? 'Submit estimate revision?' : 'Finish diagnosis?',
+        description: isRevision
+          ? 'Submit this revised estimate for approval. You cannot edit it again once submitted.'
+          : 'Confirm the diagnosis is complete and submit the estimate for approval. You cannot edit it again once submitted.',
+        type: 'positive',
+        confirmText: isRevision ? 'Submit Revision' : 'Finish & Submit',
+        onConfirm: () => handleDiagnose(undefined, true),
+      });
+      setConfirmOpen(true);
       return;
     }
 
@@ -1639,6 +1610,20 @@ export default function ServiceDashboardPage() {
             unitPrice: Number(part.base_price) || 0,
           };
         }
+      } else if (key === 'itemSource' && value === 'CUSTOM') {
+        // A custom part is for the machine on this ticket, so seed Brand and
+        // Model Name from the ticket's product details. Only fill blanks —
+        // never clobber what the technician already typed.
+        updated[index] = {
+          ...updated[index],
+          itemSource: 'CUSTOM',
+          customPartBrand: updated[index].customPartBrand || selectedTicket?.productBrand || '',
+          customPartDescription:
+            updated[index].customPartDescription ||
+            selectedTicket?.productModel ||
+            selectedTicket?.productName ||
+            '',
+        };
       } else {
         updated[index] = {
           ...updated[index],
@@ -1815,456 +1800,451 @@ export default function ServiceDashboardPage() {
               No service tickets found matching your selection.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="w-full table-fixed">
-                <TableHeader className="bg-slate-50/50">
-                  <TableRow>
-                    <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[8%]' : 'w-[9%]'}`}
-                    >
-                      Ticket No
+            <Table className="w-full">
+              <TableHeader className="bg-slate-50/50">
+                <TableRow>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Ticket No
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Brand / Model
+                  </TableHead>
+                  {user?.role === 'ADMIN' && (
+                    <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                      Branch
                     </TableHead>
-                    <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[18%]' : 'w-[22%]'}`}
-                    >
-                      Brand / Model
-                    </TableHead>
-                    {user?.role === 'ADMIN' && (
-                      <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[8%]">
-                        Branch
-                      </TableHead>
-                    )}
-                    <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[8%]' : 'w-[10%]'}`}
-                    >
-                      Context
-                    </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[6%]">
-                      Job Type
-                    </TableHead>
-                    <TableHead
-                      className={`font-bold text-xs text-slate-600 py-2 px-2 ${user?.role === 'ADMIN' ? 'w-[8%]' : 'w-[9%]'}`}
-                    >
-                      Visit Date
-                    </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-2 w-[16%]">
-                      Status
-                    </TableHead>
-                    <TableHead className="font-bold text-xs text-slate-600 py-2 px-1 text-left w-[28%]">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTickets.map((ticket) => (
-                    <TableRow key={ticket.id} className="hover:bg-slate-50 transition-colors">
-                      <TableCell className="py-2 pl-2 pr-4 font-mono text-xs font-bold text-blue-600 truncate">
+                  )}
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Context
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Job Type
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Visit Date
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Status
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTickets.map((ticket) => (
+                  <TableRow key={ticket.id} className="hover:bg-slate-50 transition-colors">
+                    <TableCell className="px-4 py-3 font-mono text-xs font-bold text-blue-600">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedTicket(ticket);
+                          setShowDetailsModal(true);
+                        }}
+                        className="hover:underline text-blue-600 hover:text-blue-800 font-bold focus:outline-none"
+                      >
+                        {ticket.ticketNumber}
+                      </button>
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <div className="text-xs font-bold text-slate-700 max-w-[260px] truncate">
+                        {formatMachineName(
+                          ticket.productBrand,
+                          ticket.productModel,
+                          ticket.productName,
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedTicket(ticket);
-                            setShowDetailsModal(true);
+                            if (ticket.serialNumber) {
+                              handleOpenMachineIntel(ticket.serialNumber);
+                            }
                           }}
-                          className="hover:underline text-blue-600 hover:text-blue-800 font-bold focus:outline-none"
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-mono font-bold hover:underline focus:outline-none"
                         >
-                          {ticket.ticketNumber}
+                          SN: {ticket.serialNumber || 'N/A'}
                         </button>
+                      </div>
+                    </TableCell>
+                    {user?.role === 'ADMIN' && (
+                      <TableCell className="px-4 py-3 text-xs text-slate-600 font-medium">
+                        {ticket.branchName || '—'}
                       </TableCell>
-                      <TableCell className="py-2 px-2 truncate">
-                        <div className="text-xs font-bold text-slate-700 truncate">
-                          {formatMachineName(
-                            ticket.productBrand,
-                            ticket.productModel,
-                            ticket.productName,
-                          )}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                    )}
+                    <TableCell className="px-4 py-3">
+                      <Badge context={ticket.serviceContext} />
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-xs text-slate-500 font-medium">
+                      {ticket.jobType}
+                    </TableCell>
+                    <TableCell className="px-4 py-3 text-xs text-slate-500 font-medium">
+                      {ticket.scheduledVisitDate
+                        ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
+                        : 'Unscheduled'}
+                    </TableCell>
+                    <TableCell className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Badge status={ticket.status} />
+                        {ticket.status === 'COMPLETED' && (
                           <button
-                            type="button"
+                            title="Share Completion Bill"
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (ticket.serialNumber) {
-                                handleOpenMachineIntel(ticket.serialNumber);
-                              }
+                              setShareTicket(ticket);
+                              setShareDocType('completion-bill');
+                              setShareModalOpen(true);
                             }}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-mono font-bold hover:underline focus:outline-none"
                           >
-                            SN: {ticket.serialNumber || 'N/A'}
+                            <Send className="size-3.5" />
                           </button>
-                        </div>
-                      </TableCell>
-                      {user?.role === 'ADMIN' && (
-                        <TableCell className="py-2 px-2 text-xs text-slate-600 font-medium truncate">
-                          {ticket.branchName || '—'}
-                        </TableCell>
-                      )}
-                      <TableCell className="py-2 px-2">
-                        <Badge context={ticket.serviceContext} />
-                      </TableCell>
-                      <TableCell className="py-2 px-2 text-xs text-slate-500 font-medium truncate">
-                        {ticket.jobType}
-                      </TableCell>
-                      <TableCell className="py-2 px-2 text-xs text-slate-500 font-medium truncate">
-                        {ticket.scheduledVisitDate
-                          ? new Date(ticket.scheduledVisitDate).toLocaleDateString()
-                          : 'Unscheduled'}
-                      </TableCell>
-                      <TableCell className="py-2 px-2 overflow-hidden">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Badge status={ticket.status} />
-                          {ticket.status === 'COMPLETED' && (
-                            <button
-                              title="Share Completion Bill"
-                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShareTicket(ticket);
-                                setShareDocType('completion-bill');
-                                setShareModalOpen(true);
-                              }}
-                            >
-                              <Send className="size-3.5" />
-                            </button>
-                          )}
-                          {(ticket.status === 'QUOTED' ||
-                            ticket.status === 'CUSTOMER_APPROVED') && (
-                            <button
-                              title="Share Service Quotation"
-                              className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShareTicket(ticket);
-                                setShareDocType('quotation');
-                                setShareModalOpen(true);
-                              }}
-                            >
-                              <FileText className="size-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell
-                        className="text-right py-2 px-1 actions-cell"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex flex-col items-end gap-1.5">
-                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                            {/* HELP DESK / MANAGER ACTIONS — technician can be assigned or
+                        )}
+                        {(ticket.status === 'QUOTED' || ticket.status === 'CUSTOMER_APPROVED') && (
+                          <button
+                            title="Share Service Quotation"
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShareTicket(ticket);
+                              setShareDocType('quotation');
+                              setShareModalOpen(true);
+                            }}
+                          >
+                            <FileText className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell
+                      className="px-4 py-3 actions-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex flex-col items-start gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* HELP DESK / MANAGER ACTIONS — technician can be assigned or
                                 changed any time before the job is done or cancelled (e.g. the
                                 original technician becomes unavailable mid-flow). Whoever ends
                                 up assigned when the ticket completes gets the target credit. */}
-                            {(isHelpDesk || isManagerOrAdmin) &&
-                              !['COMPLETED', 'CANCELLED'].includes(ticket.status) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-slate-200 text-slate-600 hover:bg-slate-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => {
-                                    setSelectedTicket(ticket);
-                                    setAssignForm({
-                                      technicianId: ticket.assignedTechnicianId || '',
-                                    });
-                                    setShowAssignModal(true);
-                                  }}
-                                >
-                                  <UserPlus className="size-3.5" />
-                                  {ticket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
-                                </Button>
-                              )}
+                          {(isHelpDesk || isManagerOrAdmin) &&
+                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-slate-200 text-slate-600 hover:bg-slate-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  setAssignForm({
+                                    technicianId: ticket.assignedTechnicianId || '',
+                                  });
+                                  setShowAssignModal(true);
+                                }}
+                              >
+                                <UserPlus className="size-3.5" />
+                                {ticket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
+                              </Button>
+                            )}
 
-                            {(isHelpDesk || isManagerOrAdmin) &&
-                              (ticket.status === 'FINANCE_APPROVED' ||
-                                ticket.status === 'QUOTED') && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                    onClick={() => handleApproveQuotation(ticket.id)}
-                                  >
-                                    <CheckCircle2 className="size-3.5" />
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                    onClick={() => {
-                                      const eligible = isVisitChargeCollectionEligible(ticket);
-                                      setRejectCollect(eligible);
-                                      setRejectPaymentMode('');
-                                      setRejectAccountId('');
-                                      setRejectReason('');
-                                      setRejectDiscountAmount('');
-                                      if (eligible) loadCashBankAccounts(ticket.branchId);
-                                      setRejectVCModal({
-                                        kind: 'quotation',
-                                        ticketId: ticket.id,
-                                        amount: Number(ticket.visitChargeAmount) || 0,
-                                        eligible,
-                                      });
-                                    }}
-                                  >
-                                    <XCircle className="size-3.5" />
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-
-                            {/* TECHNICIAN / MANAGER ACTIONS — manager may diagnose
-                              before assignment; assigned technician after */}
-                            {((isTechnician && ticket.status === 'ASSIGNED') ||
-                              (isManagerOrAdmin &&
-                                (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED'))) &&
-                              !ticket.diagnosisStartedAt && (
-                                <Button
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => handleStartDiagnosis(ticket.id)}
-                                >
-                                  <Play className="size-3.5 fill-current" />
-                                  Diagnose
-                                </Button>
-                              )}
-
-                            {(isTechnician || isManagerOrAdmin) &&
-                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
-                              ticket.diagnosisStartedAt &&
-                              ticket.diagnosisStartedBy &&
-                              ticket.diagnosisStartedBy !== user?.userId && (
-                                <span
-                                  className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md select-none"
-                                  title="Diagnosis was started by another user"
-                                >
-                                  Opened by{' '}
-                                  {ticket.diagnosisStartedBy === ticket.assignedTechnicianId
-                                    ? 'Technician'
-                                    : 'Manager'}
-                                </span>
-                              )}
-
-                            {(isTechnician || isManagerOrAdmin) &&
-                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
-                              ticket.diagnosisStartedAt && (
-                                <div className="flex items-center gap-1">
-                                  <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
-                                  <Button
-                                    size="sm"
-                                    className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                    onClick={() => {
-                                      setSelectedTicket(ticket);
-                                      loadCashBankAccounts(ticket.branchId);
-                                      setDiagnosisForm({
-                                        notes: '',
-                                        problemFound: '',
-                                        rootCause: '',
-                                        meterReading: 0,
-                                        labourCost: 0,
-                                        visitChargeAmount: 0,
-                                        visitChargeMethod: 'ADDED_TO_ESTIMATE',
-                                        visitChargeCollected: true,
-                                        visitChargePaymentMode: '',
-                                        visitChargeAccountId: '',
-                                        transportChargeAmount: 0,
-                                        discountAmount: 0,
-                                        technicianNoteToFinance: '',
-                                        items: [],
-                                      });
-                                      setShowDiagnoseModal(true);
-                                    }}
-                                  >
-                                    Diagnose
-                                  </Button>
-                                </div>
-                              )}
-
-                            {/* ESTIMATE WORKFLOW FOR ALL PARTIES */}
-                            {!isHelpDesk &&
-                              (ticket.status === 'DIAGNOSED' ||
-                                ticket.status === 'WAITING_FINANCE_APPROVAL' ||
-                                ticket.status === 'FINANCE_APPROVED' ||
-                                ticket.status === 'FINANCE_REJECTED' ||
-                                ticket.status === 'CUSTOMER_APPROVED' ||
-                                ticket.status === 'CUSTOMER_REJECTED') && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => handleOpenEstimates(ticket)}
-                                >
-                                  <Calculator className="size-3.5" />
-                                  Estimates
-                                </Button>
-                              )}
-
-                            {(isTechnician || isManagerOrAdmin) &&
-                              (ticket.status === 'FINANCE_REJECTED' ||
-                                ticket.status === 'REVISED') && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => {
-                                    setSelectedTicket(ticket);
-                                    loadCashBankAccounts(ticket.branchId);
-                                    const laborItem = ticket.items?.find(
-                                      (it) => it.partName === 'Labor Cost / Service Charge',
-                                    );
-                                    const otherItems =
-                                      ticket.items?.filter(
-                                        (it) => it.partName !== 'Labor Cost / Service Charge',
-                                      ) || [];
-                                    setDiagnosisForm({
-                                      notes: ticket.diagnosisNotes || '',
-                                      problemFound: ticket.problemFound || '',
-                                      rootCause: ticket.rootCause || '',
-                                      meterReading: ticket.meterReadingAtService || 0,
-                                      labourCost: laborItem ? Number(laborItem.unitPrice) : 0,
-                                      visitChargeAmount: ticket.visitChargeAmount || 0,
-                                      visitChargeMethod:
-                                        (ticket.visitChargeMethod as
-                                          | 'ADDED_TO_ESTIMATE'
-                                          | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
-                                      visitChargeCollected: !!ticket.visitChargeCollected,
-                                      visitChargePaymentMode: '',
-                                      visitChargeAccountId: '',
-                                      transportChargeAmount: ticket.transportChargeAmount || 0,
-                                      discountAmount: ticket.discountAmount || 0,
-                                      technicianNoteToFinance: ticket.technicianNoteToFinance || '',
-                                      items: otherItems.map((it) => ({
-                                        itemSource: it.itemSource,
-                                        sparePartId: it.sparePartId || '',
-                                        customPartName: it.customPartName || '',
-                                        customPartBrand: it.customPartBrand || '',
-                                        customPartDescription: it.customPartDescription || '',
-                                        mpn: it.mpn || '',
-                                        partName: it.partName || '',
-                                        quantity: it.quantity || 1,
-                                        unitPrice: it.unitPrice || 0,
-                                        isFree: !!it.isFree,
-                                      })),
-                                    });
-                                    setShowDiagnoseModal(true);
-                                  }}
-                                >
-                                  <Pencil className="size-3.5" />
-                                  Revise Estimate
-                                </Button>
-                              )}
-
-                            {((isTechnician && ticket.assignedTechnicianId === user?.userId) ||
-                              isManagerOrAdmin) &&
-                              (ticket.status === 'CUSTOMER_APPROVED' ||
-                                ticket.status === 'FREE_SERVICE') &&
-                              !ticket.repairStartedAt && (
+                          {(isHelpDesk || isTechnician || isManagerOrAdmin) &&
+                            (ticket.status === 'FINANCE_APPROVED' ||
+                              ticket.status === 'QUOTED') && (
+                              <>
                                 <Button
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => handleStartRepair(ticket.id)}
+                                  onClick={() => handleApproveQuotation(ticket.id)}
                                 >
-                                  <Play className="size-3.5 fill-current" />
-                                  Repair
+                                  <CheckCircle2 className="size-3.5" />
+                                  Approve
                                 </Button>
-                              )}
-
-                            {(isTechnician || isManagerOrAdmin) &&
-                              ticket.status === 'IN_PROGRESS' &&
-                              ticket.repairStartedAt &&
-                              !ticket.repairPausedAt && (
-                                <div className="flex items-center gap-1">
-                                  <ActiveTimer startTime={ticket.repairStartedAt.toString()} />
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                    onClick={() => handlePauseRepair(ticket.id)}
-                                  >
-                                    <Pause className="size-3.5" />
-                                    Pause
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                    onClick={() => {
-                                      setSelectedTicket(ticket);
-                                      setCompleteForm({
-                                        workPerformed: '',
-                                        resolutionDetails: '',
-                                        meterReading: 0,
-                                        customerRemarks: '',
-                                        technicianRemarks: '',
-                                        customerSignature: 'Customer Signed',
-                                        technicianSignature: 'Technician Signed',
-                                      });
-                                      setCompletionNotes('');
-                                      setShowCompleteModal(true);
-                                    }}
-                                  >
-                                    <CheckCircle2 className="size-3.5" />
-                                    Complete
-                                  </Button>
-                                </div>
-                              )}
-
-                            {(isTechnician || isManagerOrAdmin) &&
-                              ticket.status === 'IN_PROGRESS' &&
-                              ticket.repairStartedAt &&
-                              ticket.repairPausedAt && (
-                                <div className="flex items-center gap-1">
-                                  <PausedTimer
-                                    startTime={ticket.repairStartedAt.toString()}
-                                    pausedAt={ticket.repairPausedAt.toString()}
-                                    pausedDurationMinutes={ticket.repairPausedDurationMinutes}
-                                  />
-                                  <Button
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                    onClick={() => handleResumeRepair(ticket.id)}
-                                  >
-                                    <Play className="size-3.5 fill-current" />
-                                    Resume
-                                  </Button>
-                                </div>
-                              )}
-                          </div>
-
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* MANAGER/ADMIN ACTIONS */}
-                            {isManagerOrAdmin &&
-                              ticket.status !== 'COMPLETED' &&
-                              ticket.status !== 'CANCELLED' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() =>
-                                    handleCancelTicketClick(ticket.id, ticket.ticketNumber)
-                                  }
+                                  onClick={() => {
+                                    const eligible = isVisitChargeCollectionEligible(ticket);
+                                    setRejectCollect(eligible);
+                                    setRejectPaymentMode('');
+                                    setRejectAccountId('');
+                                    setRejectReason('');
+                                    setRejectDiscountAmount('');
+                                    if (eligible) loadCashBankAccounts(ticket.branchId);
+                                    setRejectVCModal({
+                                      kind: 'quotation',
+                                      ticketId: ticket.id,
+                                      amount: Number(ticket.visitChargeAmount) || 0,
+                                      eligible,
+                                    });
+                                  }}
                                 >
-                                  <Ban className="size-3.5" />
-                                  Cancel
+                                  <XCircle className="size-3.5" />
+                                  Reject
                                 </Button>
-                              )}
+                              </>
+                            )}
 
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-slate-500 hover:bg-slate-100 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                              onClick={() => {
-                                setSelectedTicket(ticket);
-                                setShowDetailsModal(true);
-                              }}
-                            >
-                              <Eye className="size-3.5" />
-                              Details
-                            </Button>
-                          </div>
+                          {/* TECHNICIAN / MANAGER ACTIONS — manager may diagnose
+                              before assignment; assigned technician after */}
+                          {((isTechnician && ticket.status === 'ASSIGNED') ||
+                            (isManagerOrAdmin &&
+                              (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED'))) &&
+                            !ticket.diagnosisStartedAt && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() =>
+                                  setArrivalDialog({
+                                    ticketId: ticket.id,
+                                    ticketNo: ticket.ticketNumber,
+                                    location: ticket.serviceLocation,
+                                  })
+                                }
+                              >
+                                <Play className="size-3.5 fill-current" />
+                                Diagnose
+                              </Button>
+                            )}
+
+                          {(isTechnician || isManagerOrAdmin) &&
+                            (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
+                            ticket.diagnosisStartedAt &&
+                            ticket.diagnosisStartedBy &&
+                            ticket.diagnosisStartedBy !== user?.userId && (
+                              <span
+                                className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md select-none"
+                                title="Diagnosis was started by another user"
+                              >
+                                Opened by{' '}
+                                {ticket.diagnosisStartedBy === ticket.assignedTechnicianId
+                                  ? 'Technician'
+                                  : 'Manager'}
+                              </span>
+                            )}
+
+                          {(isTechnician || isManagerOrAdmin) &&
+                            (ticket.status === 'OPEN' || ticket.status === 'ASSIGNED') &&
+                            ticket.diagnosisStartedAt && (
+                              <div className="flex items-center gap-1">
+                                <ActiveTimer startTime={ticket.diagnosisStartedAt.toString()} />
+                                <Button
+                                  size="sm"
+                                  className="bg-amber-600 hover:bg-amber-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    loadCashBankAccounts(ticket.branchId);
+                                    setDiagnosisForm({
+                                      notes: '',
+                                      problemFound: '',
+                                      rootCause: '',
+                                      meterReading: 0,
+                                      labourCost: 0,
+                                      visitChargeAmount: 0,
+                                      visitChargeMethod: 'ADDED_TO_ESTIMATE',
+                                      visitChargeCollected: true,
+                                      visitChargePaymentMode: '',
+                                      visitChargeAccountId: '',
+                                      transportChargeAmount: 0,
+                                      discountAmount: 0,
+                                      technicianNoteToFinance: '',
+                                      items: [],
+                                    });
+                                    setShowDiagnoseModal(true);
+                                  }}
+                                >
+                                  Diagnose
+                                </Button>
+                              </div>
+                            )}
+
+                          {/* ESTIMATE WORKFLOW FOR ALL PARTIES */}
+                          {!isHelpDesk &&
+                            (ticket.status === 'DIAGNOSED' ||
+                              ticket.status === 'WAITING_FINANCE_APPROVAL' ||
+                              ticket.status === 'FINANCE_APPROVED' ||
+                              ticket.status === 'FINANCE_REJECTED' ||
+                              ticket.status === 'CUSTOMER_APPROVED' ||
+                              ticket.status === 'CUSTOMER_REJECTED') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() => handleOpenEstimates(ticket)}
+                              >
+                                <Calculator className="size-3.5" />
+                                Estimates
+                              </Button>
+                            )}
+
+                          {(isTechnician || isManagerOrAdmin) &&
+                            (ticket.status === 'FINANCE_REJECTED' ||
+                              ticket.status === 'REVISED') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() => {
+                                  setSelectedTicket(ticket);
+                                  loadCashBankAccounts(ticket.branchId);
+                                  const laborItem = ticket.items?.find(
+                                    (it) => it.partName === 'Labor Cost / Service Charge',
+                                  );
+                                  const otherItems =
+                                    ticket.items?.filter(
+                                      (it) => it.partName !== 'Labor Cost / Service Charge',
+                                    ) || [];
+                                  setDiagnosisForm({
+                                    notes: ticket.diagnosisNotes || '',
+                                    problemFound: ticket.problemFound || '',
+                                    rootCause: ticket.rootCause || '',
+                                    meterReading: ticket.meterReadingAtService || 0,
+                                    labourCost: laborItem ? Number(laborItem.unitPrice) : 0,
+                                    visitChargeAmount: ticket.visitChargeAmount || 0,
+                                    visitChargeMethod:
+                                      (ticket.visitChargeMethod as
+                                        | 'ADDED_TO_ESTIMATE'
+                                        | 'SEPARATE') || 'ADDED_TO_ESTIMATE',
+                                    visitChargeCollected: !!ticket.visitChargeCollected,
+                                    visitChargePaymentMode: '',
+                                    visitChargeAccountId: '',
+                                    transportChargeAmount: ticket.transportChargeAmount || 0,
+                                    discountAmount: ticket.discountAmount || 0,
+                                    technicianNoteToFinance: ticket.technicianNoteToFinance || '',
+                                    items: otherItems.map((it) => ({
+                                      itemSource: it.itemSource,
+                                      sparePartId: it.sparePartId || '',
+                                      customPartName: it.customPartName || '',
+                                      customPartBrand: it.customPartBrand || '',
+                                      customPartDescription: it.customPartDescription || '',
+                                      mpn: it.mpn || '',
+                                      partName: it.partName || '',
+                                      quantity: it.quantity || 1,
+                                      unitPrice: it.unitPrice || 0,
+                                      isFree: !!it.isFree,
+                                    })),
+                                  });
+                                  setShowDiagnoseModal(true);
+                                }}
+                              >
+                                <Pencil className="size-3.5" />
+                                Revise Estimate
+                              </Button>
+                            )}
+
+                          {((isTechnician && ticket.assignedTechnicianId === user?.userId) ||
+                            isManagerOrAdmin) &&
+                            (ticket.status === 'CUSTOMER_APPROVED' ||
+                              ticket.status === 'FREE_SERVICE') &&
+                            !ticket.repairStartedAt && (
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() => handleStartRepair(ticket.id)}
+                              >
+                                <Play className="size-3.5 fill-current" />
+                                Repair
+                              </Button>
+                            )}
+
+                          {(isTechnician || isManagerOrAdmin) &&
+                            ticket.status === 'IN_PROGRESS' &&
+                            ticket.repairStartedAt &&
+                            !ticket.repairPausedAt && (
+                              <div className="flex items-center gap-1">
+                                <ActiveTimer startTime={ticket.repairStartedAt.toString()} />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-amber-200 text-amber-600 hover:bg-amber-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  onClick={() => handlePauseRepair(ticket.id)}
+                                >
+                                  <Pause className="size-3.5" />
+                                  Pause
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    setCompleteForm({
+                                      workPerformed: '',
+                                      resolutionDetails: '',
+                                      meterReading: 0,
+                                      customerRemarks: '',
+                                      technicianRemarks: '',
+                                      customerSignature: 'Customer Signed',
+                                      technicianSignature: 'Technician Signed',
+                                    });
+                                    setCompletionNotes('');
+                                    setShowCompleteModal(true);
+                                  }}
+                                >
+                                  <CheckCircle2 className="size-3.5" />
+                                  Complete
+                                </Button>
+                              </div>
+                            )}
+
+                          {(isTechnician || isManagerOrAdmin) &&
+                            ticket.status === 'IN_PROGRESS' &&
+                            ticket.repairStartedAt &&
+                            ticket.repairPausedAt && (
+                              <div className="flex items-center gap-1">
+                                <PausedTimer
+                                  startTime={ticket.repairStartedAt.toString()}
+                                  pausedAt={ticket.repairPausedAt.toString()}
+                                  pausedDurationMinutes={ticket.repairPausedDurationMinutes}
+                                />
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                  onClick={() => handleResumeRepair(ticket.id)}
+                                >
+                                  <Play className="size-3.5 fill-current" />
+                                  Resume
+                                </Button>
+                              </div>
+                            )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {/* MANAGER/ADMIN ACTIONS */}
+                          {isManagerOrAdmin &&
+                            ticket.status !== 'COMPLETED' &&
+                            ticket.status !== 'CANCELLED' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-600 hover:bg-red-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() =>
+                                  handleCancelTicketClick(ticket.id, ticket.ticketNumber)
+                                }
+                              >
+                                <Ban className="size-3.5" />
+                                Cancel
+                              </Button>
+                            )}
+
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-slate-500 hover:bg-slate-100 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                            onClick={() => {
+                              setSelectedTicket(ticket);
+                              setShowDetailsModal(true);
+                            }}
+                          >
+                            <Eye className="size-3.5" />
+                            Details
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -2337,7 +2317,7 @@ export default function ServiceDashboardPage() {
                       }));
                     }}
                   >
-                    New Customer (Lead) Flow
+                    New Customer Flow
                   </button>
                 </div>
 
@@ -2948,10 +2928,7 @@ export default function ServiceDashboardPage() {
                                     type="button"
                                     variant="outline"
                                     size="icon"
-                                    onClick={() => {
-                                      setBrandError(null);
-                                      setShowCreateBrandModal(true);
-                                    }}
+                                    onClick={() => setShowCreateBrandModal(true)}
                                     className="h-9 w-9 shrink-0 border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500"
                                   >
                                     <Plus size={16} />
@@ -3232,7 +3209,7 @@ export default function ServiceDashboardPage() {
                     {/* CRM Lead Details */}
                     <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3">
                       <h4 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
-                        <Plus size={14} className="text-primary" /> Lead Contact Details
+                        <Plus size={14} className="text-primary" /> Customer Contact Details
                       </h4>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -3313,10 +3290,7 @@ export default function ServiceDashboardPage() {
                               type="button"
                               variant="outline"
                               size="icon"
-                              onClick={() => {
-                                setBrandError(null);
-                                setShowCreateBrandModal(true);
-                              }}
+                              onClick={() => setShowCreateBrandModal(true)}
                               className="h-9 w-9 shrink-0 border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500"
                             >
                               <Plus size={16} />
@@ -3667,171 +3641,20 @@ export default function ServiceDashboardPage() {
         </div>
       )}
 
-      {/* CREATE BRAND MODAL */}
-      {showCreateBrandModal && (
-        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-sm bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
-              <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Plus className="text-primary" size={16} /> Create Brand
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Add a new hardware brand to the repository list.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleCreateBrand}>
-              <CardContent className="p-5 space-y-3.5">
-                {brandError && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-xl flex items-start gap-2">
-                    <span className="font-medium">{brandError}</span>
-                  </div>
-                )}
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Brand Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. Xerox, HP, Canon"
-                    value={brandForm.name}
-                    onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
-                    className="h-8.5 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Description
-                  </label>
-                  <Input
-                    placeholder="Short description of the brand"
-                    value={brandForm.description}
-                    onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
-                    className="h-8.5 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
-                  />
-                </div>
-              </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-3.5 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowCreateBrandModal(false);
-                    setBrandForm({ name: '', description: '' });
-                    setBrandError(null);
-                  }}
-                  className="rounded-xl h-8 text-xs font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={creatingBrandState}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl h-8 text-xs px-4"
-                >
-                  {creatingBrandState && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Create
-                  Brand
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+      {/* CREATE BRAND MODAL — same dialog as the Brand management page */}
+      <AddBrandDialog
+        open={showCreateBrandModal}
+        onOpenChange={setShowCreateBrandModal}
+        onSuccess={handleBrandCreated}
+      />
 
-      {/* CREATE MODEL MODAL */}
+      {/* CREATE MODEL MODAL — same dialog as the Model management page */}
       {showCreateModelModal && (
-        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-sm bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
-              <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Plus className="text-primary" size={16} /> Create Model
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Add a new model to the list and link it to a brand.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleCreateModel}>
-              <CardContent className="p-5 space-y-3.5">
-                {modelError && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-xl flex items-start gap-2">
-                    <span className="font-medium">{modelError}</span>
-                  </div>
-                )}
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Brand <span className="text-red-500">*</span>
-                  </label>
-                  <SearchableSelect
-                    options={brands.map((b) => ({ value: b.id, label: b.name }))}
-                    value={modelForm.brand_id}
-                    onValueChange={(val) => setModelForm({ ...modelForm, brand_id: val })}
-                    placeholder="Select brand..."
-                    className="h-8.5 w-full rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Model Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. VersaLink C405"
-                    value={modelForm.model_name}
-                    onChange={(e) => setModelForm({ ...modelForm, model_name: e.target.value })}
-                    className="h-8.5 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Model Number / Code <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. C405-DX"
-                    value={modelForm.model_no}
-                    onChange={(e) => setModelForm({ ...modelForm, model_no: e.target.value })}
-                    className="h-8.5 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Description
-                  </label>
-                  <Input
-                    placeholder="Short description of the model features"
-                    value={modelForm.description}
-                    onChange={(e) => setModelForm({ ...modelForm, description: e.target.value })}
-                    className="h-8.5 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-primary"
-                  />
-                </div>
-              </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-3.5 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowCreateModelModal(false);
-                    setModelForm({ model_no: '', model_name: '', brand_id: '', description: '' });
-                    setModelError(null);
-                  }}
-                  className="rounded-xl h-8 text-xs font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={creatingModelState}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl h-8 text-xs px-4"
-                >
-                  {creatingModelState && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Create
-                  Model
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
+        <ModelFormModal
+          initialData={null}
+          onClose={() => setShowCreateModelModal(false)}
+          onConfirm={handleModelCreated}
+        />
       )}
 
       {/* ASSIGN / CHANGE TECHNICIAN MODAL */}
@@ -3919,25 +3742,54 @@ export default function ServiceDashboardPage() {
       {/* DIAGNOSE TICKET MODAL */}
       {showDiagnoseModal && selectedTicket && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl bg-white border-none shadow-xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <Card className="w-full max-w-3xl bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <CardHeader className="bg-slate-50 border-b border-slate-100 p-6">
-              <CardTitle className="text-base font-bold text-slate-800">
-                Technician Diagnosis
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Record issue diagnosis notes and declare parts that need to be replaced.
-              </CardDescription>
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-blue-50 shrink-0">
+                  <Wrench className="size-5 text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                    Technician Diagnosis
+                    <span className="text-[10px] font-bold text-slate-400 font-mono">
+                      {selectedTicket.ticketNumber}
+                    </span>
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Record issue diagnosis notes and declare parts that need to be replaced.
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <form onSubmit={handleDiagnose}>
-              <CardContent className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-                {/* Customer Complaint */}
-                <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3.5 space-y-1">
-                  <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
-                    Complaint Raised by Customer
-                  </h4>
-                  <p className="text-xs text-amber-950 font-semibold whitespace-pre-wrap leading-relaxed">
-                    {selectedTicket.issueDescription || 'No complaint details provided.'}
-                  </p>
+              <CardContent className="p-6 space-y-4 max-h-[62vh] overflow-y-auto">
+                {/* Machine + Complaint context */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5 space-y-1.5">
+                    <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Machine Under Service
+                    </h4>
+                    <p className="text-xs font-bold text-slate-800 leading-snug">
+                      {[selectedTicket.productBrand, selectedTicket.productModel]
+                        .filter(Boolean)
+                        .join(' ') ||
+                        selectedTicket.productName ||
+                        'Machine details not recorded'}
+                    </p>
+                    {selectedTicket.serialNumber && (
+                      <p className="text-[11px] font-mono text-slate-500">
+                        SN: {selectedTicket.serialNumber}
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3.5 space-y-1">
+                    <h4 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                      Complaint Raised by Customer
+                    </h4>
+                    <p className="text-xs text-amber-950 font-semibold whitespace-pre-wrap leading-relaxed">
+                      {selectedTicket.issueDescription || 'No complaint details provided.'}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4033,8 +3885,14 @@ export default function ServiceDashboardPage() {
 
                 <div className="border-t border-slate-100 pt-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="size-3.5 text-slate-400" />
                       Spare Parts / Items Required
+                      {diagnosisForm.items.length > 0 && (
+                        <span className="text-[10px] font-bold text-slate-400">
+                          ({diagnosisForm.items.length})
+                        </span>
+                      )}
                     </label>
                     <Button
                       type="button"
@@ -4047,20 +3905,46 @@ export default function ServiceDashboardPage() {
                     </Button>
                   </div>
 
+                  {diagnosisForm.items.length === 0 && (
+                    <div className="border border-dashed border-slate-200 rounded-xl py-6 text-center">
+                      <p className="text-xs text-slate-400 font-medium">
+                        No parts added. Click{' '}
+                        <span className="font-bold text-slate-500">Add Item</span> if the repair
+                        needs parts.
+                      </p>
+                    </div>
+                  )}
+
                   {diagnosisForm.items.map((item, idx) => (
                     <div
                       key={idx}
-                      className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3"
+                      className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3"
                     >
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-white border border-slate-200 rounded-md px-2 py-0.5">
+                          Item {idx + 1}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDiagnosisItem(idx)}
+                          className="text-red-500 text-[11px] font-bold hover:bg-red-50 hover:text-red-600 rounded-lg h-7 px-2 gap-1"
+                        >
+                          <Trash2 className="size-3.5" />
+                          Remove
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
                             Item Source
                           </label>
                           <select
                             value={item.itemSource}
                             onChange={(e) => updateDiagnosisItem(idx, 'itemSource', e.target.value)}
-                            className="w-full h-8 text-[11px] border border-slate-200 rounded-lg px-2 bg-white text-slate-700 font-medium"
+                            className="w-full h-9 text-xs border border-slate-200 rounded-lg px-2 bg-white text-slate-700 font-medium focus:outline-none focus:border-blue-500"
                           >
                             <option value="SPARE_PART">Registered Spare Part</option>
                             <option value="CUSTOM">Unregistered Custom Part</option>
@@ -4069,7 +3953,7 @@ export default function ServiceDashboardPage() {
 
                         {item.itemSource === 'SPARE_PART' ? (
                           <div className="sm:col-span-2">
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
                               Spare Part
                             </label>
                             <SearchableSelect
@@ -4081,7 +3965,7 @@ export default function ServiceDashboardPage() {
                               value={item.sparePartId}
                               onValueChange={(val) => updateDiagnosisItem(idx, 'sparePartId', val)}
                               placeholder="Search spare part..."
-                              className="h-8 rounded-lg border-slate-200 bg-white text-[11px] font-medium text-slate-700 w-full"
+                              className="h-9 rounded-lg border-slate-200 bg-white text-xs font-medium text-slate-700 w-full"
                             />
                             {item.sparePartId &&
                               (() => {
@@ -4096,7 +3980,7 @@ export default function ServiceDashboardPage() {
                           </div>
                         ) : (
                           <div className="sm:col-span-2">
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
                               Custom Part Name
                             </label>
                             <Input
@@ -4107,57 +3991,64 @@ export default function ServiceDashboardPage() {
                                 updateDiagnosisItem(idx, 'customPartName', e.target.value);
                                 updateDiagnosisItem(idx, 'partName', e.target.value);
                               }}
-                              className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
+                              className="h-9 text-xs bg-white border-slate-200 rounded-lg"
                             />
                           </div>
                         )}
                       </div>
 
                       {item.itemSource === 'CUSTOM' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                              Brand
-                            </label>
-                            <Input
-                              placeholder="e.g. Generic / HP"
-                              value={item.customPartBrand}
-                              onChange={(e) =>
-                                updateDiagnosisItem(idx, 'customPartBrand', e.target.value)
-                              }
-                              className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
-                            />
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                                Brand
+                              </label>
+                              <Input
+                                placeholder="e.g. Generic / HP"
+                                value={item.customPartBrand}
+                                onChange={(e) =>
+                                  updateDiagnosisItem(idx, 'customPartBrand', e.target.value)
+                                }
+                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                                Model Name
+                              </label>
+                              <Input
+                                placeholder="e.g. VersaLink C405"
+                                value={item.customPartDescription}
+                                onChange={(e) =>
+                                  updateDiagnosisItem(idx, 'customPartDescription', e.target.value)
+                                }
+                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                                Mfg. Part Number
+                              </label>
+                              <Input
+                                placeholder="e.g. CB435A"
+                                value={item.mpn}
+                                onChange={(e) => updateDiagnosisItem(idx, 'mpn', e.target.value)}
+                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                              Mfg. Part Number
-                            </label>
-                            <Input
-                              placeholder="e.g. CB435A"
-                              value={item.mpn}
-                              onChange={(e) => updateDiagnosisItem(idx, 'mpn', e.target.value)}
-                              className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                              Description / Spec
-                            </label>
-                            <Input
-                              placeholder="Spec details..."
-                              value={item.customPartDescription}
-                              onChange={(e) =>
-                                updateDiagnosisItem(idx, 'customPartDescription', e.target.value)
-                              }
-                              className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
-                            />
-                          </div>
+                          <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <Info className="size-3 shrink-0" />
+                            Brand and Model Name are pre-filled from the machine on this ticket —
+                            edit if the part differs.
+                          </p>
                         </div>
                       )}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
                             Quantity
                           </label>
                           <Input
@@ -4168,12 +4059,12 @@ export default function ServiceDashboardPage() {
                             onChange={(e) =>
                               updateDiagnosisItem(idx, 'quantity', parseInt(e.target.value, 10))
                             }
-                            className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
+                            className="h-9 text-xs bg-white border-slate-200 rounded-lg"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-bold text-slate-400 block mb-1">
-                            Unit Price ($)
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                            Unit Price ({getActiveCurrency()})
                           </label>
                           <Input
                             type="number"
@@ -4184,29 +4075,18 @@ export default function ServiceDashboardPage() {
                             onChange={(e) =>
                               updateDiagnosisItem(idx, 'unitPrice', parseFloat(e.target.value))
                             }
-                            className="h-8 text-[11px] bg-white border-slate-200 rounded-lg"
+                            className="h-9 text-xs bg-white border-slate-200 rounded-lg disabled:opacity-60"
                           />
                         </div>
-                        <div className="flex items-center gap-2 mt-4">
+                        <label className="flex items-center gap-2 h-9 px-2.5 rounded-lg border border-slate-200 bg-white cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={item.isFree}
                             onChange={(e) => updateDiagnosisItem(idx, 'isFree', e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-200 text-primary focus:ring-primary"
+                            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                           />
-                          <label className="text-[10px] font-bold text-slate-500">Free / FOC</label>
-                        </div>
-                        <div className="text-right mt-4">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeDiagnosisItem(idx)}
-                            className="text-red-500 text-xs font-bold hover:bg-red-50 rounded-lg h-8"
-                          >
-                            Remove
-                          </Button>
-                        </div>
+                          <span className="text-[11px] font-bold text-slate-600">Free / FOC</span>
+                        </label>
                       </div>
                     </div>
                   ))}
@@ -5087,7 +4967,11 @@ export default function ServiceDashboardPage() {
                             className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 rounded-lg font-bold gap-1"
                             onClick={() => {
                               setShowDetailsModal(false);
-                              handleStartDiagnosis(selectedTicket.id);
+                              setArrivalDialog({
+                                ticketId: selectedTicket.id,
+                                ticketNo: selectedTicket.ticketNumber,
+                                location: selectedTicket.serviceLocation,
+                              });
                             }}
                           >
                             <Play className="size-3.5 fill-current" />
@@ -5820,49 +5704,50 @@ export default function ServiceDashboardPage() {
                           </div>
                         )}
 
-                        {/* Customer Action Triggers (Simulated or Actionable) */}
-                        {est.status === 'FINANCE_APPROVED' && (
-                          <div className="flex gap-2 pt-1.5 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100">
-                            <span className="text-[10px] text-yellow-800 font-bold block mb-1 w-full">
-                              Customer Action:
-                            </span>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
-                                onClick={() => handleApproveCustomer(est.id)}
-                              >
-                                Approve (Customer)
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="text-[11px] h-8 px-3 rounded-lg"
-                                onClick={() => {
-                                  const eligible = !!(
-                                    selectedTicket &&
-                                    isVisitChargeCollectionEligible(selectedTicket)
-                                  );
-                                  setRejectCollect(eligible);
-                                  setRejectPaymentMode('');
-                                  setRejectAccountId('');
-                                  setRejectReason('');
-                                  setRejectDiscountAmount('');
-                                  if (eligible && selectedTicket)
-                                    loadCashBankAccounts(selectedTicket.branchId);
-                                  setRejectVCModal({
-                                    kind: 'estimate',
-                                    estimateId: est.id,
-                                    amount: Number(selectedTicket?.visitChargeAmount) || 0,
-                                    eligible,
-                                  });
-                                }}
-                              >
-                                Reject (Customer)
-                              </Button>
+                        {/* Customer Action Triggers — TECHNICIAN, HELP_DESK, and MANAGER/ADMIN */}
+                        {est.status === 'FINANCE_APPROVED' &&
+                          (isHelpDesk || isTechnician || isManagerOrAdmin) && (
+                            <div className="flex gap-2 pt-1.5 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100">
+                              <span className="text-[10px] text-yellow-800 font-bold block mb-1 w-full">
+                                Customer Action:
+                              </span>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
+                                  onClick={() => handleApproveCustomer(est.id)}
+                                >
+                                  Approve (Customer)
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="text-[11px] h-8 px-3 rounded-lg"
+                                  onClick={() => {
+                                    const eligible = !!(
+                                      selectedTicket &&
+                                      isVisitChargeCollectionEligible(selectedTicket)
+                                    );
+                                    setRejectCollect(eligible);
+                                    setRejectPaymentMode('');
+                                    setRejectAccountId('');
+                                    setRejectReason('');
+                                    setRejectDiscountAmount('');
+                                    if (eligible && selectedTicket)
+                                      loadCashBankAccounts(selectedTicket.branchId);
+                                    setRejectVCModal({
+                                      kind: 'estimate',
+                                      estimateId: est.id,
+                                      amount: Number(selectedTicket?.visitChargeAmount) || 0,
+                                      eligible,
+                                    });
+                                  }}
+                                >
+                                  Reject (Customer)
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
 
                         {/* Submit draft option */}
                         {est.status === 'DRAFT' && (
@@ -6481,6 +6366,24 @@ export default function ServiceDashboardPage() {
             await confirmConfig.onConfirm();
           }
           setConfirmOpen(false);
+        }}
+      />
+
+      <ArrivalDiagnosisDialog
+        isOpen={!!arrivalDialog}
+        onClose={() => setArrivalDialog(null)}
+        ticketNo={arrivalDialog?.ticketNo}
+        location={arrivalDialog?.location}
+        isLoading={startingDiagnosis}
+        onStart={async () => {
+          if (!arrivalDialog) return;
+          setStartingDiagnosis(true);
+          try {
+            await handleStartDiagnosis(arrivalDialog.ticketId);
+            setArrivalDialog(null);
+          } finally {
+            setStartingDiagnosis(false);
+          }
         }}
       />
 

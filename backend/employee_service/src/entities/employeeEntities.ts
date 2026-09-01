@@ -38,6 +38,9 @@ export class Employee {
   @Column({ type: 'varchar', length: 255, nullable: true })
   last_name!: string | null;
 
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  phone!: string | null;
+
   @Column({ type: 'varchar', length: 255 })
   password_hash!: string;
 

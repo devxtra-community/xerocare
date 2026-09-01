@@ -119,6 +119,15 @@ export class LeaveApplicationRepository {
     return this.repo.count({ where: whereCondition });
   }
 
+  async countApprovedByEmployeeIdInYear(employeeId: string, year: number): Promise<number> {
+    return this.repo
+      .createQueryBuilder('leave')
+      .where('leave.employee_id = :employeeId', { employeeId })
+      .andWhere('leave.status = :status', { status: LeaveStatus.APPROVED })
+      .andWhere('EXTRACT(YEAR FROM leave.start_date) = :year', { year })
+      .getCount();
+  }
+
   async findPendingByBranch(branchId: string): Promise<LeaveApplication[]> {
     return this.repo.find({
       where: {

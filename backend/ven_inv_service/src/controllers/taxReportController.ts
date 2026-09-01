@@ -245,6 +245,7 @@ export async function getInputTaxInternational(req: Request, res: Response, next
         taxableAmount,
         importVatReverseCharge,
         taxPercent,
+        taxName: p.taxName ?? p.branch?.tax_name ?? 'VAT',
         customsEntryNo: p.customsEntryNo ?? '—',
         customsDuty,
         shippingCost: Number(p.shippingCost ?? 0),

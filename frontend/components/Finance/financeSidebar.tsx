@@ -81,7 +81,7 @@ const accountsMenu: FinanceMenuItem[] = [
   { title: 'Assets & Depreciation', icon: Package, href: '/finance/accounts/assets' },
   { title: 'Income', icon: Coins, href: '/finance/accounts/income' },
   { title: 'Equity', icon: Landmark, href: '/finance/accounts/equity' },
-  { title: 'Tax Report (VAT)', icon: Receipt, href: '/finance/accounts/tax' },
+  { title: 'Tax Report', icon: Receipt, href: '/finance/accounts/tax' },
   { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/finance/accounts/guarantee-cheques' },
   {
     title: 'Exchange Rates',

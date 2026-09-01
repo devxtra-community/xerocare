@@ -10,6 +10,7 @@ import { Branch } from '../entities/branchEntity';
 import { LeaveApplication } from '../entities/leaveApplicationEntity';
 import { Payroll } from '../entities/payrollEntity'; // [x] Define `Payroll` entity
 import { Notification } from '../entities/notificationEntity';
+import { LateMark } from '../entities/lateMarkEntity';
 
 import { logger } from './logger';
 import { seedAdmin } from '../utils/seedAdmin';
@@ -21,7 +22,7 @@ export const Source = new DataSource({
     ? { rejectUnauthorized: false }
     : false,
   synchronize: false,
-  entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification],
+  entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification, LateMark],
   poolSize: 1,
   extra: {
     max: 1,
@@ -216,6 +217,48 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           );
         } catch (err) {
           logger.warn('Could not drop notifications employee_id FK constraint:', err);
+        }
+
+        // Guaranteed on every boot (not just fresh databases) since this table
+        // was added after most environments' schemas were already synchronized.
+        try {
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS late_marks (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              employee_id VARCHAR NOT NULL,
+              branch_id VARCHAR NOT NULL,
+              date DATE NOT NULL,
+              note TEXT NULL,
+              marked_by VARCHAR NOT NULL,
+              "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              CONSTRAINT uq_late_marks_employee_date UNIQUE (employee_id, date)
+            );
+            CREATE INDEX IF NOT EXISTS idx_late_marks_employee_id ON late_marks (employee_id);
+            CREATE INDEX IF NOT EXISTS idx_late_marks_branch_id ON late_marks (branch_id);
+          `);
+          logger.info('Guaranteed late_marks table exists.');
+        } catch (err) {
+          logger.error('Failed to create late_marks table:', err);
+        }
+
+        try {
+          await Source.query(`
+            ALTER TABLE auth
+            ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMPTZ NULL,
+            ADD COLUMN IF NOT EXISTS superseded_by_token VARCHAR NULL;
+          `);
+          logger.info('Guaranteed auth.superseded_at / superseded_by_token columns exist.');
+        } catch (err) {
+          logger.error('Failed to add supersession columns to auth table:', err);
+        }
+
+        try {
+          await Source.query(`
+            ALTER TABLE employee ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL;
+          `);
+          logger.info('Guaranteed employee.phone column exists.');
+        } catch (err) {
+          logger.error('Failed to add phone column to employee table:', err);
         }
 
         await seedAdmin(Source);

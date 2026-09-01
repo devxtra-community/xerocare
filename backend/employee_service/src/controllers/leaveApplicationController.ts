@@ -4,8 +4,10 @@ import { AppError } from '../errors/appError';
 import { LeaveStatus } from '../constants/leaveStatus';
 import { LeaveType } from '../constants/leaveType';
 import { EmployeeRole } from '../constants/employeeRole';
+import { EmployeeRepository } from '../repositories/employeeRepository';
 
 const service = new LeaveApplicationService();
+const employeeRepo = new EmployeeRepository();
 
 export const submitLeaveApplication = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -210,6 +212,41 @@ export const cancelLeaveApplication = async (req: Request, res: Response, next: 
   } catch (err: unknown) {
     const error = err as { message: string; statusCode?: number };
     next(new AppError(error.message, error.statusCode || 400));
+  }
+};
+
+export const getEmployeeLeaveCount = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const employeeId = req.params.employeeId as string;
+
+    const isSelf = employeeId === req.user?.userId;
+    const isHROrAdminOrManager = [
+      EmployeeRole.HR,
+      EmployeeRole.ADMIN,
+      EmployeeRole.MANAGER,
+    ].includes(req.user?.role as EmployeeRole);
+
+    if (!isSelf && !isHROrAdminOrManager) {
+      throw new AppError('You do not have permission to view this record', 403);
+    }
+
+    if (!isSelf && req.user?.role !== EmployeeRole.ADMIN) {
+      const targetEmployee = await employeeRepo.findById(employeeId);
+      if (!targetEmployee || targetEmployee.branch_id !== req.user?.branchId) {
+        throw new AppError('You do not have permission to view this record', 403);
+      }
+    }
+
+    const count = await service.getEmployeeApprovedLeaveCountThisYear(employeeId);
+
+    res.json({
+      success: true,
+      message: 'Leave count fetched successfully',
+      data: { count },
+    });
+  } catch (err: unknown) {
+    const error = err as { message: string; statusCode?: number };
+    next(new AppError(error.message, error.statusCode || 500));
   }
 };
 

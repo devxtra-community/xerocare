@@ -1761,6 +1761,61 @@ export const getCustomerBillingHistory = async (
   }
 };
 
+/**
+ * Recent sale/rent/lease activity for one employee — for the employee detail
+ * page's "Recent Activity" list. MANAGER is locked to their own branch so they
+ * can't pull activity for an employee outside it; ADMIN/HR can see any branch.
+ */
+export const getEmployeeRecentActivity = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const employeeId = req.params.employeeId as string;
+    const limit = Math.min(Number(req.query.limit) || 15, 50);
+
+    const where: Record<string, unknown> = {
+      createdBy: employeeId,
+      isTemplate: false,
+      status: Not(
+        In([
+          InvoiceStatus.TEMPLATE,
+          InvoiceStatus.CANCELLED,
+          InvoiceStatus.RETAKEN,
+          InvoiceStatus.SUPERSEDED,
+        ]),
+      ),
+    };
+    if (req.user?.role === EmployeeRole.MANAGER) {
+      where.branchId = req.user.branchId;
+    }
+
+    const invoices = await Source.getRepository(Invoice).find({
+      where,
+      relations: ['creditNotes'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+
+    const data = invoices.map((inv) => ({
+      id: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      saleType: inv.saleType,
+      status: inv.status,
+      totalAmount: Number(inv.totalAmount || 0),
+      currencyCode: inv.currencyCode,
+      customerName: inv.customerName,
+      createdAt: inv.createdAt,
+      returnCount: inv.creditNotes?.length || 0,
+    }));
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const reviseEstimate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;

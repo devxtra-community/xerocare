@@ -312,13 +312,13 @@ app.get(
 app.post(
   '/i/service/tickets/:id/customer-approve',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK']),
+  requireServiceRole(['SERVICE_TECHNICIAN']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(
   '/i/service/tickets/:id/customer-reject',
   authMiddleware,
-  requireServiceRole(['SERVICE_HELP_DESK']),
+  requireServiceRole(['SERVICE_TECHNICIAN']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(
@@ -328,9 +328,45 @@ app.post(
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(
+  '/i/service/tickets/:id/start-diagnosis',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/start-repair',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/pause-repair',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/resume-repair',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
   '/i/service/tickets/:id/complete',
   authMiddleware,
   requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/extend-validity',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/cancel',
+  authMiddleware,
+  requireServiceRole([]), // Only ADMIN and MANAGER allowed
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(
@@ -355,12 +391,6 @@ app.post(
   '/i/service/tickets/:id/send-completion-bill',
   authMiddleware,
   requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK']),
-  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
-);
-app.post(
-  '/i/service/tickets/:id/cancel',
-  authMiddleware,
-  requireServiceRole([]), // Only ADMIN and MANAGER allowed
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(

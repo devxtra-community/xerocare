@@ -727,7 +727,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   gap: '8px',
                 }}
               >
-                <span>Subtotal (Before VAT):</span>
+                <span>Subtotal (Before {totals.vatName || 'VAT'}):</span>
                 <span>Discount:</span>
                 {/* Only show a VAT/tax line when there's an actual tax story to tell —
                     either a real rate/amount, or an explicit exemption label. A branch
@@ -777,7 +777,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <span style={{ fontWeight: '500', fontSize: '16px', textTransform: 'uppercase' }}>
-                  Grand Total (Including VAT):
+                  Grand Total (Including {totals.vatName || 'VAT'}):
                 </span>
                 <span style={{ fontWeight: '500', fontSize: '18px' }}>
                   {getActiveCurrency()} {fmt(totals.balanceDue)}

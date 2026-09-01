@@ -128,3 +128,11 @@ export async function getLeaveStats() {
   const response = await api.get<LeaveStatsResponse>('/e/leave-applications/stats');
   return response.data;
 }
+
+// Get an employee's approved leave count for the current year
+export async function getEmployeeLeaveCount(employeeId: string) {
+  const response = await api.get<{ success: boolean; message: string; data: { count: number } }>(
+    `/e/leave-applications/employee/${employeeId}/count`,
+  );
+  return response.data;
+}

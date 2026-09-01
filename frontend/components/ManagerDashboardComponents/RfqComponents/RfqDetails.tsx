@@ -77,6 +77,10 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isWarehouseDialogOpen, setIsWarehouseDialogOpen] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  // What the warehouse picker resumes into once a warehouse is chosen: awarding
+  // a vendor (normal path — the warehouse goes in the award email), or creating
+  // a lot (fallback, only hit for RFQs awarded before this field existed).
+  const [warehousePickerFor, setWarehousePickerFor] = useState<'award' | 'lot' | null>(null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -252,10 +256,27 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
     }
   };
 
+  // Award needs a delivery warehouse (it's sent to the vendor in the award
+  // email). If the branch has none, block outright; if one isn't picked yet,
+  // ask before opening the award confirmation.
+  const handleAwardClick = (vendorId: string) => {
+    if (warehouses.length === 0) {
+      toast.error(
+        'No warehouses set up for this branch yet. Add a warehouse first — the vendor needs a delivery address.',
+      );
+      return;
+    }
+    setVendorToAward(vendorId);
+    if (!selectedWarehouseId) {
+      setWarehousePickerFor('award');
+      setIsWarehouseDialogOpen(true);
+    }
+  };
+
   const confirmAward = async () => {
-    if (!vendorToAward) return;
+    if (!vendorToAward || !selectedWarehouseId) return;
     try {
-      const result = await awardVendor(id, vendorToAward);
+      const result = await awardVendor(id, vendorToAward, selectedWarehouseId);
       const conv = (result as Record<string, unknown>)?.conversion as
         | {
             vendorCurrency?: string;
@@ -283,25 +304,33 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
     }
   };
 
-  const handleCreateLot = async () => {
-    if (!selectedWarehouseId && warehouses.length > 0) {
-      setIsWarehouseDialogOpen(true);
-      return;
-    }
-
+  // Normal case: the RFQ already carries the warehouse chosen at award time,
+  // so this needs no warehouseId. The explicit param only exists to recover
+  // RFQs awarded before that field existed (backend rejects with a
+  // "warehouse" message; we catch that and ask for one here instead).
+  const handleCreateLot = async (explicitWarehouseId?: string) => {
     try {
       setLotLoading(true);
-      await createLotFromRfq(id, selectedWarehouseId || undefined);
+      await createLotFromRfq(id, explicitWarehouseId);
       toast.success('Lot created successfully');
       router.push(`${basePath}/lots`);
     } catch (error: unknown) {
-      toast.error(
-        (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to create lot',
-      );
+      const message =
+        (error as { response?: { data?: { message?: string } } }).response?.data?.message || '';
+      if (!explicitWarehouseId && /warehouse/i.test(message)) {
+        if (warehouses.length === 0) {
+          toast.error(
+            'This RFQ was awarded without a warehouse. Add a warehouse for this branch first, then try again.',
+          );
+        } else {
+          setWarehousePickerFor('lot');
+          setIsWarehouseDialogOpen(true);
+        }
+      } else {
+        toast.error(message || 'Failed to create lot');
+      }
     } finally {
       setLotLoading(false);
-      setIsWarehouseDialogOpen(false);
     }
   };
 
@@ -373,7 +402,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           )}
           {rfq.status === RfqStatus.AWARDED && (
             <Button
-              onClick={handleCreateLot}
+              onClick={() => handleCreateLot()}
               className="bg-green-600 hover:bg-green-700 min-w-[130px]"
               disabled={lotLoading}
             >
@@ -798,7 +827,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                         (vs: Record<string, unknown>) => (
                           <td key={vs.vendorId as string} className="px-5 py-6 text-center">
                             <Button
-                              onClick={() => setVendorToAward(vs.vendorId as string)}
+                              onClick={() => handleAwardClick(vs.vendorId as string)}
                               disabled={!!vs.allOutOfStock}
                               variant={vs.isCheapest ? 'default' : 'outline'}
                               className={`w-full h-11 transition-all ${vs.allOutOfStock ? 'opacity-50 cursor-not-allowed' : vs.isCheapest ? 'bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg' : 'hover:border-primary/50 hover:text-primary'}`}
@@ -823,7 +852,10 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         )}
       </div>
 
-      <AlertDialog open={!!vendorToAward} onOpenChange={(open) => !open && setVendorToAward(null)}>
+      <AlertDialog
+        open={!!vendorToAward && !isWarehouseDialogOpen}
+        onOpenChange={(open) => !open && setVendorToAward(null)}
+      >
         <AlertDialogContent className="bg-white p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
           <AlertDialogHeader className="space-y-4">
@@ -881,7 +913,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={isWarehouseDialogOpen} onOpenChange={setIsWarehouseDialogOpen}>
+      <Dialog
+        open={isWarehouseDialogOpen}
+        onOpenChange={(open) => {
+          setIsWarehouseDialogOpen(open);
+          if (!open) {
+            if (warehousePickerFor === 'award') setVendorToAward(null);
+            setWarehousePickerFor(null);
+          }
+        }}
+      >
         <DialogContent className="bg-white p-6 sm:p-10 rounded-[2rem] max-w-lg border-none shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)]">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
           <DialogHeader className="space-y-4">
@@ -889,11 +930,12 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               <WarehouseIcon className="h-8 w-8 text-blue-600" />
             </div>
             <DialogTitle className="text-2xl font-bold text-center text-slate-800 tracking-tight">
-              Assign Warehouse
+              Select Delivery Warehouse
             </DialogTitle>
             <DialogDescription className="text-center text-slate-500 text-[15px] leading-relaxed px-2">
-              Select a warehouse where the items from this lot will be stored. This step ensures
-              accurate inventory tracking.
+              {warehousePickerFor === 'lot'
+                ? 'This RFQ was awarded without a delivery warehouse. Pick one now so the lot can be created and inventory tracked correctly.'
+                : "This address is included in the award email so the vendor knows where to ship the items, and it's carried over automatically when the lot is created."}
             </DialogDescription>
           </DialogHeader>
           <div className="py-8">
@@ -912,13 +954,21 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           <DialogFooter className="mt-4 gap-3 sm:gap-2 sm:justify-center flex-col sm:flex-row w-full">
             <Button
               variant="outline"
-              onClick={() => setIsWarehouseDialogOpen(false)}
+              onClick={() => {
+                setIsWarehouseDialogOpen(false);
+                if (warehousePickerFor === 'award') setVendorToAward(null);
+                setWarehousePickerFor(null);
+              }}
               className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
             >
               Cancel
             </Button>
             <Button
-              onClick={handleCreateLot}
+              onClick={() => {
+                setIsWarehouseDialogOpen(false);
+                if (warehousePickerFor === 'lot') handleCreateLot(selectedWarehouseId);
+                setWarehousePickerFor(null);
+              }}
               disabled={!selectedWarehouseId || lotLoading}
               className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
             >
@@ -927,7 +977,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               ) : (
                 <Package className="mr-2 h-4 w-4" />
               )}
-              {lotLoading ? 'Creating...' : 'Create Lot'}
+              {lotLoading ? 'Creating...' : 'Continue'}
             </Button>
           </DialogFooter>
         </DialogContent>

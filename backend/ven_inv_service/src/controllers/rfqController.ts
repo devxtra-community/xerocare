@@ -185,9 +185,11 @@ export class RfqController {
 
   awardVendor = async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const { warehouseId } = req.body;
       const result = await this.rfqService.awardVendor(
         req.params.id as string,
         req.params.vendorId as string,
+        warehouseId,
       );
       return res.json(result);
     } catch (error) {

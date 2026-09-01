@@ -22,7 +22,6 @@ interface CreateVendorDTO {
   name: string;
   email: string;
   phone?: string;
-  type?: 'Supplier' | 'Distributor' | 'Service';
   contactPerson?: string;
   status?: VendorStatus;
   currency?: string;

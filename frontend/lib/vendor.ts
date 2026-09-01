@@ -4,6 +4,7 @@ export interface BankAccount {
   bankName: string;
   accountHolderName: string;
   accountNumber: string;
+  accountType?: 'Savings Account' | 'Current Account' | 'Business Account';
   routingNumber?: string;
   swiftCode?: string;
   /** Country-correct bank identifier: IFSC (India), IBAN (ISO 13616 countries),
@@ -31,7 +32,6 @@ export interface Vendor {
   status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   createdAt: string;
   updatedAt: string;
-  type?: 'Supplier' | 'Distributor' | 'Service';
   contactPerson?: string;
   totalOrders?: number;
   purchaseValue?: number;
@@ -71,12 +71,7 @@ export interface PaginatedResponse<T> {
   total: number;
 }
 
-export async function getVendors(params?: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  type?: string;
-}) {
+export async function getVendors(params?: { page?: number; limit?: number; search?: string }) {
   const res = await api.get('/i/vendors/', { params });
   if (res.data && res.data.page !== undefined) {
     return res.data;

@@ -2961,7 +2961,9 @@ export default function UsageRecordingModal({
                   {estimatedTax > 0 && (
                     <>
                       <div className="pt-2 flex justify-between items-center text-sm">
-                        <span className="text-slate-500">Subtotal (Before VAT)</span>
+                        <span className="text-slate-500">
+                          Subtotal (Before {contract?.taxName || 'VAT'})
+                        </span>
                         <span className="text-slate-700">
                           {formatCurrency(estimatedCost - estimatedTax, currency)}
                         </span>

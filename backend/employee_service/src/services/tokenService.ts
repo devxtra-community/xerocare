@@ -10,8 +10,8 @@ import { REFRESH_COOKIE_NAME, refreshCookieOptions } from '../config/cookieOptio
 
 const authRepo = new AuthRepository();
 
-export async function issueTokens(user: Employee | Admin, req: Request, res: Response) {
-  const accessToken = signAccesstoken({
+export function signAccessTokenForUser(user: Employee | Admin) {
+  return signAccesstoken({
     userId: user.id,
     branchId: 'branch_id' in user ? user.branch_id || '' : '',
     email: user.email,
@@ -19,6 +19,10 @@ export async function issueTokens(user: Employee | Admin, req: Request, res: Res
     employeeJob: 'employee_job' in user ? user.employee_job : null,
     financeJob: 'finance_job' in user ? user.finance_job : null,
   });
+}
+
+export async function issueTokens(user: Employee | Admin, req: Request, res: Response) {
+  const accessToken = signAccessTokenForUser(user);
 
   const refreshToken = signRefreshtoken({ id: user.id });
 
@@ -50,5 +54,5 @@ export async function issueTokens(user: Employee | Admin, req: Request, res: Res
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions);
 
-  return accessToken;
+  return { accessToken, refreshToken };
 }

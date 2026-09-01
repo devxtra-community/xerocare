@@ -8,6 +8,7 @@ import {
   rejectLeaveApplication,
   cancelLeaveApplication,
   getLeaveStats,
+  getEmployeeLeaveCount,
 } from '../controllers/leaveApplicationController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
@@ -24,6 +25,7 @@ leaveApplicationRouter.delete('/:id', cancelLeaveApplication);
 
 // HR and Admin routes
 leaveApplicationRouter.get('/stats', requireRole('ADMIN', 'HR'), getLeaveStats);
+leaveApplicationRouter.get('/employee/:employeeId/count', getEmployeeLeaveCount); // Access control in controller
 leaveApplicationRouter.get('/', requireRole('ADMIN', 'HR'), getBranchLeaveApplications);
 leaveApplicationRouter.get('/:id', getLeaveApplicationById); // Access control in controller
 leaveApplicationRouter.put('/:id/approve', requireRole('ADMIN', 'HR'), approveLeaveApplication);

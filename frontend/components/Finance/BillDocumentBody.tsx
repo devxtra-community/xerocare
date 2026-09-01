@@ -437,11 +437,11 @@ function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
 function ChargesSection({
   bill,
   currency,
-  paymentTiming,
+  invoice,
 }: {
   bill: Partial<Bill>;
   currency: string;
-  paymentTiming?: 'ADVANCE' | 'ARREARS' | null;
+  invoice: Invoice;
 }) {
   // Advance-billing model: the advance collected at signing prepays period 1's rent; every
   // bill after that already prepays the UPCOMING period's rent alongside this period's
@@ -449,7 +449,7 @@ function ChargesSection({
   // back the one period that has nothing further to prepay). Label the rent line to match,
   // so the customer isn't left wondering why a bill for period N's meter reading also
   // charges what looks like a second rent payment.
-  const isAdvanceBilling = paymentTiming !== 'ARREARS';
+  const isAdvanceBilling = invoice.paymentTiming !== 'ARREARS';
   const isFinalPeriodCredit = Number(bill.advanceAdjusted) > 0;
   const rentLabel =
     isAdvanceBilling && !isFinalPeriodCredit
@@ -483,7 +483,8 @@ function ChargesSection({
         {Number(bill.taxAmount) > 0 && (
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 text-xs">
             <span className="text-slate-500">
-              VAT{bill.taxPercent ? ` (${bill.taxPercent}%)` : ''}
+              {invoice.taxName || 'VAT'}
+              {bill.taxPercent ? ` (${bill.taxPercent}%)` : ''}
             </span>
             <span className="font-bold text-slate-700">{fmtAmt(bill.taxAmount, currency)}</span>
           </div>
@@ -591,7 +592,7 @@ export function BillDocumentBody({
         <>
           <ReadingsSection bill={bill} />
           <DocRule />
-          <ChargesSection bill={bill} currency={currency} paymentTiming={invoice.paymentTiming} />
+          <ChargesSection bill={bill} currency={currency} invoice={invoice} />
         </>
       )}
       <DocRule />

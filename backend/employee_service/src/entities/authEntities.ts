@@ -32,6 +32,17 @@ export class Auth {
   @Column({ nullable: true })
   user_agent!: string;
 
+  // Set when this refresh token has been rotated. Kept (rather than deleted)
+  // for a short grace window so a second request racing the one that already
+  // rotated it — two open tabs, or several API calls firing at once right as
+  // the access token expires — can still succeed instead of forcing a logout.
+  // See AuthService.refresh().
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  superseded_at!: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  superseded_by_token!: string | null;
+
   @CreateDateColumn({ type: 'timestamp with time zone' })
   createdAt!: Date;
 

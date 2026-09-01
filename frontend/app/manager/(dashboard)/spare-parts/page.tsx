@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Upload, Search, Pencil, Trash2, Copy } from 'lucide-react';
+import { Upload, Search, Pencil, Trash2, Copy, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { StandardTable } from '@/components/table/StandardTable';
 import { usePagination } from '@/hooks/usePagination';
@@ -14,7 +14,6 @@ import AddSparePartDialog from '@/components/ManagerDashboardComponents/sparePar
 import BulkSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/BulkSparePartDialog';
 import { toast } from 'sonner';
 import EditSparePartDialog from '@/components/ManagerDashboardComponents/spareParts/EditSparePartDialog';
-import SparePartDetailDialog from '@/components/ManagerDashboardComponents/spareParts/SparePartDetailDialog';
 import { ErrorDialog } from '@/components/dialogs/ErrorDialog';
 import { lotService } from '@/lib/lot';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
@@ -23,6 +22,7 @@ import { getUserFromToken } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 function SparePartsContent() {
+  const router = useRouter();
   const currency = useBranchCurrency();
   const [isAdmin, setIsAdmin] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -36,11 +36,6 @@ function SparePartsContent() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partToDelete, setPartToDelete] = useState<{ id: string; name: string } | null>(null);
-
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [selectedPartForDetail, setSelectedPartForDetail] = useState<SparePartInventoryItem | null>(
-    null,
-  );
 
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -85,7 +80,11 @@ function SparePartsContent() {
       const checkLotSpareParts = async () => {
         try {
           const lot = await lotService.getLotById(lotId);
-          const sparePartItems = lot?.items?.filter((item) => item.itemType === 'SPARE_PART') || [];
+          const sparePartItems =
+            lot?.items?.filter(
+              (item) =>
+                item.itemType === 'SPARE_PART' && item.receivedQuantity - item.usedQuantity > 0,
+            ) || [];
 
           if (sparePartItems.length > 1) {
             setBulkOpen(true);
@@ -93,7 +92,7 @@ function SparePartsContent() {
             setInitialItemId(sparePartItems[0].id);
             setAddOpen(true);
           } else {
-            toast.error('No spare parts found in this lot');
+            toast.error('All spare parts in this lot have already been added to inventory');
           }
         } catch (err) {
           console.error('Failed to fetch lot for routing:', err);
@@ -134,8 +133,7 @@ function SparePartsContent() {
   };
 
   const handleOpenDetail = (part: SparePartInventoryItem) => {
-    setSelectedPartForDetail(part);
-    setDetailOpen(true);
+    router.push(`/manager/spare-parts/${part.id}`);
   };
 
   return (
@@ -262,6 +260,13 @@ function SparePartsContent() {
                 cell: (item: SparePartInventoryItem) => (
                   <div className="flex justify-end gap-2 text-primary">
                     <button
+                      onClick={() => handleOpenDetail(item)}
+                      className="hover:opacity-70 transition-opacity"
+                      title="View Details"
+                    >
+                      <Eye size={18} />
+                    </button>
+                    <button
                       onClick={() => handleEdit(item)}
                       className="hover:opacity-70 transition-opacity"
                     >
@@ -330,17 +335,6 @@ function SparePartsContent() {
             onOpenChange={setEditOpen}
             product={selectedPart}
             onSuccess={loadParts}
-          />
-        )}
-
-        {detailOpen && selectedPartForDetail && (
-          <SparePartDetailDialog
-            part={selectedPartForDetail}
-            onClose={() => setDetailOpen(false)}
-            onEdit={() => {
-              setDetailOpen(false);
-              handleEdit(selectedPartForDetail);
-            }}
           />
         )}
 

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { ServiceController } from '../controllers/serviceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
-import { roleMiddleware } from '../middlewares/roleMiddleware';
+import { roleMiddleware, requireServiceRole } from '../middlewares/roleMiddleware';
 
 const router = Router();
 const controller = new ServiceController();
@@ -27,8 +27,16 @@ router.get('/contracts/:id/meter-readings', controller.getContractMeterReadings)
 router.get('/contracts/:id/bills', controller.getContractBills);
 router.post('/external-machines', controller.registerExternalMachine);
 router.post('/tickets/:id/assign', controller.assignTechnician);
-router.post('/tickets/:id/start-diagnosis', controller.startDiagnosis);
-router.post('/tickets/:id/diagnose', controller.diagnoseTicket);
+router.post(
+  '/tickets/:id/start-diagnosis',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.startDiagnosis,
+);
+router.post(
+  '/tickets/:id/diagnose',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.diagnoseTicket,
+);
 router.get('/tickets/:id/estimates', controller.getTicketEstimates);
 router.post('/tickets/:id/estimates', controller.createEstimate);
 router.post('/tickets/:id/estimates/submit', controller.submitEstimateForApproval);
@@ -42,8 +50,16 @@ router.post(
   roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
   controller.rejectEstimateFinance,
 );
-router.post('/estimates/:estimateId/approve-customer', controller.approveEstimateCustomer);
-router.post('/estimates/:estimateId/reject-customer', controller.rejectEstimateCustomer);
+router.post(
+  '/estimates/:estimateId/approve-customer',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.approveEstimateCustomer,
+);
+router.post(
+  '/estimates/:estimateId/reject-customer',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.rejectEstimateCustomer,
+);
 router.post('/tickets/:id/estimates/revisions', controller.createEstimateRevision);
 router.post(
   '/estimates/revisions/:revisionId/approve-finance',
@@ -52,11 +68,24 @@ router.post(
 );
 router.post(
   '/estimates/revisions/:revisionId/approve-customer',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
   controller.approveRevisionCustomer,
 );
-router.post('/tickets/:id/start-repair', controller.startRepair);
-router.post('/tickets/:id/pause-repair', controller.pauseRepair);
-router.post('/tickets/:id/resume-repair', controller.resumeRepair);
+router.post(
+  '/tickets/:id/start-repair',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.startRepair,
+);
+router.post(
+  '/tickets/:id/pause-repair',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.pauseRepair,
+);
+router.post(
+  '/tickets/:id/resume-repair',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.resumeRepair,
+);
 router.post('/tickets/:id/quote', controller.submitQuotation);
 router.patch('/tickets/:id/quotation-link', controller.patchQuotationLink);
 router.patch(
@@ -72,15 +101,35 @@ router.patch(
 router.post('/tickets/:id/extend-validity', controller.extendValidity);
 router.patch('/tickets/:id/revise-estimate', controller.reviseEstimate);
 router.get('/tickets/:id/revisions', controller.getRevisions);
-router.post('/tickets/:id/customer-approve', controller.customerApprove);
-router.post('/tickets/:id/customer-reject', controller.customerReject);
-router.post('/tickets/:id/start', controller.startService);
-router.post('/tickets/:id/complete', controller.completeService);
+router.post(
+  '/tickets/:id/customer-approve',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.customerApprove,
+);
+router.post(
+  '/tickets/:id/customer-reject',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.customerReject,
+);
+router.post(
+  '/tickets/:id/start',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.startService,
+);
+router.post(
+  '/tickets/:id/complete',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  controller.completeService,
+);
 router.get('/tickets/:id/quotation-pdf', controller.getQuotationPdf);
 router.get('/tickets/:id/completion-bill-pdf', controller.getCompletionBillPdf);
 router.post('/tickets/:id/send-quotation', controller.sendQuotation);
 router.post('/tickets/:id/send-completion-bill', controller.sendCompletionBill);
-router.post('/tickets/:id/cancel', controller.cancelTicket);
+router.post(
+  '/tickets/:id/cancel',
+  requireServiceRole([], false), // Only ADMIN and MANAGER
+  controller.cancelTicket,
+);
 router.get('/technicians', controller.getTechnicians);
 router.get('/accounts/cash-bank', controller.listCashBankAccounts);
 router.get('/technicians/:technicianId/performance', controller.getTechnicianPerformance);

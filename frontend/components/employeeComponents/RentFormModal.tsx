@@ -99,7 +99,7 @@ export default function RentFormModal({
     monthlyEmiAmount: string;
     monthlyLeaseAmount: string;
     // Warranty
-    warrantyType: 'none' | 'duration' | 'copies';
+    warrantyType: 'none' | 'duration' | 'copies' | 'both';
     warrantyDurationValue: string;
     warrantyDurationUnit: 'months' | 'years';
     warrantyCopyLimit: string;
@@ -131,15 +131,17 @@ export default function RentFormModal({
       initialData?.monthlyEmiAmount !== undefined ? String(initialData.monthlyEmiAmount) : '',
     monthlyLeaseAmount:
       initialData?.monthlyLeaseAmount !== undefined ? String(initialData.monthlyLeaseAmount) : '',
-    // Warranty
-    warrantyType: (initialData?.warrantyType as 'none' | 'duration' | 'copies') || 'none',
+    // Warranty — default: 2 years OR 200000 copies, whichever first.
+    warrantyType: (initialData?.warrantyType as 'none' | 'duration' | 'copies' | 'both') || 'both',
     warrantyDurationValue:
       initialData?.warrantyDurationValue !== undefined
         ? String(initialData.warrantyDurationValue)
-        : '',
-    warrantyDurationUnit: (initialData?.warrantyDurationUnit as 'months' | 'years') || 'months',
+        : '2',
+    warrantyDurationUnit: (initialData?.warrantyDurationUnit as 'months' | 'years') || 'years',
     warrantyCopyLimit:
-      initialData?.warrantyCopyLimit !== undefined ? String(initialData.warrantyCopyLimit) : '',
+      initialData?.warrantyCopyLimit !== undefined
+        ? String(initialData.warrantyCopyLimit)
+        : '200000',
     pricingItems: (() => {
       if (!initialData) {
         // Default for NEW invoice
@@ -621,11 +623,17 @@ export default function RentFormModal({
           // Warranty (Top Level)
           warrantyType: form.warrantyType,
           warrantyDurationValue:
-            form.warrantyType === 'duration' ? cleanNumber(form.warrantyDurationValue) : undefined,
+            form.warrantyType === 'duration' || form.warrantyType === 'both'
+              ? cleanNumber(form.warrantyDurationValue)
+              : undefined,
           warrantyDurationUnit:
-            form.warrantyType === 'duration' ? form.warrantyDurationUnit : undefined,
+            form.warrantyType === 'duration' || form.warrantyType === 'both'
+              ? form.warrantyDurationUnit
+              : undefined,
           warrantyCopyLimit:
-            form.warrantyType === 'copies' ? cleanNumber(form.warrantyCopyLimit) : undefined,
+            form.warrantyType === 'copies' || form.warrantyType === 'both'
+              ? cleanNumber(form.warrantyCopyLimit)
+              : undefined,
 
           items: selectedModels.flatMap((m) => {
             const prefix = m.product_name || m.brandRelation?.name;
@@ -925,7 +933,13 @@ export default function RentFormModal({
                         const newLeaseType = e.target.value as 'EMI' | 'FSM';
                         setForm({ ...form, leaseType: newLeaseType });
                         if (newLeaseType === 'FSM') {
-                          updateUsageRules(selectedModels, form.rentType);
+                          // FSM leases only offer CPC billing now — force off any
+                          // legacy FIXED_* default so the dropdown below stays valid.
+                          const nextRentType =
+                            form.rentType === 'CPC' || form.rentType === 'CPC_COMBO'
+                              ? form.rentType
+                              : 'CPC';
+                          updateUsageRules(selectedModels, nextRentType);
                         }
                       }}
                     >
@@ -943,9 +957,13 @@ export default function RentFormModal({
                       value={form.rentType}
                       onChange={(e) => handleRentTypeChange(e.target.value)}
                     >
-                      <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
-                      <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
-                      <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
+                      {form.saleType === 'RENT' && (
+                        <>
+                          <option value="FIXED_LIMIT">Fixed Rent + Individual Limit</option>
+                          <option value="FIXED_COMBO">Fixed Rent + Combined Limit</option>
+                          <option value="FIXED_FLAT">Fixed Flat Rent (No Limits)</option>
+                        </>
+                      )}
                       <option value="CPC">CPC (Individual)</option>
                       <option value="CPC_COMBO">CPC (Combined)</option>
                     </select>
@@ -1325,18 +1343,19 @@ export default function RentFormModal({
                       onChange={(e) =>
                         setForm({
                           ...form,
-                          warrantyType: e.target.value as 'none' | 'duration' | 'copies',
+                          warrantyType: e.target.value as 'none' | 'duration' | 'copies' | 'both',
                         })
                       }
                     >
                       <option value="none">None</option>
                       <option value="duration">By Duration</option>
                       <option value="copies">By Count of Copies</option>
+                      <option value="both">Both (Duration &amp; Copies, whichever first)</option>
                     </select>
                   </div>
 
                   {/* Conditional Duration Input */}
-                  {form.warrantyType === 'duration' && (
+                  {(form.warrantyType === 'duration' || form.warrantyType === 'both') && (
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[11px] font-bold text-muted-foreground uppercase">
@@ -1377,7 +1396,7 @@ export default function RentFormModal({
                   )}
 
                   {/* Conditional Copies Input */}
-                  {form.warrantyType === 'copies' && (
+                  {(form.warrantyType === 'copies' || form.warrantyType === 'both') && (
                     <div className="space-y-2">
                       <label className="text-[11px] font-bold text-muted-foreground uppercase">
                         Warranty Copy Limit

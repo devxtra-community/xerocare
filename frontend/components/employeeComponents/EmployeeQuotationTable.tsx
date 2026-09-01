@@ -1247,7 +1247,11 @@ export default function EmployeeQuotationTable() {
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Select Customer
                 </label>
-                <CustomerSelect value={assignCustomerId} onChange={setAssignCustomerId} />
+                <CustomerSelect
+                  value={assignCustomerId}
+                  onChange={setAssignCustomerId}
+                  customersOnly
+                />
               </div>
 
               <div className="space-y-2">
@@ -1304,6 +1308,7 @@ export default function EmployeeQuotationTable() {
                 <CustomerSelect
                   value={newFromExistingCustomerId}
                   onChange={setNewFromExistingCustomerId}
+                  customersOnly
                 />
               </div>
 
@@ -1434,10 +1439,15 @@ function QuotationFormModal({
   const [monthlyEmiAmount, setMonthlyEmiAmount] = useState('');
 
   // ── WARRANTY state ──────────────────────────────────────────────────────
-  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('none');
-  const [warrantyDurationValue, setWarrantyDurationValue] = useState('');
-  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('months');
-  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('');
+  // Default warranty across SALE/RENT/LEASE: 2 years OR 200000 copies, whichever
+  // first. Staff can still override per-quotation; `warrantyManuallySet` tracks
+  // whether they (or a product's own warranty data) already have, so the
+  // baseline default doesn't stomp on either.
+  const [warrantyType, setWarrantyType] = useState<'none' | 'duration' | 'copies' | 'both'>('both');
+  const [warrantyDurationValue, setWarrantyDurationValue] = useState('2');
+  const [warrantyDurationUnit, setWarrantyDurationUnit] = useState<'months' | 'years'>('years');
+  const [warrantyCopyLimit, setWarrantyCopyLimit] = useState('200000');
+  const [warrantyManuallySet, setWarrantyManuallySet] = useState(false);
 
   const [lastEditedLease, setLastEditedLease] = useState<'TOTAL' | 'PERIODIC'>('TOTAL');
 
@@ -1584,8 +1594,10 @@ function QuotationFormModal({
     if (initialData.monthlyEmiAmount) setMonthlyEmiAmount(String(initialData.monthlyEmiAmount));
 
     // Warranty initial mapping
-    if (initialData.warrantyType)
+    if (initialData.warrantyType) {
       setWarrantyType(initialData.warrantyType as 'none' | 'duration' | 'copies' | 'both');
+      setWarrantyManuallySet(true);
+    }
     if (initialData.warrantyDurationValue)
       setWarrantyDurationValue(String(initialData.warrantyDurationValue));
     if (initialData.warrantyDurationUnit)
@@ -1784,9 +1796,10 @@ function QuotationFormModal({
 
   // ── Sale item helpers ────────────────────────────────────────────────────
   // Prefill the warranty configuration from the product's stored warranty
-  // (e.g. "2 Years" + max pages) unless the user already set one.
+  // (e.g. "2 Years" + max pages) unless the user (or a prior product) already
+  // set one — the baseline 2yr/200000-copy default doesn't count as "set".
   const applyProductWarrantyDefaults = (pr: Product) => {
-    if (warrantyType !== 'none' || warrantyDurationValue || warrantyCopyLimit) return;
+    if (warrantyManuallySet) return;
     const durationMatch = (pr.warranty || '').match(/(\d+)\s*(year|month)/i);
     const maxPages = pr.warranty_max_pages;
     if (!durationMatch && !maxPages) return;
@@ -1798,6 +1811,7 @@ function QuotationFormModal({
     }
     if (maxPages) setWarrantyCopyLimit(String(maxPages));
     setWarrantyType(durationMatch && maxPages ? 'both' : durationMatch ? 'duration' : 'copies');
+    setWarrantyManuallySet(true);
   };
 
   const addItem = (item: SelectableItem, asAccessory: boolean = false) => {
@@ -3045,6 +3059,7 @@ function QuotationFormModal({
                     if (ct === 'B2B' || ct === 'B2C') setTransactionType(ct);
                     else setTransactionType('B2C');
                   }}
+                  customersOnly
                 />
               </div>
 
@@ -3557,9 +3572,10 @@ function QuotationFormModal({
                           </label>
                           <Select
                             value={warrantyType}
-                            onValueChange={(v) =>
-                              setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both')
-                            }
+                            onValueChange={(v) => {
+                              setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both');
+                              setWarrantyManuallySet(true);
+                            }}
                           >
                             <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
                               <SelectValue />
@@ -3585,7 +3601,10 @@ function QuotationFormModal({
                                 type="number"
                                 placeholder="e.g. 6"
                                 value={warrantyDurationValue}
-                                onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                                onChange={(e) => {
+                                  setWarrantyDurationValue(e.target.value);
+                                  setWarrantyManuallySet(true);
+                                }}
                                 className="h-9 text-sm border-amber-100 shadow-sm"
                               />
                             </div>
@@ -3595,9 +3614,10 @@ function QuotationFormModal({
                               </label>
                               <Select
                                 value={warrantyDurationUnit}
-                                onValueChange={(v) =>
-                                  setWarrantyDurationUnit(v as 'months' | 'years')
-                                }
+                                onValueChange={(v) => {
+                                  setWarrantyDurationUnit(v as 'months' | 'years');
+                                  setWarrantyManuallySet(true);
+                                }}
                               >
                                 <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
                                   <SelectValue />
@@ -3620,7 +3640,10 @@ function QuotationFormModal({
                               type="number"
                               placeholder="e.g. 100000"
                               value={warrantyCopyLimit}
-                              onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                              onChange={(e) => {
+                                setWarrantyCopyLimit(e.target.value);
+                                setWarrantyManuallySet(true);
+                              }}
                               className="h-9 text-sm border-amber-100 shadow-sm"
                             />
                           </div>
@@ -4267,7 +4290,19 @@ function QuotationFormModal({
                       </label>
                       <Select
                         value={leaseType}
-                        onValueChange={(v) => setLeaseType(v as 'EMI' | 'FSM')}
+                        onValueChange={(v) => {
+                          const newLeaseType = v as 'EMI' | 'FSM';
+                          setLeaseType(newLeaseType);
+                          // FSM leases only offer CPC billing now — force off any
+                          // legacy FIXED_* default so the dropdown below stays valid.
+                          if (
+                            newLeaseType === 'FSM' &&
+                            rentType !== 'CPC' &&
+                            rentType !== 'CPC_COMBO'
+                          ) {
+                            handleRentTypeChange('CPC');
+                          }
+                        }}
                       >
                         <SelectTrigger className="h-9 text-sm border-purple-100 w-full">
                           <SelectValue placeholder="Select Lease Type" />
@@ -4307,9 +4342,6 @@ function QuotationFormModal({
                             <SelectValue placeholder="Select Billing Type" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="FIXED_LIMIT">Fixed Limit (BW + Color)</SelectItem>
-                            <SelectItem value="FIXED_COMBO">Fixed Combo (Combined)</SelectItem>
-                            <SelectItem value="FIXED_FLAT">Fixed Flat Rate</SelectItem>
                             <SelectItem value="CPC">CPC (Cost Per Copy)</SelectItem>
                             <SelectItem value="CPC_COMBO">CPC Combo</SelectItem>
                           </SelectContent>
@@ -5063,9 +5095,10 @@ function QuotationFormModal({
                         </label>
                         <Select
                           value={warrantyType}
-                          onValueChange={(v) =>
-                            setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both')
-                          }
+                          onValueChange={(v) => {
+                            setWarrantyType(v as 'none' | 'duration' | 'copies' | 'both');
+                            setWarrantyManuallySet(true);
+                          }}
                         >
                           <SelectTrigger className="h-9 text-sm border-amber-100 bg-white shadow-sm">
                             <SelectValue />
@@ -5091,7 +5124,10 @@ function QuotationFormModal({
                               type="number"
                               placeholder="e.g. 6"
                               value={warrantyDurationValue}
-                              onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                              onChange={(e) => {
+                                setWarrantyDurationValue(e.target.value);
+                                setWarrantyManuallySet(true);
+                              }}
                               className="h-9 text-sm border-amber-100 shadow-sm"
                             />
                           </div>
@@ -5101,9 +5137,10 @@ function QuotationFormModal({
                             </label>
                             <Select
                               value={warrantyDurationUnit}
-                              onValueChange={(v) =>
-                                setWarrantyDurationUnit(v as 'months' | 'years')
-                              }
+                              onValueChange={(v) => {
+                                setWarrantyDurationUnit(v as 'months' | 'years');
+                                setWarrantyManuallySet(true);
+                              }}
                             >
                               <SelectTrigger className="h-9 text-sm border-amber-100 bg-white">
                                 <SelectValue />
@@ -5126,7 +5163,10 @@ function QuotationFormModal({
                             type="number"
                             placeholder="e.g. 100000"
                             value={warrantyCopyLimit}
-                            onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                            onChange={(e) => {
+                              setWarrantyCopyLimit(e.target.value);
+                              setWarrantyManuallySet(true);
+                            }}
                             className="h-9 text-sm border-amber-100 shadow-sm"
                           />
                         </div>

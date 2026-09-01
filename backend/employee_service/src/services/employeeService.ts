@@ -37,6 +37,7 @@ export class EmployeeService {
     first_name: string;
     last_name: string;
     email: string;
+    phone: string;
     role?: string;
     employee_job?: EmployeeJob;
     finance_job?: FinanceJob;
@@ -50,6 +51,7 @@ export class EmployeeService {
       first_name,
       last_name,
       email,
+      phone,
       role,
       employee_job,
       finance_job,
@@ -63,6 +65,10 @@ export class EmployeeService {
     const existing = await this.employeeRepo.findByEmail(email);
     if (existing) {
       throw new AppError('Employee already Exist', 409);
+    }
+
+    if (!phone || !phone.trim()) {
+      throw new AppError('Phone number is required', 400);
     }
 
     if (role === EmployeeRole.ADMIN) {
@@ -127,6 +133,7 @@ export class EmployeeService {
       first_name,
       last_name,
       email,
+      phone: phone.trim(),
       display_id,
       password_hash: passwordHash,
       role: roleEnum,
@@ -256,6 +263,7 @@ export class EmployeeService {
     payload: {
       first_name?: string;
       last_name?: string;
+      phone?: string | null;
       role?: EmployeeRole;
       employee_job?: EmployeeJob | null;
       finance_job?: FinanceJob | null;

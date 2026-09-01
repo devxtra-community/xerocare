@@ -66,6 +66,7 @@ import {
   createServiceContractInvoice,
   getContractBySerial,
   getCustomerBillingHistory,
+  getEmployeeRecentActivity,
   reviseEstimate,
   applyDiscount,
   financeExtendValidity,
@@ -312,6 +313,17 @@ router.get('/:id/ledger', authMiddleware, getInvoiceLedger);
  * Show me only the bills and deals I am personally working on.
  */
 router.get('/my-invoices', authMiddleware, getMyInvoices);
+
+/**
+ * Recent sale/rent/lease activity for one employee (used by the employee
+ * detail page). MANAGER is locked to their own branch inside the controller.
+ */
+router.get(
+  '/employee/:employeeId/recent-activity',
+  authMiddleware,
+  requireRole(EmployeeRole.MANAGER, EmployeeRole.ADMIN, EmployeeRole.HR),
+  getEmployeeRecentActivity,
+);
 
 /**
  * List every single bill in the system.

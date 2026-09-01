@@ -56,6 +56,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       first_name,
       last_name,
       email,
+      phone,
       role,
       employee_job,
       finance_job,
@@ -89,6 +90,7 @@ export const addEmployee = async (req: Request, res: Response, next: NextFunctio
       first_name,
       last_name,
       email,
+      phone,
       role,
       employee_job,
       finance_job,
@@ -191,9 +193,19 @@ export const getAllEmployees = async (req: Request, res: Response, next: NextFun
  */
 export const getEmployeeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const isSelf = req.user?.userId === req.params.id;
+    const isPrivileged = [EmployeeRole.ADMIN, EmployeeRole.HR, EmployeeRole.MANAGER].includes(
+      req.user?.role as EmployeeRole,
+    );
+
+    if (!isSelf && !isPrivileged) {
+      throw new AppError('Access denied', 403);
+    }
+
     const employee = await service.getEmployeeById(req.params.id as string);
 
     // Security check for managers: can only see employees in their branch
+    // (trivially satisfied when viewing themselves).
     if (req.user?.role === EmployeeRole.MANAGER && employee.branch_id !== req.user.branchId) {
       throw new AppError('Access denied: employee belongs to another branch', 403);
     }

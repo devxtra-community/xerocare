@@ -12,10 +12,10 @@ import {
   Edit,
   Trash2,
   Search,
-  Filter,
   Plus,
   Trash,
   Star,
+  Pencil,
   ChevronsUpDown,
   Check,
   User,
@@ -23,12 +23,6 @@ import {
   Landmark,
   Settings,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
 import {
@@ -73,7 +67,7 @@ import { currencyOptions, getDefaultCurrencyForCountry } from '@/lib/currencyLis
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const countryList = require('country-list');
 
-type BankAccount = {
+export type BankAccount = {
   bankName: string;
   accountHolderName: string;
   accountNumber: string;
@@ -97,10 +91,9 @@ type BankAccount = {
   isPrimary?: boolean;
 };
 
-type Vendor = {
+export type Vendor = {
   id: string;
   name: string;
-  type: 'Supplier' | 'Distributor' | 'Service';
   contactPerson: string;
   phone: string;
   email: string;
@@ -120,9 +113,8 @@ type Vendor = {
   lotCurrencyCodes?: string[];
 };
 
-type VendorFormData = {
+export type VendorFormData = {
   name: string;
-  type: 'Supplier' | 'Distributor' | 'Service';
   contactPerson: string;
   phone: string;
   email: string;
@@ -385,7 +377,8 @@ const COUNTRY_DIAL_CODES: Record<string, string> = {
   ZW: '+263',
 };
 
-export { type Vendor }; // Export so parent can use it
+// Vendor, VendorFormData, BankAccount, and VendorFormModal are exported directly
+// so vendor detail pages can reuse the same edit dialog (see manager/admin [id] pages).
 
 /**
  * Comprehensive table for managing vendors.
@@ -400,9 +393,6 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
   // their own branch by the backend and never pick a branch themselves.
   const isAdmin = basePath === '/admin';
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'All' | 'Supplier' | 'Distributor' | 'Service'>(
-    'All',
-  );
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -417,14 +407,12 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
   const fetchVendorsData = useCallback(async () => {
     setLoading(true);
     try {
-      const typeFilter = filterType !== 'All' ? filterType : undefined;
-      const res = await getVendors({ page, limit, search, type: typeFilter });
+      const res = await getVendors({ page, limit, search });
       const rawVendors = res.data || [];
 
       const mappedVendors: Vendor[] = rawVendors.map((v: Record<string, unknown>) => ({
         id: v.id as string,
         name: v.name as string,
-        type: (v.type as 'Supplier' | 'Distributor' | 'Service') || 'Supplier',
         contactPerson: (v.contactPerson as string) || 'N/A',
         phone: (v.phone as string) || 'N/A',
         email: (v.email as string) || 'N/A',
@@ -476,7 +464,7 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, filterType, setTotal]);
+  }, [page, limit, search, setTotal]);
 
   React.useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -494,7 +482,6 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
         name: data.name,
         email: data.email,
         phone: data.phone,
-        type: data.type,
         contactPerson: data.contactPerson,
         status: (data.status === 'Active' ? 'ACTIVE' : 'INACTIVE') as 'ACTIVE' | 'INACTIVE',
         currency: data.currency,
@@ -579,24 +566,6 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2 bg-card border-blue-400/60">
-                <Filter className="h-4 w-4" />
-                Filter: {filterType}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setFilterType('All')}>All Types</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('Supplier')}>
-                Supplier
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('Distributor')}>
-                Distributor
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setFilterType('Service')}>Service</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
           <Button
             className="bg-primary text-white gap-2"
             onClick={() => {
@@ -642,24 +611,6 @@ export default function VendorTable({ basePath = '/admin' }: { basePath?: string
                 },
               ]
             : []),
-          {
-            id: 'type',
-            header: 'TYPE',
-            className: 'font-semibold text-[11px] text-primary uppercase',
-            cell: (v: Vendor) => (
-              <span
-                className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                  v.type === 'Supplier'
-                    ? 'bg-blue-100 text-blue-700'
-                    : v.type === 'Distributor'
-                      ? 'bg-purple-100 text-purple-700'
-                      : 'bg-orange-100 text-orange-700'
-                }`}
-              >
-                {v.type}
-              </span>
-            ),
-          },
           {
             id: 'contact',
             header: 'CONTACT',
@@ -859,7 +810,7 @@ const BLANK_BANK: BankAccount = {
   isPrimary: false,
 };
 
-function VendorFormModal({
+export function VendorFormModal({
   initialData,
   open,
   onClose,
@@ -877,6 +828,7 @@ function VendorFormModal({
   const [countryQuery, setCountryQuery] = React.useState('');
   const deferredCountryQuery = React.useDeferredValue(countryQuery);
   const [addingBank, setAddingBank] = React.useState(false);
+  const [editingBankIndex, setEditingBankIndex] = React.useState<number | null>(null);
   const [bankDraft, setBankDraft] = React.useState<BankAccount>({ ...BLANK_BANK });
   const [branches, setBranches] = React.useState<Branch[]>([]);
 
@@ -890,7 +842,6 @@ function VendorFormModal({
 
   const [form, setForm] = useState<VendorFormData>({
     name: '',
-    type: 'Supplier',
     contactPerson: '',
     phone: '',
     email: '',
@@ -908,11 +859,11 @@ function VendorFormModal({
   React.useEffect(() => {
     if (open) {
       setAddingBank(false);
+      setEditingBankIndex(null);
       setBankDraft({ ...BLANK_BANK });
       if (initialData) {
         setForm({
           name: initialData.name,
-          type: initialData.type,
           contactPerson: initialData.contactPerson,
           phone: stripDialCode(initialData.phone),
           email: initialData.email,
@@ -929,7 +880,6 @@ function VendorFormModal({
       } else {
         setForm({
           name: '',
-          type: 'Supplier',
           contactPerson: '',
           phone: '',
           email: '',
@@ -961,17 +911,28 @@ function VendorFormModal({
     setCountryOpen(false);
   };
 
-  const addBankAccount = () => {
+  const saveBankAccount = () => {
     if (!bankDraft.bankName || !bankDraft.accountNumber || !bankDraft.accountHolderName) {
       toast.error('Bank name, account holder name and account number are required');
       return;
     }
-    const newAccounts = bankDraft.isPrimary
-      ? form.bankAccounts.map((a) => ({ ...a, isPrimary: false }))
-      : [...form.bankAccounts];
-    setForm((f) => ({ ...f, bankAccounts: [...newAccounts, { ...bankDraft }] }));
+    if (editingBankIndex !== null) {
+      setForm((f) => ({
+        ...f,
+        bankAccounts: f.bankAccounts.map((a, i) => {
+          if (i === editingBankIndex) return { ...bankDraft };
+          return bankDraft.isPrimary ? { ...a, isPrimary: false } : a;
+        }),
+      }));
+    } else {
+      const newAccounts = bankDraft.isPrimary
+        ? form.bankAccounts.map((a) => ({ ...a, isPrimary: false }))
+        : [...form.bankAccounts];
+      setForm((f) => ({ ...f, bankAccounts: [...newAccounts, { ...bankDraft }] }));
+    }
     setBankDraft({ ...BLANK_BANK });
     setAddingBank(false);
+    setEditingBankIndex(null);
   };
 
   const removeBankAccount = (idx: number) => {
@@ -1028,7 +989,7 @@ function VendorFormModal({
 
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-none border border-slate-200 shadow-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-primary">
             {initialData ? 'Update Vendor' : 'Add Vendor'}
@@ -1053,7 +1014,7 @@ function VendorFormModal({
                   placeholder="Enter vendor name"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
 
@@ -1065,27 +1026,8 @@ function VendorFormModal({
                   placeholder="Contact person"
                   value={form.contactPerson}
                   onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
-                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Type
-                </label>
-                <Select
-                  value={form.type}
-                  onValueChange={(v) => setForm({ ...form, type: v as VendorFormData['type'] })}
-                >
-                  <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Supplier">Supplier</SelectItem>
-                    <SelectItem value="Distributor">Distributor</SelectItem>
-                    <SelectItem value="Service">Service</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="space-y-2">
@@ -1096,7 +1038,7 @@ function VendorFormModal({
                   placeholder="Email address"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                  className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
               </div>
             </div>
@@ -1125,7 +1067,7 @@ function VendorFormModal({
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full h-11 rounded-xl bg-card border-none shadow-sm justify-between font-normal text-sm"
+                      className="w-full h-11 rounded-xl bg-card border shadow-sm justify-between font-normal text-sm"
                     >
                       {form.countryCode
                         ? `${form.countryCode} — ${form.countryName}`
@@ -1183,7 +1125,7 @@ function VendorFormModal({
                           setForm((f) => ({ ...f, stateProvince: v, city: undefined }))
                         }
                       >
-                        <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                        <SelectTrigger className="h-11 rounded-xl bg-card border shadow-sm focus:ring-2 focus:ring-primary/20">
                           <SelectValue placeholder={`Select ${stateLabel}`} />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl max-h-64">
@@ -1205,7 +1147,7 @@ function VendorFormModal({
                             city: undefined,
                           }))
                         }
-                        className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                       />
                     )}
                   </div>
@@ -1218,7 +1160,7 @@ function VendorFormModal({
                         value={form.city ?? ''}
                         onValueChange={(v) => setForm((f) => ({ ...f, city: v }))}
                       >
-                        <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                        <SelectTrigger className="h-11 rounded-xl bg-card border shadow-sm focus:ring-2 focus:ring-primary/20">
                           <SelectValue placeholder="Select city" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl max-h-64">
@@ -1239,7 +1181,7 @@ function VendorFormModal({
                         onChange={(e) =>
                           setForm((f) => ({ ...f, city: e.target.value || undefined }))
                         }
-                        className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                        className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20"
                       />
                     )}
                   </div>
@@ -1258,7 +1200,7 @@ function VendorFormModal({
                     (code auto from country)
                   </span>
                 </label>
-                <div className="flex h-11 rounded-xl bg-card shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
+                <div className="flex h-11 rounded-xl bg-card border shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-primary/20">
                   <div className="flex items-center px-3 bg-blue-50 border-r border-blue-100 text-xs font-mono font-bold text-blue-600 whitespace-nowrap shrink-0 min-w-[52px] justify-center">
                     {form.countryCode && COUNTRY_DIAL_CODES[form.countryCode]
                       ? COUNTRY_DIAL_CODES[form.countryCode]
@@ -1300,7 +1242,7 @@ function VendorFormModal({
                   value={form.currency}
                   onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
                   maxLength={10}
-                  className="h-11 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 font-mono"
+                  className="h-11 rounded-xl bg-card border shadow-sm focus-visible:ring-2 focus-visible:ring-primary/20 font-mono"
                 />
               </div>
 
@@ -1316,7 +1258,7 @@ function VendorFormModal({
                   onChange={(e) =>
                     setForm((f) => ({ ...f, vatNumber: e.target.value || undefined }))
                   }
-                  className="w-full h-11 rounded-xl bg-card shadow-sm border-0 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="w-full h-11 rounded-xl bg-card shadow-sm border px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
             </div>
@@ -1343,7 +1285,7 @@ function VendorFormModal({
                       setForm({ ...form, branchId: v === 'UNASSIGNED' ? undefined : v })
                     }
                   >
-                    <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
+                    <SelectTrigger className="h-11 rounded-xl bg-card border shadow-sm">
                       <SelectValue placeholder="Select branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1366,7 +1308,7 @@ function VendorFormModal({
                   value={form.status}
                   onValueChange={(v) => setForm({ ...form, status: v as VendorFormData['status'] })}
                 >
-                  <SelectTrigger className="h-11 rounded-xl bg-card border-none shadow-sm">
+                  <SelectTrigger className="h-11 rounded-xl bg-card border shadow-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1392,6 +1334,7 @@ function VendorFormModal({
                   className="h-7 text-[11px] gap-1 border-blue-200 text-blue-700"
                   onClick={() => {
                     setAddingBank(true);
+                    setEditingBankIndex(null);
                     setBankDraft({
                       ...BLANK_BANK,
                       bankCountry: form.countryCode ?? '',
@@ -1422,17 +1365,14 @@ function VendorFormModal({
                         )}
                       </div>
                       <p className="text-[11px] text-gray-500">{acc.accountHolderName}</p>
-                      <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
-                      {(acc.swiftCode || acc.iban || acc.address) && (
-                        <div className="flex items-center gap-2">
-                          <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
-                          {acc.accountType && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
-                              {acc.accountType}
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <p className="text-[11px] font-mono text-gray-600">{acc.accountNumber}</p>
+                        {acc.accountType && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                            {acc.accountType}
+                          </span>
+                        )}
+                      </div>
                       {(acc.swiftCode || acc.iban || acc.address) && (
                         <p className="text-[10px] text-gray-400 mt-0.5">
                           {acc.swiftCode && `SWIFT: ${acc.swiftCode}`}
@@ -1442,6 +1382,18 @@ function VendorFormModal({
                       )}
                     </div>
                     <div className="flex flex-col gap-1">
+                      <button
+                        type="button"
+                        title="Edit account"
+                        onClick={() => {
+                          setBankDraft({ ...acc });
+                          setEditingBankIndex(idx);
+                          setAddingBank(true);
+                        }}
+                        className="p-1 rounded-lg hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                       {!acc.isPrimary && (
                         <button
                           type="button"
@@ -1454,6 +1406,7 @@ function VendorFormModal({
                       )}
                       <button
                         type="button"
+                        title="Remove account"
                         onClick={() => removeBankAccount(idx)}
                         className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
                       >
@@ -1469,7 +1422,7 @@ function VendorFormModal({
             {addingBank && (
               <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/30 space-y-3">
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
-                  New Bank Account
+                  {editingBankIndex !== null ? 'Edit Bank Account' : 'New Bank Account'}
                 </p>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase">
@@ -1487,7 +1440,7 @@ function VendorFormModal({
                     }
                     placeholder="Country where this bank is located"
                     emptyText="No country found."
-                    className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                    className="h-9 text-sm rounded-lg bg-card border shadow-sm"
                   />
                 </div>
                 <BankBranchSelector
@@ -1514,7 +1467,7 @@ function VendorFormModal({
                       onChange={(e) =>
                         setBankDraft((d) => ({ ...d, accountHolderName: e.target.value }))
                       }
-                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                      className="h-9 text-sm rounded-lg bg-card border shadow-sm"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1527,7 +1480,7 @@ function VendorFormModal({
                       onChange={(e) =>
                         setBankDraft((d) => ({ ...d, accountNumber: e.target.value }))
                       }
-                      className="h-9 text-sm font-mono rounded-lg bg-card border-none shadow-sm"
+                      className="h-9 text-sm font-mono rounded-lg bg-card border shadow-sm"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1543,7 +1496,7 @@ function VendorFormModal({
                         }))
                       }
                     >
-                      <SelectTrigger className="h-9 text-sm rounded-lg bg-card border-none shadow-sm">
+                      <SelectTrigger className="h-9 text-sm rounded-lg bg-card border shadow-sm">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1561,7 +1514,7 @@ function VendorFormModal({
                       placeholder="e.g. QNBAQAQA"
                       value={bankDraft.swiftCode || ''}
                       onChange={(e) => setBankDraft((d) => ({ ...d, swiftCode: e.target.value }))}
-                      className="h-9 text-sm font-mono rounded-lg bg-card border-none shadow-sm"
+                      className="h-9 text-sm font-mono rounded-lg bg-card border shadow-sm"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1572,7 +1525,7 @@ function VendorFormModal({
                       placeholder="Bank address"
                       value={bankDraft.address || ''}
                       onChange={(e) => setBankDraft((d) => ({ ...d, address: e.target.value }))}
-                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                      className="h-9 text-sm rounded-lg bg-card border shadow-sm"
                     />
                   </div>
                   <div className="space-y-1">
@@ -1585,7 +1538,7 @@ function VendorFormModal({
                       onValueChange={(v) => setBankDraft((d) => ({ ...d, currency: v }))}
                       placeholder="Currency this account is held/paid in"
                       emptyText="No currency found."
-                      className="h-9 text-sm rounded-lg bg-card border-none shadow-sm"
+                      className="h-9 text-sm rounded-lg bg-card border shadow-sm"
                     />
                   </div>
                   <div className="col-span-2">
@@ -1605,15 +1558,19 @@ function VendorFormModal({
                   </div>
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <Button type="button" size="sm" className="h-8 text-xs" onClick={addBankAccount}>
-                    Add Account
+                  <Button type="button" size="sm" className="h-8 text-xs" onClick={saveBankAccount}>
+                    {editingBankIndex !== null ? 'Save Changes' : 'Add Account'}
                   </Button>
                   <Button
                     type="button"
                     size="sm"
                     variant="ghost"
                     className="h-8 text-xs"
-                    onClick={() => setAddingBank(false)}
+                    onClick={() => {
+                      setAddingBank(false);
+                      setEditingBankIndex(null);
+                      setBankDraft({ ...BLANK_BANK });
+                    }}
                   >
                     Cancel
                   </Button>
@@ -1668,10 +1625,17 @@ function VendorFormModal({
                     );
                     return;
                   }
-                  const existingAccounts = bankDraft.isPrimary
-                    ? form.bankAccounts.map((a) => ({ ...a, isPrimary: false }))
-                    : [...form.bankAccounts];
-                  finalBankAccounts = [...existingAccounts, { ...bankDraft }];
+                  if (editingBankIndex !== null) {
+                    finalBankAccounts = form.bankAccounts.map((a, i) => {
+                      if (i === editingBankIndex) return { ...bankDraft };
+                      return bankDraft.isPrimary ? { ...a, isPrimary: false } : a;
+                    });
+                  } else {
+                    const existingAccounts = bankDraft.isPrimary
+                      ? form.bankAccounts.map((a) => ({ ...a, isPrimary: false }))
+                      : [...form.bankAccounts];
+                    finalBankAccounts = [...existingAccounts, { ...bankDraft }];
+                  }
                 }
 
                 // Recombine dial code + national number for storage.

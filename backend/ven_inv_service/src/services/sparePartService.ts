@@ -5,10 +5,12 @@ import { LotService } from './lotService';
 import { LotItemType } from '../entities/lotItemEntity';
 import { LotStatus } from '../entities/lotEntity';
 import { getCached, setCached, deleteCached } from '../utils/cacheUtil';
+import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
 import { generateSku } from '../utils/skuGenerator';
 import { Source } from '../config/db';
 import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
+import { Branch } from '../entities/branchEntity';
 
 interface BulkUploadRow {
   sku?: string;
@@ -133,6 +135,12 @@ export class SparePartService {
       lotItemId = lotItem.id;
     }
 
+    // Never let a spare part reach inventory with no warehouse — it becomes
+    // unlocatable by barcode scan (scanLookup matches on warehouse_id).
+    if (!warehouseId) {
+      throw new AppError('Warehouse is required to add a spare part to inventory.', 400);
+    }
+
     if (lotId && sku) {
       // IMPROVED DUPLICATE DETECTION: If it's the same lot and same sku, it's definitely the same part.
       // Prioritize sku over fuzzy name matching.
@@ -192,6 +200,11 @@ export class SparePartService {
 
     const generatedSku = sku || generateSku();
 
+    // Tax rate is not a per-item choice — it always mirrors the branch's
+    // configured tax (GST/VAT/etc.), same as purchases and invoices already do.
+    const branch = await Source.getRepository(Branch).findOne({ where: { id: branchId } });
+    const taxRate = branch?.has_tax && branch.tax_percent != null ? Number(branch.tax_percent) : 0;
+
     const sparePart = await this.repo.createMaster({
       part_name: data.part_name?.trim(),
       brand: data.brand,
@@ -200,6 +213,7 @@ export class SparePartService {
       base_price: data.base_price,
       purchase_price: data.purchase_price || 0,
       wholesale_price: data.wholesale_price || 0,
+      tax_rate: taxRate,
       branch_id: branchId,
       quantity: quantity,
       lot_id: lotId,

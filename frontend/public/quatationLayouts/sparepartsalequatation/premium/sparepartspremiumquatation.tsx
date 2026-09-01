@@ -617,7 +617,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               }}
             >
               <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
-                SUBTOTAL (BEFORE VAT)
+                SUBTOTAL (BEFORE {(totals.vatName || 'VAT').toUpperCase()})
               </span>
               <span style={{ fontWeight: '400' }}>
                 {getActiveCurrency()} {fmt(totals.subTotal)}
@@ -648,8 +648,8 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               >
                 <span style={{ color: mutedText, fontWeight: '400', fontSize: '11px' }}>
                   {totals.vatPercent
-                    ? `${totals.vatName || 'VAT'} (${totals.vatPercent}%)`
-                    : totals.vatName || 'VAT AMOUNT'}
+                    ? `${(totals.vatName || 'VAT').toUpperCase()} (${totals.vatPercent}%)`
+                    : `${(totals.vatName || 'VAT').toUpperCase()} AMOUNT`}
                 </span>
                 <span style={{ fontWeight: '400' }}>
                   {getActiveCurrency()} {fmt(totals.vatTotal)}
@@ -671,7 +671,7 @@ const SparePartsPremiumQuotation: React.FC<SparePartsPremiumQuotationProps> = ({
               }}
             >
               <span style={{ fontWeight: '900', fontSize: '14px' }}>
-                GRAND TOTAL (INCLUDING VAT)
+                GRAND TOTAL (INCLUDING {(totals.vatName || 'VAT').toUpperCase()})
               </span>
               <span style={{ fontWeight: '900', fontSize: '20px' }}>
                 {getActiveCurrency()} {fmt(totals.total)}

@@ -258,7 +258,9 @@ function InputLocalDocument({ row, branch }: { row: InputTaxLocalRow; branch: Br
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, color: TEXT_MUTED }}>VAT Claimable :</span>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>
+              {row.taxName ?? 'VAT'} Claimable :
+            </span>
             <span style={{ fontSize: 12, fontWeight: 300 }}>{row.vatClaimable ? 'Yes' : 'No'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -286,7 +288,7 @@ function InputLocalDocument({ row, branch }: { row: InputTaxLocalRow; branch: Br
               <th style={{ ...thStyle('left'), width: '40%' }}>Category</th>
               <th style={thStyle('right')}>Taxable Amount</th>
               <th style={thStyle('center')}>{row.taxName ?? 'VAT'} %</th>
-              <th style={thStyle('right')}>Input VAT</th>
+              <th style={thStyle('right')}>Input {row.taxName ?? 'VAT'}</th>
               <th style={thStyle('right')}>Total</th>
             </tr>
           </thead>
@@ -309,7 +311,7 @@ function InputLocalDocument({ row, branch }: { row: InputTaxLocalRow; branch: Br
         rows={[
           { label: 'Taxable Amount', value: fmt(row.taxableAmount, row.currencyCode) },
           {
-            label: `${row.taxName ?? 'Input VAT'} (${row.taxPercent ?? 0}%)`,
+            label: `Input ${row.taxName ?? 'VAT'} (${row.taxPercent ?? 0}%)`,
             value: fmt(row.inputVatAmount, row.currencyCode),
           },
           { label: 'Total Amount', value: fmt(row.totalAmount, row.currencyCode), bold: true },
@@ -325,7 +327,8 @@ function InputLocalDocument({ row, branch }: { row: InputTaxLocalRow; branch: Br
           fontStyle: 'italic',
         }}
       >
-        Computer-generated Purchase Tax Record for internal VAT reporting purposes.
+        Computer-generated Purchase Tax Record for internal {row.taxName ?? 'VAT'} reporting
+        purposes.
       </div>
 
       <DocFooter branch={branch} />
@@ -366,7 +369,11 @@ function InputIntlDocument({ row, branch }: { row: InputTaxInternationalRow; bra
           </div>
           <div style={{ fontSize: 14, fontWeight: 300, marginBottom: 4 }}>{row.supplierName}</div>
           <div style={{ fontSize: 12, color: TEXT_MUTED, lineHeight: 1.5 }}>
-            {row.supplierVatNumber && <div>VAT No: {row.supplierVatNumber}</div>}
+            {row.supplierVatNumber && (
+              <div>
+                {row.taxName ?? 'VAT'} No: {row.supplierVatNumber}
+              </div>
+            )}
             {row.supplierCountry && <div>{row.supplierCountry}</div>}
           </div>
         </div>
@@ -402,7 +409,9 @@ function InputIntlDocument({ row, branch }: { row: InputTaxInternationalRow; bra
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, color: TEXT_MUTED }}>VAT Claimable :</span>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>
+              {row.taxName ?? 'VAT'} Claimable :
+            </span>
             <span style={{ fontSize: 12, fontWeight: 300 }}>{row.vatClaimable ? 'Yes' : 'No'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -430,7 +439,7 @@ function InputIntlDocument({ row, branch }: { row: InputTaxInternationalRow; bra
               <th style={{ ...thStyle('left'), width: '40%' }}>Goods / Service</th>
               <th style={thStyle('right')}>Taxable Amount</th>
               <th style={thStyle('right')}>Customs Duty</th>
-              <th style={thStyle('right')}>Reverse Charge VAT</th>
+              <th style={thStyle('right')}>Reverse Charge {row.taxName ?? 'VAT'}</th>
               <th style={thStyle('right')}>Total</th>
             </tr>
           </thead>
@@ -452,7 +461,7 @@ function InputIntlDocument({ row, branch }: { row: InputTaxInternationalRow; bra
           { label: 'Taxable Amount', value: fmt(row.taxableAmount, row.currencyCode) },
           { label: 'Customs Duty', value: fmt(row.customsDuty, row.currencyCode) },
           {
-            label: `Reverse Charge VAT${row.taxPercent != null ? ` (${row.taxPercent}%)` : ''}`,
+            label: `Reverse Charge ${row.taxName ?? 'VAT'}${row.taxPercent != null ? ` (${row.taxPercent}%)` : ''}`,
             value: fmt(row.importVatReverseCharge, row.currencyCode),
           },
           { label: 'Total', value: fmt(totalAmount, row.currencyCode), bold: true },
@@ -468,8 +477,8 @@ function InputIntlDocument({ row, branch }: { row: InputTaxInternationalRow; bra
           fontStyle: 'italic',
         }}
       >
-        Self-billed under the Reverse Charge Mechanism. VAT declared by the recipient ({branch.name}
-        ).
+        Self-billed under the Reverse Charge Mechanism. {row.taxName ?? 'VAT'} declared by the
+        recipient ({branch.name}).
       </div>
 
       <DocFooter branch={branch} />
@@ -584,7 +593,7 @@ export default function TaxDocumentDialog({
       `${branch.name}${branch.tax_registration_number ? ` | TRN: ${branch.tax_registration_number}` : ''}`,
       `Date: ${date}`,
       data.type === 'output'
-        ? `Customer: ${(row.customerName as string) ?? '—'} | Taxable: ${fmt(row.taxableAmount as number, currency)} | VAT: ${fmt(row.outputVat as number, currency)} | Total: ${fmt(row.totalInvoice as number, currency)}`
+        ? `Customer: ${(row.customerName as string) ?? '—'} | Taxable: ${fmt(row.taxableAmount as number, currency)} | ${(row.taxName as string) ?? 'VAT'}: ${fmt(row.outputVat as number, currency)} | Total: ${fmt(row.totalInvoice as number, currency)}`
         : data.type === 'local'
           ? `Vendor: ${(row.vendorName as string) ?? '—'} | Total: ${fmt(row.totalAmount as number, currency)}`
           : `Supplier: ${(row.supplierName as string) ?? '—'} | Total: ${fmt(((row.taxableAmount as number) ?? 0) + ((row.customsDuty as number) ?? 0) + ((row.importVatReverseCharge as number) ?? 0), currency)}`,

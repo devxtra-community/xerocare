@@ -42,10 +42,10 @@ export class Vendor {
 
   @Column({
     type: 'enum',
-    enum: ['Supplier', 'Distributor', 'Service'],
+    enum: ['Supplier'],
     default: 'Supplier',
   })
-  type!: 'Supplier' | 'Distributor' | 'Service';
+  type!: 'Supplier';
 
   @Column({ nullable: true })
   contactPerson?: string;
