@@ -77,6 +77,14 @@ export class BranchController {
     // even though the route deliberately allows ADMIN to call it (see the
     // ADMIN-aware branchId pattern already used in list()/getById() above).
     if (req.user?.role === 'ADMIN') {
+      // Admin has no home branch, but may ask about a specific one via ?branchId=
+      // (the Spare Parts page needs the picked branch's tax config).
+      const requested = req.query.branchId as string | undefined;
+      if (requested) {
+        const branch = await this.service.getBranchById(requested);
+        res.json({ success: true, data: branch });
+        return;
+      }
       res.json({ success: true, data: null });
       return;
     }

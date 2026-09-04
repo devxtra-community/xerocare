@@ -65,6 +65,12 @@ export class SparePartService {
    * Adds a single spare part, validating model and tracking lot usage.
    */
   async addSingleSparePart(data: BulkUploadRow, branchId: string, createdBy?: string) {
+    // MPN is mandatory for every spare part (single add and each bulk row).
+    if (!data.mpn || !data.mpn.trim()) {
+      throw new AppError('MPN is required', 400);
+    }
+    data.mpn = data.mpn.trim();
+
     // In bulk upload, sku might be missing as it's generated
     const sku = data.sku?.trim().toUpperCase();
 

@@ -149,6 +149,31 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed branch currency & tax columns exist.');
 
+        // --- Warehouse country + contact person columns ---
+        // contact_person_* is denormalised: employees live in employee_service,
+        // so we keep the id for reference and the name/email for display.
+        await Source.query(`
+          ALTER TABLE warehouses
+          ADD COLUMN IF NOT EXISTS country VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS contact_person_id UUID,
+          ADD COLUMN IF NOT EXISTS contact_person_name VARCHAR(150),
+          ADD COLUMN IF NOT EXISTS contact_person_email VARCHAR(150),
+          ALTER COLUMN capacity DROP NOT NULL,
+          ALTER COLUMN location DROP NOT NULL,
+          ALTER COLUMN address DROP NOT NULL;
+        `);
+        logger.info('Guaranteed warehouse country & contact person columns exist.');
+
+        // --- Machine type (PRINTER / COMPUTER / OTHER) on model, product, ticket ---
+        // Existing rows backfill to PRINTER via the column default, preserving
+        // the current meter-based service workflow.
+        await Source.query(`
+          ALTER TABLE model           ADD COLUMN IF NOT EXISTS machine_type VARCHAR(20) DEFAULT 'PRINTER';
+          ALTER TABLE products        ADD COLUMN IF NOT EXISTS machine_type VARCHAR(20) DEFAULT 'PRINTER';
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS machine_type VARCHAR(20) DEFAULT 'PRINTER';
+        `);
+        logger.info('Guaranteed machine_type columns exist on model, products, service_tickets.');
+
         // --- Exchange Rates table ---
         await Source.query(`
           CREATE TABLE IF NOT EXISTS exchange_rates (
@@ -419,7 +444,7 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             BEGIN
               IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'service_tickets_servicecontext_enum') THEN
                 CREATE TYPE service_tickets_servicecontext_enum AS ENUM (
-                  'RENT', 'LEASE_UNDER_WARRANTY', 'FSMA', 'SMA', 'AMC', 'CHARGEABLE', 'LEASE_EXPIRED'
+                  'RENT', 'LEASE_UNDER_WARRANTY', 'FSMA', 'SMA', 'AMC', 'CHARGEABLE', 'LEASE_EXPIRED', 'LEASE_CPC'
                 );
               END IF;
               
@@ -451,6 +476,12 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
 
               BEGIN
                 ALTER TYPE service_tickets_servicecontext_enum ADD VALUE 'EXTERNAL_MACHINE';
+              EXCEPTION
+                WHEN duplicate_object THEN NULL;
+              END;
+
+              BEGIN
+                ALTER TYPE service_tickets_servicecontext_enum ADD VALUE 'LEASE_CPC';
               EXCEPTION
                 WHEN duplicate_object THEN NULL;
               END;

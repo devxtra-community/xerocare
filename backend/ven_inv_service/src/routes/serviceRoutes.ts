@@ -27,6 +27,7 @@ router.get('/contracts/:id/meter-readings', controller.getContractMeterReadings)
 router.get('/contracts/:id/bills', controller.getContractBills);
 router.post('/external-machines', controller.registerExternalMachine);
 router.post('/tickets/:id/assign', controller.assignTechnician);
+router.post('/tickets/:id/collect-visit-charge', controller.collectVisitCharge);
 router.post(
   '/tickets/:id/start-diagnosis',
   requireServiceRole(['SERVICE_TECHNICIAN']),

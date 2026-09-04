@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -240,6 +240,40 @@ export default function CustomerFormDialog({
 
   const dialCode = dialCodeForCountry(formData.country) || parsedDial;
 
+  // State/city lookups — memoized, and never fetching a whole-country city
+  // list when the country has states to narrow by first. `country-state-city`
+  // returns tens of thousands of rows for large federal countries (India
+  // ~57k, US ~26k); computing that inline in JSX with no memoization (as
+  // before) reran on every keystroke anywhere in the form, and its dedup
+  // was an O(n²) `.filter(findIndex)` over that whole list — together they
+  // froze the tab as soon as a big country was selected.
+  const regionLabel =
+    formData.country === 'AE'
+      ? 'Emirate'
+      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(formData.country || '')
+        ? 'State'
+        : formData.country === 'CA'
+          ? 'Province'
+          : 'Region / Province';
+  const states = useMemo(
+    () => (formData.country ? State.getStatesOfCountry(formData.country) : []),
+    [formData.country],
+  );
+  const selectedState = useMemo(
+    () => states.find((s) => s.name === formData.stateProvince),
+    [states, formData.stateProvince],
+  );
+  const cities = useMemo(() => {
+    if (!formData.country) return [];
+    if (selectedState) return City.getCitiesOfState(formData.country, selectedState.isoCode) ?? [];
+    if (states.length > 0) return []; // narrow by state first — see note above
+    return City.getCitiesOfCountry(formData.country) ?? [];
+  }, [formData.country, selectedState, states.length]);
+  const uniqueCities = useMemo(() => {
+    const seen = new Set<string>();
+    return cities.filter((c) => (seen.has(c.name) ? false : (seen.add(c.name), true)));
+  }, [cities]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-xl border-none shadow-2xl bg-card">
@@ -313,99 +347,83 @@ export default function CustomerFormDialog({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {formData.country &&
-                (() => {
-                  const states = State.getStatesOfCountry(formData.country);
-                  const label =
-                    formData.country === 'AE'
-                      ? 'Emirate'
-                      : ['US', 'IN', 'AU', 'MX', 'BR'].includes(formData.country)
-                        ? 'State'
-                        : formData.country === 'CA'
-                          ? 'Province'
-                          : 'Region / Province';
-                  const selectedState = states.find((s) => s.name === formData.stateProvince);
-                  const cities = selectedState
-                    ? City.getCitiesOfState(formData.country, selectedState.isoCode)
-                    : (City.getCitiesOfCountry(formData.country) ?? []);
-                  return (
-                    <>
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                          {label}
-                        </Label>
-                        {states.length > 0 ? (
-                          <Select
-                            value={formData.stateProvince ?? ''}
-                            onValueChange={(val) => {
-                              handleSelectChange('stateProvince', val);
-                              handleSelectChange('city', '');
-                            }}
-                          >
-                            <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                              <SelectValue placeholder={`Select ${label}`} />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
-                              {states.map((s) => (
-                                <SelectItem key={s.isoCode} value={s.name}>
-                                  {s.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            name="stateProvince"
-                            value={formData.stateProvince ?? ''}
-                            onChange={(e) => {
-                              handleChange(e);
-                              handleSelectChange('city', '');
-                            }}
-                            placeholder={`Enter ${label}`}
-                            className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                          />
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                          City
-                        </Label>
-                        {cities.length > 0 ? (
-                          <Select
-                            value={formData.city ?? ''}
-                            onValueChange={(val) => handleSelectChange('city', val)}
-                          >
-                            <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                              <SelectValue placeholder="Select city" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
-                              {cities
-                                .filter(
-                                  (c, i, arr) => arr.findIndex((x) => x.name === c.name) === i,
-                                )
-                                .map((c, idx) => (
-                                  <SelectItem
-                                    key={`${c.stateCode ?? ''}-${c.name}-${idx}`}
-                                    value={c.name}
-                                  >
-                                    {c.name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            name="city"
-                            value={formData.city ?? ''}
-                            onChange={handleChange}
-                            placeholder="Enter city"
-                            className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                          />
-                        )}
-                      </div>
-                    </>
-                  );
-                })()}
+              {formData.country && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                      {regionLabel}
+                    </Label>
+                    {states.length > 0 ? (
+                      <Select
+                        value={formData.stateProvince ?? ''}
+                        onValueChange={(val) => {
+                          handleSelectChange('stateProvince', val);
+                          handleSelectChange('city', '');
+                        }}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                          <SelectValue placeholder={`Select ${regionLabel}`} />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                          {states.map((s) => (
+                            <SelectItem key={s.isoCode} value={s.name}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        name="stateProvince"
+                        value={formData.stateProvince ?? ''}
+                        onChange={(e) => {
+                          handleChange(e);
+                          handleSelectChange('city', '');
+                        }}
+                        placeholder={`Enter ${regionLabel}`}
+                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                      City
+                    </Label>
+                    {uniqueCities.length > 0 ? (
+                      <Select
+                        value={formData.city ?? ''}
+                        onValueChange={(val) => handleSelectChange('city', val)}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                          <SelectValue placeholder="Select city" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-xl max-h-64">
+                          {uniqueCities.map((c, idx) => (
+                            <SelectItem
+                              key={`${c.stateCode ?? ''}-${c.name}-${idx}`}
+                              value={c.name}
+                            >
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        name="city"
+                        value={formData.city ?? ''}
+                        onChange={handleChange}
+                        placeholder={
+                          states.length > 0 && !selectedState
+                            ? `Select a ${regionLabel.toLowerCase()} first, or type a city`
+                            : 'Enter city'
+                        }
+                        className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                      />
+                    )}
+                  </div>
+                </>
+              )}
 
               {/*
                 Phone sits after country / state / city: the dial-code prefix is

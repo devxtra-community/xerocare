@@ -66,6 +66,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       purchase_price,
       tax_rate,
       print_colour,
+      machine_type,
       max_discount_amount,
       wholesale_price,
       lot_id,
@@ -124,6 +125,7 @@ export const addproduct = async (req: Request, res: Response, next: NextFunction
       purchase_price: purchase_price ? Number(purchase_price) : undefined,
       tax_rate: tax_rate ? Number(tax_rate) : 0,
       print_colour,
+      machine_type,
       max_discount_amount:
         max_discount_amount !== '' && max_discount_amount !== undefined
           ? Number(max_discount_amount)

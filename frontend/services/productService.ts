@@ -25,6 +25,8 @@ export interface Product {
   product_status: 'AVAILABLE' | 'RENTED' | 'LEASE' | 'SOLD' | 'DAMAGED';
   /** Does it print in color or simple black and white? */
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  /** PRINTER (default, meter-based service) | COMPUTER | OTHER. */
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
   max_discount_amount: number;
   imageUrl?: string;
   stock?: number;
@@ -52,6 +54,7 @@ export interface CreateProductDTO {
   purchase_price?: number;
   tax_rate: number;
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
   max_discount_amount: number;
   wholesale_price?: number;
   lot_id?: string;
@@ -78,6 +81,7 @@ export interface BulkProductRow {
   purchase_price?: number;
   tax_rate: number;
   print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
   max_discount_amount: number;
   wholesale_price?: number;
   lot_id?: string;

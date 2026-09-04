@@ -9,6 +9,8 @@ export interface Model {
   brand_id?: string; // Direct ID
   description: string;
   quantity: number;
+  /** Default machine type for products of this model. */
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
 }
 
 export interface CreateModelDTO {
@@ -16,6 +18,7 @@ export interface CreateModelDTO {
   model_name: string;
   brand_id: string;
   description: string;
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
 }
 
 export interface PaginatedResponse<T> {

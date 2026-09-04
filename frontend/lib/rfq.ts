@@ -49,6 +49,12 @@ export interface Rfq {
 
 export async function createRfq(data: { vendorIds: string[]; items: RfqItem[] }) {
   const res = await api.post('/i/rfq/', data);
+  return res.data.data;
+}
+
+/** DRAFT-only — replaces the RFQ's items and vendor invite list wholesale. */
+export async function updateRfq(id: string, data: { vendorIds: string[]; items: RfqItem[] }) {
+  const res = await api.put(`/i/rfq/${id}`, data);
   return res.data;
 }
 

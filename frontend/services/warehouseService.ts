@@ -22,8 +22,10 @@ export const warehouseService = {
   /**
    * Retrieves warehouses associated with the current user's branch.
    */
-  getWarehousesByBranch: async (): Promise<Warehouse[]> => {
-    const response = await api.get('/i/warehouses/my-branch');
+  getWarehousesByBranch: async (branchId?: string): Promise<Warehouse[]> => {
+    const response = await api.get('/i/warehouses/my-branch', {
+      params: branchId ? { branchId } : undefined,
+    });
     return response.data.data;
   },
 };

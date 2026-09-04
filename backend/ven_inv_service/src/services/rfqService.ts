@@ -293,6 +293,76 @@ export class RfqService {
     });
   }
 
+  /**
+   * Replaces a DRAFT RFQ's items and vendor invite list wholesale — same
+   * validation as createRfq. Only DRAFT RFQs are editable: once sent, vendors
+   * may already be quoting against the current item set.
+   */
+  async updateRfq(id: string, data: Omit<CreateRfqDto, 'branchId' | 'createdBy'>): Promise<Rfq> {
+    return this.dataSource.transaction(async (manager) => {
+      const rfq = await manager.findOne(Rfq, { where: { id } });
+      if (!rfq) throw new AppError('RFQ not found', 404);
+      if (rfq.status !== RfqStatus.DRAFT) {
+        throw new AppError('Only draft RFQs can be edited', 400);
+      }
+
+      await manager.delete(RfqItem, { rfq_id: id });
+      await manager.delete(RfqVendor, { rfq_id: id });
+
+      if (data.items?.length > 0) {
+        const items = data.items.map((i) => {
+          if (i.itemType === ItemType.PRODUCT) {
+            if (!i.modelId) throw new AppError('Model ID is required for Product items', 400);
+            if (!i.productId && !i.customProductName)
+              throw new AppError('Either Product or Custom Product Name is required', 400);
+          } else if (i.itemType === ItemType.SPARE_PART) {
+            if (!i.brandId && !i.customBrandName)
+              throw new AppError('Either Brand or Custom Brand Name is required', 400);
+            if (!i.sparePartId && !i.customSparePartName)
+              throw new AppError('Either Spare Part or Custom Spare Part Name is required', 400);
+          }
+          return manager.create(RfqItem, {
+            rfq_id: id,
+            branch_id: rfq.branch_id,
+            created_by: rfq.created_by,
+            item_type: i.itemType,
+            model_id: i.modelId,
+            product_id: i.productId,
+            brand_id: i.brandId,
+            spare_part_id: i.sparePartId,
+            custom_product_name: i.customProductName,
+            custom_spare_part_name: i.customSparePartName,
+            custom_brand_name: i.customBrandName,
+            hs_code: i.hsCode,
+            mpn: i.mpn,
+            compatible_models: i.compatibleModels,
+            modelIds: i.modelIds,
+            description: i.description,
+            quantity: i.quantity,
+            expected_delivery_date: i.expectedDeliveryDate,
+          });
+        });
+        await manager.save(items);
+      }
+
+      if (data.vendorIds?.length > 0) {
+        const vendors = data.vendorIds.map((vId) =>
+          manager.create(RfqVendor, {
+            rfq_id: id,
+            vendor_id: vId,
+            status: RfqVendorStatus.INVITED,
+          }),
+        );
+        await manager.save(vendors);
+      }
+
+      return manager.findOne(Rfq, {
+        where: { id },
+        relations: ['items', 'vendors'],
+      }) as Promise<Rfq>;
+    });
+  }
+
   private async generateRfqExcel(rfq: Rfq, manager?: EntityManager): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('RFQ_Response');
@@ -964,8 +1034,8 @@ export class RfqService {
               vendorName: vendor.vendor.name,
               rfqNumber: rfq.rfq_number,
               warehouseName: warehouse.warehouseName,
-              warehouseAddress: warehouse.address,
-              warehouseLocation: warehouse.location,
+              warehouseAddress: warehouse.address ?? '',
+              warehouseLocation: warehouse.location ?? '',
             });
           }
         } else {

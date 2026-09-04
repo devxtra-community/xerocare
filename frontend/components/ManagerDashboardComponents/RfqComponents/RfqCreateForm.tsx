@@ -2,7 +2,15 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createRfq, uploadRfqExcel, ItemType, RfqItem } from '@/lib/rfq';
+import {
+  createRfq,
+  updateRfq,
+  getRfqById,
+  uploadRfqExcel,
+  ItemType,
+  RfqItem,
+  RfqStatus,
+} from '@/lib/rfq';
 import { getVendors, Vendor } from '@/lib/vendor';
 import { getAllModels, Model } from '@/lib/model';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
@@ -41,8 +49,12 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const vendorIdParam = searchParams.get('vendorId');
+  const editRfqId = searchParams.get('edit');
+  const isEditMode = !!editRfqId;
 
   const [loading, setLoading] = useState(false);
+  const [loadingRfq, setLoadingRfq] = useState(isEditMode);
+  const [rfqNumber, setRfqNumber] = useState('');
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [spareParts, setSpareParts] = useState<SparePart[]>([]);
@@ -89,6 +101,74 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
       setSelectedVendors([vendorIdParam]);
     }
   }, [vendorIdParam]);
+
+  // Edit mode: load the existing draft and prefill the form. Backend
+  // updateRfq() 400s on anything past DRAFT, so bounce back to the detail
+  // page rather than let the user fill out a form that can't submit.
+  useEffect(() => {
+    if (!editRfqId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rfq = await getRfqById(editRfqId);
+        if (cancelled) return;
+        if (rfq.status !== RfqStatus.DRAFT) {
+          toast.error('Only draft RFQs can be edited');
+          router.replace(`${basePath}/rfqs/${editRfqId}`);
+          return;
+        }
+        setRfqNumber(rfq.rfq_number);
+        setSelectedVendors((rfq.vendors as { vendor_id: string }[]).map((v) => v.vendor_id));
+        setItems(
+          (
+            rfq.items as {
+              item_type: ItemType;
+              model_id?: string;
+              product_id?: string;
+              brand_id?: string;
+              spare_part_id?: string;
+              custom_product_name?: string;
+              custom_spare_part_name?: string;
+              custom_brand_name?: string;
+              hs_code?: string;
+              mpn?: string;
+              compatible_models?: string;
+              modelIds?: string[];
+              description?: string;
+              quantity: number;
+              expected_delivery_date?: string;
+            }[]
+          ).map((i) => ({
+            itemType: i.item_type,
+            modelId: i.model_id,
+            productId: i.product_id,
+            brandId: i.brand_id,
+            sparePartId: i.spare_part_id,
+            customProductName: i.custom_product_name,
+            customSparePartName: i.custom_spare_part_name,
+            customBrandName: i.custom_brand_name,
+            hsCode: i.hs_code,
+            mpn: i.mpn,
+            compatibleModels: i.compatible_models,
+            modelIds: i.modelIds,
+            description: i.description,
+            quantity: i.quantity,
+            expectedDeliveryDate: i.expected_delivery_date,
+          })),
+        );
+      } catch (error) {
+        console.error('Failed to load RFQ for editing', error);
+        toast.error('Failed to load RFQ');
+        router.replace(`${basePath}/rfqs`);
+      } finally {
+        if (!cancelled) setLoadingRfq(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRfqId]);
 
   const toggleVendor = (vendorId: string) => {
     setSelectedVendors((prev) =>
@@ -318,17 +398,26 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
 
     try {
       setLoading(true);
-      await createRfq({
-        vendorIds: selectedVendors,
-        items: enrichedItems,
-      });
-      toast.success('RFQ created successfully');
-      router.push(`${basePath}/rfqs`);
+      if (isEditMode && editRfqId) {
+        await updateRfq(editRfqId, {
+          vendorIds: selectedVendors,
+          items: enrichedItems,
+        });
+        toast.success('RFQ updated successfully');
+        router.push(`${basePath}/rfqs/${editRfqId}`);
+      } else {
+        await createRfq({
+          vendorIds: selectedVendors,
+          items: enrichedItems,
+        });
+        toast.success('RFQ created successfully');
+        router.push(`${basePath}/rfqs`);
+      }
     } catch (error: unknown) {
       console.error(error);
       toast.error(
         (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Failed to create RFQ',
+          `Failed to ${isEditMode ? 'update' : 'create'} RFQ`,
       );
     } finally {
       setLoading(false);
@@ -370,201 +459,289 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h3 className="text-lg font-semibold text-slate-800">Draft New RFQ</h3>
+          <h3 className="text-lg font-semibold text-slate-800">
+            {isEditMode ? `Edit RFQ Draft${rfqNumber ? ` — ${rfqNumber}` : ''}` : 'Draft New RFQ'}
+          </h3>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-8">
-        {/* Vendors Section */}
-        <section className="space-y-4">
-          <h4 className="font-semibold text-slate-700 text-base border-b pb-2">
-            1. Select Vendors
-          </h4>
+      {loadingRfq ? (
+        <div className="p-12 text-center text-slate-500 text-sm">Loading draft...</div>
+      ) : (
+        <form onSubmit={handleSubmit} className="p-6 space-y-8">
+          {/* Vendors Section */}
+          <section className="space-y-4">
+            <h4 className="font-semibold text-slate-700 text-base border-b pb-2">
+              1. Select Vendors
+            </h4>
 
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search Vendor by Name or Vendor ID"
-              value={vendorSearchQuery}
-              onChange={(e) => setVendorSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[300px] overflow-y-auto p-1">
-            {sortedVendors.map((vendor) => {
-              const isSelected = selectedVendors.includes(vendor.id);
-              return (
-                <label
-                  key={vendor.id}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-primary bg-primary/5 shadow-sm'
-                      : 'border-slate-200 hover:border-primary/40 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="mt-0.5 flex-shrink-0">
-                    {isSelected ? (
-                      <CheckCircle2 className="h-5 w-5 text-primary fill-primary/10" />
-                    ) : (
-                      <div className="h-5 w-5 rounded border border-slate-300 bg-white" />
-                    )}
-                    <input
-                      type="checkbox"
-                      className="sr-only"
-                      checked={isSelected}
-                      onChange={() => toggleVendor(vendor.id)}
-                    />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-medium text-slate-800 text-sm truncate">
-                      {vendor.name}
-                    </span>
-                    <span className="text-xs text-slate-500 truncate">{vendor.email}</span>
-                  </div>
-                </label>
-              );
-            })}
-          </div>
-          {vendors.length === 0 && <p className="text-sm text-slate-500">No vendors available.</p>}
-          {vendors.length > 0 && sortedVendors.length === 0 && (
-            <p className="text-sm text-slate-500">No vendors match your search.</p>
-          )}
-        </section>
-
-        {/* Items Section */}
-        <section className="space-y-4">
-          <div className="flex justify-between items-end border-b pb-2">
-            <h4 className="font-semibold text-slate-700 text-base">2. Request Items</h4>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 gap-1.5 text-xs text-slate-600 hover:text-slate-900"
-                onClick={downloadSampleExcel}
-              >
-                <DownloadCloud size={14} />
-                Download Sample
-              </Button>
-
-              <input
-                type="file"
-                accept=".xlsx, .xls, .csv"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search Vendor by Name or Vendor ID"
+                value={vendorSearchQuery}
+                onChange={(e) => setVendorSearchQuery(e.target.value)}
+                className="pl-9"
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <UploadCloud size={14} />
-                Upload Excel
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-9"
-                onClick={addItemRow}
-              >
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Item
-              </Button>
             </div>
-          </div>
 
-          <div className="space-y-3">
-            {items.map((item, index) => (
-              <div
-                key={index}
-                className="flex flex-col gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200"
-              >
-                {/* Row 1: Type & Model/Brand */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-500 font-medium">Type</Label>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-slate-300"
-                      value={item.itemType}
-                      onChange={(e) => updateItem(index, 'itemType', e.target.value as ItemType)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[300px] overflow-y-auto p-1">
+              {sortedVendors.map((vendor) => {
+                const isSelected = selectedVendors.includes(vendor.id);
+                return (
+                  <label
+                    key={vendor.id}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-primary bg-primary/5 shadow-sm'
+                        : 'border-slate-200 hover:border-primary/40 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="mt-0.5 flex-shrink-0">
+                      {isSelected ? (
+                        <CheckCircle2 className="h-5 w-5 text-primary fill-primary/10" />
+                      ) : (
+                        <div className="h-5 w-5 rounded border border-slate-300 bg-white" />
+                      )}
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={isSelected}
+                        onChange={() => toggleVendor(vendor.id)}
+                      />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-medium text-slate-800 text-sm truncate">
+                        {vendor.name}
+                      </span>
+                      <span className="text-xs text-slate-500 truncate">{vendor.email}</span>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            {vendors.length === 0 && (
+              <p className="text-sm text-slate-500">No vendors available.</p>
+            )}
+            {vendors.length > 0 && sortedVendors.length === 0 && (
+              <p className="text-sm text-slate-500">No vendors match your search.</p>
+            )}
+          </section>
+
+          {/* Items Section */}
+          <section className="space-y-4">
+            <div className="flex justify-between items-end border-b pb-2">
+              <h4 className="font-semibold text-slate-700 text-base">2. Request Items</h4>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 gap-1.5 text-xs text-slate-600 hover:text-slate-900"
+                  onClick={downloadSampleExcel}
+                >
+                  <DownloadCloud size={14} />
+                  Download Sample
+                </Button>
+
+                {!isEditMode && (
+                  <>
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls, .csv"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 gap-1.5 text-xs text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 hover:text-blue-700"
+                      onClick={() => fileInputRef.current?.click()}
                     >
-                      <option value={ItemType.PRODUCT}>Product</option>
-                      <option value={ItemType.SPARE_PART}>Spare Part</option>
-                    </select>
+                      <UploadCloud size={14} />
+                      Upload Excel
+                    </Button>
+                  </>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={addItemRow}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Add Item
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {items.map((item, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col gap-3 p-4 rounded-lg bg-slate-50 border border-slate-200"
+                >
+                  {/* Row 1: Type & Model/Brand */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 font-medium">Type</Label>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:border-slate-300"
+                        value={item.itemType}
+                        onChange={(e) => updateItem(index, 'itemType', e.target.value as ItemType)}
+                      >
+                        <option value={ItemType.PRODUCT}>Product</option>
+                        <option value={ItemType.SPARE_PART}>Spare Part</option>
+                      </select>
+                    </div>
+
+                    {item.itemType === ItemType.PRODUCT ? (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center h-4 mb-1">
+                          <Label className="text-xs text-slate-500 font-medium">Model *</Label>
+                          <button
+                            type="button"
+                            onClick={() => setModelDialogOpen(true)}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                          >
+                            + Request New Model?
+                          </button>
+                        </div>
+                        <SearchableSelect
+                          options={models.map((m) => ({
+                            value: m.id,
+                            label: `${m.model_no} - ${m.model_name}`,
+                          }))}
+                          value={item.modelId || ''}
+                          onValueChange={(val) => updateItem(index, 'modelId', val)}
+                          placeholder="Search Model..."
+                          emptyText="No models found"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center h-4 mb-1">
+                          <Label className="text-xs text-slate-500 font-medium">Brand *</Label>
+                          <button
+                            type="button"
+                            onClick={() => setBrandDialogOpen(true)}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                          >
+                            + Create Brand?
+                          </button>
+                        </div>
+                        <SearchableSelect
+                          options={brands.map((b) => ({
+                            value: b.id,
+                            label: b.name,
+                          }))}
+                          value={item.brandId || ''}
+                          onValueChange={(val) => updateItem(index, 'brandId', val)}
+                          placeholder="Search Brand..."
+                          emptyText="No brands found"
+                        />
+                      </div>
+                    )}
                   </div>
 
-                  {item.itemType === ItemType.PRODUCT ? (
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center h-4 mb-1">
-                        <Label className="text-xs text-slate-500 font-medium">Model *</Label>
-                        <button
-                          type="button"
-                          onClick={() => setModelDialogOpen(true)}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                        >
-                          + Request New Model?
-                        </button>
-                      </div>
-                      <SearchableSelect
-                        options={models.map((m) => ({
-                          value: m.id,
-                          label: `${m.model_no} - ${m.model_name}`,
-                        }))}
-                        value={item.modelId || ''}
-                        onValueChange={(val) => updateItem(index, 'modelId', val)}
-                        placeholder="Search Model..."
-                        emptyText="No models found"
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center h-4 mb-1">
-                        <Label className="text-xs text-slate-500 font-medium">Brand *</Label>
-                        <button
-                          type="button"
-                          onClick={() => setBrandDialogOpen(true)}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                        >
-                          + Create Brand?
-                        </button>
-                      </div>
-                      <SearchableSelect
-                        options={brands.map((b) => ({
-                          value: b.id,
-                          label: b.name,
-                        }))}
-                        value={item.brandId || ''}
-                        onValueChange={(val) => updateItem(index, 'brandId', val)}
-                        placeholder="Search Brand..."
-                        emptyText="No brands found"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Row 2: Product/Part & Quantity & Delete */}
-                <div className="space-y-4">
-                  {/* Selector Row */}
-                  <div className="grid grid-cols-[1fr_120px_40px] gap-4 items-end">
-                    {item.itemType === ItemType.PRODUCT ? (
-                      item.isRequestingNewProduct ? (
+                  {/* Row 2: Product/Part & Quantity & Delete */}
+                  <div className="space-y-4">
+                    {/* Selector Row */}
+                    <div className="grid grid-cols-[1fr_120px_40px] gap-4 items-end">
+                      {item.itemType === ItemType.PRODUCT ? (
+                        item.isRequestingNewProduct ? (
+                          <div className="flex gap-4">
+                            <div className="flex-1 space-y-1">
+                              <div className="flex justify-between items-center h-4 mb-1">
+                                <Label className="text-xs text-slate-500 font-medium">
+                                  New Product Name
+                                </Label>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateItem(index, 'isRequestingNewProduct', false);
+                                    updateItem(index, 'customProductName', undefined);
+                                    updateItem(index, 'hsCode', undefined);
+                                  }}
+                                  className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <Input
+                                placeholder="Custom product name"
+                                value={item.customProductName || ''}
+                                onChange={(e) =>
+                                  updateItem(index, 'customProductName', e.target.value)
+                                }
+                                required
+                              />
+                            </div>
+                            <div className="w-[120px] space-y-1">
+                              <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
+                                HS Code *
+                              </Label>
+                              <Input
+                                placeholder="00.00"
+                                value={item.hsCode || ''}
+                                onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
+                                required={!!item.customProductName}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex justify-between items-center h-4 mb-1">
+                              <Label className="text-xs text-slate-500 font-medium">Product</Label>
+                              {item.modelId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateItem(index, 'isRequestingNewProduct', true);
+                                    updateItem(index, 'productId', undefined);
+                                  }}
+                                  className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                >
+                                  + Request New Product?
+                                </button>
+                              )}
+                            </div>
+                            <SearchableSelect
+                              options={products
+                                .filter(
+                                  (p) =>
+                                    !item.modelId ||
+                                    p.model?.id === item.modelId ||
+                                    (p as { model_id?: string }).model_id === item.modelId,
+                                )
+                                .map((p) => ({
+                                  value: p.id,
+                                  label: p.name,
+                                }))}
+                              value={item.productId || ''}
+                              onValueChange={(val) => updateItem(index, 'productId', val)}
+                              placeholder="Search Product..."
+                              emptyText="No products found"
+                              disabled={!item.modelId}
+                            />
+                          </div>
+                        )
+                      ) : item.isRequestingNewPart ? (
                         <div className="flex gap-4">
                           <div className="flex-1 space-y-1">
                             <div className="flex justify-between items-center h-4 mb-1">
                               <Label className="text-xs text-slate-500 font-medium">
-                                New Product Name
+                                New Part Name
                               </Label>
                               <button
                                 type="button"
                                 onClick={() => {
-                                  updateItem(index, 'isRequestingNewProduct', false);
-                                  updateItem(index, 'customProductName', undefined);
+                                  updateItem(index, 'isRequestingNewPart', false);
+                                  updateItem(index, 'customSparePartName', undefined);
                                   updateItem(index, 'hsCode', undefined);
                                 }}
                                 className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
@@ -573,10 +750,10 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                               </button>
                             </div>
                             <Input
-                              placeholder="Custom product name"
-                              value={item.customProductName || ''}
+                              placeholder="Custom part name"
+                              value={item.customSparePartName || ''}
                               onChange={(e) =>
-                                updateItem(index, 'customProductName', e.target.value)
+                                updateItem(index, 'customSparePartName', e.target.value)
                               }
                               required
                             />
@@ -589,245 +766,173 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                               placeholder="00.00"
                               value={item.hsCode || ''}
                               onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
-                              required={!!item.customProductName}
+                              required={!!item.customSparePartName}
                             />
                           </div>
                         </div>
                       ) : (
                         <div className="space-y-1">
                           <div className="flex justify-between items-center h-4 mb-1">
-                            <Label className="text-xs text-slate-500 font-medium">Product</Label>
-                            {item.modelId && (
+                            <Label className="text-xs text-slate-500 font-medium">Spare Part</Label>
+                            {item.brandId && (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  updateItem(index, 'isRequestingNewProduct', true);
-                                  updateItem(index, 'productId', undefined);
+                                  updateItem(index, 'isRequestingNewPart', true);
+                                  updateItem(index, 'sparePartId', undefined);
                                 }}
                                 className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
                               >
-                                + Request New Product?
+                                + Request New Spare Part?
                               </button>
                             )}
                           </div>
                           <SearchableSelect
-                            options={products
-                              .filter(
-                                (p) =>
-                                  !item.modelId ||
-                                  p.model?.id === item.modelId ||
-                                  (p as { model_id?: string }).model_id === item.modelId,
-                              )
-                              .map((p) => ({
-                                value: p.id,
-                                label: p.name,
+                            options={spareParts
+                              .filter((spItem) => {
+                                if (!item.brandId) return true;
+                                const selectedBrandName = brands.find(
+                                  (b) => b.id === item.brandId,
+                                )?.name;
+                                if (!selectedBrandName) return true;
+                                return (
+                                  spItem.brand?.toLowerCase() === selectedBrandName.toLowerCase()
+                                );
+                              })
+                              .map((spItem: { id: string; sku?: string; part_name?: string }) => ({
+                                value: spItem.id,
+                                label: `${spItem.sku} - ${spItem.part_name}`,
                               }))}
-                            value={item.productId || ''}
-                            onValueChange={(val) => updateItem(index, 'productId', val)}
-                            placeholder="Search Product..."
-                            emptyText="No products found"
-                            disabled={!item.modelId}
+                            value={item.sparePartId || ''}
+                            onValueChange={(val) => updateItem(index, 'sparePartId', val)}
+                            placeholder="Search Part..."
+                            emptyText="No spare parts found"
+                            disabled={!item.brandId}
                           />
                         </div>
-                      )
-                    ) : item.isRequestingNewPart ? (
-                      <div className="flex gap-4">
-                        <div className="flex-1 space-y-1">
-                          <div className="flex justify-between items-center h-4 mb-1">
-                            <Label className="text-xs text-slate-500 font-medium">
-                              New Part Name
-                            </Label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateItem(index, 'isRequestingNewPart', false);
-                                updateItem(index, 'customSparePartName', undefined);
-                                updateItem(index, 'hsCode', undefined);
-                              }}
-                              className="text-[10px] text-red-500 hover:text-red-700 font-medium transition-colors"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                          <Input
-                            placeholder="Custom part name"
-                            value={item.customSparePartName || ''}
-                            onChange={(e) =>
-                              updateItem(index, 'customSparePartName', e.target.value)
-                            }
-                            required
-                          />
-                        </div>
-                        <div className="w-[120px] space-y-1">
-                          <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block">
-                            HS Code *
-                          </Label>
-                          <Input
-                            placeholder="00.00"
-                            value={item.hsCode || ''}
-                            onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
-                            required={!!item.customSparePartName}
-                          />
-                        </div>
-                      </div>
-                    ) : (
+                      )}
+
                       <div className="space-y-1">
-                        <div className="flex justify-between items-center h-4 mb-1">
-                          <Label className="text-xs text-slate-500 font-medium">Spare Part</Label>
-                          {item.brandId && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                updateItem(index, 'isRequestingNewPart', true);
-                                updateItem(index, 'sparePartId', undefined);
-                              }}
-                              className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                            >
-                              + Request New Spare Part?
-                            </button>
-                          )}
-                        </div>
-                        <SearchableSelect
-                          options={spareParts
-                            .filter((spItem) => {
-                              if (!item.brandId) return true;
-                              const selectedBrandName = brands.find(
-                                (b) => b.id === item.brandId,
-                              )?.name;
-                              if (!selectedBrandName) return true;
-                              return (
-                                spItem.brand?.toLowerCase() === selectedBrandName.toLowerCase()
-                              );
-                            })
-                            .map((spItem: { id: string; sku?: string; part_name?: string }) => ({
-                              value: spItem.id,
-                              label: `${spItem.sku} - ${spItem.part_name}`,
-                            }))}
-                          value={item.sparePartId || ''}
-                          onValueChange={(val) => updateItem(index, 'sparePartId', val)}
-                          placeholder="Search Part..."
-                          emptyText="No spare parts found"
-                          disabled={!item.brandId}
-                        />
-                      </div>
-                    )}
-
-                    <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
-                        Quantity
-                      </Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        placeholder="Qty"
-                        className="text-center"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateItem(index, 'quantity', parseInt(e.target.value, 10) || 1)
-                        }
-                        required
-                      />
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent transition-all h-10 w-10 mb-[1px]"
-                      onClick={() => removeItem(index)}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </div>
-
-                  {/* Metadata Row for Spare Parts */}
-                  {item.itemType === ItemType.SPARE_PART && (
-                    <div className="grid grid-cols-2 gap-4 pb-2 border-b border-dashed border-slate-100">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500 font-medium">
-                          Manufacturing Part # (MPN)
+                        <Label className="text-xs text-slate-500 font-medium h-4 mb-1 block text-center">
+                          Quantity
                         </Label>
                         <Input
-                          placeholder="Search or enter MPN..."
-                          value={item.mpn || ''}
-                          className="h-9 text-xs"
-                          onChange={(e) => updateItem(index, 'mpn', e.target.value)}
+                          type="number"
+                          min="1"
+                          placeholder="Qty"
+                          className="text-center"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateItem(index, 'quantity', parseInt(e.target.value, 10) || 1)
+                          }
+                          required
                         />
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500 font-medium font-medium">
-                          Compatible Models
-                        </Label>
-                        <MultiSelect
-                          values={item.modelIds || []}
-                          onValuesChange={(newValues) => {
-                            if (
-                              newValues.includes('universal') &&
-                              !(item.modelIds || []).includes('universal')
-                            ) {
-                              updateItem(index, 'modelIds', ['universal']);
-                            } else if (newValues.length > 1 && newValues.includes('universal')) {
-                              updateItem(
-                                index,
-                                'modelIds',
-                                newValues.filter((v) => v !== 'universal'),
-                              );
-                            } else {
-                              updateItem(index, 'modelIds', newValues);
-                            }
-                          }}
-                          options={[
-                            {
-                              value: 'universal',
-                              label: 'Universal',
-                              description: 'Compatible with all',
-                            },
-                            ...models
-                              .filter((m) => {
-                                if (!item.brandId) return false;
-                                return m.brandRelation?.id === item.brandId;
-                              })
-                              .map((m) => ({
-                                value: m.id,
-                                label: m.model_no,
-                                description: m.model_name,
-                              })),
-                          ]}
-                          placeholder="Comp. Models"
-                          className="h-9 text-xs bg-gray-50/30"
-                          disabled={!item.brandId}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {items.length === 0 && (
-              <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 text-sm">
-                No items added yet. Click &quot;Add Item&quot; to begin.
-              </div>
-            )}
-          </div>
-        </section>
 
-        {/* Form Actions */}
-        <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading} className="min-w-[120px]">
-            {loading ? (
-              'Creating...'
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Draft
-              </>
-            )}
-          </Button>
-        </div>
-      </form>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 border border-transparent transition-all h-10 w-10 mb-[1px]"
+                        onClick={() => removeItem(index)}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    </div>
+
+                    {/* Metadata Row for Spare Parts */}
+                    {item.itemType === ItemType.SPARE_PART && (
+                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-dashed border-slate-100">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 font-medium">
+                            Manufacturing Part # (MPN)
+                          </Label>
+                          <Input
+                            placeholder="Search or enter MPN..."
+                            value={item.mpn || ''}
+                            className="h-9 text-xs"
+                            onChange={(e) => updateItem(index, 'mpn', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 font-medium font-medium">
+                            Compatible Models
+                          </Label>
+                          <MultiSelect
+                            values={item.modelIds || []}
+                            onValuesChange={(newValues) => {
+                              if (
+                                newValues.includes('universal') &&
+                                !(item.modelIds || []).includes('universal')
+                              ) {
+                                updateItem(index, 'modelIds', ['universal']);
+                              } else if (newValues.length > 1 && newValues.includes('universal')) {
+                                updateItem(
+                                  index,
+                                  'modelIds',
+                                  newValues.filter((v) => v !== 'universal'),
+                                );
+                              } else {
+                                updateItem(index, 'modelIds', newValues);
+                              }
+                            }}
+                            options={[
+                              {
+                                value: 'universal',
+                                label: 'Universal',
+                                description: 'Compatible with all',
+                              },
+                              ...models
+                                .filter((m) => {
+                                  if (!item.brandId) return false;
+                                  return m.brandRelation?.id === item.brandId;
+                                })
+                                .map((m) => ({
+                                  value: m.id,
+                                  label: m.model_no,
+                                  description: m.model_name,
+                                })),
+                            ]}
+                            placeholder="Comp. Models"
+                            className="h-9 text-xs bg-gray-50/30"
+                            disabled={!item.brandId}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {items.length === 0 && (
+                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-500 text-sm">
+                  No items added yet. Click &quot;Add Item&quot; to begin.
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Form Actions */}
+          <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading} className="min-w-[120px]">
+              {loading ? (
+                isEditMode ? (
+                  'Updating...'
+                ) : (
+                  'Creating...'
+                )
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {isEditMode ? 'Update Draft' : 'Save Draft'}
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

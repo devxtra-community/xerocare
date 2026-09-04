@@ -7,6 +7,10 @@ export interface Warehouse {
   location: string;
   address: string;
   capacity: string;
+  country?: string;
+  contactPersonId?: string;
+  contactPersonName?: string;
+  contactPersonEmail?: string;
   status: 'ACTIVE' | 'INACTIVE' | 'DELETED';
   branchId?: string;
   branch?: {

@@ -94,9 +94,10 @@ export async function getAllBranches(): Promise<Branch[]> {
  * `{ silent: true }` from callers that treat "no branch" as a normal outcome,
  * so the global interceptor does not toast an error the caller already handles.
  */
-export async function getMyBranch(opts?: { silent?: boolean }): Promise<Branch> {
+export async function getMyBranch(opts?: { silent?: boolean; branchId?: string }): Promise<Branch> {
   const res = await api.get<{ success: boolean; data: Branch }>('/i/branch/my-branch', {
     skipErrorToast: opts?.silent,
+    params: opts?.branchId ? { branchId: opts.branchId } : undefined,
   });
   return res.data.data;
 }

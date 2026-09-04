@@ -67,7 +67,7 @@ export class InventoryRepository {
       .addSelect("COUNT(CASE WHEN product.product_status = 'LEASE' THEN 1 END)", 'lease_qty')
       .addSelect("COUNT(CASE WHEN product.product_status = 'SOLD' THEN 1 END)", 'sold_qty')
       .addSelect("COUNT(CASE WHEN product.product_status = 'DAMAGED' THEN 1 END)", 'damaged_qty')
-      .addSelect('AVG(product.sale_price)', 'product_cost')
+      .addSelect('AVG(product.purchase_price)', 'product_cost')
       .groupBy('model.id')
       .addGroupBy('brandRelation.id')
       .addGroupBy('brandRelation.name')
@@ -124,7 +124,7 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'LEASE' THEN 1 ELSE 0 END)::int AS lease_qty`,
         `SUM(CASE WHEN product.product_status = 'DAMAGED' THEN 1 ELSE 0 END)::int AS damaged_qty`,
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
-        'AVG(product.sale_price) AS product_cost',
+        'AVG(product.purchase_price) AS product_cost',
       ])
       .where('warehouse.branchId = :branchId', { branchId });
 
@@ -193,7 +193,7 @@ export class InventoryRepository {
         `SUM(CASE WHEN product.product_status = 'LEASE' THEN 1 ELSE 0 END)::int AS lease_qty`,
         `SUM(CASE WHEN product.product_status = 'DAMAGED' THEN 1 ELSE 0 END)::int AS damaged_qty`,
         `SUM(CASE WHEN product.product_status = 'SOLD' THEN 1 ELSE 0 END)::int AS sold_qty`,
-        'AVG(product.sale_price) AS product_cost',
+        'AVG(product.purchase_price) AS product_cost',
       ])
       .where('product.warehouse_id = :warehouseId', { warehouseId });
 
@@ -237,7 +237,7 @@ export class InventoryRepository {
       .createQueryBuilder('product')
       .select([
         `COUNT(product.id) FILTER (WHERE product.product_status != 'SOLD')::int AS "totalStock"`,
-        `SUM(product.sale_price) FILTER (WHERE product.product_status != 'SOLD' AND product.sale_price IS NOT NULL)::int AS "totalValue"`,
+        `SUM(product.purchase_price) FILTER (WHERE product.product_status != 'SOLD' AND product.purchase_price IS NOT NULL)::int AS "totalValue"`,
       ]);
 
     if (branchId) {
@@ -255,7 +255,7 @@ export class InventoryRepository {
       .createQueryBuilder('sp')
       .select([
         `SUM(sp.quantity)::int AS "spareStock"`,
-        `SUM(sp.quantity * sp.base_price)::int AS "spareValue"`,
+        `SUM(sp.quantity * sp.purchase_price)::int AS "spareValue"`,
       ]);
 
     if (branchId) {

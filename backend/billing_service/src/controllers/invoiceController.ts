@@ -1991,7 +1991,8 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
     const leaseInvoice = await Source.query(
       `
       SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit",
-             i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit"
+             i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit",
+             i."leaseType", i."rentType"
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
       WHERE i.type = 'PROFORMA'

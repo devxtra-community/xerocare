@@ -13,6 +13,7 @@ export class WarehouseService {
       throw new AppError('Warehouse name and code are required', 400);
     }
     if (!payload.branchId) delete payload.branchId;
+    if (!payload.contactPersonId) delete payload.contactPersonId;
     try {
       return await this.repo.create(payload);
     } catch (err: unknown) {
@@ -51,6 +52,7 @@ export class WarehouseService {
       throw new AppError('Warehouse not found', 404);
     }
     if (!payload.branchId) delete payload.branchId;
+    if (payload.contactPersonId === '') payload.contactPersonId = undefined;
     try {
       return await this.repo.update(id, payload);
     } catch (err: unknown) {

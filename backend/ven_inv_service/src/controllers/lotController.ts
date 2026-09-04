@@ -50,8 +50,9 @@ export const getAllLots = async (req: Request, res: Response, next: NextFunction
     const branchId = req.user?.branchId;
     const isAdmin = req.user?.role === 'ADMIN';
 
-    // Admins see all, others only their branch
-    const filteredBranchId = isAdmin ? undefined : branchId;
+    // Admins see all, others only their branch — but an admin may scope to one
+    // branch via ?branchId= (Spare Parts page sends the branch picked in its filter).
+    const filteredBranchId = isAdmin ? (req.query.branchId as string | undefined) : branchId;
 
     const lots = await lotService.getAllLots(filteredBranchId);
     res.status(200).json({ success: true, data: lots });

@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Search, Eye } from 'lucide-react';
+import { PlusCircle, Search, Eye, Pencil } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PurchaseOriginBadge } from '@/components/PurchaseOriginBadge';
@@ -142,7 +142,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                     <TableCell className="text-center">
                       <PurchaseOriginBadge origin={rfq.purchase_origin} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -152,6 +152,17 @@ export default function RfqTable({ basePath }: RfqTableProps) {
                         <Eye className="h-4 w-4 mr-1.5" />
                         View
                       </Button>
+                      {rfq.status === RfqStatus.DRAFT && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => router.push(`${basePath}/rfqs/create?edit=${rfq.id}`)}
+                          className="text-slate-600 hover:text-primary transition-colors"
+                        >
+                          <Pencil className="h-4 w-4 mr-1.5" />
+                          Edit
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

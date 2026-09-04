@@ -35,6 +35,8 @@ interface BulkSparePartDialogProps {
   onSuccess: () => void;
   initialLotId?: string;
   initialItemId?: string;
+  /** ADMIN only — the branch picked in the page's branch filter. Managers derive it from their token. */
+  branchId?: string;
 }
 
 interface BulkSparePartRow {
@@ -91,6 +93,7 @@ export default function BulkSparePartDialog({
   onSuccess,
   initialLotId,
   initialItemId,
+  branchId,
 }: BulkSparePartDialogProps) {
   const [rows, setRows] = useState<Partial<BulkSparePartRow>[]>([]);
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
@@ -142,11 +145,11 @@ export default function BulkSparePartDialog({
     try {
       const [v, w, l, b, m, branch] = await Promise.all([
         vendorService.getVendors(),
-        warehouseService.getWarehousesByBranch(),
-        lotService.getAllLots(),
+        warehouseService.getWarehousesByBranch(branchId),
+        lotService.getAllLots(branchId ? { branchId } : undefined),
         brandService.getAllBrands(),
         modelService.getAllModels({ limit: 1000 }),
-        getMyBranch({ silent: true }),
+        getMyBranch({ silent: true, branchId }),
       ]);
       setVendors(v || []);
       setWarehouses(w || []);
@@ -154,9 +157,9 @@ export default function BulkSparePartDialog({
       setBrands(b || []);
       setModels(m.data || []);
       setBranchTax({
-        has_tax: branch.has_tax,
-        tax_name: branch.tax_name,
-        tax_percent: branch.tax_percent,
+        has_tax: branch?.has_tax,
+        tax_name: branch?.tax_name,
+        tax_percent: branch?.tax_percent,
       });
     } catch {
       toast.error('Failed to load dependencies');
@@ -193,7 +196,8 @@ export default function BulkSparePartDialog({
         setExpandedRows({});
       }
     }
-  }, [open, initialLotId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialLotId, branchId]);
 
   useEffect(() => {
     if (open && initialLotId && lots.length > 0) {
@@ -236,13 +240,23 @@ export default function BulkSparePartDialog({
 
   const findIdByName = (
     name: string,
-    list: { id: string; name?: string; model_name?: string; warehouseName?: string }[],
+    list: {
+      id: string;
+      name?: string;
+      model_name?: string;
+      model_no?: string;
+      warehouseName?: string;
+    }[],
   ) => {
     if (!name) return '';
     const lower = String(name).toLowerCase().trim();
     const found = list.find((item) => {
-      const n = (item.name || item.model_name || item.warehouseName || '').toLowerCase();
-      return n === lower || item.id === name;
+      // Models can be named in the sheet by model number ("TK-1150") or by
+      // model name — match either. Vendors/warehouses match on their single name.
+      const candidates = [item.name, item.model_name, item.model_no, item.warehouseName]
+        .filter(Boolean)
+        .map((s) => String(s).toLowerCase());
+      return item.id === name || candidates.includes(lower);
     });
     return found ? found.id : '';
   };
@@ -261,22 +275,27 @@ export default function BulkSparePartDialog({
           return '';
         };
 
-        const rawModel = getVal(['model_ids', 'model_id', 'Model ID', 'Model', 'Compatible Model']);
+        // "Compatible Models" cell: "Universal" (or blank) = fits every model;
+        // otherwise a comma-separated list of model numbers or model names,
+        // e.g. "TK-1150, TK-1160". Unrecognised entries are dropped.
+        const rawModel = getVal([
+          'model_ids',
+          'model_id',
+          'Model ID',
+          'Model',
+          'Models',
+          'Compatible Model',
+          'Compatible Models',
+        ]);
         let parsedModelIds: string[] = [];
-        if (rawModel) {
-          if (String(rawModel).toLowerCase().includes('universal')) {
-            parsedModelIds = ['universal'];
-          } else {
-            parsedModelIds = String(rawModel)
-              .split(',')
-              .map((s) => s.trim())
-              .map((p) => findIdByName(p, models))
-              .filter(Boolean);
-            if (parsedModelIds.length === 0) parsedModelIds = ['universal'];
-          }
-        } else {
-          parsedModelIds = ['universal'];
+        if (rawModel && !String(rawModel).toLowerCase().includes('universal')) {
+          parsedModelIds = String(rawModel)
+            .split(',')
+            .map((s) => s.trim())
+            .map((p) => findIdByName(p, models))
+            .filter(Boolean);
         }
+        if (parsedModelIds.length === 0) parsedModelIds = ['universal'];
 
         const rawSku = getVal(['sku', 'SKU', 'item_code', 'Item Code']);
         const rawSelect = getVal(['Select Spare Parts from Lot', 'Select Product from Lot']);
@@ -286,7 +305,16 @@ export default function BulkSparePartDialog({
           if (parts.length > 1) sku = parts[0].trim();
         }
 
-        const lotIdFromExcel = getVal(['lot_id', 'lotNumber', 'Lot ID', 'Lot', 'lot_number']);
+        // Lot column is optional. Blank, "none", "no lot" or "-" all mean
+        // "add to existing stock, not tied to any lot".
+        const lotCell = String(
+          getVal(['lot_id', 'lotNumber', 'Lot ID', 'Lot', 'lot_number']) || '',
+        ).trim();
+        const clearsLot = /^(none|no lot|no-lot|n\/a|-)$/i.test(lotCell);
+        // Accept either a lot number ("LOT-001") or a raw lot id in the cell.
+        const lotIdFromExcel = clearsLot
+          ? ''
+          : lots.find((l) => l.lotNumber?.toLowerCase() === lotCell.toLowerCase())?.id || lotCell;
 
         return {
           sku: sku ? String(sku) : '',
@@ -305,8 +333,7 @@ export default function BulkSparePartDialog({
             String(getVal(['warehouse_id', 'Warehouse ID', 'Warehouse']) || ''),
             warehouses,
           ),
-          lot_id:
-            (lotIdFromExcel ? String(lotIdFromExcel) : undefined) || initialLotId || undefined,
+          lot_id: clearsLot ? undefined : lotIdFromExcel || initialLotId || undefined,
           mpn: String(
             getVal(['mpn', 'MPN', 'Manufacturing Part Number', 'manufacturing_part_number']) || '',
           ),
@@ -327,24 +354,52 @@ export default function BulkSparePartDialog({
     }
   };
 
-  /** Downloads a sample sheet with headers matching parseExcelData's column names. */
+  /**
+   * Downloads a sample sheet. Column order matches what the form shows —
+   * Brand, Item Name, MPN, SKU first — but parseExcelData matches on header
+   * name, not position, so users may reorder or drop columns freely.
+   *
+   * - MPN is required.
+   * - "Compatible Models": leave blank or "Universal" to fit every model, or
+   *   list model numbers / names separated by commas ("TK-1150, TK-1160").
+   * - Vendor / Warehouse: the exact name as it appears in the app (or its ID).
+   * - "Lot": optional. Blank or "none" adds the part straight to existing stock
+   *   (no lot). Rows with no lot must have a Warehouse.
+   */
   const handleDownloadSample = () => {
     const sampleRows = [
       {
-        'Item Name': 'Toner Cartridge TK-1150',
-        SKU: 'SKU-0001',
-        MPN: 'TK-1150',
         Brand: 'Kyocera',
+        'Item Name': 'Toner Cartridge TK-1150',
+        MPN: 'TK-1150',
+        SKU: 'SKU-0001',
+        'Compatible Models': 'Universal',
         Description: 'High quality replacement toner',
-        'Compatible Model': 'Universal',
         Quantity: 10,
         'Purchase Price': 45,
         'Wholesale Price': 65,
         'Selling Price': 80,
         'Max Discount': 5,
-        Vendor: 'Look up the Vendor ID from the Vendors page',
-        Warehouse: 'Look up the Warehouse ID from the Warehouses page',
+        Vendor: 'Exact Vendor name (or its ID)',
+        Warehouse: 'Exact Warehouse name (or its ID)',
         Yield: '3,000 pages @ 5% coverage',
+        Lot: 'none',
+      },
+      {
+        Brand: 'Kyocera',
+        'Item Name': 'Drum Unit DK-1150',
+        MPN: 'DK-1150',
+        SKU: '',
+        'Compatible Models': 'TK-1150, TK-1160',
+        Description: 'OEM drum unit',
+        Quantity: 4,
+        'Purchase Price': 30,
+        'Wholesale Price': 48,
+        'Selling Price': 60,
+        'Max Discount': 3,
+        Vendor: 'Exact Vendor name (or its ID)',
+        Warehouse: 'Exact Warehouse name (or its ID)',
+        Yield: '100,000 pages',
         Lot: '',
       },
     ];
@@ -405,15 +460,24 @@ export default function BulkSparePartDialog({
   const handleSubmit = async () => {
     // SKU is optional here on purpose — the backend auto-generates one via
     // generateSku() when it's omitted (sparePartService.ts addSingleSparePart).
-    const validRows = rows.filter((r) => r.part_name);
+    // Name and MPN are both required.
+    const validRows = rows.filter((r) => r.part_name && r.mpn?.trim());
 
-    if (!rows.some((r) => r.lot_id)) {
-      toast.error('Please assign a Lot to at least one spare part row before uploading');
+    const namedRows = rows.filter((r) => r.part_name);
+    if (namedRows.some((r) => !r.mpn?.trim())) {
+      toast.error('Every spare part row needs an MPN');
+      return;
+    }
+
+    // A Lot is optional. Rows with no Lot go straight to existing stock, but the
+    // backend still needs somewhere to put them — so a Warehouse is mandatory there.
+    if (namedRows.some((r) => !r.lot_id && !r.warehouse_id)) {
+      toast.error('Rows without a Lot need a Warehouse');
       return;
     }
 
     if (validRows.length === 0) {
-      toast.error('Please add at least one valid spare part with a Name');
+      toast.error('Please add at least one valid spare part with a Name and MPN');
       return;
     }
 
@@ -439,7 +503,7 @@ export default function BulkSparePartDialog({
         };
       });
 
-      const result = await sparePartService.bulkUpload(payload);
+      const result = await sparePartService.bulkUpload(payload, branchId);
 
       if (result.success) {
         toast.success(`Successfully uploaded ${result.data.success} spare parts`);
@@ -514,7 +578,7 @@ export default function BulkSparePartDialog({
           {rows.length > 0 ? (
             rows.map((row, i) => {
               const isExpanded = !!expandedRows[i];
-              const isValid = !!(row.part_name && row.sku);
+              const isValid = !!(row.part_name && row.mpn?.trim());
               const lotOptions = getLotSparePartItems(row.lot_id);
               const lot = lots.find((l) => l.id === row.lot_id);
               const filteredModels = row.brand
@@ -661,11 +725,11 @@ export default function BulkSparePartDialog({
                             />
                           </Field>
 
-                          <Field label="MPN (Manufacturing Part Number)">
+                          <Field label="MPN (Manufacturing Part Number) *">
                             <Input
                               value={row.mpn || ''}
                               onChange={(e) => updateRow(i, 'mpn', e.target.value)}
-                              placeholder="MPN (Optional)"
+                              placeholder="MPN"
                             />
                           </Field>
 

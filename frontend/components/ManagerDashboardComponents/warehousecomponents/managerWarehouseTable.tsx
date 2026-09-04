@@ -5,13 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, Trash2 } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -30,6 +23,7 @@ import { getBranches, Branch } from '@/lib/branch';
 import { toast } from 'sonner';
 import { getUserFromToken } from '@/lib/auth';
 import axios from 'axios';
+import WarehouseFormDialog from '@/components/warehouse/WarehouseFormDialog';
 
 /**
  * Comprehensive Warehouse management dashboard component.
@@ -173,8 +167,9 @@ export default function ManagerWarehouseTable() {
                   'WAREHOUSE NAME',
                   'CODE',
                   'BRANCH',
+                  'COUNTRY',
+                  'CONTACT PERSON',
                   'LOCATION',
-                  'ADDRESS',
                   'CAPACITY',
                   'STATUS',
                   'ACTION',
@@ -198,9 +193,10 @@ export default function ManagerWarehouseTable() {
                   <td className="px-4 py-3 text-sm font-medium">{w.warehouseName}</td>
                   <td className="px-4 py-3 text-sm text-primary font-medium">{w.warehouseCode}</td>
                   <td className="px-4 py-3 text-sm">{w.branch?.name || 'N/A'}</td>
-                  <td className="px-4 py-3 text-sm">{w.location}</td>
-                  <td className="px-4 py-3 text-sm">{w.address}</td>
-                  <td className="px-4 py-3 text-sm font-medium">{w.capacity}</td>
+                  <td className="px-4 py-3 text-sm">{w.country || '—'}</td>
+                  <td className="px-4 py-3 text-sm">{w.contactPersonName || '—'}</td>
+                  <td className="px-4 py-3 text-sm">{w.location || '—'}</td>
+                  <td className="px-4 py-3 text-sm font-medium">{w.capacity || '—'}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -239,12 +235,16 @@ export default function ManagerWarehouseTable() {
       </div>
 
       {/* MODALS */}
-      <WarehouseFormModal
+      <WarehouseFormDialog
         initialData={editingWarehouse}
         branches={branches}
+        lockedBranchId={getUserFromToken()?.branchId || undefined}
         open={formOpen}
-        onClose={() => setFormOpen(false)}
-        onConfirm={handleSave}
+        onOpenChange={(o) => {
+          setFormOpen(o);
+          if (!o) setEditingWarehouse(null);
+        }}
+        onSubmit={handleSave}
       />
 
       <ConfirmDeleteModal
@@ -254,191 +254,6 @@ export default function ManagerWarehouseTable() {
         onConfirm={confirmDelete}
       />
     </div>
-  );
-}
-
-function WarehouseFormModal({
-  initialData,
-  branches,
-  open,
-  onClose,
-  onConfirm,
-}: {
-  initialData: Warehouse | null;
-  branches: Branch[];
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (data: Partial<Warehouse>) => void;
-}) {
-  const [form, setForm] = useState<Partial<Warehouse>>(
-    initialData ?? {
-      warehouseName: '',
-      warehouseCode: '',
-      branchId: branches[0]?.id || '',
-      location: '',
-      address: '',
-      capacity: '',
-      status: 'ACTIVE',
-    },
-  );
-
-  useEffect(() => {
-    if (initialData) {
-      setForm(initialData);
-    } else {
-      const user = getUserFromToken();
-      setForm({
-        warehouseName: '',
-        warehouseCode: '',
-        branchId: user?.branchId || branches[0]?.id || '',
-        location: '',
-        address: '',
-        capacity: '',
-        status: 'ACTIVE',
-      });
-    }
-  }, [initialData, branches]);
-
-  const handleSubmit = () => {
-    if (!form.warehouseName?.trim()) {
-      toast.error('Warehouse name is required');
-      return;
-    }
-    if (!form.warehouseCode?.trim()) {
-      toast.error('Warehouse code is required');
-      return;
-    }
-    if (!form.location?.trim()) {
-      toast.error('Location / City is required');
-      return;
-    }
-    if (!form.address?.trim()) {
-      toast.error('Full address is required');
-      return;
-    }
-    if (!form.capacity?.trim()) {
-      toast.error('Capacity is required');
-      return;
-    }
-    onConfirm(form);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-primary">
-            {initialData ? 'Update Warehouse' : 'Add Warehouse'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-6 pt-6">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Warehouse Name *
-              </label>
-              <Input
-                placeholder="Enter warehouse name"
-                value={form.warehouseName}
-                onChange={(e) => setForm({ ...form, warehouseName: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Warehouse Code *
-              </label>
-              <Input
-                placeholder="e.g., WH-001"
-                value={form.warehouseCode}
-                onChange={(e) => setForm({ ...form, warehouseCode: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Branch
-              </label>
-              <div className="h-12 rounded-xl bg-gray-50 border border-gray-100 shadow-sm flex items-center px-4 text-sm font-medium text-gray-700">
-                {branches.find((b) => b.id === form.branchId)?.name || 'N/A'}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Location / City *
-              </label>
-              <Input
-                placeholder="Enter city"
-                value={form.location}
-                onChange={(e) => setForm({ ...form, location: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="col-span-2 space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Full Address *
-              </label>
-              <Input
-                placeholder="Enter complete address"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Capacity *
-              </label>
-              <Input
-                placeholder="e.g., 30000 sqft"
-                value={form.capacity}
-                onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-                className="h-12 rounded-xl bg-card border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Status
-              </label>
-              <Select
-                value={form.status || 'ACTIVE'}
-                onValueChange={(value) =>
-                  setForm({ ...form, status: value as 'ACTIVE' | 'INACTIVE' })
-                }
-              >
-                <SelectTrigger className="h-12 rounded-xl bg-card border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="INACTIVE">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex justify-end items-center gap-6 pt-8">
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-sm font-bold text-foreground hover:text-gray-600 transition-colors"
-            >
-              Cancel
-            </button>
-            <Button className="h-12 px-10" onClick={handleSubmit}>
-              {initialData ? 'Update' : 'Confirm'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

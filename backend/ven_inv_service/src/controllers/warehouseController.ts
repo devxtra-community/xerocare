@@ -48,9 +48,15 @@ export class WarehouseController {
    * Retrieves warehouses for the current user's branch.
    */
   getMyBranchWarehouses = async (req: Request, res: Response) => {
-    const branchId = req.user?.branchId;
+    // ADMIN tokens carry no branchId — allow it to target a branch via ?branchId=
+    // (used by the Spare Parts page when an admin picks a branch in its filter).
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? (req.query.branchId as string | undefined) : req.user?.branchId;
     if (!branchId) {
-      return res.status(400).json({ success: false, message: 'Branch ID not found in token' });
+      return res.status(400).json({
+        success: false,
+        message: isAdmin ? 'Select a branch first' : 'Branch ID not found in token',
+      });
     }
     const warehouses = await this.service.getWarehousesByBranch(branchId);
     res.json({ success: true, data: warehouses });

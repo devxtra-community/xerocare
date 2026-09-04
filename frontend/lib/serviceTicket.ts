@@ -49,6 +49,8 @@ export interface ServiceTicket {
   serialNumber?: string;
   serviceContext: string;
   contractReferenceId?: string;
+  /** PRINTER (default, meter-based) | COMPUTER | OTHER — computer/other skip meter readings. */
+  machineType?: 'PRINTER' | 'COMPUTER' | 'OTHER';
   issueDescription: string;
   jobType: string;
   status: string;
@@ -102,6 +104,20 @@ export const createServiceTicket = async (data: Partial<ServiceTicket>): Promise
   return response.data.data;
 };
 
+/** Collect the visit charge any time after creation — before or after a
+ *  technician is assigned/diagnosis happens. Does not gate assignment. */
+export const collectVisitCharge = async (
+  id: string,
+  paymentMode: string,
+  accountId?: string,
+): Promise<ServiceTicket> => {
+  const response = await api.post(`/i/service/tickets/${id}/collect-visit-charge`, {
+    paymentMode,
+    accountId,
+  });
+  return response.data.data;
+};
+
 export const assignTechnician = async (
   id: string,
   assignedTechnicianId: string,
@@ -120,7 +136,8 @@ export const diagnoseServiceTicket = async (
     problemFound: string;
     rootCause: string;
     technicianNotes: string;
-    meterReading: number;
+    /** Printer only — omit for computer / other machines. */
+    meterReading?: number;
     labourCost?: number;
     visitChargeAmount?: number;
     visitChargeMethod?: string | null;
@@ -187,7 +204,8 @@ export const completeServiceTicket = async (
   payload: {
     workPerformed: string;
     resolutionDetails: string;
-    meterReading: number;
+    /** Printer only — omit for computer / other machines. */
+    meterReading?: number;
     customerRemarks?: string;
     technicianRemarks?: string;
     customerSignature?: string;
@@ -480,6 +498,7 @@ export const markSparePartDamaged = async (id: string, quantity: number): Promis
 export const getMachineContext = async (
   serialNumber: string,
   meterReading?: number,
+  machineType?: 'PRINTER' | 'COMPUTER' | 'OTHER',
 ): Promise<{
   serviceContext: string;
   contractReferenceId: string | null;
@@ -492,6 +511,7 @@ export const getMachineContext = async (
   };
   contract: ServiceContract | null;
   warrantyInfo: WarrantyInfo | null;
+  machineType?: 'PRINTER' | 'COMPUTER' | 'OTHER';
   contractUsage: {
     copiesUsed: number;
     copyLimit: number;
@@ -500,8 +520,9 @@ export const getMachineContext = async (
     overagePerCopyRate: number;
   } | null;
 }> => {
-  const params: Record<string, number> = {};
+  const params: Record<string, string | number> = {};
   if (meterReading !== undefined && meterReading > 0) params.meterReading = meterReading;
+  if (machineType) params.machineType = machineType;
   const response = await api.get(`/i/service/machines/${serialNumber}/context`, { params });
   return response.data.data;
 };
