@@ -16,7 +16,7 @@ const ROUTING_KEY = 'inventory.product.status.update';
 /**
  * Allowed bill types
  */
-type BillType = 'SALE' | 'RENT' | 'LEASE' | 'RETURNED' | 'DAMAGED';
+type BillType = 'SALE' | 'RENT' | 'LEASE' | 'RETURNED' | 'DAMAGED' | 'AVAILABLE';
 
 /**
  * BillType → ProductStatus mapping
@@ -27,12 +27,19 @@ const STATUS_MAP: Record<BillType, ProductStatus> = {
   LEASE: ProductStatus.LEASE,
   RETURNED: ProductStatus.RETURNED,
   DAMAGED: ProductStatus.DAMAGED,
+  // Finance cleared the unit back into sellable stock after auditing a replacement
+  // return. RETURNED means "off the contract, awaiting audit"; only AVAILABLE means
+  // it can be sold or allocated again.
+  AVAILABLE: ProductStatus.AVAILABLE,
 };
 
 /**
  * BillType → OwnershipType mapping
  */
-const OWNERSHIP_MAP: Record<Exclude<BillType, 'RETURNED' | 'DAMAGED'>, OwnershipType> = {
+const OWNERSHIP_MAP: Record<
+  Exclude<BillType, 'RETURNED' | 'DAMAGED' | 'AVAILABLE'>,
+  OwnershipType
+> = {
   SALE: OwnershipType.SALE,
   RENT: OwnershipType.RENT,
   LEASE: OwnershipType.LEASE,
@@ -120,9 +127,11 @@ export async function startProductStatusConsumer() {
        * 3️⃣ Idempotency check
        */
       const targetCustomerId =
-        billType === 'RETURNED' || billType === 'DAMAGED' ? null : customerId || null;
+        billType === 'RETURNED' || billType === 'DAMAGED' || billType === 'AVAILABLE'
+          ? null
+          : customerId || null;
       const targetOwnership =
-        billType === 'RETURNED' || billType === 'DAMAGED'
+        billType === 'RETURNED' || billType === 'DAMAGED' || billType === 'AVAILABLE'
           ? product.ownership
           : OWNERSHIP_MAP[billType];
 

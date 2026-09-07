@@ -36,6 +36,11 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
+import OnlinePaymentFields, {
+  EMPTY_ONLINE_PAYMENT,
+  OnlinePaymentDetails,
+  onlinePaymentComplete,
+} from '@/components/payments/OnlinePaymentFields';
 import { getActiveCurrency } from '@/lib/currency';
 import {
   ArrowLeft,
@@ -86,9 +91,11 @@ export default function ServiceContractDetailPage() {
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [cardDetails, setCardDetails] = useState<OnlinePaymentDetails>(EMPTY_ONLINE_PAYMENT);
+  const [, setCardQuoteError] = useState<string | null>(null);
   const [payForm, setPayForm] = useState({
     amount: '',
-    paymentMode: 'CASH' as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
+    paymentMode: 'CASH' as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT',
     paymentDate: new Date().toISOString().split('T')[0],
     referenceNumber: '',
     remarks: '',
@@ -178,14 +185,35 @@ export default function ServiceContractDetailPage() {
       toast.error('Enter a payment amount greater than 0.');
       return;
     }
+    if (payForm.paymentMode === 'ONLINE_PAYMENT') {
+      if (!onlinePaymentComplete(cardDetails)) {
+        toast.error(
+          'Complete the card details: payment type, issuing bank, network, card holder and the last 4 digits.',
+        );
+        return;
+      }
+    }
     setSavingPayment(true);
     try {
       await recordSalePayment(contract.invoiceId, {
         amount,
-        paymentMode: payForm.paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
+        paymentMode: payForm.paymentMode,
         paymentDate: payForm.paymentDate,
         referenceNumber: payForm.referenceNumber || undefined,
         remarks: payForm.remarks || undefined,
+        // Card facts only — the processing fee is priced server-side from the
+        // configured merchant agreement, never sent from here.
+        ...(payForm.paymentMode === 'ONLINE_PAYMENT'
+          ? {
+              cardType: cardDetails.cardType,
+              cardNetwork: cardDetails.cardNetwork,
+              issuerCountry: cardDetails.issuerCountry,
+              issuerBank: cardDetails.issuerBank,
+              cardLast4: cardDetails.cardLast4,
+              cardHolderName: cardDetails.cardHolderName.trim(),
+              transactionReference: cardDetails.transactionReference || undefined,
+            }
+          : {}),
       });
       toast.success('Payment submitted for Finance approval.');
       setPayDialogOpen(false);
@@ -876,9 +904,20 @@ export default function ServiceContractDetailPage() {
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="CHEQUE">Cheque</option>
-                  <option value="CREDIT_CARD">Credit Card</option>
+                  <option value="ONLINE_PAYMENT">Online Payment (Card)</option>
                 </select>
               </div>
+              {payForm.paymentMode === 'ONLINE_PAYMENT' && (
+                <div className="col-span-full">
+                  <OnlinePaymentFields
+                    value={cardDetails}
+                    onChange={setCardDetails}
+                    amount={Number(payForm.amount) || 0}
+                    currency={getActiveCurrency()}
+                    onQuoteChange={(_q, err) => setCardQuoteError(err)}
+                  />
+                </div>
+              )}
               <div className="flex flex-col space-y-1">
                 <label className="text-xs font-bold text-slate-600">Payment Date *</label>
                 <Input

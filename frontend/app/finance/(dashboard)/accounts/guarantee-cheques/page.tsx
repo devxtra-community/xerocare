@@ -97,6 +97,11 @@ function GuaranteeModal({
   }, [branchCurrency, isEdit]);
   const [bankName, setBankName] = useState(cheque?.bankName ?? '');
   const [receivedDate, setReceivedDate] = useState(cheque?.receivedDate?.slice(0, 10) ?? today);
+  // Date written on the cheque — the earliest date it may be banked. Defaults to the
+  // received date, which is correct for a non-post-dated cheque.
+  const [chequeDate, setChequeDate] = useState(
+    cheque?.chequeDate?.slice(0, 10) ?? cheque?.receivedDate?.slice(0, 10) ?? today,
+  );
   const [purpose, setPurpose] = useState<GuaranteePurpose>(
     cheque?.purpose ?? 'PERFORMANCE_SECURITY',
   );
@@ -151,6 +156,7 @@ function GuaranteeModal({
         currencyCode,
         bankName,
         receivedDate,
+        chequeDate,
         purpose,
         notes: notes || undefined,
       };
@@ -166,7 +172,8 @@ function GuaranteeModal({
     onError: (err: Error) => toast.error(err.message || 'Failed to save'),
   });
 
-  const isValid = customerId && chequeNumber && Number(amount) > 0 && bankName && receivedDate;
+  const isValid =
+    customerId && chequeNumber && Number(amount) > 0 && bankName && receivedDate && chequeDate;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -290,12 +297,25 @@ function GuaranteeModal({
           {/* Received Date + Purpose */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Received Date *</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                Cheque Received Date *
+              </label>
               <input
                 type="date"
                 value={receivedDate}
                 max={today}
                 onChange={(e) => setReceivedDate(e.target.value)}
+                className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                Cheque Date * <span className="font-normal">(earliest deposit)</span>
+              </label>
+              <input
+                type="date"
+                value={chequeDate}
+                onChange={(e) => setChequeDate(e.target.value)}
                 className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
               />
             </div>
@@ -503,10 +523,17 @@ function DepositDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: 
             <input
               type="date"
               value={depositDate}
+              min={cheque.chequeDate ? String(cheque.chequeDate).slice(0, 10) : undefined}
               max={today}
               onChange={(e) => setDepositDate(e.target.value)}
               className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
             />
+            {cheque.chequeDate && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Cheque Date is {String(cheque.chequeDate).slice(0, 10)} — it cannot be deposited
+                before then.
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>

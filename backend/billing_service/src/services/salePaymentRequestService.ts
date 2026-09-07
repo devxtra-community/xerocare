@@ -3,6 +3,7 @@ import { AppError } from '../errors/appError';
 import { Invoice } from '../entities/invoiceEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { generatePaymentReference } from './billingHelpers';
+import type { calculateCardProcessingFee } from './cardProcessingFeeService';
 
 async function fetchEmployeeName(employeeId: string): Promise<string> {
   try {
@@ -27,7 +28,7 @@ async function fetchEmployeeName(employeeId: string): Promise<string> {
   }
 }
 
-async function generateSalePaymentRequestNo(): Promise<string> {
+export async function generateSalePaymentRequestNo(): Promise<string> {
   const repo = Source.getRepository(SalePaymentRequest);
   const year = new Date().getFullYear();
   const count = await repo
@@ -58,6 +59,74 @@ export interface CreateSalePaymentRequestParams {
   /** Identifies this payment as a refundable security deposit — separates it from
    *  normal rent/sale revenue in Accounts so deposits are never treated as income. */
   isSecurityDeposit?: boolean;
+
+  // ─── ONLINE_PAYMENT only ────────────────────────────────────────────────────
+  // The card facts the salesperson captured. Note what is absent: no PAN, no CVV.
+  // The client sends the last four digits it derived locally and nothing more, so the
+  // full number never crosses the network or reaches a log.
+  cardType?: string;
+  cardNetwork?: string;
+  issuerCountry?: string;
+  issuerBank?: string;
+  cardLast4?: string;
+  cardHolderName?: string;
+  gatewayToken?: string;
+  paymentGateway?: string;
+  transactionChannel?: string;
+  transactionReference?: string;
+}
+
+/** Payment modes this system accepts. CREDIT_CARD is legacy-read-only; see below. */
+export const SUPPORTED_PAYMENT_MODES = [
+  'CASH',
+  'BANK_TRANSFER',
+  'CHEQUE',
+  'ONLINE_PAYMENT',
+] as const;
+
+const CARD_TYPES = ['DEBIT', 'CREDIT'];
+const CARD_NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'UNIONPAY', 'MADA', 'KNET', 'OTHER'];
+const ISSUER_COUNTRIES = ['AE', 'SA', 'QA', 'KW', 'OM', 'BH'];
+
+/**
+ * Validates the card half of an ONLINE_PAYMENT and returns the normalized values.
+ *
+ * Deliberately rejects anything that looks like a full card number arriving in a field
+ * that should only ever hold four digits — a client bug that posted the PAN there would
+ * otherwise persist it, and the whole point of this design is that the PAN never lands
+ * in the database at all.
+ */
+function validateCardDetails(params: CreateSalePaymentRequestParams) {
+  const cardType = (params.cardType || '').toUpperCase();
+  const cardNetwork = (params.cardNetwork || '').toUpperCase();
+  const issuerCountry = (params.issuerCountry || '').toUpperCase();
+  const issuerBank = (params.issuerBank || '').trim();
+  const cardLast4 = (params.cardLast4 || '').trim();
+  const cardHolderName = (params.cardHolderName || '').trim();
+
+  if (!CARD_TYPES.includes(cardType)) {
+    throw new AppError('Select whether this is a Debit Card or a Credit Card', 400);
+  }
+  if (!ISSUER_COUNTRIES.includes(issuerCountry)) {
+    throw new AppError('Select the country that issued the card', 400);
+  }
+  if (!issuerBank) {
+    throw new AppError('Select the issuing bank / card', 400);
+  }
+  if (!CARD_NETWORKS.includes(cardNetwork)) {
+    throw new AppError('Select the card network (Visa, Mastercard, Amex, UnionPay…)', 400);
+  }
+  if (!cardHolderName) {
+    throw new AppError("Enter the card holder's name", 400);
+  }
+  if (!/^[0-9]{4}$/.test(cardLast4)) {
+    throw new AppError(
+      'Card details are invalid. Only the last four digits of the card are accepted — ' +
+        'the full card number must never be sent to or stored by this system.',
+      400,
+    );
+  }
+  return { cardType, cardNetwork, issuerCountry, issuerBank, cardLast4, cardHolderName };
 }
 
 /**
@@ -81,6 +150,14 @@ export async function createSalePaymentRequest(
   }
   if (paymentMode === 'CHEQUE' && !params.chequeNumber) {
     throw new AppError('chequeNumber is required for CHEQUE payment', 400);
+  }
+  if (!SUPPORTED_PAYMENT_MODES.includes(paymentMode as (typeof SUPPORTED_PAYMENT_MODES)[number])) {
+    // CREDIT_CARD is intentionally not accepted for NEW payments: it is the legacy
+    // stored value for what is now ONLINE_PAYMENT + cardType CREDIT. Old rows keep it.
+    throw new AppError(
+      `Unsupported payment mode "${paymentMode}". Use one of: ${SUPPORTED_PAYMENT_MODES.join(', ')}.`,
+      400,
+    );
   }
 
   const invoiceRepo = Source.getRepository(Invoice);
@@ -114,6 +191,41 @@ export async function createSalePaymentRequest(
     } else {
       resolvedContext = 'SALE';
     }
+  }
+
+  // ─── ONLINE_PAYMENT: validate the card, then recompute the fee server-side ───
+  //
+  // Whatever commission the client displayed is ignored. The rate is looked up from the
+  // merchant's configured agreement here, on the server, and it is THIS result that is
+  // stored — so a request posting commissionRate: 0 cannot make the merchant's
+  // processing cost disappear. The applied rate and the rule version are snapshotted on
+  // the row so re-negotiating the agreement tomorrow never rewrites today's receipt.
+  let card: ReturnType<typeof validateCardDetails> | null = null;
+  let fee: Awaited<ReturnType<typeof calculateCardProcessingFee>> | null = null;
+
+  if (paymentMode === 'ONLINE_PAYMENT') {
+    card = validateCardDetails(params);
+    // Price the card if the rate is already on file, but never block the collection on
+    // it. The salesperson takes the money at the counter and has no way of knowing what
+    // the acquirer charges — the commission is Accounts' business, settled when Finance
+    // approves the receipt. Refusing here stranded a real payment that had already been
+    // swiped, which is worse than carrying the fee as "not yet priced" for a few hours.
+    // The fee is recomputed at approval, so a rate added in between is picked up then,
+    // and approval will not post without one.
+    const { findApplicableRule, applyRule } = await import('./cardProcessingFeeService');
+    const rule = await findApplicableRule({
+      branchId,
+      issuerCountry: card.issuerCountry,
+      issuerBank: card.issuerBank,
+      cardType: card.cardType,
+      cardNetwork: card.cardNetwork,
+      paymentGateway: params.paymentGateway,
+      transactionChannel: params.transactionChannel,
+      currency: invoice.currencyCode || 'AED',
+      grossAmount: Number(amount),
+      onDate: new Date(paymentDate).toISOString().split('T')[0],
+    });
+    fee = rule ? applyRule(rule, Number(amount), invoice.currencyCode || 'AED') : null;
   }
 
   const [requestNo, employeeName, autoReferenceNumber] = await Promise.all([
@@ -171,6 +283,19 @@ export async function createSalePaymentRequest(
     chequeDate: params.chequeDate,
     collectLater: Boolean(params.collectLater),
     isSecurityDeposit: Boolean(params.isSecurityDeposit),
+    ...(card ? { ...card, gatewayToken: params.gatewayToken } : {}),
+    ...(fee
+      ? {
+          transactionReference: params.transactionReference,
+          paymentGateway: params.paymentGateway,
+          commissionRateApplied: fee.ratePercentApplied,
+          commissionFixedApplied: fee.fixedFeeApplied,
+          commissionAmount: fee.commissionAmount,
+          netSettlementAmount: fee.netSettlementAmount,
+          commissionRuleId: fee.ruleId,
+          commissionRuleVersion: fee.ruleVersion,
+        }
+      : {}),
     paymentContext: resolvedContext,
     usageRecordId: params.usageRecordId,
     taxableAmount,

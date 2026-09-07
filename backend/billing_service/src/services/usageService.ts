@@ -17,7 +17,7 @@ import { ProductAllocation, AllocationStatus } from '../entities/productAllocati
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { PaymentTiming } from '../entities/enums/paymentTiming';
-import { MoreThanOrEqual } from 'typeorm';
+import { MoreThanOrEqual, In } from 'typeorm';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
@@ -850,8 +850,19 @@ export class UsageService {
   /**
    * Retrieves usage history for a contract.
    */
-  async getUsageHistory(contractId: string) {
-    const history = await this.usageRepo.getUsageHistory(contractId, 'ASC');
+  /**
+   * @param includeAllBillTypes  Opt in to non-USAGE bills (the first-month ADVANCE bill,
+   *   security deposits). OFF BY DEFAULT and it must stay that way: an ADVANCE row
+   *   carries all-zero placeholder readings, and every caller that treats "the newest
+   *   history row" as the previous meter reading will silently take 0 as the baseline —
+   *   showing "Prev: 0" instead of the technician's real installation reading, and
+   *   over-billing from it. Only the Usage History audit screen, which renders these
+   *   rows as charge lines rather than meter periods, should pass true.
+   */
+  async getUsageHistory(contractId: string, includeAllBillTypes = false) {
+    const history = includeAllBillTypes
+      ? await this.usageRepo.getBillHistory(contractId, 'ASC')
+      : await this.usageRepo.getUsageHistory(contractId, 'ASC');
     if (history.length === 0) return [];
 
     // 1️⃣ Fetch Contract WITH Pricing Rules
@@ -882,6 +893,24 @@ export class UsageService {
       combinedExcessRate: 0,
     }) as Partial<InvoiceItem>;
 
+    // The security deposit is a single collection made at conversion, held against the
+    // whole contract — so it is looked up once here, not per row, and attached only to
+    // the advance/deposit bill that actually represents it.
+    //
+    // It is deliberately NOT added into any row's total: a deposit is a refundable
+    // liability, not revenue. Same separation getBill() keeps in saleWorkflowController,
+    // and the same reason accountsShared.ts excludes it from AR.
+    const { Source } = await import('../config/dataSource');
+    const { SalePaymentRequest } = await import('../entities/salePaymentRequestEntity');
+    const depositPayment = await Source.getRepository(SalePaymentRequest).findOne({
+      where: {
+        invoiceId: contractId,
+        paymentContext: In(['RENT_SECURITY_DEPOSIT', 'LEASE_SECURITY_DEPOSIT']),
+        status: In(['PENDING', 'APPROVED']),
+      },
+      order: { createdAt: 'ASC' },
+    });
+
     // Track previous readings for on-the-fly delta calculation (backwards compatibility)
     let lastBwA4 = pricingRule.initialBwCount || 0;
     let lastBwA3 = 0;
@@ -890,6 +919,14 @@ export class UsageService {
 
     const result = await Promise.all(
       history.map(async (record) => {
+        // An ADVANCE (or any non-USAGE) bill carries no meter reading — its counts are
+        // all-zero placeholders. It must therefore neither be given computed deltas nor
+        // be allowed to move the running reading pointers, or the NEXT real period would
+        // take its delta from zero and bill the customer for the machine's whole
+        // lifetime count. This is the same trap the billType filter on
+        // usageRepo.getUsageHistory was originally added to close.
+        const isUsageRow = (record.billType ?? 'USAGE') === 'USAGE';
+
         // 3️⃣ Determine Free Limit (DELTA BASED)
         let freeLimit: number = 0;
         const isCPC = contract.rentType === 'CPC' || contract.rentType === 'CPC_COMBO';
@@ -902,19 +939,25 @@ export class UsageService {
         }
 
         // 4️⃣ Normalize Monthly Usage (DELTA BASED - Fallback for legacy records)
-        const bwA4D = record.bwA4Delta || Math.max(0, record.bwA4Count - lastBwA4);
-        const bwA3D = record.bwA3Delta || Math.max(0, record.bwA3Count - lastBwA3);
-        const colorA4D = record.colorA4Delta || Math.max(0, record.colorA4Count - lastColorA4);
-        const colorA3D = record.colorA3Delta || Math.max(0, record.colorA3Count - lastColorA3);
+        const bwA4D = isUsageRow ? record.bwA4Delta || Math.max(0, record.bwA4Count - lastBwA4) : 0;
+        const bwA3D = isUsageRow ? record.bwA3Delta || Math.max(0, record.bwA3Count - lastBwA3) : 0;
+        const colorA4D = isUsageRow
+          ? record.colorA4Delta || Math.max(0, record.colorA4Count - lastColorA4)
+          : 0;
+        const colorA3D = isUsageRow
+          ? record.colorA3Delta || Math.max(0, record.colorA3Count - lastColorA3)
+          : 0;
 
         const monthlyNormalized = bwA4D + bwA3D * 2 + (colorA4D + colorA3D * 2);
         const totalUsage = monthlyNormalized;
 
-        // Update pointers for next record in ASC sequence
-        lastBwA4 = record.bwA4Count;
-        lastBwA3 = record.bwA3Count;
-        lastColorA4 = record.colorA4Count;
-        lastColorA3 = record.colorA3Count;
+        // Update pointers for next record in ASC sequence — usage rows only.
+        if (isUsageRow) {
+          lastBwA4 = record.bwA4Count;
+          lastBwA3 = record.bwA3Count;
+          lastColorA4 = record.colorA4Count;
+          lastColorA3 = record.colorA3Count;
+        }
 
         // 5️⃣ Use Stored Values (Source of Truth)
         const exceededCount = Number(record.exceededTotal || 0);
@@ -935,6 +978,21 @@ export class UsageService {
 
         return {
           id: record.id,
+          // 'USAGE' | 'ADVANCE' | 'RETURNED' — the UI renders an advance bill as a
+          // charge line rather than a meter period.
+          billType: record.billType ?? 'USAGE',
+          // Security deposit collected against this contract. Shown as its own column on
+          // the bill row that represents the collection, and never folded into finalTotal
+          // (refundable liability, not revenue). A standalone SECURITY_DEPOSIT bill IS
+          // the deposit, so it reports its own charge.
+          depositAmount:
+            record.billType === 'ADVANCE'
+              ? Number(depositPayment?.amount ?? 0)
+              : record.billType === 'SECURITY_DEPOSIT'
+                ? Number(record.totalCharge || 0)
+                : 0,
+          depositStatus:
+            record.billType === 'ADVANCE' && depositPayment ? depositPayment.status : undefined,
           periodStart: new Date(record.billingPeriodStart).toISOString().split('T')[0],
           periodEnd: new Date(record.billingPeriodEnd).toISOString().split('T')[0],
           readingTakenDate: record.readingTakenDate
@@ -1395,6 +1453,20 @@ export class UsageService {
 
     if (!usage) {
       throw new AppError('Usage record not found', 404);
+    }
+
+    // A customer-approved bill is a document the customer signed off on — its readings,
+    // excess and total are what they agreed to pay. Editing it afterwards would silently
+    // change an agreed figure and leave the approval standing against numbers that were
+    // never shown. The UI hides the edit action at this point too, but that alone is not
+    // enforcement: this endpoint is reachable directly.
+    // A REJECTED bill stays editable on purpose — correcting and re-sending it is the
+    // whole point of a rejection.
+    if (usage.billStatus === 'CUSTOMER_APPROVED') {
+      throw new AppError(
+        'This bill has been approved by the customer and can no longer be edited.',
+        400,
+      );
     }
 
     const contract = await this.invoiceRepo.findById(usage.contractId);

@@ -334,6 +334,17 @@ function AdvancePaymentSection({
 
 function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
   const items = bill.items || [];
+
+  // A machine swapped during this period shows up as two metered lines: the outgoing
+  // unit (allocation REPLACED, endTimestamp = the swap) and the unit that took over
+  // (replacementOfAllocationId set, startTimestamp = the same moment). Surfacing that
+  // explicitly is what makes a mid-period bill readable — otherwise the customer sees
+  // two serial numbers with no explanation of why their meter appears to restart.
+  const outgoing = items.find((it) => it.allocation?.status === 'REPLACED');
+  const incoming = items.find((it) => it.allocation?.replacementOfAllocationId);
+  const replacedOn = outgoing?.allocation?.endTimestamp ?? incoming?.allocation?.startTimestamp;
+  const hasSwap = Boolean(outgoing && incoming);
+
   return (
     <div>
       <div className="flex items-start justify-between mb-3">
@@ -344,6 +355,42 @@ function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
           </p>
         )}
       </div>
+
+      {hasSwap && (
+        <div className="mb-3 border border-amber-200 bg-amber-50 px-3 py-2">
+          <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">
+            Machine replaced during this period — {fmtDate(replacedOn)}
+          </p>
+          <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-amber-600">
+                Removed · {outgoing?.allocation?.serialNumber}
+              </p>
+              <p className="text-[10px] font-bold text-slate-700">
+                Closing reading — B&amp;W {outgoing?.endBwA4?.toLocaleString()}
+                {outgoing?.endBwA3 ? ` (+ ${outgoing.endBwA3.toLocaleString()} A3)` : ''} · Color{' '}
+                {outgoing?.endColorA4?.toLocaleString()}
+                {outgoing?.endColorA3 ? ` (+ ${outgoing.endColorA3.toLocaleString()} A3)` : ''}
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-emerald-700">
+                Installed · {incoming?.allocation?.serialNumber}
+              </p>
+              <p className="text-[10px] font-bold text-slate-700">
+                Opening reading — B&amp;W {incoming?.startBwA4?.toLocaleString()}
+                {incoming?.startBwA3 ? ` (+ ${incoming.startBwA3.toLocaleString()} A3)` : ''} ·
+                Color {incoming?.startColorA4?.toLocaleString()}
+                {incoming?.startColorA3 ? ` (+ ${incoming.startColorA3.toLocaleString()} A3)` : ''}
+              </p>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[9px] text-amber-700">
+            Both machines are billed on this invoice: usage up to the swap on the removed unit, and
+            from the swap onwards on its replacement.
+          </p>
+        </div>
+      )}
       {items.length > 0 ? (
         <div className="overflow-x-auto border border-slate-200">
           <table className="w-full text-[10px]">
@@ -374,6 +421,16 @@ function ReadingsSection({ bill }: { bill: Partial<Bill> }) {
                 >
                   <td className="p-2 font-bold text-slate-700">
                     {it.allocation?.serialNumber || `Machine ${idx + 1}`}
+                    {it.allocation?.status === 'REPLACED' && (
+                      <span className="ml-1 font-black text-[8px] uppercase tracking-wider text-amber-600">
+                        Removed {fmtDate(it.allocation.endTimestamp)}
+                      </span>
+                    )}
+                    {it.allocation?.replacementOfAllocationId && (
+                      <span className="ml-1 font-black text-[8px] uppercase tracking-wider text-emerald-700">
+                        New {fmtDate(it.allocation.startTimestamp)}
+                      </span>
+                    )}
                   </td>
                   <td className="p-2 text-right text-slate-600">
                     {it.startBwA4} → {it.endBwA4}

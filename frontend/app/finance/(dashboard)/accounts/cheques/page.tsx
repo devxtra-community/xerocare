@@ -180,7 +180,10 @@ function AddChequeModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">
-                {isReceived ? 'Cheque Collected Date' : 'Issue Date'}
+                {isReceived ? 'Cheque Received Date' : 'Issue Date'}{' '}
+                <span className="font-normal">
+                  {isReceived ? '(received from customer)' : '(handed to vendor)'}
+                </span>
               </label>
               <input
                 type="date"
@@ -413,7 +416,7 @@ function ChequeTable({
               'Party / Bank',
               'Amount',
               'Cheque Date',
-              'Due Date',
+              'Received / Issued',
               'Source',
               'Status',
               'Actions',
@@ -438,20 +441,25 @@ function ChequeTable({
               <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                 {formatCurrency(c.amount, currency)}
               </td>
+              {/* Cheque Date — the deposit/presentment-eligible date, for both
+                  directions. It used to show issueDate for ISSUED cheques, which is
+                  a different concept and belongs in the next column. */}
+              <td
+                className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+              >
+                {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
+                {isOverdue(c) && <span className="ml-1 text-red-500">⚠</span>}
+              </td>
+              {/* Received from the customer / handed to the vendor. Replaces the old
+                  Due Date column, which just repeated the Cheque Date. */}
               <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                 {c.type === 'RECEIVED'
-                  ? c.chequeDate
-                    ? String(c.chequeDate).slice(0, 10)
+                  ? c.collectedDate
+                    ? String(c.collectedDate).slice(0, 10)
                     : '—'
                   : c.issueDate
                     ? String(c.issueDate).slice(0, 10)
                     : '—'}
-              </td>
-              <td
-                className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
-              >
-                {String(c.dueDate).slice(0, 10)}
-                {isOverdue(c) && <span className="ml-1 text-red-500">⚠</span>}
               </td>
               <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px]">
                 <div className="flex flex-col gap-1 items-start">

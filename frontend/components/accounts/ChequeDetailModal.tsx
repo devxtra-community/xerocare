@@ -75,7 +75,16 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
     { label: 'Amount', value: formatCurrency(cheque.amount, currency) },
     {
       label: 'Cheque Date',
-      value: cheque.chequeDate ? String(cheque.chequeDate).slice(0, 10) : '—',
+      value: cheque.chequeDate ? (
+        <span>
+          {String(cheque.chequeDate).slice(0, 10)}
+          <span className="ml-1 text-[10px] font-normal text-gray-400">
+            (earliest deposit date)
+          </span>
+        </span>
+      ) : (
+        '—'
+      ),
     },
     {
       label: 'Status',
@@ -93,7 +102,7 @@ export function ChequeDetailBody({ cheque, currency }: { cheque: Cheque; currenc
   // Cheque Date (often collected well before the date written on it).
   if (cheque.type === 'RECEIVED' && cheque.collectedDate) {
     rows.splice(4, 0, {
-      label: 'Cheque Collected Date',
+      label: 'Cheque Received Date',
       value: String(cheque.collectedDate).slice(0, 10),
     });
   }
@@ -302,9 +311,12 @@ export function ChequeActionModal({
             if ((action === 'deposit' || action === 'clear') && cheque.chequeDate) {
               const todayStr = new Date().toISOString().slice(0, 10);
               const chequeDateStr = String(cheque.chequeDate).slice(0, 10);
-              if (todayStr < chequeDateStr) {
+              // `date` is the Deposit/Cleared Date the user picked — checking only
+              // today let a back-dated deposit slip through once the Cheque Date
+              // had passed. Mirrors requireChequeDateReached() on the server.
+              if (todayStr < chequeDateStr || (date && date < chequeDateStr)) {
                 return toast.error(
-                  `This cheque cannot be ${action === 'clear' ? 'cleared' : 'deposited'} before ${chequeDateStr}.`,
+                  `This cheque cannot be ${action === 'clear' ? 'cleared' : 'deposited'} before its Cheque Date (${chequeDateStr}).`,
                 );
               }
             }
@@ -349,14 +361,31 @@ export function ChequeActionModal({
           {needsDate && (
             <div>
               <label className="text-xs font-medium text-gray-600">
-                {action === 'clear' ? 'Cleared / Cash Received Date' : 'Transaction Date'}
+                {action === 'clear'
+                  ? 'Cleared / Cash Received Date'
+                  : action === 'deposit'
+                    ? 'Deposit Date'
+                    : 'Transaction Date'}
               </label>
               <input
                 type="date"
                 value={date}
+                // A cheque is not presentable before the date written on it, so the
+                // picker itself refuses anything earlier for deposit/clear.
+                min={
+                  (action === 'deposit' || action === 'clear') && cheque.chequeDate
+                    ? String(cheque.chequeDate).slice(0, 10)
+                    : undefined
+                }
                 onChange={(e) => setDate(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              {(action === 'deposit' || action === 'clear') && cheque.chequeDate && (
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Cheque Date is {String(cheque.chequeDate).slice(0, 10)} — it cannot be{' '}
+                  {action === 'clear' ? 'cleared' : 'deposited'} before then.
+                </p>
+              )}
             </div>
           )}
           <div>

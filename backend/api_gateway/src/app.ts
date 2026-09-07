@@ -2,7 +2,8 @@ import './config/env';
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import compression from 'compression';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
+import type { IncomingMessage } from 'http';
 import healthRouter from './routes/health';
 import { startCustomerConsumer } from './events/consumers/customerUpdatedConsumer';
 import invoiceRouter from './routes/invoiceRoutes';
@@ -150,9 +151,26 @@ function createServiceProxy(target: string) {
     secure: false, // Trust our own internal network connections
 
     on: {
+      // Re-send a body that an earlier express.json() already drained.
+      //
+      // Some paths hit a local gateway router before reaching this proxy — most of all
+      // /b/invoices, which is mounted with express.json() so the aggregation routes can
+      // read req.body. That parser consumes the request stream for EVERY request under
+      // the prefix, including ones the local router has no route for. Those fall through
+      // to this proxy, which then forwards a request whose body will never arrive: the
+      // upstream service sits waiting for bytes that were already read, and the call
+      // hangs until a 60s timeout instead of answering.
+      //
+      // The symptom is badly misleading — a mistyped or not-yet-proxied POST looks like
+      // a frozen server rather than the 404 it actually is. fixRequestBody re-writes the
+      // parsed body onto the proxied request, so a consumed stream is restored and the
+      // request completes normally. GETs were never affected (no body to consume), which
+      // is why this only ever showed up on POST/PUT.
+      proxyReq: fixRequestBody,
+
       // If the destination service is down or doesn't respond, we tell the user.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      error(err: Error, req: Request, res: any) {
+      error(err: Error, req: IncomingMessage, res: any) {
         logger.error(`Proxy error → ${target}: ${err.message}`, {
           target,
           url: req.url,
@@ -241,6 +259,14 @@ app.all('/b/invoices/:id/installation-request', createServiceProxy(BILLING_SERVI
 app.all('/b/invoices/ongoing-contracts', createServiceProxy(BILLING_SERVICE_URL));
 app.all('/b/invoices/:id/renewal-decision', createServiceProxy(BILLING_SERVICE_URL));
 app.all('/b/invoices/:id/extend-contract', createServiceProxy(BILLING_SERVICE_URL));
+
+// Card processing fee (MDR) engine — quoting and merchant-agreement administration.
+// Proxied straight through: the gateway has no business re-deriving a rate, and the
+// quote the form shows must come from the same engine that posts the transaction.
+app.all('/b/card-fees/preview', createServiceProxy(BILLING_SERVICE_URL));
+app.all('/b/card-fees/settlements', createServiceProxy(BILLING_SERVICE_URL));
+app.all('/b/card-fees/rules', createServiceProxy(BILLING_SERVICE_URL));
+app.all('/b/card-fees/rules/:id', createServiceProxy(BILLING_SERVICE_URL));
 
 /**
  * Invoice Management: Local Billing Routes

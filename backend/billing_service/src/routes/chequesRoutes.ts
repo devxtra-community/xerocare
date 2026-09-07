@@ -26,11 +26,30 @@ const router = Router();
 // a cheque cannot legally be presented at the bank before its own Cheque Date. A
 // frontend disabled-button alone isn't enough (a direct API call would still slip
 // through), so this is the authoritative, server-side gate.
-function requireChequeDateReached(cheque: Cheque, actionLabel: 'deposited' | 'cleared') {
+function requireChequeDateReached(
+  cheque: Cheque,
+  actionLabel: 'deposited' | 'cleared',
+  actionDate?: string | Date | null,
+) {
   if (!cheque.chequeDate) return;
   const chequeDateStr = String(cheque.chequeDate).slice(0, 10);
-  if (todayInBusinessTz() < chequeDateStr) {
-    throw new AppError(`This cheque cannot be ${actionLabel} before ${chequeDateStr}.`, 400);
+
+  // Two separate ways this action can be too early, and both must be blocked:
+  //   1. It is attempted before the Cheque Date has arrived at all.
+  //   2. Today has passed the Cheque Date, but the user back-dates the action
+  //      itself (the Deposit/Cleared Date field) to before it. Checking only
+  //      today let this through and recorded a deposit dated earlier than the
+  //      first date the cheque was presentable.
+  const todayStr = todayInBusinessTz();
+  const actionDateStr = actionDate
+    ? String(actionDate instanceof Date ? actionDate.toISOString() : actionDate).slice(0, 10)
+    : todayStr;
+
+  if (todayStr < chequeDateStr || actionDateStr < chequeDateStr) {
+    throw new AppError(
+      `This cheque cannot be ${actionLabel} before its Cheque Date (${chequeDateStr}).`,
+      400,
+    );
   }
 }
 
@@ -536,7 +555,7 @@ router.post('/:id/deposit', async (req, res, next) => {
       throw new AppError('Only RECEIVED cheques can be deposited', 400);
     if (cheque.status !== 'PENDING')
       throw new AppError('Only PENDING cheques can be deposited', 400);
-    requireChequeDateReached(cheque, 'deposited');
+    requireChequeDateReached(cheque, 'deposited', depositDate);
 
     // The account must be real, belong to this branch, and be a BANK account — a
     // stale/foreign/wrong-type id must never be silently accepted here, since it's
@@ -626,7 +645,7 @@ router.post('/:id/clear', async (req, res, next) => {
     if (!['DEPOSITED', 'ISSUED'].includes(cheque.status)) {
       throw new AppError('Only DEPOSITED or ISSUED cheques can be cleared', 400);
     }
-    requireChequeDateReached(cheque, 'cleared');
+    requireChequeDateReached(cheque, 'cleared', clearedDate);
 
     const prevStatus = cheque.status;
 

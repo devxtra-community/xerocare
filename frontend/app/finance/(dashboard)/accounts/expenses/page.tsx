@@ -700,7 +700,10 @@ function PayExpenseModal({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Due Date *</label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Cheque Date *{' '}
+                    <span className="font-normal">(earliest date it can be presented)</span>
+                  </label>
                   <input
                     type="date"
                     required

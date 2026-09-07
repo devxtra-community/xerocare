@@ -44,8 +44,15 @@ export class SalePaymentRequest {
   @Column({ length: 3, default: 'AED' })
   currency!: string;
 
+  /**
+   * CASH | BANK_TRANSFER | CHEQUE | ONLINE_PAYMENT
+   *
+   * CREDIT_CARD is the legacy value for what is now ONLINE_PAYMENT + cardType CREDIT.
+   * Historical rows keep it — rewriting stored modes would change what past reports say
+   * happened — and the UI maps it for display. New payments never write it.
+   */
   @Column({ type: 'varchar' })
-  paymentMode!: string; // CASH | BANK_TRANSFER | CHEQUE
+  paymentMode!: string;
 
   @Column({ type: 'date' })
   paymentDate!: Date;
@@ -135,6 +142,30 @@ export class SalePaymentRequest {
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   taxPercent?: number;
 
+  // Security Deposit APPLIED to an outstanding bill (typically the final month's, at
+  // contract end). This is NOT a refund and moves no cash: the deposit is a liability we
+  // already hold, so applying it discharges that liability against the customer's
+  // receivable — a contra between two balance-sheet positions.
+  //
+  // Tracked as an amount rather than a boolean because a deposit can be split: part
+  // applied to a final bill, the remainder refunded. refundSecurityDeposit only pays out
+  // (amount - appliedAmount), and the balance-sheet deposit liability nets both off.
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  appliedAmount!: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  appliedAt?: Date;
+
+  @Column({ type: 'uuid', nullable: true })
+  appliedById?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  appliedByName?: string;
+
+  /** The bill this deposit was applied against — for the audit trail on the deposit row. */
+  @Column({ type: 'uuid', nullable: true })
+  appliedToUsageRecordId?: string;
+
   // Security Deposit refund — Cash/Bank deposits only (a Cheque deposit is refunded by
   // returning the GuaranteeCheque instead, see guaranteeChequesRoutes.ts's /:id/return;
   // that path never touches these fields). Set together, once, by refundSecurityDeposit —
@@ -163,4 +194,66 @@ export class SalePaymentRequest {
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  // ─── Online (card) payment ──────────────────────────────────────────────────
+  // Only populated when paymentMode is ONLINE_PAYMENT. Deliberately NO pan/cvv column
+  // exists: this records a payment for accounting, it is not a card vault. Only the
+  // last four digits are ever stored, and only a gateway token if a real gateway is
+  // integrated later.
+
+  /** DEBIT | CREDIT — the second level under Online Payment. */
+  @Column({ type: 'varchar', nullable: true })
+  cardType?: string;
+
+  /** VISA | MASTERCARD | AMEX | UNIONPAY | MADA | KNET | OTHER */
+  @Column({ type: 'varchar', nullable: true })
+  cardNetwork?: string;
+
+  /** ISO alpha-2 of the issuing country: AE | SA | QA | KW | OM | BH */
+  @Column({ type: 'varchar', length: 2, nullable: true })
+  issuerCountry?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  issuerBank?: string;
+
+  /** Exactly four digits. Never the full PAN. */
+  @Column({ type: 'varchar', length: 4, nullable: true })
+  cardLast4?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  cardHolderName?: string;
+
+  /** Set only when a real gateway tokenizes the card; never a raw PAN. */
+  @Column({ type: 'varchar', nullable: true })
+  gatewayToken?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  paymentGateway?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  transactionReference?: string;
+
+  // ─── Processing fee, as actually applied ────────────────────────────────────
+  // Snapshotted on the row, not re-derived from today's configuration: a receipt
+  // reprinted after the merchant renegotiates its MDR must still show the rate the
+  // customer's payment was actually charged at.
+
+  @Column({ type: 'decimal', precision: 6, scale: 4, nullable: true })
+  commissionRateApplied?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 3, nullable: true })
+  commissionFixedApplied?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 3, nullable: true })
+  commissionAmount?: number;
+
+  /** amount − commissionAmount. Stored so the reconciliation report never recomputes. */
+  @Column({ type: 'decimal', precision: 12, scale: 3, nullable: true })
+  netSettlementAmount?: number;
+
+  @Column({ type: 'uuid', nullable: true })
+  commissionRuleId?: string;
+
+  @Column({ type: 'int', nullable: true })
+  commissionRuleVersion?: number;
 }

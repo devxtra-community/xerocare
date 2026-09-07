@@ -26,9 +26,30 @@ function fmtAmt(n?: number | null, curr?: string) {
   return `${curr ?? ''} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 }
 
+// Every mode gets its own label. This used to fall through to 'Cheque' for anything
+// that was not Cash or Bank Transfer, so a card receipt told the customer they had paid
+// by cheque.
+const MODE_LABELS: Record<string, string> = {
+  CASH: 'Cash',
+  BANK_TRANSFER: 'Bank Transfer',
+  CHEQUE: 'Cheque',
+  ONLINE_PAYMENT: 'Online Payment (Card)',
+  CREDIT_CARD: 'Card',
+};
+
 function modeLabel(mode: string) {
-  return mode === 'BANK_TRANSFER' ? 'Bank Transfer' : mode === 'CASH' ? 'Cash' : 'Cheque';
+  return MODE_LABELS[mode] ?? mode.replace(/_/g, ' ');
 }
+
+const NETWORK_LABELS: Record<string, string> = {
+  VISA: 'Visa',
+  MASTERCARD: 'Mastercard',
+  AMEX: 'American Express',
+  UNIONPAY: 'UnionPay',
+  MADA: 'mada',
+  KNET: 'KNET',
+  OTHER: 'Other',
+};
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
@@ -392,6 +413,77 @@ export function SalePaymentReceiptView({
               </>
             )}
           </div>
+          {payment.paymentMode === 'ONLINE_PAYMENT' && payment.cardLast4 && (
+            <div className="mt-2 p-2 bg-indigo-50 rounded-lg space-y-1">
+              <p className="text-[9px] font-black uppercase tracking-widest text-indigo-600">
+                Card Details
+              </p>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <span className="text-slate-500 font-bold">Card</span>
+                <span className="text-right font-bold text-slate-700">
+                  {payment.issuerBank ? `${payment.issuerBank} ` : ''}
+                  {payment.cardNetwork
+                    ? (NETWORK_LABELS[payment.cardNetwork] ?? payment.cardNetwork)
+                    : ''}
+                  {payment.cardType ? ` ${payment.cardType === 'DEBIT' ? 'Debit' : 'Credit'}` : ''}
+                </span>
+                {/* Masked, always. The full number is not stored, so it cannot be shown
+                    here even by mistake. */}
+                <span className="text-slate-500 font-bold">Card Number</span>
+                <span className="text-right font-bold text-slate-700 font-mono">
+                  •••• •••• •••• {payment.cardLast4}
+                </span>
+                {payment.cardHolderName && (
+                  <>
+                    <span className="text-slate-500 font-bold">Card Holder</span>
+                    <span className="text-right font-bold text-slate-700 uppercase">
+                      {payment.cardHolderName}
+                    </span>
+                  </>
+                )}
+                {payment.transactionReference && (
+                  <>
+                    <span className="text-slate-500 font-bold">Approval Ref</span>
+                    <span className="text-right font-bold text-slate-700">
+                      {payment.transactionReference}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* Bank commission, at the rate agreed with THIS issuer.
+                  Stated separately and labelled as the merchant's cost, because the
+                  customer paid the gross above and is not charged this — the acquirer
+                  withholds it from what it settles to us. */}
+              {payment.commissionAmount != null && (
+                <div className="mt-2 border-t border-dashed border-indigo-200 pt-2">
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <span className="text-slate-500 font-bold">Amount Charged</span>
+                    <span className="text-right font-bold text-slate-700">
+                      {fmtAmt(Number(payment.amount), currency)}
+                    </span>
+                    <span className="text-slate-500 font-bold">
+                      Bank Commission
+                      {payment.commissionRateApplied != null &&
+                        ` (${Number(payment.commissionRateApplied)}%)`}
+                    </span>
+                    <span className="text-right font-bold text-red-600">
+                      − {fmtAmt(Number(payment.commissionAmount), currency)}
+                    </span>
+                    <span className="text-slate-600 font-black">Net Settlement</span>
+                    <span className="text-right font-black text-emerald-700">
+                      {fmtAmt(Number(payment.netSettlementAmount ?? payment.amount), currency)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[9px] font-bold text-slate-400">
+                    Commission is deducted by the bank from the merchant&apos;s settlement. The
+                    customer is credited the full amount charged.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {payment.paymentMode === 'CHEQUE' && (payment.chequeNumber || payment.chequeBankName) && (
             <div className="mt-2 p-2 bg-amber-50 rounded-lg space-y-1">
               <p className="text-[9px] font-black uppercase tracking-widest text-amber-600">
@@ -414,19 +506,19 @@ export function SalePaymentReceiptView({
                     </span>
                   </>
                 )}
+                {payment.paymentDate && (
+                  <>
+                    <span className="text-slate-500 font-bold">Cheque Received Date</span>
+                    <span className="text-right font-bold text-slate-700">
+                      {fmtDate(payment.paymentDate)}
+                    </span>
+                  </>
+                )}
                 {payment.chequeDate && (
                   <>
                     <span className="text-slate-500 font-bold">Cheque Date</span>
                     <span className="text-right font-bold text-slate-700">
                       {fmtDate(payment.chequeDate)}
-                    </span>
-                  </>
-                )}
-                {payment.chequeDueDate && (
-                  <>
-                    <span className="text-slate-500 font-bold">Due Date</span>
-                    <span className="text-right font-bold text-slate-700">
-                      {fmtDate(payment.chequeDueDate)}
                     </span>
                   </>
                 )}

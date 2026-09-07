@@ -6,6 +6,10 @@ import {
   approveSalePayment,
   rejectSalePayment,
   refundSecurityDeposit,
+  applySecurityDepositToBill,
+  reverseDepositApplication,
+  getBillsForContract,
+  type BillForContract,
   recordSalePayment,
   sendReceiptEmail,
   sendReceiptWhatsApp,
@@ -18,6 +22,11 @@ import {
   filterAccountsByPaymentMode,
   type Cheque,
 } from '@/lib/finance/accountsApi';
+import OnlinePaymentFields, {
+  EMPTY_ONLINE_PAYMENT,
+  OnlinePaymentDetails,
+  onlinePaymentComplete,
+} from '@/components/payments/OnlinePaymentFields';
 import {
   ChequeActionModal,
   ChequeDetailModal,
@@ -76,10 +85,19 @@ import {
   X,
   ShieldCheck,
   Undo2,
+  Wallet,
+  RotateCcw,
 } from 'lucide-react';
 import { SalePaymentReceiptView } from '@/components/finance/SalePaymentReceiptView';
 import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+
+/**
+ * Modes whose money lands in a real cash or bank account, so approval must be told
+ * which one. ONLINE_PAYMENT settles into a bank account exactly as a transfer does —
+ * leaving it out is what let card approvals through with no cashbook entry at all.
+ */
+const MODES_NEEDING_ACCOUNT = ['CASH', 'BANK_TRANSFER', 'ONLINE_PAYMENT'];
 
 type FilterTab = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL' | 'CUSTOMERS';
 
@@ -168,7 +186,7 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                   'Customer / Bank',
                   'Amount',
                   'Cheque Date',
-                  'Due Date',
+                  'Received Date',
                   'Status',
                   'Actions',
                 ].map((h) => (
@@ -197,14 +215,14 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                     <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                       {formatCurrency(c.amount, currency)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                      {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
-                    </td>
                     <td
                       className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-500'}`}
                     >
-                      {String(c.dueDate).slice(0, 10)}
+                      {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
                       {isOverdue && <span className="ml-1 text-red-500">⚠</span>}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                      {c.collectedDate ? String(c.collectedDate).slice(0, 10) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -340,7 +358,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
   // Secondary filters
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'SALE' | 'RENT' | 'LEASE'>('ALL');
-  const [modeFilter, setModeFilter] = useState<'ALL' | 'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('ALL');
+  const [modeFilter, setModeFilter] = useState<
+    'ALL' | 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT'
+  >('ALL');
   // Independent of typeFilter — a deposit is a modifier on a RENT/LEASE payment (see
   // PaymentTypeBadges), not its own contract type, so it needs its own filter rather
   // than being folded into the Type dropdown.
@@ -361,9 +381,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
   // Approve/reject/refund state
   const [actionTarget, setActionTarget] = useState<SalePaymentRequest | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'view' | 'refund' | null>(
-    null,
-  );
+  const [actionType, setActionType] = useState<
+    'approve' | 'reject' | 'view' | 'refund' | 'applyDeposit' | null
+  >(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isActing, setIsActing] = useState(false);
 
@@ -371,6 +391,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const [cashAccounts, setCashAccounts] = useState<CashBankAccount[]>([]);
   const [approvingAccountId, setApprovingAccountId] = useState('');
   const [refundAccountId, setRefundAccountId] = useState('');
+  // Apply-deposit-to-bill state: the contract's unpaid bills, and which one to settle.
+  const [applyBills, setApplyBills] = useState<BillForContract[]>([]);
+  const [applyBillId, setApplyBillId] = useState('');
+  const [applyLoading, setApplyLoading] = useState(false);
   const [refundRemarks, setRefundRemarks] = useState('');
 
   // Receipt view
@@ -384,7 +408,16 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const [directPayInvoice, setDirectPayInvoice] = useState<Invoice | null>(null);
   const [isSearchingInvoice, setIsSearchingInvoice] = useState(false);
   const [directAmount, setDirectAmount] = useState('');
-  const [directMode, setDirectMode] = useState<'CASH' | 'BANK_TRANSFER' | 'CHEQUE'>('CASH');
+  const [directMode, setDirectMode] = useState<
+    'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT'
+  >('CASH');
+  // Card facts for a balance payment taken on a card. No PAN is held here either —
+  // OnlinePaymentFields derives the last four locally and discards the number.
+  const [directCard, setDirectCard] = useState<OnlinePaymentDetails>(EMPTY_ONLINE_PAYMENT);
+  const [, setDirectCardQuoteError] = useState<string | null>(null);
+  // Card commission entered at approval, for a bank whose rate is not on file (or a
+  // one-off promotional rate). Blank means "use the configured agreement".
+  const [approvingCommissionRate, setApprovingCommissionRate] = useState('');
   const [directDate, setDirectDate] = useState(new Date().toISOString().split('T')[0]);
   const [directRef, setDirectRef] = useState('');
   const [directRemarks, setDirectRemarks] = useState('');
@@ -417,6 +450,8 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     setDirectChequeNo('');
     setDirectChequeBank('');
     setDirectChequeDate(new Date().toISOString().split('T')[0]);
+    setDirectCard(EMPTY_ONLINE_PAYMENT);
+    setDirectCardQuoteError(null);
   };
 
   const loadData = useCallback(async () => {
@@ -488,7 +523,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const handleApprove = async () => {
     if (!actionTarget) return;
     const needsAccount =
-      ['CASH', 'BANK_TRANSFER'].includes(actionTarget.paymentMode) && !actionTarget.cashAccountId;
+      MODES_NEEDING_ACCOUNT.includes(actionTarget.paymentMode) && !actionTarget.cashAccountId;
     if (needsAccount && !approvingAccountId) {
       toast.error('Select a cash or bank account before approving');
       return;
@@ -496,7 +531,13 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     setIsActing(true);
     try {
       const accountToUse = actionTarget.cashAccountId || approvingAccountId || undefined;
-      await approveSalePayment(actionTarget.id, accountToUse);
+      await approveSalePayment(
+        actionTarget.id,
+        accountToUse,
+        actionTarget.paymentMode === 'ONLINE_PAYMENT' && approvingCommissionRate !== ''
+          ? Number(approvingCommissionRate)
+          : undefined,
+      );
       toast.success('Payment approved', {
         description: `${actionTarget.requestNo} — ${actionTarget.currency} ${Number(actionTarget.amount).toFixed(2)} posted to ledger.`,
       });
@@ -525,6 +566,66 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       loadData();
     } catch (err) {
       toast.error('Failed to reject', { description: getApiErrorMessage(err) });
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const openApplyDeposit = async (pmt: SalePaymentRequest) => {
+    setActionTarget(pmt);
+    setActionType('applyDeposit');
+    setApplyBillId('');
+    setApplyBills([]);
+    setApplyLoading(true);
+    try {
+      const bills = await getBillsForContract(pmt.invoiceId);
+      // Only bills the customer has approved and still owes money on can be settled —
+      // the same two conditions the server enforces.
+      const settleable = bills.filter(
+        (b) => b.billStatus === 'CUSTOMER_APPROVED' && Number(b.amountPending) > 0.001,
+      );
+      setApplyBills(settleable);
+      if (settleable.length > 0) setApplyBillId(settleable[0].usageRecordId);
+    } catch (err) {
+      toast.error('Could not load this contract’s bills', { description: getApiErrorMessage(err) });
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
+  const handleApplyDeposit = async () => {
+    if (!actionTarget || !applyBillId) return;
+    setIsActing(true);
+    try {
+      const res = await applySecurityDepositToBill(actionTarget.id, {
+        usageRecordId: applyBillId,
+      });
+      toast.success('Deposit applied to the bill', {
+        description:
+          `${actionTarget.currency} ${res.applied.toFixed(2)} settled. ` +
+          `Bill still owes ${actionTarget.currency} ${res.billOutstandingAfter.toFixed(2)}; ` +
+          `deposit left ${actionTarget.currency} ${res.depositRemainingAfter.toFixed(2)}.`,
+      });
+      setActionTarget(null);
+      setActionType(null);
+      loadData();
+    } catch (err) {
+      toast.error('Failed to apply deposit', { description: getApiErrorMessage(err) });
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleReverseApplication = async (pmt: SalePaymentRequest) => {
+    setIsActing(true);
+    try {
+      const res = await reverseDepositApplication(pmt.id);
+      toast.success('Deposit application reversed', {
+        description: `${pmt.currency} ${res.reversed.toFixed(2)} released back to the deposit.`,
+      });
+      loadData();
+    } catch (err) {
+      toast.error('Could not reverse the application', { description: getApiErrorMessage(err) });
     } finally {
       setIsActing(false);
     }
@@ -605,9 +706,17 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
 
   const handleDirectPaySubmit = async () => {
     if (!directPayInvoice || !directAmount) return;
-    if (['CASH', 'BANK_TRANSFER'].includes(directMode) && !directAccountId) {
+    if (MODES_NEEDING_ACCOUNT.includes(directMode) && !directAccountId) {
       toast.error('Select a cash or bank account');
       return;
+    }
+    if (directMode === 'ONLINE_PAYMENT') {
+      if (!onlinePaymentComplete(directCard)) {
+        toast.error(
+          'Complete the card details: payment type, issuing bank, network, card holder and the last 4 digits.',
+        );
+        return;
+      }
     }
     if (directPayExisting && Number(directAmount) > directPayExisting.safeRemaining + 0.1) {
       toast.error('This would overpay the invoice', {
@@ -630,10 +739,29 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
         chequeNumber: directMode === 'CHEQUE' ? directChequeNo : undefined,
         chequeBankName: directMode === 'CHEQUE' ? directChequeBank : undefined,
         chequeDate: directMode === 'CHEQUE' ? directChequeDate : undefined,
+        // Card facts only — the fee is priced server-side from the configured
+        // agreement, never taken from anything sent here.
+        ...(directMode === 'ONLINE_PAYMENT'
+          ? {
+              cardType: directCard.cardType,
+              cardNetwork: directCard.cardNetwork,
+              issuerCountry: directCard.issuerCountry,
+              issuerBank: directCard.issuerBank,
+              cardLast4: directCard.cardLast4,
+              cardHolderName: directCard.cardHolderName.trim(),
+              transactionReference: directCard.transactionReference || undefined,
+            }
+          : {}),
         paymentContext: 'SALE',
       });
       const accountToUse = directMode !== 'CHEQUE' ? directAccountId : undefined;
-      await approveSalePayment(spr.id, accountToUse);
+      await approveSalePayment(
+        spr.id,
+        accountToUse,
+        directMode === 'ONLINE_PAYMENT' && approvingCommissionRate !== ''
+          ? Number(approvingCommissionRate)
+          : undefined,
+      );
       toast.success('Balance payment recorded & approved', {
         description: `${currency} ${Number(directAmount).toFixed(2)} posted to ledger for ${directPayInvoice.invoiceNumber}.`,
       });
@@ -940,6 +1068,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   <SelectItem value="CASH">Cash</SelectItem>
                   <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
                   <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  <SelectItem value="ONLINE_PAYMENT">Online Payment (Card)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1242,12 +1371,41 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </TableCell>
                       <TableCell>
                         <span className="text-[10px] font-black text-slate-500 uppercase">
-                          {pmt.paymentMode.replace('_', ' ')}
+                          {pmt.paymentMode === 'ONLINE_PAYMENT'
+                            ? 'ONLINE (CARD)'
+                            : pmt.paymentMode.replace('_', ' ')}
                         </span>
+                        {pmt.paymentMode === 'ONLINE_PAYMENT' && pmt.cardLast4 && (
+                          <span className="block text-[10px] font-bold text-slate-400">
+                            {pmt.issuerBank ? `${pmt.issuerBank} · ` : ''}••••{pmt.cardLast4}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-black text-slate-800">
                         {pmt.currency}{' '}
                         {Number(pmt.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {/* What the customer paid is the figure above; what the bank
+                            actually receives is this. The difference is the merchant's
+                            processing fee, never a charge to the customer. */}
+                        {pmt.paymentMode === 'ONLINE_PAYMENT' &&
+                          pmt.netSettlementAmount != null && (
+                            <span className="block text-[10px] font-bold text-slate-400">
+                              net {pmt.currency}{' '}
+                              {Number(pmt.netSettlementAmount).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                              })}
+                              {pmt.commissionAmount != null && (
+                                <span className="text-red-500">
+                                  {' '}
+                                  (−
+                                  {Number(pmt.commissionAmount).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                  )
+                                </span>
+                              )}
+                            </span>
+                          )}
                       </TableCell>
                       <TableCell className="text-[11px] font-bold text-slate-500">
                         {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
@@ -1303,8 +1461,37 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                           )}
                           {pmt.isSecurityDeposit &&
                             pmt.status === 'APPROVED' &&
+                            Number(pmt.appliedAmount ?? 0) > 0.001 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={isActing}
+                                onClick={() => handleReverseApplication(pmt)}
+                                className="h-7 w-7 p-0 text-amber-500 hover:bg-amber-50"
+                                title={`Reverse the ${pmt.currency} ${Number(pmt.appliedAmount).toFixed(2)} applied from this deposit`}
+                              >
+                                <RotateCcw size={13} />
+                              </Button>
+                            )}
+                          {pmt.isSecurityDeposit &&
+                            pmt.status === 'APPROVED' &&
+                            !pmt.isRefunded &&
+                            Number(pmt.amount) - Number(pmt.appliedAmount ?? 0) > 0.001 && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openApplyDeposit(pmt)}
+                                className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50"
+                                title="Apply deposit to an outstanding bill"
+                              >
+                                <Wallet size={13} />
+                              </Button>
+                            )}
+                          {pmt.isSecurityDeposit &&
+                            pmt.status === 'APPROVED' &&
                             pmt.paymentMode !== 'CHEQUE' &&
-                            !pmt.isRefunded && (
+                            !pmt.isRefunded &&
+                            Number(pmt.amount) - Number(pmt.appliedAmount ?? 0) > 0.001 && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -1335,6 +1522,125 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       <CustomerChequesSection branchIds={branchIds} />
 
       {/* Receipt View Dialog */}
+      {actionType === 'applyDeposit' && actionTarget && (
+        <Dialog
+          open
+          onOpenChange={() => {
+            setActionType(null);
+            setActionTarget(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl">
+            <DialogTitle className="text-base font-black text-slate-800">
+              Apply Security Deposit to a Bill
+            </DialogTitle>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">
+                  Deposit held · {actionTarget.customerName}
+                </p>
+                <p className="text-lg font-black text-indigo-800">
+                  {actionTarget.currency}{' '}
+                  {(Number(actionTarget.amount) - Number(actionTarget.appliedAmount ?? 0)).toFixed(
+                    2,
+                  )}
+                </p>
+                {Number(actionTarget.appliedAmount ?? 0) > 0 && (
+                  <p className="text-[10px] font-bold text-indigo-600">
+                    {actionTarget.currency} {Number(actionTarget.appliedAmount).toFixed(2)} of{' '}
+                    {Number(actionTarget.amount).toFixed(2)} already applied
+                  </p>
+                )}
+              </div>
+
+              {applyLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 size={20} className="animate-spin text-slate-400" />
+                </div>
+              ) : applyBills.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-xs font-bold text-slate-400">
+                  No customer-approved bill on this contract still has an outstanding balance.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Settle which bill?
+                  </label>
+                  {applyBills.map((b) => {
+                    const willApply = Math.min(
+                      Number(actionTarget.amount) - Number(actionTarget.appliedAmount ?? 0),
+                      Number(b.amountPending),
+                    );
+                    const selected = applyBillId === b.usageRecordId;
+                    return (
+                      <button
+                        key={b.usageRecordId}
+                        type="button"
+                        onClick={() => setApplyBillId(b.usageRecordId)}
+                        className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                          selected
+                            ? 'border-indigo-400 bg-indigo-50'
+                            : 'border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <p className="text-xs font-black text-slate-800">
+                          {b.billType === 'ADVANCE' ? 'Advance Bill' : 'Usage Bill'} ·{' '}
+                          {new Date(b.billingPeriodStart).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                          })}{' '}
+                          –{' '}
+                          {new Date(b.billingPeriodEnd).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </p>
+                        <p className="text-[11px] font-bold text-slate-500">
+                          Outstanding {actionTarget.currency} {Number(b.amountPending).toFixed(2)}
+                        </p>
+                        {selected && (
+                          <p className="mt-1 text-[11px] font-black text-indigo-700">
+                            Applying {actionTarget.currency} {willApply.toFixed(2)} → remaining{' '}
+                            {actionTarget.currency}{' '}
+                            {(Number(b.amountPending) - willApply).toFixed(2)}
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                  <p className="text-[10px] leading-relaxed text-slate-400">
+                    No cash moves — the deposit already held is used to settle the bill, so
+                    Outstanding drops and the deposit liability reduces by the same amount.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setActionType(null);
+                    setActionTarget(null);
+                  }}
+                  className="text-xs font-bold text-slate-500"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!applyBillId || isActing}
+                  onClick={handleApplyDeposit}
+                  className="bg-indigo-600 text-xs font-black text-white hover:bg-indigo-700"
+                >
+                  {isActing ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
+                  Apply Deposit
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {actionType === 'view' && actionTarget && (
         <Dialog
           open
@@ -1508,7 +1814,95 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               <span className="font-black">{actionTarget.customerName}</span>. This cannot be
               undone.
             </DialogDescription>
-            {['CASH', 'BANK_TRANSFER'].includes(actionTarget.paymentMode) &&
+            {/* No rate on file for this bank — Accounts sets it here. This is the point
+                where the commission is genuinely known, which is why capture no longer
+                asks for it. */}
+            {actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
+              actionTarget.commissionAmount == null && (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                    Bank Commission
+                  </p>
+                  <p className="mt-1 text-[11px] font-bold text-slate-500">
+                    {actionTarget.issuerBank} {actionTarget.cardNetwork}{' '}
+                    {actionTarget.cardType === 'DEBIT' ? 'Debit' : 'Credit'} — no rate is on file.
+                    Enter the agreed percentage to apply it to this payment.
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      max="100"
+                      value={approvingCommissionRate}
+                      onChange={(e) => setApprovingCommissionRate(e.target.value)}
+                      placeholder="e.g. 2.25"
+                      className="h-9 w-32 border-slate-200 text-sm font-bold"
+                    />
+                    <span className="text-sm font-black text-slate-500">%</span>
+                    {approvingCommissionRate !== '' && Number(approvingCommissionRate) >= 0 && (
+                      <span className="text-xs font-bold text-slate-600">
+                        = {actionTarget.currency}{' '}
+                        {(
+                          (Number(actionTarget.amount) * Number(approvingCommissionRate)) /
+                          100
+                        ).toFixed(2)}{' '}
+                        · net{' '}
+                        {(
+                          Number(actionTarget.amount) -
+                          (Number(actionTarget.amount) * Number(approvingCommissionRate)) / 100
+                        ).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-bold text-slate-400">
+                    Saving a rate under Accounts → Card Processing Fees applies it to every future
+                    payment on this bank automatically.
+                  </p>
+                </div>
+              )}
+
+            {/* Approving a card receipt posts three different numbers to three different
+                places, so state them before the click rather than after. */}
+            {actionTarget.paymentMode === 'ONLINE_PAYMENT' &&
+              actionTarget.commissionAmount != null && (
+                <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 text-xs">
+                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                    Card Settlement
+                  </p>
+                  {actionTarget.cardLast4 && (
+                    <div className="mb-1.5 font-bold text-slate-600">
+                      {actionTarget.issuerBank} {actionTarget.cardNetwork}{' '}
+                      {actionTarget.cardType === 'DEBIT' ? 'Debit' : 'Credit'} · ••••
+                      {actionTarget.cardLast4}
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-slate-600">
+                    <span>Customer paid (reduces receivable)</span>
+                    <span>
+                      {actionTarget.currency} {Number(actionTarget.amount).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-bold text-slate-600">
+                    <span>
+                      Processing fee
+                      {actionTarget.commissionRateApplied != null &&
+                        ` (${actionTarget.commissionRateApplied}%)`}
+                    </span>
+                    <span className="text-red-600">
+                      − {actionTarget.currency} {Number(actionTarget.commissionAmount).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between border-t border-dashed border-indigo-200 pt-1 font-black text-slate-800">
+                    <span>Posted to the bank account</span>
+                    <span className="text-emerald-700">
+                      {actionTarget.currency}{' '}
+                      {Number(actionTarget.netSettlementAmount ?? actionTarget.amount).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            {MODES_NEEDING_ACCOUNT.includes(actionTarget.paymentMode) &&
               !actionTarget.cashAccountId && (
                 <div className="mt-3 space-y-1">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -1813,8 +2207,12 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   <Select
                     value={directMode}
                     onValueChange={(v) => {
-                      setDirectMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE');
+                      setDirectMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT');
                       setDirectAccountId('');
+                      // Card facts belong to the card that was chosen — never carry
+                      // them over to a different mode.
+                      setDirectCard(EMPTY_ONLINE_PAYMENT);
+                      setDirectCardQuoteError(null);
                     }}
                   >
                     <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
@@ -1830,12 +2228,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       <SelectItem value="CHEQUE" className="text-xs font-bold">
                         Cheque
                       </SelectItem>
+                      <SelectItem value="ONLINE_PAYMENT" className="text-xs font-bold">
+                        Online Payment (Card)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                    Payment Date
+                    {directMode === 'CHEQUE' ? 'Cheque Received Date' : 'Payment Date'}
                   </Label>
                   <Input
                     type="date"
@@ -1845,6 +2246,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   />
                 </div>
               </div>
+              {directMode === 'ONLINE_PAYMENT' && (
+                <OnlinePaymentFields
+                  value={directCard}
+                  onChange={setDirectCard}
+                  amount={Number(directAmount) || 0}
+                  currency={currency}
+                  onQuoteChange={(_q, err) => setDirectCardQuoteError(err)}
+                />
+              )}
               {directMode !== 'CHEQUE' && (
                 <div>
                   <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
@@ -1895,7 +2305,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                     </div>
                     <div className="col-span-2">
                       <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                        Cheque Date (earliest deposit/clear date)
+                        Cheque Date (earliest date it can be deposited)
                       </Label>
                       <Input
                         type="date"
@@ -1942,7 +2352,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   disabled={
                     isSavingDirect ||
                     !directAmount ||
-                    (['CASH', 'BANK_TRANSFER'].includes(directMode) && !directAccountId)
+                    (MODES_NEEDING_ACCOUNT.includes(directMode) && !directAccountId)
                   }
                   className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest px-6 rounded-xl"
                 >

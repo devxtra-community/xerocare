@@ -31,6 +31,7 @@ import { WarrantyDurationUnit } from '../entities/enums/warrantyDurationUnit';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { DeviceMeterReading, ReadingSource } from '../entities/deviceMeterReadingEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
+import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { UsageService } from './usageService';
 import { NotificationService } from './notificationService';
 import { PaymentMode } from '../entities/paymentLedgerEntity';
@@ -3262,42 +3263,61 @@ export class BillingService {
         throw new AppError('Active product allocation not found', 404);
       }
 
-      // 0. Validate oldMeter reading against the latest usage record for this contract
+      // 0. Validate the outgoing unit's closing meter against what THAT UNIT was last
+      // billed at — not against the contract's aggregate count.
+      //
+      // This used to compare against UsageRecord.bwA4Count, which is the contract-wide
+      // total across every machine on the contract. On any multi-machine contract that
+      // total necessarily exceeds an individual unit's own reading, so a perfectly
+      // legitimate closing meter was rejected as "lower than previously billed" and the
+      // swap could not be completed at all. The per-unit figure lives on the
+      // UsageRecordItem row for this allocation; fall back to the allocation's own last
+      // captured reading when the contract has no billed period yet.
       const latestUsageRecord = await queryRunner.manager
         .getRepository(UsageRecord)
         .createQueryBuilder('ur')
         .where('ur.contractId = :contractId', { contractId: oldAllocation.contractId })
+        .andWhere('ur.billType = :billType', { billType: 'USAGE' })
         .orderBy('ur.billingPeriodEnd', 'DESC')
         .getOne();
 
+      let lastBilled: { bwA4: number; bwA3: number; colorA4: number; colorA3: number } | null =
+        null;
+
       if (latestUsageRecord) {
-        if (oldMeter.bwA4 !== undefined && oldMeter.bwA4 < (latestUsageRecord.bwA4Count || 0)) {
-          throw new AppError(
-            `Old B&W A4 meter (${oldMeter.bwA4}) cannot be lower than previously billed (${latestUsageRecord.bwA4Count})`,
-            400,
-          );
+        const lastItem = await queryRunner.manager.findOne(UsageRecordItem, {
+          where: { usageRecordId: latestUsageRecord.id, allocationId: oldAllocation.id },
+        });
+        if (lastItem) {
+          lastBilled = {
+            bwA4: lastItem.endBwA4 || 0,
+            bwA3: lastItem.endBwA3 || 0,
+            colorA4: lastItem.endColorA4 || 0,
+            colorA3: lastItem.endColorA3 || 0,
+          };
         }
-        if (oldMeter.bwA3 !== undefined && oldMeter.bwA3 < (latestUsageRecord.bwA3Count || 0)) {
+      }
+      if (!lastBilled) {
+        // No per-unit history (contract never billed, or a legacy record without items):
+        // the allocation's own running counters are the floor.
+        lastBilled = {
+          bwA4: oldAllocation.currentBwA4 || 0,
+          bwA3: oldAllocation.currentBwA3 || 0,
+          colorA4: oldAllocation.currentColorA4 || 0,
+          colorA3: oldAllocation.currentColorA3 || 0,
+        };
+      }
+
+      const meterChecks: Array<[string, number | undefined, number]> = [
+        ['B&W A4', oldMeter.bwA4, lastBilled.bwA4],
+        ['B&W A3', oldMeter.bwA3, lastBilled.bwA3],
+        ['Color A4', oldMeter.colorA4, lastBilled.colorA4],
+        ['Color A3', oldMeter.colorA3, lastBilled.colorA3],
+      ];
+      for (const [label, entered, floor] of meterChecks) {
+        if (entered !== undefined && entered < floor) {
           throw new AppError(
-            `Old B&W A3 meter (${oldMeter.bwA3}) cannot be lower than previously billed (${latestUsageRecord.bwA3Count})`,
-            400,
-          );
-        }
-        if (
-          oldMeter.colorA4 !== undefined &&
-          oldMeter.colorA4 < (latestUsageRecord.colorA4Count || 0)
-        ) {
-          throw new AppError(
-            `Old Color A4 meter (${oldMeter.colorA4}) cannot be lower than previously billed (${latestUsageRecord.colorA4Count})`,
-            400,
-          );
-        }
-        if (
-          oldMeter.colorA3 !== undefined &&
-          oldMeter.colorA3 < (latestUsageRecord.colorA3Count || 0)
-        ) {
-          throw new AppError(
-            `Old Color A3 meter (${oldMeter.colorA3}) cannot be lower than previously billed (${latestUsageRecord.colorA3Count})`,
+            `Old ${label} meter (${entered}) cannot be lower than this machine's last recorded reading (${floor})`,
             400,
           );
         }
@@ -3517,6 +3537,16 @@ export class BillingService {
     paymentAmount?: number;
     paymentMode?: PaymentMode;
     paymentReference?: string;
+    // ONLINE_PAYMENT card facts. No PAN and no CVV: the client sends the last four it
+    // derived locally, and the commission is not accepted from the client at all —
+    // createSalePaymentRequest prices the card from the configured merchant agreement.
+    cardType?: string;
+    cardNetwork?: string;
+    issuerCountry?: string;
+    issuerBank?: string;
+    cardLast4?: string;
+    cardHolderName?: string;
+    transactionReference?: string;
     notes?: string;
     warrantyType?: string;
     warrantyDurationValue?: number;
@@ -3536,6 +3566,24 @@ export class BillingService {
 
     if (!payload.items || payload.items.length === 0) {
       throw new AppError('Direct sale must have at least one item', 400);
+    }
+
+    // A serialized machine can only be sold once, so the same unit must not appear on
+    // two lines of one sale. The database already refuses it — there is a unique index
+    // on active product allocations — but that surfaces as a raw 500 with
+    // "duplicate key value violates unique constraint", which tells the salesperson
+    // nothing about what they did wrong. Catch it here and name the machine instead.
+    const seenProductIds = new Map<string, string>();
+    for (const item of payload.items) {
+      if (item.itemType !== 'PRODUCT' || !item.productId) continue;
+      const label = item.serialNumber || item.description || item.productId;
+      if (seenProductIds.has(item.productId)) {
+        throw new AppError(
+          `The same machine (${label}) is on this sale twice. Each serial number can only be sold once — pick a different unit for one of the lines.`,
+          400,
+        );
+      }
+      seenProductIds.set(item.productId, label);
     }
 
     // Determine SaleType based on item composition:
@@ -3800,9 +3848,18 @@ export class BillingService {
       // so the invoice cannot be marked PAID here on their say-so — it stays SENT (i.e.
       // outstanding) and only becomes PAID when approveSalePayment clears the request.
       // Finance/Admin recording a sale ARE Accounts, so nothing is pending for them.
-      const needsReceiptApproval = !['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(
-        (payload.createdByRole || '').toUpperCase(),
-      );
+      // A card payment always goes through the request/approval path, whoever created
+      // the sale. That path is the only one that prices the card against the merchant's
+      // configured agreement and posts the three-way split — gross against the
+      // receivable, the processing fee to Card Processing Fees, and only the net into
+      // the bank. recordPayment() below knows none of that, so a Finance-created card
+      // sale would otherwise bank the full amount and silently lose the fee, making the
+      // same sale post differently depending on who keyed it in. It also reflects what
+      // actually happens: card money is not in the account until the acquirer settles.
+      const needsReceiptApproval =
+        !['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(
+          (payload.createdByRole || '').toUpperCase(),
+        ) || String(payload.paymentMode) === 'ONLINE_PAYMENT';
       let paymentStatus = InvoiceStatus.SENT;
       if (payload.paymentAmount && payload.paymentAmount > 0 && !needsReceiptApproval) {
         if (payload.paymentAmount >= calculatedTotal - 0.01) {
@@ -3848,6 +3905,13 @@ export class BillingService {
               referenceNumber: payload.paymentReference,
               remarks: 'Direct Sale Payment — collected at sale',
               paymentContext: 'SALE',
+              cardType: payload.cardType,
+              cardNetwork: payload.cardNetwork,
+              issuerCountry: payload.issuerCountry,
+              issuerBank: payload.issuerBank,
+              cardLast4: payload.cardLast4,
+              cardHolderName: payload.cardHolderName,
+              transactionReference: payload.transactionReference,
             });
           } else {
             await this.recordPayment(

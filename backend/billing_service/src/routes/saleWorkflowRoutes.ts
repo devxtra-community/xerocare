@@ -24,6 +24,11 @@ import {
   assignTechnician,
   startInstallation,
   stopInstallation,
+  getInstallationReport,
+  generateInstallationSigningToken,
+  signInstallationReportInPerson,
+  getInstallationReportForSigning,
+  signInstallationReportViaToken,
   getSalePaymentsForInvoice,
   getPendingSalePayments,
   getAllSalePaymentsForBranch,
@@ -31,6 +36,8 @@ import {
   approveSalePayment,
   rejectSalePayment,
   refundSecurityDeposit,
+  applySecurityDepositToBill,
+  reverseDepositApplication,
   getSaleContracts,
   updateDeliveryStatus,
   getPendingUsagePayments,
@@ -55,7 +62,26 @@ import {
   generateSecurityDepositBill,
   getSecurityDepositBillStatus,
 } from '../controllers/saleWorkflowController';
-import { uploadSignedAgreementDoc } from '../middlewares/uploadMiddleware';
+import { uploadSignedAgreementDoc, uploadReplacementPhotos } from '../middlewares/uploadMiddleware';
+import {
+  getReplacementContext,
+  createReplacementRequest,
+  listReplacements,
+  getReplacement,
+  getReplacementLastReading,
+  decideReplacement,
+  selectUnit,
+  setDelivery,
+  assignTechnician as assignReplacementTechnicianCtl,
+  install,
+  startReplacementWorkCtl,
+  dispositionReplacement,
+  generateSigningToken as generateReplacementSigningToken,
+  markCustomerApproved,
+  getReplacementForSigning,
+  approveReplacementViaToken,
+  sendReplacementReport,
+} from '../controllers/replacementRequestController';
 
 const router = Router();
 
@@ -116,6 +142,21 @@ router.patch(
 router.post('/installation-requests/:id/start', authMiddleware, startInstallation);
 router.post('/installation-requests/:id/stop', authMiddleware, stopInstallation);
 
+// Installation report — readable by any authenticated branch user; signing is gated on
+// the job actually being COMPLETED (enforced in installationReportService).
+router.get('/installation-requests/:id/report', authMiddleware, getInstallationReport);
+router.post(
+  '/installation-requests/:id/signing-token',
+  authMiddleware,
+  generateInstallationSigningToken,
+);
+router.post('/installation-requests/:id/sign', authMiddleware, signInstallationReportInPerson);
+
+// Public (no auth) — customer signs the installation report from their own device.
+// The single-use 72-hour token IS the credential, same as contract/replacement signing.
+router.get('/installation/sign/:token', getInstallationReportForSigning);
+router.post('/installation/sign/:token', signInstallationReportViaToken);
+
 // ─── Pending Usage Payments (Rent/Lease periodic collection shortfalls) ───────
 router.get(
   '/usage-payments/pending',
@@ -164,6 +205,12 @@ router.post('/invoices/:id/sale-payments', authMiddleware, recordSalePayment);
 router.post('/sale-payments/:id/approve', authMiddleware, approveSalePayment);
 router.post('/sale-payments/:id/reject', authMiddleware, rejectSalePayment);
 router.post('/sale-payments/:id/refund-deposit', authMiddleware, refundSecurityDeposit);
+router.post('/sale-payments/:id/apply-deposit', authMiddleware, applySecurityDepositToBill);
+router.post(
+  '/sale-payments/:id/reverse-deposit-application',
+  authMiddleware,
+  reverseDepositApplication,
+);
 router.post('/sale-payments/:id/generate-receipt', authMiddleware, generateSalePaymentReceipt);
 router.post('/sale-payments/:id/notify/email', authMiddleware, sendSalePaymentReceiptEmail);
 router.post('/sale-payments/:id/notify/whatsapp', authMiddleware, sendSalePaymentReceiptWhatsApp);
@@ -179,5 +226,39 @@ router.post('/contracts/:contractId/machine-swap', authMiddleware, initiateMachi
 router.get('/machine-swaps', authMiddleware, getMachineSwapRequests);
 router.post('/machine-swaps/:id/approve', authMiddleware, approveMachineSwap);
 router.post('/machine-swaps/:id/reject', authMiddleware, rejectMachineSwap);
+
+// ─── Machine Replacement chain ────────────────────────────────────────────────
+// Seven stages, each gated on the one before it (see replacementRequestEntity's
+// ReplacementStatus). The allocation swap fires only at /install — the stage where the
+// machine physically changes hands and both meters are read.
+router.get('/replacements', authMiddleware, listReplacements);
+router.get('/replacements/contract/:contractId/context', authMiddleware, getReplacementContext);
+router.post(
+  '/replacements',
+  authMiddleware,
+  uploadReplacementPhotos.array('photos', 8),
+  createReplacementRequest,
+);
+router.get('/replacements/:id', authMiddleware, getReplacement);
+router.get('/replacements/:id/last-reading', authMiddleware, getReplacementLastReading);
+router.post('/replacements/:id/decision', authMiddleware, decideReplacement);
+router.post('/replacements/:id/select-unit', authMiddleware, selectUnit);
+router.post('/replacements/:id/delivery', authMiddleware, setDelivery);
+router.post('/replacements/:id/assign-technician', authMiddleware, assignReplacementTechnicianCtl);
+router.post(
+  '/replacements/:id/install',
+  authMiddleware,
+  uploadReplacementPhotos.array('photos', 8),
+  install,
+);
+router.post('/replacements/:id/start-work', authMiddleware, startReplacementWorkCtl);
+router.post('/replacements/:id/disposition', authMiddleware, dispositionReplacement);
+router.post('/replacements/:id/signing-token', authMiddleware, generateReplacementSigningToken);
+router.post('/replacements/:id/mark-approved', authMiddleware, markCustomerApproved);
+router.post('/replacements/:id/notify/:channel', authMiddleware, sendReplacementReport);
+
+// Public (no auth) — customer signs the replacement report from their own device
+router.get('/replacement/sign/:token', getReplacementForSigning);
+router.post('/replacement/sign/:token/approve', approveReplacementViaToken);
 
 export default router;

@@ -186,6 +186,12 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                           </TableCell>
                           <TableCell className="text-right text-sm text-emerald-600 font-medium">
                             {formatCurrency(b.amountGiven, currency)}
+                            {Number(b.depositApplied ?? 0) > 0 && (
+                              <span className="block text-[10px] font-bold text-indigo-500">
+                                incl. {formatCurrency(Number(b.depositApplied), currency)} from
+                                deposit
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right text-sm font-bold text-amber-600">
                             {formatCurrency(b.amountPending, currency)}

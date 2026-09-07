@@ -115,7 +115,10 @@ export const updateUsageRecord = async (req: Request, res: Response, next: NextF
 export const getUsageHistory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const contractId = req.params.contractId as string;
-    const history = await usageService.getUsageHistory(contractId);
+    // Opt-in only — see the doc comment on usageService.getUsageHistory for why the
+    // default must remain metered periods only.
+    const includeAllBillTypes = req.query.includeAllBillTypes === 'true';
+    const history = await usageService.getUsageHistory(contractId, includeAllBillTypes);
     return res.status(200).json({
       success: true,
       data: history,

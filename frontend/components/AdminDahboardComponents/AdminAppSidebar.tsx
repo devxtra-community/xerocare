@@ -398,6 +398,8 @@ const adminAccountsMenuItems: MenuLink[] = [
   { title: 'Equity', icon: Scale, href: '/admin/accounts/equity' },
   { title: 'Depreciation', icon: PieChart, href: '/admin/accounts/depreciation' },
   { title: 'Exchange Rates', icon: ArrowRightLeft, href: '/admin/accounts/exchange-rates' },
+  { title: 'Card Processing Fees', icon: CreditCard, href: '/admin/accounts/card-fees' },
+  { title: 'Card Settlements', icon: Landmark, href: '/admin/accounts/card-settlements' },
   { title: 'Data Integrity', icon: ShieldAlert, href: '/admin/accounts/data-integrity' },
 ];
 

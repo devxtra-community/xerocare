@@ -183,7 +183,7 @@ export function CollectSecurityDepositModal({
                 />
               </div>
               <div className="space-y-1 col-span-2">
-                <Label>Cheque Date (earliest deposit/clear date)</Label>
+                <Label>Cheque Date (earliest date it can be deposited)</Label>
                 <Input
                   type="date"
                   value={chequeDate}

@@ -17,6 +17,7 @@ import {
   Receipt,
   FileSignature,
   Wrench,
+  Repeat,
 } from 'lucide-react';
 
 import {
@@ -140,6 +141,17 @@ const menuItems = [
     icon: Wrench,
     href: '/employee/service/installation-requests',
     modules: ['service'],
+  },
+  {
+    // Service desk ONLY — deliberately not 'service'. Stages 04-05 of the replacement
+    // chain (confirm the machine reached the customer, assign the technician who swaps
+    // it) exist on this page and nowhere else, so the help desk needs the link or the
+    // chain stalls at UNIT_SELECTED. Technicians do not: they pick their replacement
+    // jobs up from the Replacement Requests tab on Installation Requests.
+    title: 'Machine Replacements',
+    icon: Repeat,
+    href: '/employee/service/machine-replacements',
+    modules: ['service_desk'],
   },
   {
     title: 'Notifications',

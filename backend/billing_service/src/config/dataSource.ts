@@ -48,6 +48,8 @@ import { IncomeEntry } from '../entities/incomeEntryEntity';
 import { ManualJournalEntry } from '../entities/manualJournalEntryEntity';
 import { ContractAgreement } from '../entities/contractAgreementEntity';
 import { InstallationRequest } from '../entities/installationRequestEntity';
+import { ReplacementRequest } from '../entities/replacementRequestEntity';
+import { CardProcessingFeeRule } from '../entities/cardProcessingFeeRuleEntity';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { MachineSwapRequest } from '../entities/machineSwapRequestEntity';
 
@@ -105,6 +107,8 @@ export const Source = new DataSource({
     ManualJournalEntry,
     ContractAgreement,
     InstallationRequest,
+    ReplacementRequest,
+    CardProcessingFeeRule,
     SalePaymentRequest,
     MachineSwapRequest,
   ],
@@ -1135,6 +1139,52 @@ async function runPreMigrations() {
     `);
     logger.info('Cheque cheque_date/deposit_date/cleared_date columns applied.');
 
+    // ─── replacement_requests: Finance audit of the returned machine ─────────
+    // A swapped-out unit is not sellable stock until Finance has looked at it.
+    await client.query(`
+      ALTER TABLE replacement_requests
+        ADD COLUMN IF NOT EXISTS "dispositionStatus" VARCHAR NOT NULL DEFAULT 'PENDING',
+        ADD COLUMN IF NOT EXISTS "dispositionNote" TEXT NULL,
+        ADD COLUMN IF NOT EXISTS "dispositionAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "dispositionById" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "dispositionByName" VARCHAR NULL;
+    `);
+    logger.info('Replacement request disposition columns applied.');
+
+    // ─── replacement_requests: on-site work timer ────────────────────────────
+    // How long the technician spent swapping the machine. Nullable throughout: rows
+    // created before the timer existed have no start, and the report renders "—".
+    await client.query(`
+      ALTER TABLE replacement_requests
+        ADD COLUMN IF NOT EXISTS "workStartedAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "workEndedAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "workDurationSeconds" INTEGER NULL;
+    `);
+    logger.info('Replacement request work-timer columns applied.');
+
+    // ─── installation_requests: report + customer sign-off ───────────────────
+    // The installation report is rendered live from the request, its contract and the
+    // product allocations, so only the handover facts are persisted.
+    await client.query(`
+      ALTER TABLE installation_requests
+        ADD COLUMN IF NOT EXISTS "reportGeneratedAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "signingToken" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "signingTokenExpiresAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "signingTokenUsed" BOOLEAN NOT NULL DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS "customerSignedAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "customerSignatureName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "customerSignatureData" TEXT NULL,
+        ADD COLUMN IF NOT EXISTS "customerSignatureNote" TEXT NULL,
+        ADD COLUMN IF NOT EXISTS "customerSignatureMethod" VARCHAR NULL;
+    `);
+    // The public signing endpoint looks a request up by this token alone, so it must
+    // not be a sequential scan as the table grows.
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_installation_requests_signing_token
+        ON installation_requests ("signingToken");
+    `);
+    logger.info('Installation request report/sign-off columns applied.');
+
     // ─── Cheques: 2-date model — collected_date, cheque_date becomes the sole
     // deposit/presentment-eligibility date, due_date deprecated ─────────────────
     // "Cheque Date" was redefined to mean exactly what cheque_date already tracked
@@ -1235,7 +1285,18 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS deposited_date DATE NULL,
         ADD COLUMN IF NOT EXISTS deposited_to_account_id UUID NULL;
     `);
-    logger.info('Guarantee cheques table ensured.');
+    // cheque_date — the date written on the cheque, i.e. the earliest date it may be
+    // banked. Guarantee cheques only ever had received_date (when the customer handed
+    // it over), so a post-dated security cheque could be deposited immediately. Backfill
+    // from received_date, which is the only date these rows have historically carried.
+    await client.query(`
+      ALTER TABLE guarantee_cheques
+        ADD COLUMN IF NOT EXISTS cheque_date DATE NULL;
+    `);
+    await client.query(`
+      UPDATE guarantee_cheques SET cheque_date = received_date WHERE cheque_date IS NULL;
+    `);
+    logger.info('Guarantee cheques table ensured (cheque_date applied).');
 
     // ─── credit_notes: spare-part support + tax snapshot + payment mode columns ─
     await client.query(`
@@ -1563,6 +1624,161 @@ async function runPreMigrations() {
     `);
     logger.info('Installation requests extended columns (saleType, initialReadings) ensured.');
 
+    // ─── Machine Replacement chain (employee → finance → technician → customer) ─
+    // The workflow record only. The physical swap still lives in ProductAllocation and
+    // is performed by billingService.replaceDeviceAllocation() at the INSTALLED stage;
+    // this table is the audit trail of the human process around it.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS replacement_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "requestNo" VARCHAR UNIQUE NOT NULL,
+        "contractId" UUID NOT NULL,
+        "contractNumber" VARCHAR NOT NULL,
+        "branchId" UUID NOT NULL,
+        "oldAllocationId" UUID NOT NULL,
+        "oldSerialNumber" VARCHAR NOT NULL,
+        "oldProductId" UUID NULL,
+        "modelId" VARCHAR NULL,
+        "customerId" UUID NULL,
+        "customerName" VARCHAR NOT NULL,
+        "customerEmail" VARCHAR NULL,
+        "customerPhone" VARCHAR NULL,
+        reason VARCHAR NOT NULL,
+        notes TEXT NULL,
+        "proofPhotoUrls" TEXT[] NOT NULL DEFAULT '{}',
+        "raisedByEmployeeId" UUID NOT NULL,
+        "raisedByEmployeeName" VARCHAR NOT NULL,
+        "raisedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR NOT NULL DEFAULT 'PENDING_FINANCE',
+        "reviewedById" UUID NULL,
+        "reviewedByName" VARCHAR NULL,
+        "reviewedAt" TIMESTAMP NULL,
+        "rejectionReason" TEXT NULL,
+        "newProductId" UUID NULL,
+        "newSerialNumber" VARCHAR NULL,
+        "selectedAt" TIMESTAMP NULL,
+        "selectedById" UUID NULL,
+        "selectedByName" VARCHAR NULL,
+        "deliveredAt" TIMESTAMP NULL,
+        "deliveredById" UUID NULL,
+        "deliveredByName" VARCHAR NULL,
+        "technicianId" UUID NULL,
+        "technicianName" VARCHAR NULL,
+        "assignedAt" TIMESTAMP NULL,
+        "oldMeterBwA4" INTEGER NULL,
+        "oldMeterBwA3" INTEGER NULL,
+        "oldMeterColorA4" INTEGER NULL,
+        "oldMeterColorA3" INTEGER NULL,
+        "newMeterBwA4" INTEGER NULL,
+        "newMeterBwA3" INTEGER NULL,
+        "newMeterColorA4" INTEGER NULL,
+        "newMeterColorA3" INTEGER NULL,
+        "installedOn" DATE NULL,
+        "installedAt" TIMESTAMP NULL,
+        "installedById" UUID NULL,
+        "installPhotoUrls" TEXT[] NOT NULL DEFAULT '{}',
+        "newAllocationId" UUID NULL,
+        "reportSentAt" TIMESTAMP NULL,
+        "reportChannel" VARCHAR NULL,
+        "signingToken" VARCHAR NULL,
+        "signingTokenExpiresAt" TIMESTAMP NULL,
+        "signingTokenUsed" BOOLEAN NOT NULL DEFAULT FALSE,
+        "customerApprovedAt" TIMESTAMP NULL,
+        "customerApprovalName" VARCHAR NULL,
+        "approvalNote" TEXT NULL,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_replacement_requests_contractId" ON replacement_requests ("contractId");
+      CREATE INDEX IF NOT EXISTS "IDX_replacement_requests_branchId" ON replacement_requests ("branchId");
+      CREATE INDEX IF NOT EXISTS "IDX_replacement_requests_status" ON replacement_requests (status);
+      CREATE UNIQUE INDEX IF NOT EXISTS "UQ_replacement_requests_signingToken"
+        ON replacement_requests ("signingToken") WHERE "signingToken" IS NOT NULL;
+    `);
+    logger.info('Replacement requests table ensured.');
+
+    // ─── Online (card) payment: MDR rules + card fields ────────────────────────
+    // Rates are merchant configuration, never system constants — see
+    // cardProcessingFeeRuleEntity for why. No rows are seeded: an unconfigured
+    // merchant must be refused at payment time, not silently charged 0%.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS card_processing_fee_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "branchId" UUID NULL,
+        "issuerCountry" VARCHAR(2) NOT NULL,
+        "issuerBank" VARCHAR NULL,
+        "cardType" VARCHAR NULL,
+        "cardNetwork" VARCHAR NULL,
+        "paymentGateway" VARCHAR NULL,
+        "transactionChannel" VARCHAR NULL,
+        "ratePercent" DECIMAL(6,4) NOT NULL DEFAULT 0,
+        "fixedFee" DECIMAL(12,3) NOT NULL DEFAULT 0,
+        "minimumFee" DECIMAL(12,3) NULL,
+        "maximumFee" DECIMAL(12,3) NULL,
+        currency VARCHAR(3) NOT NULL,
+        "effectiveFrom" DATE NOT NULL,
+        "effectiveTo" DATE NULL,
+        "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+        priority INTEGER NOT NULL DEFAULT 0,
+        notes TEXT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        "createdBy" UUID NULL,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+      );
+      CREATE INDEX IF NOT EXISTS "IDX_card_fee_rules_country" ON card_processing_fee_rules ("issuerCountry");
+      CREATE INDEX IF NOT EXISTS "IDX_card_fee_rules_branch" ON card_processing_fee_rules ("branchId");
+    `);
+    logger.info('Card processing fee rules table ensured.');
+
+    // Card columns on the approval-gated payment request. Additive only: existing
+    // CASH/BANK_TRANSFER/CHEQUE rows keep working untouched, and legacy CREDIT_CARD
+    // rows keep their stored mode so historical reporting does not shift under them.
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+        ADD COLUMN IF NOT EXISTS "cardType" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "cardNetwork" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "issuerCountry" VARCHAR(2) NULL,
+        ADD COLUMN IF NOT EXISTS "issuerBank" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "cardLast4" VARCHAR(4) NULL,
+        ADD COLUMN IF NOT EXISTS "cardHolderName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "gatewayToken" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "paymentGateway" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "transactionReference" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "commissionRateApplied" DECIMAL(6,4) NULL,
+        ADD COLUMN IF NOT EXISTS "commissionFixedApplied" DECIMAL(12,3) NULL,
+        ADD COLUMN IF NOT EXISTS "commissionAmount" DECIMAL(12,3) NULL,
+        ADD COLUMN IF NOT EXISTS "netSettlementAmount" DECIMAL(12,3) NULL,
+        ADD COLUMN IF NOT EXISTS "commissionRuleId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "commissionRuleVersion" INTEGER NULL;
+    `);
+    await client.query(`
+      ALTER TABLE payment_transactions
+        ADD COLUMN IF NOT EXISTS card_type VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS card_network VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS issuer_country VARCHAR(2) NULL,
+        ADD COLUMN IF NOT EXISTS issuer_bank VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS card_last4 VARCHAR(4) NULL,
+        ADD COLUMN IF NOT EXISTS card_holder_name VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS transaction_reference VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS commission_rate_applied DECIMAL(6,4) NULL,
+        ADD COLUMN IF NOT EXISTS commission_amount DECIMAL(12,3) NULL,
+        ADD COLUMN IF NOT EXISTS net_settlement_amount DECIMAL(12,3) NULL,
+        ADD COLUMN IF NOT EXISTS commission_rule_id UUID NULL;
+    `);
+    logger.info('Online card payment columns ensured on payment tables.');
+
+    // 5016 Card Processing Fees — the MDR the acquirer deducts is a merchant expense,
+    // and none of 5001-5015 describes it. Without its own line it would land in "Other
+    // Expenses" and become invisible in the card-settlement reconciliation.
+    await client.query(`
+      INSERT INTO chart_of_accounts
+        ("accountNumber", "accountName", category, "accountGroup", "sourceType", "isSystemDefault", "isActive", "categoryKey")
+      VALUES ('5016', 'Card Processing Fees', 'EXPENSE', 'EXPENSE', 'SYSTEM', true, true, 'CARD_PROCESSING_FEE')
+      ON CONFLICT ("accountNumber") DO NOTHING;
+    `);
+    logger.info('Chart of accounts 5016 Card Processing Fees ensured.');
+
     // ─── Sale Workflow: Sale Payment Requests (Finance approval gate) ──────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS sale_payment_requests (
@@ -1769,6 +1985,19 @@ async function runPreMigrations() {
       ADD COLUMN IF NOT EXISTS "refundedById" UUID NULL,
       ADD COLUMN IF NOT EXISTS "refundedByName" VARCHAR NULL,
       ADD COLUMN IF NOT EXISTS "refundCashAccountId" UUID NULL;
+    `);
+
+    // Security Deposit applied against an outstanding bill (contract end). Separate from
+    // the refund columns above: applying moves no cash, it discharges the deposit
+    // liability straight against the customer's receivable. An amount, not a flag, so a
+    // deposit can be part-applied and part-refunded.
+    await client.query(`
+      ALTER TABLE sale_payment_requests
+      ADD COLUMN IF NOT EXISTS "appliedAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS "appliedAt" TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS "appliedById" UUID NULL,
+      ADD COLUMN IF NOT EXISTS "appliedByName" VARCHAR NULL,
+      ADD COLUMN IF NOT EXISTS "appliedToUsageRecordId" UUID NULL;
     `);
     logger.info('Security deposit refund columns ensured on sale_payment_requests table.');
 

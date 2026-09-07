@@ -306,6 +306,13 @@ export type UpdateCreditNotePayload = Partial<CreateCreditNotePayload>;
 
 export interface UsageRecord {
   id: string;
+  /** 'USAGE' = a metered billing period. 'ADVANCE' = the first-month advance +
+   *  security deposit bill raised at conversion, which carries no meter reading. */
+  billType?: 'USAGE' | 'ADVANCE' | 'RETURNED' | 'SECURITY_DEPOSIT';
+  /** Security deposit held against the contract, shown on the bill row that collected
+   *  it. Never part of finalTotal — a deposit is a refundable liability, not revenue. */
+  depositAmount?: number;
+  depositStatus?: string;
   periodStart: string;
   periodEnd: string;
   readingTakenDate?: string;
@@ -942,8 +949,22 @@ export const recordUsage = async (payload: FormData): Promise<RecordUsageResult>
 /**
  * Retrieves the history of usage records for a specific contract.
  */
-export const getUsageHistory = async (contractId: string): Promise<UsageRecord[]> => {
-  const response = await api.get(`/b/usage/contract/${contractId}`);
+/**
+ * Metered billing periods for a contract.
+ *
+ * `includeAllBillTypes` additionally returns the first-month ADVANCE bill and any
+ * security-deposit bill. Leave it off unless you are *displaying* bills: those rows
+ * carry all-zero placeholder meter readings, so any caller that treats the newest row
+ * as "the previous reading" will take 0 as its baseline instead of the machine's real
+ * installation reading.
+ */
+export const getUsageHistory = async (
+  contractId: string,
+  opts?: { includeAllBillTypes?: boolean },
+): Promise<UsageRecord[]> => {
+  const response = await api.get(`/b/usage/contract/${contractId}`, {
+    params: opts?.includeAllBillTypes ? { includeAllBillTypes: 'true' } : undefined,
+  });
   return response.data.data;
 };
 

@@ -195,3 +195,55 @@ body::-webkit-scrollbar-track,
 [data-slot='sidebar-content']::-webkit-scrollbar-track {
   background: transparent;
 }
+/* ── Printing a dialog ────────────────────────────────────────────────────────
+   Reports (installation, replacement, statements) are printed straight from the
+   dialog they are read in. Radix renders that dialog into a portal on <body>, so
+   without these rules window.print() emits the whole dashboard — sidebar, header
+   and dimmed backdrop included — with the report itself clipped to the on-screen
+   height of its scroll container.
+
+   When a dialog is open we therefore print ONLY the portal, promoted out of its
+   fixed/centred positioning so it flows across as many pages as it needs. */
+@media print {
+  body:has([data-slot='dialog-content']) > *:not([data-slot='dialog-portal']) {
+    display: none !important;
+  }
+
+  [data-slot='dialog-overlay'] {
+    display: none !important;
+  }
+
+  [data-slot='dialog-content'] {
+    position: static !important;
+    transform: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  /* The dialog's own scroll container must not clip the document at print time. */
+  [data-slot='dialog-content'] * {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Radix's built-in close button is chrome, never part of the document. */
+  [data-slot='dialog-content'] > [data-slot='dialog-close'] {
+    display: none !important;
+  }
+
+  /* Keep a report's sections from being split across a page break mid-block. */
+  [data-slot='dialog-content'] .rounded-xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

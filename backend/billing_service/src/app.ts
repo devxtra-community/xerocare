@@ -37,6 +37,7 @@ import adminAccountsRouter from './routes/adminAccountsRoutes';
 import expenseRequestRouter from './routes/expenseRequestRoutes';
 import targetRouter from './routes/targetRoutes';
 import saleWorkflowRouter from './routes/saleWorkflowRoutes';
+import cardProcessingFeeRouter from './routes/cardProcessingFeeRoutes';
 
 /**
  * Routing: Directing users to the right department.
@@ -55,6 +56,7 @@ app.use('/expenses/requests', expenseRequestRouter);
 app.use('/accounts/admin', adminAccountsRouter);
 app.use('/accounts', accountsRouter);
 app.use('/targets', targetRouter);
+app.use('/card-fees', cardProcessingFeeRouter);
 app.use('/', saleWorkflowRouter);
 
 /**

@@ -31,6 +31,10 @@ import { getMyInvoices, getBranchInvoices, Invoice, employeeApproveInvoice } fro
 import UsageRecordingModal from '../Finance/UsageRecordingModal';
 import { BillModal } from '../Finance/BillModal';
 import {
+  ReplacementActionButton,
+  useReplacementMap,
+} from '@/components/replacement/ReplacementActionButton';
+import {
   generateAdvanceBill,
   getAdvanceBillStatus,
   AdvanceBillStatus,
@@ -109,6 +113,10 @@ export default function EmployeeLeaseTable({
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+
+  // One request-list call for the whole table; each row reads its own contract's latest
+  // replacement out of the map (see useReplacementMap).
+  const { map: replacementMap, refresh: refreshReplacements } = useReplacementMap();
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [isConverterOpen, setIsConverterOpen] = useState(false);
@@ -568,6 +576,16 @@ export default function EmployeeLeaseTable({
                             <ClipboardList className="h-4 w-4" />
                           </Button>
                         )}
+
+                        <ReplacementActionButton
+                          contractId={inv.id}
+                          contractStatus={inv.contractStatus}
+                          request={replacementMap[inv.id]}
+                          onChanged={() => {
+                            refreshReplacements();
+                            fetchInvoices();
+                          }}
+                        />
 
                         {!!inv.contractStatus && inv.contractStatus !== 'CANCELLED' && (
                           <Button

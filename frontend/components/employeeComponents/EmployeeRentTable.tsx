@@ -48,6 +48,10 @@ import UsageRecordingModal from '../Finance/UsageRecordingModal';
 import { ContractAgreementModal } from './ContractAgreementModal';
 import { BillModal } from '../Finance/BillModal';
 import {
+  ReplacementActionButton,
+  useReplacementMap,
+} from '@/components/replacement/ReplacementActionButton';
+import {
   generateAdvanceBill,
   getAdvanceBillStatus,
   AdvanceBillStatus,
@@ -122,6 +126,10 @@ export default function EmployeeRentTable({
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
+
+  // One request-list call for the whole table; each row reads its own contract's latest
+  // replacement out of the map (see useReplacementMap).
+  const { map: replacementMap, refresh: refreshReplacements } = useReplacementMap();
   const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [isConverterOpen, setIsConverterOpen] = useState(false);
@@ -594,6 +602,16 @@ export default function EmployeeRentTable({
                             </Button>
                           </>
                         )}
+
+                        <ReplacementActionButton
+                          contractId={inv.id}
+                          contractStatus={inv.contractStatus}
+                          request={replacementMap[inv.id]}
+                          onChanged={() => {
+                            refreshReplacements();
+                            fetchInvoices();
+                          }}
+                        />
 
                         {inv.contractStatus === 'ACTIVE' && (
                           <Button

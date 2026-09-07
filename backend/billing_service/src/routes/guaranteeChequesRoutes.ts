@@ -11,9 +11,26 @@ import { CashbookEntry } from '../entities/cashbookEntryEntity';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
 import { getBranchCurrencyInfo } from '../services/billingHelpers';
+import { todayInBusinessTz } from '../utils/businessDate';
 
 function genGCRef(): string {
   return `GCQ-${new Date().getFullYear()}-${Date.now().toString().slice(-7)}`;
+}
+
+// A guarantee cheque is still a cheque: it cannot be banked before the date written
+// on it. Mirrors requireChequeDateReached() in chequesRoutes.ts — both the attempt
+// itself and a back-dated Deposit Date are refused.
+function requireGuaranteeChequeDateReached(cheque: GuaranteeCheque, depositDate?: string) {
+  if (!cheque.chequeDate) return;
+  const chequeDateStr = String(cheque.chequeDate).slice(0, 10);
+  const todayStr = todayInBusinessTz();
+  const depositDateStr = depositDate ? String(depositDate).slice(0, 10) : todayStr;
+  if (todayStr < chequeDateStr || depositDateStr < chequeDateStr) {
+    throw new AppError(
+      `This cheque cannot be deposited before its Cheque Date (${chequeDateStr}).`,
+      400,
+    );
+  }
 }
 
 const router = Router();
@@ -225,6 +242,7 @@ router.post('/', async (req, res, next) => {
       currencyCode,
       bankName,
       receivedDate,
+      chequeDate,
       purpose,
       notes,
     } = req.body;
@@ -247,6 +265,10 @@ router.post('/', async (req, res, next) => {
       currencyCode: currencyCode || 'AED',
       bankName,
       receivedDate,
+      // Falls back to receivedDate so a caller that does not yet send a cheque date
+      // still gets a usable (immediately bankable) value rather than a null that
+      // would silently disable the deposit gate.
+      chequeDate: chequeDate || receivedDate,
       purpose: purpose || GuaranteeChequePurpose.PERFORMANCE_SECURITY,
       status: GuaranteeChequeStatus.RECEIVED, // always starts RECEIVED — ignore client-sent status
       branchId: branchId!,
@@ -283,6 +305,7 @@ router.put('/:id', async (req, res, next) => {
       contractInvoiceId,
       contractReference,
       receivedDate,
+      chequeDate,
       purpose,
     } = req.body;
 
@@ -294,6 +317,7 @@ router.put('/:id', async (req, res, next) => {
     if (contractInvoiceId !== undefined) cheque.contractInvoiceId = contractInvoiceId || null;
     if (contractReference !== undefined) cheque.contractReference = contractReference || null;
     if (receivedDate !== undefined) cheque.receivedDate = receivedDate;
+    if (chequeDate !== undefined) cheque.chequeDate = chequeDate;
     if (purpose !== undefined) cheque.purpose = purpose;
     // Status is NOT editable via PUT — use the /return action endpoint
 
@@ -395,6 +419,7 @@ router.post('/:id/deposit', async (req, res, next) => {
       if (cheque.status !== GuaranteeChequeStatus.RECEIVED) {
         throw new AppError(`Cannot deposit: cheque is already ${cheque.status.toLowerCase()}`, 400);
       }
+      requireGuaranteeChequeDateReached(cheque, depositDate);
 
       const account = await accountRepo.findOne({ where: { id: bankAccountId } });
       if (!account) throw new AppError('Bank account not found', 404);

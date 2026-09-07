@@ -51,7 +51,6 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
   const [referenceNumber, setReferenceNumber] = useState('');
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
-  const [chequeDueDate, setChequeDueDate] = useState('');
   const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
   const [cashAccountId, setCashAccountId] = useState('');
   const [cashAccounts, setCashAccounts] = useState<CashBankAccount[]>([]);
@@ -72,7 +71,6 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
     setReferenceNumber('');
     setChequeNumber('');
     setChequeBankName('');
-    setChequeDueDate('');
     setChequeDate(new Date().toISOString().split('T')[0]);
     setCashAccountId('');
   }, [target]);
@@ -94,7 +92,8 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
         cashAccountId: paymentMode === 'CHEQUE' ? undefined : cashAccountId || undefined,
         chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
         chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
-        chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+        // dueDate is a deprecated mirror of chequeDate server-side.
+        chequeDueDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
         chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
       });
       toast.success('Collection recorded', { description: 'Submitted to Accounts for approval.' });
@@ -188,7 +187,7 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                  Date
+                  {paymentMode === 'CHEQUE' ? 'Cheque Received Date' : 'Date'}
                 </Label>
                 <Input
                   type="date"
@@ -237,25 +236,14 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                     className="h-9 text-sm font-bold"
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Cheque Date
+                    Cheque Date (earliest date it can be deposited)
                   </Label>
                   <Input
                     type="date"
                     value={chequeDate}
                     onChange={(e) => setChequeDate(e.target.value)}
-                    className="h-9 text-sm font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Due Date
-                  </Label>
-                  <Input
-                    type="date"
-                    value={chequeDueDate}
-                    onChange={(e) => setChequeDueDate(e.target.value)}
                     className="h-9 text-sm font-bold"
                   />
                 </div>

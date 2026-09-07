@@ -23,6 +23,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import api from '@/lib/api';
+import OnlinePaymentFields, {
+  EMPTY_ONLINE_PAYMENT,
+  FeeQuote,
+  OnlinePaymentDetails,
+  onlinePaymentComplete,
+} from '@/components/payments/OnlinePaymentFields';
 import { toast } from 'sonner';
 import { Product } from '@/lib/product';
 import { SparePart } from '@/lib/spare-part';
@@ -79,6 +85,11 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMode, setPaymentMode] = useState<string>('CASH');
   const [paymentReference, setPaymentReference] = useState('');
+  // ONLINE_PAYMENT only. `cardDetails` never holds a PAN — OnlinePaymentFields derives
+  // the last four locally and discards the number.
+  const [cardDetails, setCardDetails] = useState<OnlinePaymentDetails>(EMPTY_ONLINE_PAYMENT);
+  const [cardQuote, setCardQuote] = useState<FeeQuote | null>(null);
+  const [, setCardQuoteError] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
   // Warranty states (for product sales) — business default: 2 years + 100,000 copies.
@@ -144,8 +155,35 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
     }
   };
 
+  /**
+   * Units already on the sale, keyed by product/spare-part id.
+   *
+   * Feeds ProductSelect so an item already in the cart is shown as "Already added" and
+   * greyed out — the Quotation form has always done this; Direct Sale never passed it,
+   * so nothing on screen distinguished the unit you had just picked from the rest of an
+   * identical-looking list.
+   */
+  const selectedQuantities = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const it of items) {
+      const id = it.itemType === 'PRODUCT' ? it.productId : it.sparePartId;
+      if (id) map[id] = (map[id] || 0) + (it.itemType === 'PRODUCT' ? 1 : it.quantity);
+    }
+    return map;
+  }, [items]);
+
   const handleAddItem = async (selected: SelectableItem) => {
     const isSparePart = 'part_name' in selected;
+
+    // A serialized machine is one physical unit — it cannot be on the sale twice. The
+    // database enforces this too (unique index on active allocations), but only after
+    // submit, as a 500; refusing it here keeps the cart honest while it is being built.
+    if (!isSparePart && items.some((it) => it.productId === selected.id)) {
+      toast.error('That machine is already on this sale', {
+        description: 'Each serial number can only be sold once — pick a different unit.',
+      });
+      return;
+    }
     let description = '';
     let unitPrice = 0;
     const itemKey = Math.random().toString(36).substring(2, 9);
@@ -399,6 +437,28 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
       }
     }
 
+    // A payment mode with no amount collects nothing. The sale still saves — it just
+    // saves as fully outstanding, with no receipt for Accounts to approve, which looks
+    // exactly like a payment that vanished. Catch it here: whoever picked a card and
+    // keyed in its details plainly meant to take money.
+    if (paymentAmount <= 0 && (paymentMode !== 'CASH' || paymentReference)) {
+      return toast.error(
+        `You selected ${paymentMode === 'ONLINE_PAYMENT' ? 'Online Payment' : paymentMode.replace('_', ' ').toLowerCase()} but left Amount Paid empty. ` +
+          'Enter the amount being collected, or switch the mode back to Cash to save this sale as unpaid.',
+      );
+    }
+
+    // Card payments need their issuer facts before they can be priced or posted. This
+    // mirrors the server's own validation so the salesperson is told here rather than
+    // after a failed round-trip.
+    if (paymentAmount > 0 && paymentMode === 'ONLINE_PAYMENT') {
+      if (!onlinePaymentComplete(cardDetails)) {
+        return toast.error(
+          'Complete the card details: payment type, issuing bank, network, card holder and the last 4 digits.',
+        );
+      }
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -411,6 +471,19 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
         paymentAmount: Number(paymentAmount) || 0,
         paymentMode: paymentAmount > 0 ? paymentMode : undefined,
         paymentReference: paymentAmount > 0 ? paymentReference : undefined,
+        // Card facts only. The commission is deliberately NOT sent: the server
+        // recomputes it from the configured agreement and ignores anything we claim.
+        ...(paymentAmount > 0 && paymentMode === 'ONLINE_PAYMENT'
+          ? {
+              cardType: cardDetails.cardType,
+              cardNetwork: cardDetails.cardNetwork,
+              issuerCountry: cardDetails.issuerCountry,
+              issuerBank: cardDetails.issuerBank,
+              cardLast4: cardDetails.cardLast4,
+              cardHolderName: cardDetails.cardHolderName.trim(),
+              transactionReference: cardDetails.transactionReference || undefined,
+            }
+          : {}),
         notes,
         // Warranty fields (only when at least one PRODUCT item)
         ...(items.some((it) => it.itemType === 'PRODUCT') && {
@@ -741,7 +814,8 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 <ProductSelect
                   onSelect={handleAddItem}
                   mode="BOTH"
-                  placeholder="Search product or spare part..."
+                  selectedQuantities={selectedQuantities}
+                  placeholder="Search by name, model or serial — add as many as you need"
                   className="rounded-lg border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 w-full"
                 />
               </div>
@@ -865,11 +939,26 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                                 }}
                               >
                                 <option value="">Select Serial</option>
-                                {availableProducts[item.key]?.map((p) => (
-                                  <option key={p.id} value={p.serial_no}>
-                                    {p.serial_no}
-                                  </option>
-                                ))}
+                                {availableProducts[item.key]
+                                  ?.filter(
+                                    // Hide serials already taken by another line. Two rows
+                                    // pointing at one machine passes the form but fails at
+                                    // the database's unique active-allocation index, so it
+                                    // must not be selectable in the first place.
+                                    (p) =>
+                                      p.serial_no === item.serialNumber ||
+                                      !items.some(
+                                        (other) =>
+                                          other.key !== item.key &&
+                                          other.itemType === 'PRODUCT' &&
+                                          other.serialNumber === p.serial_no,
+                                      ),
+                                  )
+                                  .map((p) => (
+                                    <option key={p.id} value={p.serial_no}>
+                                      {p.serial_no}
+                                    </option>
+                                  ))}
                               </select>
                             ) : (
                               <span className="text-slate-700 font-medium px-2 bg-slate-100 border border-slate-200 rounded-md text-xs py-1 select-all font-mono">
@@ -972,7 +1061,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                   <option value="CASH">Cash</option>
                   <option value="BANK_TRANSFER">Bank Transfer</option>
                   <option value="CHEQUE">Cheque</option>
-                  <option value="CREDIT_CARD">Credit Card</option>
+                  <option value="ONLINE_PAYMENT">Online Payment (Card)</option>
                 </select>
               </div>
               <div>
@@ -995,6 +1084,24 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
               </div>
             </div>
 
+            {/* Shown as soon as the mode is chosen. Gating this on an amount too meant
+                picking "Online Payment" appeared to do nothing until a figure was typed,
+                which is the wrong order — the card is in hand before the amount is. The
+                fee quote inside still waits for an amount, since it cannot be priced
+                without one. */}
+            {paymentMode === 'ONLINE_PAYMENT' && (
+              <OnlinePaymentFields
+                value={cardDetails}
+                onChange={setCardDetails}
+                amount={paymentAmount}
+                currency={currency}
+                onQuoteChange={(q, err) => {
+                  setCardQuote(q);
+                  setCardQuoteError(err);
+                }}
+              />
+            )}
+
             <div className="flex flex-col gap-2 pt-4 border-t border-slate-200">
               <div className="flex justify-between items-center text-sm text-slate-600">
                 <span>Total (Without Tax):</span>
@@ -1008,6 +1115,22 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                 <span>Grand Total (With Tax):</span>
                 <span>{formatCurrency(grandTotal, currency)}</span>
               </div>
+              {paymentMode === 'ONLINE_PAYMENT' && cardQuote && paymentAmount > 0 && (
+                <>
+                  <div className="flex justify-between items-center text-sm text-slate-500 pt-1 border-t border-dashed border-slate-200">
+                    <span>Card Processing Fee ({cardQuote.ratePercentApplied}%):</span>
+                    <span className="font-medium text-red-600">
+                      − {formatCurrency(cardQuote.commissionAmount, currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm text-slate-600">
+                    <span>Merchant Net Settlement:</span>
+                    <span className="font-semibold text-emerald-700">
+                      {formatCurrency(cardQuote.netSettlementAmount, currency)}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between items-center text-sm text-slate-500 pt-1 border-t border-dashed border-slate-200">
                 <span>Pending Balance:</span>
                 <span

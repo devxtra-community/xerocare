@@ -445,10 +445,13 @@ export default function AddPaymentModal({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold text-slate-500 uppercase">Due Date *</Label>
+                    <Label className="text-xs font-bold text-slate-500 uppercase">
+                      Cheque Date *
+                    </Label>
                     <Input
                       type="date"
                       required
+                      title="Earliest date the vendor can present this cheque"
                       className="h-10 text-xs border-slate-200"
                       value={chequeDueDate}
                       onChange={(e) => setChequeDueDate(e.target.value)}

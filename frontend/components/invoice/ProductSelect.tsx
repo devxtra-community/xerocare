@@ -94,8 +94,15 @@ export function ProductSelect({
       type = 'Spare Part';
       availableStock = typeof sp.quantity === 'number' ? sp.quantity : 999999;
     } else {
-      // Product
-      const baseLabel = `${item.name} ${item.model?.model_name ? `- ${item.model.model_name}` : ''}`;
+      // Product — the serial number is part of the label, not just the description.
+      //
+      // Every row here is one physical, serialized unit, so a branch holding fifteen of
+      // the same model produced fifteen options rendering as identical text. Choosing a
+      // second machine looked impossible: the list appeared to hold one product repeated,
+      // and nothing on screen distinguished the unit already added from the rest.
+      const baseLabel = `${item.name}${item.model?.model_name ? ` - ${item.model.model_name}` : ''}${
+        item.serial_no ? ` · ${item.serial_no}` : ''
+      }`;
 
       // Colorize brackets based on status
       let statusNode: React.ReactNode = null;
@@ -138,10 +145,27 @@ export function ProductSelect({
     const selectedQty = selectedQuantities?.[item.id] || 0;
     const isDisabled = selectedQty >= availableStock;
 
+    // Plain-text mirror of the label so the picker's search can actually match — name,
+    // model, serial/SKU and brand are all typed into that box in practice.
+    const searchText =
+      'part_name' in item
+        ? [
+            item.part_name,
+            item.sku,
+            (item as SparePart & { item_code?: string }).item_code,
+            item.lotNumber,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        : [item.name, item.model?.model_name, item.serial_no, item.brand, item.product_status]
+            .filter(Boolean)
+            .join(' ');
+
     return {
       value: item.id,
       label: label,
-      description: `${type} • ${getActiveCurrency()} ${price.toLocaleString()} • Available: ${availableStock}${selectedQty > 0 ? ` (Selected: ${selectedQty})` : ''}`,
+      searchText,
+      description: `${type} • ${getActiveCurrency()} ${price.toLocaleString()} • Available: ${availableStock}${selectedQty > 0 ? ` (Already added)` : ''}`,
       disabled: isDisabled,
     };
   });

@@ -31,6 +31,25 @@ export const uploadMeterImage = multer({
   }),
 });
 
+/**
+ * Fault evidence and install photos for a machine replacement. Several files per
+ * request, so it is used with .array() rather than .single(). Same public-read policy
+ * as meter images — the customer's own replacement report renders them.
+ */
+export const uploadReplacementPhotos = multer({
+  storage: multerS3({
+    s3: r2,
+    bucket: process.env.R2_BUCKET!,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: (req: Request, file, cb) => {
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${file.originalname}`;
+      cb(null, `replacements/${fileName}`);
+    },
+    acl: 'public-read',
+  }),
+  limits: { files: 8, fileSize: 10 * 1024 * 1024 },
+});
+
 export const uploadPaymentReceipt = multer({
   storage: multerS3({
     s3: r2,

@@ -151,7 +151,9 @@ export function QuotationConversionFlow({
   >('CASH');
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
-  const [chequeDueDate, setChequeDueDate] = useState('');
+  const [chequeReceivedDate, setChequeReceivedDate] = useState(
+    new Date().toISOString().split('T')[0],
+  );
   const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
   const paymentDate = new Date().toISOString().split('T')[0];
   const [remarks, setRemarks] = useState('');
@@ -181,7 +183,9 @@ export function QuotationConversionFlow({
   );
   const [cautionChequeNumber, setCautionChequeNumber] = useState('');
   const [cautionChequeBankName, setCautionChequeBankName] = useState('');
-  const [cautionChequeDueDate, setCautionChequeDueDate] = useState('');
+  const [cautionChequeReceivedDate, setCautionChequeReceivedDate] = useState(
+    new Date().toISOString().split('T')[0],
+  );
   const [cautionChequeDate, setCautionChequeDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -265,7 +269,10 @@ export function QuotationConversionFlow({
                   // Auto-generated server-side for non-Cheque modes (see
                   // billingHelpers.ts's generatePaymentReference) — nothing to send.
                   reference: undefined,
-                  receivedDate: paymentDate || new Date().toISOString().split('T')[0],
+                  receivedDate:
+                    (cautionMode === 'CHEQUE' ? cautionChequeReceivedDate : '') ||
+                    paymentDate ||
+                    new Date().toISOString().split('T')[0],
                 }
               : undefined,
         });
@@ -282,7 +289,8 @@ export function QuotationConversionFlow({
         await recordSalePayment(quotation.id, {
           amount: rentAdvancePortion + accessoryTotal,
           paymentMode: mode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
-          paymentDate,
+          // For a cheque, the date it was received from the customer.
+          paymentDate: (mode === 'CHEQUE' ? chequeReceivedDate : '') || paymentDate,
           // Auto-generated server-side for non-Cheque modes (see billingHelpers.ts's
           // generatePaymentReference) — nothing to send from here.
           referenceNumber: undefined,
@@ -291,7 +299,8 @@ export function QuotationConversionFlow({
             `Advance payment collected at conversion — Invoice ${quotation.invoiceNumber}`,
           chequeNumber: mode === 'CHEQUE' ? chequeNumber : undefined,
           chequeBankName: mode === 'CHEQUE' ? chequeBankName : undefined,
-          chequeDueDate: mode === 'CHEQUE' ? chequeDueDate : undefined,
+          // dueDate is a deprecated mirror of chequeDate server-side.
+          chequeDueDate: mode === 'CHEQUE' ? chequeDate : undefined,
           chequeDate: mode === 'CHEQUE' ? chequeDate : undefined,
         });
       }
@@ -305,14 +314,15 @@ export function QuotationConversionFlow({
         await recordSalePayment(quotation.id, {
           amount: Number(cautionAmount),
           paymentMode: cautionPayMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
-          paymentDate,
+          paymentDate:
+            (cautionPayMode === 'CHEQUE' ? cautionChequeReceivedDate : '') || paymentDate,
           // Auto-generated server-side for non-Cheque modes — nothing to send from here.
           referenceNumber: undefined,
           remarks: `Security Deposit collected at conversion — Invoice ${quotation.invoiceNumber}`,
           isSecurityDeposit: true,
           chequeNumber: cautionPayMode === 'CHEQUE' ? cautionChequeNumber : undefined,
           chequeBankName: cautionPayMode === 'CHEQUE' ? cautionChequeBankName : undefined,
-          chequeDueDate: cautionPayMode === 'CHEQUE' ? cautionChequeDueDate : undefined,
+          chequeDueDate: cautionPayMode === 'CHEQUE' ? cautionChequeDate : undefined,
           chequeDate: cautionPayMode === 'CHEQUE' ? cautionChequeDate : undefined,
         });
       }
@@ -638,24 +648,24 @@ export function QuotationConversionFlow({
                         </div>
                         <div>
                           <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                            Cheque Date *
+                            Cheque Received Date *
                           </Label>
                           <Input
                             type="date"
-                            value={chequeDate}
-                            onChange={(e) => setChequeDate(e.target.value)}
+                            value={chequeReceivedDate}
+                            onChange={(e) => setChequeReceivedDate(e.target.value)}
                             required
                             className="h-10 border-slate-200 font-bold text-xs"
                           />
                         </div>
                         <div>
                           <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                            Due Date *
+                            Cheque Date * (earliest deposit)
                           </Label>
                           <Input
                             type="date"
-                            value={chequeDueDate}
-                            onChange={(e) => setChequeDueDate(e.target.value)}
+                            value={chequeDate}
+                            onChange={(e) => setChequeDate(e.target.value)}
                             required
                             className="h-10 border-slate-200 font-bold text-xs"
                           />
@@ -769,24 +779,24 @@ export function QuotationConversionFlow({
                         </div>
                         <div>
                           <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                            Cheque Date *
+                            Cheque Received Date *
                           </Label>
                           <Input
                             type="date"
-                            value={cautionChequeDate}
-                            onChange={(e) => setCautionChequeDate(e.target.value)}
+                            value={cautionChequeReceivedDate}
+                            onChange={(e) => setCautionChequeReceivedDate(e.target.value)}
                             required
                             className="h-10 border-slate-200 font-bold text-xs"
                           />
                         </div>
                         <div>
                           <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                            Due Date *
+                            Cheque Date * (earliest deposit)
                           </Label>
                           <Input
                             type="date"
-                            value={cautionChequeDueDate}
-                            onChange={(e) => setCautionChequeDueDate(e.target.value)}
+                            value={cautionChequeDate}
+                            onChange={(e) => setCautionChequeDate(e.target.value)}
                             required
                             className="h-10 border-slate-200 font-bold text-xs"
                           />

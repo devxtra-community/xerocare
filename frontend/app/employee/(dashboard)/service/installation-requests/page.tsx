@@ -45,10 +45,13 @@ import {
   X,
   Warehouse as WarehouseIcon,
   ShieldCheck,
+  ClipboardCheck,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 import { ChangeMachineModal } from '@/components/employeeComponents/ChangeMachineModal';
+import { TechnicianReplacementsTab } from '@/components/replacement/TechnicianReplacementsTab';
 import { CollectSecurityDepositModal } from '@/components/employeeComponents/CollectSecurityDepositModal';
+import { InstallationReportModal } from '@/components/installation/InstallationReportModal';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
 
@@ -56,8 +59,15 @@ export default function InstallationRequestsPage() {
   // Vendor purchasing/contact info isn't relevant here (Service Desk); Lot info is
   // additionally hidden for Service Technicians specifically, who also use this page.
   const [isServiceTechnician, setIsServiceTechnician] = useState(false);
+  // The Replacement Requests tab lists replacement jobs assigned to the viewer as the
+  // swapping technician, so it is always empty for the Service Desk — whose own leg of
+  // that chain (confirm delivery, assign the technician) lives on the Machine
+  // Replacements page instead.
+  const [isServiceHelpDesk, setIsServiceHelpDesk] = useState(false);
   useEffect(() => {
-    setIsServiceTechnician(getUserFromToken()?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN);
+    const job = getUserFromToken()?.employeeJob;
+    setIsServiceTechnician(job === EmployeeJob.SERVICE_TECHNICIAN);
+    setIsServiceHelpDesk(job === EmployeeJob.SERVICE_HELP_DESK);
   }, []);
   const [requests, setRequests] = useState<InstallationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +84,9 @@ export default function InstallationRequestsPage() {
   const [readingDate, setReadingDate] = useState(new Date().toISOString().split('T')[0]);
   const [isSavingReading, setIsSavingReading] = useState(false);
   const [readingContract, setReadingContract] = useState<Invoice | null>(null);
+
+  // Installation report + customer sign-off (COMPLETED jobs only)
+  const [reportRequestId, setReportRequestId] = useState<string | null>(null);
 
   // Product view + Change Machine
   const [viewProductId, setViewProductId] = useState<string | null>(null);
@@ -262,6 +275,10 @@ export default function InstallationRequestsPage() {
     );
   };
 
+  // Technicians keep one destination: installations and replacement swaps are both
+  // "jobs assigned to me", so replacements are a tab here rather than a separate page.
+  const [jobTab, setJobTab] = useState<'installations' | 'replacements'>('installations');
+
   return (
     <div className="p-6 space-y-5">
       {/* Header */}
@@ -271,7 +288,9 @@ export default function InstallationRequestsPage() {
             Installation Requests
           </h1>
           <p className="text-xs text-slate-400 font-bold mt-0.5">
-            Track and manage product installation tasks
+            {jobTab === 'installations' || isServiceHelpDesk
+              ? 'Track and manage product installation tasks'
+              : 'Machine replacements assigned to you'}
           </p>
         </div>
         <Button
@@ -285,301 +304,348 @@ export default function InstallationRequestsPage() {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          {
-            label: 'Pending',
-            count: requests.filter((r) => r.status === 'PENDING').length,
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
-          },
-          {
-            label: 'Assigned',
-            count: requests.filter((r) => r.status === 'ASSIGNED').length,
-            color: 'text-blue-600',
-            bg: 'bg-blue-50',
-          },
-          {
-            label: 'In Progress',
-            count: requests.filter((r) => r.status === 'IN_PROGRESS').length,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-50',
-          },
-          {
-            label: 'Completed',
-            count: requests.filter((r) => r.status === 'COMPLETED').length,
-            color: 'text-slate-600',
-            bg: 'bg-slate-50',
-          },
-        ].map((s) => (
-          <div key={s.label} className={`${s.bg} rounded-2xl p-4 flex flex-col items-center gap-1`}>
-            <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-              {s.label}
-            </p>
+      {/* Job type tabs — a lone tab is just noise, so the bar only appears when the
+          viewer actually has a choice. */}
+      {!isServiceHelpDesk && (
+        <div className="flex gap-1 border-b border-slate-200">
+          {(
+            [
+              ['installations', 'Installations'],
+              ['replacements', 'Replacement Requests'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setJobTab(key)}
+              className={`px-4 py-2.5 text-sm font-bold transition-colors border-b-2 -mb-px ${
+                jobTab === key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {jobTab === 'replacements' && !isServiceHelpDesk && <TechnicianReplacementsTab />}
+
+      {(jobTab === 'installations' || isServiceHelpDesk) && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              {
+                label: 'Pending',
+                count: requests.filter((r) => r.status === 'PENDING').length,
+                color: 'text-amber-600',
+                bg: 'bg-amber-50',
+              },
+              {
+                label: 'Assigned',
+                count: requests.filter((r) => r.status === 'ASSIGNED').length,
+                color: 'text-blue-600',
+                bg: 'bg-blue-50',
+              },
+              {
+                label: 'In Progress',
+                count: requests.filter((r) => r.status === 'IN_PROGRESS').length,
+                color: 'text-emerald-600',
+                bg: 'bg-emerald-50',
+              },
+              {
+                label: 'Completed',
+                count: requests.filter((r) => r.status === 'COMPLETED').length,
+                color: 'text-slate-600',
+                bg: 'bg-slate-50',
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className={`${s.bg} rounded-2xl p-4 flex flex-col items-center gap-1`}
+              >
+                <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  {s.label}
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by invoice, customer, or technician..."
-          className="pl-9 h-9 border-slate-200 text-sm font-bold"
-        />
-      </div>
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by invoice, customer, or technician..."
+              className="pl-9 h-9 border-slate-200 text-sm font-bold"
+            />
+          </div>
 
-      <Card className="border-0 shadow-sm rounded-2xl">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-slate-400" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12">
-              <Wrench size={32} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-sm font-bold text-slate-500">No installation requests</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Requests appear here when created from Customer Contracts.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-slate-50/70">
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Invoice
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Type
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Customer
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Service Desk
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Warehouse
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Technician
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Status
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Duration
-                  </TableHead>
-                  <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Started
-                  </TableHead>
-                  <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Actions
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((req) => {
-                  const isActing = actionLoading === req.id;
-                  const liveSec = liveTimers[req.id];
-                  const isRentLease = req.saleType === 'RENT' || req.saleType === 'LEASE';
-                  return (
-                    <TableRow key={req.id} className="hover:bg-slate-50/50">
-                      <TableCell className="text-slate-800 text-sm">{req.invoiceNumber}</TableCell>
-                      <TableCell>
-                        {(() => {
-                          const type = req.saleType?.toUpperCase();
-                          if (type === 'SALE')
-                            return (
-                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">
-                                Sale
-                              </span>
-                            );
-                          if (type === 'RENT')
-                            return (
-                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700">
-                                Rent
-                              </span>
-                            );
-                          if (type === 'LEASE')
-                            return (
-                              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-700">
-                                Lease
-                              </span>
-                            );
-                          return <span className="text-slate-400 text-[11px]">—</span>;
-                        })()}
-                      </TableCell>
-                      <TableCell className="font-bold text-slate-600 text-sm">
-                        {req.customerName}
-                        {req.customerAddress && (
-                          <p className="text-[10px] text-slate-400">{req.customerAddress}</p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">
-                        {req.assignedByEmployeeName || '—'}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-500">
-                        {req.currentProductId && warehouseCache[req.currentProductId] ? (
-                          <span className="flex items-center gap-1">
-                            <WarehouseIcon size={11} className="text-slate-400" />
-                            {warehouseCache[req.currentProductId]}
-                          </span>
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell className="font-bold text-slate-600 text-sm">
-                        {req.technicianName || (
-                          <span className="text-slate-400 text-[11px]">Unassigned</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{statusBadge(req.status)}</TableCell>
-                      <TableCell className="font-bold text-slate-700">
-                        {req.status === 'IN_PROGRESS' && liveSec !== undefined ? (
-                          <span className="flex items-center gap-1 text-emerald-600">
-                            <Timer size={12} className="animate-pulse" />
-                            {formatDuration(liveSec)}
-                          </span>
-                        ) : req.durationSeconds ? (
-                          formatDuration(req.durationSeconds)
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell className="text-[11px] text-slate-500 font-bold">
-                        {req.startTime
-                          ? new Date(req.startTime).toLocaleString('en-GB', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleViewContract(req)}
-                            disabled={contractLoading === req.id}
-                            title="View contract"
-                            className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
-                          >
-                            {contractLoading === req.id ? (
-                              <Loader2 size={13} className="animate-spin" />
-                            ) : (
-                              <FileText size={13} />
+          <Card className="border-0 shadow-sm rounded-2xl">
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 size={24} className="animate-spin text-slate-400" />
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="text-center py-12">
+                  <Wrench size={32} className="mx-auto mb-3 text-slate-300" />
+                  <p className="text-sm font-bold text-slate-500">No installation requests</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Requests appear here when created from Customer Contracts.
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/70">
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Invoice
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Type
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Customer
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Service Desk
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Warehouse
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Technician
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Status
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Duration
+                      </TableHead>
+                      <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Started
+                      </TableHead>
+                      <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((req) => {
+                      const isActing = actionLoading === req.id;
+                      const liveSec = liveTimers[req.id];
+                      const isRentLease = req.saleType === 'RENT' || req.saleType === 'LEASE';
+                      return (
+                        <TableRow key={req.id} className="hover:bg-slate-50/50">
+                          <TableCell className="text-slate-800 text-sm">
+                            {req.invoiceNumber}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const type = req.saleType?.toUpperCase();
+                              if (type === 'SALE')
+                                return (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                                    Sale
+                                  </span>
+                                );
+                              if (type === 'RENT')
+                                return (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-100 text-blue-700">
+                                    Rent
+                                  </span>
+                                );
+                              if (type === 'LEASE')
+                                return (
+                                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-purple-100 text-purple-700">
+                                    Lease
+                                  </span>
+                                );
+                              return <span className="text-slate-400 text-[11px]">—</span>;
+                            })()}
+                          </TableCell>
+                          <TableCell className="font-bold text-slate-600 text-sm">
+                            {req.customerName}
+                            {req.customerAddress && (
+                              <p className="text-[10px] text-slate-400">{req.customerAddress}</p>
                             )}
-                          </Button>
-                          {req.currentProductId && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setViewProductId(req.currentProductId!)}
-                              title={`View product · ${req.currentSerialNumber ?? ''}`}
-                              className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-                            >
-                              <Eye size={13} />
-                            </Button>
-                          )}
-                          {/* Sale-only: Rent/Lease machines are replaced by Finance/Admin from the
-                              contract screen, so the meter readings needed for billing get captured. */}
-                          {req.currentProductId && req.status !== 'PENDING' && !isRentLease && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => {
-                                setSwapTarget(req);
-                                setSwapOpen(true);
-                              }}
-                              title="Change Machine"
-                              className="h-7 w-7 p-0 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
-                            >
-                              <RefreshCcw size={13} />
-                            </Button>
-                          )}
-                          {/* Sometimes the Employee doesn't collect the deposit at conversion —
-                              this is the fallback so it's never left uncollected indefinitely. */}
-                          {isRentLease &&
-                            (req.securityDepositAmount ?? 0) > 0 &&
-                            !req.securityDepositCollected && (
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600">
+                            {req.assignedByEmployeeName || '—'}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-500">
+                            {req.currentProductId && warehouseCache[req.currentProductId] ? (
+                              <span className="flex items-center gap-1">
+                                <WarehouseIcon size={11} className="text-slate-400" />
+                                {warehouseCache[req.currentProductId]}
+                              </span>
+                            ) : (
+                              '—'
+                            )}
+                          </TableCell>
+                          <TableCell className="font-bold text-slate-600 text-sm">
+                            {req.technicianName || (
+                              <span className="text-slate-400 text-[11px]">Unassigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{statusBadge(req.status)}</TableCell>
+                          <TableCell className="font-bold text-slate-700">
+                            {req.status === 'IN_PROGRESS' && liveSec !== undefined ? (
+                              <span className="flex items-center gap-1 text-emerald-600">
+                                <Timer size={12} className="animate-pulse" />
+                                {formatDuration(liveSec)}
+                              </span>
+                            ) : req.durationSeconds ? (
+                              formatDuration(req.durationSeconds)
+                            ) : (
+                              '—'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-[11px] text-slate-500 font-bold">
+                            {req.startTime
+                              ? new Date(req.startTime).toLocaleString('en-GB', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : '—'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => setDepositTarget(req)}
-                                title="Collect Security Deposit"
-                                className="h-7 w-7 p-0 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
+                                onClick={() => handleViewContract(req)}
+                                disabled={contractLoading === req.id}
+                                title="View contract"
+                                className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
                               >
-                                <ShieldCheck size={13} />
+                                {contractLoading === req.id ? (
+                                  <Loader2 size={13} className="animate-spin" />
+                                ) : (
+                                  <FileText size={13} />
+                                )}
                               </Button>
-                            )}
-                          {req.status === 'ASSIGNED' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleStart(req.id)}
-                              disabled={isActing}
-                              className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
-                            >
-                              {isActing ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <>
-                                  <Play size={10} className="mr-1" />
-                                  Start
-                                </>
+                              {req.currentProductId && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setViewProductId(req.currentProductId!)}
+                                  title={`View product · ${req.currentSerialNumber ?? ''}`}
+                                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
+                                >
+                                  <Eye size={13} />
+                                </Button>
                               )}
-                            </Button>
-                          )}
-                          {req.status === 'IN_PROGRESS' && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleCompleteClick(req)}
-                              disabled={isActing}
-                              className="h-7 bg-red-500 hover:bg-red-600 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
-                            >
-                              {isActing ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <>
-                                  {isRentLease ? (
-                                    <Gauge size={10} className="mr-1" />
+                              {/* Sale-only: Rent/Lease machines are replaced by Finance/Admin from the
+                              contract screen, so the meter readings needed for billing get captured. */}
+                              {req.currentProductId && req.status !== 'PENDING' && !isRentLease && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setSwapTarget(req);
+                                    setSwapOpen(true);
+                                  }}
+                                  title="Change Machine"
+                                  className="h-7 w-7 p-0 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+                                >
+                                  <RefreshCcw size={13} />
+                                </Button>
+                              )}
+                              {/* Sometimes the Employee doesn't collect the deposit at conversion —
+                              this is the fallback so it's never left uncollected indefinitely. */}
+                              {isRentLease &&
+                                (req.securityDepositAmount ?? 0) > 0 &&
+                                !req.securityDepositCollected && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setDepositTarget(req)}
+                                    title="Collect Security Deposit"
+                                    className="h-7 w-7 p-0 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
+                                  >
+                                    <ShieldCheck size={13} />
+                                  </Button>
+                                )}
+                              {req.status === 'ASSIGNED' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStart(req.id)}
+                                  disabled={isActing}
+                                  className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
+                                >
+                                  {isActing ? (
+                                    <Loader2 size={12} className="animate-spin" />
                                   ) : (
-                                    <Square size={10} className="mr-1" />
+                                    <>
+                                      <Play size={10} className="mr-1" />
+                                      Start
+                                    </>
                                   )}
-                                  {isRentLease ? 'Readings' : 'Complete'}
-                                </>
+                                </Button>
                               )}
-                            </Button>
-                          )}
-                          {req.status === 'COMPLETED' && (
-                            <span className="flex items-center gap-1 text-emerald-500">
-                              <CheckCircle2 size={14} />
-                              <span className="text-[10px] font-black">Done</span>
-                            </span>
-                          )}
-                          {req.status === 'PENDING' && (
-                            <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1">
-                              <Clock size={12} />
-                              Pending
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                              {req.status === 'IN_PROGRESS' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleCompleteClick(req)}
+                                  disabled={isActing}
+                                  className="h-7 bg-red-500 hover:bg-red-600 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
+                                >
+                                  {isActing ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <>
+                                      {isRentLease ? (
+                                        <Gauge size={10} className="mr-1" />
+                                      ) : (
+                                        <Square size={10} className="mr-1" />
+                                      )}
+                                      {isRentLease ? 'Readings' : 'Complete'}
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              {req.status === 'COMPLETED' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setReportRequestId(req.id)}
+                                  title="Installation report & customer signature"
+                                  className="h-7 w-7 p-0 text-violet-500 hover:text-violet-700 hover:bg-violet-50 rounded-lg"
+                                >
+                                  <ClipboardCheck size={14} />
+                                </Button>
+                              )}
+                              {req.status === 'COMPLETED' && (
+                                <span className="flex items-center gap-1 text-emerald-500">
+                                  <CheckCircle2 size={14} />
+                                  <span className="text-[10px] font-black">Done</span>
+                                </span>
+                              )}
+                              {req.status === 'PENDING' && (
+                                <span className="text-[10px] font-bold text-amber-500 flex items-center gap-1">
+                                  <Clock size={12} />
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       <ProductDetailModal
         productId={viewProductId}
@@ -616,6 +682,14 @@ export default function InstallationRequestsPage() {
             setDepositTarget(null);
             loadData();
           }}
+        />
+      )}
+
+      {reportRequestId && (
+        <InstallationReportModal
+          requestId={reportRequestId}
+          onClose={() => setReportRequestId(null)}
+          onSigned={loadData}
         />
       )}
 

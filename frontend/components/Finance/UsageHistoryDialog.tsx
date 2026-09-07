@@ -108,7 +108,9 @@ export default function UsageHistoryDialog({
   const fetchHistory = React.useCallback(() => {
     if (isOpen && contractId) {
       setLoading(true);
-      getUsageHistory(contractId)
+      // This screen renders bills, not meter periods, so it is the one caller that
+      // wants the ADVANCE / deposit rows too.
+      getUsageHistory(contractId, { includeAllBillTypes: true })
         .then((data) => setHistory(data))
         .catch((err) => {
           console.error('Failed to fetch usage history', err);
@@ -313,6 +315,9 @@ export default function UsageHistoryDialog({
                         <TableHead className="font-bold text-blue-400 text-right">
                           ADVANCE
                         </TableHead>
+                        <TableHead className="font-bold text-teal-300 text-right">
+                          DEPOSIT
+                        </TableHead>
                         <TableHead className="font-bold text-blue-400 text-right">TOTAL</TableHead>
                         <TableHead className="font-bold text-white text-center">APPROVAL</TableHead>
                         <TableHead className="font-bold text-white text-center rounded-tr-[1.5rem]">
@@ -324,21 +329,42 @@ export default function UsageHistoryDialog({
                       {paginatedHistory.map((record) => (
                         <TableRow
                           key={record.id}
-                          className="group border-b border-slate-50 last:border-0 hover:bg-blue-50/20 transition-all duration-300"
+                          className={`group border-b border-slate-50 last:border-0 transition-all duration-300 ${
+                            record.billType === 'ADVANCE'
+                              ? 'bg-indigo-50/40 hover:bg-indigo-50/70'
+                              : 'hover:bg-blue-50/20'
+                          }`}
                         >
                           <TableCell className="py-6 px-6">
                             <div className="flex flex-col">
-                              <span className="font-bold text-slate-900 text-sm">
-                                {formatDateLabel(record.periodStart, record.periodEnd)}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-black uppercase mt-0.5">
-                                {safeFormatDate(record.periodStart, 'MMMM yyyy')}
-                              </span>
+                              {record.billType === 'ADVANCE' ? (
+                                <>
+                                  <span className="font-bold text-indigo-900 text-sm">
+                                    First Month Advance
+                                  </span>
+                                  <span className="text-[10px] text-indigo-400 font-black uppercase mt-0.5">
+                                    Collected {safeFormatDate(record.periodStart, 'dd MMM yyyy')}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-bold text-slate-900 text-sm">
+                                    {formatDateLabel(record.periodStart, record.periodEnd)}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-black uppercase mt-0.5">
+                                    {safeFormatDate(record.periodStart, 'MMMM yyyy')}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </TableCell>
                           {!isCpc && !isEmiLease && (
                             <TableCell className="text-right font-bold text-slate-500">
-                              {record.freeLimit === 'No Free Limit' ? (
+                              {/* An advance bill has no meter period, so a free limit
+                                  would be meaningless here rather than merely zero. */}
+                              {record.billType === 'ADVANCE' ? (
+                                <span className="text-slate-300">—</span>
+                              ) : record.freeLimit === 'No Free Limit' ? (
                                 <span className="text-[10px] text-slate-300 italic">No Limit</span>
                               ) : (
                                 Number(record.freeLimit).toLocaleString()
@@ -348,91 +374,140 @@ export default function UsageHistoryDialog({
                           {!isEmiLease && (
                             <>
                               <TableCell className="text-right">
-                                <div className="flex flex-col items-end">
-                                  <span className="font-black text-slate-900 text-sm">
-                                    {record.totalUsage.toLocaleString()}
-                                  </span>
-                                  <span className="text-[9px] text-slate-400 font-bold uppercase">
-                                    Units
-                                  </span>
-                                </div>
+                                {record.billType === 'ADVANCE' ? (
+                                  <span className="text-slate-300">—</span>
+                                ) : (
+                                  <div className="flex flex-col items-end">
+                                    <span className="font-black text-slate-900 text-sm">
+                                      {record.totalUsage.toLocaleString()}
+                                    </span>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">
+                                      Units
+                                    </span>
+                                  </div>
+                                )}
                               </TableCell>
                               {!isCpc ? (
                                 <TableCell className="text-center">
-                                  <Badge
-                                    className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
-                                      record.exceededCount > 0
-                                        ? 'bg-orange-100 text-orange-700'
-                                        : 'bg-emerald-100 text-emerald-700'
-                                    }`}
-                                  >
-                                    {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
-                                  </Badge>
+                                  {record.billType === 'ADVANCE' ? (
+                                    <Badge className="rounded-full border-none bg-indigo-100 px-3 py-1 text-[10px] font-black text-indigo-700 shadow-sm">
+                                      ADVANCE
+                                    </Badge>
+                                  ) : (
+                                    <Badge
+                                      className={`rounded-full px-3 py-1 text-[10px] font-black border-none shadow-sm ${
+                                        record.exceededCount > 0
+                                          ? 'bg-orange-100 text-orange-700'
+                                          : 'bg-emerald-100 text-emerald-700'
+                                      }`}
+                                    >
+                                      {record.exceededCount > 0 ? 'EXCEEDED' : 'WITHIN LIMIT'}
+                                    </Badge>
+                                  )}
                                 </TableCell>
                               ) : (
                                 <TableCell className="text-right font-bold text-slate-700">
-                                  {(() => {
-                                    try {
-                                      const total = record.totalUsage;
-                                      // Basic logic to find which slab applied
-                                      // In CPC, record has bw/color delta. If combo, we use combo rule.
-                                      // Since UsageRecord doesn't easily map back to the individual rule used in the table here,
-                                      // we calculate a rough blended/applied rate string.
-                                      let appliedRateStr = '-';
-                                      let slabs: Array<{ from: number; to: number; rate: number }> =
-                                        [];
+                                  {record.billType === 'ADVANCE' ? (
+                                    <span className="text-slate-300">—</span>
+                                  ) : (
+                                    (() => {
+                                      try {
+                                        const total = record.totalUsage;
+                                        // Basic logic to find which slab applied
+                                        // In CPC, record has bw/color delta. If combo, we use combo rule.
+                                        // Since UsageRecord doesn't easily map back to the individual rule used in the table here,
+                                        // we calculate a rough blended/applied rate string.
+                                        let appliedRateStr = '-';
+                                        let slabs: Array<{
+                                          from: number;
+                                          to: number;
+                                          rate: number;
+                                        }> = [];
 
-                                      if (ruleItems.combo) {
-                                        slabs = ruleItems.combo.comboSlabRanges || [];
-                                      } else if (ruleItems.color && record.colorA4Delta > 0) {
-                                        slabs = ruleItems.color.colorSlabRanges || [];
-                                      } else if (ruleItems.bw) {
-                                        slabs = ruleItems.bw.bwSlabRanges || [];
-                                      }
-
-                                      if (slabs.length > 0) {
-                                        const sortedSlabs = [...slabs].sort(
-                                          (a, b) => a.from - b.from,
-                                        );
-                                        let applicableRate = sortedSlabs[0]?.rate || 0;
-                                        let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
-
-                                        for (const slab of sortedSlabs) {
-                                          if (total >= slab.from) {
-                                            applicableRate = slab.rate;
-                                            applicableRange =
-                                              slab.to === 9999999
-                                                ? `${slab.from}+`
-                                                : `${slab.from}-${slab.to}`;
-                                          }
+                                        if (ruleItems.combo) {
+                                          slabs = ruleItems.combo.comboSlabRanges || [];
+                                        } else if (ruleItems.color && record.colorA4Delta > 0) {
+                                          slabs = ruleItems.color.colorSlabRanges || [];
+                                        } else if (ruleItems.bw) {
+                                          slabs = ruleItems.bw.bwSlabRanges || [];
                                         }
-                                        appliedRateStr = `${getActiveCurrency()} ${applicableRate} (${applicableRange})`;
+
+                                        if (slabs.length > 0) {
+                                          const sortedSlabs = [...slabs].sort(
+                                            (a, b) => a.from - b.from,
+                                          );
+                                          let applicableRate = sortedSlabs[0]?.rate || 0;
+                                          let applicableRange = `${sortedSlabs[0]?.from || 0}-${sortedSlabs[0]?.to || 0}`;
+
+                                          for (const slab of sortedSlabs) {
+                                            if (total >= slab.from) {
+                                              applicableRate = slab.rate;
+                                              applicableRange =
+                                                slab.to === 9999999
+                                                  ? `${slab.from}+`
+                                                  : `${slab.from}-${slab.to}`;
+                                            }
+                                          }
+                                          appliedRateStr = `${getActiveCurrency()} ${applicableRate} (${applicableRange})`;
+                                        }
+                                        return appliedRateStr;
+                                      } catch {
+                                        return 'Slab-based';
                                       }
-                                      return appliedRateStr;
-                                    } catch {
-                                      return 'Slab-based';
-                                    }
-                                  })()}
+                                    })()
+                                  )}
                                 </TableCell>
                               )}
                               <TableCell className="text-right">
-                                <span className="font-black text-orange-600 text-sm">
-                                  {formatCurrency(Number(record.exceededAmount), currency)}
-                                </span>
+                                {record.billType === 'ADVANCE' ? (
+                                  <span className="text-slate-300">—</span>
+                                ) : (
+                                  <span className="font-black text-orange-600 text-sm">
+                                    {formatCurrency(Number(record.exceededAmount), currency)}
+                                  </span>
+                                )}
                               </TableCell>
                             </>
                           )}
 
                           <TableCell className="text-right font-bold text-slate-700">
-                            {formatCurrency(Number(record.rent), currency)}
+                            {record.billType === 'ADVANCE' ? (
+                              <span className="text-slate-300">—</span>
+                            ) : (
+                              formatCurrency(Number(record.rent), currency)
+                            )}
                           </TableCell>
                           {!isEmiLease && (
                             <TableCell className="text-right font-bold text-emerald-600">
-                              {formatCurrency(Number(record.discountAmount || 0), currency)}
+                              {record.billType === 'ADVANCE' ? (
+                                <span className="text-slate-300">—</span>
+                              ) : (
+                                formatCurrency(Number(record.discountAmount || 0), currency)
+                              )}
                             </TableCell>
                           )}
                           <TableCell className="text-right font-bold text-blue-600">
-                            {formatCurrency(Number(record.advanceAdjusted || 0), currency)}
+                            {/* This column is the advance CREDITED BACK on a period bill,
+                                not the advance itself — blank on the advance bill row. */}
+                            {record.billType === 'ADVANCE' ? (
+                              <span className="text-slate-300">—</span>
+                            ) : (
+                              formatCurrency(Number(record.advanceAdjusted || 0), currency)
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {Number(record.depositAmount || 0) > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="font-black text-sm text-teal-700">
+                                  {formatCurrency(Number(record.depositAmount), currency)}
+                                </span>
+                                <span className="text-[9px] font-bold uppercase text-teal-500">
+                                  Refundable
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right bg-blue-50/30 group-hover:bg-blue-100/50 transition-colors">
                             <span className="font-black text-blue-700 text-base">
@@ -517,20 +592,30 @@ export default function UsageHistoryDialog({
                                   <Send className="h-4 w-4" />
                                 )}
                               </Button>
-                              {history[0]?.id === record.id && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
-                                  onClick={() => {
-                                    setEditingRecord(record);
-                                    setIsEditModalOpen(true);
-                                  }}
-                                  title="Edit Usage Record"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
+                              {/* Editable only while the figures are still the company's
+                                  to change: the newest metered period, not an advance
+                                  bill, and not one the customer has already approved —
+                                  an approved bill is a document they signed off on.
+                                  A rejected bill stays editable so it can be corrected
+                                  and re-sent. Status is resolved the same way the
+                                  APPROVAL column resolves it. */}
+                              {history[0]?.id === record.id &&
+                                record.billType !== 'ADVANCE' &&
+                                (billByRecordId.get(record.id)?.billStatus || record.billStatus) !==
+                                  'CUSTOMER_APPROVED' && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
+                                    onClick={() => {
+                                      setEditingRecord(record);
+                                      setIsEditModalOpen(true);
+                                    }}
+                                    title="Edit Usage Record"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
                             </div>
                           </TableCell>
                         </TableRow>

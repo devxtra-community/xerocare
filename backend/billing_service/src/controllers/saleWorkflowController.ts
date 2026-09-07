@@ -7,8 +7,16 @@ import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
 import { ContractAgreement } from '../entities/contractAgreementEntity';
 import { InstallationRequest } from '../entities/installationRequestEntity';
+import {
+  getInstallationReportDetail,
+  stampReportGenerated,
+  issueInstallationSigningToken,
+  signInstallationReport,
+  resolveSigningToken,
+} from '../services/installationReportService';
 import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 import { Invoice } from '../entities/invoiceEntity';
+import { ExpenseEntry } from '../entities/expenseEntryEntity';
 import { InvoiceStatus } from '../entities/enums/invoiceStatus';
 import { DeliveryStatus } from '../entities/enums/deliveryStatus';
 import { InvoiceItem } from '../entities/invoiceItemEntity';
@@ -25,7 +33,15 @@ import {
 } from '../entities/guaranteeChequeEntity';
 import { UsageRecord } from '../entities/usageRecordEntity';
 import { r2 } from '../config/r2';
-import { createSalePaymentRequest } from '../services/salePaymentRequestService';
+import {
+  createSalePaymentRequest,
+  generateSalePaymentRequestNo,
+} from '../services/salePaymentRequestService';
+import {
+  computeBillSettlement,
+  isWrappedBill,
+  DEPOSIT_ADJUSTMENT_MODE,
+} from '../services/billOutstanding';
 import { requireCashAccount, postCashbookEntry } from '../services/cashbookService';
 
 import { logger } from '../config/logger';
@@ -615,9 +631,14 @@ async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: strin
 }
 
 async function loadBillForBranch(usageRecordId: string, branchId: string) {
+  // 'items.allocation' — each metered line's machine. Without it the bill's Meter
+  // Readings table had no serial number to print (it fell back to "Machine 1"), and no
+  // way to show that a machine was swapped mid-period: the allocation carries the swap
+  // date (endTimestamp on the outgoing unit, startTimestamp on its replacement) and the
+  // replacementOfAllocationId link between the two.
   const usage = await Source.getRepository(UsageRecord).findOne({
     where: { id: usageRecordId },
-    relations: ['items'],
+    relations: ['items', 'items.allocation'],
   });
   if (!usage) throw new AppError('Bill not found', 404);
   // 'items' + 'productAllocations' — the Advance Bill needs the machine's initial reading
@@ -1098,7 +1119,10 @@ export const getBillForSigning = async (req: Request, res: Response, next: NextF
   try {
     const token = req.params.token as string;
     const repo = Source.getRepository(UsageRecord);
-    const usage = await repo.findOne({ where: { signingToken: token }, relations: ['items'] });
+    const usage = await repo.findOne({
+      where: { signingToken: token },
+      relations: ['items', 'items.allocation'],
+    });
     if (!usage) throw new AppError('Invalid or expired bill link', 404);
     if (usage.signingTokenUsed) throw new AppError('This bill link has already been used', 410);
     if (usage.signingTokenExpiresAt && usage.signingTokenExpiresAt < new Date()) {
@@ -1318,33 +1342,29 @@ export const getBillsForContract = async (req: Request, res: Response, next: Nex
       .where('spr."usageRecordId" IN (:...ids)', { ids: usageRecordIds })
       .getMany();
 
-    const givenByUsageRecord = new Map<string, number>();
+    const paymentsByUsageRecord = new Map<string, SalePaymentRequest[]>();
     for (const p of payments) {
-      if (p.status === 'REJECTED' || !p.usageRecordId) continue;
-      givenByUsageRecord.set(
-        p.usageRecordId,
-        (givenByUsageRecord.get(p.usageRecordId) || 0) + Number(p.amount),
-      );
+      if (!p.usageRecordId) continue;
+      const list = paymentsByUsageRecord.get(p.usageRecordId) ?? [];
+      list.push(p);
+      paymentsByUsageRecord.set(p.usageRecordId, list);
     }
 
     const result = usageRecords.map((ur) => {
-      // Advance and Security Deposit Bills don't go through Stage B collection at all —
-      // that money was already collected via the separate RENT_ADVANCE/LEASE_ADVANCE or
-      // RENT_SECURITY_DEPOSIT/LEASE_SECURITY_DEPOSIT payment flow, so there's nothing for
-      // "Add Collect Amount" to apply to here; showing it as fully pending (the
-      // SalePaymentRequest.usageRecordId join below never matches either payment, since
-      // both are linked by invoiceId/paymentContext instead) would be actively misleading
-      // and risk a double-collection click.
-      const isWrappedPayment = ur.billType === 'ADVANCE' || ur.billType === 'SECURITY_DEPOSIT';
-      const given = isWrappedPayment ? Number(ur.totalCharge) : givenByUsageRecord.get(ur.id) || 0;
+      // Single source of truth — see billOutstanding.ts for why an ADVANCE /
+      // SECURITY_DEPOSIT bill is settled by definition.
+      const settlement = computeBillSettlement(ur, paymentsByUsageRecord.get(ur.id) ?? []);
       return {
         usageRecordId: ur.id,
         billType: ur.billType,
         billingPeriodStart: ur.billingPeriodStart,
         billingPeriodEnd: ur.billingPeriodEnd,
-        totalCharge: Number(ur.totalCharge),
-        amountGiven: given,
-        amountPending: isWrappedPayment ? 0 : Math.max(0, Number(ur.totalCharge) - given),
+        totalCharge: settlement.totalCharge,
+        amountGiven: settlement.collected,
+        amountPending: settlement.outstanding,
+        // Split out so the UI can say how much of "collected" was settled from the
+        // security deposit rather than actually received.
+        depositApplied: settlement.depositApplied,
         billStatus: ur.billStatus,
         billCreatedByName: ur.billCreatedByName,
         customerApprovedByName: ur.customerApprovedByName,
@@ -1788,6 +1808,21 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       collectLater,
       paymentContext,
       isSecurityDeposit,
+      // ONLINE_PAYMENT card facts. Note what is NOT read off the body: commissionAmount,
+      // commissionRateApplied and netSettlementAmount. Whatever the client believes the
+      // fee is, it is display-only — createSalePaymentRequest recomputes it from the
+      // configured rule and ignores any figure sent from outside. Note also what the
+      // client is not permitted to send at all: the PAN and the CVV.
+      cardType,
+      cardNetwork,
+      issuerCountry,
+      issuerBank,
+      cardLast4,
+      cardHolderName,
+      gatewayToken,
+      paymentGateway,
+      transactionChannel,
+      transactionReference,
     } = req.body;
 
     const request = await createSalePaymentRequest({
@@ -1807,6 +1842,16 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       chequeDate: chequeDate ? new Date(chequeDate) : undefined,
       collectLater,
       paymentContext,
+      cardType,
+      cardNetwork,
+      issuerCountry,
+      issuerBank,
+      cardLast4,
+      cardHolderName,
+      gatewayToken,
+      paymentGateway,
+      transactionChannel,
+      transactionReference,
     });
 
     // Soft, non-blocking heads-up only — never rejects the request. A legitimate
@@ -1861,6 +1906,37 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
   }
 };
 
+/**
+ * How a payment mode is named on a customer-facing receipt.
+ *
+ * `paymentMode.replace('_', ' ')` printed "ONLINE PAYMENT", which tells the customer
+ * nothing about which card was used; a card receipt has to identify the card, and
+ * identify it masked.
+ */
+function receiptModeLabel(mode: string): string {
+  if (mode === 'ONLINE_PAYMENT') return 'Online Payment (Card)';
+  return mode.replace(/_/g, ' ');
+}
+
+/**
+ * The card description printed on a receipt. Last four only — the full number is not
+ * stored anywhere in this system, so there is nothing else that could be printed.
+ */
+function receiptCardLine(request: {
+  issuerBank?: string;
+  cardNetwork?: string;
+  cardType?: string;
+  cardLast4?: string;
+}): string | null {
+  if (!request.cardLast4) return null;
+  const parts = [
+    request.issuerBank,
+    request.cardNetwork,
+    request.cardType === 'DEBIT' ? 'Debit' : request.cardType === 'CREDIT' ? 'Credit' : undefined,
+  ].filter(Boolean);
+  return `${parts.join(' ')} •••• ${request.cardLast4}`.trim();
+}
+
 export const approveSalePayment = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string; // salePaymentRequestId
@@ -1885,7 +1961,12 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
     const approvingCashAccountId: string | undefined =
       ((req.body ?? {}).cashAccountId as string | undefined) ?? request.cashAccountId ?? undefined;
 
-    if (['CASH', 'BANK_TRANSFER'].includes(request.paymentMode) && !approvingCashAccountId) {
+    // ONLINE_PAYMENT settles into a bank account exactly as a transfer does, so it needs
+    // an account just the same. Without it the old CREDIT_CARD mode fell through every
+    // branch below and approved with no cashbook entry at all — the money was recorded
+    // against the invoice but never landed anywhere.
+    const MODES_NEEDING_ACCOUNT = ['CASH', 'BANK_TRANSFER', 'ONLINE_PAYMENT'];
+    if (MODES_NEEDING_ACCOUNT.includes(request.paymentMode) && !approvingCashAccountId) {
       throw new AppError('Select a cash or bank account before approving this payment', 400);
     }
 
@@ -1894,12 +1975,78 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
     // account resolution below used to be a bare findOne with no type/branch check at
     // all, so a mismatched account (or one from a different branch) silently accepted
     // the approval and posted the cashbook entry against whatever it found.
-    if (['CASH', 'BANK_TRANSFER'].includes(request.paymentMode)) {
+    if (MODES_NEEDING_ACCOUNT.includes(request.paymentMode)) {
       await requireCashAccount(Source, {
         branchId: request.branchId,
         paymentMode: request.paymentMode,
         explicitAccountId: approvingCashAccountId,
       });
+    }
+
+    // ── Price the card, here at Accounts ──────────────────────────────────────
+    //
+    // Commission is settled at approval rather than at capture, because this is where
+    // it is actually known: the salesperson who swiped the card has no idea what the
+    // acquirer charges, whereas Finance does. Capture therefore records the card facts
+    // and leaves the fee unpriced; this recomputes from the merchant agreement now in
+    // force, so a rate added after the sale is still applied correctly.
+    //
+    // Finance may also override the rate on this one transaction — a bank sometimes
+    // bills a promotional or renegotiated percentage that is not yet on file — and
+    // whatever is applied is snapshotted onto the request and the transaction, so the
+    // receipt always shows the rate the money actually moved at.
+    if (request.paymentMode === 'ONLINE_PAYMENT') {
+      const body = req.body ?? {};
+      const overrideRate =
+        body.commissionRatePercent !== undefined && body.commissionRatePercent !== null
+          ? Number(body.commissionRatePercent)
+          : undefined;
+
+      if (overrideRate !== undefined) {
+        if (!Number.isFinite(overrideRate) || overrideRate < 0 || overrideRate > 100) {
+          throw new AppError('Commission rate must be between 0 and 100', 400);
+        }
+        const { percentOfMinor, toMinor, fromMinor } = await import('../utils/money');
+        const currency = request.currency || 'AED';
+        const grossMinor = toMinor(Number(request.amount), currency);
+        const feeMinor = Math.min(percentOfMinor(grossMinor, overrideRate), grossMinor);
+        request.commissionRateApplied = overrideRate;
+        request.commissionFixedApplied = 0;
+        request.commissionAmount = fromMinor(feeMinor, currency);
+        request.netSettlementAmount = fromMinor(grossMinor - feeMinor, currency);
+        request.commissionRuleId = undefined;
+        request.commissionRuleVersion = undefined;
+      } else {
+        const { findApplicableRule, applyRule } =
+          await import('../services/cardProcessingFeeService');
+        const rule = await findApplicableRule({
+          branchId: request.branchId,
+          issuerCountry: request.issuerCountry || '',
+          issuerBank: request.issuerBank,
+          cardType: request.cardType || '',
+          cardNetwork: request.cardNetwork,
+          paymentGateway: request.paymentGateway,
+          currency: request.currency || 'AED',
+          grossAmount: Number(request.amount),
+          onDate: new Date(request.paymentDate).toISOString().split('T')[0],
+        });
+        if (!rule) {
+          throw new AppError(
+            `No commission rate is on file for this ${request.cardType} ${request.cardNetwork} ` +
+              `card from ${request.issuerBank}. Add the bank's agreed rate under ` +
+              `Accounts → Card Processing Fees, or enter the rate on this approval to ` +
+              `apply it to this payment only.`,
+            400,
+          );
+        }
+        const priced = applyRule(rule, Number(request.amount), request.currency || 'AED');
+        request.commissionRateApplied = priced.ratePercentApplied;
+        request.commissionFixedApplied = priced.fixedFeeApplied;
+        request.commissionAmount = priced.commissionAmount;
+        request.netSettlementAmount = priced.netSettlementAmount;
+        request.commissionRuleId = priced.ruleId;
+        request.commissionRuleVersion = priced.ruleVersion;
+      }
     }
 
     const reviewerName = await fetchEmployeeName(userId);
@@ -1929,6 +2076,19 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
         // "paid" — see PaymentTransaction.isSecurityDeposit. Without it a deposit
         // reduced the customer's outstanding balance despite never being part of it.
         isSecurityDeposit: request.isSecurityDeposit === true,
+        // Card facts carried onto the transaction so settlement reporting can read them
+        // without joining back to the request. Last four only — never a PAN.
+        cardType: request.cardType,
+        cardNetwork: request.cardNetwork,
+        issuerCountry: request.issuerCountry,
+        issuerBank: request.issuerBank,
+        cardLast4: request.cardLast4,
+        cardHolderName: request.cardHolderName,
+        transactionReference: request.transactionReference,
+        commissionRateApplied: request.commissionRateApplied,
+        commissionAmount: request.commissionAmount,
+        netSettlementAmount: request.netSettlementAmount,
+        commissionRuleId: request.commissionRuleId,
       });
       const savedTxn = await queryRunner.manager.save(PaymentTransaction, txn);
 
@@ -1965,18 +2125,42 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
       // via the SalePaymentRequest row (status/amount) and, once approved, the
       // GuaranteeCheque or cashbook entry below — just never through this ledger.
       if (!request.isSecurityDeposit) {
+        // The overpayment ceiling must be what the customer has ACTUALLY been billed.
+        //
+        // Invoice.totalAmount is a running accumulator: usageService adds each period's
+        // charge to it as bills are raised, and adjusts it by a delta when a bill is
+        // corrected. That makes it fragile — it has no relationship to the bills once
+        // the two drift, and nothing anywhere reconciles them. Any interrupted write, or
+        // a bill amount changed by any route that does not go through updateUsageRecord,
+        // leaves it permanently wrong. When it drifts LOW the guard below rejects a
+        // perfectly legitimate periodic collection and tells Finance the payment is a
+        // duplicate, which is the opposite of the truth.
+        //
+        // So derive the real figure from the bills themselves and take whichever is
+        // higher. Deriving is self-correcting; taking the max never TIGHTENS the ceiling,
+        // so this cannot newly reject anything that was previously accepted, and genuine
+        // duplicates are still caught (paying the same bill twice still exceeds the sum
+        // of bills raised).
+        const billedRow = await queryRunner.manager
+          .createQueryBuilder(UsageRecord, 'ur')
+          .select('COALESCE(SUM(ur."totalCharge"), 0)', 'sum')
+          .where('ur."contractId" = :cid', { cid: request.invoiceId })
+          .getRawOne<{ sum: string }>();
+        const billedTotal = Number(billedRow?.sum ?? 0);
+        const effectiveTotal = Math.max(Number(inv.totalAmount), billedTotal);
+
         let ledger = await queryRunner.manager.findOne(InvoiceLedger, {
           where: { invoiceId: request.invoiceId },
         });
         if (!ledger) {
           ledger = queryRunner.manager.create(InvoiceLedger, {
             invoiceId: request.invoiceId,
-            totalAmount: Number(inv.totalAmount),
+            totalAmount: effectiveTotal,
             paidAmount: 0,
-            balanceAmount: Number(inv.totalAmount),
+            balanceAmount: effectiveTotal,
           });
         } else {
-          ledger.totalAmount = Number(inv.totalAmount);
+          ledger.totalAmount = effectiveTotal;
         }
         {
           const newPaidAmount = Number(ledger.paidAmount) + Number(request.amount);
@@ -2041,6 +2225,14 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
               currencyCode: request.currency,
               bankName: request.chequeBankName || 'N/A',
               receivedDate: new Date(request.paymentDate),
+              // The Cheque Date collected on the deposit form was being discarded here,
+              // so every security cheque landed immediately bankable regardless of the
+              // date written on it. Fall back to the payment date only when absent.
+              chequeDate: request.chequeDate
+                ? new Date(request.chequeDate)
+                : request.chequeDueDate
+                  ? new Date(request.chequeDueDate)
+                  : new Date(request.paymentDate),
               purpose: GuaranteeChequePurpose.PERFORMANCE_SECURITY,
               status: GuaranteeChequeStatus.RECEIVED,
               branchId: request.branchId,
@@ -2114,21 +2306,39 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
           logger.warn('Failed to create cheque entity for sale payment:', chequeErr);
         }
       } else if (approvingCashAccountId) {
-        // CASH / BANK_TRANSFER: post cashbook entry immediately. Type and branch were
-        // already validated above — re-fetch through the queryRunner so the balance
-        // update below is part of this same transaction and rolls back with it.
+        // CASH / BANK_TRANSFER / ONLINE_PAYMENT: post cashbook entry immediately. Type
+        // and branch were already validated above — re-fetch through the queryRunner so
+        // the balance update below is part of this same transaction and rolls back with
+        // it.
         const account = await queryRunner.manager.findOne(CashBankAccount, {
           where: { id: approvingCashAccountId },
         });
         if (account) {
+          // An acquirer deposits the settlement NET of its fee, so for a card payment
+          // the bank movement is the net, not the gross the customer paid. The gross is
+          // still what clears the customer's balance (the InvoiceLedger update above
+          // uses request.amount) and the difference is booked as an expense below —
+          // that three-way split is what makes gross − fee = net and
+          // AR-reduction = gross both hold at once.
+          const isOnlineCard = request.paymentMode === 'ONLINE_PAYMENT';
+          const commission = Number(request.commissionAmount ?? 0);
+          const bankMovement =
+            isOnlineCard &&
+            request.netSettlementAmount !== null &&
+            request.netSettlementAmount !== undefined
+              ? Number(request.netSettlementAmount)
+              : Number(request.amount);
+
           const entry = queryRunner.manager.create(CashbookEntry, {
             referenceNo: `CE-${request.requestNo}`,
             date: new Date(request.paymentDate),
             accountId: approvingCashAccountId,
             entryType: 'RECEIPT',
-            amount: request.amount,
+            amount: bankMovement,
             category: 'SALE_COLLECTION',
-            description: `Sale payment — ${request.invoiceNumber} (${request.customerName})`,
+            description: isOnlineCard
+              ? `Card settlement — ${request.invoiceNumber} (${request.customerName}) — gross ${request.amount}, fee ${commission}`
+              : `Sale payment — ${request.invoiceNumber} (${request.customerName})`,
             linkedInvoiceId: request.invoiceId,
             paymentMode: request.paymentMode,
             createdBy: userId,
@@ -2138,8 +2348,44 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
           });
           await queryRunner.manager.save(CashbookEntry, entry);
 
-          account.currentBalance = Number(account.currentBalance) + Number(request.amount);
+          account.currentBalance = Number(account.currentBalance) + bankMovement;
           await queryRunner.manager.save(CashBankAccount, account);
+
+          // The MDR itself, as a merchant expense against 5016 Card Processing Fees.
+          //
+          // Recorded APPROVED with no paidFrom on purpose: the money never left a bank
+          // account of ours, it was withheld at source, and the cashbook entry above is
+          // already net of it. Giving it a paidFrom would deduct the same fee a second
+          // time and put the bank balance out by the fee on every card sale.
+          if (isOnlineCard && commission > 0) {
+            const expenseNo = `CPF-${request.requestNo}`;
+            const already = await queryRunner.manager.findOne(ExpenseEntry, {
+              where: { expenseNo },
+            });
+            if (!already) {
+              const feeExpense = queryRunner.manager.create(ExpenseEntry, {
+                expenseNo,
+                date: new Date(request.paymentDate),
+                category: 'CARD_PROCESSING_FEE',
+                subCategory:
+                  `${request.cardNetwork ?? ''} ${request.cardType ?? ''}`.trim() || undefined,
+                description:
+                  `Card processing fee — ${request.invoiceNumber} (${request.customerName}) · ` +
+                  `${request.issuerBank ?? 'card'} ****${request.cardLast4 ?? ''} · ` +
+                  `${Number(request.commissionRateApplied ?? 0)}%`,
+                branchId: request.branchId,
+                amount: commission,
+                vatAmount: 0,
+                netAmount: commission,
+                currency: request.currency,
+                status: 'APPROVED',
+                referenceNo: request.transactionReference ?? request.referenceNumber,
+                approvedBy: userId,
+                createdBy: userId,
+              });
+              await queryRunner.manager.save(ExpenseEntry, feeExpense);
+            }
+          }
         }
       }
 
@@ -2194,6 +2440,282 @@ export const rejectSalePayment = async (req: Request, res: Response, next: NextF
 // /:id/return. This endpoint only ever handles the Cash/Bank case, which previously had
 // no refund path at all: an approved deposit's cash sat in the account balance forever
 // with no way to record giving it back to the customer.
+/**
+ * POST /sale-payments/:id/apply-deposit
+ *
+ * Settle an outstanding bill out of the security deposit already held — the normal way a
+ * contract ends when the customer does not pay the final month separately.
+ *
+ * This is NOT a refund and deliberately posts NO cashbook entry: no money moves. The
+ * deposit is a liability we are already sitting on, so applying it discharges that
+ * liability directly against the customer's receivable. Posting cash here would invent
+ * a second receipt for money that was banked when the deposit was first collected.
+ *
+ * What it does write:
+ *   - an APPROVED SalePaymentRequest against the target bill, so the bill's Collected /
+ *     Pending columns move (that is what getBillsForContract sums)
+ *   - a PaymentTransaction for the audit trail, is_security_deposit FALSE because this
+ *     row IS a payment now, not deposit money being held
+ *   - invoice_ledger.paidAmount, so Outstanding on the Receivable page drops
+ *   - appliedAmount on the deposit itself, which nets it off the balance-sheet deposit
+ *     liability and caps any later refund
+ */
+export const applySecurityDepositToBill = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const { userId, branchId, role } = req.user!;
+    const { usageRecordId, amount: requestedAmount, remarks } = req.body ?? {};
+
+    if (!['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      throw new AppError('Only Finance can apply a security deposit to a bill', 403);
+    }
+    if (!usageRecordId) throw new AppError('Select the bill to settle from the deposit', 400);
+
+    const repo = Source.getRepository(SalePaymentRequest);
+    const deposit = await repo.findOne({ where: { id } });
+    if (!deposit) throw new AppError('Payment request not found', 404);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && deposit.branchId !== branchId) {
+      throw new AppError('Access denied', 403);
+    }
+    if (!deposit.isSecurityDeposit)
+      throw new AppError('This payment is not a security deposit', 400);
+    if (deposit.status !== 'APPROVED') {
+      throw new AppError(
+        `Cannot apply a ${deposit.status} security deposit — it must be Approved (actually collected) first`,
+        400,
+      );
+    }
+    if (deposit.isRefunded) {
+      throw new AppError('This security deposit has already been refunded', 400);
+    }
+
+    const depositRemaining = Number(deposit.amount) - Number(deposit.appliedAmount ?? 0);
+    if (depositRemaining <= 0.001) {
+      throw new AppError('This security deposit has already been fully applied', 400);
+    }
+
+    // The bill must belong to the same contract — a deposit secures its own contract and
+    // can never be used to settle a different customer's balance.
+    const bill = await Source.getRepository(UsageRecord).findOne({ where: { id: usageRecordId } });
+    if (!bill) throw new AppError('Bill not found', 404);
+    if (bill.contractId !== deposit.invoiceId) {
+      throw new AppError('That bill belongs to a different contract', 400);
+    }
+    if (bill.billStatus !== 'CUSTOMER_APPROVED') {
+      throw new AppError(
+        'The customer must approve this bill before the deposit can be applied to it',
+        400,
+      );
+    }
+    // A wrapped bill (ADVANCE / SECURITY_DEPOSIT) was settled at signing — see
+    // billOutstanding.ts. Refused explicitly rather than relying on its outstanding
+    // computing to zero, so the message says why.
+    if (isWrappedBill(bill.billType)) {
+      throw new AppError(
+        'That bill was already settled when the contract was signed — a deposit can only be applied to a usage bill.',
+        400,
+      );
+    }
+
+    const { outstanding: billOutstanding } = computeBillSettlement(
+      bill,
+      await repo.find({ where: { usageRecordId } }),
+    );
+    if (billOutstanding <= 0.001) {
+      throw new AppError('That bill is already fully settled', 400);
+    }
+
+    // Never apply more than the deposit still holds, and never more than the bill owes —
+    // an over-application would create a credit balance out of a liability.
+    const capped = Math.min(depositRemaining, billOutstanding);
+    const applyAmount =
+      requestedAmount != null && Number(requestedAmount) > 0
+        ? Math.min(Number(requestedAmount), capped)
+        : capped;
+    if (applyAmount <= 0.001) throw new AppError('Nothing to apply', 400);
+
+    const applierName = await fetchEmployeeName(userId);
+    const note =
+      remarks?.trim() ||
+      `Settled from security deposit ${deposit.requestNo} — ${deposit.invoiceNumber}`;
+
+    await Source.transaction(async (m) => {
+      // 1 · the payment against the bill (drives the bill's Collected/Pending columns)
+      const settlement = m.create(SalePaymentRequest, {
+        requestNo: await generateSalePaymentRequestNo(),
+        invoiceId: deposit.invoiceId,
+        invoiceNumber: deposit.invoiceNumber,
+        branchId: deposit.branchId,
+        recordedByEmployeeId: userId,
+        recordedByEmployeeName: applierName,
+        customerName: deposit.customerName,
+        amount: applyAmount,
+        currency: deposit.currency,
+        // Not a cash/bank/cheque receipt — no money moved. Its own mode so it can never
+        // be mistaken for a banked collection in reporting or reconciliation.
+        paymentMode: DEPOSIT_ADJUSTMENT_MODE,
+        paymentDate: new Date(),
+        paymentContext: deposit.paymentContext?.startsWith('LEASE')
+          ? 'LEASE_PERIODIC'
+          : 'RENT_PERIODIC',
+        usageRecordId,
+        remarks: note,
+        status: 'APPROVED',
+        approvedById: userId,
+        approvedByName: applierName,
+        approvedAt: new Date(),
+        // FALSE on purpose: this row is the deposit being SPENT as payment, not deposit
+        // money being held. Leaving it true would re-exclude it from AR and from the
+        // ledger, so the outstanding would never actually come down.
+        isSecurityDeposit: false,
+      } as Partial<SalePaymentRequest>);
+      await m.save(SalePaymentRequest, settlement);
+
+      // 2 · audit trail on the invoice
+      await m.save(
+        m.create(PaymentTransaction, {
+          invoiceId: deposit.invoiceId,
+          transactionDate: new Date(),
+          paymentMode: 'SECURITY_DEPOSIT_ADJUSTMENT',
+          referenceNumber: settlement.requestNo,
+          amount: applyAmount,
+          recordedBy: userId,
+          remarks: note,
+          currencyCode: deposit.currency,
+          isSecurityDeposit: false,
+        } as Partial<PaymentTransaction>),
+      );
+
+      // 3 · Outstanding on the Receivable page
+      const ledger = await m.findOne(InvoiceLedger, { where: { invoiceId: deposit.invoiceId } });
+      if (ledger) {
+        ledger.paidAmount = Number(ledger.paidAmount) + applyAmount;
+        ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
+        await m.save(InvoiceLedger, ledger);
+      }
+
+      // 4 · the deposit itself — nets off the balance-sheet liability, caps any refund
+      deposit.appliedAmount = Number(deposit.appliedAmount ?? 0) + applyAmount;
+      deposit.appliedAt = new Date();
+      deposit.appliedById = userId;
+      deposit.appliedByName = applierName;
+      deposit.appliedToUsageRecordId = usageRecordId;
+      await m.save(SalePaymentRequest, deposit);
+    });
+
+    const refreshed = await repo.findOne({ where: { id } });
+    res.json({
+      success: true,
+      data: {
+        deposit: refreshed,
+        applied: applyAmount,
+        billOutstandingAfter: billOutstanding - applyAmount,
+        depositRemainingAfter: depositRemaining - applyAmount,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /sale-payments/:id/reverse-deposit-application
+ *
+ * Undo a deposit that was applied to the wrong bill. Finance picks the bill by hand, so
+ * getting it wrong is a matter of when, not if — without this the only remedy is editing
+ * the database, and a half-done manual reversal leaves the ledger, the bill and the
+ * deposit disagreeing with each other.
+ *
+ * Reverses exactly what applySecurityDepositToBill wrote, in the same transaction shape:
+ * the settlement is voided (REJECTED, not deleted — the audit trail of what happened is
+ * the point), its PaymentTransaction is flagged reversed, the ledger gives the money
+ * back, and the deposit's appliedAmount is released so it can be applied again or
+ * refunded.
+ */
+export const reverseDepositApplication = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const { userId, branchId, role } = req.user!;
+    const { remarks } = req.body ?? {};
+
+    if (!['FINANCE', 'ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      throw new AppError('Only Finance can reverse a deposit application', 403);
+    }
+
+    const repo = Source.getRepository(SalePaymentRequest);
+    const deposit = await repo.findOne({ where: { id } });
+    if (!deposit) throw new AppError('Payment request not found', 404);
+    if (!['ADMIN', 'SUPER_ADMIN'].includes(role) && deposit.branchId !== branchId) {
+      throw new AppError('Access denied', 403);
+    }
+    if (!deposit.isSecurityDeposit) {
+      throw new AppError('This payment is not a security deposit', 400);
+    }
+    if (Number(deposit.appliedAmount ?? 0) <= 0.001) {
+      throw new AppError('This deposit has not been applied to any bill', 400);
+    }
+
+    // Every settlement this deposit produced that is still live. Matched on the
+    // adjustment mode + this contract, so a normal cash collection is never touched.
+    const settlements = await repo.find({
+      where: {
+        invoiceId: deposit.invoiceId,
+        paymentMode: DEPOSIT_ADJUSTMENT_MODE,
+        status: 'APPROVED',
+      },
+    });
+    if (settlements.length === 0) {
+      throw new AppError('No live deposit settlement found to reverse', 400);
+    }
+
+    const reverserName = await fetchEmployeeName(userId);
+    const total = settlements.reduce((sum, s) => sum + Number(s.amount), 0);
+
+    await Source.transaction(async (m) => {
+      for (const s of settlements) {
+        s.status = 'REJECTED';
+        s.rejectionReason = remarks?.trim() || `Deposit application reversed by ${reverserName}`;
+        await m.save(SalePaymentRequest, s);
+
+        await m.update(
+          PaymentTransaction,
+          { referenceNumber: s.requestNo },
+          { isReversed: true, reversedById: userId },
+        );
+      }
+
+      const ledger = await m.findOne(InvoiceLedger, { where: { invoiceId: deposit.invoiceId } });
+      if (ledger) {
+        ledger.paidAmount = Math.max(0, Number(ledger.paidAmount) - total);
+        ledger.balanceAmount = Math.max(0, Number(ledger.totalAmount) - Number(ledger.paidAmount));
+        await m.save(InvoiceLedger, ledger);
+      }
+
+      deposit.appliedAmount = Math.max(0, Number(deposit.appliedAmount ?? 0) - total);
+      deposit.appliedToUsageRecordId = undefined;
+      deposit.appliedAt = undefined;
+      deposit.appliedById = undefined;
+      deposit.appliedByName = undefined;
+      await m.save(SalePaymentRequest, deposit);
+    });
+
+    res.json({
+      success: true,
+      data: { reversed: total, deposit: await repo.findOne({ where: { id } }) },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const refundSecurityDeposit = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -2232,6 +2754,17 @@ export const refundSecurityDeposit = async (req: Request, res: Response, next: N
       throw new AppError('Select a Cash/Bank account to refund the deposit from', 400);
     }
 
+    // Only the unapplied part is still the customer's money. Refunding the gross amount
+    // after part of it had already settled a final bill would pay the same money out
+    // twice — once as a bill settlement, once as cash.
+    const refundable = Number(request.amount) - Number(request.appliedAmount ?? 0);
+    if (refundable <= 0.001) {
+      throw new AppError(
+        'This deposit has already been fully applied to outstanding bills — there is nothing left to refund.',
+        400,
+      );
+    }
+
     const refunderName = await fetchEmployeeName(userId);
 
     // postCashbookEntry validates the account belongs to this branch, matches the
@@ -2242,7 +2775,7 @@ export const refundSecurityDeposit = async (req: Request, res: Response, next: N
     await postCashbookEntry({
       date: refundDate || new Date(),
       entryType: 'PAYMENT',
-      amount: Number(request.amount),
+      amount: refundable,
       category: 'SECURITY_DEPOSIT_REFUND',
       branchId: request.branchId,
       createdBy: userId,
@@ -2519,13 +3052,12 @@ export const getPendingUsagePayments = async (req: Request, res: Response, next:
       .where('spr."usageRecordId" IN (:...ids)', { ids: usageRecordIds })
       .getMany();
 
-    const givenByUsageRecord = new Map<string, number>();
+    const paymentsByUsageRecord = new Map<string, SalePaymentRequest[]>();
     for (const p of payments) {
-      if (p.status === 'REJECTED' || !p.usageRecordId) continue;
-      givenByUsageRecord.set(
-        p.usageRecordId,
-        (givenByUsageRecord.get(p.usageRecordId) || 0) + Number(p.amount),
-      );
+      if (!p.usageRecordId) continue;
+      const list = paymentsByUsageRecord.get(p.usageRecordId) ?? [];
+      list.push(p);
+      paymentsByUsageRecord.set(p.usageRecordId, list);
     }
 
     const result = usageRecords
@@ -2535,8 +3067,10 @@ export const getPendingUsagePayments = async (req: Request, res: Response, next:
       .filter((ur) => ur.billStatus === 'CUSTOMER_APPROVED')
       .map((ur) => {
         const invoice = invoiceMap.get(ur.contractId);
-        const given = givenByUsageRecord.get(ur.id) || 0;
-        const pending = Math.max(0, Number(ur.totalCharge) - given);
+        const { collected: given, outstanding: pending } = computeBillSettlement(
+          ur,
+          paymentsByUsageRecord.get(ur.id) ?? [],
+        );
         return {
           usageRecordId: ur.id,
           contractId: ur.contractId,
@@ -2741,7 +3275,7 @@ export const generateSalePaymentReceipt = async (
         'Amount:',
         `${request.currency} ${Number(request.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
       );
-      row('Payment Mode:', request.paymentMode.replace('_', ' '));
+      row('Payment Mode:', receiptModeLabel(request.paymentMode));
       row(
         'Payment Date:',
         new Date(request.paymentDate).toLocaleDateString('en-GB', {
@@ -2759,6 +3293,15 @@ export const generateSalePaymentReceipt = async (
           row('Cheque Date:', new Date(request.chequeDate).toLocaleDateString('en-GB'));
         if (request.chequeDueDate)
           row('Due Date:', new Date(request.chequeDueDate).toLocaleDateString('en-GB'));
+      } else if (request.paymentMode === 'ONLINE_PAYMENT') {
+        // The card, masked, and the approval code. The processing fee is deliberately
+        // absent: it is the merchant's cost, not a charge to the customer, and printing
+        // it on their receipt would imply they were billed it.
+        const cardLine = receiptCardLine(request);
+        if (cardLine) row('Card:', cardLine);
+        if (request.cardHolderName) row('Card Holder:', request.cardHolderName);
+        if (request.transactionReference) row('Approval Ref:', request.transactionReference);
+        if (request.referenceNumber) row('Reference No.:', request.referenceNumber);
       } else if (request.referenceNumber) {
         row('Reference No.:', request.referenceNumber);
       }
@@ -2857,7 +3400,7 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
       'Amount:',
       `${request.currency} ${Number(request.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
     );
-    row('Payment Mode:', request.paymentMode.replace('_', ' '));
+    row('Payment Mode:', receiptModeLabel(request.paymentMode));
     row(
       'Payment Date:',
       new Date(request.paymentDate).toLocaleDateString('en-GB', {
@@ -2870,6 +3413,10 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
     if (request.paymentMode === 'CHEQUE' && request.chequeNumber) {
       row('Cheque No.:', request.chequeNumber);
       if (request.chequeBankName) row('Bank:', request.chequeBankName);
+    } else if (request.paymentMode === 'ONLINE_PAYMENT') {
+      const cardLine = receiptCardLine(request);
+      if (cardLine) row('Card:', cardLine);
+      if (request.transactionReference) row('Approval Ref:', request.transactionReference);
     } else if (request.referenceNumber) {
       row('Reference No.:', request.referenceNumber);
     }
@@ -2978,11 +3525,21 @@ export const sendSalePaymentReceiptEmail = async (
     const contextLabel = request.paymentContext
       ? request.paymentContext.replace(/_/g, ' ')
       : 'Payment';
-    const modeLabel = request.paymentMode.replace('_', ' ');
+    const modeLabel = receiptModeLabel(request.paymentMode);
 
     const chequeBlock =
       request.paymentMode === 'CHEQUE' && request.chequeNumber
         ? `<tr><td style="padding:6px 12px;color:#92400e;font-weight:700">Cheque No.</td><td style="padding:6px 12px;font-weight:600">${request.chequeNumber}${request.chequeBankName ? ` — ${request.chequeBankName}` : ''}</td></tr>`
+        : '';
+
+    // Masked card identification only. The PAN is not stored, and the processing fee is
+    // the merchant's cost — neither belongs in the customer's inbox.
+    const cardBlock =
+      request.paymentMode === 'ONLINE_PAYMENT' && request.cardLast4
+        ? `<tr><td style="padding:6px 12px;color:#4338ca;font-weight:700">Card</td><td style="padding:6px 12px;font-weight:600">${receiptCardLine(request)}</td></tr>` +
+          (request.transactionReference
+            ? `<tr><td style="padding:6px 12px;color:#4338ca;font-weight:700">Approval Ref</td><td style="padding:6px 12px;font-weight:600">${request.transactionReference}</td></tr>`
+            : '')
         : '';
 
     const htmlBody = `
@@ -3001,6 +3558,7 @@ export const sendSalePaymentReceiptEmail = async (
       <tr style="background:#f3f4f6"><td style="padding:6px 12px;color:#6b7280;font-weight:700">Payment Date</td><td style="padding:6px 12px;font-weight:600">${paymentDate}</td></tr>
       ${request.referenceNumber && request.paymentMode !== 'CHEQUE' ? `<tr><td style="padding:6px 12px;color:#6b7280;font-weight:700">Reference</td><td style="padding:6px 12px;font-weight:600">${request.referenceNumber}</td></tr>` : ''}
       ${chequeBlock}
+      ${cardBlock}
       <tr style="background:#f3f4f6"><td style="padding:6px 12px;color:#6b7280;font-weight:700">Payment Type</td><td style="padding:6px 12px;font-weight:600">${contextLabel}</td></tr>
       <tr><td style="padding:6px 12px;color:#6b7280;font-weight:700">Approved by</td><td style="padding:6px 12px;font-weight:600">${request.reviewedByName || 'Finance'}</td></tr>
     </table>
@@ -3076,7 +3634,10 @@ export const sendSalePaymentReceiptWhatsApp = async (
       `Receipt No: ${request.requestNo}\n` +
       `Invoice: ${request.invoiceNumber}\n` +
       `Amount: ${amountFormatted}\n` +
-      `Mode: ${request.paymentMode.replace('_', ' ')}\n` +
+      `Mode: ${receiptModeLabel(request.paymentMode)}\n` +
+      (request.paymentMode === 'ONLINE_PAYMENT' && request.cardLast4
+        ? `Card: ${receiptCardLine(request)}\n`
+        : '') +
       `Date: ${paymentDate}\n` +
       `Type: ${contextLabel}\n` +
       `Approved by: ${request.reviewedByName || 'Finance'}\n\n` +
@@ -3092,6 +3653,93 @@ export const sendSalePaymentReceiptWhatsApp = async (
 
     logger.info(`[SalePayment] Receipt WhatsApp queued for ${request.requestNo} → ${recipient}`);
     res.json({ success: true, data: { message: 'Receipt WhatsApp queued', recipient } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── Installation Report & customer sign-off ─────────────────────────────────
+// The document the technician hands over at the end of the job, and the customer's
+// signature on it. Assembled live in installationReportService — see the note there on
+// why none of the report's content is persisted.
+
+/** GET /installation-requests/:id/report */
+export const getInstallationReport = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const detail = await getInstallationReportDetail(id);
+    await stampReportGenerated(id);
+    res.json({ success: true, data: detail });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** POST /installation-requests/:id/signing-token */
+export const generateInstallationSigningToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { token, expiresAt } = await issueInstallationSigningToken(req.params.id as string);
+    res.json({ success: true, data: { token, expiresAt } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** POST /installation-requests/:id/sign — technician's device, customer signs in person. */
+export const signInstallationReportInPerson = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { signatureName, signatureData, note } = req.body as Record<string, string>;
+    const updated = await signInstallationReport(req.params.id as string, {
+      signatureName,
+      signatureData,
+      note,
+      method: 'IN_PERSON',
+    });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** GET /installation/sign/:token — unauthenticated; the token is the credential. */
+export const getInstallationReportForSigning = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const request = await resolveSigningToken(req.params.token as string);
+    const detail = await getInstallationReportDetail(request.id);
+    res.json({ success: true, data: detail });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** POST /installation/sign/:token — customer signs from their own device. */
+export const signInstallationReportViaToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { signatureName, signatureData, note } = req.body as Record<string, string>;
+    const request = await resolveSigningToken(req.params.token as string);
+    const updated = await signInstallationReport(request.id, {
+      signatureName,
+      signatureData,
+      note,
+      method: 'REMOTE_LINK',
+    });
+    res.json({ success: true, data: { signedAt: updated.customerSignedAt } });
   } catch (err) {
     next(err);
   }

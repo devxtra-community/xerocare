@@ -79,6 +79,44 @@ export class InstallationRequest {
   @Column({ type: 'date', nullable: true })
   initialReadingTakenDate?: Date;
 
+  // ─── Installation report & customer sign-off ────────────────────────────────
+  // The report is generated on demand from live data, so nothing about its *content*
+  // is stored here — only the handover facts: that the customer saw it, who signed,
+  // and the signature itself.
+
+  /** Stamped the first time the report is opened, purely as an audit breadcrumb. */
+  @Column({ type: 'timestamp', nullable: true })
+  reportGeneratedAt?: Date;
+
+  /** Single-use, 72-hour token backing the public signing link. */
+  @Column({ type: 'varchar', nullable: true })
+  signingToken?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  signingTokenExpiresAt?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  signingTokenUsed!: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  customerSignedAt?: Date;
+
+  /** Printed name of whoever signed — may be an authorised representative, not the
+   *  contract's customerName, so it is captured separately rather than assumed. */
+  @Column({ type: 'varchar', nullable: true })
+  customerSignatureName?: string;
+
+  /** base64 PNG data URI, same convention as contractAgreementEntity's signatures. */
+  @Column({ type: 'text', nullable: true })
+  customerSignatureData?: string;
+
+  @Column({ type: 'text', nullable: true })
+  customerSignatureNote?: string;
+
+  /** 'IN_PERSON' (technician's device at handover) or 'REMOTE_LINK'. */
+  @Column({ type: 'varchar', nullable: true })
+  customerSignatureMethod?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

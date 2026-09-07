@@ -72,7 +72,9 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
   );
   const [depositRef, setDepositRef] = useState('');
   const [depositChequeBankName, setDepositChequeBankName] = useState('');
-  const [depositChequeDueDate, setDepositChequeDueDate] = useState('');
+  const [depositChequeReceivedDate, setDepositChequeReceivedDate] = useState(
+    new Date().toISOString().split('T')[0],
+  );
   const [depositChequeDate, setDepositChequeDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -302,10 +304,15 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
           amount: Number(depositAmount),
           mode: depositMode,
           reference: depositRef,
-          receivedDate: new Date().toISOString().split('T')[0],
+          // For a cheque this is the date it was received from the customer — the
+          // server stores it as the cheque's Received (collected) date.
+          receivedDate:
+            (depositMode === 'CHEQUE' ? depositChequeReceivedDate : '') ||
+            new Date().toISOString().split('T')[0],
           ...(depositMode === 'CHEQUE' && {
             chequeBankName: depositChequeBankName || undefined,
-            chequeDueDate: depositChequeDueDate || undefined,
+            // dueDate is a deprecated mirror of chequeDate server-side.
+            chequeDueDate: depositChequeDate || undefined,
             chequeDate: depositChequeDate || undefined,
           }),
         };
@@ -489,21 +496,27 @@ export function ActivateContractModal({ invoice, onClose, onSuccess }: ActivateC
                           </div>
                           <div className="space-y-1.5">
                             <Label className="text-xs text-slate-500">
-                              Cheque Date <span className="font-normal">(on the cheque)</span>
+                              Cheque Received Date{' '}
+                              <span className="font-normal">(received from customer)</span>
+                            </Label>
+                            <Input
+                              type="date"
+                              value={depositChequeReceivedDate}
+                              onChange={(e) => setDepositChequeReceivedDate(e.target.value)}
+                              className="bg-white"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-slate-500">
+                              Cheque Date{' '}
+                              <span className="font-normal">
+                                (earliest date it can be deposited)
+                              </span>
                             </Label>
                             <Input
                               type="date"
                               value={depositChequeDate}
                               onChange={(e) => setDepositChequeDate(e.target.value)}
-                              className="bg-white"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500">Cheque Due Date</Label>
-                            <Input
-                              type="date"
-                              value={depositChequeDueDate}
-                              onChange={(e) => setDepositChequeDueDate(e.target.value)}
                               className="bg-white"
                             />
                           </div>

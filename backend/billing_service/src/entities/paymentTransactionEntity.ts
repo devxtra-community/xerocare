@@ -88,4 +88,55 @@ export class PaymentTransaction {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
+
+  // ─── Online (card) payment snapshot ─────────────────────────────────────────
+  // Mirrored from the approved SalePaymentRequest so the settlement/reporting side can
+  // read card facts without joining back, exactly as it already does for amount and
+  // paymentMode. No PAN, no CVV — last four only.
+
+  @Column({ name: 'card_type', type: 'varchar', nullable: true })
+  cardType?: string;
+
+  @Column({ name: 'card_network', type: 'varchar', nullable: true })
+  cardNetwork?: string;
+
+  @Column({ name: 'issuer_country', type: 'varchar', length: 2, nullable: true })
+  issuerCountry?: string;
+
+  @Column({ name: 'issuer_bank', type: 'varchar', nullable: true })
+  issuerBank?: string;
+
+  @Column({ name: 'card_last4', type: 'varchar', length: 4, nullable: true })
+  cardLast4?: string;
+
+  @Column({ name: 'card_holder_name', type: 'varchar', nullable: true })
+  cardHolderName?: string;
+
+  @Column({ name: 'transaction_reference', type: 'varchar', nullable: true })
+  transactionReference?: string;
+
+  @Column({
+    name: 'commission_rate_applied',
+    type: 'decimal',
+    precision: 6,
+    scale: 4,
+    nullable: true,
+  })
+  commissionRateApplied?: number;
+
+  @Column({ name: 'commission_amount', type: 'decimal', precision: 12, scale: 3, nullable: true })
+  commissionAmount?: number;
+
+  /** amount − commissionAmount: what the acquirer actually deposits. */
+  @Column({
+    name: 'net_settlement_amount',
+    type: 'decimal',
+    precision: 12,
+    scale: 3,
+    nullable: true,
+  })
+  netSettlementAmount?: number;
+
+  @Column({ name: 'commission_rule_id', type: 'uuid', nullable: true })
+  commissionRuleId?: string;
 }

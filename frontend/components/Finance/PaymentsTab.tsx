@@ -563,7 +563,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                       'Vendor / Bank',
                       'Amount',
                       'Cheque Date',
-                      'Due Date',
+                      'Issued Date',
                       'Status',
                       'Actions',
                     ].map((h) => (
@@ -602,14 +602,14 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                           <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap">
                             {formatCurrency(c.amount, currency)}
                           </td>
-                          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                            {c.issueDate ? String(c.issueDate).slice(0, 10) : '—'}
-                          </td>
                           <td
                             className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-500'}`}
                           >
-                            {String(c.dueDate).slice(0, 10)}
+                            {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
                             {isOverdue && <span className="ml-1 text-red-500">⚠</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                            {c.issueDate ? String(c.issueDate).slice(0, 10) : '—'}
                           </td>
                           <td className="px-4 py-3">
                             <span

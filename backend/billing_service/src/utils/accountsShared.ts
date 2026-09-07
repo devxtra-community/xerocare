@@ -68,6 +68,9 @@ export interface PnLResult {
   otherExpenses: number;
   importLabourCost: number; // 5014: purchase-side labour_cost (e.g. import/customs-clearance) — distinct from 5002
   customsDuty: number; // 5015: purchases.customs_duty, expensed directly (not capitalized into inventory)
+  /** 5016 — the MDR an acquirer deducts from a card settlement. A merchant cost, never
+   *  a customer charge, so it reduces profit without touching the invoice or the AR. */
+  cardProcessingFees: number;
   otherIncome: number; // 4008 catch-all: income_entries rows not yet linked to a custom account
   totalExpenses: number;
 
@@ -927,6 +930,7 @@ export async function computeProfitAndLoss(
   // Purchase Cost / VAT reverse-charge reports (ven_inv_service) read customs_duty directly
   // from the purchases table and are unaffected by this — they're informational, not P&L.
   const customsDuty = expMap['CUSTOMS_DUTY'] ?? 0;
+  const cardProcessingFees = expMap['CARD_PROCESSING_FEE'] ?? 0;
 
   const salaryExpense = expMap['SALARY'] ?? 0;
   const travelExpense = expMap['TRAVEL'] ?? 0;
@@ -950,6 +954,7 @@ export async function computeProfitAndLoss(
     'INSURANCE',
     'IMPORT_LABOUR',
     'CUSTOMS_DUTY',
+    'CARD_PROCESSING_FEE',
     'OTHER',
   ]);
 
@@ -1050,6 +1055,7 @@ export async function computeProfitAndLoss(
     insuranceExpense +
     importLabourCost +
     customsDuty +
+    cardProcessingFees +
     stockWriteOff +
     otherExpenses +
     customExpenseTotal;
@@ -1109,6 +1115,7 @@ export async function computeProfitAndLoss(
     insuranceExpense,
     importLabourCost,
     customsDuty,
+    cardProcessingFees,
     otherIncome,
     otherExpenses,
     customIncome: customIncomeBreakdown,
@@ -1279,6 +1286,12 @@ export async function computeBalanceSheet(
           SELECT "invoice_id" AS invoice_id, SUM(amount) AS paid
           FROM payment_transactions
           WHERE is_security_deposit = FALSE
+            -- A reversed transaction is money that was un-taken: the row is kept for the
+            -- audit trail, never counted. Omitting this made every reversal permanently
+            -- understate Receivable (and therefore Assets) by its amount, with no way to
+            -- notice — the entity defines is_reversed for exactly this purpose and every
+            -- other consumer honours it.
+            AND COALESCE(is_reversed, FALSE) = FALSE
           GROUP BY "invoice_id"
           UNION ALL
           SELECT "invoiceId" AS invoice_id, SUM("amountPaid") AS paid
@@ -1382,7 +1395,15 @@ export async function computeBalanceSheet(
     // advances query below, for the same reason).
     db.query<CcyRow[]>(`
       SELECT COALESCE(i."currency_code", '${baseCurrency}') AS currency_code,
-             COALESCE(SUM(spr.amount), 0) AS amount
+             -- Only the part still HELD is a liability. A refunded deposit was paid back
+             -- (cash already left), and an applied one was consumed settling the
+             -- customer's own bill — carrying either at face value overstated what we
+             -- owe. isRefunded was never netted off here at all, so a fully refunded
+             -- deposit sat on the balance sheet forever.
+             COALESCE(SUM(
+               CASE WHEN spr."isRefunded" THEN 0
+                    ELSE spr.amount - COALESCE(spr."appliedAmount", 0) END
+             ), 0) AS amount
       FROM sale_payment_requests spr
       JOIN invoices i ON i.id = spr."invoiceId"
       WHERE spr.status = 'APPROVED'

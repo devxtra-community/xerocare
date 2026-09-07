@@ -102,4 +102,29 @@ export class UsageRepository {
       },
     });
   }
+
+  /**
+   * Every bill raised against a contract, whatever its type — the DISPLAY counterpart to
+   * getUsageHistory above.
+   *
+   * The Usage History screen is the customer-facing audit of a contract, so it must show
+   * the ADVANCE bill (first month's rent + security deposit, collected at conversion)
+   * alongside the metered periods. getUsageHistory deliberately cannot: its billType
+   * filter exists to stop the advance bill's all-zero placeholder readings being mistaken
+   * for a prior meter period, and every calculation caller depends on that. Hence a
+   * separate method rather than a flag — the two want genuinely different row sets, and
+   * mixing them is what caused the bug that filter was added to fix.
+   *
+   * Callers MUST NOT feed non-USAGE rows into meter-delta or period-sequence logic.
+   */
+  getBillHistory(contractId: string, order: 'ASC' | 'DESC' = 'DESC') {
+    return this.repo.find({
+      where: { contractId },
+      relations: ['items', 'items.allocation'],
+      order: {
+        billingPeriodStart: order,
+        createdAt: order,
+      },
+    });
+  }
 }

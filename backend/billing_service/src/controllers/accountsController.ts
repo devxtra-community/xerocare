@@ -2741,6 +2741,7 @@ export const getProfitLoss = async (req: Request, res: Response, next: NextFunct
       INSURANCE: pl.insuranceExpense,
       IMPORT_LABOUR: pl.importLabourCost,
       CUSTOMS_DUTY: pl.customsDuty,
+      CARD_PROCESSING_FEE: pl.cardProcessingFees,
       OTHER: pl.otherExpenses,
     };
     // Custom (non-system) expense accounts — same reasoning as revenueByType above.
@@ -3694,6 +3695,7 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
       insuranceExpense,
       importLabourCost,
       customsDuty,
+      cardProcessingFees,
       otherIncome,
       otherExpenses,
       customIncome,
@@ -3941,6 +3943,12 @@ export const getChartOfAccounts = async (req: Request, res: Response, next: Next
             currency,
           ),
           customsDuty: makeAccountBalance('5015', 'Customs Duty', customsDuty, currency),
+          cardProcessingFees: makeAccountBalance(
+            '5016',
+            'Card Processing Fees',
+            cardProcessingFees,
+            currency,
+          ),
           custom: shapeCustom(customExpenses),
           totalExpenses: +totalExpenses.toFixed(2),
         },

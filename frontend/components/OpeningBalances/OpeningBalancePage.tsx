@@ -193,7 +193,8 @@ export default function OpeningBalancePage() {
       if (paymentForm.paymentMode === 'CHEQUE') {
         payload.chequeNumber = paymentForm.chequeNumber || undefined;
         payload.chequeBankName = paymentForm.chequeBankName || undefined;
-        payload.chequeDueDate = paymentForm.chequeDueDate || undefined;
+        // dueDate is a deprecated mirror of chequeDate server-side.
+        payload.chequeDueDate = paymentForm.chequeDate || undefined;
         payload.chequeDate = paymentForm.chequeDate || undefined;
       }
       await recordOpeningBalancePayment(paymentEntry.id, payload);
@@ -1255,7 +1256,7 @@ export default function OpeningBalancePage() {
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  Payment Date
+                  {paymentForm.paymentMode === 'CHEQUE' ? 'Cheque Received Date' : 'Payment Date'}
                 </label>
                 <Input
                   type="date"
@@ -1344,26 +1345,13 @@ export default function OpeningBalancePage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Cheque Date
+                      Cheque Date (earliest deposit)
                     </label>
                     <Input
                       type="date"
                       value={paymentForm.chequeDate || ''}
                       onChange={(e) =>
                         setPaymentForm({ ...paymentForm, chequeDate: e.target.value })
-                      }
-                      className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      Due / Clear Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={paymentForm.chequeDueDate || ''}
-                      onChange={(e) =>
-                        setPaymentForm({ ...paymentForm, chequeDueDate: e.target.value })
                       }
                       className="h-11 rounded-xl bg-slate-50 dark:bg-slate-800 border-none text-sm"
                     />

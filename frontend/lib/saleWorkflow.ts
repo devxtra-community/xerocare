@@ -90,7 +90,7 @@ export interface SalePaymentRequest {
   customerName: string;
   amount: number;
   currency: string;
-  paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+  paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT';
   paymentDate: string;
   referenceNumber?: string;
   remarks?: string;
@@ -99,6 +99,36 @@ export interface SalePaymentRequest {
   chequeBankName?: string;
   chequeDueDate?: string;
   chequeDate?: string;
+
+  /** Security deposit consumed settling outstanding bills. The refundable balance is
+   *  amount - appliedAmount. */
+  appliedAmount?: number;
+  appliedAt?: string;
+  appliedByName?: string;
+  appliedToUsageRecordId?: string;
+
+  // ── ONLINE_PAYMENT (card) ──────────────────────────────────────────────────
+  // Structured card facts, so settlement reporting can group by issuer, network or
+  // country rather than parsing a display string. There is deliberately no field for
+  // the card number or the CVV: the server stores neither, so neither can arrive here.
+  cardType?: 'DEBIT' | 'CREDIT';
+  cardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'UNIONPAY' | 'MADA' | 'KNET' | 'OTHER';
+  issuerCountry?: string;
+  issuerBank?: string;
+  /** Last four digits only — the display masks everything before them. */
+  cardLast4?: string;
+  cardHolderName?: string;
+  transactionReference?: string;
+  paymentGateway?: string;
+  /** MDR snapshot: what was actually charged, at the rate in force that day. Server
+   *  computed — a client-supplied figure is ignored on the way in. */
+  commissionRateApplied?: number;
+  commissionFixedApplied?: number;
+  commissionAmount?: number;
+  /** amount − commissionAmount: what the acquirer actually deposits. */
+  netSettlementAmount?: number;
+  commissionRuleId?: string;
+  commissionRuleVersion?: number;
   receiptUrl?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   reviewedById?: string;
@@ -431,7 +461,7 @@ export const recordSalePayment = async (
   invoiceId: string,
   data: {
     amount: number;
-    paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE';
+    paymentMode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT';
     paymentDate: string;
     referenceNumber?: string;
     remarks?: string;
@@ -443,6 +473,17 @@ export const recordSalePayment = async (
     collectLater?: boolean;
     paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
     isSecurityDeposit?: boolean;
+
+    // ONLINE_PAYMENT only. Card facts, never the PAN or the CVV — and deliberately no
+    // commission field: the server prices the card itself and ignores any figure sent
+    // from here, so there is nothing for a caller to get wrong or to forge.
+    cardType?: 'DEBIT' | 'CREDIT' | '';
+    cardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'UNIONPAY' | 'MADA' | 'KNET' | 'OTHER' | '';
+    issuerCountry?: string;
+    issuerBank?: string;
+    cardLast4?: string;
+    cardHolderName?: string;
+    transactionReference?: string;
   },
 ): Promise<SalePaymentRequest> => {
   const res = await api.post<ApiResponse<SalePaymentRequest>>(
@@ -460,10 +501,19 @@ export const recordSalePayment = async (
 export const approveSalePayment = async (
   requestId: string,
   cashAccountId?: string,
+  /** Card payments only. Overrides the configured merchant rate for this one
+   *  transaction — for a promotional or renegotiated percentage not yet on file. Left
+   *  undefined, the server prices the card from the rule in force. The server clamps
+   *  and recomputes the amount either way; only a percentage is accepted here, never a
+   *  commission figure. */
+  commissionRatePercent?: number,
 ): Promise<SalePaymentRequest> => {
   const res = await api.post<ApiResponse<SalePaymentRequest>>(
     `/b/sale-payments/${requestId}/approve`,
-    cashAccountId ? { cashAccountId } : {},
+    {
+      ...(cashAccountId ? { cashAccountId } : {}),
+      ...(commissionRatePercent !== undefined ? { commissionRatePercent } : {}),
+    },
   );
   return res.data.data;
 };
@@ -489,6 +539,42 @@ export const refundSecurityDeposit = async (
   const res = await api.post<ApiResponse<SalePaymentRequest>>(
     `/b/sale-payments/${requestId}/refund-deposit`,
     data,
+  );
+  return res.data.data;
+};
+
+/** Settle an outstanding bill out of the security deposit already held (contract end).
+ *  Moves no cash — it discharges the deposit liability straight against the customer's
+ *  receivable, so Outstanding drops without a second receipt being invented. */
+export const applySecurityDepositToBill = async (
+  requestId: string,
+  data: { usageRecordId: string; amount?: number; remarks?: string },
+): Promise<{
+  deposit: SalePaymentRequest;
+  applied: number;
+  billOutstandingAfter: number;
+  depositRemainingAfter: number;
+}> => {
+  const res = await api.post<
+    ApiResponse<{
+      deposit: SalePaymentRequest;
+      applied: number;
+      billOutstandingAfter: number;
+      depositRemainingAfter: number;
+    }>
+  >(`/b/sale-payments/${requestId}/apply-deposit`, data);
+  return res.data.data;
+};
+
+/** Undo a deposit that was applied to the wrong bill — voids the settlement, gives the
+ *  ledger its money back and releases the deposit so it can be applied again. */
+export const reverseDepositApplication = async (
+  requestId: string,
+  data?: { remarks?: string },
+): Promise<{ reversed: number; deposit: SalePaymentRequest }> => {
+  const res = await api.post<ApiResponse<{ reversed: number; deposit: SalePaymentRequest }>>(
+    `/b/sale-payments/${requestId}/reverse-deposit-application`,
+    data ?? {},
   );
   return res.data.data;
 };
@@ -601,7 +687,20 @@ export interface Bill {
   customerRejectedAt?: string;
   items?: Array<{
     allocationId: string;
-    allocation?: { serialNumber: string; modelId: string };
+    allocation?: {
+      serialNumber: string;
+      modelId: string;
+      /** ALLOCATED | RETURNED | REPLACED — REPLACED marks the outgoing machine. */
+      status?: string;
+      /** When this machine went on the contract. On a replacement unit this is the
+       *  moment the swap happened. */
+      startTimestamp?: string;
+      /** When it came off. On a replaced machine this is the swap date. */
+      endTimestamp?: string | null;
+      /** Set on the incoming unit, pointing at the allocation it replaced. */
+      replacementOfAllocationId?: string | null;
+      replacementReason?: string | null;
+    };
     startBwA4: number;
     endBwA4: number;
     deltaBwA4: number;
@@ -625,6 +724,9 @@ export interface BillForContract {
   totalCharge: number;
   amountGiven: number;
   amountPending: number;
+  /** Of amountGiven, how much was settled from the customer's security deposit rather
+   *  than actually received. */
+  depositApplied?: number;
   billStatus: BillStatus;
   billCreatedByName?: string;
   customerApprovedByName?: string;

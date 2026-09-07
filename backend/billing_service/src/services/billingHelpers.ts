@@ -393,7 +393,11 @@ export async function getBranchStaffByRole(
 const REFERENCE_MODE_PREFIX: Record<string, string> = {
   CASH: 'CASH',
   BANK_TRANSFER: 'BANK',
+  // Retained so historic CREDIT_CARD rows keep resolving; new payments use
+  // ONLINE_PAYMENT. Without the ONLINE entry a card collection silently got no
+  // reference number at all, since an unmapped mode returns undefined here.
   CREDIT_CARD: 'CARD',
+  ONLINE_PAYMENT: 'ONLINE',
 };
 
 /**

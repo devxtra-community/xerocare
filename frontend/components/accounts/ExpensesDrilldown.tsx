@@ -407,6 +407,7 @@ export function buildExpensesTree(expenses: {
   otherExpenses: { balance: number };
   importLabourCost: { balance: number };
   customsDuty: { balance: number };
+  cardProcessingFees: { balance: number };
 }): DrilldownNode[] {
   return [
     {
@@ -492,6 +493,12 @@ export function buildExpensesTree(expenses: {
       key: 'CUSTOMS_DUTY',
       label: 'Customs Duty',
       amount: expenses.customsDuty.balance,
+      viewable: true,
+    },
+    {
+      key: 'CARD_PROCESSING_FEE',
+      label: 'Card Processing Fees',
+      amount: expenses.cardProcessingFees.balance,
       viewable: true,
     },
     {

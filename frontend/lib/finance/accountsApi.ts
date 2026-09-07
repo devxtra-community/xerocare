@@ -1128,6 +1128,9 @@ export interface ChartOfAccountsResponse {
     otherExpenses: AccountBalance;
     importLabourCost: AccountBalance;
     customsDuty: AccountBalance;
+    /** 5016 — the acquirer's commission on card receipts. A merchant cost, never billed
+     *  to the customer: the customer is invoiced the gross, the bank receives the net. */
+    cardProcessingFees: AccountBalance;
     custom: CustomAccountBalance[];
     totalExpenses: number;
   };
@@ -2276,7 +2279,10 @@ export interface GuaranteeCheque {
   amount: number;
   currencyCode: string;
   bankName: string;
+  /** When the customer physically handed the cheque over. */
   receivedDate: string;
+  /** Date written on the cheque — the earliest date it may be deposited. */
+  chequeDate?: string | null;
   purpose: GuaranteePurpose;
   status: GuaranteeStatus;
   returnedDate?: string | null;
@@ -2332,6 +2338,7 @@ export interface CreateGuaranteeChequePayload {
   currencyCode: string;
   bankName: string;
   receivedDate: string;
+  chequeDate?: string;
   purpose: GuaranteePurpose;
   notes?: string;
 }

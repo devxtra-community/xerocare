@@ -249,7 +249,12 @@ function PaymentModal({
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: () =>
-      recordReceivablePayment(receivable.id, { ...form, amount: parseFloat(form.amount) }),
+      recordReceivablePayment(receivable.id, {
+        ...form,
+        // dueDate is a deprecated mirror of chequeDate server-side.
+        chequeDueDate: form.chequeDate,
+        amount: parseFloat(form.amount),
+      }),
     onSuccess: () => {
       toast.success(
         isCheque
@@ -285,7 +290,9 @@ function PaymentModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground">Payment Date</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                {form.paymentMode === 'Cheque' ? 'Cheque Received Date' : 'Payment Date'}
+              </label>
               <input
                 type="date"
                 value={form.paymentDate}
@@ -375,22 +382,14 @@ function PaymentModal({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Cheque Date *</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    Cheque Date * <span className="font-normal">(earliest deposit)</span>
+                  </label>
                   <input
                     type="date"
                     required
                     value={form.chequeDate}
                     onChange={(e) => set('chequeDate', e.target.value)}
-                    className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Due Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={form.chequeDueDate}
-                    onChange={(e) => set('chequeDueDate', e.target.value)}
                     className="mt-1 w-full px-3 py-2 rounded-md border border-border text-sm bg-background"
                   />
                 </div>

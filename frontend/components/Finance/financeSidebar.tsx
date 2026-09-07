@@ -89,6 +89,11 @@ const accountsMenu: FinanceMenuItem[] = [
     href: '/finance/accounts/exchange-rates',
   },
   {
+    title: 'Card Settlements',
+    icon: Landmark,
+    href: '/finance/accounts/card-settlements',
+  },
+  {
     title: 'Opening Balances',
     icon: FileText,
     href: '/finance/accounts/opening-balances',
@@ -120,7 +125,7 @@ const financeMenu: FinanceMenuGroup[] = [
         href: '/finance/lease',
       },
       {
-        title: 'Contract Renewals',
+        title: 'Renewals & Replacements',
         icon: CalendarClock,
         href: '/finance/contract-renewals',
       },

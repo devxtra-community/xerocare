@@ -129,6 +129,17 @@ function ChequeActionModal({
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            // Same rule the server enforces: too early, or back-dated to before the
+            // Cheque Date, are both refused.
+            if ((action === 'deposit' || action === 'clear') && cheque.chequeDate) {
+              const todayStr = new Date().toISOString().slice(0, 10);
+              const chequeDateStr = String(cheque.chequeDate).slice(0, 10);
+              if (todayStr < chequeDateStr || (date && date < chequeDateStr)) {
+                return toast.error(
+                  `This cheque cannot be ${action === 'clear' ? 'cleared' : 'deposited'} before its Cheque Date (${chequeDateStr}).`,
+                );
+              }
+            }
             if (needsAccount && !accountId) return toast.error('Select a bank account');
             if (requiresReason && !notes.trim())
               return toast.error('A reason is required for this action');
@@ -170,14 +181,29 @@ function ChequeActionModal({
           {needsDate && (
             <div>
               <label className="text-xs font-medium text-gray-600">
-                {action === 'clear' ? 'Cleared / Cash Received Date' : 'Transaction Date'}
+                {action === 'clear'
+                  ? 'Cleared / Cash Received Date'
+                  : action === 'deposit'
+                    ? 'Deposit Date'
+                    : 'Transaction Date'}
               </label>
               <input
                 type="date"
                 value={date}
+                min={
+                  (action === 'deposit' || action === 'clear') && cheque.chequeDate
+                    ? String(cheque.chequeDate).slice(0, 10)
+                    : undefined
+                }
                 onChange={(e) => setDate(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
               />
+              {(action === 'deposit' || action === 'clear') && cheque.chequeDate && (
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Cheque Date is {String(cheque.chequeDate).slice(0, 10)} — it cannot be{' '}
+                  {action === 'clear' ? 'cleared' : 'deposited'} before then.
+                </p>
+              )}
             </div>
           )}
           <div>
@@ -565,7 +591,7 @@ function AdminChequesContent() {
                     'Party / Bank',
                     'Amount',
                     'Cheque Date',
-                    'Due Date',
+                    'Received / Issued',
                     'Source',
                     'Status',
                     'Actions',
@@ -589,20 +615,20 @@ function AdminChequesContent() {
                     <td className="px-4 py-3 font-semibold whitespace-nowrap">
                       {formatCurrency(c.amount, currency)}
                     </td>
+                    <td
+                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
+                    >
+                      {c.chequeDate ? String(c.chequeDate).slice(0, 10) : '—'}
+                      {isOverdue(c) && ' ⚠'}
+                    </td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                       {c.type === 'RECEIVED'
-                        ? c.chequeDate
-                          ? String(c.chequeDate).slice(0, 10)
+                        ? c.collectedDate
+                          ? String(c.collectedDate).slice(0, 10)
                           : '—'
                         : c.issueDate
                           ? String(c.issueDate).slice(0, 10)
                           : '—'}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-xs whitespace-nowrap ${isOverdue(c) ? 'text-red-600 font-bold' : 'text-gray-500'}`}
-                    >
-                      {String(c.dueDate).slice(0, 10)}
-                      {isOverdue(c) && ' ⚠'}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px]">
                       {c.sourceLabel ? (

@@ -28,6 +28,11 @@ import { useExchangeRateMap, convertAmount, formatDualCurrency } from '@/lib/dua
 import { currencyOptions } from '@/lib/currencyList';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { toast } from 'sonner';
+import OnlinePaymentFields, {
+  EMPTY_ONLINE_PAYMENT,
+  OnlinePaymentDetails,
+  onlinePaymentComplete,
+} from '@/components/payments/OnlinePaymentFields';
 
 interface InvoiceAccountViewProps {
   invoiceId: string;
@@ -54,13 +59,16 @@ export function InvoiceAccountView({
   const [showForm, setShowForm] = useState(false);
   const [amountPaid, setAmountPaid] = useState('');
   const [paymentMode, setPaymentMode] = useState('CASH');
+  // ONLINE_PAYMENT only. Holds no PAN — OnlinePaymentFields keeps the number local and
+  // hands back the last four.
+  const [cardDetails, setCardDetails] = useState<OnlinePaymentDetails>(EMPTY_ONLINE_PAYMENT);
+  const [, setCardQuoteError] = useState<string | null>(null);
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [referenceNumber, setReferenceNumber] = useState('');
   const [remarks, setRemarks] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [chequeNumber, setChequeNumber] = useState('');
   const [chequeBankName, setChequeBankName] = useState('');
-  const [chequeDueDate, setChequeDueDate] = useState('');
   const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -111,6 +119,17 @@ export function InvoiceAccountView({
       return;
     }
 
+    // Mirrors the server's own card validation so the user is told here rather than
+    // after a failed round-trip.
+    if (paymentMode === 'ONLINE_PAYMENT') {
+      if (!onlinePaymentComplete(cardDetails)) {
+        toast.error(
+          'Complete the card details: payment type, issuing bank, network, card holder and the last 4 digits.',
+        );
+        return;
+      }
+    }
+
     const isForeignCurrency = paidCurrency && paidCurrency !== invoiceCurrency;
     let exchangeRate: number | undefined;
     if (isForeignCurrency) {
@@ -133,18 +152,38 @@ export function InvoiceAccountView({
 
     try {
       setSubmitting(true);
-      if (gated) {
+      // A card payment always takes the approval route, gated or not. Only that route
+      // prices the card against the merchant's configured agreement and posts the split
+      // — gross against the receivable, the fee to Card Processing Fees, the net to the
+      // bank. recordPayment() below knows none of that and would bank the full amount,
+      // silently losing the fee.
+      if (gated || paymentMode === 'ONLINE_PAYMENT') {
         // Route through Finance approval gate — do NOT touch the ledger directly
         await recordSalePayment(invoiceId, {
           amount: Number(amountPaid),
-          paymentMode: paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
+          paymentMode: paymentMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT',
           paymentDate,
           referenceNumber: referenceNumber || undefined,
           remarks: remarks || undefined,
           chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
           chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
-          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+          // dueDate is a deprecated mirror of chequeDate server-side — send the
+          // same value so nothing downstream reads a stale, separate due date.
+          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
           chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
+          // Card facts only — the commission is priced server-side and is never taken
+          // from anything sent here.
+          ...(paymentMode === 'ONLINE_PAYMENT'
+            ? {
+                cardType: cardDetails.cardType,
+                cardNetwork: cardDetails.cardNetwork,
+                issuerCountry: cardDetails.issuerCountry,
+                issuerBank: cardDetails.issuerBank,
+                cardLast4: cardDetails.cardLast4,
+                cardHolderName: cardDetails.cardHolderName.trim(),
+                transactionReference: cardDetails.transactionReference || undefined,
+              }
+            : {}),
         });
         toast.success('Payment submitted for Finance approval.', {
           description: 'The outstanding balance will update once Finance approves the payment.',
@@ -160,7 +199,9 @@ export function InvoiceAccountView({
           receiptFile,
           chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
           chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
-          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDueDate : undefined,
+          // dueDate is a deprecated mirror of chequeDate server-side — send the
+          // same value so nothing downstream reads a stale, separate due date.
+          chequeDueDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
           chequeDate: paymentMode === 'CHEQUE' ? chequeDate : undefined,
           currency: paidCurrency || undefined,
           exchangeRate,
@@ -179,7 +220,6 @@ export function InvoiceAccountView({
       setReceiptFile(null);
       setChequeNumber('');
       setChequeBankName('');
-      setChequeDueDate('');
       setChequeDate(new Date().toISOString().split('T')[0]);
       setSelectedBankAccountIdx('');
       setPaidCurrency(summary?.currency || invoiceCurrency);
@@ -313,7 +353,16 @@ export function InvoiceAccountView({
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500">Payment Mode</label>
-                    <Select value={paymentMode} onValueChange={setPaymentMode}>
+                    <Select
+                      value={paymentMode}
+                      onValueChange={(v) => {
+                        setPaymentMode(v);
+                        // Card facts belong to the card that was picked — never let them
+                        // survive a switch to a different mode.
+                        setCardDetails(EMPTY_ONLINE_PAYMENT);
+                        setCardQuoteError(null);
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -321,12 +370,16 @@ export function InvoiceAccountView({
                         <SelectItem value="CASH">Cash</SelectItem>
                         <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
                         <SelectItem value="CHEQUE">Cheque</SelectItem>
-                        <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                        <SelectItem value="ONLINE_PAYMENT">Online Payment (Card)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500">Payment Date</label>
+                    <label className="text-xs font-bold text-slate-500">
+                      {paymentMode === 'CHEQUE'
+                        ? 'Cheque Received Date (received from customer)'
+                        : 'Payment Date'}
+                    </label>
                     <Input
                       type="date"
                       required
@@ -385,6 +438,17 @@ export function InvoiceAccountView({
                       </Select>
                     </div>
                   )}
+                {/* Card-specific fields — shown as soon as the mode is chosen. */}
+                {paymentMode === 'ONLINE_PAYMENT' && (
+                  <OnlinePaymentFields
+                    value={cardDetails}
+                    onChange={setCardDetails}
+                    amount={Number(amountPaid) || 0}
+                    currency={invoiceCurrency}
+                    onQuoteChange={(_q, err) => setCardQuoteError(err)}
+                  />
+                )}
+
                 {/* Cheque-specific fields */}
                 {paymentMode === 'CHEQUE' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
@@ -405,22 +469,14 @@ export function InvoiceAccountView({
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-500">
-                        Cheque Date * <span className="font-normal">(date on the cheque)</span>
+                        Cheque Date *{' '}
+                        <span className="font-normal">(earliest date it can be deposited)</span>
                       </label>
                       <Input
                         type="date"
                         required
                         value={chequeDate}
                         onChange={(e) => setChequeDate(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500">Cheque Due Date *</label>
-                      <Input
-                        type="date"
-                        required
-                        value={chequeDueDate}
-                        onChange={(e) => setChequeDueDate(e.target.value)}
                       />
                     </div>
                   </div>

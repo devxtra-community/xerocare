@@ -48,8 +48,16 @@ export class GuaranteeCheque {
   @Column({ name: 'bank_name', type: 'varchar', length: 150 })
   bankName!: string;
 
+  // When the customer physically handed the cheque over.
   @Column({ name: 'received_date', type: 'date' })
   receivedDate!: Date;
+
+  // The date written on the cheque — the earliest date it may be deposited. Distinct
+  // from receivedDate: a post-dated security cheque is collected long before it is
+  // bankable. Nullable only for rows predating the column; backfilled from
+  // received_date in runPreMigrations.
+  @Column({ name: 'cheque_date', type: 'date', nullable: true })
+  chequeDate?: Date;
 
   @Column({
     name: 'purpose',

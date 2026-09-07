@@ -193,7 +193,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
       return;
     }
     if (isCheque) {
-      if (!form.chequeNumber || !form.chequeBankName || !form.chequeDate || !form.chequeDueDate) {
+      if (!form.chequeNumber || !form.chequeBankName || !form.chequeDate) {
         toast.error('Cheque number, bank name, cheque date and due date are all required');
         return;
       }
@@ -233,7 +233,8 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
             chequeNumber: form.chequeNumber,
             chequeBankName: form.chequeBankName,
             chequeDate: form.chequeDate,
-            chequeDueDate: form.chequeDueDate,
+            // dueDate is a deprecated mirror of chequeDate server-side.
+            chequeDueDate: form.chequeDate,
           }
         : {}),
     };
@@ -450,24 +451,15 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Cheque Date <span className="text-gray-400 font-normal">(date on cheque)</span>
+                  Cheque Date{' '}
+                  <span className="text-gray-400 font-normal">
+                    (earliest date it can be deposited)
+                  </span>
                 </label>
                 <input
                   type="date"
                   value={form.chequeDate}
                   onChange={(e) => set('chequeDate', e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Cheque Due Date
-                </label>
-                <input
-                  type="date"
-                  value={form.chequeDueDate}
-                  onChange={(e) => set('chequeDueDate', e.target.value)}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />

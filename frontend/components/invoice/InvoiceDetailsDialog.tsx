@@ -29,8 +29,7 @@ import { getProductById } from '@/lib/product';
 import { getAllSpareParts, getSparePartById } from '@/lib/spare-part';
 import { differenceInMonths, differenceInDays } from 'date-fns';
 import UsageRecordingModal from '@/components/Finance/UsageRecordingModal';
-import ReplaceDeviceModal from '@/components/Finance/ReplaceDeviceModal';
-import { RefreshCw } from 'lucide-react';
+
 import { InvoiceViewDialog } from '../employeeComponents/InvoiceViewDialog';
 import AuditTimeline from './AuditTimeline';
 import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
@@ -88,12 +87,6 @@ export function InvoiceDetailsDialog({
   const [isLoading, setIsLoading] = React.useState(false);
   const [isEmailSending, setIsEmailSending] = React.useState(false);
   const [isUsageModalOpen, setIsUsageModalOpen] = React.useState(false);
-  const [isReplaceModalOpen, setIsReplaceModalOpen] = React.useState(false);
-  const [replacingAllocation, setReplacingAllocation] = React.useState<{
-    allocationId: string;
-    serialNumber: string;
-    modelId: string;
-  } | null>(null);
 
   const [ticketDetails, setTicketDetails] = React.useState<ServiceTicket | null>(null);
   const [loadingTicket, setLoadingTicket] = React.useState(false);
@@ -887,27 +880,6 @@ export function InvoiceDetailsDialog({
                               >
                                 {alloc.status}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="py-3 text-right">
-                              {mode === 'FINANCE' && alloc.status === 'ALLOCATED' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 px-3 text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setReplacingAllocation({
-                                      allocationId: alloc.id,
-                                      serialNumber: alloc.serialNumber,
-                                      modelId: alloc.modelId,
-                                    });
-                                    setIsReplaceModalOpen(true);
-                                  }}
-                                >
-                                  <RefreshCw size={14} className="mr-1.5" />
-                                  Replace
-                                </Button>
-                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -1851,23 +1823,6 @@ export function InvoiceDetailsDialog({
             handleSelectInvoice(currentInvoice.id); // Refresh current view
           }}
           invoice={undefined}
-        />
-      )}
-
-      {replacingAllocation && (
-        <ReplaceDeviceModal
-          isOpen={isReplaceModalOpen}
-          onClose={() => {
-            setIsReplaceModalOpen(false);
-            setReplacingAllocation(null);
-          }}
-          contractId={currentInvoice.referenceContractId || currentInvoice.id}
-          allocationId={replacingAllocation.allocationId}
-          oldSerialNumber={replacingAllocation.serialNumber}
-          modelId={replacingAllocation.modelId}
-          onSuccess={() => {
-            handleSelectInvoice(currentInvoice.id); // Refresh current view
-          }}
         />
       )}
     </Dialog>
