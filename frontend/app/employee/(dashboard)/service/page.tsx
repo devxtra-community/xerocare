@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { getUserFromToken } from '@/lib/auth';
 import { getBranches, Branch } from '@/lib/branch';
-import { getCustomers, Customer, createCustomer } from '@/lib/customer';
+import { getCustomers, Customer, createCustomer, CreateCustomerData } from '@/lib/customer';
+import CustomerFormDialog from '@/components/employeeComponents/CustomerFormDialog';
 import { getLeads, Lead, createLead } from '@/lib/lead';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { getBrands, Brand } from '@/lib/brand';
@@ -61,6 +62,7 @@ import {
   ConsumableYieldHistory,
   WarrantyInfo,
   fetchServiceCashBankAccounts,
+  collectVisitCharge,
 } from '@/lib/serviceTicket';
 import { ServiceContract, getServiceContracts } from '@/lib/serviceContract';
 import {
@@ -207,7 +209,8 @@ export default function ServiceDashboardPage() {
   const [tickets, setTickets] = useState<ServiceTicket[]>([]);
   const [technicians, setTechnicians] = useState<ServiceTechnicianInfo[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showNewCustomerDialog, setShowNewCustomerDialog] = useState(false);
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [spareParts, setSpareParts] = useState<SparePart[]>([]);
 
@@ -295,6 +298,23 @@ export default function ServiceDashboardPage() {
     Number(t.visitChargeAmount || 0) > 0 &&
     t.visitChargeMethod === 'ADDED_TO_ESTIMATE' &&
     !t.visitChargeCollected;
+
+  // Collect-visit-charge-up-front modal — available any time before COMPLETED/
+  // CANCELLED, independent of diagnosis/assignment. Never gates either.
+  const CHARGEABLE_VISIT_CONTEXTS = ['CHARGEABLE', 'LEASE_EXPIRED', 'EXTERNAL_MACHINE'];
+  const canCollectVisitChargeNow = (t: ServiceTicket) =>
+    CHARGEABLE_VISIT_CONTEXTS.includes(t.serviceContext) &&
+    Number(t.visitChargeAmount || 0) > 0 &&
+    !t.visitChargeCollected &&
+    !['COMPLETED', 'CANCELLED'].includes(t.status);
+  const [collectVCModal, setCollectVCModal] = useState<{
+    ticketId: string;
+    ticketNumber: string;
+    amount: number;
+  } | null>(null);
+  const [collectVCPaymentMode, setCollectVCPaymentMode] = useState('');
+  const [collectVCAccountId, setCollectVCAccountId] = useState('');
+  const [collectVCSubmitting, setCollectVCSubmitting] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [associatedLeadName, setAssociatedLeadName] = useState('');
   const [leadForm, setLeadForm] = useState({
@@ -322,10 +342,12 @@ export default function ServiceDashboardPage() {
     serialNumber: '',
     serviceContext: 'CHARGEABLE',
     contractReferenceId: '',
+    machineType: 'PRINTER' as 'PRINTER' | 'COMPUTER' | 'OTHER',
     issueDescription: '',
     jobType: 'ONSITE',
     scheduledVisitDate: '',
     serviceLocation: '',
+    visitChargeAmount: '',
   });
 
   const [creationPath, setCreationPath] = useState<'existing' | 'new'>('existing');
@@ -347,6 +369,7 @@ export default function ServiceDashboardPage() {
     };
     contract: ServiceContract | null;
     warrantyInfo?: WarrantyInfo | null;
+    machineType?: 'PRINTER' | 'COMPUTER' | 'OTHER';
     contractUsage?: {
       copiesUsed: number;
       copyLimit: number;
@@ -368,6 +391,8 @@ export default function ServiceDashboardPage() {
     setMachineContextLoading(true);
     const timer = setTimeout(() => {
       import('@/lib/serviceTicket').then(({ getMachineContext }) => {
+        // For an existing catalogue machine the type is whatever the product
+        // record says — the server derives and returns it, and we lock the form to it.
         getMachineContext(serial, reading)
           .then((res) => {
             setMachineContextData(res);
@@ -375,6 +400,7 @@ export default function ServiceDashboardPage() {
               ...prev,
               serviceContext: res.serviceContext,
               contractReferenceId: res.contractReferenceId || '',
+              machineType: res.machineType || prev.machineType,
             }));
           })
           .catch((err) => {
@@ -581,9 +607,11 @@ export default function ServiceDashboardPage() {
         return;
       }
       // Copy-limited warranties need the customer's meter reading to decide
-      // whether the warranty is still valid.
+      // whether the warranty is still valid. Printers only — computer/other
+      // machines have no meter.
       if (
         !isOtherMachine &&
+        newTicket.machineType === 'PRINTER' &&
         selectedMachine &&
         (selectedMachine.type === 'SALE' || selectedMachine.type === 'LEASE') &&
         machineContextData?.warrantyInfo?.copyLimit != null &&
@@ -611,6 +639,7 @@ export default function ServiceDashboardPage() {
             : newTicket.productName || undefined,
           serialNumber: newTicket.serialNumber ? newTicket.serialNumber.trim() : undefined,
           serviceContext: isOtherMachine ? 'CHARGEABLE' : newTicket.serviceContext,
+          machineType: newTicket.machineType,
           contractReferenceId: isOtherMachine
             ? undefined
             : newTicket.contractReferenceId || undefined,
@@ -623,85 +652,21 @@ export default function ServiceDashboardPage() {
               : undefined,
           issueDescription: newTicket.issueDescription.trim(),
           meterReadingAtCreation:
-            !isOtherMachine && meterReadingInput !== '' ? Number(meterReadingInput) : undefined,
+            !isOtherMachine && newTicket.machineType === 'PRINTER' && meterReadingInput !== ''
+              ? Number(meterReadingInput)
+              : undefined,
+          visitChargeAmount:
+            newTicket.visitChargeAmount !== '' ? Number(newTicket.visitChargeAmount) : undefined,
         };
 
         await createServiceTicket(payload);
-        toast.success('Service ticket created successfully!');
+        toast.success('Service ticket created — confirmation email sent to the customer.');
         setShowCreateModal(false);
         resetTicketForm();
         await fetchInitialData();
       } catch (error) {
         console.error('Failed to create ticket:', error);
         toast.error('Error creating service ticket. Please verify inputs and connection.');
-      } finally {
-        setSubmitting(false);
-      }
-    } else {
-      // New Customer Flow — anyone we service becomes a customer, not a lead.
-      if (!leadForm.name.trim() || !leadForm.phone.trim() || !leadForm.location.trim()) {
-        toast.error('Customer Name, Phone, and Location are required.');
-        return;
-      }
-      if (
-        !newTicket.productBrand.trim() ||
-        !newTicket.productModel.trim() ||
-        !newTicket.productName.trim()
-      ) {
-        toast.error('Product Brand, Model, and Name are required.');
-        return;
-      }
-      if (!newTicket.issueDescription.trim()) {
-        toast.error('Issue description is required.');
-        return;
-      }
-      if (newTicket.jobType === 'ONSITE' && !newTicket.scheduledVisitDate) {
-        toast.error('Scheduled Visit Date is required for On-Site service.');
-        return;
-      }
-      if (newTicket.jobType === 'ONSITE' && newTicket.scheduledVisitDate < todayLocalISO()) {
-        toast.error('Scheduled Visit Date cannot be in the past.');
-        return;
-      }
-
-      try {
-        setSubmitting(true);
-        // Step 1: Create the Customer — a service ticket means they're being
-        // serviced, which makes them a customer, not a CRM lead.
-        const created = await createCustomer({
-          name: leadForm.name.trim(),
-          city: leadForm.location.trim(),
-          email: leadForm.email.trim() || undefined,
-          phone: leadForm.phone.trim(),
-        });
-        const customerId = created.id;
-
-        // Step 2: Create ticket with customerId
-        const payload: Partial<ServiceTicket> = {
-          customerId,
-          productBrand: newTicket.productBrand.trim(),
-          productModel: newTicket.productModel.trim(),
-          productName: newTicket.productName.trim(),
-          serialNumber: newTicket.serialNumber.trim() || undefined,
-          serviceContext: 'CHARGEABLE',
-          jobType: newTicket.jobType,
-          scheduledVisitDate:
-            newTicket.jobType === 'ONSITE' ? newTicket.scheduledVisitDate : undefined,
-          serviceLocation:
-            newTicket.jobType === 'ONSITE'
-              ? newTicket.serviceLocation.trim() || leadForm.location.trim() || undefined
-              : undefined,
-          issueDescription: newTicket.issueDescription.trim(),
-        };
-
-        await createServiceTicket(payload);
-        toast.success('Customer and service ticket created successfully!');
-        setShowCreateModal(false);
-        resetTicketForm();
-        await fetchInitialData();
-      } catch (error) {
-        console.error('Failed to create customer/ticket:', error);
-        toast.error('Error creating customer or service ticket.');
       } finally {
         setSubmitting(false);
       }
@@ -868,6 +833,28 @@ export default function ServiceDashboardPage() {
     }
   };
 
+  const handleCollectVisitChargeNow = async () => {
+    if (!collectVCModal) return;
+    if (!collectVCPaymentMode || (collectVCPaymentMode !== 'CHEQUE' && !collectVCAccountId)) {
+      toast.error('Select a payment mode (and account, unless paying by cheque).');
+      return;
+    }
+    try {
+      setCollectVCSubmitting(true);
+      await collectVisitCharge(collectVCModal.ticketId, collectVCPaymentMode, collectVCAccountId);
+      toastSuccess('Visit charge collected.');
+      setCollectVCModal(null);
+      setCollectVCPaymentMode('');
+      setCollectVCAccountId('');
+      await fetchInitialData();
+    } catch (error) {
+      console.error('Failed to collect visit charge:', error);
+      toastError('Failed to collect visit charge.');
+    } finally {
+      setCollectVCSubmitting(false);
+    }
+  };
+
   const handleDiagnose = async (e?: React.FormEvent, confirmed = false) => {
     e?.preventDefault();
     if (!selectedTicket) return;
@@ -958,7 +945,10 @@ export default function ServiceDashboardPage() {
           problemFound: diagnosisForm.problemFound || 'General breakdown',
           rootCause: diagnosisForm.rootCause || 'Undetermined root cause',
           technicianNotes: diagnosisForm.notes,
-          meterReading: Number(diagnosisForm.meterReading) || 0,
+          meterReading:
+            selectedTicket.machineType === 'PRINTER'
+              ? Number(diagnosisForm.meterReading) || 0
+              : undefined,
           labourCost: Number(diagnosisForm.labourCost) || 0,
           visitChargeAmount: Number(diagnosisForm.visitChargeAmount) || 0,
           visitChargeMethod: diagnosisForm.visitChargeMethod,
@@ -1071,7 +1061,10 @@ export default function ServiceDashboardPage() {
       await completeServiceTicket(selectedTicket.id, {
         workPerformed: completeForm.workPerformed || 'Standard service repair',
         resolutionDetails: completeForm.resolutionDetails || completionNotes,
-        meterReading: Number(completeForm.meterReading) || 0,
+        meterReading:
+          selectedTicket.machineType === 'PRINTER'
+            ? Number(completeForm.meterReading) || 0
+            : undefined,
         customerRemarks: completeForm.customerRemarks || undefined,
         technicianRemarks: completeForm.technicianRemarks || undefined,
         customerSignature: completeForm.customerSignature || 'Customer Signed',
@@ -1261,9 +1254,16 @@ export default function ServiceDashboardPage() {
       if (selectedTicket) await fetchEstimates(selectedTicket.id);
       await fetchInitialData();
       toastSuccess('Customer approved the estimate!');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      toastError('Failed to approve estimate.');
+      const error = err as { response?: { data?: { message?: string } } };
+      const message = error.response?.data?.message || 'Failed to approve estimate.';
+      toastError(message);
+      // Expired estimate — refetch so the expiry banner (and Finance's Extend
+      // Validity control, already shown in this same modal) appears.
+      if (message.toLowerCase().includes('validity has expired') && selectedTicket) {
+        await fetchEstimates(selectedTicket.id);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1455,18 +1455,23 @@ export default function ServiceDashboardPage() {
     setConfirmOpen(true);
   };
 
-  const handleApproveQuotation = async (ticketId: string) => {
+  const handleApproveQuotation = async (ticket: ServiceTicket) => {
     try {
       setLoading(true);
-      await approveServiceQuotation(ticketId);
+      await approveServiceQuotation(ticket.id);
       toastSuccess('Customer approval recorded.');
       await fetchInitialData();
     } catch (error: unknown) {
       console.error('Failed to approve:', error);
       const err = error as { response?: { data?: { message?: string } } };
-      toastError(
-        err.response?.data?.message || 'Failed to record customer approval. Please try again.',
-      );
+      const message =
+        err.response?.data?.message || 'Failed to record customer approval. Please try again.';
+      toastError(message);
+      // Expired estimate — land them on the Estimates view, which already
+      // surfaces the expiry banner (and Finance's Extend Validity control).
+      if (message.toLowerCase().includes('validity has expired')) {
+        await handleOpenEstimates(ticket);
+      }
     } finally {
       setLoading(false);
     }
@@ -1534,6 +1539,32 @@ export default function ServiceDashboardPage() {
     }
   };
 
+  // Creates the customer via the full CustomerFormDialog (not the old inline
+  // "New Customer Flow" tab), then auto-selects it so the rest of the ticket
+  // form proceeds exactly like the existing-customer path.
+  const handleCreateNewCustomer = async (data: Partial<CreateCustomerData>) => {
+    const created = await createCustomer({
+      name: data.name!,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+      vatNumber: data.vatNumber,
+      vatStatus: data.vatStatus,
+      exemptionReason: data.exemptionReason,
+      customerType: data.customerType,
+      country: data.country,
+      stateProvince: data.stateProvince,
+      city: data.city,
+      bankName: data.bankName,
+      bankAccountNumber: data.bankAccountNumber,
+      bankAccounts: data.bankAccounts,
+    });
+    setCustomers((prev) => [...prev, created]);
+    setNewTicket((prev) => ({ ...prev, customerId: created.id }));
+    loadModalCustomerIntel(created.id);
+    toast.success('Customer created.');
+  };
+
   const resetTicketForm = () => {
     setNewTicket({
       customerId: '',
@@ -1545,10 +1576,12 @@ export default function ServiceDashboardPage() {
       serialNumber: '',
       serviceContext: 'CHARGEABLE',
       contractReferenceId: '',
+      machineType: 'PRINTER',
       issueDescription: '',
       jobType: 'ONSITE',
       scheduledVisitDate: '',
       serviceLocation: '',
+      visitChargeAmount: '',
     });
     setLeadForm({
       name: '',
@@ -1664,6 +1697,18 @@ export default function ServiceDashboardPage() {
       }
     }
     return parts.filter(Boolean).join(' - ') || 'Device';
+  };
+
+  const getTicketCustomerName = (ticket: ServiceTicket) => {
+    if (ticket.customerId) {
+      const c = customers.find((cust) => cust.id === ticket.customerId);
+      if (c?.name) return c.name;
+    }
+    if (ticket.leadId) {
+      const l = leads.find((lead) => lead._id === ticket.leadId);
+      if (l?.name) return l.name;
+    }
+    return '—';
   };
 
   const isHelpDesk = user?.employeeJob === 'SERVICE_HELP_DESK';
@@ -1807,6 +1852,9 @@ export default function ServiceDashboardPage() {
                     Ticket No
                   </TableHead>
                   <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
+                    Customer
+                  </TableHead>
+                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
                     Brand / Model
                   </TableHead>
                   {user?.role === 'ADMIN' && (
@@ -1814,9 +1862,6 @@ export default function ServiceDashboardPage() {
                       Branch
                     </TableHead>
                   )}
-                  <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
-                    Context
-                  </TableHead>
                   <TableHead className="font-bold text-xs text-slate-600 px-4 py-3">
                     Job Type
                   </TableHead>
@@ -1846,6 +1891,9 @@ export default function ServiceDashboardPage() {
                         {ticket.ticketNumber}
                       </button>
                     </TableCell>
+                    <TableCell className="px-4 py-3 text-xs font-medium text-slate-700 max-w-[200px] truncate">
+                      {getTicketCustomerName(ticket)}
+                    </TableCell>
                     <TableCell className="px-4 py-3">
                       <div className="text-xs font-bold text-slate-700 max-w-[260px] truncate">
                         {formatMachineName(
@@ -1874,9 +1922,6 @@ export default function ServiceDashboardPage() {
                         {ticket.branchName || '—'}
                       </TableCell>
                     )}
-                    <TableCell className="px-4 py-3">
-                      <Badge context={ticket.serviceContext} />
-                    </TableCell>
                     <TableCell className="px-4 py-3 text-xs text-slate-500 font-medium">
                       {ticket.jobType}
                     </TableCell>
@@ -1947,14 +1992,43 @@ export default function ServiceDashboardPage() {
                               </Button>
                             )}
 
-                          {(isHelpDesk || isTechnician || isManagerOrAdmin) &&
+                          {/* Pay-now for the visit charge — available any time before
+                              COMPLETED/CANCELLED, whether or not a technician is assigned
+                              yet or diagnosis has happened. Customers who'd rather pay
+                              later (on-site or on the completion bill) still can. */}
+                          {(isHelpDesk || isManagerOrAdmin || isTechnician) &&
+                            canCollectVisitChargeNow(ticket) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() => {
+                                  loadCashBankAccounts(ticket.branchId);
+                                  setCollectVCPaymentMode('');
+                                  setCollectVCAccountId('');
+                                  setCollectVCModal({
+                                    ticketId: ticket.id,
+                                    ticketNumber: ticket.ticketNumber,
+                                    amount: Number(ticket.visitChargeAmount) || 0,
+                                  });
+                                }}
+                              >
+                                <DollarSign className="size-3.5" />
+                                Collect Visit Charge
+                              </Button>
+                            )}
+
+                          {/* Recording that the customer accepted is limited to the assigned
+                              technician and branch manager/admin — they're the ones actually
+                              present with the customer, not Help Desk. */}
+                          {(isTechnician || isManagerOrAdmin) &&
                             (ticket.status === 'FINANCE_APPROVED' ||
                               ticket.status === 'QUOTED') && (
                               <>
                                 <Button
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => handleApproveQuotation(ticket.id)}
+                                  onClick={() => handleApproveQuotation(ticket)}
                                 >
                                   <CheckCircle2 className="size-3.5" />
                                   Approve
@@ -2040,7 +2114,7 @@ export default function ServiceDashboardPage() {
                                       rootCause: '',
                                       meterReading: 0,
                                       labourCost: 0,
-                                      visitChargeAmount: 0,
+                                      visitChargeAmount: ticket.visitChargeAmount || 0,
                                       visitChargeMethod: 'ADDED_TO_ESTIMATE',
                                       visitChargeCollected: true,
                                       visitChargePaymentMode: '',
@@ -2258,77 +2332,28 @@ export default function ServiceDashboardPage() {
                 <Plus className="text-primary" size={18} /> Create Service Ticket
               </CardTitle>
               <CardDescription className="text-xs">
-                Select between existing customer machine registry or onboarding a new lead.
+                Pick the customer&apos;s machine from their registry, or add a new customer first.
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleCreateTicket}>
               <CardContent className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-                {/* Switcher tabs */}
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition ${
-                      creationPath === 'existing'
-                        ? 'bg-white text-slate-800 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                    onClick={() => {
-                      setCreationPath('existing');
-                      setSelectedMachine(null);
-                      setIsOtherMachine(false);
-                      setNewTicket((prev) => ({
-                        ...prev,
-                        customerId: '',
-                        leadId: '',
-                        productId: '',
-                        productBrand: '',
-                        productModel: '',
-                        productName: '',
-                        serialNumber: '',
-                        serviceContext: 'CHARGEABLE',
-                        contractReferenceId: '',
-                      }));
-                    }}
-                  >
-                    Existing Customer Flow
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex-1 text-center py-2 text-xs font-bold rounded-lg transition ${
-                      creationPath === 'new'
-                        ? 'bg-white text-slate-800 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                    onClick={() => {
-                      setCreationPath('new');
-                      setSelectedMachine(null);
-                      setIsOtherMachine(false);
-                      setNewTicket((prev) => ({
-                        ...prev,
-                        customerId: '',
-                        leadId: '',
-                        productId: '',
-                        productBrand: '',
-                        productModel: '',
-                        productName: '',
-                        serialNumber: '',
-                        serviceContext: 'CHARGEABLE',
-                        contractReferenceId: '',
-                      }));
-                    }}
-                  >
-                    New Customer Flow
-                  </button>
-                </div>
-
                 {/* PATH 1: EXISTING CUSTOMER FLOW */}
                 {creationPath === 'existing' && (
                   <div className="space-y-4">
                     {/* Customer Selection */}
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                        Select Customer (Name or ID)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          Select Customer (Name or ID)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowNewCustomerDialog(true)}
+                          className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5"
+                        >
+                          <Plus className="size-3" /> New Customer
+                        </button>
+                      </div>
                       <SearchableSelect
                         options={customers.map((c) => ({
                           value: c.id,
@@ -2391,6 +2416,7 @@ export default function ServiceDashboardPage() {
                                         productName: '',
                                         serialNumber: '',
                                         serviceContext: 'CHARGEABLE',
+                                        machineType: 'PRINTER',
                                       }));
                                     }}
                                     className="text-[10px] font-bold text-red-600 hover:text-white bg-red-50 hover:bg-red-500 border border-red-200 hover:border-red-500 px-2 py-0.5 rounded-full transition cursor-pointer"
@@ -2874,6 +2900,7 @@ export default function ServiceDashboardPage() {
                                     productName: '',
                                     serialNumber: '',
                                     serviceContext: 'CHARGEABLE',
+                                    machineType: 'PRINTER',
                                     jobType: 'ONSITE',
                                   }));
                                 }}
@@ -3077,49 +3104,51 @@ export default function ServiceDashboardPage() {
                               </div>
                             </div>
 
-                            {/* METER READING — copies can expire a warranty before time does */}
-                            {(selectedMachine.type === 'SALE' ||
-                              selectedMachine.type === 'LEASE') && (
-                              <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
-                                <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
-                                  Current Meter Reading (Total Copies)
-                                  {machineContextData?.warrantyInfo?.copyLimit != null && ' *'}
-                                </label>
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  placeholder="Ask the customer for the machine's current meter reading..."
-                                  value={meterReadingInput}
-                                  onChange={(e) => setMeterReadingInput(e.target.value)}
-                                  className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
-                                />
-                                {machineContextData?.warrantyInfo && (
-                                  <p
-                                    className={`text-[11px] font-semibold ${
-                                      machineContextData.warrantyInfo.isUnderWarranty
-                                        ? 'text-emerald-700'
-                                        : 'text-red-700'
-                                    }`}
-                                  >
-                                    {machineContextData.warrantyInfo.isUnderWarranty
-                                      ? `Under warranty${
-                                          machineContextData.warrantyInfo.copiesRemaining != null
-                                            ? ` — ${machineContextData.warrantyInfo.copiesRemaining.toLocaleString()} copies remaining`
-                                            : ''
-                                        }${
-                                          machineContextData.warrantyInfo.warrantyEndDate
-                                            ? ` (until ${new Date(machineContextData.warrantyInfo.warrantyEndDate).toLocaleDateString()})`
-                                            : ''
-                                        }`
-                                      : `Warranty expired${
-                                          machineContextData.warrantyInfo.expiredBy
-                                            ? ` — limit hit: ${machineContextData.warrantyInfo.expiredBy}`
-                                            : ''
-                                        }. Service will be chargeable.`}
-                                  </p>
-                                )}
-                              </div>
-                            )}
+                            {/* METER READING — copies can expire a warranty before time does.
+                                Printer machines only; computer / other have no meter. */}
+                            {newTicket.machineType === 'PRINTER' &&
+                              (selectedMachine.type === 'SALE' ||
+                                selectedMachine.type === 'LEASE') && (
+                                <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
+                                  <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
+                                    Current Meter Reading (Total Copies)
+                                    {machineContextData?.warrantyInfo?.copyLimit != null && ' *'}
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    placeholder="Ask the customer for the machine's current meter reading..."
+                                    value={meterReadingInput}
+                                    onChange={(e) => setMeterReadingInput(e.target.value)}
+                                    className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
+                                  />
+                                  {machineContextData?.warrantyInfo && (
+                                    <p
+                                      className={`text-[11px] font-semibold ${
+                                        machineContextData.warrantyInfo.isUnderWarranty
+                                          ? 'text-emerald-700'
+                                          : 'text-red-700'
+                                      }`}
+                                    >
+                                      {machineContextData.warrantyInfo.isUnderWarranty
+                                        ? `Under warranty${
+                                            machineContextData.warrantyInfo.copiesRemaining != null
+                                              ? ` — ${machineContextData.warrantyInfo.copiesRemaining.toLocaleString()} copies remaining`
+                                              : ''
+                                          }${
+                                            machineContextData.warrantyInfo.warrantyEndDate
+                                              ? ` (until ${new Date(machineContextData.warrantyInfo.warrantyEndDate).toLocaleDateString()})`
+                                              : ''
+                                          }`
+                                        : `Warranty expired${
+                                            machineContextData.warrantyInfo.expiredBy
+                                              ? ` — limit hit: ${machineContextData.warrantyInfo.expiredBy}`
+                                              : ''
+                                          }. Service will be chargeable.`}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
 
                             {machineContextData?.contract && (
                               <div className="p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl space-y-1">
@@ -3203,180 +3232,59 @@ export default function ServiceDashboardPage() {
                   </div>
                 )}
 
-                {/* PATH 2: NEW CUSTOMER FLOW */}
-                {creationPath === 'new' && (
-                  <div className="space-y-4">
-                    {/* CRM Lead Details */}
-                    <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
-                        <Plus size={14} className="text-primary" /> Customer Contact Details
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Full Name *
-                          </label>
-                          <Input
-                            placeholder="e.g. John Doe"
-                            value={leadForm.name}
-                            onChange={(e) => setLeadForm({ ...leadForm, name: e.target.value })}
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Phone Number *
-                          </label>
-                          <Input
-                            placeholder="e.g. +974 5555 1234"
-                            value={leadForm.phone}
-                            onChange={(e) => setLeadForm({ ...leadForm, phone: e.target.value })}
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Email (Optional)
-                          </label>
-                          <Input
-                            placeholder="e.g. john@example.com"
-                            value={leadForm.email}
-                            onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Location/City *
-                          </label>
-                          <Input
-                            placeholder="e.g. Doha, Qatar"
-                            value={leadForm.location}
-                            onChange={(e) => setLeadForm({ ...leadForm, location: e.target.value })}
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Product Details */}
-                    <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3">
-                      <h4 className="text-xs font-bold text-slate-700 border-b border-slate-100 pb-1.5">
-                        Product Details
-                      </h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Product Brand *
-                          </label>
-                          <div className="flex gap-1.5 items-center">
-                            <div className="flex-1 min-w-0">
-                              <SearchableSelect
-                                options={brands.map((b) => ({ value: b.name, label: b.name }))}
-                                value={newTicket.productBrand}
-                                onValueChange={(val) =>
-                                  setNewTicket((prev) => ({
-                                    ...prev,
-                                    productBrand: val,
-                                    productModel: '',
-                                    productName: '',
-                                  }))
-                                }
-                                placeholder="Select brand..."
-                                className="h-9 rounded-xl border-slate-200 bg-white text-xs font-medium text-slate-700"
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() => setShowCreateBrandModal(true)}
-                              className="h-9 w-9 shrink-0 border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500"
-                            >
-                              <Plus size={16} />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Product Model *
-                          </label>
-                          <div className="flex gap-1.5 items-center">
-                            <div className="flex-1 min-w-0">
-                              <SearchableSelect
-                                options={models
-                                  .filter(
-                                    (m) =>
-                                      !newTicket.productBrand ||
-                                      m.brandRelation?.name?.toLowerCase() ===
-                                        newTicket.productBrand.toLowerCase(),
-                                  )
-                                  .map((m) => ({
-                                    value: m.model_no,
-                                    label: `${m.model_name} (${m.model_no})`,
-                                  }))}
-                                value={newTicket.productModel}
-                                onValueChange={(val) => {
-                                  const m = models.find((x) => x.model_no === val);
-                                  setNewTicket((prev) => ({
-                                    ...prev,
-                                    productModel: val,
-                                    productName: m ? m.model_name : val,
-                                  }));
-                                }}
-                                placeholder="Select model..."
-                                className="h-9 rounded-xl border-slate-200 bg-white text-xs font-medium text-slate-700"
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={handleOpenCreateModel}
-                              className="h-9 w-9 shrink-0 border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-500"
-                            >
-                              <Plus size={16} />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Product Name *
-                          </label>
-                          <Input
-                            placeholder="e.g. Color Copier"
-                            value={newTicket.productName}
-                            onChange={(e) =>
-                              setNewTicket({ ...newTicket, productName: e.target.value })
-                            }
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Serial Number
-                          </label>
-                          <Input
-                            placeholder="e.g. SN-12345"
-                            value={newTicket.serialNumber}
-                            onChange={(e) =>
-                              setNewTicket({ ...newTicket, serialNumber: e.target.value })
-                            }
-                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary font-mono"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {/* STEP 3 & 4: JOB TYPE & REMAINING FIELDS */}
                 {((creationPath === 'existing' && (selectedMachine || isOtherMachine)) ||
                   creationPath === 'new') && (
                   <div className="space-y-4 border-t border-slate-100 pt-4">
+                    {/* Machine Type — Printer keeps the meter-based workflow;
+                        Computer / Other have no meter and time-only warranty. */}
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        Machine Type
+                      </label>
+                      {creationPath === 'existing' && selectedMachine && !isOtherMachine ? (
+                        <div className="h-9 px-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-between">
+                          <span>
+                            {newTicket.machineType === 'PRINTER'
+                              ? 'Printer / Copier'
+                              : newTicket.machineType === 'COMPUTER'
+                                ? 'Computer'
+                                : 'Other Machine'}
+                          </span>
+                          <span className="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-extrabold uppercase">
+                            From machine record
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex bg-slate-100 p-1 rounded-xl">
+                          {(['PRINTER', 'COMPUTER', 'OTHER'] as const).map((mt) => (
+                            <button
+                              key={mt}
+                              type="button"
+                              onClick={() => setNewTicket((prev) => ({ ...prev, machineType: mt }))}
+                              className={`flex-1 text-center py-1.5 text-[11px] font-bold rounded-lg transition ${
+                                newTicket.machineType === mt
+                                  ? 'bg-white text-slate-800 shadow-sm'
+                                  : 'text-slate-500 hover:text-slate-700'
+                              }`}
+                            >
+                              {mt === 'PRINTER'
+                                ? 'Printer'
+                                : mt === 'COMPUTER'
+                                  ? 'Computer'
+                                  : 'Other'}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {newTicket.machineType !== 'PRINTER' && (
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                          No meter reading. Warranty is time-based; only RENT or an active AMC
+                          contract covers the service.
+                        </p>
+                      )}
+                    </div>
+
                     {/* Information Banner */}
                     {(() => {
                       let bannerClass = '';
@@ -3392,6 +3300,10 @@ export default function ServiceDashboardPage() {
                           bannerClass = 'bg-blue-50 border-blue-200 text-blue-800';
                           bannerText =
                             'Active Rent Contract: Repair service & spare parts are fully covered.';
+                        } else if (ctx === 'LEASE_CPC') {
+                          bannerClass = 'bg-blue-50 border-blue-200 text-blue-800';
+                          bannerText =
+                            'Lease (CPC): Full-service — labour, spare parts and toner/consumables are all covered.';
                         } else if (ctx === 'LEASE_UNDER_WARRANTY') {
                           bannerClass = 'bg-emerald-50 border-emerald-200 text-emerald-800';
                           bannerText =
@@ -3427,6 +3339,51 @@ export default function ServiceDashboardPage() {
                       );
                     })()}
 
+                    {/* VISIT CHARGE — captured up front so the confirmation email to the
+                        customer carries a real amount, not "TBD". Only shown when the
+                        machine isn't covered by an active rental/lease/warranty/contract.
+                        Purely a quote at this point — paying it is never required before
+                        assigning a technician or diagnosing (customers can and do pay
+                        later, at diagnosis or on the completion bill). */}
+                    {(() => {
+                      const covered = [
+                        'RENT',
+                        'LEASE_CPC',
+                        'LEASE_UNDER_WARRANTY',
+                        'WARRANTY',
+                        'AMC',
+                        'FSMA',
+                        'SMA',
+                      ];
+                      const chargeableVisit =
+                        creationPath === 'new' ||
+                        isOtherMachine ||
+                        (!!selectedMachine && !covered.includes(newTicket.serviceContext));
+                      if (!chargeableVisit) return null;
+                      return (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Visit Charge Amount ({getActiveCurrency()})
+                          </label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder="e.g. 100.00"
+                            value={newTicket.visitChargeAmount}
+                            onChange={(e) =>
+                              setNewTicket({ ...newTicket, visitChargeAmount: e.target.value })
+                            }
+                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Sent to the customer in the confirmation email. Leave blank to confirm
+                            the amount later — technician assignment is never blocked on payment.
+                          </p>
+                        </div>
+                      );
+                    })()}
+
                     {/* Job Type selection */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -3438,9 +3395,14 @@ export default function ServiceDashboardPage() {
                             creationPath === 'existing' &&
                             !isOtherMachine &&
                             selectedMachine &&
-                            ['RENT', 'LEASE_UNDER_WARRANTY', 'AMC', 'FSMA', 'SMA'].includes(
-                              newTicket.serviceContext,
-                            );
+                            [
+                              'RENT',
+                              'LEASE_CPC',
+                              'LEASE_UNDER_WARRANTY',
+                              'AMC',
+                              'FSMA',
+                              'SMA',
+                            ].includes(newTicket.serviceContext);
 
                           if (lockOnsite) {
                             return (
@@ -3824,25 +3786,27 @@ export default function ServiceDashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Current Meter Reading
-                    </label>
-                    <Input
-                      type="number"
-                      required
-                      min={0}
-                      placeholder="Enter current page count"
-                      value={diagnosisForm.meterReading ?? 0}
-                      onChange={(e) =>
-                        setDiagnosisForm({
-                          ...diagnosisForm,
-                          meterReading: parseInt(e.target.value, 10) || 0,
-                        })
-                      }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
-                    />
-                  </div>
+                  {selectedTicket.machineType === 'PRINTER' && (
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        Current Meter Reading
+                      </label>
+                      <Input
+                        type="number"
+                        required
+                        min={0}
+                        placeholder="Enter current page count"
+                        value={diagnosisForm.meterReading ?? 0}
+                        onChange={(e) =>
+                          setDiagnosisForm({
+                            ...diagnosisForm,
+                            meterReading: parseInt(e.target.value, 10) || 0,
+                          })
+                        }
+                        className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                       Diagnosis Notes
@@ -4105,6 +4069,7 @@ export default function ServiceDashboardPage() {
                         'SMA',
                         'FSMA',
                         'RENT',
+                        'LEASE_CPC',
                         'WARRANTY',
                         'LEASE_UNDER_WARRANTY',
                       ].includes(selectedTicket.serviceContext);
@@ -4493,25 +4458,27 @@ export default function ServiceDashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                      Completion Meter Reading
-                    </label>
-                    <Input
-                      type="number"
-                      required
-                      min={0}
-                      placeholder="Enter the machine's current page count"
-                      value={completeForm.meterReading || ''}
-                      onChange={(e) =>
-                        setCompleteForm({
-                          ...completeForm,
-                          meterReading: parseInt(e.target.value, 10) || 0,
-                        })
-                      }
-                      className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
-                    />
-                  </div>
+                  {selectedTicket.machineType === 'PRINTER' && (
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                        Completion Meter Reading
+                      </label>
+                      <Input
+                        type="number"
+                        required
+                        min={0}
+                        placeholder="Enter the machine's current page count"
+                        value={completeForm.meterReading || ''}
+                        onChange={(e) =>
+                          setCompleteForm({
+                            ...completeForm,
+                            meterReading: parseInt(e.target.value, 10) || 0,
+                          })
+                        }
+                        className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                       Customer Remarks
@@ -4803,6 +4770,12 @@ export default function ServiceDashboardPage() {
                             >
                               SN: {selectedTicket.serialNumber || 'N/A'} (View)
                             </button>
+                            {selectedTicket.machineType &&
+                              selectedTicket.machineType !== 'PRINTER' && (
+                                <span className="text-[9px] font-extrabold uppercase tracking-wide bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-600">
+                                  {selectedTicket.machineType === 'COMPUTER' ? 'Computer' : 'Other'}
+                                </span>
+                              )}
                           </div>
                         </div>
                       </div>
@@ -4996,7 +4969,7 @@ export default function ServiceDashboardPage() {
                                   rootCause: '',
                                   meterReading: 0,
                                   labourCost: 0,
-                                  visitChargeAmount: 0,
+                                  visitChargeAmount: selectedTicket.visitChargeAmount || 0,
                                   visitChargeMethod: 'ADDED_TO_ESTIMATE',
                                   visitChargeCollected: true,
                                   visitChargePaymentMode: '',
@@ -5446,27 +5419,29 @@ export default function ServiceDashboardPage() {
                     </div>
                   )}
 
-                  {selectedTicket.meterReadingAtCreation !== undefined && (
-                    <div>
-                      <span className="text-slate-500 font-medium block">
-                        Meter Reading (at Ticket Creation):
-                      </span>
-                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
-                        {selectedTicket.meterReadingAtCreation}
-                      </span>
-                    </div>
-                  )}
+                  {selectedTicket.machineType === 'PRINTER' &&
+                    selectedTicket.meterReadingAtCreation !== undefined && (
+                      <div>
+                        <span className="text-slate-500 font-medium block">
+                          Meter Reading (at Ticket Creation):
+                        </span>
+                        <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
+                          {selectedTicket.meterReadingAtCreation}
+                        </span>
+                      </div>
+                    )}
 
-                  {selectedTicket.meterReadingAtService !== undefined && (
-                    <div>
-                      <span className="text-slate-500 font-medium block">
-                        Meter Reading (at Service):
-                      </span>
-                      <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
-                        {selectedTicket.meterReadingAtService}
-                      </span>
-                    </div>
-                  )}
+                  {selectedTicket.machineType === 'PRINTER' &&
+                    selectedTicket.meterReadingAtService !== undefined && (
+                      <div>
+                        <span className="text-slate-500 font-medium block">
+                          Meter Reading (at Service):
+                        </span>
+                        <span className="font-semibold text-slate-800 bg-white px-2 py-1 rounded border border-slate-200/60 block mt-1 font-mono">
+                          {selectedTicket.meterReadingAtService}
+                        </span>
+                      </div>
+                    )}
 
                   {(selectedTicket.diagnosisNotes || selectedTicket.technicianNoteToFinance) && (
                     <div className="md:col-span-3 space-y-3">
@@ -5704,9 +5679,10 @@ export default function ServiceDashboardPage() {
                           </div>
                         )}
 
-                        {/* Customer Action Triggers — TECHNICIAN, HELP_DESK, and MANAGER/ADMIN */}
+                        {/* Customer Action Triggers — assigned TECHNICIAN and MANAGER/ADMIN
+                            only; Help Desk isn't on-site with the customer to confirm. */}
                         {est.status === 'FINANCE_APPROVED' &&
-                          (isHelpDesk || isTechnician || isManagerOrAdmin) && (
+                          (isTechnician || isManagerOrAdmin) && (
                             <div className="flex gap-2 pt-1.5 bg-yellow-50/50 p-2.5 rounded-lg border border-yellow-100">
                               <span className="text-[10px] text-yellow-800 font-bold block mb-1 w-full">
                                 Customer Action:
@@ -6369,6 +6345,13 @@ export default function ServiceDashboardPage() {
         }}
       />
 
+      <CustomerFormDialog
+        open={showNewCustomerDialog}
+        onOpenChange={setShowNewCustomerDialog}
+        customer={null}
+        onSubmit={handleCreateNewCustomer}
+      />
+
       <ArrivalDiagnosisDialog
         isOpen={!!arrivalDialog}
         onClose={() => setArrivalDialog(null)}
@@ -6386,6 +6369,69 @@ export default function ServiceDashboardPage() {
           }
         }}
       />
+
+      <Modal
+        isOpen={!!collectVCModal}
+        onClose={() => setCollectVCModal(null)}
+        maxWidth="sm"
+        title="Collect Visit Charge"
+      >
+        {collectVCModal && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Ticket {collectVCModal.ticketNumber} — outstanding visit charge of{' '}
+              {getActiveCurrency()} {collectVCModal.amount.toFixed(2)}. This can be paid now or left
+              for later (on-site or on the completion bill) — collecting it here does not affect
+              technician assignment or diagnosis.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select
+                value={collectVCPaymentMode}
+                onChange={(e) => {
+                  setCollectVCPaymentMode(e.target.value);
+                  setCollectVCAccountId('');
+                }}
+                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+              >
+                <option value="">Select mode...</option>
+                <option value="CASH">Cash</option>
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="CHEQUE">Cheque</option>
+                <option value="CREDIT_CARD">Credit Card</option>
+              </select>
+              {collectVCPaymentMode && collectVCPaymentMode !== 'CHEQUE' && (
+                <select
+                  value={collectVCAccountId}
+                  onChange={(e) => setCollectVCAccountId(e.target.value)}
+                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                >
+                  <option value="">Select account...</option>
+                  {cashBankAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.type})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCollectVCModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  collectVCSubmitting ||
+                  !collectVCPaymentMode ||
+                  (collectVCPaymentMode !== 'CHEQUE' && !collectVCAccountId)
+                }
+                onClick={handleCollectVisitChargeNow}
+              >
+                {collectVCSubmitting ? 'Collecting...' : 'Confirm Payment'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         isOpen={!!rejectVCModal}

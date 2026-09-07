@@ -27,14 +27,29 @@ export class Warehouse {
   @Column({ name: 'warehouse_code', unique: true })
   warehouseCode!: string;
 
-  @Column()
-  location!: string;
+  @Column({ nullable: true })
+  location?: string;
 
-  @Column()
-  address!: string;
+  @Column({ nullable: true })
+  address?: string;
 
-  @Column()
+  @Column({ nullable: true })
   capacity!: string;
+
+  @Column({ nullable: true })
+  country?: string;
+
+  // Contact person is an employee from the warehouse's branch. Employees are
+  // owned by employee_service, so we store the id plus a denormalised name/email
+  // for display without a cross-service join.
+  @Column({ name: 'contact_person_id', type: 'uuid', nullable: true })
+  contactPersonId?: string;
+
+  @Column({ name: 'contact_person_name', nullable: true })
+  contactPersonName?: string;
+
+  @Column({ name: 'contact_person_email', nullable: true })
+  contactPersonEmail?: string;
 
   @Column({
     type: 'varchar',

@@ -273,6 +273,7 @@ export const lotService = {
     page?: number;
     limit?: number;
     search?: string;
+    branchId?: string;
   }): Promise<PaginatedResponse<Lot>> => {
     const response = await api.get('/i/lots', { params });
     const resData = response.data;

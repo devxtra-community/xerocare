@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Product } from './productEntity';
 import { Brand } from './brandEntity';
+import { MachineType } from './enums/machineType';
 
 @Entity('model')
 @Index(['model_no', 'branch_id'], { unique: true })
@@ -98,6 +99,10 @@ export class Model {
     },
   })
   maxDiscountableAmount!: number;
+
+  // Default machine type for products of this model (PRINTER / COMPUTER / OTHER).
+  @Column({ name: 'machine_type', type: 'varchar', length: 20, default: MachineType.PRINTER })
+  machine_type!: MachineType;
 
   @OneToMany(() => Product, (product) => product.model)
   products!: Product[];

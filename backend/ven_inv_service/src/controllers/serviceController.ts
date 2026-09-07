@@ -9,7 +9,7 @@ import {
   generateServiceReportPdf,
   PdfPerson,
 } from '../utils/servicePdfGenerator';
-import { sendServicePdfEmail } from '../utils/emailService';
+import { sendServicePdfEmail, sendServiceEmail } from '../utils/emailService';
 import { sendWhatsappMessage } from '../utils/whatsapp';
 import {
   ServiceTicket,
@@ -17,6 +17,7 @@ import {
   ServiceContext,
   JobType,
 } from '../entities/serviceTicketEntity';
+import { MachineType, isMeteredMachine } from '../entities/enums/machineType';
 import { ServiceTicketItem, ServiceItemSource } from '../entities/serviceTicketItemEntity';
 import { SparePart } from '../entities/sparePartEntity';
 import { Product, OwnershipType, ProductStatus, PrintColour } from '../entities/productEntity';
@@ -308,6 +309,7 @@ export class ServiceController {
   private async determineServiceContextAndJobType(
     serialNumber: string,
     meterReading?: number,
+    machineTypeHint?: string | null,
   ): Promise<{
     serviceContext: ServiceContext;
     contractReferenceId: string | null;
@@ -316,6 +318,7 @@ export class ServiceController {
     track: 'A' | 'B';
     linkedInvoiceId: string | null;
     warrantyInfo: WarrantyEvaluation | null;
+    machineType: MachineType;
     contractUsage: {
       copiesUsed: number;
       copyLimit: number;
@@ -342,6 +345,15 @@ export class ServiceController {
     const product = await Source.getRepository(Product).findOne({
       where: { serial_no: serialNumber },
     });
+
+    // Machine type: explicit hint wins, else the matched product's type, else PRINTER.
+    const machineType = (machineTypeHint ||
+      product?.machine_type ||
+      MachineType.PRINTER) as MachineType;
+    // COMPUTER / OTHER: no usage meter → warranty is time-only and SMA/FSMA
+    // per-click contracts never apply (only RENT, time-warranty, AMC, CHARGEABLE).
+    const metered = isMeteredMachine(machineType);
+
     if (product) {
       productId = product.id;
 
@@ -366,8 +378,10 @@ export class ServiceController {
         logger.error('Failed to fetch machine billing context from billing service:', err);
       }
 
-      const copiesUsed =
-        meterReading !== undefined && meterReading !== null
+      // Non-metered machines: copies never enter warranty math.
+      const copiesUsed = !metered
+        ? 0
+        : meterReading !== undefined && meterReading !== null
           ? meterReading
           : copiesUsedFromCounters(latestAllocation, product.meter_reading);
 
@@ -382,10 +396,11 @@ export class ServiceController {
         let isSaleWarrantyActive = false;
         if (saleInvoice) {
           warrantyInfo = evaluateWarranty({
-            warrantyType: saleInvoice.warrantyType || 'duration',
+            // COMPUTER / OTHER: time-only warranty, ignore any copy limit.
+            warrantyType: metered ? saleInvoice.warrantyType || 'duration' : 'duration',
             warrantyDurationValue: saleInvoice.warrantyDurationValue,
             warrantyDurationUnit: saleInvoice.warrantyDurationUnit,
-            warrantyCopyLimit: saleInvoice.warrantyCopyLimit,
+            warrantyCopyLimit: metered ? saleInvoice.warrantyCopyLimit : null,
             startDate: new Date(saleInvoice.effectiveFrom || saleInvoice.createdAt),
             copiesUsed,
             // Legacy fallback: item-level warranty string or product.warranty (months)
@@ -405,10 +420,11 @@ export class ServiceController {
           // Step 3 - Check if machine is on LEASE
           if (leaseInvoice) {
             warrantyInfo = evaluateWarranty({
-              warrantyType: leaseInvoice.warrantyType || 'both',
+              // COMPUTER / OTHER: time-only warranty, ignore any copy limit.
+              warrantyType: metered ? leaseInvoice.warrantyType || 'both' : 'duration',
               warrantyDurationValue: leaseInvoice.warrantyDurationValue,
               warrantyDurationUnit: leaseInvoice.warrantyDurationUnit,
-              warrantyCopyLimit: leaseInvoice.warrantyCopyLimit,
+              warrantyCopyLimit: metered ? leaseInvoice.warrantyCopyLimit : null,
               startDate: new Date(leaseInvoice.effectiveFrom),
               copiesUsed,
               fallbackMonths: Number(leaseInvoice.leaseTenureMonths) || 0,
@@ -417,7 +433,14 @@ export class ServiceController {
             });
 
             if (warrantyInfo.isUnderWarranty) {
-              serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
+              // CPC / CPC_COMBO leases are full-service: spare parts AND toner
+              // covered, exactly like RENT. Fixed-plan leases keep the
+              // SMA-style coverage (toner chargeable).
+              const isCpcLease =
+                leaseInvoice.rentType === 'CPC' || leaseInvoice.rentType === 'CPC_COMBO';
+              serviceContext = isCpcLease
+                ? ServiceContext.LEASE_CPC
+                : ServiceContext.LEASE_UNDER_WARRANTY;
               track = 'A';
               linkedInvoiceId = leaseInvoice.id;
             } else {
@@ -430,6 +453,7 @@ export class ServiceController {
           // Step 4 - Check for active service contracts if not matched on active lease/sale warranty
           if (
             serviceContext !== ServiceContext.LEASE_UNDER_WARRANTY &&
+            serviceContext !== ServiceContext.LEASE_CPC &&
             serviceContext !== ServiceContext.LEASE_EXPIRED
           ) {
             const contractRepo = Source.getRepository(ServiceContract);
@@ -441,12 +465,16 @@ export class ServiceController {
             });
             if (activeContract) {
               const now = new Date();
-              if (now >= activeContract.startDate && now <= activeContract.endDate) {
+              const withinTerm = now >= activeContract.startDate && now <= activeContract.endDate;
+              // COMPUTER / OTHER only ever run under AMC — SMA/FSMA are
+              // per-click printer contracts and are ignored for them.
+              const contractApplies = metered || activeContract.contractType === 'AMC';
+              if (withinTerm && contractApplies) {
                 contractReferenceId = activeContract.id;
-                if (activeContract.contractType === 'FSMA') {
+                if (metered && activeContract.contractType === 'FSMA') {
                   serviceContext = ServiceContext.FSMA;
                   track = 'A';
-                } else if (activeContract.contractType === 'SMA') {
+                } else if (metered && activeContract.contractType === 'SMA') {
                   serviceContext = ServiceContext.SMA;
                   track = 'A';
                 } else if (activeContract.contractType === 'AMC') {
@@ -476,7 +504,7 @@ export class ServiceController {
                     overagePerCopyRate: Number(activeContract.overagePerCopyRate) || 0,
                   };
                 }
-              } else if (now > activeContract.endDate) {
+              } else if (!withinTerm && now > activeContract.endDate) {
                 // Term is over — flip the stale ACTIVE status so lists and
                 // stats stop counting it.
                 activeContract.status = 'EXPIRED';
@@ -501,6 +529,7 @@ export class ServiceController {
       track,
       linkedInvoiceId,
       warrantyInfo,
+      machineType,
       contractUsage,
     };
   }
@@ -525,6 +554,8 @@ export class ServiceController {
         ticketType,
         meterReadingAtCreation,
         serviceLocation,
+        machineType: machineTypeInput,
+        visitChargeAmount,
       } = req.body;
 
       const reportedMeterReading =
@@ -547,10 +578,18 @@ export class ServiceController {
         jobType: finalJobType,
         track,
         linkedInvoiceId,
-      } = await this.determineServiceContextAndJobType(serialNumber, reportedMeterReading);
+        machineType,
+      } = await this.determineServiceContextAndJobType(
+        serialNumber,
+        reportedMeterReading,
+        machineTypeInput,
+      );
+
+      // Meter readings are printer-only.
+      const metered = isMeteredMachine(machineType);
 
       // Persist the fresh reading on the product so future warranty checks use it
-      if (reportedMeterReading !== undefined && productId) {
+      if (metered && reportedMeterReading !== undefined && productId) {
         const productRepo = Source.getRepository(Product);
         const product = await productRepo.findOne({ where: { id: productId } });
         if (product) {
@@ -577,6 +616,19 @@ export class ServiceController {
       const branchId = req.user.branchId || req.body.branchId;
       if (!branchId) throw new Error('Branch ID is required');
 
+      // Not under an active rental/lease/warranty/service contract — a visit
+      // charge applies (third-party machines, expired lease/warranty, or
+      // straight CHARGEABLE). Help desk quotes it now so the confirmation
+      // email carries a real number instead of "TBD".
+      const chargeableVisit = !this.isTravelCovered(serviceContext);
+      let quotedVisitCharge = 0;
+      if (chargeableVisit && visitChargeAmount !== undefined && visitChargeAmount !== null) {
+        quotedVisitCharge = Number(visitChargeAmount) || 0;
+        if (quotedVisitCharge < 0) {
+          throw new AppError('Visit charge amount cannot be negative', 400);
+        }
+      }
+
       const ticket = ticketRepo.create({
         ticketNumber,
         customerId: customerId || null,
@@ -588,6 +640,7 @@ export class ServiceController {
         serialNumber,
         serviceContext,
         contractReferenceId,
+        machineType,
         issueDescription,
         jobType: finalJobType || jobType,
         status,
@@ -597,8 +650,9 @@ export class ServiceController {
         track,
         linkedInvoiceId,
         ticketType: ticketType || 'COMPLAINT',
-        meterReadingAtCreation: reportedMeterReading ?? null,
+        meterReadingAtCreation: metered ? (reportedMeterReading ?? null) : null,
         serviceLocation: serviceLocation || null,
+        visitChargeAmount: quotedVisitCharge,
       });
 
       await ticketRepo.save(ticket);
@@ -617,11 +671,81 @@ export class ServiceController {
         referenceType: 'SERVICE',
       });
 
+      // Confirmation email is best-effort — never fail ticket creation over
+      // a down SMTP server or a customer with no email on file.
+      this.sendTicketConfirmationEmail(ticket, chargeableVisit).catch((err) => {
+        logger.error('Failed to send ticket confirmation email:', err);
+      });
+
       res.status(201).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
     }
   };
+
+  /** Contexts where the machine is under an active rental/lease/warranty/service
+   *  contract — visits, labour, spare parts (and for RENT/FSMA/LEASE_CPC, toner
+   *  too) are covered, so no visit charge applies. Everything else — including
+   *  third-party machines and expired warranty/lease/contract — is chargeable. */
+  private isTravelCovered(serviceContext: ServiceContext): boolean {
+    return [
+      ServiceContext.AMC,
+      ServiceContext.SMA,
+      ServiceContext.FSMA,
+      ServiceContext.RENT,
+      ServiceContext.LEASE_CPC,
+      ServiceContext.WARRANTY,
+      ServiceContext.LEASE_UNDER_WARRANTY,
+    ].includes(serviceContext);
+  }
+
+  /**
+   * Best-effort confirmation email sent right when a ticket is created, so
+   * the customer knows up front whether the visit is free or chargeable —
+   * and for how much. Does not gate or block anything downstream: technician
+   * assignment and diagnosis proceed regardless of whether/when this sends,
+   * and regardless of whether the visit charge has been paid yet.
+   */
+  private async sendTicketConfirmationEmail(
+    ticket: ServiceTicket,
+    chargeableVisit: boolean,
+  ): Promise<void> {
+    const customer = await this.fetchCustomerDetails(ticket.customerId);
+    if (!customer?.email) return;
+
+    const customerName =
+      `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Valued Customer';
+    const machine =
+      `${ticket.productBrand || ''} ${ticket.productModel || ''}`.trim() ||
+      ticket.productName ||
+      'your machine';
+
+    const coverageLine = chargeableVisit
+      ? Number(ticket.visitChargeAmount) > 0
+        ? `A visit charge of QAR ${Number(ticket.visitChargeAmount).toFixed(2)} applies for this service call, since ${machine} is not currently under an active rental, lease, warranty, or service contract. You're welcome to pay it now or at the time of service — payment is not required before we send a technician.`
+        : `This machine is not currently under an active rental, lease, warranty, or service contract, so a visit charge applies. Our team will confirm the exact amount shortly.`
+      : `Good news — ${machine} is currently covered (active rental, lease, warranty, or service contract), so this service visit is FREE of charge.`;
+
+    const subject = `Service Ticket ${ticket.ticketNumber} Confirmed`;
+    const bodyText = `Dear ${customerName},
+
+Your service request has been logged.
+
+Ticket No: ${ticket.ticketNumber}
+Machine: ${machine}${ticket.serialNumber ? ` (SN: ${ticket.serialNumber})` : ''}
+Location: ${ticket.serviceLocation || 'To be confirmed'}
+
+${coverageLine}
+
+A technician will be assigned shortly and will contact you before the visit.
+
+Best regards,
+Xerocare Technical Services`;
+
+    await sendServiceEmail(customer.email, subject, bodyText);
+    ticket.visitChargeInformed = true;
+    await Source.getRepository(ServiceTicket).save(ticket);
+  }
 
   /**
    * POST /service/tickets/:id/assign
@@ -860,10 +984,16 @@ export class ServiceController {
         ServiceContext.SMA,
         ServiceContext.FSMA,
         ServiceContext.RENT,
+        ServiceContext.LEASE_CPC,
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
       ].includes(ticket.serviceContext);
-      const effectiveVisitCharge = travelCoveredContext ? 0 : Number(visitChargeAmount) || 0;
+      // Fall back to whatever was already quoted on the ticket (e.g. at
+      // creation) when the diagnosis form doesn't resend an amount — so an
+      // upfront quote/collection isn't silently zeroed out here.
+      const effectiveVisitCharge = travelCoveredContext
+        ? 0
+        : Number(visitChargeAmount ?? ticket.visitChargeAmount) || 0;
       const effectiveTransportCharge = travelCoveredContext
         ? 0
         : Number(transportChargeAmount) || 0;
@@ -895,7 +1025,10 @@ export class ServiceController {
       ticket.problemFound = problemFound;
       ticket.rootCause = rootCause;
       ticket.diagnosisNotes = technicianNotes;
-      ticket.meterReadingAtService = meterReading || 0;
+      // Meter reading is printer-only; leave it null for computer / other.
+      if (isMeteredMachine(ticket.machineType)) {
+        ticket.meterReadingAtService = meterReading || 0;
+      }
 
       if (isFreeContext) {
         ticket.status = ServiceTicketStatus.FREE_SERVICE;
@@ -1080,6 +1213,7 @@ export class ServiceController {
       const finalLabourCost =
         ticket.serviceContext === ServiceContext.AMC ||
         ticket.serviceContext === ServiceContext.RENT ||
+        ticket.serviceContext === ServiceContext.LEASE_CPC ||
         ticket.serviceContext === ServiceContext.WARRANTY ||
         ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
         ticket.serviceContext === ServiceContext.FSMA ||
@@ -1317,6 +1451,7 @@ export class ServiceController {
       let finalLabourCost = Number(labourCost) || 0;
       if (
         ticket.serviceContext === ServiceContext.RENT ||
+        ticket.serviceContext === ServiceContext.LEASE_CPC ||
         ticket.serviceContext === ServiceContext.WARRANTY ||
         ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
         ticket.serviceContext === ServiceContext.FSMA ||
@@ -1372,6 +1507,7 @@ export class ServiceController {
           let isItemFree = !!it.isFree;
           if (
             ticket.serviceContext === ServiceContext.RENT ||
+            ticket.serviceContext === ServiceContext.LEASE_CPC ||
             ticket.serviceContext === ServiceContext.FSMA
           ) {
             isItemFree = true;
@@ -1657,12 +1793,26 @@ export class ServiceController {
       });
       if (!estimate) throw new Error('Estimate not found');
 
-      estimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
-      await estimateRepo.save(estimate);
-
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
       if (!ticket) throw new Error('Ticket not found');
+
+      // Same expiry gate as the ticket-level customer-approve path — an expired
+      // estimate always blocks approval, Finance must extend validity first.
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const latestRevision = await revisionRepo.findOne({
+        where: { ticketId: ticket.id },
+        order: { submittedAt: 'DESC' },
+      });
+      if (latestRevision?.validUntil && new Date() > new Date(latestRevision.validUntil)) {
+        throw new AppError(
+          'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
+          400,
+        );
+      }
+
+      estimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
+      await estimateRepo.save(estimate);
 
       ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
       await ticketRepo.save(ticket);
@@ -2206,7 +2356,11 @@ export class ServiceController {
         throw new AppError('Resume the repair before completing the job.', 400);
       }
 
-      if (meterReading !== undefined && meterReading !== null) {
+      if (
+        isMeteredMachine(ticket.machineType) &&
+        meterReading !== undefined &&
+        meterReading !== null
+      ) {
         const previousReading = ticket.meterReadingAtService ?? 0;
         if (meterReading < previousReading) {
           throw new AppError(
@@ -2372,7 +2526,10 @@ export class ServiceController {
         });
 
         let nextScheduledMaintenanceDate: Date | null = null;
-        if (ticket.serviceContext === ServiceContext.RENT) {
+        if (
+          ticket.serviceContext === ServiceContext.RENT ||
+          ticket.serviceContext === ServiceContext.LEASE_CPC
+        ) {
           nextScheduledMaintenanceDate = new Date();
           nextScheduledMaintenanceDate.setMonth(nextScheduledMaintenanceDate.getMonth() + 2);
         }
@@ -2757,9 +2914,11 @@ export class ServiceController {
         !isNaN(Number(meterReadingParam))
           ? Number(meterReadingParam)
           : undefined;
+      const machineTypeParam = (req.query.machineType as string | undefined) || undefined;
       const details = await this.determineServiceContextAndJobType(
         String(serialNumber),
         meterReading,
+        machineTypeParam,
       );
 
       let activeContract = null;
@@ -2775,7 +2934,11 @@ export class ServiceController {
             activeContract.coverageRules || coverageForContractType(activeContract.contractType),
           );
         }
-      } else if (details.serviceContext === ServiceContext.RENT) {
+      } else if (
+        details.serviceContext === ServiceContext.RENT ||
+        details.serviceContext === ServiceContext.LEASE_CPC
+      ) {
+        // RENT and CPC leases are full-service — spare parts AND toner free.
         coverage = { ...FULL_COVERAGE };
       } else if (
         details.serviceContext === ServiceContext.WARRANTY ||
@@ -2794,6 +2957,7 @@ export class ServiceController {
           coverage,
           contract: activeContract,
           warrantyInfo: details.warrantyInfo,
+          machineType: details.machineType,
           contractUsage: details.contractUsage,
         },
       });
@@ -2916,7 +3080,12 @@ export class ServiceController {
             ticketRevenue += Number(item.totalPrice) || 0;
           }
         }
-        if (ticket.visitChargeMethod === 'ADDED_TO_ESTIMATE') {
+        // ADDED_TO_ESTIMATE is booked into the invoice regardless of when it's
+        // paid; a SEPARATE charge (on-site at diagnosis, or collected up front
+        // before assignment) only counts once actually collected — it's billed
+        // through its own standalone invoice in billing_service, not this
+        // ticket's estimate, so it wasn't being counted here at all before.
+        if (ticket.visitChargeMethod === 'ADDED_TO_ESTIMATE' || ticket.visitChargeCollected) {
           ticketRevenue += Number(ticket.visitChargeAmount) || 0;
         }
         ticketRevenue += Number(ticket.transportChargeAmount) || 0;
@@ -3132,10 +3301,12 @@ export class ServiceController {
         );
       }
 
-      // RENT covers everything; warranty mirrors SMA (toner chargeable);
-      // contract contexts cover per item category (SMA/AMC charge toner,
-      // AMC charges parts too). Labour is free under all three contract types.
-      const baseFreeContext = ticket.serviceContext === ServiceContext.RENT;
+      // RENT and CPC leases cover everything; warranty mirrors SMA (toner
+      // chargeable); contract contexts cover per item category (SMA/AMC charge
+      // toner, AMC charges parts too). Labour is free under all three contract types.
+      const baseFreeContext =
+        ticket.serviceContext === ServiceContext.RENT ||
+        ticket.serviceContext === ServiceContext.LEASE_CPC;
       const warrantyContext = [
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
@@ -3525,14 +3696,15 @@ export class ServiceController {
 
       // Validity rules: the up-front visit/estimate charge pays for the labour
       // of making the estimate — a customer approving within the 1-month
-      // validity is not charged labour again. Approving after expiry keeps
-      // labour billed. Covered machines (contract/warranty) can't expire into
-      // charges — finance must extend the validity instead.
+      // validity is not charged labour again. An expired estimate always
+      // blocks approval — Finance must extend the validity first, regardless
+      // of service context — so a customer can never approve stale pricing.
       const approvalTravelCovered = [
         ServiceContext.AMC,
         ServiceContext.SMA,
         ServiceContext.FSMA,
         ServiceContext.RENT,
+        ServiceContext.LEASE_CPC,
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,
       ].includes(ticket.serviceContext);
@@ -3557,14 +3729,14 @@ export class ServiceController {
           logger.error('Failed to fetch estimate for validity check:', err);
         }
 
-        if (estimateExpired && approvalTravelCovered) {
+        if (estimateExpired) {
           throw new AppError(
             'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
             400,
           );
         }
 
-        if (invoiceFetched && !estimateExpired && !approvalTravelCovered) {
+        if (invoiceFetched && !approvalTravelCovered) {
           // Timely approval — waive the labour line on the billing estimate.
           try {
             await axios.post(
@@ -3581,15 +3753,6 @@ export class ServiceController {
           } catch (err) {
             logger.error('Failed to waive labour on billing estimate:', err);
           }
-        }
-
-        if (estimateExpired && !approvalTravelCovered) {
-          await this.logActivity(
-            ticket.id,
-            'LABOUR_CHARGED',
-            'Customer approved after estimate validity expired — labour cost remains chargeable.',
-            req.user?.userId,
-          );
         }
       }
 
@@ -3737,6 +3900,101 @@ export class ServiceController {
       userId,
     );
   }
+
+  /**
+   * POST /service/tickets/:id/collect-visit-charge
+   *
+   * Lets the customer pay the visit charge up front — any time after ticket
+   * creation, including before a technician is assigned or diagnosis has
+   * happened. Purely additive: it does NOT gate assignment or diagnosis, and
+   * customers who'd rather pay later still can (the existing on-site/
+   * add-to-estimate/reject-time collection points at diagnosis are untouched).
+   */
+  collectVisitCharge = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const callerRole = req.user?.role;
+      const callerJob = req.user?.employeeJob;
+      const mayCollect =
+        callerRole === 'MANAGER' ||
+        callerRole === 'ADMIN' ||
+        callerJob === 'SERVICE_HELP_DESK' ||
+        callerJob === 'SERVICE_TECHNICIAN';
+      if (!mayCollect) {
+        throw new AppError('Not authorized to collect payment for this ticket', 403);
+      }
+
+      const { paymentMode, accountId } = req.body;
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      if (
+        ticket.status === ServiceTicketStatus.COMPLETED ||
+        ticket.status === ServiceTicketStatus.CANCELLED
+      ) {
+        throw new AppError(
+          `Cannot collect payment on a ${ticket.status.toLowerCase()} ticket`,
+          400,
+        );
+      }
+      if (this.isTravelCovered(ticket.serviceContext)) {
+        throw new AppError('This machine is covered — no visit charge applies', 400);
+      }
+      if (Number(ticket.visitChargeAmount) <= 0) {
+        throw new AppError('No visit charge has been quoted on this ticket yet', 400);
+      }
+      if (ticket.visitChargeCollected) {
+        throw new AppError('Visit charge already collected', 400);
+      }
+      if (!paymentMode || (paymentMode !== 'CHEQUE' && !accountId)) {
+        throw new AppError(
+          'paymentMode (and accountId, unless paying by cheque) are required.',
+          400,
+        );
+      }
+
+      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+        expiresIn: '1m',
+      });
+      await axios.post(
+        `${BILLING_SERVICE_URL}/invoices/service-visit-charge`,
+        {
+          serviceTicketId: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          customerId: ticket.customerId,
+          branchId: ticket.branchId,
+          amount: Number(ticket.visitChargeAmount),
+          collectedBy: req.user?.userId || 'SYSTEM',
+          paymentMode,
+          accountId,
+          remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected before assignment/diagnosis`,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      ticket.visitChargeCollected = true;
+      ticket.visitChargeCollectedAt = new Date();
+      // Mark it the same way the on-site "pay now" path does — a stand-alone
+      // collected charge, not deferred onto the estimate — so anything that
+      // keys off visitChargeMethod (finance reporting, the diagnosis-time
+      // "already collected" guard) treats it consistently either way.
+      if (!ticket.visitChargeMethod) {
+        ticket.visitChargeMethod = 'SEPARATE';
+      }
+      await ticketRepo.save(ticket);
+      await this.logActivity(
+        ticket.id,
+        'VISIT_CHARGE_COLLECTED',
+        `Visit charge of ${ticket.visitChargeAmount} collected up front and posted to accounts.`,
+        req.user?.userId,
+      );
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   /**
    * Applies an incremental discount to the linked billing Invoice without
@@ -5297,9 +5555,11 @@ For queries contact us at +974 4455 6677`;
       await revisionRepo.save(newRevision);
 
       // Coverage is per item category under contracts (SMA/AMC charge toner,
-      // AMC charges parts). Warranty mirrors SMA (toner chargeable); RENT stays
-      // fully covered. Computed BEFORE any mutation so validation can reject early.
-      const baseFreeContext = ticket.serviceContext === ServiceContext.RENT;
+      // AMC charges parts). Warranty mirrors SMA (toner chargeable); RENT and
+      // CPC leases stay fully covered. Computed BEFORE any mutation so validation can reject early.
+      const baseFreeContext =
+        ticket.serviceContext === ServiceContext.RENT ||
+        ticket.serviceContext === ServiceContext.LEASE_CPC;
       const warrantyContext = [
         ServiceContext.WARRANTY,
         ServiceContext.LEASE_UNDER_WARRANTY,

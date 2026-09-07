@@ -93,6 +93,22 @@ export function warrantyDisplayFields(w?: WarrantyInfo) {
   };
 }
 
+/**
+ * A rent contract's raw `contractStatus` is not flipped when its term lapses
+ * (the billing-side expiry job only touches the invoice `status`). Derive the
+ * real state from `effectiveTo` so the picker never labels a lapsed rental
+ * "ACTIVE".
+ */
+function deriveContractStatus(effectiveTo?: string, rawStatus?: string): string {
+  if (effectiveTo) {
+    const end = new Date(effectiveTo);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!isNaN(end.getTime()) && end < today) return 'EXPIRED';
+  }
+  return rawStatus || 'ACTIVE';
+}
+
 export function getRentedMachines(
   history: CustomerServiceHistory | null,
   models: Model[],
@@ -114,7 +130,7 @@ export function getRentedMachines(
           effectiveFrom: inv.effectiveFrom,
           effectiveTo: inv.effectiveTo,
           monthlyRent: inv.monthlyRent || 0,
-          contractStatus: inv.contractStatus || 'ACTIVE',
+          contractStatus: deriveContractStatus(inv.effectiveTo, inv.contractStatus),
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
           type: 'RENT',
@@ -133,7 +149,7 @@ export function getRentedMachines(
             effectiveFrom: inv.effectiveFrom,
             effectiveTo: inv.effectiveTo,
             monthlyRent: inv.monthlyRent || 0,
-            contractStatus: inv.contractStatus || 'ACTIVE',
+            contractStatus: deriveContractStatus(inv.effectiveTo, inv.contractStatus),
             contractReferenceId: inv.id,
             invoiceNumber: inv.invoiceNumber,
             type: 'RENT',

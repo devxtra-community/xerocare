@@ -107,6 +107,10 @@ export const CONTEXT_MAP = {
     label: 'Lease — Under Warranty',
     className: 'bg-green-100 text-green-800 border-green-200',
   },
+  LEASE_CPC: {
+    label: 'Lease CPC — Free',
+    className: 'bg-green-100 text-green-800 border-green-200',
+  },
   LEASE_EXPIRED: { label: 'Warranty Expired', className: 'bg-red-100 text-red-800 border-red-200' },
   AMC: { label: 'AMC Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },
   FSMA: { label: 'FSMA Contract', className: 'bg-blue-100 text-blue-800 border-blue-200' },

@@ -35,6 +35,12 @@ export const COUNTRY_PHONE_OPTIONS: CountryPhoneOption[] = [...ALL_COUNTRIES]
 export const dialCodeFor = (iso2: string | null | undefined): string =>
   COUNTRY_PHONE_OPTIONS.find((c) => c.value === iso2)?.dialCode ?? '';
 
+/** Human-readable country name for an ISO-2 code, e.g. "AE" -> "United Arab Emirates". */
+export const countryNameFromIso = (iso2: string | null | undefined): string => {
+  if (!iso2) return '';
+  return ALL_COUNTRIES.find((c) => c.iso2.toUpperCase() === iso2.toUpperCase())?.name ?? '';
+};
+
 // Longest match first: +1 must not win over +1242 for a Bahamian number.
 const DIAL_CODES_BY_LENGTH = [...new Set(COUNTRY_PHONE_OPTIONS.map((c) => c.dialCode))].sort(
   (a, b) => b.length - a.length,

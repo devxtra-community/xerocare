@@ -149,12 +149,27 @@ function SparePartsContent() {
           <h3 className="text-xl sm:text-2xl font-bold text-primary">Spare Parts Inventory</h3>
           {isAdmin && <BranchFilterBar />}
           <div className="flex gap-2">
-            <Button className="bg-primary text-white gap-2" onClick={() => setAddOpen(true)}>
+            <Button
+              className="bg-primary text-white gap-2"
+              onClick={() => {
+                if (isAdmin && !branchId) {
+                  toast.error('Pick a branch in the filter above before adding a spare part');
+                  return;
+                }
+                setAddOpen(true);
+              }}
+            >
               + Add Item
             </Button>
             <Button
               className="bg-card text-primary border border-primary gap-2 hover:bg-muted/50"
-              onClick={() => setBulkOpen(true)}
+              onClick={() => {
+                if (isAdmin && !branchId) {
+                  toast.error('Pick a branch in the filter above before uploading spare parts');
+                  return;
+                }
+                setBulkOpen(true);
+              }}
             >
               <Upload size={16} /> Bulk Upload
             </Button>
@@ -310,6 +325,7 @@ function SparePartsContent() {
             onSuccess={handleRefresh}
             initialLotId={initialLotId}
             initialItemId={initialItemId}
+            branchId={isAdmin ? branchId : undefined}
           />
         )}
 
@@ -326,6 +342,7 @@ function SparePartsContent() {
             onSuccess={loadParts}
             initialLotId={initialLotId}
             initialItemId={initialItemId}
+            branchId={isAdmin ? branchId : undefined}
           />
         )}
 

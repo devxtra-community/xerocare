@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { State, City } from 'country-state-city';
 import { getCountryDataList } from 'countries-list';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
@@ -58,14 +58,26 @@ export function TaxLocationFilter({
 }) {
   const country = value.country;
   const stateLabel = stateLabelFor(country);
-  const states = country ? State.getStatesOfCountry(country) : [];
-  const selectedState = states.find((s) => s.name === value.stateProvince);
-  const cities = country
-    ? selectedState
-      ? City.getCitiesOfState(country, selectedState.isoCode)
-      : (City.getCitiesOfCountry(country) ?? [])
-    : [];
-  const uniqueCities = cities.filter((c, i, arr) => arr.findIndex((x) => x.name === c.name) === i);
+  // Memoized, and never fetching a whole-country city list when the country
+  // has states to narrow by first — `country-state-city` returns tens of
+  // thousands of rows for large federal countries (India ~57k, US ~26k).
+  // Unmemoized + an O(n²) dedup over that list (as this used to be) froze
+  // the tab on every re-render once such a country was selected.
+  const states = useMemo(() => (country ? State.getStatesOfCountry(country) : []), [country]);
+  const selectedState = useMemo(
+    () => states.find((s) => s.name === value.stateProvince),
+    [states, value.stateProvince],
+  );
+  const cities = useMemo(() => {
+    if (!country) return [];
+    if (selectedState) return City.getCitiesOfState(country, selectedState.isoCode) ?? [];
+    if (states.length > 0) return [];
+    return City.getCitiesOfCountry(country) ?? [];
+  }, [country, selectedState, states.length]);
+  const uniqueCities = useMemo(() => {
+    const seen = new Set<string>();
+    return cities.filter((c) => (seen.has(c.name) ? false : (seen.add(c.name), true)));
+  }, [cities]);
 
   return (
     <>

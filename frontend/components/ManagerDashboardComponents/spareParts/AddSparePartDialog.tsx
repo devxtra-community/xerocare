@@ -30,6 +30,8 @@ interface AddSparePartDialogProps {
   onSuccess: () => void;
   initialLotId?: string;
   initialItemId?: string;
+  /** ADMIN only — the branch picked in the page's branch filter. Managers derive it from their token. */
+  branchId?: string;
 }
 
 /**
@@ -45,6 +47,7 @@ export default function AddSparePartDialog({
   onSuccess,
   initialLotId,
   initialItemId,
+  branchId,
 }: AddSparePartDialogProps) {
   const [loading, setLoading] = useState(false);
   interface Warehouse {
@@ -93,20 +96,20 @@ export default function AddSparePartDialog({
   const loadDependencies = async () => {
     try {
       const [whRes, vendorRes, lotsRes, brandsRes, branch] = await Promise.all([
-        warehouseService.getWarehousesByBranch(),
+        warehouseService.getWarehousesByBranch(branchId),
         vendorService.getVendors(),
-        lotService.getAllLots(),
+        lotService.getAllLots(branchId ? { branchId } : undefined),
         brandService.getAllBrands(),
-        getMyBranch({ silent: true }),
+        getMyBranch({ silent: true, branchId }),
       ]);
       setWarehouses(whRes || []);
       setVendors(vendorRes || []);
       setLots(lotsRes.data || []);
       setBrands(brandsRes || []);
       setBranchTax({
-        has_tax: branch.has_tax,
-        tax_name: branch.tax_name,
-        tax_percent: branch.tax_percent,
+        has_tax: branch?.has_tax,
+        tax_name: branch?.tax_name,
+        tax_percent: branch?.tax_percent,
       });
     } catch (error) {
       console.error('Failed to load dependencies', error);
@@ -117,7 +120,8 @@ export default function AddSparePartDialog({
     if (open) {
       loadDependencies();
     }
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, branchId]);
 
   useEffect(() => {
     const fetchModelsForBrand = async () => {
@@ -214,6 +218,11 @@ export default function AddSparePartDialog({
       return;
     }
 
+    if (!formData.mpn.trim()) {
+      toast.error('MPN is required');
+      return;
+    }
+
     // Get the selected lot and lot item (if not "No Lot")
     let availableQuantity = Infinity;
     if (!isNoLot) {
@@ -250,22 +259,25 @@ export default function AddSparePartDialog({
         sku = selectedLotItem?.sparePart?.sku.toUpperCase() || '';
       }
 
-      const respo = await sparePartService.addSparePart({
-        ...formData,
-        sku: sku || undefined, // Backend will generate SKU if undefined
-        model_ids: formData.model_ids,
-        warehouse_id: formData.warehouse_id || undefined,
-        vendor_id: formData.vendor_id || undefined,
-        base_price: Number(formData.base_price),
-        purchase_price: Number(formData.purchase_price),
-        wholesale_price: Number(formData.wholesale_price),
-        maxDiscountableAmount: Number(formData.maxDiscountableAmount || 0),
-        quantity: requestedQuantity,
-        lot_id: isNoLot ? undefined : formData.lot_id,
-        mpn: formData.mpn,
-        description: formData.description,
-        yield: formData.yield,
-      });
+      const respo = await sparePartService.addSparePart(
+        {
+          ...formData,
+          sku: sku || undefined, // Backend will generate SKU if undefined
+          model_ids: formData.model_ids,
+          warehouse_id: formData.warehouse_id || undefined,
+          vendor_id: formData.vendor_id || undefined,
+          base_price: Number(formData.base_price),
+          purchase_price: Number(formData.purchase_price),
+          wholesale_price: Number(formData.wholesale_price),
+          maxDiscountableAmount: Number(formData.maxDiscountableAmount || 0),
+          quantity: requestedQuantity,
+          lot_id: isNoLot ? undefined : formData.lot_id,
+          mpn: formData.mpn,
+          description: formData.description,
+          yield: formData.yield,
+        },
+        branchId,
+      );
       console.log(respo);
       toast.success('Spare part added successfully');
       onSuccess();
@@ -470,11 +482,12 @@ export default function AddSparePartDialog({
               )}
             </div>
             <div className="space-y-2">
-              <Label>Manufacturing Part Number (MPN)</Label>
+              <Label>Manufacturing Part Number (MPN) *</Label>
               <Input
+                required
                 value={formData.mpn}
                 onChange={(e) => setFormData({ ...formData, mpn: e.target.value })}
-                placeholder="Enter MPN (Optional)"
+                placeholder="Enter MPN"
               />
               {selectedLotItemId && !isNoLot && (
                 <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>

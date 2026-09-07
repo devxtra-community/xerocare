@@ -15,9 +15,17 @@ export const bulkUploadSpareParts = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Invalid data format' });
     }
 
-    const branchId = req.user?.branchId;
+    // ADMIN carries no branchId in its token — it must name the target branch
+    // explicitly (the Spare Parts page sends the one picked in its branch filter).
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? (req.body.branchId as string | undefined) : req.user?.branchId;
     if (!branchId)
-      return res.status(400).json({ success: false, message: 'Branch context missing' });
+      return res.status(400).json({
+        success: false,
+        message: isAdmin
+          ? 'Select a branch before uploading spare parts'
+          : 'Branch context missing',
+      });
 
     const result = await service.bulkUpload(rows, branchId);
     res.status(200).json({
@@ -36,9 +44,17 @@ export const bulkUploadSpareParts = async (req: Request, res: Response) => {
  */
 export const addSparePart = async (req: Request, res: Response) => {
   try {
-    const branchId = req.user?.branchId;
+    // ADMIN carries no branchId in its token — it must name the target branch
+    // explicitly (the Spare Parts page sends the one picked in its branch filter).
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? (req.body.branchId as string | undefined) : req.user?.branchId;
     if (!branchId)
-      return res.status(400).json({ success: false, message: 'User branch context missing' });
+      return res.status(400).json({
+        success: false,
+        message: isAdmin
+          ? 'Select a branch before adding a spare part'
+          : 'User branch context missing',
+      });
 
     const result = await service.addSingleSparePart(req.body, branchId, req.user?.userId);
     res.status(201).json({ success: true, message: 'Spare part added successfully', data: result });

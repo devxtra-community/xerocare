@@ -22,6 +22,12 @@ import { getFinanceJobOptions, FinanceJob } from '@/lib/financeJob';
 import { getUserFromToken } from '@/lib/auth';
 
 import { getActiveCurrency } from '@/lib/currency';
+import {
+  COUNTRY_PHONE_OPTIONS,
+  applyDialCode,
+  countryFromPhone,
+  dialCodeFor,
+} from '@/lib/countryOptions';
 interface EmployeeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -53,6 +59,8 @@ export default function EmployeeFormDialog({
     status: 'ACTIVE',
     branchId: '',
   });
+
+  const [country, setCountry] = useState('');
 
   const [profileImage, setProfileImage] = useState<File | null>(null);
   const [idProof, setIdProof] = useState<File | null>(null);
@@ -117,6 +125,7 @@ export default function EmployeeFormDialog({
         status: initialData.status || 'ACTIVE',
         branchId: initialData.branch_id || '',
       });
+      setCountry(countryFromPhone(initialData.phone || ''));
       setProfilePreview(initialData.profile_image_url);
     } else {
       // For new employees, auto-fill branchId with HR's branch
@@ -133,11 +142,19 @@ export default function EmployeeFormDialog({
         status: 'ACTIVE',
         branchId: !isAdmin && userBranchId ? userBranchId : '',
       });
+      setCountry('');
       setProfilePreview(null);
       setProfileImage(null);
       setIdProof(null);
     }
   }, [initialData, open, isAdmin, userBranchId]);
+
+  const dialCode = dialCodeFor(country);
+
+  const handleCountryChange = (iso2: string) => {
+    setCountry(iso2);
+    setFormData((prev) => ({ ...prev, phone: applyDialCode(prev.phone || '', dialCodeFor(iso2)) }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -303,15 +320,28 @@ export default function EmployeeFormDialog({
 
             <div className="space-y-2">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                Phone Number
+                Country
+              </label>
+              <SearchableSelect
+                value={country}
+                onValueChange={handleCountryChange}
+                options={COUNTRY_PHONE_OPTIONS}
+                placeholder="Select country"
+                emptyText="No country found."
+                className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Phone Number <span className="normal-case text-gray-300">(optional)</span>
               </label>
               <Input
                 name="phone"
                 type="tel"
-                placeholder="+1 234 567 8900"
+                placeholder={dialCode ? `${dialCode} 50 123 4567` : 'Select a country first'}
                 value={formData.phone}
                 onChange={handleChange}
-                required
                 className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
               />
             </div>

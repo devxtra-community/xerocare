@@ -125,6 +125,7 @@ export class SparePartRepository {
         'sp.brand AS brand',
         'warehouse.warehouseName AS warehouse_name',
         'branch.name AS branch_name',
+        'sp.branch_id AS branch_id',
         'vendor.name AS vendor_name',
         'sp.model_id AS model_id',
         'sp.quantity AS quantity',

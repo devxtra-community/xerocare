@@ -60,6 +60,7 @@ export function ProductFormModal({
     product_status: string;
     imageUrl: string;
     print_colour: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
+    machine_type: 'PRINTER' | 'COMPUTER' | 'OTHER';
     max_discount_amount: string | number;
     wholesale_price: string | number;
     lot_id: string;
@@ -81,6 +82,7 @@ export function ProductFormModal({
     product_status: initialData?.product_status || 'AVAILABLE',
     imageUrl: initialData?.imageUrl || '',
     print_colour: initialData?.print_colour || 'BLACK_WHITE',
+    machine_type: initialData?.machine_type || 'PRINTER',
     max_discount_amount: initialData?.max_discount_amount ?? '',
     wholesale_price: initialData?.wholesale_price ?? '',
     lot_id: initialData?.lot_id || initialLotId || '',
@@ -327,9 +329,12 @@ export function ProductFormModal({
               value={form.model_id}
               disabled={!selectedBrandId || !!initialData}
               onValueChange={(v) => {
+                const picked = models.find((m) => m.id === v);
                 setForm({
                   ...form,
                   model_id: v,
+                  // Inherit the model's machine type (falls back to PRINTER).
+                  machine_type: picked?.machine_type || form.machine_type,
                 });
               }}
               options={filteredModels.map((m) => ({
@@ -686,23 +691,42 @@ export function ProductFormModal({
                 placeholder="HS Code"
               />
             </Field>
-            <Field label="Print Colour">
+            <Field label="Machine Type">
               <Select
-                value={form.print_colour}
+                value={form.machine_type}
                 onValueChange={(v) =>
-                  setForm({ ...form, print_colour: v as 'BLACK_WHITE' | 'COLOUR' | 'BOTH' })
+                  setForm({ ...form, machine_type: v as 'PRINTER' | 'COMPUTER' | 'OTHER' })
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Colour" />
+                  <SelectValue placeholder="Select Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="BLACK_WHITE">Black & White</SelectItem>
-                  <SelectItem value="COLOUR">Colour</SelectItem>
-                  <SelectItem value="BOTH">Both</SelectItem>
+                  <SelectItem value="PRINTER">Printer / Copier</SelectItem>
+                  <SelectItem value="COMPUTER">Computer</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
+            {form.machine_type === 'PRINTER' && (
+              <Field label="Print Colour">
+                <Select
+                  value={form.print_colour}
+                  onValueChange={(v) =>
+                    setForm({ ...form, print_colour: v as 'BLACK_WHITE' | 'COLOUR' | 'BOTH' })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Colour" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BLACK_WHITE">Black & White</SelectItem>
+                    <SelectItem value="COLOUR">Colour</SelectItem>
+                    <SelectItem value="BOTH">Both</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
           </div>
 
           <div className="pt-4 border-t mt-6">

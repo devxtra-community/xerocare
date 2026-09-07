@@ -28,6 +28,7 @@ router.get(
   rfqController.getAllRfqs,
 );
 router.get('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), rfqController.getRfqById);
+router.put('/:id', authMiddleware, roleMiddleware(['ADMIN', 'MANAGER']), rfqController.updateRfq);
 
 router.post(
   '/:id/send',

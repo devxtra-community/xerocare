@@ -1,4 +1,5 @@
 import { ProductStatus, PrintColour } from '../entities/productEntity';
+import { MachineType } from '../entities/enums/machineType';
 
 export interface AddProductDTO {
   model_id: string;
@@ -13,6 +14,7 @@ export interface AddProductDTO {
   purchase_price?: number;
   tax_rate: number;
   print_colour?: PrintColour;
+  machine_type?: MachineType;
   max_discount_amount?: number | null;
   wholesale_price?: number;
   imageUrl?: string | null;
@@ -38,6 +40,7 @@ export interface BulkProductRow {
   purchase_price?: number;
   tax_rate: number;
   print_colour?: PrintColour;
+  machine_type?: MachineType;
   max_discount_amount?: number | null;
   wholesale_price?: number;
   imageUrl?: string | null;

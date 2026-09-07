@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { Model } from './modelEntity';
 import { Warehouse } from './warehouseEntity';
+import { MachineType } from './enums/machineType';
 export enum ProductStatus {
   AVAILABLE = 'AVAILABLE',
   RENTED = 'RENTED',
@@ -160,6 +161,11 @@ export class Product {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   warranty?: string;
+
+  // PRINTER (default) / COMPUTER / OTHER. Drives the service-ticket workflow:
+  // only PRINTER uses meter readings and SMA/FSMA contracts.
+  @Column({ name: 'machine_type', type: 'varchar', length: 20, default: MachineType.PRINTER })
+  machine_type!: MachineType;
 
   // Same partial-unique reasoning as serial_no above (uq_products_barcode_id_active).
   @Column({ name: 'barcode_id', type: 'varchar', length: 255, nullable: true })

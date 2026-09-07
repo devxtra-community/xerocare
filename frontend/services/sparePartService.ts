@@ -94,15 +94,16 @@ export const sparePartService = {
   /**
    * Bulk uploads spare parts.
    */
-  bulkUpload: async (rows: Record<string, unknown>[]) => {
-    const response = await api.post('/i/spare-parts/bulk', { rows });
+  bulkUpload: async (rows: Record<string, unknown>[], branchId?: string) => {
+    const response = await api.post('/i/spare-parts/bulk', { rows, branchId });
     return response.data;
   },
   /**
-   * Adds a new spare part.
+   * Adds a new spare part. `branchId` is only needed for ADMIN, whose token
+   * carries no branch — managers' branch comes from the token server-side.
    */
-  addSparePart: async (data: Record<string, unknown>) => {
-    const response = await api.post('/i/spare-parts/add', data);
+  addSparePart: async (data: Record<string, unknown>, branchId?: string) => {
+    const response = await api.post('/i/spare-parts/add', { ...data, branchId });
     return response.data;
   },
   /**

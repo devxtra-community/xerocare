@@ -846,7 +846,7 @@ export async function generateServiceCompletionBillPdf(
       doc.text(`Serviced By: ${techName}`, 40, y);
       doc.text(`Completed: ${completionDate}`, 40, y + 15);
 
-      if (ticket.serviceContext === 'RENT') {
+      if (ticket.serviceContext === 'RENT' || ticket.serviceContext === 'LEASE_CPC') {
         const nextDue = new Date();
         nextDue.setMonth(nextDue.getMonth() + 2);
         doc.text(`Next Service Due: ${nextDue.toLocaleDateString('en-GB')}`, 300, y);

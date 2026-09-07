@@ -24,6 +24,19 @@ export class RfqController {
     }
   };
 
+  updateRfq = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { items, vendorIds } = req.body;
+      const rfq = await this.rfqService.updateRfq(req.params.id as string, {
+        items,
+        vendorIds,
+      });
+      return res.json({ success: true, data: rfq });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   sendRfq = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rfq = await this.rfqService.sendRfq(req.params.id as string);

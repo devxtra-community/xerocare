@@ -7,6 +7,9 @@ import {
   OneToMany,
 } from 'typeorm';
 import { ServiceTicketItem } from './serviceTicketItemEntity';
+import { MachineType } from './enums/machineType';
+
+export { MachineType };
 
 export enum ServiceTicketStatus {
   OPEN = 'OPEN',
@@ -32,6 +35,8 @@ export enum ServiceContext {
   RENT = 'RENT',
   WARRANTY = 'WARRANTY',
   LEASE_UNDER_WARRANTY = 'LEASE_UNDER_WARRANTY',
+  /** Lease billed per-copy (CPC/CPC_COMBO): fully covered like RENT — spare parts AND toner free. */
+  LEASE_CPC = 'LEASE_CPC',
   FSMA = 'FSMA',
   SMA = 'SMA',
   AMC = 'AMC',
@@ -160,6 +165,11 @@ export class ServiceTicket {
   // New fields
   @Column({ type: 'varchar', default: 'COMPLAINT', name: 'ticket_type' })
   ticketType!: 'COMPLAINT' | 'PREVENTATIVE_MAINTENANCE';
+
+  // PRINTER = full meter-based workflow; COMPUTER / OTHER skip meter readings
+  // and use time-only warranty (see MachineType).
+  @Column({ type: 'varchar', length: 20, default: MachineType.PRINTER, name: 'machine_type' })
+  machineType!: MachineType;
 
   @Column({ type: 'varchar', name: 'track' })
   track!: 'A' | 'B'; // Auto-set from serviceContext

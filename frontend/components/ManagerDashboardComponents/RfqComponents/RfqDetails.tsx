@@ -28,6 +28,7 @@ import {
   Upload,
   CheckCircle,
   Package,
+  Pencil,
   Download,
   Eye,
   Clock,
@@ -384,6 +385,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             >
               <Download className="mr-2 h-4 w-4" />
               Download Excel
+            </Button>
+          )}
+          {rfq.status === RfqStatus.DRAFT && (
+            <Button
+              variant="outline"
+              onClick={() => router.push(`${basePath}/rfqs/create?edit=${id}`)}
+              className="bg-white text-slate-700 border-slate-300"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
             </Button>
           )}
           {rfq.status === RfqStatus.DRAFT && (
