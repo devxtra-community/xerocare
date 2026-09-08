@@ -4,7 +4,7 @@
 # PRESERVED (confirmed with the user before running):
 #   • xerocare_employee.admin           — the Admin account, so login still works
 #   • xerocare_employee.auth (admin rows) — the Admin's sessions/refresh tokens
-#   • xerocare_vendor.branches          — the QATAR branch row ONLY (its shell/config)
+#   • (branches are NOT preserved — cleared on request, see below)
 #   • billing: chart_of_accounts, country_tax_rules, exchange_rates
 #     ^ system configuration rather than test data. Deleting these does not "clear test
 #       data", it removes the definitions the Accounts pages read on load. Flagged to the
@@ -22,10 +22,9 @@ set -uo pipefail
 export PGPASSWORD=password123
 PSQL="psql -h localhost -U xerouser -v ON_ERROR_STOP=1 -qtA"
 
-QATAR_BRANCH='426625c1-62e8-4e14-952b-457452eb0f28'
 KEEP_BILLING="chart_of_accounts country_tax_rules exchange_rates"
 KEEP_EMPLOYEE="admin auth"
-KEEP_VENDOR="branches"
+KEEP_VENDOR=""
 
 count() { $PSQL -d "$1" -c "SELECT count(*) FROM \"$2\"" 2>/dev/null || echo "?"; }
 
@@ -60,7 +59,7 @@ clear_db() {
 
 echo "############################################################"
 echo "# Xerocare test-data clear"
-echo "# Preserving: Admin account + Qatar branch shell + billing config"
+echo "# Preserving: Admin account + admin sessions + billing config"
 echo "############################################################"
 
 clear_db xerocare_billing  $KEEP_BILLING
@@ -72,10 +71,7 @@ clear_db xerocare_crm
 echo ""
 echo "=== targeted deletes within preserved tables ==="
 
-# Branches: keep only Qatar's row.
-before=$(count xerocare_vendor branches)
-$PSQL -d xerocare_vendor -c "DELETE FROM branches WHERE id <> '$QATAR_BRANCH'" >/dev/null
-echo "  branches         $before -> $(count xerocare_vendor branches)  (Qatar row kept)"
+# Branches are cleared with the rest of the vendor DB (KEEP_VENDOR is empty).
 
 # Auth: keep the Admin's sessions, drop every employee session.
 before=$(count xerocare_employee auth)
@@ -85,7 +81,6 @@ echo "  auth             $before -> $(count xerocare_employee auth)  (admin sess
 echo ""
 echo "=== preserved, final state ==="
 echo "  admin accounts:  $(count xerocare_employee admin)"
-echo "  branches:        $(count xerocare_vendor branches)"
 echo "  chart_of_accounts: $(count xerocare_billing chart_of_accounts)"
 echo ""
 echo "Done."

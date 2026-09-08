@@ -1,4 +1,5 @@
 import React from 'react';
+import { LetterheadTop, LetterheadBottom } from '@/components/shared/documentTemplate';
 import { numberToWords } from '@/lib/numberToWords';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -137,12 +138,12 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
   },
 }) => {
   const companyInfo = {
-    name: 'Xerocare Trading & Services W.L.L',
-    address: 'P.O.BOX 37494, DOHA-QATAR',
-    email: 'mail@xerocare.com',
-    phone: '+974 7071 7282',
+    name: 'Xerocare Technology L.L.C',
+    address: 'Shams Business Center, Media City free Zone, Al Messaned, Sharjah, UAE',
+    email: 'support.ae@xerocare.com',
+    phone: '+971 6527 0399',
     website: 'www.xerocare.com',
-    logo: '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png',
+    logo: '/branding/xerocare-logo.png',
   };
 
   return (
@@ -154,25 +155,19 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
         minHeight: '1122px',
         margin: '0 auto',
         padding: '50px 40px',
+        backgroundImage: `url('/branding/letterhead-watermark.png')`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        backgroundSize: '78%',
         color: '#1a1a1a',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
       }}
     >
-      {/* ─── TITLE ─── */}
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-        <div
-          style={{
-            fontSize: '22px',
-            fontWeight: '300',
-            color: ACCENT,
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-          }}
-        >
-          PRODUCT QUOTATION
-        </div>
+      {/* ─── COMPANY LETTERHEAD ─── */}
+      <div style={{ marginLeft: -40, marginRight: -40, marginTop: -50, marginBottom: 20 }}>
+        <LetterheadTop />
       </div>
 
       {/* ─── HEADER ─── */}
@@ -187,35 +182,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             <div>Email: {companyInfo.email}</div>
           </div>
         </div>
-        <div
-          style={{
-            width: '160px',
-            height: '75px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-          }}
-        >
-          {companyInfo.logo ? (
-            <img
-              src={companyInfo.logo}
-              alt="Logo"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
-          ) : (
-            <div
-              style={{
-                fontSize: '20px',
-                fontWeight: 'normal',
-                color: '#ccc',
-                border: '1px solid #ccc',
-                padding: '8px 16px',
-              }}
-            >
-              LOGO
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ─── BILL TO & QUOTATION INFO ─── */}
@@ -224,7 +190,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           marginBottom: '24px',
-          borderTop: `1px solid ${ACCENT}`,
           paddingTop: '18px',
         }}
       >
@@ -283,8 +248,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             backgroundColor: 'transparent',
             color: '#000000',
             padding: '6px 20px',
-            border: '1px solid #000000',
-            borderRadius: '6px',
             textAlign: 'center',
             fontSize: '13px',
             fontWeight: '300',
@@ -326,8 +289,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             color: ACCENT,
             textTransform: 'uppercase',
             marginBottom: '10px',
-            borderBottom: '1px solid #e0e0e0',
-            paddingBottom: '5px',
           }}
         >
           Product Details
@@ -409,7 +370,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                 key={idx}
                 style={{
                   backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
-                  borderBottom: '1px solid #eee',
                 }}
               >
                 <td style={tdStyle()}>{idx + 1}</td>
@@ -636,7 +596,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   padding: '8px 0',
-                  borderBottom: i === rows.length - 1 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
                 }}
               >
                 <div
@@ -702,7 +661,6 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
             pageBreakBefore: 'always',
             marginTop: '20px',
             paddingTop: '20px',
-            borderTop: 'none',
           }}
         >
           <div
@@ -733,9 +691,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                   </div>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
-                      <tr
-                        style={{ backgroundColor: '#f9f9f9', borderBottom: `1px solid ${ACCENT}` }}
-                      >
+                      <tr style={{ backgroundColor: '#f9f9f9' }}>
                         <th style={{ ...thStyle('left', '#333'), fontWeight: '300' }}>
                           Part Number
                         </th>
@@ -750,7 +706,7 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
                     </thead>
                     <tbody>
                       {item.consumables!.map((c, cidx) => (
-                        <tr key={cidx} style={{ borderBottom: '1px solid #eee' }}>
+                        <tr key={cidx}>
                           <td style={tdStyle('left')}>{c.partName}</td>
                           <td style={tdStyle('left')}>{c.description}</td>
                           <td style={tdStyle('center')}>{c.yield}</td>
@@ -831,29 +787,16 @@ const ProductNormalQuotation: React.FC<ProductNormalQuotationProps> = ({
               transform: 'rotate(-15deg)',
             }}
           />
-          <div style={{ borderTop: 'none', width: '100%', marginBottom: '6px' }}></div>
+          <div style={{ width: '100%', marginBottom: '6px' }}></div>
           <div style={{ fontSize: '11px', fontWeight: '300', color: '#111' }}>
             AUTHORIZED SIGNATURE
           </div>
         </div>
       </div>
 
-      {/* ─── FOOTER ─── */}
-      <div
-        style={{
-          borderTop: `1px solid ${ACCENT}`,
-          paddingTop: '15px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '11px',
-          color: '#666',
-        }}
-      >
-        <div>{companyInfo.website}</div>
-        <div>37494,Doha-qatar (٣٧٤٩٤ ، الدوحة-قطر)</div>
-        <div>
-          {companyInfo.email} | {companyInfo.phone} (+٩٧٤ ٧٠٧١ ٧٢٨٢)
-        </div>
+      {/* ─── COMPANY FOOTER ─── */}
+      <div style={{ marginTop: 'auto', marginLeft: -40, marginRight: -40, marginBottom: -50 }}>
+        <LetterheadBottom />
       </div>
     </div>
   );

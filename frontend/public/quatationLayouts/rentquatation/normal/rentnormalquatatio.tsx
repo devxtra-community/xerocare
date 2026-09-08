@@ -1,4 +1,5 @@
 import React from 'react';
+import { LetterheadTop, LetterheadBottom } from '@/components/shared/documentTemplate';
 import { numberToWords } from '@/lib/numberToWords';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -27,6 +28,15 @@ export interface RentLineItem {
   warranty?: string;
 }
 
+/** dd MMM yyyy, tolerant of nulls and unparsable values. */
+const fmtDay = (v?: string | null): string => {
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 export interface RentAgreementDetails {
   rentType: string;
   period: string;
@@ -41,6 +51,10 @@ export interface RentAgreementDetails {
   discountedMonthlyRent?: number;
   contractRentalValue?: number;
   initialAmountPayable?: number;
+  /** Contract period the rent covers — start, and the end derived from the duration.
+   *  ISO or any Date-parsable string; rendered as "07 Sep 2026". */
+  contractStartDate?: string;
+  contractEndDate?: string;
 }
 
 export interface AccessoryLineItem {
@@ -116,12 +130,12 @@ const tdStyle = (align: 'left' | 'center' | 'right' = 'center'): React.CSSProper
 
 const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
   companyInfo = {
-    name: 'Xerocare Trading & Services W.L.L',
-    address: 'P.O.BOX 37494, DOHA-QATAR',
-    email: 'mail@xerocare.com',
-    phone: '+974 7071 7282',
+    name: 'Xerocare Technology L.L.C',
+    address: 'Shams Business Center, Media City free Zone, Al Messaned, Sharjah, UAE',
+    email: 'support.ae@xerocare.com',
+    phone: '+971 6527 0399',
     website: 'www.xerocare.com',
-    logo: '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png',
+    logo: '/branding/xerocare-logo.png',
   },
   billTo = {
     name: 'Customer Name',
@@ -180,25 +194,19 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
         minHeight: '1122px',
         margin: '0 auto',
         padding: '50px 40px',
+        backgroundImage: `url('/branding/letterhead-watermark.png')`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        backgroundSize: '78%',
         color: '#1a1a1a',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
       }}
     >
-      {/* ─── TITLE ─── */}
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-        <div
-          style={{
-            fontSize: '22px',
-            fontWeight: '300',
-            color: ACCENT,
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-          }}
-        >
-          RENT QUOTATION
-        </div>
+      {/* ─── COMPANY LETTERHEAD ─── */}
+      <div style={{ marginLeft: -40, marginRight: -40, marginTop: -50, marginBottom: 20 }}>
+        <LetterheadTop />
       </div>
 
       {/* ─── HEADER ─── */}
@@ -213,35 +221,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             <div>Email: {companyInfo.email}</div>
           </div>
         </div>
-        <div
-          style={{
-            width: '160px',
-            height: '75px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-          }}
-        >
-          {companyInfo.logo ? (
-            <img
-              src={companyInfo.logo}
-              alt="Logo"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
-          ) : (
-            <div
-              style={{
-                fontSize: '20px',
-                fontWeight: 'normal',
-                color: '#ccc',
-                border: '2px solid #ccc',
-                padding: '8px 16px',
-              }}
-            >
-              LOGO
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ─── BILL TO & QUOTATION INFO ─── */}
@@ -250,7 +229,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           marginBottom: '24px',
-          borderTop: `1px solid ${ACCENT}`,
           paddingTop: '18px',
         }}
       >
@@ -323,8 +301,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             color: ACCENT,
             textTransform: 'uppercase',
             marginBottom: '10px',
-            borderBottom: '1px solid #e0e0e0',
-            paddingBottom: '5px',
           }}
         >
           Machine Details
@@ -377,8 +353,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `1px solid ${ACCENT}`,
-            paddingBottom: '5px',
             marginBottom: '10px',
           }}
         >
@@ -390,8 +364,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               style={{
                 backgroundColor: 'transparent',
                 color: '#000',
-                borderTop: '2.5px solid #000',
-                borderBottom: '2.5px solid #000',
               }}
             >
               <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
@@ -407,7 +379,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 key={idx}
                 style={{
                   backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
-                  borderBottom: '1px solid #eee',
                 }}
               >
                 <td style={tdStyle()}>{idx + 1}</td>
@@ -421,20 +392,24 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                       lineHeight: '1.6',
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: '300',
-                        color: '#dc2626',
-                        textTransform: 'uppercase',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      Product Description
-                    </div>
-                    <div style={{ marginBottom: item.features?.length ? '12px' : '0' }}>
-                      {item.description}
-                    </div>
+                    {!!item.description && item.description !== item.productName && (
+                      <>
+                        <div
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: '300',
+                            color: '#dc2626',
+                            textTransform: 'uppercase',
+                            marginBottom: '6px',
+                          }}
+                        >
+                          Product Description
+                        </div>
+                        <div style={{ marginBottom: item.features?.length ? '12px' : '0' }}>
+                          {item.description}
+                        </div>
+                      </>
+                    )}
                     {(item.features || []).length > 0 && (
                       <>
                         <div
@@ -505,7 +480,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                       style={{
                         display: 'flex',
                         color: '#111',
-                        borderBottom: item.productImage ? '1px solid #eee' : 'none',
                       }}
                     >
                       <div
@@ -580,8 +554,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               fontWeight: '300',
               color: ACCENT,
               textTransform: 'uppercase',
-              borderBottom: `1px solid ${ACCENT}`,
-              paddingBottom: '5px',
               marginBottom: '10px',
             }}
           >
@@ -589,12 +561,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr
-                style={{
-                  borderTop: '2.5px solid #000',
-                  borderBottom: '2.5px solid #000',
-                }}
-              >
+              <tr style={{}}>
                 <th style={{ ...thStyle(), width: '70px' }}></th>
                 <th style={thStyle()}>Description</th>
                 <th style={thStyle('center')}>Qty</th>
@@ -607,7 +574,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                   key={idx}
                   style={{
                     backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
-                    borderBottom: '1px solid #eee',
                   }}
                 >
                   <td style={{ padding: '8px 10px' }}>
@@ -653,8 +619,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               fontWeight: '300',
               color: ACCENT,
               textTransform: 'uppercase',
-              borderBottom: `1px solid ${ACCENT}`,
-              paddingBottom: '5px',
               marginBottom: '14px',
             }}
           >
@@ -683,7 +647,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                         marginBottom: '12px',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        borderBottom: '1px solid #e2e8f0',
                         paddingBottom: '8px',
                       }}
                     >
@@ -730,7 +693,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                 style={{
                                   color: '#64748b',
                                   textAlign: 'left',
-                                  borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
                                 <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
@@ -747,7 +709,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                             </thead>
                             <tbody>
                               {item.bwSlabs.map((s, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={i}>
                                   <td style={{ padding: '6px 0', color: '#334155' }}>
                                     {s.from.toLocaleString()} –{' '}
                                     {Number(s.to) === 0 || s.to >= 999999
@@ -801,7 +763,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                 style={{
                                   color: '#64748b',
                                   textAlign: 'left',
-                                  borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
                                 <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
@@ -818,7 +779,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                             </thead>
                             <tbody>
                               {item.colorSlabs.map((s, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={i}>
                                   <td style={{ padding: '6px 0', color: '#334155' }}>
                                     {s.from.toLocaleString()} –{' '}
                                     {Number(s.to) === 0 || s.to >= 999999
@@ -872,7 +833,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                                 style={{
                                   color: '#64748b',
                                   textAlign: 'left',
-                                  borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
                                 <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
@@ -889,7 +849,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                             </thead>
                             <tbody>
                               {item.comboSlabs.map((s, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={i}>
                                   <td style={{ padding: '6px 0', color: '#334155' }}>
                                     {s.from.toLocaleString()} –{' '}
                                     {Number(s.to) === 0 || s.to >= 999999
@@ -929,8 +889,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             color: ACCENT,
             marginBottom: '12px',
             textTransform: 'uppercase',
-            borderBottom: `1px solid ${ACCENT}`,
-            paddingBottom: '5px',
           }}
         >
           Rent Agreement Details
@@ -945,11 +903,13 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               <th style={thStyle('center', ACCENT)}>Monthly Rent</th>
               <th style={thStyle('center', ACCENT)}>First Month Advance</th>
               <th style={thStyle('center', ACCENT)}>Months Count</th>
+              <th style={thStyle('center', ACCENT)}>Rent Start</th>
+              <th style={thStyle('center', ACCENT)}>Rent End</th>
               <th style={thStyle('right', ACCENT)}>Contract Rental Value</th>
             </tr>
           </thead>
           <tbody>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
+            <tr>
               <td style={tdStyle('left')}>{agreementDetails.rentType}</td>
               <td style={{ ...tdStyle('center'), fontWeight: '300' }}>
                 {agreementDetails.billingType || 'Monthly Advance'}
@@ -963,6 +923,8 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 {getActiveCurrency()} {fmt(agreementDetails.advance || 0)}
               </td>
               <td style={tdStyle('center')}>{agreementDetails.duration}</td>
+              <td style={tdStyle('center')}>{fmtDay(agreementDetails.contractStartDate)}</td>
+              <td style={tdStyle('center')}>{fmtDay(agreementDetails.contractEndDate)}</td>
               <td style={{ ...tdStyle('right'), fontWeight: '300', color: ACCENT }}>
                 {getActiveCurrency()} {fmt(agreementDetails.contractRentalValue || 0)}
               </td>
@@ -995,7 +957,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
             <tbody>
               {(agreementDetails.advance || 0) > 0 && (
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr>
                   <td style={{ padding: '4px 0', color: '#64748b' }}>
                     First Month Advance Payment
                   </td>
@@ -1005,7 +967,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 </tr>
               )}
               {!(agreementDetails.advance > 0) && (
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr>
                   <td style={{ padding: '4px 0', color: '#64748b' }}>First Month Advance</td>
                   <td
                     style={{
@@ -1020,7 +982,7 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 </tr>
               )}
               {(agreementDetails.deposit || 0) > 0 && (
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr>
                   <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
                   <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
                     {getActiveCurrency()} {fmt(agreementDetails.deposit)}
@@ -1028,20 +990,20 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                 </tr>
               )}
               {(agreementDetails.deposit || 0) === 0 && (
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr>
                   <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
                   <td style={{ padding: '4px 0', textAlign: 'right', color: '#94a3b8' }}>None</td>
                 </tr>
               )}
               {accessoryTotal > 0 && (
-                <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr>
                   <td style={{ padding: '4px 0', color: '#64748b' }}>Accessories</td>
                   <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
                     {getActiveCurrency()} {fmt(accessoryTotal)}
                   </td>
                 </tr>
               )}
-              <tr style={{ borderTop: '2px solid #333', fontWeight: '700' }}>
+              <tr style={{ fontWeight: '700' }}>
                 <td style={{ padding: '6px 0', color: '#1e293b', fontSize: '12px' }}>
                   INITIAL AMOUNT PAYABLE
                 </td>
@@ -1107,7 +1069,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
                   display: 'flex',
                   flexDirection: 'column',
                   padding: '8px 0',
-                  borderBottom: i === rows.length - 1 ? `1px solid ${ACCENT}` : '1px solid #f0f0f0',
                 }}
               >
                 <div
@@ -1159,8 +1120,6 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
             fontWeight: '300',
             color: ACCENT,
             textTransform: 'uppercase',
-            borderBottom: `1px solid ${ACCENT}`,
-            paddingBottom: '5px',
             marginBottom: '12px',
           }}
         >
@@ -1191,28 +1150,16 @@ const RentNormalQuotation: React.FC<RentNormalQuotationProps> = ({
               transform: 'rotate(-15deg)',
             }}
           />
-          <div style={{ borderTop: '1px solid #111', width: '100%', marginBottom: '6px' }}></div>
+          <div style={{ width: '100%', marginBottom: '6px' }}></div>
           <div style={{ fontSize: '11px', fontWeight: '300', color: '#111' }}>
             AUTHORIZED SIGNATURE
           </div>
         </div>
       </div>
 
-      {/* ─── FOOTER ─── */}
-      <div
-        style={{
-          borderTop: `1px solid ${ACCENT}`,
-          paddingTop: '15px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '11px',
-          color: '#666',
-        }}
-      >
-        <div>{companyInfo.website}</div>
-        <div>
-          {companyInfo.email} | {companyInfo.phone}
-        </div>
+      {/* ─── COMPANY FOOTER ─── */}
+      <div style={{ marginTop: 'auto', marginLeft: -40, marginRight: -40, marginBottom: -50 }}>
+        <LetterheadBottom />
       </div>
     </div>
   );

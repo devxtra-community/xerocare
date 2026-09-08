@@ -32,7 +32,19 @@ import {
   Home,
   Tag,
   RefreshCcw,
+  BookMarked,
+  Waves,
+  CalendarDays,
+  Coins,
+  ShieldCheck,
+  Layers,
+  Landmark,
+  ArrowLeftRight,
+  FileSpreadsheet,
 } from 'lucide-react';
+import { useNavCounts } from '@/hooks/useNavCounts';
+import { navCountFor, navCountForTitles } from '@/lib/navCounts';
+import { NavBadge } from '@/components/ui/NavBadge';
 
 import { useState, useEffect } from 'react';
 import { SidebarSearch, type SearchableNavItem } from '@/components/ui/SidebarSearch';
@@ -242,12 +254,12 @@ const menuItems = [
       {
         title: 'Receivables (AR)',
         icon: ReceiptText,
-        href: '/finance/accounts/receivable',
+        href: '/manager/accounts/receivable',
       },
       {
         title: 'Payables (AP)',
         icon: CreditCard,
-        href: '/finance/accounts/payable',
+        href: '/manager/accounts/payable',
       },
       {
         title: 'Service Estimates',
@@ -311,12 +323,26 @@ const menuItems = [
  */
 const accountsMenuItems = [
   { title: 'Overview', icon: BarChart2, href: '/manager/accounts' },
-  { title: 'Cash & Bank', icon: BookOpen, href: '/manager/accounts/cash-bank' },
+  { title: 'Chart of Accounts', icon: BookOpen, href: '/manager/accounts/chart-of-accounts' },
+  { title: 'General Ledger', icon: BookMarked, href: '/manager/accounts/general-ledger' },
+  { title: 'Cash & Bank', icon: Landmark, href: '/manager/accounts/cash-bank' },
+  { title: 'Income Statement', icon: TrendingUp, href: '/manager/accounts/income-statement' },
+  { title: 'Segmented P&L', icon: Layers, href: '/manager/accounts/segmented-pnl' },
+  { title: 'Balance Sheet', icon: Scale, href: '/manager/accounts/balance-sheet' },
+  { title: 'Cash Flow', icon: Waves, href: '/manager/accounts/cash-flow' },
+  { title: 'Day Book', icon: CalendarDays, href: '/manager/accounts/day-book' },
+  { title: 'Accounts Receivable', icon: ReceiptText, href: '/manager/accounts/receivable' },
+  { title: 'Accounts Payable', icon: CreditCard, href: '/manager/accounts/payable' },
+  { title: 'Assets & Depreciation', icon: Package, href: '/manager/accounts/assets' },
   { title: 'Income & Expenses', icon: DollarSign, href: '/manager/accounts/expenses' },
-  { title: 'Receivables', icon: ReceiptText, href: '/manager/accounts/receivable' },
-  { title: 'Payables', icon: CreditCard, href: '/manager/accounts/payable' },
-  { title: 'Profit & Loss', icon: TrendingUp, href: '/manager/accounts/profit-loss' },
+  { title: 'Income', icon: Coins, href: '/manager/accounts/income' },
   { title: 'Equity', icon: Scale, href: '/manager/accounts/equity' },
+  { title: 'Tax Report', icon: Receipt, href: '/manager/accounts/tax' },
+  { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/manager/accounts/guarantee-cheques' },
+  { title: 'Exchange Rates', icon: ArrowLeftRight, href: '/manager/accounts/exchange-rates' },
+  { title: 'Card Settlements', icon: CreditCard, href: '/manager/accounts/card-settlements' },
+  { title: 'Opening Balances', icon: FileSpreadsheet, href: '/manager/accounts/opening-balances' },
+  { title: 'Profit & Loss', icon: TrendingUp, href: '/manager/accounts/profit-loss' },
   { title: 'Depreciation', icon: PieChart, href: '/manager/accounts/depreciation' },
 ];
 
@@ -343,6 +369,7 @@ const managerSearchItems: SearchableNavItem[] = [
 
 export default function ManagerSidebar() {
   const pathname = usePathname();
+  const navCounts = useNavCounts();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [accountsOpen, setAccountsOpen] = useState(pathname.startsWith('/manager/accounts'));
   const [expiryCount, setExpiryCount] = useState(0);
@@ -441,6 +468,12 @@ export default function ManagerSidebar() {
                           <div className="flex items-center gap-3 px-3">
                             <item.icon className="h-4 w-4" />
                             <span className="font-medium">{item.title}</span>
+                            <NavBadge
+                              count={navCountForTitles(
+                                [item.title, ...(item.subItems?.map((s) => s.title) ?? [])],
+                                navCounts,
+                              )}
+                            />
                             {item.title === 'Sales Desk' && expiryCount > 0 && (
                               <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse ml-2">
                                 {expiryCount}
@@ -475,6 +508,7 @@ export default function ManagerSidebar() {
                                     <div className="flex items-center gap-3">
                                       <sub.icon className="h-3.5 w-3.5" />
                                       <span>{sub.title}</span>
+                                      <NavBadge count={navCountFor(sub.title, navCounts)} />
                                     </div>
                                     {sub.title === 'Overview' && expiryCount > 0 && (
                                       <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
@@ -501,7 +535,8 @@ export default function ManagerSidebar() {
                       >
                         <a href={item.href} className="flex items-center gap-3 px-3">
                           <item.icon className="h-4 w-4" />
-                          <span className="font-medium">{item.title}</span>
+                          <span className="font-medium flex-1">{item.title}</span>
+                          <NavBadge count={navCountFor(item.title, navCounts)} />
                         </a>
                       </SidebarMenuButton>
                     )}
@@ -540,7 +575,8 @@ export default function ManagerSidebar() {
                       >
                         <a href={item.href} className="flex items-center gap-2.5 px-3 w-full">
                           <item.icon className="h-3.5 w-3.5 shrink-0" />
-                          <span className="font-medium leading-tight">{item.title}</span>
+                          <span className="font-medium leading-tight flex-1">{item.title}</span>
+                          <NavBadge count={navCountFor(item.title, navCounts)} />
                         </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

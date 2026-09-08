@@ -24,6 +24,7 @@ import purchaseRouter from './routes/purchaseRoutes';
 import { httpLogger } from './middlewares/httpLogger';
 import serviceRouter from './routes/serviceRoutes';
 import stockTransferRouter from './routes/stockTransferRoutes';
+import navCountsRouter from './routes/navCountsRoutes';
 import taxReportRouter from './routes/taxReportRoutes';
 import { signFileUrls } from './middlewares/signFileUrls';
 
@@ -73,6 +74,7 @@ app.use('/purchases/tax-report', taxReportRouter);
 app.use('/purchases', purchaseRouter);
 app.use('/service', serviceRouter);
 app.use('/stock-transfers', stockTransferRouter);
+app.use('/', navCountsRouter);
 
 /**
  * Safety Net: Handling mistakes.

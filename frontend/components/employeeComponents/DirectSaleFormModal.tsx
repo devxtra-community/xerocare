@@ -973,6 +973,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                                 disabled
                                 className="w-full border border-slate-200 rounded-lg bg-slate-50 text-slate-400 text-sm px-2 py-1 cursor-not-allowed text-center"
                                 value={item.quantity}
+                                onWheel={(e) => e.currentTarget.blur()}
                               />
                             ) : (
                               <input
@@ -981,6 +982,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                                 className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-center"
                                 value={item.quantity}
                                 onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
+                                onWheel={(e) => e.currentTarget.blur()}
                               />
                             )}
                           </td>
@@ -990,6 +992,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                               className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
                               value={item.unitPrice}
                               onChange={(e) => updateItem(idx, 'unitPrice', Number(e.target.value))}
+                              onWheel={(e) => e.currentTarget.blur()}
                             />
                           </td>
                           <td className="px-4 py-3">
@@ -998,6 +1001,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                               className="w-full border border-slate-300 rounded-lg text-sm px-2 py-1 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
                               value={item.discount}
                               onChange={(e) => handleDiscountChange(idx, Number(e.target.value))}
+                              onWheel={(e) => e.currentTarget.blur()}
                               placeholder={`Max: ${item.maxDiscount || 0}`}
                             />
                           </td>
@@ -1007,6 +1011,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                               disabled
                               className="w-full border border-slate-200 rounded-lg bg-slate-50 text-slate-400 text-sm px-2 py-1 cursor-not-allowed text-center"
                               value={item.taxRate || 0}
+                              onWheel={(e) => e.currentTarget.blur()}
                             />
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-700">
@@ -1046,6 +1051,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
                   value={paymentAmount || ''}
                   onChange={(e) => setPaymentAmount(Number(e.target.value))}
+                  onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0.00"
                 />
               </div>
@@ -1179,6 +1185,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                         placeholder="e.g. 12"
                         value={warrantyDurationValue}
                         onChange={(e) => setWarrantyDurationValue(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                       />
                     </div>
                     <div>
@@ -1210,6 +1217,7 @@ export default function DirectSaleFormModal({ onClose, onSuccess }: DirectSaleFo
                       placeholder="e.g. 100000"
                       value={warrantyCopyLimit}
                       onChange={(e) => setWarrantyCopyLimit(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
                     />
                   </div>
                 )}

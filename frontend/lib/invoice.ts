@@ -128,6 +128,9 @@ export interface CreditNoteRecord {
 export interface Invoice {
   id: string;
   invoiceNumber: string;
+  /** The QTN- number this document carried before it converted into a contract.
+   *  Present only on converted rent/lease/sale rows. */
+  quotationNumber?: string;
   branchId: string;
   customerId: string | null;
   createdBy: string;

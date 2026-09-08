@@ -28,6 +28,16 @@ export class UsageRecord {
   @JoinColumn({ name: 'contractId' })
   contract!: Invoice;
 
+  // Human-facing document number for this bill (BILL-YYYY-NNNN), assigned once at
+  // creation and never reused — the reference a customer quotes when they call about a
+  // bill. Deliberately a single sequence across all three billTypes: an Advance Bill and
+  // a Security Deposit Bill are documents the customer receives too, so they need their
+  // own number in the same series rather than a parallel one. Nullable only so the column
+  // can be added to a table that already has rows; the startup backfill fills every
+  // pre-existing row (see dataSource.ts), and every creation path sets it from then on.
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  billNumber?: string;
+
   @Column({ type: 'date' })
   billingPeriodStart!: Date;
 

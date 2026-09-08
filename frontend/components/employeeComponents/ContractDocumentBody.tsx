@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { Letterhead, ACCENT, COMPANY } from '@/components/shared/documentTemplate';
+import { DocSectionTitle, DocFieldLabel, docBody } from '@/components/shared/documentStyle';
 import { Invoice } from '@/lib/invoice';
 import { ContractAgreement } from '@/lib/saleWorkflow';
 import { ExternalLink, FileText } from 'lucide-react';
@@ -75,25 +77,19 @@ function paymentModeLabel(mode?: string) {
 
 // ─── Layout primitives ────────────────────────────────────────────────────────
 
-function DocRule() {
-  return <hr className="border-0 border-t border-slate-300 my-0 print:border-slate-400" />;
-}
+// Headings and captions come from the shared quotation look so an agreement, a bill and
+// a quotation read as one set of paperwork. Nothing here draws a rule — the quotation
+// separates sections with space, not lines.
+/** Body typography for the whole agreement, matching the quotation layouts. */
+const docStyleBase: React.CSSProperties = {
+  fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
+  fontSize: 12,
+  fontWeight: 300,
+  color: '#1a1a1a',
+};
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-600 mb-3 print:text-slate-800">
-      {children}
-    </p>
-  );
-}
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-0.5 print:text-slate-500">
-      {children}
-    </p>
-  );
-}
+const SectionHeading = DocSectionTitle;
+const FieldLabel = DocFieldLabel;
 
 // ─── Document Header ──────────────────────────────────────────────────────────
 
@@ -123,35 +119,30 @@ function DocumentHeader({
 }) {
   const meta = AGREEMENT_TITLE[saleType] || AGREEMENT_TITLE.SALE;
   return (
-    <div>
-      {/* Letterhead row */}
-      <div className="flex items-start justify-between mb-5">
-        {/* Left: company mark */}
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500 mb-0.5">
-            Xerocare Trading &amp; Services W.L.L
-          </p>
-          <p className="text-[10px] text-slate-400 leading-relaxed max-w-65">
-            {agreement.dealerAddress || ''}
-            {agreement.dealerPhone ? ` · ${agreement.dealerPhone}` : ''}
-          </p>
+          <div style={{ fontSize: 17, fontWeight: 300, color: ACCENT, marginBottom: 6 }}>
+            {COMPANY.name}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 300, color: '#333', lineHeight: 1.5 }}>
+            <div>{agreement.dealerAddress || COMPANY.addressLine1}</div>
+            {agreement.dealerPhone ? <div>Mobile: {agreement.dealerPhone}</div> : null}
+          </div>
         </div>
-        {/* Right: document type */}
-        <div className="text-right">
-          <p className="text-2xl font-black tracking-tight text-slate-800 uppercase leading-none">
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 20, fontWeight: 300, color: ACCENT, textTransform: 'uppercase' }}>
             {meta.title}
-          </p>
-          <p className="text-[10px] text-slate-400 mt-1">
-            Ref: <span className="font-bold text-slate-600">{agreement.agreementNumber}</span>
-          </p>
-          <p className="text-[10px] text-slate-400">
-            Date:{' '}
-            <span className="font-bold text-slate-600">{fmtDate(agreement.contractDate)}</span>
-          </p>
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 300, color: '#333', marginTop: 6 }}>
+            Ref: {agreement.agreementNumber}
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 300, color: '#333' }}>
+            Date: {fmtDate(agreement.contractDate)}
+          </div>
         </div>
       </div>
-      <DocRule />
-      <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">{meta.subtitle}</p>
+      <div style={{ ...docBody, marginTop: 10 }}>{meta.subtitle}</div>
     </div>
   );
 }
@@ -168,9 +159,9 @@ function PartiesSection({
   return (
     <div>
       <SectionHeading>Parties to this Agreement</SectionHeading>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
         {/* Seller */}
-        <div className="p-3 border-r-0 sm:border-r border-b sm:border-b-0 border-slate-200">
+        <div className="p-3">
           <FieldLabel>Seller / Dealer</FieldLabel>
           <p className="text-sm font-black text-slate-800 mb-1">{agreement.dealerName}</p>
           {agreement.dealerAddress && (
@@ -237,9 +228,9 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
       {(productItems.length > 0 || allocations.length > 0) && (
         <div>
           <SectionHeading>Equipment / Product Details</SectionHeading>
-          <table className="w-full text-xs border border-slate-200 border-collapse">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
+              <tr className="bg-slate-50">
                 <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-slate-500">
                   Description
                 </th>
@@ -257,7 +248,7 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
                     const alloc = allocations[idx];
                     const serial = item.serialNumber || item.sn || alloc?.serialNumber || '—';
                     return (
-                      <tr key={idx} className="border-t border-slate-100">
+                      <tr key={idx}>
                         <td className="px-3 py-2 font-semibold text-slate-700">
                           {item.description}
                         </td>
@@ -269,7 +260,7 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
                     );
                   })
                 : allocations.map((alloc, idx) => (
-                    <tr key={idx} className="border-t border-slate-100">
+                    <tr key={idx}>
                       <td className="px-3 py-2 font-semibold text-slate-700">Allocated Machine</td>
                       <td className="px-3 py-2 font-mono text-[11px] text-slate-600">
                         {alloc.serialNumber}
@@ -286,9 +277,9 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
           <p className="text-[9px] font-black uppercase tracking-widest text-teal-600 mb-2">
             Accessories Included
           </p>
-          <table className="w-full text-xs border border-teal-100 border-collapse">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-teal-100 bg-teal-50/50">
+              <tr className="bg-teal-50/50">
                 <th className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest text-teal-600">
                   Description
                 </th>
@@ -302,7 +293,7 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
             </thead>
             <tbody>
               {accessoryItems.map((item, idx) => (
-                <tr key={idx} className="border-t border-teal-50">
+                <tr key={idx}>
                   <td className="px-3 py-2 font-semibold text-slate-700">{item.description}</td>
                   <td className="px-3 py-2 text-center text-slate-600">{item.quantity ?? 1}</td>
                   <td className="px-3 py-2 text-right font-semibold text-slate-700">
@@ -310,7 +301,7 @@ function ProductSection({ invoice, currency }: { invoice: Invoice; currency: str
                   </td>
                 </tr>
               ))}
-              <tr className="border-t border-teal-200 bg-teal-50/30">
+              <tr className="bg-teal-50/30">
                 <td
                   colSpan={2}
                   className="px-3 py-2 text-right font-black text-teal-700 text-[11px] uppercase"
@@ -341,16 +332,16 @@ function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
   return (
     <div>
       <SectionHeading>Sale Summary</SectionHeading>
-      <table className="w-full text-xs border border-slate-200 border-collapse">
+      <table className="w-full text-xs">
         <tbody>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 text-slate-600 font-semibold">Subtotal</td>
             <td className="px-3 py-2 text-right font-semibold text-slate-800">
               {fmtAmt(subtotal, currency)}
             </td>
           </tr>
           {tax > 0 && (
-            <tr className="border-b border-slate-100">
+            <tr>
               <td className="px-3 py-2 text-slate-500 font-semibold">
                 {invoice.taxName || 'VAT'}
                 {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
@@ -361,14 +352,14 @@ function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
             </tr>
           )}
           {invoice.customerVatStatus === 'EXEMPT' && (
-            <tr className="border-b border-slate-100">
+            <tr>
               <td className="px-3 py-2 text-slate-500 font-semibold">{invoice.taxName || 'VAT'}</td>
               <td className="px-3 py-2 text-right font-semibold text-slate-700">
                 {invoice.taxName || 'VAT'} Exempt
               </td>
             </tr>
           )}
-          <tr className="border-b border-slate-200 bg-slate-50">
+          <tr className="bg-slate-50">
             <td className="px-3 py-2 font-black text-slate-800">Total Amount</td>
             <td className="px-3 py-2 text-right font-black text-slate-800">
               {fmtAmt(total, currency)}
@@ -376,7 +367,7 @@ function SaleTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           </tr>
           {advance > 0 && (
             <>
-              <tr className="border-b border-slate-100">
+              <tr>
                 <td className="px-3 py-2 text-slate-500 font-semibold">Advance Paid</td>
                 <td className="px-3 py-2 text-right font-semibold text-slate-700">
                   − {fmtAmt(advance, currency)}
@@ -419,9 +410,9 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
   return (
     <div>
       <SectionHeading>Rental Terms</SectionHeading>
-      <table className="w-full text-xs border border-slate-200 border-collapse">
+      <table className="w-full text-xs">
         <tbody>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Contract Start
             </td>
@@ -430,7 +421,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
             </td>
           </tr>
           {invoice.effectiveTo && (
-            <tr className="border-b border-slate-100">
+            <tr>
               <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                 Contract End
               </td>
@@ -439,7 +430,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               </td>
             </tr>
           )}
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Billing Cycle
             </td>
@@ -447,7 +438,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               {billingCycleLabel(invoice.rentPeriod)}
             </td>
           </tr>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Payment Timing
             </td>
@@ -455,7 +446,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               {invoice.paymentTiming === 'ARREARS' ? 'Arrears (Postpaid)' : 'Advance'}
             </td>
           </tr>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Plan Type
             </td>
@@ -463,7 +454,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
               {planLabel(invoice.rentType)}
             </td>
           </tr>
-          <tr className="border-b border-slate-100 bg-slate-50">
+          <tr className="bg-slate-50">
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Monthly Rate
             </td>
@@ -473,7 +464,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           </tr>
           {monthlyRentTax > 0 && (
             <>
-              <tr className="border-b border-slate-100">
+              <tr>
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   {invoice.taxName || 'VAT'}
                   {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
@@ -482,7 +473,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                   {fmtAmt(monthlyRentTax, currency)}
                 </td>
               </tr>
-              <tr className="border-b border-slate-100 bg-slate-50">
+              <tr className="bg-slate-50">
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Monthly Rate (Incl. {invoice.taxName || 'VAT'})
                 </td>
@@ -497,7 +488,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           {bwItem && (
             <>
               {(bwItem.bwIncludedLimit ?? 0) > 0 && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     B&W Free Limit (A4)
                   </td>
@@ -507,7 +498,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                 </tr>
               )}
               {(bwItem.bwExcessRate ?? 0) > 0 && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     B&W Excess Rate (A4)
                   </td>
@@ -523,7 +514,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           {colorItem && (
             <>
               {(colorItem.colorIncludedLimit ?? 0) > 0 && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     Color Free Limit
                   </td>
@@ -533,7 +524,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                 </tr>
               )}
               {(colorItem.colorExcessRate ?? 0) > 0 && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     Color Excess Rate
                   </td>
@@ -549,7 +540,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
           {comboItem && (
             <>
               {(comboItem.combinedIncludedLimit ?? 0) > 0 && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     Combined Free Limit
                   </td>
@@ -620,7 +611,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                 <p className="text-[9px] font-black uppercase tracking-widest text-blue-600 mb-2">
                   Contract Rental Value
                 </p>
-                <div className="bg-blue-50/50 rounded p-3 border border-blue-100">
+                <div className="bg-blue-50/50 rounded p-3">
                   <div className="flex justify-between">
                     <span className="text-xs text-slate-600">Monthly Rent × {months} Months</span>
                     <span className="text-sm font-black text-blue-700">
@@ -660,7 +651,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                       <span className="font-semibold">{fmtAmt(accessoryTotal, currency)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-xs font-black border-t border-emerald-200 pt-1">
+                  <div className="flex justify-between text-xs font-black pt-1">
                     <span className="text-emerald-800 uppercase">Initial Amount Payable</span>
                     <span className="text-emerald-700">{fmtAmt(initialPayable, currency)}</span>
                   </div>
@@ -673,7 +664,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                   <p className="text-[9px] font-black uppercase tracking-widest text-violet-600 mb-2">
                     Contract Rental Schedule
                   </p>
-                  <table className="w-full text-xs border border-slate-200 border-collapse">
+                  <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-50">
                         <th className="px-2 py-1 text-left text-[8px] font-black uppercase tracking-widest text-slate-400">
@@ -692,7 +683,7 @@ function RentTermsSection({ invoice, currency }: { invoice: Invoice; currency: s
                     </thead>
                     <tbody>
                       {schedule.map((row) => (
-                        <tr key={row.month} className="border-b border-slate-100">
+                        <tr key={row.month}>
                           <td className="px-2 py-1 font-semibold">
                             Month {row.month} — {row.label}
                           </td>
@@ -753,9 +744,9 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
   return (
     <div>
       <SectionHeading>Lease Terms</SectionHeading>
-      <table className="w-full text-xs border border-slate-200 border-collapse">
+      <table className="w-full text-xs">
         <tbody>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Lease Type
             </td>
@@ -763,7 +754,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
               {isEMI ? 'EMI — Equal Monthly Installments' : 'FSM — Full-Service Management'}
             </td>
           </tr>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Tenure
             </td>
@@ -771,7 +762,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
               {invoice.leaseTenureMonths ?? '—'} months
             </td>
           </tr>
-          <tr className="border-b border-slate-100">
+          <tr>
             <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
               Contract Start
             </td>
@@ -782,7 +773,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
 
           {isEMI ? (
             <>
-              <tr className="border-b border-slate-100 bg-slate-50">
+              <tr className="bg-slate-50">
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Monthly EMI
                 </td>
@@ -792,7 +783,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
               </tr>
               {monthlyTax > 0 && (
                 <>
-                  <tr className="border-b border-slate-100">
+                  <tr>
                     <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                       {invoice.taxName || 'VAT'}
                       {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
@@ -801,7 +792,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                       {fmtAmt(monthlyTax, currency)}
                     </td>
                   </tr>
-                  <tr className="border-b border-slate-100 bg-slate-50">
+                  <tr className="bg-slate-50">
                     <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                       Monthly EMI (Incl. {invoice.taxName || 'VAT'})
                     </td>
@@ -822,7 +813,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
             </>
           ) : (
             <>
-              <tr className="border-b border-slate-100">
+              <tr>
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Service Plan
                 </td>
@@ -830,7 +821,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                   {planLabel(invoice.rentType)}
                 </td>
               </tr>
-              <tr className="border-b border-slate-100 bg-slate-50">
+              <tr className="bg-slate-50">
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Monthly Service Amount
                 </td>
@@ -840,7 +831,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
               </tr>
               {monthlyTax > 0 && (
                 <>
-                  <tr className="border-b border-slate-100">
+                  <tr>
                     <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                       {invoice.taxName || 'VAT'}
                       {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''}
@@ -849,7 +840,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                       {fmtAmt(monthlyTax, currency)}
                     </td>
                   </tr>
-                  <tr className="border-b border-slate-100 bg-slate-50">
+                  <tr className="bg-slate-50">
                     <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                       Monthly Service Amount (Incl. {invoice.taxName || 'VAT'})
                     </td>
@@ -862,7 +853,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
               {bwItem && (
                 <>
                   {(bwItem.bwIncludedLimit ?? 0) > 0 && (
-                    <tr className="border-b border-slate-100">
+                    <tr>
                       <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                         B&W Free Limit (A4)
                       </td>
@@ -872,7 +863,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
                     </tr>
                   )}
                   {(bwItem.bwExcessRate ?? 0) > 0 && (
-                    <tr className="border-b border-slate-100">
+                    <tr>
                       <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                         B&W Excess Rate
                       </td>
@@ -886,7 +877,7 @@ function LeaseTermsSection({ invoice, currency }: { invoice: Invoice; currency: 
               {colorItem && (
                 <>
                   {(colorItem.colorIncludedLimit ?? 0) > 0 && (
-                    <tr className="border-b border-slate-100">
+                    <tr>
                       <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                         Color Free Limit
                       </td>
@@ -963,11 +954,11 @@ function AdvanceSection({
         {saleType === 'LEASE' ? 'Down Payment / Advance' : 'First Month Advance & Security Deposit'}
         {hasAccessories ? ' & Accessories' : ''}
       </SectionHeading>
-      <table className="w-full text-xs border border-slate-200 border-collapse">
+      <table className="w-full text-xs">
         <tbody>
           {hasAdvance && (
             <>
-              <tr className="border-b border-slate-100">
+              <tr>
                 <td className="px-3 py-2 w-32 sm:w-48 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   {advanceLabel}
                 </td>
@@ -976,7 +967,7 @@ function AdvanceSection({
                 </td>
               </tr>
               {advanceTax > 0 && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     {invoice.taxName || 'VAT'}
                     {invoice.taxPercent ? ` (${invoice.taxPercent}%)` : ''} on {advanceLabel}
@@ -990,7 +981,7 @@ function AdvanceSection({
                 </tr>
               )}
               {invoice.preferredPaymentMode && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     Payment Mode
                   </td>
@@ -999,7 +990,7 @@ function AdvanceSection({
                   </td>
                 </tr>
               )}
-              <tr className={hasDeposit || hasAccessories ? 'border-b border-slate-200' : ''}>
+              <tr className={hasDeposit || hasAccessories ? '' : ''}>
                 <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
                   {advanceNote}
                 </td>
@@ -1008,7 +999,7 @@ function AdvanceSection({
           )}
           {hasDeposit && (
             <>
-              <tr className="border-b border-slate-100 bg-slate-50">
+              <tr className="bg-slate-50">
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   Security Deposit
                 </td>
@@ -1017,7 +1008,7 @@ function AdvanceSection({
                 </td>
               </tr>
               {invoice.securityDepositMode && (
-                <tr className="border-b border-slate-100">
+                <tr>
                   <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     Deposit Mode
                   </td>
@@ -1026,7 +1017,7 @@ function AdvanceSection({
                   </td>
                 </tr>
               )}
-              <tr className={hasAccessories ? 'border-b border-slate-200' : ''}>
+              <tr className={hasAccessories ? '' : ''}>
                 <td colSpan={2} className="px-3 py-2 text-[10px] text-slate-500 italic">
                   {depositNote}
                 </td>
@@ -1035,7 +1026,7 @@ function AdvanceSection({
           )}
           {hasAccessories && (
             <>
-              <tr className="border-b border-slate-100 bg-teal-50/40">
+              <tr className="bg-teal-50/40">
                 <td className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-teal-600">
                   Accessories ({accessoryItems.length})
                 </td>
@@ -1077,7 +1068,7 @@ function WarrantySection({ invoice }: { invoice: Invoice }) {
   return (
     <div>
       <SectionHeading>Warranty</SectionHeading>
-      <div className="border border-slate-200 px-3 py-2.5 text-xs space-y-1">
+      <div className="px-3 py-2.5 text-xs space-y-1">
         {lines.map((line, i) => (
           <p key={i} className="font-semibold text-slate-700">
             {line}
@@ -1099,7 +1090,7 @@ function TermsSection({ agreement }: { agreement: ContractAgreement }) {
   return (
     <div>
       <SectionHeading>Terms &amp; Conditions</SectionHeading>
-      <div className="border border-slate-200 px-3 py-3">
+      <div className="px-3 py-3">
         <pre className="text-[10px] text-slate-600 whitespace-pre-wrap font-sans leading-relaxed">
           {agreement.termsAndConditions}
         </pre>
@@ -1114,9 +1105,9 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
   return (
     <div>
       <SectionHeading>Signatures</SectionHeading>
-      <div className="grid grid-cols-1 sm:grid-cols-2 border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2">
         {/* Seller */}
-        <div className="p-3 border-r-0 sm:border-r border-b sm:border-b-0 border-slate-200">
+        <div className="p-3">
           <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
             Seller Signature
           </p>
@@ -1125,7 +1116,7 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
               <img
                 src={agreement.employeeSignatureData}
                 alt="Employee Signature"
-                className="max-h-16 w-full object-contain border border-slate-200 bg-white p-1 mb-1"
+                className="max-h-16 w-full object-contain bg-white p-1 mb-1"
               />
               <p className="text-[9px] text-slate-500">
                 {agreement.employeeSignedByName}
@@ -1135,11 +1126,11 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
               </p>
             </div>
           ) : (
-            <div className="border border-dashed border-slate-300 py-4 text-center">
+            <div className="py-4 text-center">
               <p className="text-[10px] text-slate-400">Awaiting seller signature</p>
             </div>
           )}
-          <div className="mt-3 pt-2 border-t border-slate-200">
+          <div className="mt-3 pt-2">
             <p className="text-[9px] text-slate-400">Authorised Signatory</p>
             <p className="text-[9px] font-bold text-slate-600">{agreement.dealerName}</p>
           </div>
@@ -1151,7 +1142,7 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
             Customer Signature
           </p>
           {agreement.customerSignedMethod === 'UPLOAD' && agreement.customerSignedDocumentUrl ? (
-            <div className="border border-slate-200 p-2 space-y-1.5">
+            <div className="p-2 space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <FileText size={12} className="text-slate-500 shrink-0" />
                 <p className="text-[10px] font-bold text-slate-600">Uploaded Document</p>
@@ -1166,7 +1157,7 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
                 View Signed Document
               </a>
               {agreement.customerSignedDocumentNote && (
-                <p className="text-[10px] text-slate-500 border-t border-slate-100 pt-1">
+                <p className="text-[10px] text-slate-500 pt-1">
                   {agreement.customerSignedDocumentNote}
                 </p>
               )}
@@ -1182,7 +1173,7 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
               <img
                 src={agreement.customerSignatureData}
                 alt="Customer Signature"
-                className="max-h-16 w-full object-contain border border-slate-200 bg-white p-1 mb-1"
+                className="max-h-16 w-full object-contain bg-white p-1 mb-1"
               />
               <p className="text-[9px] text-slate-500">
                 {agreement.customerSignedByName}
@@ -1195,11 +1186,11 @@ function SignaturesSection({ agreement }: { agreement: ContractAgreement }) {
               </p>
             </div>
           ) : (
-            <div className="border border-dashed border-slate-300 py-4 text-center">
+            <div className="py-4 text-center">
               <p className="text-[10px] text-slate-400">Awaiting customer signature</p>
             </div>
           )}
-          <div className="mt-3 pt-2 border-t border-slate-200">
+          <div className="mt-3 pt-2">
             <p className="text-[9px] text-slate-400">Customer / Authorised Representative</p>
             <p className="text-[9px] font-bold text-slate-600">{agreement.customerName}</p>
           </div>
@@ -1220,43 +1211,37 @@ export function ContractDocumentBody({ invoice, agreement, currency }: Props) {
   const saleType = (invoice.saleType || 'SALE').toUpperCase();
 
   return (
-    <div className="space-y-5 text-slate-800 bg-white print:p-6">
-      {/* ── Letterhead / Document Header ── */}
-      <DocumentHeader agreement={agreement} saleType={saleType} />
+    // Same stationery the quotations use — letterhead bands top and bottom with the
+    // faded trademark behind the content.
+    <Letterhead>
+      <div style={{ ...docStyleBase }}>
+        {/* ── Letterhead / Document Header ── */}
+        <DocumentHeader agreement={agreement} saleType={saleType} />
 
-      {/* ── Parties ── */}
-      <PartiesSection invoice={invoice} agreement={agreement} />
+        {/* ── Parties ── */}
+        <PartiesSection invoice={invoice} agreement={agreement} />
 
-      <DocRule />
+        {/* ── Equipment ── */}
+        <ProductSection invoice={invoice} currency={currency} />
 
-      {/* ── Equipment ── */}
-      <ProductSection invoice={invoice} currency={currency} />
+        {/* ── Type-specific terms ── */}
+        {saleType === 'SALE' && <SaleTermsSection invoice={invoice} currency={currency} />}
+        {saleType === 'RENT' && <RentTermsSection invoice={invoice} currency={currency} />}
+        {saleType === 'LEASE' && <LeaseTermsSection invoice={invoice} currency={currency} />}
 
-      <DocRule />
+        {/* ── First Month Advance & Security Deposit ── */}
+        <AdvanceSection invoice={invoice} saleType={saleType} currency={currency} />
 
-      {/* ── Type-specific terms ── */}
-      {saleType === 'SALE' && <SaleTermsSection invoice={invoice} currency={currency} />}
-      {saleType === 'RENT' && <RentTermsSection invoice={invoice} currency={currency} />}
-      {saleType === 'LEASE' && <LeaseTermsSection invoice={invoice} currency={currency} />}
+        {/* ── Warranty ── */}
+        <WarrantySection invoice={invoice} />
 
-      <DocRule />
+        {/* ── Terms & Conditions ── */}
+        <TermsSection agreement={agreement} />
 
-      {/* ── First Month Advance & Security Deposit ── */}
-      <AdvanceSection invoice={invoice} saleType={saleType} currency={currency} />
-
-      {/* ── Warranty ── */}
-      <WarrantySection invoice={invoice} />
-
-      <DocRule />
-
-      {/* ── Terms & Conditions ── */}
-      <TermsSection agreement={agreement} />
-
-      <DocRule />
-
-      {/* ── Signatures ── */}
-      <SignaturesSection agreement={agreement} />
-    </div>
+        {/* ── Signatures ── */}
+        <SignaturesSection agreement={agreement} />
+      </div>
+    </Letterhead>
   );
 }
 

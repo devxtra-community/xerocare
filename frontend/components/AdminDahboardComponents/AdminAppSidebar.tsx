@@ -51,6 +51,9 @@ import {
   Repeat,
   type LucideIcon,
 } from 'lucide-react';
+import { useNavCounts } from '@/hooks/useNavCounts';
+import { navCountFor, navCountForTitles } from '@/lib/navCounts';
+import { NavBadge } from '@/components/ui/NavBadge';
 
 import {
   Sidebar,
@@ -426,6 +429,7 @@ const adminSearchItems: SearchableNavItem[] = [
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const navCounts = useNavCounts();
   const [openGroups, setOpenGroups] = useState<string[]>([]);
   const [accountsOpen, setAccountsOpen] = useState(pathname.startsWith('/admin/accounts'));
 
@@ -504,6 +508,12 @@ export default function AppSidebar() {
                           <div className="flex items-center gap-3 px-3">
                             <item.icon className="h-4 w-4" />
                             <span className="font-medium">{item.title}</span>
+                            <NavBadge
+                              count={navCountForTitles(
+                                [item.title, ...(item.subItems?.map((s) => s.title) ?? [])],
+                                navCounts,
+                              )}
+                            />
                           </div>
                           {isOpen ? (
                             <ChevronDown className="h-4 w-4 opacity-50" />
@@ -530,7 +540,8 @@ export default function AppSidebar() {
                                 >
                                   <a href={sub.href} className="flex items-center gap-3 px-3">
                                     <sub.icon className="h-3.5 w-3.5" />
-                                    <span>{sub.title}</span>
+                                    <span className="flex-1">{sub.title}</span>
+                                    <NavBadge count={navCountFor(sub.title, navCounts)} />
                                   </a>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
@@ -556,7 +567,8 @@ export default function AppSidebar() {
                       >
                         <a href={item.href} className="flex items-center gap-3 px-3">
                           <item.icon className="h-4 w-4" />
-                          <span className="font-medium">{item.title}</span>
+                          <span className="font-medium flex-1">{item.title}</span>
+                          <NavBadge count={navCountFor(item.title, navCounts)} />
                         </a>
                       </SidebarMenuButton>
                     )}
@@ -595,7 +607,8 @@ export default function AppSidebar() {
                       >
                         <a href={item.href} className="flex items-center gap-2.5 px-3 w-full">
                           <item.icon className="h-3.5 w-3.5 shrink-0" />
-                          <span className="font-medium leading-tight">{item.title}</span>
+                          <span className="font-medium leading-tight flex-1">{item.title}</span>
+                          <NavBadge count={navCountFor(item.title, navCounts)} />
                         </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

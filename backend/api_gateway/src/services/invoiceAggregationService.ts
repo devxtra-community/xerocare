@@ -1273,6 +1273,48 @@ export class InvoiceAggregationService {
     }
   }
 
+  /**
+   * Sidebar badge counts, merged from every service that owns some kind of queue.
+   *
+   * Uses allSettled rather than all: a badge is a convenience, so one service being down
+   * or not yet exposing the endpoint must degrade to "no dot for its keys" instead of
+   * failing the whole sidebar. Each service namespaces its own keys, so the merge cannot
+   * have two services fighting over one number.
+   */
+  async getNavCounts(token: string, branchId: string): Promise<Record<string, number>> {
+    const headers = { Authorization: `Bearer ${token}` };
+    const sources: Array<{ name: string; url: string }> = [
+      { name: 'billing', url: `${BILLING_SERVICE_URL}/invoices/nav-counts?branchId=${branchId}` },
+      { name: 'inventory', url: `${VENDOR_INVENTORY_SERVICE_URL}/nav-counts?branchId=${branchId}` },
+      { name: 'employee', url: `${EMPLOYEE_SERVICE_URL}/nav-counts?branchId=${branchId}` },
+    ];
+
+    const results = await Promise.allSettled(
+      sources.map((s) => axios.get(s.url, { headers, timeout: 8000 })),
+    );
+
+    const merged: Record<string, number> = {};
+    results.forEach((result, i) => {
+      if (result.status !== 'fulfilled') {
+        logger.warn(`navCounts: ${sources[i].name} unavailable`, {
+          reason: axios.isAxiosError(result.reason)
+            ? `${result.reason.response?.status ?? ''} ${result.reason.message}`
+            : String(result.reason),
+        });
+        return;
+      }
+      const data = result.value.data?.data;
+      if (data && typeof data === 'object') {
+        for (const [key, value] of Object.entries(data)) {
+          const n = Number(value);
+          if (Number.isFinite(n)) merged[key] = (merged[key] || 0) + n;
+        }
+      }
+    });
+
+    return merged;
+  }
+
   async getPendingCounts(token: string, branchId: string) {
     try {
       const response = await axios.get(

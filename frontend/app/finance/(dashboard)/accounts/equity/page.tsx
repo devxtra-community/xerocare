@@ -332,6 +332,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                   step="1"
                   value={form.numberOfShares}
                   onChange={(e) => set('numberOfShares', e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -345,6 +346,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                   step="0.0001"
                   value={form.pricePerShare}
                   onChange={(e) => set('pricePerShare', e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -387,6 +389,7 @@ function EquityModal({ entry, cashAccounts, onClose, onSave, saving }: ModalProp
                 step="0.01"
                 value={form.amount}
                 onChange={(e) => set('amount', e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />

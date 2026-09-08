@@ -24,6 +24,7 @@ import { RentPeriod } from '../entities/enums/rentPeriod';
 import { LeaseType } from '../entities/enums/leaseType';
 import { ItemType } from '../entities/enums/itemType';
 import { InvoiceType } from '../entities/enums/invoiceType';
+import { promoteQuotationToInvoice } from '../utils/invoiceNumber';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { WarrantyType } from '../entities/enums/warrantyType';
@@ -1296,6 +1297,10 @@ export class BillingService {
     if (invoice.saleType === SaleType.LEASE) {
       // LEASE: No Security Deposit Logic
       const saved = await this.invoiceRepo.save(invoice);
+      // Approving converts the quotation into a contract — renumber QTN- to INV- here
+      // too, since this path can promote a document that was never explicitly converted.
+      const approvedNumber = await promoteQuotationToInvoice(this.invoiceRepo.manager, saved.id);
+      if (approvedNumber) saved.invoiceNumber = approvedNumber;
       await logAudit(
         invoice.id,
         'STATUS_CHANGE',
@@ -1318,6 +1323,10 @@ export class BillingService {
     }
 
     const saved = await this.invoiceRepo.save(invoice);
+    // Approving converts the quotation into a contract — renumber QTN- to INV- here
+    // too, since this path can promote a document that was never explicitly converted.
+    const approvedNumber = await promoteQuotationToInvoice(this.invoiceRepo.manager, saved.id);
+    if (approvedNumber) saved.invoiceNumber = approvedNumber;
     await logAudit(
       invoice.id,
       'STATUS_CHANGE',
@@ -1836,6 +1845,8 @@ export class BillingService {
     invoice.status = InvoiceStatus.DRAFT;
 
     const saved = await this.invoiceRepo.save(invoice);
+    const convertedNumber = await promoteQuotationToInvoice(this.invoiceRepo.manager, saved.id);
+    if (convertedNumber) saved.invoiceNumber = convertedNumber;
     await logAudit(
       invoice.id,
       'STATUS_CHANGE',
@@ -2048,6 +2059,10 @@ export class BillingService {
       invoice.financeApprovedBy = userId;
 
       const savedInvoice = await queryRunner.manager.save(invoice);
+      // The document has stopped being a quotation — give it its INV- number before the
+      // transaction closes, so the renumber can never commit apart from the conversion.
+      const promotedNumber = await promoteQuotationToInvoice(queryRunner.manager, savedInvoice.id);
+      if (promotedNumber) savedInvoice.invoiceNumber = promotedNumber;
       await queryRunner.commitTransaction();
 
       await logAudit(
@@ -2235,6 +2250,10 @@ export class BillingService {
       }
 
       const savedInvoice = await queryRunner.manager.save(invoice);
+      // The document has stopped being a quotation — give it its INV- number before the
+      // transaction closes, so the renumber can never commit apart from the conversion.
+      const promotedNumber = await promoteQuotationToInvoice(queryRunner.manager, savedInvoice.id);
+      if (promotedNumber) savedInvoice.invoiceNumber = promotedNumber;
       await queryRunner.commitTransaction();
 
       // Record Security Deposit — goes through the approval gate, NOT directly to cashbook.

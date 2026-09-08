@@ -2111,6 +2111,64 @@ async function runPreMigrations() {
     `);
     logger.info('readingTakenDate column ensured (and backfilled) on usage_records.');
 
+    // Bill document number (BILL-YYYY-NNNN) — the reference a customer quotes when they
+    // call about a bill. Added nullable because the table already has rows; the backfill
+    // below numbers every one of them, and all four creation paths set it from here on.
+    await client.query(`
+      ALTER TABLE usage_records
+      ADD COLUMN IF NOT EXISTS "billNumber" VARCHAR;
+    `);
+    // Partial unique index (not a plain UNIQUE constraint) for the same reason the
+    // signingToken index above is partial: it must tolerate the NULL rows that exist in
+    // the window between adding the column and the backfill completing.
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uniq_usage_records_billNumber
+          ON usage_records ("billNumber") WHERE "billNumber" IS NOT NULL;
+      `);
+    } catch (err) {
+      logger.warn(
+        `Could not create uniq_usage_records_billNumber index: ${(err as Error).message}`,
+      );
+    }
+    // Backfill in creation order, restarting the sequence each calendar year so the
+    // numbers read the way the generator will continue them. The offset subquery makes
+    // this safe to re-run: it starts after the highest number already issued for that
+    // year instead of colliding with it.
+    await client.query(`
+      WITH numbered AS (
+        SELECT u.id,
+               EXTRACT(YEAR FROM u."createdAt")::int AS yr,
+               ROW_NUMBER() OVER (
+                 PARTITION BY EXTRACT(YEAR FROM u."createdAt")
+                 ORDER BY u."createdAt" ASC, u.id ASC
+               ) AS rn
+        FROM usage_records u
+        WHERE u."billNumber" IS NULL
+      )
+      UPDATE usage_records t
+      SET "billNumber" =
+        'BILL-' || n.yr::text || '-' ||
+        LPAD((n.rn + COALESCE((
+          SELECT MAX(SUBSTRING(x."billNumber" FROM 11)::int)
+          FROM usage_records x
+          WHERE x."billNumber" LIKE 'BILL-' || n.yr::text || '-%'
+        ), 0))::text, 4, '0')
+      FROM numbered n
+      WHERE t.id = n.id;
+    `);
+    logger.info('billNumber column ensured (and backfilled) on usage_records.');
+
+    // Original quotation reference, preserved when a converted quotation is renumbered
+    // from QTN- to INV-. Nullable with no backfill on purpose: rows that already exist
+    // were never renumbered, so they have no earlier number to record, and inventing one
+    // would imply a conversion that never happened.
+    await client.query(`
+      ALTER TABLE invoices
+      ADD COLUMN IF NOT EXISTS "quotationNumber" VARCHAR;
+    `);
+    logger.info('quotationNumber column ensured on invoices.');
+
     // ProductAllocation.itemType — see the entity's comment on this column for why every
     // consumer of a contract's productAllocations needs it. Defaults (and is backfilled)
     // to 'PRODUCT': every row that existed before accessories could be allocated at all

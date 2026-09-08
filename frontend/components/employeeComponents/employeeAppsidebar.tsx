@@ -19,6 +19,9 @@ import {
   Wrench,
   Repeat,
 } from 'lucide-react';
+import { useNavCounts } from '@/hooks/useNavCounts';
+import { navCountFor } from '@/lib/navCounts';
+import { NavBadge } from '@/components/ui/NavBadge';
 
 import {
   Sidebar,
@@ -171,6 +174,7 @@ export default function EmployeeSidebar({
   initialEmployeeJob?: EmployeeJob | null;
 }) {
   const pathname = usePathname();
+  const navCounts = useNavCounts();
   const [employeeJob, setEmployeeJob] = useState<EmployeeJob | null | undefined>(
     initialEmployeeJob,
   );
@@ -259,7 +263,8 @@ export default function EmployeeSidebar({
                   >
                     <a href={item.href} className="flex items-center gap-3 px-3">
                       <item.icon className="h-4 w-4" />
-                      <span className="font-medium">{item.title}</span>
+                      <span className="font-medium flex-1">{item.title}</span>
+                      <NavBadge count={navCountFor(item.title, navCounts)} />
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

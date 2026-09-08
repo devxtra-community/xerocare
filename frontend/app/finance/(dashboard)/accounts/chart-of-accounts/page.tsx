@@ -12,6 +12,7 @@ import {
 import { formatCurrency } from '@/lib/format';
 import { getActiveCurrency } from '@/lib/currency';
 import { getUserFromToken } from '@/lib/auth';
+import { useAccountsBasePath } from '@/lib/accountsBasePath';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { buildChartOfAccountsStatement } from '@/lib/finance/statementBuilders';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,7 @@ function LoadingSkeleton() {
 }
 
 export default function ChartOfAccountsPage() {
+  const accountsBase = useAccountsBasePath();
   const [periodFrom, setPeriodFrom] = useState(currentYearFrom());
   const [periodTo, setPeriodTo] = useState(currentYearTo());
   const [openSections, setOpenSections] = useState(
@@ -650,8 +652,8 @@ export default function ChartOfAccountsPage() {
           periodFrom={periodFrom}
           periodTo={periodTo}
           isAdmin={currentUser?.role === 'ADMIN'}
-          cashBankPagePath="/finance/accounts/cash-bank"
-          assetsPagePath="/finance/accounts/assets"
+          cashBankPagePath={`${accountsBase}/cash-bank`}
+          assetsPagePath={`${accountsBase}/assets`}
           onClose={() => setViewingLineItem(null)}
         />
       )}

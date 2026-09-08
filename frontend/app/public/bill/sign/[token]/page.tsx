@@ -155,6 +155,8 @@ export default function RemoteBillApprovalPage() {
                     bill={bill.usage}
                     currency={getActiveCurrency()}
                     advancePayment={bill.advancePayment}
+                    depositPayment={bill.depositPayment}
+                    previousBill={bill.previousBill}
                   />
                 </div>
               ) : (

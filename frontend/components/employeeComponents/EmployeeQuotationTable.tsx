@@ -1424,9 +1424,24 @@ function QuotationFormModal({
     setRentType(value);
     if (value === 'CPC' || value === 'CPC_COMBO') {
       setMonthlyRent('');
+      // CPC bills for copies actually made, so the charge for a period cannot be known
+      // until that period has run — there is no fixed rent to collect up front. Force
+      // postpaid, and clear any advance already typed: the advance field is hidden
+      // under ARREARS, so a figure left in state would be submitted invisibly against
+      // a contract that has no advance.
+      setPaymentTiming('ARREARS');
+      setAdvanceAmount('');
+      setAdvanceEdited(false);
     }
   };
   const [advanceAmount, setAdvanceAmount] = useState('');
+  // The first month's advance is one period's rent, so it mirrors the rent as it is
+  // typed. The mirroring must STOP the moment the user types their own figure — a
+  // customer can agree an advance that differs from the monthly rent, and silently
+  // overwriting that would be worse than not prefilling at all. Held as state rather
+  // than a ref because the edit-load effect also sets it, which the React Compiler
+  // rightly refuses on a ref.
+  const [advanceEdited, setAdvanceEdited] = useState(false);
   const [discountPercent, setDiscountPercent] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().split('T')[0]);
   const [effectiveTo, setEffectiveTo] = useState('');
@@ -1570,7 +1585,12 @@ function QuotationFormModal({
     if (initialData.rentType) setRentType(initialData.rentType);
     if (initialData.rentPeriod) setRentPeriod(initialData.rentPeriod);
     if (initialData.monthlyRent) setMonthlyRent(String(initialData.monthlyRent));
-    if (initialData.advanceAmount) setAdvanceAmount(String(initialData.advanceAmount));
+    if (initialData.advanceAmount) {
+      // Editing an existing quotation: its advance is a saved figure, not a mirror, so
+      // retyping the rent must not overwrite it.
+      setAdvanceEdited(true);
+      setAdvanceAmount(String(initialData.advanceAmount));
+    }
     if (initialData.discountPercent) setDiscountPercent(String(initialData.discountPercent));
     if (initialData.paymentTiming)
       setPaymentTiming(initialData.paymentTiming as 'ADVANCE' | 'ARREARS');
@@ -4026,6 +4046,54 @@ function QuotationFormModal({
                     )}
                   </div>
 
+                  {/* Payment Timing */}
+                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Billing Method
+                        </label>
+                        <Select
+                          value={paymentTiming}
+                          onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
+                        >
+                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Disabled on CPC: there is no fixed rent to prepay, so
+                                the auto-switch to postpaid cannot be undone into an
+                                invalid combination. */}
+                            <SelectItem
+                              value="ADVANCE"
+                              disabled={rentType === 'CPC' || rentType === 'CPC_COMBO'}
+                            >
+                              Advance Billing (Advance Payment)
+                            </SelectItem>
+                            <SelectItem value="ARREARS">
+                              Arrears Billing (Postpaid Billing)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Description
+                        </label>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          {rentType === 'CPC' || rentType === 'CPC_COMBO'
+                            ? 'Cost-per-copy is billed after the fact — the charge depends on copies actually made, so postpaid is the only option.'
+                            : paymentTiming === 'ADVANCE'
+                              ? 'Customer pays upcoming period rent in advance + current excess usage each billing cycle.'
+                              : 'Customer pays current period rent + excess usage after the billing period completes.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Rent Config - Remaining Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {rentType !== 'CPC' && rentType !== 'CPC_COMBO' && (
@@ -4041,7 +4109,10 @@ function QuotationFormModal({
                             value={monthlyRent}
                             onChange={(e) => {
                               const v = handleDecimalInput(e.target.value);
-                              if (v !== undefined) setMonthlyRent(v);
+                              if (v !== undefined) {
+                                setMonthlyRent(v);
+                                if (!advanceEdited) setAdvanceAmount(v);
+                              }
                             }}
                             className="h-9 text-sm"
                           />
@@ -4058,7 +4129,10 @@ function QuotationFormModal({
                               value={advanceAmount}
                               onChange={(e) => {
                                 const v = handleDecimalInput(e.target.value);
-                                if (v !== undefined) setAdvanceAmount(v);
+                                if (v !== undefined) {
+                                  setAdvanceEdited(true);
+                                  setAdvanceAmount(v);
+                                }
                               }}
                               className="h-9 text-sm"
                             />
@@ -4117,7 +4191,7 @@ function QuotationFormModal({
                         <>
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Payment Mode
+                              Deposit Payment Mode
                             </label>
                             <select
                               value={securityDepositMode}
@@ -4145,46 +4219,6 @@ function QuotationFormModal({
                           </div>
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Payment Timing */}
-                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Billing Method
-                        </label>
-                        <Select
-                          value={paymentTiming}
-                          onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
-                        >
-                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ADVANCE">
-                              Advance Billing (Advance Payment)
-                            </SelectItem>
-                            <SelectItem value="ARREARS">
-                              Arrears Billing (Postpaid Billing)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Description
-                        </label>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                          {paymentTiming === 'ADVANCE'
-                            ? 'Customer pays upcoming period rent in advance + current excess usage each billing cycle.'
-                            : 'Customer pays current period rent + excess usage after the billing period completes.'}
-                        </p>
-                      </div>
                     </div>
                   </div>
 
@@ -4231,23 +4265,6 @@ function QuotationFormModal({
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Deposit Mode
-                        </label>
-                        <Select
-                          value={securityDepositMode}
-                          onValueChange={(v) => setSecurityDepositMode(v as 'CASH' | 'CHEQUE')}
-                        >
-                          <SelectTrigger className="h-9 text-sm border-slate-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="CASH">Cash</SelectItem>
-                            <SelectItem value="CHEQUE">Cheque / Reference</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                       {securityDepositMode === 'CHEQUE' && (
                         <>
                           <div className="space-y-2">
@@ -4756,6 +4773,54 @@ function QuotationFormModal({
                     )}
                   </div>
 
+                  {/* Payment Timing */}
+                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
+                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Billing Method
+                        </label>
+                        <Select
+                          value={paymentTiming}
+                          onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
+                        >
+                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Disabled on CPC: there is no fixed rent to prepay, so
+                                the auto-switch to postpaid cannot be undone into an
+                                invalid combination. */}
+                            <SelectItem
+                              value="ADVANCE"
+                              disabled={rentType === 'CPC' || rentType === 'CPC_COMBO'}
+                            >
+                              Advance Billing (Advance Payment)
+                            </SelectItem>
+                            <SelectItem value="ARREARS">
+                              Arrears Billing (Postpaid Billing)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Description
+                        </label>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          {rentType === 'CPC' || rentType === 'CPC_COMBO'
+                            ? 'Cost-per-copy is billed after the fact — the charge depends on copies actually made, so postpaid is the only option.'
+                            : paymentTiming === 'ADVANCE'
+                              ? 'Customer pays upcoming period rent in advance + current excess usage each billing cycle.'
+                              : 'Customer pays current period rent + excess usage after the billing period completes.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Lease Config - Remaining Fields */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-card p-4 rounded-xl border border-slate-100 shadow-sm space-y-2">
@@ -4835,6 +4900,7 @@ function QuotationFormModal({
                                 if (v !== undefined) {
                                   setLastEditedLease('PERIODIC');
                                   setMonthlyRent(v);
+                                  if (!advanceEdited) setAdvanceAmount(v);
                                   if (!v) setTotalLeaseAmount('');
                                 }
                               }}
@@ -4854,7 +4920,10 @@ function QuotationFormModal({
                               value={advanceAmount}
                               onChange={(e) => {
                                 const v = handleDecimalInput(e.target.value);
-                                if (v !== undefined) setAdvanceAmount(v);
+                                if (v !== undefined) {
+                                  setAdvanceEdited(true);
+                                  setAdvanceAmount(v);
+                                }
                               }}
                               className="h-9 text-sm"
                             />
@@ -4913,7 +4982,7 @@ function QuotationFormModal({
                         <>
                           <div className="space-y-2">
                             <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Payment Mode
+                              Deposit Payment Mode
                             </label>
                             <select
                               value={securityDepositMode}
@@ -4941,46 +5010,6 @@ function QuotationFormModal({
                           </div>
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Payment Timing */}
-                  <div className="bg-card p-5 rounded-xl border border-violet-100 shadow-sm space-y-4">
-                    <label className="text-[11px] font-bold text-violet-600 uppercase flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-violet-400" /> Payment Timing
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Billing Method
-                        </label>
-                        <Select
-                          value={paymentTiming}
-                          onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
-                        >
-                          <SelectTrigger className="h-9 text-sm w-full border-orange-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ADVANCE">
-                              Advance Billing (Advance Payment)
-                            </SelectItem>
-                            <SelectItem value="ARREARS">
-                              Arrears Billing (Postpaid Billing)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Description
-                        </label>
-                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                          {paymentTiming === 'ADVANCE'
-                            ? 'Customer pays upcoming period rent in advance + current excess usage each billing cycle.'
-                            : 'Customer pays current period rent + excess usage after the billing period completes.'}
-                        </p>
-                      </div>
                     </div>
                   </div>
 
@@ -5030,23 +5059,6 @@ function QuotationFormModal({
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                          Deposit Mode
-                        </label>
-                        <Select
-                          value={securityDepositMode}
-                          onValueChange={(v) => setSecurityDepositMode(v as 'CASH' | 'CHEQUE')}
-                        >
-                          <SelectTrigger className="h-9 text-sm border-slate-200">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="CASH">Cash</SelectItem>
-                            <SelectItem value="CHEQUE">Cheque / Reference</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
                       {securityDepositMode === 'CHEQUE' && (
                         <>
                           <div className="space-y-2">

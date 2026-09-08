@@ -2,10 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Send,
   Mail,
   Phone,
-  Globe,
   AlertTriangle,
   AlertCircle,
   RotateCcw,
@@ -51,6 +49,11 @@ import ReturnInvoiceLayout from '../../public/quatationLayouts/ReturnInvoiceLayo
 
 import { getActiveCurrency } from '@/lib/currency';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import {
+  LetterheadTop,
+  LetterheadBottom,
+  watermarkBackground,
+} from '@/components/shared/documentTemplate';
 interface ProductMeta {
   brandRelation?: { name?: string };
   brand?: string;
@@ -677,6 +680,10 @@ export function InvoiceViewDialog({
     discountedMonthlyRent: (invoice.monthlyRent || 0) * (1 - (invoice.discountPercent || 0) / 100),
     contractRentalValue: contractRentalValueInvoice,
     initialAmountPayable: initialAmountPayableInvoice,
+    // Same contract period the quotation shows — start, and the end derived from the
+    // duration, so the invoice states the term it is billing for.
+    contractStartDate: invoice.effectiveFrom,
+    contractEndDate: invoice.effectiveTo,
   };
 
   // Rent totals — use snapshotted taxPercent first, fall back to product metadata
@@ -750,6 +757,8 @@ export function InvoiceViewDialog({
       : Number(invoice.totalAmount || 0),
     contractRentalValue: (invoice.monthlyRent || 0) * (invoice.leaseTenureMonths || 0),
     initialAmountPayable: firstMonthAdvanceInvoice + securityDepositInvoice,
+    contractStartDate: invoice.effectiveFrom,
+    contractEndDate: invoice.effectiveTo,
   };
 
   // Lease totals — use snapshotted taxPercent first, fall back to product metadata
@@ -823,6 +832,7 @@ export function InvoiceViewDialog({
             <div
               id="invoice-print-content"
               className="flex-1 overflow-y-auto scrollbar-hide flex flex-col bg-white"
+              style={watermarkBackground}
             >
               {useTemplate ? (
                 <div className="flex-1">
@@ -1084,38 +1094,8 @@ export function InvoiceViewDialog({
                 </div>
               ) : (
                 <>
-                  {/* Header */}
-                  <div className="relative flex justify-between items-center px-12 pt-6 pb-4 shrink-0 bg-white">
-                    <div className="flex flex-col">
-                      <h1 className="text-5xl font-[900] text-[#D41B22] tracking-[-0.051em] leading-[0.7] font-sans lowercase">
-                        xerocare
-                      </h1>
-                      <p className="text-[11px] font-bold text-[#AAAAAA] tracking-[0.25em] mt-2 uppercase">
-                        TRADING & SERVICES W.L.L
-                      </p>
-                    </div>
-                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center justify-center pt-2 bg-transparent">
-                      <img
-                        src="/quatationlogo/quatationlogo.png"
-                        alt="logo"
-                        className="w-[90px] h-[90px] object-contain"
-                      />
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <h1
-                        className="text-5xl font-[900] text-[#D41B22] leading-[0.7] mb-1"
-                        dir="rtl"
-                      >
-                        زيرو كير
-                      </h1>
-                      <p
-                        className="text-[14px] font-black text-[#AAAAAA] tracking-tight mt-2"
-                        dir="rtl"
-                      >
-                        للتجارة والخدمات ذ.م.م
-                      </p>
-                    </div>
-                  </div>
+                  {/* Company letterhead — the printed stationery artwork. */}
+                  <LetterheadTop />
 
                   <div className="px-12 pb-6 space-y-4 bg-white flex-1 overflow-visible">
                     <div className="flex justify-between items-start pt-1">
@@ -1249,11 +1229,16 @@ export function InvoiceViewDialog({
                           const image = resolveImageUrl(detail?.imageUrl || detail?.image_url);
                           const productName =
                             detail?.name || detail?.part_name || item.description || 'N/A';
-                          const productDesc =
+                          // item.description holds the model NAME on a quotation line,
+                          // so using it as a last resort printed the name again under a
+                          // "Product Description" heading and read as a broken field.
+                          // Fall back to the real description only.
+                          const rawDesc =
                             detail?.description ||
                             detail?.model?.description ||
                             item.description ||
                             '';
+                          const productDesc = rawDesc === productName ? '' : rawDesc;
                           return (
                             <div key={idx} className="space-y-4 relative">
                               <div className="pl-2">
@@ -1428,7 +1413,7 @@ export function InvoiceViewDialog({
                           <div className="pt-2">
                             <p className="text-[13px] font-black text-black uppercase">For</p>
                             <p className="text-[13px] font-black text-black uppercase">
-                              XEROCARE TRADING & SERVICES WLL
+                              XEROCARE TECHNOLOGY L.L.C
                             </p>
                             <p className="text-[13px] font-black text-black uppercase">
                               DOHA QATAR
@@ -1651,33 +1636,8 @@ export function InvoiceViewDialog({
                     </div>
                   )}
 
-                  <div className="px-12 pb-10 pt-4 bg-white shrink-0 border-t-[2px] border-black mt-auto">
-                    <div className="flex justify-between items-center py-6">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-zinc-900 p-2 rounded-md">
-                          <Mail size={16} className="text-white" />
-                        </div>
-                        <span className="text-[12px] font-black text-black">mail@xerocare.com</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="bg-zinc-900 p-2 rounded-md">
-                          <Phone size={16} className="text-white" />
-                        </div>
-                        <span className="text-[12px] font-black text-black">+974 7071 7282</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="bg-zinc-900 p-2 rounded-md">
-                          <Send size={16} className="text-white" />
-                        </div>
-                        <span className="text-[12px] font-black text-black">Doha-Qatar</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="bg-zinc-900 p-2 rounded-md">
-                          <Globe size={16} className="text-white" />
-                        </div>
-                        <span className="text-[12px] font-black text-black">www.xerocare.com</span>
-                      </div>
-                    </div>
+                  <div className="mt-auto shrink-0">
+                    <LetterheadBottom />
                   </div>
                 </>
               )}

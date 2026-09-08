@@ -16,6 +16,7 @@ import { WarrantyType } from '../entities/enums/warrantyType';
 import { ProductAllocation, AllocationStatus } from '../entities/productAllocationEntity';
 import { emitProductStatusUpdate } from '../events/publisher/productStatusEvent';
 import { UsageRecordItem } from '../entities/usageRecordItemEntity';
+import { withBillNumber } from '../utils/billNumber';
 import { PaymentTiming } from '../entities/enums/paymentTiming';
 import { MoreThanOrEqual, In } from 'typeorm';
 import { r2SignedGetUrl } from '../utils/r2Url';
@@ -618,7 +619,10 @@ export class UsageService {
           billCreatedByEmployeeId: payload.recordedBy,
           billCreatedByName,
         });
-        await queryRunner.manager.save(usage);
+        await withBillNumber(queryRunner.manager, async (billNumber) => {
+          usage.billNumber = billNumber;
+          return queryRunner.manager.save(usage);
+        });
 
         if (usageItemsToSave.length > 0) {
           const itemsToCreate = usageItemsToSave.map((item) =>
@@ -727,7 +731,10 @@ export class UsageService {
         billCreatedByEmployeeId: payload.recordedBy,
         billCreatedByName,
       });
-      await this.usageRepo.save(usage);
+      await withBillNumber(this.invoiceRepo.manager, async (billNumber) => {
+        usage.billNumber = billNumber;
+        return this.usageRepo.save(usage);
+      });
 
       if (usageItemsToSave.length > 0) {
         const itemsToCreate = usageItemsToSave.map((item) =>

@@ -1,6 +1,9 @@
 'use client';
 
 import { LayoutDashboard, Users, CalendarCheck, Plane, Wallet, Bell } from 'lucide-react';
+import { useNavCounts } from '@/hooks/useNavCounts';
+import { navCountFor } from '@/lib/navCounts';
+import { NavBadge } from '@/components/ui/NavBadge';
 
 import {
   Sidebar,
@@ -59,6 +62,7 @@ const menuItems = [
  */
 export default function HrAppSidebar() {
   const pathname = usePathname();
+  const navCounts = useNavCounts();
 
   const handleLogout = async () => {
     try {
@@ -113,7 +117,8 @@ export default function HrAppSidebar() {
                   >
                     <a href={item.href} className="flex items-center gap-3 px-3">
                       <item.icon className="h-4 w-4" />
-                      <span className="font-medium">{item.title}</span>
+                      <span className="font-medium flex-1">{item.title}</span>
+                      <NavBadge count={navCountFor(item.title, navCounts)} />
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

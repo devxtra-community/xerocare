@@ -453,7 +453,11 @@ export default function FinanceQuotationTable({
                               const num = match ? parseInt(match[1], 10) : 0;
                               return `RTN-INV-${String(num).padStart(4, '0')}`;
                             }
-                            return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
+                            // Converted rows show their INV- number; the quotation it
+                            // came from stays reachable on hover.
+                            return q.quotationNumber
+                              ? `${q.invoiceNumber} (from ${q.quotationNumber})`
+                              : q.invoiceNumber;
                           })()}
                         >
                           {(() => {
@@ -463,7 +467,7 @@ export default function FinanceQuotationTable({
                               const num = match ? parseInt(match[1], 10) : 0;
                               return `RTN-INV-${String(num).padStart(4, '0')}`;
                             }
-                            return q.invoiceNumber?.replace(/^INV-/i, 'QTN-');
+                            return q.invoiceNumber;
                           })()}
                         </span>
                       </TableCell>

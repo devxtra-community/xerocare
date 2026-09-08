@@ -30,6 +30,7 @@ import {
   markBillApprovedManually,
   resetBillForResend,
   SalePaymentRequest,
+  PreviousBillSummary,
 } from '@/lib/saleWorkflow';
 import { Invoice } from '@/lib/invoice';
 import { BillDocumentBody } from './BillDocumentBody';
@@ -72,6 +73,7 @@ export function BillModal({
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [advancePayment, setAdvancePayment] = useState<SalePaymentRequest | null>(null);
   const [depositPayment, setDepositPayment] = useState<SalePaymentRequest | null>(null);
+  const [previousBill, setPreviousBill] = useState<PreviousBillSummary | null>(null);
   const [tab, setTab] = useState<BillTab>(initialTab);
   const [remoteLink, setRemoteLink] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
@@ -90,6 +92,7 @@ export function BillModal({
       setInvoice(data.invoice);
       setAdvancePayment(data.advancePayment);
       setDepositPayment(data.depositPayment);
+      setPreviousBill(data.previousBill);
     } catch (err) {
       toast.error('Failed to load bill', { description: getApiErrorMessage(err) });
     } finally {
@@ -303,6 +306,7 @@ export function BillModal({
                       currency={currency}
                       advancePayment={advancePayment}
                       depositPayment={depositPayment}
+                      previousBill={previousBill}
                     />
                     <Button
                       variant="ghost"

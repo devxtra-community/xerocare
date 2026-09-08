@@ -50,6 +50,7 @@ import {
   updateStatus,
   deleteInvoice,
   getAuditLogs,
+  getNavCounts,
 } from '../controllers/invoiceController';
 
 /**
@@ -147,6 +148,16 @@ router.get(
   '/pending-counts',
   requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER),
   getPendingCounts,
+);
+
+/**
+ * Sidebar badge counts for every module. Open to all signed-in roles — each sidebar
+ * shows only its own menu items, so the counts a role can see are bounded by that.
+ */
+router.get(
+  '/nav-counts',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE, UserRole.MANAGER, UserRole.EMPLOYEE, UserRole.HR),
+  getNavCounts,
 );
 
 /**

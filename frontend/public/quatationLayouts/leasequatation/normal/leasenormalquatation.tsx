@@ -1,4 +1,5 @@
 import React from 'react';
+import { LetterheadTop, LetterheadBottom } from '@/components/shared/documentTemplate';
 import { numberToWords } from '@/lib/numberToWords';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -28,6 +29,15 @@ export interface LeaseLineItem {
   warranty?: string;
 }
 
+/** dd MMM yyyy, tolerant of nulls and unparsable values. */
+const fmtDay = (v?: string | null): string => {
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 export interface LeaseAgreementDetails {
   leaseType: string;
   rentType?: string; // FSM only: e.g. "FIXED LIMIT", "CPC"
@@ -36,6 +46,9 @@ export interface LeaseAgreementDetails {
    *  "Month-End (Arrears)" (billed after the period completes). */
   billingType?: string;
   duration: string;
+  /** Lease period — start, and the end derived from the tenure. */
+  contractStartDate?: string;
+  contractEndDate?: string;
   advance: number;
   deposit: number;
   discountPercent?: number;
@@ -120,12 +133,12 @@ const tdStyle = (align: 'left' | 'center' | 'right' = 'center'): React.CSSProper
 
 const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
   companyInfo = {
-    name: 'Xerocare Trading & Services W.L.L',
-    address: 'P.O.BOX 37494, DOHA-QATAR',
-    email: 'mail@xerocare.com',
-    phone: '+974 7071 7282',
+    name: 'Xerocare Technology L.L.C',
+    address: 'Shams Business Center, Media City free Zone, Al Messaned, Sharjah, UAE',
+    email: 'support.ae@xerocare.com',
+    phone: '+971 6527 0399',
     website: 'www.xerocare.com',
-    logo: '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png',
+    logo: '/branding/xerocare-logo.png',
   },
   billTo = {
     name: 'Customer Name',
@@ -188,25 +201,19 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
         minHeight: '1122px',
         margin: '0 auto',
         padding: '50px 40px',
+        backgroundImage: `url('/branding/letterhead-watermark.png')`,
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'center',
+        backgroundSize: '78%',
         color: '#1a1a1a',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
       }}
     >
-      {/* ─── TITLE ─── */}
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-        <div
-          style={{
-            fontSize: '22px',
-            fontWeight: '300',
-            color: ACCENT,
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-          }}
-        >
-          LEASE QUOTATION
-        </div>
+      {/* ─── COMPANY LETTERHEAD ─── */}
+      <div style={{ marginLeft: -40, marginRight: -40, marginTop: -50, marginBottom: 20 }}>
+        <LetterheadTop />
       </div>
 
       {/* ─── HEADER ─── */}
@@ -221,35 +228,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             <div>Email: {companyInfo.email}</div>
           </div>
         </div>
-        <div
-          style={{
-            width: '160px',
-            height: '75px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-          }}
-        >
-          {companyInfo.logo ? (
-            <img
-              src={companyInfo.logo}
-              alt="Logo"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
-          ) : (
-            <div
-              style={{
-                fontSize: '20px',
-                fontWeight: 'normal',
-                color: '#ccc',
-                border: '2px solid #ccc',
-                padding: '8px 16px',
-              }}
-            >
-              LOGO
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ─── BILL TO & QUOTATION INFO ─── */}
@@ -258,7 +236,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           display: 'flex',
           justifyContent: 'space-between',
           marginBottom: '24px',
-          borderTop: `1px solid ${ACCENT}`,
           paddingTop: '18px',
         }}
       >
@@ -316,8 +293,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             backgroundColor: 'transparent',
             color: '#000000',
             padding: '6px 20px',
-            border: '1px solid #000000',
-            borderRadius: '6px',
             textAlign: 'center',
             fontSize: '13px',
             fontWeight: '300',
@@ -359,8 +334,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
             color: ACCENT,
             textTransform: 'uppercase',
             marginBottom: '10px',
-            borderBottom: '1px solid #e0e0e0',
-            paddingBottom: '5px',
           }}
         >
           Product Details
@@ -428,8 +401,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               style={{
                 backgroundColor: 'transparent',
                 color: '#000',
-                borderTop: '2.5px solid #000',
-                borderBottom: '2.5px solid #000',
               }}
             >
               <th style={{ ...thStyle(), width: '36px' }}>Sl.</th>
@@ -563,7 +534,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   <tr
                     style={{
                       backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
-                      borderBottom: '1px solid #eee',
                     }}
                   >
                     <td
@@ -596,7 +566,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   </tr>
                 )}
                 {!item.productImage && (
-                  <tr style={{ borderBottom: '1px solid #eee' }}>
+                  <tr>
                     <td colSpan={isFSM ? 3 : 4}></td>
                   </tr>
                 )}
@@ -615,8 +585,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               fontWeight: '300',
               color: ACCENT,
               textTransform: 'uppercase',
-              borderBottom: `1px solid ${ACCENT}`,
-              paddingBottom: '5px',
               marginBottom: '10px',
             }}
           >
@@ -624,12 +592,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <thead>
-              <tr
-                style={{
-                  borderTop: '2.5px solid #000',
-                  borderBottom: '2.5px solid #000',
-                }}
-              >
+              <tr style={{}}>
                 <th style={{ ...thStyle('left', '#000'), width: '70px' }}></th>
                 <th style={thStyle('left', '#000')}>Description</th>
                 <th style={thStyle('center', '#000')}>Qty</th>
@@ -642,7 +605,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   key={idx}
                   style={{
                     backgroundColor: idx % 2 === 0 ? '#fff' : '#f7f7f7',
-                    borderBottom: '1px solid #eee',
                   }}
                 >
                   <td style={{ padding: '8px 10px' }}>
@@ -718,7 +680,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                         marginBottom: '12px',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        borderBottom: '1px solid #e2e8f0',
                         paddingBottom: '8px',
                       }}
                     >
@@ -765,7 +726,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                                 style={{
                                   color: '#64748b',
                                   textAlign: 'left',
-                                  borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
                                 <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
@@ -782,7 +742,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                             </thead>
                             <tbody>
                               {item.bwSlabs.map((s, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={i}>
                                   <td style={{ padding: '6px 0', color: '#334155' }}>
                                     {s.from.toLocaleString()} –{' '}
                                     {Number(s.to) === 0 || s.to >= 999999
@@ -836,7 +796,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                                 style={{
                                   color: '#64748b',
                                   textAlign: 'left',
-                                  borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
                                 <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
@@ -853,7 +812,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                             </thead>
                             <tbody>
                               {item.colorSlabs.map((s, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={i}>
                                   <td style={{ padding: '6px 0', color: '#334155' }}>
                                     {s.from.toLocaleString()} –{' '}
                                     {Number(s.to) === 0 || s.to >= 999999
@@ -907,7 +866,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                                 style={{
                                   color: '#64748b',
                                   textAlign: 'left',
-                                  borderBottom: '1px solid #e2e8f0',
                                 }}
                               >
                                 <th style={{ padding: '6px 0', fontWeight: '300' }}>Page Range</th>
@@ -924,7 +882,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                             </thead>
                             <tbody>
                               {item.comboSlabs.map((s, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <tr key={i}>
                                   <td style={{ padding: '6px 0', color: '#334155' }}>
                                     {s.from.toLocaleString()} –{' '}
                                     {Number(s.to) === 0 || s.to >= 999999
@@ -986,7 +944,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               </tr>
             </thead>
             <tbody>
-              <tr style={{ borderBottom: '1px solid #eee' }}>
+              <tr>
                 <td style={tdStyle('left')}>{leaseDetails.leaseType || 'FSM'}</td>
                 <td style={{ ...tdStyle('center'), fontWeight: '300' }}>
                   {leaseDetails.billingType || 'Monthly Advance'}
@@ -1032,7 +990,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                       <tbody>
                         {(leaseDetails.advance || 0) > 0 && (
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr>
                             <td style={{ padding: '4px 0', color: '#64748b' }}>
                               First Month Advance Payment
                             </td>
@@ -1042,7 +1000,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                           </tr>
                         )}
                         {!(leaseDetails.advance > 0) && (
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr>
                             <td style={{ padding: '4px 0', color: '#64748b' }}>
                               First Month Advance
                             </td>
@@ -1059,7 +1017,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                           </tr>
                         )}
                         {(leaseDetails.deposit || 0) > 0 && (
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr>
                             <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
                             <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
                               {getActiveCurrency()} {fmt(leaseDetails.deposit)}
@@ -1067,7 +1025,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                           </tr>
                         )}
                         {(leaseDetails.deposit || 0) === 0 && (
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr>
                             <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
                             <td style={{ padding: '4px 0', textAlign: 'right', color: '#94a3b8' }}>
                               None
@@ -1075,14 +1033,14 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                           </tr>
                         )}
                         {accessoryTotal > 0 && (
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <tr>
                             <td style={{ padding: '4px 0', color: '#64748b' }}>Accessories</td>
                             <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
                               {getActiveCurrency()} {fmt(accessoryTotal)}
                             </td>
                           </tr>
                         )}
-                        <tr style={{ borderTop: '2px solid #333', fontWeight: '700' }}>
+                        <tr style={{ fontWeight: '700' }}>
                           <td style={{ padding: '6px 0', color: '#1e293b', fontSize: '12px' }}>
                             INITIAL AMOUNT PAYABLE
                           </td>
@@ -1120,6 +1078,8 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                 { label: 'Lease Type', value: leaseDetails.leaseType },
                 { label: 'Billing Type', value: leaseDetails.billingType || 'Monthly Advance' },
                 { label: 'Tenure / Duration', value: leaseDetails.duration },
+                { label: 'Lease Start', value: fmtDay(leaseDetails.contractStartDate) },
+                { label: 'Lease End', value: fmtDay(leaseDetails.contractEndDate) },
                 {
                   label: 'Monthly EMI Amount',
                   value: `${getActiveCurrency()} ${fmt(leaseDetails.monthlyEmi)}`,
@@ -1141,7 +1101,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                     display: 'flex',
                     justifyContent: 'space-between',
                     padding: '8px 0',
-                    borderBottom: '1px solid #f0f0f0',
                   }}
                 >
                   <span style={{ fontSize: '12px', color: '#666' }}>{item.label}</span>
@@ -1175,7 +1134,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
                 <tbody>
                   {(leaseDetails.advance || 0) > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr>
                       <td style={{ padding: '4px 0', color: '#64748b' }}>
                         First Month Advance Payment
                       </td>
@@ -1185,7 +1144,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                     </tr>
                   )}
                   {!(leaseDetails.advance > 0) && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr>
                       <td style={{ padding: '4px 0', color: '#64748b' }}>First Month Advance</td>
                       <td
                         style={{
@@ -1200,7 +1159,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                     </tr>
                   )}
                   {(leaseDetails.deposit || 0) > 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr>
                       <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
                       <td style={{ padding: '4px 0', textAlign: 'right', fontWeight: '600' }}>
                         {getActiveCurrency()} {fmt(leaseDetails.deposit)}
@@ -1208,14 +1167,14 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                     </tr>
                   )}
                   {(leaseDetails.deposit || 0) === 0 && (
-                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr>
                       <td style={{ padding: '4px 0', color: '#64748b' }}>Security Deposit</td>
                       <td style={{ padding: '4px 0', textAlign: 'right', color: '#94a3b8' }}>
                         None
                       </td>
                     </tr>
                   )}
-                  <tr style={{ borderTop: '2px solid #333', fontWeight: '700' }}>
+                  <tr style={{ fontWeight: '700' }}>
                     <td style={{ padding: '6px 0', color: '#1e293b', fontSize: '12px' }}>
                       INITIAL AMOUNT PAYABLE
                     </td>
@@ -1256,7 +1215,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
                   display: 'flex',
                   justifyContent: 'space-between',
                   padding: '7px 0',
-                  borderBottom: '1px solid #f0f0f0',
                 }}
               >
                 <span style={{ fontSize: '12px', color: '#666' }}>{item.label}</span>
@@ -1278,7 +1236,6 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               marginBottom: '12px',
               textTransform: 'uppercase',
               paddingBottom: '5px',
-              borderBottom: `1px solid ${ACCENT}`,
             }}
           >
             Warranty Coverage
@@ -1490,7 +1447,7 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
               opacity: 0.6,
             }}
           />
-          <div style={{ borderTop: '2px solid #333', paddingTop: '6px' }}>
+          <div style={{ paddingTop: '6px' }}>
             <div style={{ fontSize: '12px', fontWeight: '300', textTransform: 'uppercase' }}>
               Authorized Signatory
             </div>
@@ -1501,21 +1458,9 @@ const LeaseNormalQuotation: React.FC<LeaseNormalQuotationProps> = ({
         </div>
       </div>
 
-      {/* ─── FOOTER ─── */}
-      <div
-        style={{
-          marginTop: 'auto',
-          borderTop: `1px solid ${ACCENT}`,
-          paddingTop: '15px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '11px',
-          color: '#666',
-        }}
-      >
-        <div>www.xerocare.com</div>
-        <div>37494,Doha-qatar</div>
-        <div>mail@xerocare.com | +974 7071 7282 (+٩٧٤ ٧٠٧١ ٧٢٨٢)</div>
+      {/* ─── COMPANY FOOTER ─── */}
+      <div style={{ marginTop: 'auto', marginLeft: -40, marginRight: -40, marginBottom: -50 }}>
+        <LetterheadBottom />
       </div>
     </div>
   );

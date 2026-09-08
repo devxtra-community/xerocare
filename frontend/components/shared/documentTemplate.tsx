@@ -16,18 +16,33 @@ import React from 'react';
 export const ACCENT = '#000000';
 export const TEXT_MUTED = '#555555';
 export const TEXT_LIGHT = '#888888';
-export const LOGO_SRC =
-  '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png';
+/** Retained for any consumer that still imports it — now the current wordmark, not the
+ *  retired round badge. */
+export const LOGO_SRC = '/branding/xerocare-logo.png';
+
+export const watermarkBackground: React.CSSProperties = {
+  backgroundImage: `url('/branding/letterhead-watermark.png')`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'center',
+  backgroundSize: '78%',
+};
 
 export const docStyle: React.CSSProperties = {
   fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif",
   fontSize: 13,
   color: '#1a1a1a',
   background: '#ffffff',
-  padding: '50px 48px',
+  padding: 0,
   width: '100%',
   boxSizing: 'border-box',
+  minHeight: 1040,
+  display: 'flex',
+  flexDirection: 'column',
+  ...watermarkBackground,
 };
+
+/** Inset applied to the document body, so the letterhead bands stay full-bleed. */
+const bodyInset: React.CSSProperties = { padding: '0 44px' };
 
 export const thStyle = (align: 'left' | 'center' | 'right' = 'left'): React.CSSProperties => ({
   padding: '10px 10px',
@@ -59,6 +74,108 @@ export interface BranchInfo {
   currency?: string;
 }
 
+// ─── Xerocare Letterhead ──────────────────────────────────────────────────────
+// The bands, logo lock-up and contact strip are the ACTUAL artwork from the company
+// letterhead PDF, cropped full-width at 600dpi and dropped in as images. An earlier
+// attempt rebuilt them in CSS and never matched — the wordmark, the icon glyphs and
+// the angled red flashes on the bottom rule are all bespoke vector art. Because each
+// crop spans the full page width, stretching it to 100% reproduces the original
+// spacing exactly at any page size.
+
+export const BRAND_RED = '#E3001B';
+
+/** Red band + right-aligned "xerocare Techonology L.L.C" lock-up. */
+export const LETTERHEAD_TOP_SRC = '/branding/letterhead-top.png';
+/** Contact strip (house / phone / cursor icons) above the black-and-red bottom rule. */
+export const LETTERHEAD_FOOTER_SRC = '/branding/letterhead-footer.png';
+/** The faded trademark that sits behind the page content. */
+export const LETTERHEAD_WATERMARK_SRC = '/branding/letterhead-watermark.png';
+/** The logo lock-up on its own, for anywhere that needs just the mark. */
+export const XEROCARE_LOGO_SRC = '/branding/xerocare-logo.png';
+
+/** Company contact details, matching the printed letterhead. */
+export const COMPANY = {
+  name: 'Xerocare Technology L.L.C',
+  addressLine1: 'Shams Business Center, Sharjah',
+  addressLine2: 'Media City free Zone, Al Messaned, Sharjah, UAE',
+  phone1: '+971 6527 0399',
+  phone2: '+974 4143 6399',
+  email: 'support.ae@xerocare.com',
+  website: 'www.xerocare.com',
+};
+
+/**
+ * Remittance details printed on customer-facing bills, transcribed from the bill the
+ * client supplied as the reference layout.
+ *
+ * Note this names the Qatar trading entity while LetterheadTop's artwork is the UAE one
+ * — that split is how their real paperwork reads, so it is reproduced rather than
+ * reconciled here. Change both together if the group ever consolidates.
+ */
+export const BANK = {
+  payTo: 'XEROCARE TRADING & SERVICE WLL',
+  bank: 'QNB QATAR',
+  accountNo: '0251 1998 43001',
+  iban: 'QA03 QNBA 0000 0000 0251 1998 43001',
+  swift: 'QNBAQAQAXXX',
+};
+
+export function LetterheadTop() {
+  return (
+    <img
+      src={LETTERHEAD_TOP_SRC}
+      alt="Xerocare Technology L.L.C"
+      style={{ display: 'block', width: '100%', height: 'auto' }}
+    />
+  );
+}
+
+export function LetterheadBottom() {
+  return (
+    <img
+      src={LETTERHEAD_FOOTER_SRC}
+      alt=""
+      style={{ display: 'block', width: '100%', height: 'auto' }}
+    />
+  );
+}
+
+/**
+ * Background shorthand for the faded centre trademark.
+ *
+ * Applied as a background rather than an absolutely-positioned element on purpose: an
+ * absolute child paints ABOVE the page's static content, which would put the watermark
+ * on top of the text. As a background it sits behind everything with no z-index work.
+ */
+
+/** Wraps a document in the company letterhead. */
+export function Letterhead({
+  children,
+  minHeight = 1050,
+}: {
+  children: React.ReactNode;
+  minHeight?: number | string;
+}) {
+  return (
+    <div
+      style={{
+        background: '#ffffff',
+        minHeight,
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        ...watermarkBackground,
+      }}
+    >
+      <LetterheadTop />
+      <div style={{ flex: 1, padding: '18px 40px 24px 40px' }}>{children}</div>
+      <div style={{ marginTop: 'auto' }}>
+        <LetterheadBottom />
+      </div>
+    </div>
+  );
+}
+
 export function DocHeader({
   branch,
   title,
@@ -70,7 +187,10 @@ export function DocHeader({
 }) {
   return (
     <>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+      <LetterheadTop />
+
+      <div style={{ ...bodyInset, textAlign: 'center', marginBottom: 28, marginTop: 22 }}>
+        {' '}
         <div
           style={{
             fontSize: 20,
@@ -91,6 +211,7 @@ export function DocHeader({
 
       <div
         style={{
+          ...bodyInset,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'flex-start',
@@ -107,21 +228,6 @@ export function DocHeader({
             {branch.country && <div>{branch.country}</div>}
           </div>
         </div>
-        <div
-          style={{
-            width: 160,
-            height: 75,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-          }}
-        >
-          <img
-            src={LOGO_SRC}
-            alt="Xerocare"
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-          />
-        </div>
       </div>
     </>
   );
@@ -131,20 +237,15 @@ export function DocHeader({
 
 export function DocFooter({ branch }: { branch: BranchInfo }) {
   return (
-    <div
-      style={{
-        borderTop: `1px solid ${ACCENT}`,
-        paddingTop: 14,
-        marginTop: 40,
-        display: 'flex',
-        justifyContent: 'space-between',
-        fontSize: 11,
-        color: '#666',
-      }}
-    >
-      <div>www.xerocare.com</div>
-      <div>{branch.address ?? 'Doha, Qatar'}</div>
-      <div>mail@xerocare.com | +974 7071 7282</div>
+    // marginTop:auto pins the strip to the foot of the sheet (docStyle is a flex column),
+    // so a short document does not leave it floating under the last line.
+    <div style={{ marginTop: 'auto' }}>
+      {branch.address && (
+        <div style={{ ...bodyInset, fontSize: 10, color: '#999', paddingBottom: 8 }}>
+          {branch.address}
+        </div>
+      )}
+      <LetterheadBottom />
     </div>
   );
 }

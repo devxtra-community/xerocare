@@ -6512,6 +6512,7 @@ export default function ServiceDashboardPage() {
                 step="0.01"
                 value={rejectDiscountAmount}
                 onChange={(e) => setRejectDiscountAmount(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
                 placeholder="0.00"
                 className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
               />

@@ -6,6 +6,7 @@ import { Scale, RefreshCw, AlertTriangle, FileText } from 'lucide-react';
 import { getChartOfAccounts, type ChartOfAccountsResponse } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
+import { useAccountsBasePath } from '@/lib/accountsBasePath';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -91,6 +92,7 @@ function TotalRow({
 }
 
 export default function BalanceSheetPage() {
+  const accountsBase = useAccountsBasePath();
   const [showStatement, setShowStatement] = useState(false);
   const [viewingLineItem, setViewingLineItem] = useState<{
     section: DrilldownSection;
@@ -454,8 +456,8 @@ export default function BalanceSheetPage() {
           periodFrom={periodFrom}
           periodTo={periodTo}
           isAdmin={currentUser?.role === 'ADMIN'}
-          cashBankPagePath="/finance/accounts/cash-bank"
-          assetsPagePath="/finance/accounts/assets"
+          cashBankPagePath={`${accountsBase}/cash-bank`}
+          assetsPagePath={`${accountsBase}/assets`}
           onClose={() => setViewingLineItem(null)}
         />
       )}

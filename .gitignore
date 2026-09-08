@@ -3,3 +3,7 @@ dist
 build
 .env
 
+
+# Database dumps — these carry the admin password hash and customer data,
+# so they must never be committed.
+backups/

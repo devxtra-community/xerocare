@@ -43,8 +43,21 @@ export class Invoice {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
+  /**
+   * The document's current number: QTN-YYYY-NNNN while it is a quotation, renumbered to
+   * INV-YYYY-NNNN the moment it converts into a rent, lease or sale contract.
+   */
   @Column({ unique: true })
   invoiceNumber!: string;
+
+  /**
+   * The QTN- number this document carried before conversion, kept so the original
+   * quotation reference stays searchable — customers and staff go on quoting it long
+   * after the contract starts. Null for anything that was never a quotation (opening
+   * balances) and for quotations that have not converted yet.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  quotationNumber?: string;
 
   // Security Deposit (Phase 4)
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })

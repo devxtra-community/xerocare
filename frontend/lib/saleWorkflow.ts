@@ -643,9 +643,33 @@ export type BillApprovalMethod = 'REMOTE_LINK' | 'FINANCE_MANUAL';
  *  payment instead. */
 export type BillType = 'USAGE' | 'ADVANCE' | 'SECURITY_DEPOSIT';
 
+/** Last period's figures, sent alongside a USAGE bill so the document can show
+ *  previous-month usage next to the current month. Null on the first bill of a
+ *  contract, and on Advance/Security Deposit bills (they have no meter reading). */
+export interface PreviousBillSummary {
+  billNumber?: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  readingTakenDate?: string;
+  bwA4Count: number;
+  bwA3Count: number;
+  colorA4Count: number;
+  colorA3Count: number;
+  bwA4Delta: number;
+  bwA3Delta: number;
+  colorA4Delta: number;
+  colorA3Delta: number;
+  exceededTotal: number;
+  exceededCharge: number;
+  totalCharge: number;
+}
+
 export interface Bill {
   id: string;
   contractId: string;
+  /** Document number (BILL-YYYY-NNNN), assigned at creation. Optional only for
+   *  bills fetched from a cache written before the column existed. */
+  billNumber?: string;
   billType: BillType;
   billingPeriodStart: string;
   billingPeriodEnd: string;
@@ -746,6 +770,9 @@ export const getBill = async (
    *  deposit was also collected — shown as a section within this same bill/document
    *  rather than as a separate bill. */
   depositPayment: SalePaymentRequest | null;
+  /** Last period's figures, for the bill document's previous-vs-current comparison.
+   *  Null on a contract's first bill and on Advance/Deposit bills. */
+  previousBill: PreviousBillSummary | null;
 }> => {
   const res = await api.get<
     ApiResponse<{
@@ -753,6 +780,7 @@ export const getBill = async (
       invoice: Invoice;
       advancePayment: SalePaymentRequest | null;
       depositPayment: SalePaymentRequest | null;
+      previousBill: PreviousBillSummary | null;
     }>
   >(`/b/usage/${usageRecordId}/bill`);
   return res.data.data;
@@ -869,6 +897,11 @@ export interface BillForSigning {
   usage: Partial<Bill>;
   invoice: Invoice | null;
   advancePayment?: SalePaymentRequest | null;
+  /** The endpoint has always returned this for an ADVANCE bill; it simply wasn't
+   *  declared here, so the public approval page rendered the advance without the
+   *  security deposit section the Finance-side view shows. */
+  depositPayment?: SalePaymentRequest | null;
+  previousBill?: PreviousBillSummary | null;
 }
 
 export const getBillForSigning = async (token: string): Promise<BillForSigning> => {

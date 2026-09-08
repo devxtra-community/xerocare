@@ -9,6 +9,7 @@ import leaveApplicationRouter from './routes/leaveApplicationRouter';
 import lateMarkRouter from './routes/lateMarkRouter';
 import payrollRouter from './routes/payrollRouter';
 import notificationRouter from './routes/notificationRouter';
+import navCountsRouter from './routes/navCountsRoutes';
 import cookieParser from 'cookie-parser';
 import { getRabbitChannel } from './config/rabbitmq';
 import { startWorker } from './workers/emailWorker';
@@ -68,6 +69,7 @@ app.use('/leave-applications', leaveApplicationRouter);
 app.use('/late-marks', lateMarkRouter);
 app.use('/payroll', payrollRouter);
 app.use('/notifications', notificationRouter);
+app.use('/', navCountsRouter);
 
 /**
  * Safety Net: Handling mistakes.

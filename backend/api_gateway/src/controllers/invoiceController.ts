@@ -368,6 +368,40 @@ export const getStats = async (req: AuthenticatedRequest, res: Response, next: N
 };
 
 /**
+ * Sidebar badge counts across every module, for the role calling it.
+ *
+ * Unlike getPendingCounts this is open to every signed-in role — an employee's sidebar
+ * needs its own dots as much as Finance's does, and the counts are already scoped to the
+ * caller's branch.
+ */
+export const getNavCounts = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const user = req.user;
+    if (!user) throw new Error('User not authenticated');
+    const token = req.headers.authorization?.split(' ')[1] || '';
+
+    let branchId = user.branchId;
+    if (!branchId && (user.role === 'ADMIN' || user.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
+
+    // No branch resolved (an admin with no branches yet, say) — return an empty map so
+    // the sidebar simply shows no dots, rather than erroring on every poll.
+    if (!branchId) return res.status(200).json({ success: true, data: {} });
+
+    const counts = await invoiceAggregationService.getNavCounts(token, branchId);
+    return res.status(200).json({ success: true, data: counts });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Count how many tasks (like pending approvals) need immediate attention.
  * This is used for those little notification circles you see in the sidebar.
  */

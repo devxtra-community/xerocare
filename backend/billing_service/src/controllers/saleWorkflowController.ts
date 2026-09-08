@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { randomBytes } from 'crypto';
 import { sign } from 'jsonwebtoken';
-import { FindOptionsWhere, In } from 'typeorm';
+import { FindOptionsWhere, In, LessThan } from 'typeorm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { Source } from '../config/dataSource';
 import { AppError } from '../errors/appError';
+import { withBillNumber } from '../utils/billNumber';
 import { ContractAgreement } from '../entities/contractAgreementEntity';
 import { InstallationRequest } from '../entities/installationRequestEntity';
 import {
@@ -654,6 +655,47 @@ async function loadBillForBranch(usageRecordId: string, branchId: string) {
   return { usage, invoice };
 }
 
+/**
+ * The bill immediately before this one on the same contract, so a periodic bill can show
+ * last period's usage next to this period's ("previous month / current month").
+ *
+ * Only USAGE bills qualify: an Advance or Security Deposit bill has no meter reading and
+ * its billingPeriodStart is a placeholder (the payment date), so including them would put
+ * a meaningless row in the comparison.
+ *
+ * Returns a slim projection rather than the entity — this feeds the public signing page
+ * too, which must not receive signing tokens or internal employee ids.
+ */
+async function loadPreviousBill(usage: UsageRecord) {
+  if (usage.billType !== 'USAGE') return null;
+  const prev = await Source.getRepository(UsageRecord).findOne({
+    where: {
+      contractId: usage.contractId,
+      billType: 'USAGE',
+      billingPeriodStart: LessThan(usage.billingPeriodStart),
+    },
+    order: { billingPeriodStart: 'DESC' },
+  });
+  if (!prev) return null;
+  return {
+    billNumber: prev.billNumber,
+    billingPeriodStart: prev.billingPeriodStart,
+    billingPeriodEnd: prev.billingPeriodEnd,
+    readingTakenDate: prev.readingTakenDate,
+    bwA4Count: prev.bwA4Count,
+    bwA3Count: prev.bwA3Count,
+    colorA4Count: prev.colorA4Count,
+    colorA3Count: prev.colorA3Count,
+    bwA4Delta: prev.bwA4Delta,
+    bwA3Delta: prev.bwA3Delta,
+    colorA4Delta: prev.colorA4Delta,
+    colorA3Delta: prev.colorA3Delta,
+    exceededTotal: prev.exceededTotal,
+    exceededCharge: prev.exceededCharge,
+    totalCharge: prev.totalCharge,
+  };
+}
+
 function billPeriodLabel(usage: UsageRecord): string {
   const fmt = (d: Date) =>
     new Date(d).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
@@ -727,7 +769,12 @@ export const getBill = async (req: Request, res: Response, next: NextFunction) =
       });
     }
 
-    res.json({ success: true, data: { usage, invoice, advancePayment, depositPayment } });
+    const previousBill = await loadPreviousBill(usage);
+
+    res.json({
+      success: true,
+      data: { usage, invoice, advancePayment, depositPayment, previousBill },
+    });
   } catch (err) {
     next(err);
   }
@@ -777,7 +824,13 @@ export const generateAdvanceBill = async (req: Request, res: Response, next: Nex
       billCreatedByEmployeeId: userId,
       billCreatedByName,
     });
-    await usageRepo.save(usage);
+    // A number is allocated inside the retry, not before it: a concurrent bill creation
+    // makes the UNIQUE constraint reject this INSERT, and the retry must re-read the
+    // sequence rather than re-submit the number that just lost the race.
+    await withBillNumber(Source.manager, async (billNumber) => {
+      usage.billNumber = billNumber;
+      return usageRepo.save(usage);
+    });
 
     res.status(201).json({ success: true, data: usage });
   } catch (err) {
@@ -894,7 +947,13 @@ export const generateSecurityDepositBill = async (
       billCreatedByEmployeeId: userId,
       billCreatedByName,
     });
-    await usageRepo.save(usage);
+    // A number is allocated inside the retry, not before it: a concurrent bill creation
+    // makes the UNIQUE constraint reject this INSERT, and the retry must re-read the
+    // sequence rather than re-submit the number that just lost the race.
+    await withBillNumber(Source.manager, async (billNumber) => {
+      usage.billNumber = billNumber;
+      return usageRepo.save(usage);
+    });
 
     res.status(201).json({ success: true, data: usage });
   } catch (err) {
@@ -1171,9 +1230,11 @@ export const getBillForSigning = async (req: Request, res: Response, next: NextF
       });
     }
 
+    const previousBill = await loadPreviousBill(usage);
+
     res.json({
       success: true,
-      data: { usage: usageSafe, invoice, advancePayment, depositPayment },
+      data: { usage: usageSafe, invoice, advancePayment, depositPayment, previousBill },
     });
   } catch (err) {
     next(err);

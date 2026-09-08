@@ -32,6 +32,9 @@ import {
   Layers,
   CalendarClock,
 } from 'lucide-react';
+import { useNavCounts } from '@/hooks/useNavCounts';
+import { navCountFor } from '@/lib/navCounts';
+import { NavBadge } from '@/components/ui/NavBadge';
 
 import {
   Sidebar,
@@ -168,17 +171,6 @@ const financeMenu: FinanceMenuGroup[] = [
   },
 ];
 
-/**
- * Helper to get badge count for a specific title from the counts object
- * 'Rent' -> counts.RENT
- * 'Lease' -> counts.LEASE
- * 'Sale' -> counts.SALE
- */
-const getBadgeCount = (title: string, counts: Record<string, number>) => {
-  const key = title.toUpperCase();
-  return counts[key] || 0;
-};
-
 const handleLogOut = async () => {
   try {
     const res = await logout();
@@ -219,24 +211,8 @@ export default function FinanceSidebar() {
     if (pathname.startsWith('/finance/accounts')) setAccountsOpen(true);
   }, [pathname]);
 
-  // State to store pending counts
-  const [counts, setCounts] = React.useState<Record<string, number>>({});
-
-  React.useEffect(() => {
-    const fetchCounts = async () => {
-      try {
-        const { getPendingCounts } = await import('@/lib/invoice');
-        const data = await getPendingCounts();
-        setCounts(data);
-      } catch (err) {
-        console.error('Failed to fetch sidebar counts', err);
-      }
-    };
-
-    fetchCounts();
-    const interval = setInterval(fetchCounts, 30000); // Poll every 30s for live updates
-    return () => clearInterval(interval);
-  }, [pathname]); // Refresh counts on navigation too, ensuring updates after approvals
+  // Shared across every role's sidebar — see useNavCounts / NAV_BADGE_KEYS.
+  const counts = useNavCounts();
 
   return (
     <Sidebar collapsible="icon" className="border-none border-r-0!">
@@ -263,7 +239,7 @@ export default function FinanceSidebar() {
               <SidebarMenu className="space-y-1 px-2">
                 {section.items.map((item) => {
                   const isActive = pathname === item.href;
-                  const count = getBadgeCount(item.title, counts);
+                  const count = navCountFor(item.title, counts);
 
                   return (
                     <SidebarMenuItem key={item.title}>
@@ -287,9 +263,7 @@ export default function FinanceSidebar() {
                         >
                           <item.icon className="h-4 w-4" />
                           <span className="font-medium flex-1">{item.title}</span>
-                          {count > 0 && (
-                            <span className="flex h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse" />
-                          )}
+                          <NavBadge count={count} />
                         </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

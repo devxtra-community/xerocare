@@ -75,6 +75,7 @@ import {
   getInvoiceLedger,
   getMachineBillingContext,
   getMachineHistoryData,
+  getNavCounts,
 } from '../controllers/invoiceController';
 import { uploadMeterImage } from '../middlewares/uploadMiddleware';
 import { authMiddleware } from '../middlewares/authMiddleware';
@@ -403,6 +404,7 @@ router.post(
  * Count how many tasks are waiting for someone to take action (Task badges).
  */
 router.get('/pending-counts', authMiddleware, getPendingCounts);
+router.get('/nav-counts', authMiddleware, getNavCounts);
 
 /**
  * Combine several bills into one single master bill for a customer.

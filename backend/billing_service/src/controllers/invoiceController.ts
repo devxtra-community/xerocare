@@ -705,6 +705,37 @@ export const getPendingCounts = async (req: Request, res: Response, next: NextFu
 };
 
 /**
+ * Sidebar badge counts owned by this service — see navCountsService for what each key
+ * means. Kept separate from getPendingCounts (which four dashboards already depend on
+ * for its exact RENT/LEASE/SALE/QUOTATIONS shape) so widening the badge set cannot
+ * change what those callers receive.
+ */
+export const getNavCounts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let branchId: string | undefined = req.user?.branchId || (req.query.branchId as string);
+
+    if (!branchId && (req.user?.role === 'ADMIN' || req.user?.role === 'FINANCE')) {
+      const { getFallbackBranchId } = await import('../utils/branchHelper');
+      branchId = await getFallbackBranchId();
+    }
+
+    if (!branchId) {
+      throw new AppError('Branch ID not found in user context', 400);
+    }
+
+    const { getBillingNavCounts } = await import('../services/navCountsService');
+    const counts = await getBillingNavCounts(branchId);
+    return res.status(200).json({
+      success: true,
+      data: counts,
+      message: 'Nav counts fetched successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * Reminders about customer bills that are overdue or need collecting soon.
  */
 export const getCollectionAlerts = async (req: Request, res: Response, next: NextFunction) => {

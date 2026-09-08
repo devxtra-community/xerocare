@@ -950,6 +950,10 @@ export function QuotationViewDialog({
       (quotation.monthlyRent || 0) * (1 - (quotation.discountPercent || 0) / 100),
     contractRentalValue,
     initialAmountPayable,
+    // The period the rent actually covers. effectiveTo is derived from the duration at
+    // quotation time, so a 3-month contract starting 07 Sep reads 07 Sep -> 06 Dec.
+    contractStartDate: quotation.effectiveFrom,
+    contractEndDate: quotation.effectiveTo,
   };
 
   // Rent totals — use snapshotted taxPercent first, fall back to product metadata
@@ -1102,6 +1106,8 @@ export function QuotationViewDialog({
     warrantyDurationUnit: quotation.warrantyDurationUnit,
     warrantyCopyLimit: quotation.warrantyCopyLimit,
     notes: quotation.notes,
+    contractStartDate: quotation.effectiveFrom,
+    contractEndDate: quotation.effectiveTo,
   };
 
   return (
