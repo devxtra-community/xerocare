@@ -2220,6 +2220,16 @@ async function runPreMigrations() {
     `);
     logger.info('quotationNumber column ensured on invoices.');
 
+    // Who recorded a manual bill approval — see the entity comment. Nullable with no
+    // backfill: existing manual approvals genuinely have no recorder on file, and
+    // guessing one would fabricate an audit trail rather than admit the gap.
+    await client.query(`
+      ALTER TABLE usage_records
+      ADD COLUMN IF NOT EXISTS "customerApprovalRecordedById" UUID,
+      ADD COLUMN IF NOT EXISTS "customerApprovalRecordedByName" VARCHAR;
+    `);
+    logger.info('customerApprovalRecordedBy columns ensured on usage_records.');
+
     // ProductAllocation.itemType — see the entity's comment on this column for why every
     // consumer of a contract's productAllocations needs it. Defaults (and is backfilled)
     // to 'PRODUCT': every row that existed before accessories could be allocated at all

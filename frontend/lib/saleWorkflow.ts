@@ -707,6 +707,10 @@ export interface Bill {
   customerApprovedAt?: string;
   customerApprovalMethod?: BillApprovalMethod;
   customerApprovalNote?: string;
+  /** Staff member who recorded a manual approval — a manual approval carries no
+   *  signature, so this is what makes it attributable. Absent on remote-link
+   *  approvals and on manual ones recorded before this was captured. */
+  customerApprovalRecordedByName?: string;
   customerRejectionReason?: string;
   customerRejectedAt?: string;
   items?: Array<{

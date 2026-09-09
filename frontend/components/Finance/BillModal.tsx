@@ -427,7 +427,7 @@ export function BillModal({
                       </p>
                       <p className="text-[11px] text-emerald-600 mt-1">
                         {bill.customerApprovalMethod === 'FINANCE_MANUAL'
-                          ? 'Recorded manually by Finance'
+                          ? `Recorded manually by ${bill.customerApprovalRecordedByName || 'staff'}`
                           : 'Via remote link'}
                         {bill.customerApprovedAt
                           ? ` · ${new Date(bill.customerApprovedAt).toLocaleDateString()}`

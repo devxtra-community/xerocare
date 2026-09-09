@@ -1342,16 +1342,23 @@ export const rejectBillRemote = async (req: Request, res: Response, next: NextFu
   }
 };
 
-// Finance/Admin/Manager manually marking a bill approved — for a customer's phone/
-// in-person confirmation that never went through the remote link. There is no
-// evidence-free override anywhere else in this codebase (the closest precedent,
-// Contract Agreement's UPLOAD method, always requires an uploaded file + note) — a
-// required note is the equivalent minimum bar here, since there's no document to
-// attach a bill approval to.
+// Manually marking a bill approved — for a customer's phone/in-person confirmation that
+// never went through the remote link.
+//
+// Open to employees as well as Finance/Admin/Manager: the employee is usually the one
+// standing in front of the customer, so restricting it to Finance meant the person who
+// actually took the approval could not record it.
+//
+// It stays an evidence-free override, so the safeguards matter. There is no signature or
+// document behind it, only a staff member's word — the closest precedent in this codebase
+// (Contract Agreement's UPLOAD method) always requires a file plus a note. Here the bar is
+// a required note saying HOW the customer approved, plus the recorder's identity saying
+// WHO asserted it, and the branch scope in loadBillForBranch keeping it to their own
+// branch's bills.
 export const markBillApprovedManually = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { role, branchId } = req.user!;
-    if (!['FINANCE', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(role)) {
+    const { role, branchId, userId } = req.user!;
+    if (!['FINANCE', 'ADMIN', 'MANAGER', 'SUPER_ADMIN', 'EMPLOYEE'].includes(role)) {
       throw new AppError('Insufficient role to approve a bill manually', 403);
     }
     const { customerName, approvalNote } = req.body;
@@ -1369,6 +1376,11 @@ export const markBillApprovedManually = async (req: Request, res: Response, next
     usage.customerApprovedAt = new Date();
     usage.customerApprovalMethod = 'FINANCE_MANUAL';
     usage.customerApprovalNote = approvalNote.trim();
+    // Attribute the override. The stored method string stays 'FINANCE_MANUAL' so existing
+    // rows and every reader of that value keep working — it now means "recorded by staff",
+    // and these two fields say which staff member.
+    usage.customerApprovalRecordedById = userId;
+    usage.customerApprovalRecordedByName = await fetchEmployeeName(userId);
     await Source.getRepository(UsageRecord).save(usage);
 
     res.json({ success: true, data: usage });
