@@ -189,11 +189,14 @@ export function ContractAgreementModal({
     setIsGeneratingLink(true);
     try {
       const result = await generateSigningToken(invoice.id);
-      const baseUrl =
+      // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
+      // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
+      // which is unreachable for the customer the link is being sent to.
+      const fallback =
         typeof window !== 'undefined'
           ? `${window.location.origin}/public/contract/sign/${result.token}`
           : `/public/contract/sign/${result.token}`;
-      setRemoteLink(baseUrl);
+      setRemoteLink(result.link || fallback);
     } catch (err) {
       toast.error('Failed to generate signing link', { description: getApiErrorMessage(err) });
     } finally {

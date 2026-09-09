@@ -129,11 +129,14 @@ export function BillModal({
     setIsGeneratingLink(true);
     try {
       const result = await generateBillSigningToken(usageRecordId);
-      const url =
+      // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
+      // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
+      // which is unreachable for the customer the link is being sent to.
+      const fallback =
         typeof window !== 'undefined'
           ? `${window.location.origin}/public/bill/sign/${result.token}`
           : `/public/bill/sign/${result.token}`;
-      setRemoteLink(url);
+      setRemoteLink(result.link || fallback);
     } catch (err) {
       toast.error('Failed to generate bill link', { description: getApiErrorMessage(err) });
     } finally {

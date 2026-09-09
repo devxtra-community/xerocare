@@ -272,8 +272,8 @@ export const signContractCustomerByUpload = async (
 
 export const generateSigningToken = async (
   invoiceId: string,
-): Promise<{ token: string; expiresAt: string }> => {
-  const res = await api.post<ApiResponse<{ token: string; expiresAt: string }>>(
+): Promise<{ token: string; expiresAt: string; link?: string }> => {
+  const res = await api.post<ApiResponse<{ token: string; expiresAt: string; link?: string }>>(
     `/b/invoices/${invoiceId}/contract-agreement/signing-token`,
   );
   return res.data.data;
@@ -852,8 +852,8 @@ export const getBillsForContract = async (contractId: string): Promise<BillForCo
 
 export const generateBillSigningToken = async (
   usageRecordId: string,
-): Promise<{ token: string; expiresAt: string }> => {
-  const res = await api.post<ApiResponse<{ token: string; expiresAt: string }>>(
+): Promise<{ token: string; expiresAt: string; link?: string }> => {
+  const res = await api.post<ApiResponse<{ token: string; expiresAt: string; link?: string }>>(
     `/b/usage/${usageRecordId}/bill/signing-token`,
   );
   return res.data.data;

@@ -64,9 +64,12 @@ export function InstallationReportModal({
   const makeLink = async () => {
     setGeneratingLink(true);
     try {
-      const { token } = await generateInstallationSigningToken(requestId);
+      const { token, link } = await generateInstallationSigningToken(requestId);
+      // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
+      // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
+      // which is unreachable for the customer the link is being sent to.
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      setLink(`${origin}/public/installation/sign/${token}`);
+      setLink(link || `${origin}/public/installation/sign/${token}`);
       toast.success('Signing link ready — valid for 72 hours');
     } catch (err) {
       toast.error('Could not generate a link', { description: getApiErrorMessage(err) });

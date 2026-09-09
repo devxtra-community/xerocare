@@ -369,7 +369,10 @@ export const generateSigningToken = async (req: Request, res: Response, next: Ne
     if (agreement.branchId !== branchId) throw new AppError('Access denied', 403);
 
     const { token } = await issueSigningToken(agreement);
-    res.json({ success: true, data: { token, expiresAt: agreement.signingTokenExpiresAt } });
+    res.json({
+      success: true,
+      data: { token, expiresAt: agreement.signingTokenExpiresAt, link: signingLinkUrl(token) },
+    });
   } catch (err) {
     next(err);
   }
@@ -1064,7 +1067,10 @@ export const generateBillSigningToken = async (req: Request, res: Response, next
     const { branchId } = req.user!;
     const { usage } = await loadBillForBranch(req.params.id as string, branchId);
     const { token } = await issueBillSigningToken(usage);
-    res.json({ success: true, data: { token, expiresAt: usage.signingTokenExpiresAt } });
+    res.json({
+      success: true,
+      data: { token, expiresAt: usage.signingTokenExpiresAt, link: billSigningLinkUrl(token) },
+    });
   } catch (err) {
     next(err);
   }
@@ -3736,6 +3742,10 @@ export const getInstallationReport = async (req: Request, res: Response, next: N
   }
 };
 
+function installationSigningLinkUrl(token: string): string {
+  return `${publicAppUrl()}/public/installation/sign/${token}`;
+}
+
 /** POST /installation-requests/:id/signing-token */
 export const generateInstallationSigningToken = async (
   req: Request,
@@ -3744,7 +3754,10 @@ export const generateInstallationSigningToken = async (
 ) => {
   try {
     const { token, expiresAt } = await issueInstallationSigningToken(req.params.id as string);
-    res.json({ success: true, data: { token, expiresAt } });
+    res.json({
+      success: true,
+      data: { token, expiresAt, link: installationSigningLinkUrl(token) },
+    });
   } catch (err) {
     next(err);
   }
