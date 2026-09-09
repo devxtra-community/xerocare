@@ -1141,49 +1141,59 @@ async function runPreMigrations() {
 
     // ─── replacement_requests: Finance audit of the returned machine ─────────
     // A swapped-out unit is not sellable stock until Finance has looked at it.
+    //
+    // These ALTERs only apply to databases that already have the table from a
+    // previous deploy — on a fresh DB the table is created (with these columns
+    // baked in) further down, so guard against running ALTER before CREATE.
     await client.query(`
-      ALTER TABLE replacement_requests
-        ADD COLUMN IF NOT EXISTS "dispositionStatus" VARCHAR NOT NULL DEFAULT 'PENDING',
-        ADD COLUMN IF NOT EXISTS "dispositionNote" TEXT NULL,
-        ADD COLUMN IF NOT EXISTS "dispositionAt" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "dispositionById" UUID NULL,
-        ADD COLUMN IF NOT EXISTS "dispositionByName" VARCHAR NULL;
-    `);
-    logger.info('Replacement request disposition columns applied.');
+      DO $$ BEGIN
+        IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'replacement_requests') THEN
+          ALTER TABLE replacement_requests
+            ADD COLUMN IF NOT EXISTS "dispositionStatus" VARCHAR NOT NULL DEFAULT 'PENDING',
+            ADD COLUMN IF NOT EXISTS "dispositionNote" TEXT NULL,
+            ADD COLUMN IF NOT EXISTS "dispositionAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "dispositionById" UUID NULL,
+            ADD COLUMN IF NOT EXISTS "dispositionByName" VARCHAR NULL;
 
-    // ─── replacement_requests: on-site work timer ────────────────────────────
-    // How long the technician spent swapping the machine. Nullable throughout: rows
-    // created before the timer existed have no start, and the report renders "—".
-    await client.query(`
-      ALTER TABLE replacement_requests
-        ADD COLUMN IF NOT EXISTS "workStartedAt" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "workEndedAt" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "workDurationSeconds" INTEGER NULL;
+          -- ── replacement_requests: on-site work timer ──
+          -- How long the technician spent swapping the machine. Nullable throughout:
+          -- rows created before the timer existed have no start, report renders "—".
+          ALTER TABLE replacement_requests
+            ADD COLUMN IF NOT EXISTS "workStartedAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "workEndedAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "workDurationSeconds" INTEGER NULL;
+        END IF;
+      END $$;
     `);
-    logger.info('Replacement request work-timer columns applied.');
+    logger.info('Replacement request disposition + work-timer columns applied (if table present).');
 
     // ─── installation_requests: report + customer sign-off ───────────────────
     // The installation report is rendered live from the request, its contract and the
     // product allocations, so only the handover facts are persisted.
+    //
+    // Only applies to databases that already have the table from a previous
+    // deploy — a fresh DB creates it (with these columns) further down, so
+    // guard against running ALTER before CREATE. The signing-token index is
+    // created here for existing DBs and again with the CREATE below.
     await client.query(`
-      ALTER TABLE installation_requests
-        ADD COLUMN IF NOT EXISTS "reportGeneratedAt" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "signingToken" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "signingTokenExpiresAt" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "signingTokenUsed" BOOLEAN NOT NULL DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS "customerSignedAt" TIMESTAMP NULL,
-        ADD COLUMN IF NOT EXISTS "customerSignatureName" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "customerSignatureData" TEXT NULL,
-        ADD COLUMN IF NOT EXISTS "customerSignatureNote" TEXT NULL,
-        ADD COLUMN IF NOT EXISTS "customerSignatureMethod" VARCHAR NULL;
+      DO $$ BEGIN
+        IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'installation_requests') THEN
+          ALTER TABLE installation_requests
+            ADD COLUMN IF NOT EXISTS "reportGeneratedAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "signingToken" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "signingTokenExpiresAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "signingTokenUsed" BOOLEAN NOT NULL DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS "customerSignedAt" TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS "customerSignatureName" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "customerSignatureData" TEXT NULL,
+            ADD COLUMN IF NOT EXISTS "customerSignatureNote" TEXT NULL,
+            ADD COLUMN IF NOT EXISTS "customerSignatureMethod" VARCHAR NULL;
+          CREATE INDEX IF NOT EXISTS idx_installation_requests_signing_token
+            ON installation_requests ("signingToken");
+        END IF;
+      END $$;
     `);
-    // The public signing endpoint looks a request up by this token alone, so it must
-    // not be a sequential scan as the table grows.
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_installation_requests_signing_token
-        ON installation_requests ("signingToken");
-    `);
-    logger.info('Installation request report/sign-off columns applied.');
+    logger.info('Installation request report/sign-off columns applied (if table present).');
 
     // ─── Cheques: 2-date model — collected_date, cheque_date becomes the sole
     // deposit/presentment-eligibility date, due_date deprecated ─────────────────
@@ -1605,11 +1615,21 @@ async function runPreMigrations() {
         "endTime" TIMESTAMP,
         "durationSeconds" INTEGER,
         status VARCHAR NOT NULL DEFAULT 'PENDING',
+        "reportGeneratedAt" TIMESTAMP NULL,
+        "signingToken" VARCHAR NULL,
+        "signingTokenExpiresAt" TIMESTAMP NULL,
+        "signingTokenUsed" BOOLEAN NOT NULL DEFAULT FALSE,
+        "customerSignedAt" TIMESTAMP NULL,
+        "customerSignatureName" VARCHAR NULL,
+        "customerSignatureData" TEXT NULL,
+        "customerSignatureNote" TEXT NULL,
+        "customerSignatureMethod" VARCHAR NULL,
         "createdAt" TIMESTAMP DEFAULT NOW(),
         "updatedAt" TIMESTAMP DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS "IDX_installation_requests_invoiceId" ON installation_requests ("invoiceId");
       CREATE INDEX IF NOT EXISTS "IDX_installation_requests_branchId" ON installation_requests ("branchId");
+      CREATE INDEX IF NOT EXISTS idx_installation_requests_signing_token ON installation_requests ("signingToken");
     `);
     logger.info('Installation requests table ensured.');
 
@@ -1686,6 +1706,14 @@ async function runPreMigrations() {
         "customerApprovedAt" TIMESTAMP NULL,
         "customerApprovalName" VARCHAR NULL,
         "approvalNote" TEXT NULL,
+        "dispositionStatus" VARCHAR NOT NULL DEFAULT 'PENDING',
+        "dispositionNote" TEXT NULL,
+        "dispositionAt" TIMESTAMP NULL,
+        "dispositionById" UUID NULL,
+        "dispositionByName" VARCHAR NULL,
+        "workStartedAt" TIMESTAMP NULL,
+        "workEndedAt" TIMESTAMP NULL,
+        "workDurationSeconds" INTEGER NULL,
         "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
         "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
       );
@@ -1734,23 +1762,31 @@ async function runPreMigrations() {
     // Card columns on the approval-gated payment request. Additive only: existing
     // CASH/BANK_TRANSFER/CHEQUE rows keep working untouched, and legacy CREDIT_CARD
     // rows keep their stored mode so historical reporting does not shift under them.
+    //
+    // Only applies to databases that already have the table from a previous
+    // deploy — a fresh DB creates it (with these columns) further down, so
+    // guard against running ALTER before CREATE.
     await client.query(`
-      ALTER TABLE sale_payment_requests
-        ADD COLUMN IF NOT EXISTS "cardType" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "cardNetwork" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "issuerCountry" VARCHAR(2) NULL,
-        ADD COLUMN IF NOT EXISTS "issuerBank" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "cardLast4" VARCHAR(4) NULL,
-        ADD COLUMN IF NOT EXISTS "cardHolderName" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "gatewayToken" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "paymentGateway" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "transactionReference" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "commissionRateApplied" DECIMAL(6,4) NULL,
-        ADD COLUMN IF NOT EXISTS "commissionFixedApplied" DECIMAL(12,3) NULL,
-        ADD COLUMN IF NOT EXISTS "commissionAmount" DECIMAL(12,3) NULL,
-        ADD COLUMN IF NOT EXISTS "netSettlementAmount" DECIMAL(12,3) NULL,
-        ADD COLUMN IF NOT EXISTS "commissionRuleId" UUID NULL,
-        ADD COLUMN IF NOT EXISTS "commissionRuleVersion" INTEGER NULL;
+      DO $$ BEGIN
+        IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'sale_payment_requests') THEN
+          ALTER TABLE sale_payment_requests
+            ADD COLUMN IF NOT EXISTS "cardType" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "cardNetwork" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "issuerCountry" VARCHAR(2) NULL,
+            ADD COLUMN IF NOT EXISTS "issuerBank" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "cardLast4" VARCHAR(4) NULL,
+            ADD COLUMN IF NOT EXISTS "cardHolderName" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "gatewayToken" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "paymentGateway" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "transactionReference" VARCHAR NULL,
+            ADD COLUMN IF NOT EXISTS "commissionRateApplied" DECIMAL(6,4) NULL,
+            ADD COLUMN IF NOT EXISTS "commissionFixedApplied" DECIMAL(12,3) NULL,
+            ADD COLUMN IF NOT EXISTS "commissionAmount" DECIMAL(12,3) NULL,
+            ADD COLUMN IF NOT EXISTS "netSettlementAmount" DECIMAL(12,3) NULL,
+            ADD COLUMN IF NOT EXISTS "commissionRuleId" UUID NULL,
+            ADD COLUMN IF NOT EXISTS "commissionRuleVersion" INTEGER NULL;
+        END IF;
+      END $$;
     `);
     await client.query(`
       ALTER TABLE payment_transactions
@@ -1808,6 +1844,21 @@ async function runPreMigrations() {
         "reviewedAt" TIMESTAMP,
         "rejectionReason" TEXT,
         "paymentTransactionId" UUID,
+        "cardType" VARCHAR NULL,
+        "cardNetwork" VARCHAR NULL,
+        "issuerCountry" VARCHAR(2) NULL,
+        "issuerBank" VARCHAR NULL,
+        "cardLast4" VARCHAR(4) NULL,
+        "cardHolderName" VARCHAR NULL,
+        "gatewayToken" VARCHAR NULL,
+        "paymentGateway" VARCHAR NULL,
+        "transactionReference" VARCHAR NULL,
+        "commissionRateApplied" DECIMAL(6,4) NULL,
+        "commissionFixedApplied" DECIMAL(12,3) NULL,
+        "commissionAmount" DECIMAL(12,3) NULL,
+        "netSettlementAmount" DECIMAL(12,3) NULL,
+        "commissionRuleId" UUID NULL,
+        "commissionRuleVersion" INTEGER NULL,
         "createdAt" TIMESTAMP DEFAULT NOW(),
         "updatedAt" TIMESTAMP DEFAULT NOW()
       );
