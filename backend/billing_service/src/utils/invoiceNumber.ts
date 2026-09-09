@@ -40,9 +40,15 @@ export async function generateDocumentNumber(
   const year = new Date().getFullYear();
   const stem = `${prefix}-${year}-`;
 
+  // The `::int` cast on the bound parameter is load-bearing. Postgres overloads
+  // SUBSTRING: with an integer it means "from this position", but with TEXT it treats
+  // the argument as a POSIX regex. A bound parameter carries no inferred type here, so
+  // without the cast Postgres picks the regex form, matches nothing, and MAX collapses
+  // to NULL — which silently hands out 0001 for every document and collides with the
+  // unique constraint on the second one.
   const row = await manager
     .createQueryBuilder(Invoice, 'i')
-    .select(`MAX(SUBSTRING(i."invoiceNumber" FROM :from)::int)`, 'max')
+    .select(`MAX(SUBSTRING(i."invoiceNumber" FROM :from::int)::int)`, 'max')
     .where('i."invoiceNumber" LIKE :pattern', { pattern: `${stem}%` })
     .setParameter('from', stem.length + 1)
     .getRawOne<{ max: number | null }>();

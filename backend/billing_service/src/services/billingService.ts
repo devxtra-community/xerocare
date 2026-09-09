@@ -1844,9 +1844,15 @@ export class BillingService {
     invoice.type = InvoiceType.PROFORMA;
     invoice.status = InvoiceStatus.DRAFT;
 
-    const saved = await this.invoiceRepo.save(invoice);
-    const convertedNumber = await promoteQuotationToInvoice(this.invoiceRepo.manager, saved.id);
-    if (convertedNumber) saved.invoiceNumber = convertedNumber;
+    // Type change and renumber commit together. Kept atomic because they were not once:
+    // a failure inside the renumber left documents converted to PROFORMA while still
+    // carrying their QTN number, which is a state nothing else in the system expects.
+    const saved = await this.invoiceRepo.manager.transaction(async (manager) => {
+      const row = await manager.save(invoice);
+      const convertedNumber = await promoteQuotationToInvoice(manager, row.id);
+      if (convertedNumber) row.invoiceNumber = convertedNumber;
+      return row;
+    });
     await logAudit(
       invoice.id,
       'STATUS_CHANGE',
