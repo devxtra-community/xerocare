@@ -2363,8 +2363,31 @@ export const getReceivableCharts = async (req: Request, res: Response, next: Nex
       }[]
     >(`
       SELECT i."saleType", i.customer_name, TO_CHAR(i."createdAt", 'YYYY-MM-DD') AS "createdAt",
-             i."totalAmount", COALESCE(pt.paid, 0) AS paid
+             -- Same figure the Receivable table and the 1003 balance-sheet line use. This
+             -- query claimed the same population as those two but kept reading the raw
+             -- totalAmount column, which for a RENT/LEASE contract is a running contract
+             -- figure rather than what was issued — so the charts plotted a different
+             -- number from the table sitting directly above them on the same page.
+             CASE
+               WHEN i."saleType" IN ('RENT', 'LEASE')
+                 THEN COALESCE(adv.amount, i."advanceAmount", 0) + COALESCE(ur.billed, 0)
+               ELSE i."totalAmount"
+             END AS "totalAmount",
+             COALESCE(pt.paid, 0) AS paid
       FROM invoices i
+      LEFT JOIN (
+        SELECT DISTINCT ON ("invoiceId") "invoiceId", amount
+        FROM sale_payment_requests
+        WHERE "paymentContext" IN ('RENT_ADVANCE', 'LEASE_ADVANCE')
+        ORDER BY "invoiceId", "createdAt" ASC
+      ) adv ON adv."invoiceId" = i.id
+      LEFT JOIN (
+        SELECT "contractId", SUM(COALESCE("totalCharge", 0)) AS billed
+        FROM usage_records
+        WHERE "billType" IS DISTINCT FROM 'ADVANCE'
+          AND "billType" IS DISTINCT FROM 'SECURITY_DEPOSIT'
+        GROUP BY "contractId"
+      ) ur ON ur."contractId" = i.id
       LEFT JOIN (
         SELECT invoice_id, SUM(paid) AS paid FROM (
           -- Deposits excluded — see PaymentTransaction.isSecurityDeposit. They aren't
@@ -2382,7 +2405,11 @@ export const getReceivableCharts = async (req: Request, res: Response, next: Nex
       ) pt ON pt.invoice_id = i.id
       WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
         AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')) OR i.type = 'OPENING')
-        AND i."totalAmount" > 0
+        AND (CASE
+               WHEN i."saleType" IN ('RENT', 'LEASE')
+                 THEN COALESCE(adv.amount, i."advanceAmount", 0) + COALESCE(ur.billed, 0)
+               ELSE i."totalAmount"
+             END) > 0
         AND i."deletedAt" IS NULL
         ${branchClause}
     `);
