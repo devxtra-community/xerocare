@@ -87,3 +87,21 @@ export const deleteModel = async (id: string): Promise<void> => {
 export const syncQuantities = async (): Promise<void> => {
   await api.post<ApiResponse<void>>('/i/models/sync-quantities', {});
 };
+
+/**
+ * How a model is labelled in every picker: name first, then the model number —
+ * "HP LASERJET - HP LJ-1020". People recognise the family before the part code, so
+ * leading with the number made every dropdown read back-to-front.
+ *
+ * Either half can be blank in the data, so the parts are joined rather than
+ * concatenated — a model with no name must not render as " - HP LJ-1020".
+ */
+export function formatModelLabel(model: {
+  model_no?: string | null;
+  model_name?: string | null;
+}): string {
+  return [model.model_name, model.model_no]
+    .map((p) => p?.trim())
+    .filter(Boolean)
+    .join(' - ');
+}

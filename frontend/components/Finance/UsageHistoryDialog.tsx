@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import {
   Dialog,
@@ -215,6 +215,30 @@ export default function UsageHistoryDialog({
   useEffect(() => {
     setTotal(history.length);
   }, [history.length, setTotal]);
+
+  /**
+   * The newest metered period — the one row whose figures are still the company's to
+   * change.
+   *
+   * This used to be spelled `history[0]`, which stopped being true twice over: the list
+   * is not ordered newest-first, and this screen opts into ADVANCE rows
+   * (`includeAllBillTypes`), which sort ahead of the metered ones. Index 0 therefore
+   * became the advance bill — immediately disqualified by the billType check below — so
+   * the Edit button disappeared from every contract that had an advance bill.
+   *
+   * Selecting USAGE positively rather than excluding ADVANCE also keeps SECURITY_DEPOSIT
+   * rows out: they are no more editable than an advance.
+   */
+  const latestMeteredId = useMemo(() => {
+    let newest: UsageRecord | null = null;
+    for (const r of history) {
+      if (r.billType !== 'USAGE') continue;
+      if (!newest || new Date(r.periodStart).getTime() > new Date(newest.periodStart).getTime()) {
+        newest = r;
+      }
+    }
+    return newest?.id ?? null;
+  }, [history]);
 
   const paginatedHistory = history.slice((currentPage - 1) * limit, currentPage * limit);
   const billByRecordId = React.useMemo(
@@ -593,14 +617,15 @@ export default function UsageHistoryDialog({
                                 )}
                               </Button>
                               {/* Editable only while the figures are still the company's
-                                  to change: the newest metered period, not an advance
-                                  bill, and not one the customer has already approved —
-                                  an approved bill is a document they signed off on.
-                                  A rejected bill stays editable so it can be corrected
-                                  and re-sent. Status is resolved the same way the
-                                  APPROVAL column resolves it. */}
-                              {history[0]?.id === record.id &&
-                                record.billType !== 'ADVANCE' &&
+                                  to change: the newest metered period (see
+                                  latestMeteredId) and not one the customer has already
+                                  approved — an approved bill is a document they signed
+                                  off on. A rejected bill stays editable so it can be
+                                  corrected and re-sent. Status is resolved the same way
+                                  the APPROVAL column resolves it: the bills endpoint
+                                  first, since the usage row's own billStatus comes back
+                                  null over the wire. */}
+                              {latestMeteredId === record.id &&
                                 (billByRecordId.get(record.id)?.billStatus || record.billStatus) !==
                                   'CUSTOMER_APPROVED' && (
                                   <Button

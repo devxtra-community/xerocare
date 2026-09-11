@@ -121,7 +121,17 @@ export const getAccountsReceivableTransactions = async (
       ) pt ON pt.invoice_id = i.id
       WHERE i.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
         AND (i.type = 'FINAL' OR (i.type = 'PROFORMA' AND i.status IN ('ACTIVE_CONTRACT', 'INVOICED', 'PAID')) OR i.type = 'OPENING')
-        AND i."totalAmount" > 0
+        -- Gate on the SAME figure the SELECT computes, not on the raw column. For a
+        -- RENT/LEASE contract totalAmount is a running contract figure that can sit at
+        -- 0 while real money is owed (an advance collected but not yet approved, or
+        -- periodic bills raised before any accrual landed) — testing it here silently
+        -- dropped those contracts out of Receivable entirely, understating what the
+        -- customer owes and, on the balance sheet, Assets with it.
+        AND (CASE
+               WHEN i."saleType" IN ('RENT', 'LEASE')
+                 THEN COALESCE(adv.amount, i."advanceAmount", 0) + COALESCE(ur.billed, 0)
+               ELSE i."totalAmount"
+             END) > 0
         AND i."deletedAt" IS NULL
         ${branchSql('i', bParam)}
     `);

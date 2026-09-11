@@ -1358,6 +1358,11 @@ export const rejectBillRemote = async (req: Request, res: Response, next: NextFu
 export const markBillApprovedManually = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { role, branchId, userId } = req.user!;
+    // Employees are included deliberately: the employee is usually the one standing in
+    // front of the customer, so restricting this to Finance meant the person who actually
+    // took the approval could not record it. It stays an evidence-free override, so the
+    // safeguards matter — a required note saying HOW the customer approved, the recorder's
+    // identity saying WHO asserted it, and loadBillForBranch keeping it to their own branch.
     if (!['FINANCE', 'ADMIN', 'MANAGER', 'SUPER_ADMIN', 'EMPLOYEE'].includes(role)) {
       throw new AppError('Insufficient role to approve a bill manually', 403);
     }
@@ -1376,9 +1381,8 @@ export const markBillApprovedManually = async (req: Request, res: Response, next
     usage.customerApprovedAt = new Date();
     usage.customerApprovalMethod = 'FINANCE_MANUAL';
     usage.customerApprovalNote = approvalNote.trim();
-    // Attribute the override. The stored method string stays 'FINANCE_MANUAL' so existing
-    // rows and every reader of that value keep working — it now means "recorded by staff",
-    // and these two fields say which staff member.
+    // The stored method string stays 'FINANCE_MANUAL' so existing rows and every reader of
+    // that value keep working — it now means "recorded by staff", and these say which.
     usage.customerApprovalRecordedById = userId;
     usage.customerApprovalRecordedByName = await fetchEmployeeName(userId);
     await Source.getRepository(UsageRecord).save(usage);
@@ -2892,7 +2896,17 @@ export const getSaleContracts = async (req: Request, res: Response, next: NextFu
     const qb = invoiceRepo
       .createQueryBuilder('i')
       .where(`i."saleType" IN ('SALE', 'PRODUCT_SALE', 'SPAREPART_SALE', 'RENT', 'LEASE')`)
-      .andWhere(`i.type IN ('FINAL', 'PROFORMA')`);
+      .andWhere(`i.type IN ('FINAL', 'PROFORMA')`)
+      // A contract reaches the service desk only once the employee has activated it.
+      // Allocation alone parks it at PENDING_CONFIRMATION — the machines are earmarked
+      // but the contract is not live, so there is nothing for the desk to service yet.
+      //
+      // Phrased as an exclusion rather than `IN ('ACTIVE','COMPLETED')` on purpose:
+      // contractStatus is nullable and neither direct sales (createDirectSale) nor
+      // historical contracts imported as opening balances ever set it. An inclusive
+      // test would silently drop both from the desk's list; IS DISTINCT FROM keeps
+      // NULL rows visible and removes only the one state that genuinely is not ready.
+      .andWhere(`i."contractStatus" IS DISTINCT FROM 'PENDING_CONFIRMATION'`);
 
     if (!['ADMIN', 'SUPER_ADMIN'].includes(role)) {
       qb.andWhere('i."branchId" = :branchId', { branchId });

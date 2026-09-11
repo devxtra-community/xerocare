@@ -58,6 +58,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/apiError';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -169,7 +170,7 @@ function GuaranteeModal({
       qc.invalidateQueries({ queryKey: ['admin-guarantee-stats'] });
       onSaved();
     },
-    onError: (err: Error) => toast.error(err.message || 'Failed to save'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to save')),
   });
 
   const isValid =
@@ -363,7 +364,7 @@ function ReturnDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: (
       qc.invalidateQueries({ queryKey: ['admin-guarantee-stats'] });
       onClose();
     },
-    onError: (err: Error) => toast.error(err.message || 'Failed to return cheque'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to return cheque')),
   });
 
   return (
@@ -452,7 +453,10 @@ function DepositDialog({ cheque, onClose }: { cheque: GuaranteeCheque; onClose: 
       qc.invalidateQueries({ queryKey: ['cash-bank-accounts'] });
       onClose();
     },
-    onError: (err: Error) => toast.error(err.message || 'Failed to deposit cheque'),
+    onError: (err) =>
+      toast.error('Cannot deposit this cheque', {
+        description: getApiErrorMessage(err, 'Failed to deposit cheque'),
+      }),
   });
 
   return (
@@ -623,7 +627,7 @@ function GuaranteeChequesContent() {
       qc.invalidateQueries({ queryKey: ['admin-guarantee-cheques'] });
       qc.invalidateQueries({ queryKey: ['admin-guarantee-stats'] });
     },
-    onError: () => toast.error('Failed to delete'),
+    onError: (err) => toast.error(getApiErrorMessage(err, 'Failed to delete')),
   });
 
   const statementData: SnapshotStatementData = {

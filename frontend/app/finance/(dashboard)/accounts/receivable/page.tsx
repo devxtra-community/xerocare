@@ -10,7 +10,6 @@ import {
   Search,
   Filter,
   X,
-  CreditCard,
   BarChart2,
   ChevronDown,
   ChevronUp,
@@ -60,6 +59,7 @@ import StatementDialog, {
   type RunningBalanceStatementData,
 } from '@/components/shared/StatementDialog';
 import { BillsDrilldownModal } from '@/components/Finance/BillsDrilldownModal';
+import { BillsMark, AdvancePaymentMark } from '@/components/ui/BrandMarks';
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
@@ -69,6 +69,17 @@ const AGING_COLORS: Record<string, string> = {
   '61-90 days': 'bg-red-100 text-red-700 border-red-200',
   '90+ days': 'bg-red-200 text-red-800 border-red-300',
 };
+
+/**
+ * Row action button: a 36px circular target with the hover tint supplied per action.
+ *
+ * The bare 14px icons these replaced were both hard to hit and hard to tell apart —
+ * the same flat outline glyph stood for "open the row", "open its bills" and "take a
+ * payment". Sizing and tinting them here keeps every Actions column on the page
+ * consistent, and matches the action buttons in the Rent/Lease collection tables.
+ */
+const ACTION_BTN =
+  'group inline-flex h-9 w-9 items-center justify-center rounded-full transition-all';
 
 const RECEIVABLE_TYPES = [
   'CUSTOMER_INVOICE',
@@ -1158,10 +1169,11 @@ export default function AccountsReceivablePage() {
                                   id: r.id,
                                 })
                               }
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                              className={`${ACTION_BTN} hover:bg-slate-100 hover:ring-1 hover:ring-slate-200`}
                               title="View full details"
+                              aria-label="View full details"
                             >
-                              <Eye className="h-3.5 w-3.5" />
+                              <Eye className="h-4 w-4 text-slate-400 transition-colors group-hover:text-blue-600" />
                             </button>
                             {r.isInvoice && (r.type === 'RENT' || r.type === 'LEASE') && (
                               <button
@@ -1171,19 +1183,21 @@ export default function AccountsReceivablePage() {
                                     invoiceNumber: r.referenceNo,
                                   })
                                 }
-                                className="p-1.5 rounded-md hover:bg-indigo-50 text-indigo-600"
-                                title="View Bills"
+                                className={`${ACTION_BTN} hover:bg-indigo-50 hover:ring-1 hover:ring-indigo-200`}
+                                title={`View bills raised on ${r.referenceNo}`}
+                                aria-label="View bills"
                               >
-                                <FileText className="h-3.5 w-3.5" />
+                                <BillsMark size={22} />
                               </button>
                             )}
                             {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => setPayingFor(r as ManualReceivable)}
-                                className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600"
+                                className={`${ACTION_BTN} hover:bg-blue-50 hover:ring-1 hover:ring-blue-200`}
                                 title="Record Payment"
+                                aria-label="Record payment"
                               >
-                                <CreditCard className="h-3.5 w-3.5" />
+                                <AdvancePaymentMark size={22} />
                               </button>
                             )}
                           </div>

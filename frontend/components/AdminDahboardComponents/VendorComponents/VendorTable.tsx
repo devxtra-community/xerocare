@@ -129,39 +129,6 @@ export type VendorFormData = {
   branchId?: string;
 };
 
-const COUNTRY_TO_CURRENCY_MAP: Record<string, string> = {
-  QA: 'QAR',
-  AE: 'AED',
-  SA: 'SAR',
-  OM: 'OMR',
-  KW: 'KWD',
-  BH: 'BHD',
-  IN: 'INR',
-  US: 'USD',
-  GB: 'GBP',
-  SG: 'SGD',
-  EU: 'EUR',
-  JP: 'JPY',
-  CN: 'CNY',
-  AU: 'AUD',
-  CA: 'CAD',
-  CH: 'CHF',
-  PK: 'PKR',
-  BD: 'BDT',
-  LK: 'LKR',
-  MY: 'MYR',
-  PH: 'PHP',
-  TH: 'THB',
-  ID: 'IDR',
-  NG: 'NGN',
-  ZA: 'ZAR',
-  EG: 'EGP',
-  KE: 'KES',
-  GH: 'GHS',
-  TZ: 'TZS',
-  UG: 'UGX',
-};
-
 const ALL_COUNTRIES: { code: string; name: string }[] = countryList.getData();
 
 const BANK_COUNTRY_OPTIONS = [...ALL_COUNTRIES]
@@ -898,7 +865,12 @@ export function VendorFormModal({
   }, [initialData, open]);
 
   const handleCountrySelect = (code: string, name: string) => {
-    const suggestedCurrency = COUNTRY_TO_CURRENCY_MAP[code];
+    // Derived from the countries-list ISO dataset (252 countries), not a hand-kept list.
+    // This used to read a local 29-entry map, so picking any country outside it — Tunisia,
+    // Morocco, Jordan, Türkiye and ~220 others — silently left whatever currency was
+    // already in the field, which read as "Tunisia uses AED". The bank-account currency
+    // in this same form already used this helper, so the two fields disagreed.
+    const suggestedCurrency = getDefaultCurrencyForCountry(code);
     setForm((f) => ({
       ...f,
       countryCode: code,

@@ -10,10 +10,8 @@ import {
   X,
   ImageOff,
   CalendarDays,
-  Tag,
   Warehouse,
   Users,
-  Box,
   Hash,
   CheckCircle2,
 } from 'lucide-react';
@@ -117,16 +115,9 @@ interface Props {
    * customer's contract. Other callers (inventory/purchasing views) leave this off. */
   hideVendorDetails?: boolean;
   /** Service Technicians additionally don't need lot/purchasing info either. */
-  hideLotDetails?: boolean;
 }
 
-export function ProductDetailModal({
-  productId,
-  open,
-  onClose,
-  hideVendorDetails = false,
-  hideLotDetails = false,
-}: Props) {
+export function ProductDetailModal({ productId, open, onClose, hideVendorDetails = false }: Props) {
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,11 +162,6 @@ export function ProductDetailModal({
       cancelled = true;
     };
   }, [productId, open]);
-
-  const fmt = (n?: number | null) =>
-    n != null
-      ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : null;
 
   const fmtDate = (d?: string | null) => {
     if (!d) return null;
@@ -312,20 +298,6 @@ export function ProductDetailModal({
                 </div>
               )}
 
-              {/* ── Pricing ── */}
-              {(product.sale_price != null ||
-                product.purchase_price != null ||
-                product.hs_code) && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
-                  <SectionLabel icon={Tag} label="Pricing" />
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <Field label="Sale Price" value={fmt(product.sale_price)} />
-                    <Field label="Purchase Price" value={fmt(product.purchase_price)} />
-                    <Field label="HS Code" value={product.hs_code} />
-                  </div>
-                </div>
-              )}
-
               {/* ── Warehouse Details ── */}
               {product.warehouse && (
                 <div className="bg-white rounded-xl border border-slate-100 p-4">
@@ -358,32 +330,6 @@ export function ProductDetailModal({
                     <Field label="Contact Person" value={product.vendor.contactPerson} />
                     <Field label="Phone" value={product.vendor.phone} />
                     <Field label="Email" value={product.vendor.email} />
-                  </div>
-                </div>
-              )}
-
-              {/* ── Lot Information ── */}
-              {!hideLotDetails && product.lot && (
-                <div className="bg-white rounded-xl border border-slate-100 p-4">
-                  <SectionLabel icon={Box} label="Lot Information" />
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <Field
-                      label="Lot Number"
-                      value={product.lot.lotNumber || product.lot.lot_number}
-                    />
-                    <Field
-                      label="Purchase Date"
-                      value={fmtDate(product.lot.purchaseDate || product.lot.purchase_date)}
-                    />
-                    {product.lot.vendor && (
-                      <>
-                        <Field
-                          label="Lot Vendor"
-                          value={product.lot.vendor.company_name || product.lot.vendor.name}
-                        />
-                        <Field label="Lot Vendor Phone" value={product.lot.vendor.phone} />
-                      </>
-                    )}
                   </div>
                 </div>
               )}

@@ -195,11 +195,9 @@ export class UsageRecord {
   customerApprovalNote?: string; // required attestation when FINANCE_MANUAL
 
   // Who asserted the manual approval. A manual approval is an evidence-free override —
-  // there is no signature or uploaded document behind it, only a staff member's word
-  // that the customer agreed by phone or in person. The note says how; these say who,
-  // which is what makes the override auditable now that any employee may record one.
-  // Null on remote-link approvals (the customer signed those themselves) and on manual
-  // approvals recorded before this was captured.
+  // no signature, no document, only a staff member's word that the customer agreed by
+  // phone or in person. The note says how; these say who, which is what keeps the
+  // override auditable now that any employee may record one.
   @Column({ type: 'uuid', nullable: true })
   customerApprovalRecordedById?: string;
 
