@@ -22,6 +22,7 @@ import { getBrands, Brand } from '@/lib/brand';
 import { getUserFromToken } from '@/lib/auth';
 import { getActingBranchId } from '@/lib/adminBranch';
 import { toast } from 'sonner';
+import { formatModelLabel } from '@/lib/model';
 
 interface ProductFormModalProps {
   initialData: Product | null;
@@ -339,7 +340,7 @@ export function ProductFormModal({
               }}
               options={filteredModels.map((m) => ({
                 value: m.id,
-                label: `${m.model_no} - ${m.model_name}`,
+                label: formatModelLabel(m),
                 description: `ID: ${m.id}`,
               }))}
               placeholder={selectedBrandId ? 'Select Model' : 'Select Brand First'}

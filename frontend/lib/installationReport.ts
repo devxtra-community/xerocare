@@ -79,7 +79,7 @@ export const getInstallationReport = (requestId: string) =>
 export const generateInstallationSigningToken = (requestId: string) =>
   api
     .post<
-      Res<{ token: string; expiresAt: string }>
+      Res<{ token: string; expiresAt: string; link?: string }>
     >(`/b/installation-requests/${requestId}/signing-token`)
     .then((r) => r.data.data);
 

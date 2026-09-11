@@ -252,16 +252,6 @@ const menuItems = [
         href: '/finance/quotations',
       },
       {
-        title: 'Receivables (AR)',
-        icon: ReceiptText,
-        href: '/manager/accounts/receivable',
-      },
-      {
-        title: 'Payables (AP)',
-        icon: CreditCard,
-        href: '/manager/accounts/payable',
-      },
-      {
         title: 'Service Estimates',
         icon: Settings,
         href: '/finance/service-estimates',

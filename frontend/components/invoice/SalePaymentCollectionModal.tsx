@@ -9,16 +9,8 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Loader2,
-  PlusCircle,
-  FileDown,
-  ExternalLink,
-  Mail,
-  MessageSquare,
-  Clock,
-  Wallet,
-} from 'lucide-react';
+import { GmailMark, WhatsAppMark, ReceiptMark } from '@/components/ui/BrandMarks';
+import { Loader2, PlusCircle, Clock, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getSalePaymentsForInvoice,
@@ -210,7 +202,7 @@ export function SalePaymentCollectionModal({
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="max-w-2xl max-h-[85dvh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-5xl max-h-[88dvh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-100 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
               <Wallet className="text-primary" size={20} />
@@ -293,7 +285,7 @@ export function SalePaymentCollectionModal({
                   // every Accounts/AR/Balance-Sheet distinction keyed off isSecurityDeposit
                   // is untouched; only the presentation here is merged.
                   <div
-                    className={`rounded-xl border overflow-hidden ${
+                    className={`rounded-xl border overflow-x-auto ${
                       hasDeposit ? 'border-primary/30 bg-primary/2' : 'border-slate-200'
                     }`}
                   >
@@ -305,21 +297,21 @@ export function SalePaymentCollectionModal({
                         </p>
                       </div>
                     )}
-                    <table className="w-full text-xs">
+                    <table className="w-full text-sm">
                       <thead className="bg-slate-50 text-slate-500">
-                        <tr className="text-[9px] font-black uppercase tracking-wide">
-                          <th className="text-left px-3 py-2">Request</th>
-                          <th className="text-left px-3 py-2">Mode</th>
-                          <th className="text-right px-3 py-2">Amount</th>
-                          <th className="text-left px-3 py-2">Date</th>
-                          <th className="text-left px-3 py-2">Status</th>
-                          <th className="text-left px-3 py-2">Receipt</th>
+                        <tr className="text-[11px] font-black uppercase tracking-wide">
+                          <th className="text-left px-4 py-3">Request</th>
+                          <th className="text-left px-4 py-3">Mode</th>
+                          <th className="text-right px-4 py-3">Amount</th>
+                          <th className="text-left px-4 py-3">Date</th>
+                          <th className="text-left px-4 py-3">Status</th>
+                          <th className="text-left px-4 py-3">Receipt</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {payments.map((pmt) => (
                           <tr key={pmt.id}>
-                            <td className="px-3 py-2 font-mono font-bold text-slate-700">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-700">
                               {pmt.requestNo}
                               {pmt.isSecurityDeposit && (
                                 <span className="ml-1.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-teal-100 text-teal-700">
@@ -327,16 +319,16 @@ export function SalePaymentCollectionModal({
                                 </span>
                               )}
                             </td>
-                            <td className="px-3 py-2">{pmt.paymentMode.replace('_', ' ')}</td>
-                            <td className="px-3 py-2 text-right font-bold">
+                            <td className="px-4 py-3">{pmt.paymentMode.replace('_', ' ')}</td>
+                            <td className="px-4 py-3 text-right font-bold">
                               {formatCurrency(pmt.amount, pmt.currency)}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="px-4 py-3">
                               {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="px-4 py-3">
                               <span
-                                className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
                                   pmt.status === 'APPROVED'
                                     ? 'bg-emerald-100 text-emerald-700'
                                     : pmt.status === 'REJECTED'
@@ -347,63 +339,63 @@ export function SalePaymentCollectionModal({
                                 {pmt.status}
                               </span>
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="px-4 py-3">
                               {pmt.status === 'REJECTED' ? (
                                 <span className="text-[9px] text-slate-300">—</span>
                               ) : receiptAvailable(pmt) ? (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => handleGenerateReceipt(pmt)}
-                                    disabled={generatingReceiptFor === pmt.id}
-                                    className="inline-flex items-center text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
-                                    title={pmt.receiptUrl ? 'View Receipt' : 'Generate Receipt'}
-                                  >
-                                    {generatingReceiptFor === pmt.id ? (
-                                      <Loader2 size={11} className="animate-spin" />
-                                    ) : pmt.receiptUrl ? (
-                                      <ExternalLink size={11} />
-                                    ) : (
-                                      <FileDown size={11} />
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleSendReceipt(pmt, 'email')}
-                                    disabled={sendingFor === pmt.id + 'email'}
-                                    className="text-indigo-500 hover:text-indigo-700 disabled:opacity-50"
-                                    title="Email receipt to customer"
-                                  >
-                                    {sendingFor === pmt.id + 'email' ? (
-                                      <Loader2 size={11} className="animate-spin" />
-                                    ) : (
-                                      <Mail size={11} />
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleSendReceipt(pmt, 'whatsapp')}
-                                    disabled={sendingFor === pmt.id + 'whatsapp'}
-                                    className="text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
-                                    title="WhatsApp receipt to customer"
-                                  >
-                                    {sendingFor === pmt.id + 'whatsapp' ? (
-                                      <Loader2 size={11} className="animate-spin" />
-                                    ) : (
-                                      <MessageSquare size={11} />
-                                    )}
-                                  </button>
-                                  {/* Sale-family and advance payments reach here while still
+                                <div className="flex flex-col gap-1.5">
+                                  <div className="flex items-center gap-2 whitespace-nowrap">
+                                    <button
+                                      onClick={() => handleGenerateReceipt(pmt)}
+                                      disabled={generatingReceiptFor === pmt.id}
+                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-amber-200 bg-white text-[11px] font-bold uppercase tracking-wider text-amber-700 hover:bg-amber-50 hover:border-amber-300 disabled:opacity-50"
+                                    >
+                                      {generatingReceiptFor === pmt.id ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                      ) : (
+                                        <ReceiptMark />
+                                      )}
+                                      {pmt.receiptUrl ? 'View Receipt' : 'Generate Receipt'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleSendReceipt(pmt, 'email')}
+                                      disabled={sendingFor === pmt.id + 'email'}
+                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-red-200 bg-white text-[11px] font-bold uppercase tracking-wider text-red-700 hover:bg-red-50 hover:border-red-300 disabled:opacity-50"
+                                    >
+                                      {sendingFor === pmt.id + 'email' ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                      ) : (
+                                        <GmailMark />
+                                      )}
+                                      Gmail
+                                    </button>
+                                    <button
+                                      onClick={() => handleSendReceipt(pmt, 'whatsapp')}
+                                      disabled={sendingFor === pmt.id + 'whatsapp'}
+                                      className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-emerald-200 bg-white text-[11px] font-bold uppercase tracking-wider text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 disabled:opacity-50"
+                                    >
+                                      {sendingFor === pmt.id + 'whatsapp' ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                      ) : (
+                                        <WhatsAppMark />
+                                      )}
+                                      WhatsApp
+                                    </button>
+                                    {/* Sale-family and advance payments reach here while still
                                       PENDING too — an informational hint, the buttons above
                                       already work. */}
+                                  </div>
                                   {pmt.status === 'PENDING' && (
-                                    <span className="ml-1 inline-flex items-center gap-0.5 text-[9px] text-amber-500 whitespace-nowrap">
-                                      <Clock size={9} /> awaiting approval
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 whitespace-nowrap">
+                                      <Clock size={13} /> awaiting approval
                                     </span>
                                   )}
                                 </div>
                               ) : (
                                 // Rent/Lease periodic collection, still PENDING: no receipt
                                 // until Finance approves.
-                                <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-500 whitespace-nowrap">
-                                  <Clock size={9} /> awaiting approval
+                                <span className="inline-flex items-center gap-1 text-[11px] text-amber-600 whitespace-nowrap">
+                                  <Clock size={13} /> awaiting approval
                                 </span>
                               )}
                             </td>

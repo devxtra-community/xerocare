@@ -25,12 +25,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import StatCard from '@/components/StatCard';
+import { PowerActionButton } from '@/components/ui/PowerActionButton';
+import { ContractActionsMenu } from '@/components/employeeComponents/ContractActionsMenu';
+import {
+  ContractDocMark,
+  ViewProductMark,
+  MachineSwapMark,
+  SecurityBillMark,
+  ReportMark,
+} from '@/components/ui/BrandMarks';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   Wrench,
-  Play,
   Square,
   CheckCircle2,
   Clock,
@@ -39,13 +48,9 @@ import {
   RefreshCw,
   Timer,
   Gauge,
-  Eye,
-  RefreshCcw,
   FileText,
   X,
   Warehouse as WarehouseIcon,
-  ShieldCheck,
-  ClipboardCheck,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 import { ChangeMachineModal } from '@/components/employeeComponents/ChangeMachineModal';
@@ -58,7 +63,6 @@ import { EmployeeJob } from '@/lib/employeeJob';
 export default function InstallationRequestsPage() {
   // Vendor purchasing/contact info isn't relevant here (Service Desk); Lot info is
   // additionally hidden for Service Technicians specifically, who also use this page.
-  const [isServiceTechnician, setIsServiceTechnician] = useState(false);
   // The Replacement Requests tab lists replacement jobs assigned to the viewer as the
   // swapping technician, so it is always empty for the Service Desk — whose own leg of
   // that chain (confirm delivery, assign the technician) lives on the Machine
@@ -66,7 +70,6 @@ export default function InstallationRequestsPage() {
   const [isServiceHelpDesk, setIsServiceHelpDesk] = useState(false);
   useEffect(() => {
     const job = getUserFromToken()?.employeeJob;
-    setIsServiceTechnician(job === EmployeeJob.SERVICE_TECHNICIAN);
     setIsServiceHelpDesk(job === EmployeeJob.SERVICE_HELP_DESK);
   }, []);
   const [requests, setRequests] = useState<InstallationRequest[]>([]);
@@ -333,43 +336,37 @@ export default function InstallationRequestsPage() {
 
       {(jobTab === 'installations' || isServiceHelpDesk) && (
         <>
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-3">
+          {/* Stats — the shared StatCard the Rent and Quotations pages use, so the
+              service desk's summary reads the same as the rest of the app. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
             {[
               {
-                label: 'Pending',
-                count: requests.filter((r) => r.status === 'PENDING').length,
-                color: 'text-amber-600',
-                bg: 'bg-amber-50',
+                title: 'Pending',
+                value: requests.filter((r) => r.status === 'PENDING').length,
+                subtitle: 'Awaiting a technician',
               },
               {
-                label: 'Assigned',
-                count: requests.filter((r) => r.status === 'ASSIGNED').length,
-                color: 'text-blue-600',
-                bg: 'bg-blue-50',
+                title: 'Assigned',
+                value: requests.filter((r) => r.status === 'ASSIGNED').length,
+                subtitle: 'Technician allocated',
               },
               {
-                label: 'In Progress',
-                count: requests.filter((r) => r.status === 'IN_PROGRESS').length,
-                color: 'text-emerald-600',
-                bg: 'bg-emerald-50',
+                title: 'In Progress',
+                value: requests.filter((r) => r.status === 'IN_PROGRESS').length,
+                subtitle: 'Installation underway',
               },
               {
-                label: 'Completed',
-                count: requests.filter((r) => r.status === 'COMPLETED').length,
-                color: 'text-slate-600',
-                bg: 'bg-slate-50',
+                title: 'Completed',
+                value: requests.filter((r) => r.status === 'COMPLETED').length,
+                subtitle: 'Finished jobs',
               },
             ].map((s) => (
-              <div
-                key={s.label}
-                className={`${s.bg} rounded-2xl p-4 flex flex-col items-center gap-1`}
-              >
-                <p className={`text-2xl font-black ${s.color}`}>{s.count}</p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                  {s.label}
-                </p>
-              </div>
+              <StatCard
+                key={s.title}
+                title={s.title}
+                value={s.value.toString()}
+                subtitle={s.subtitle}
+              />
             ))}
           </div>
 
@@ -517,78 +514,78 @@ export default function InstallationRequestsPage() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleViewContract(req)}
-                                disabled={contractLoading === req.id}
-                                title="View contract"
-                                className="h-7 w-7 p-0 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
-                              >
-                                {contractLoading === req.id ? (
-                                  <Loader2 size={13} className="animate-spin" />
-                                ) : (
-                                  <FileText size={13} />
-                                )}
-                              </Button>
-                              {req.currentProductId && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => setViewProductId(req.currentProductId!)}
-                                  title={`View product · ${req.currentSerialNumber ?? ''}`}
-                                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg"
-                                >
-                                  <Eye size={13} />
-                                </Button>
-                              )}
-                              {/* Sale-only: Rent/Lease machines are replaced by Finance/Admin from the
-                              contract screen, so the meter readings needed for billing get captured. */}
-                              {req.currentProductId && req.status !== 'PENDING' && !isRentLease && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setSwapTarget(req);
-                                    setSwapOpen(true);
-                                  }}
-                                  title="Change Machine"
-                                  className="h-7 w-7 p-0 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
-                                >
-                                  <RefreshCcw size={13} />
-                                </Button>
-                              )}
-                              {/* Sometimes the Employee doesn't collect the deposit at conversion —
-                              this is the fallback so it's never left uncollected indefinitely. */}
-                              {isRentLease &&
-                                (req.securityDepositAmount ?? 0) > 0 &&
-                                !req.securityDepositCollected && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setDepositTarget(req)}
-                                    title="Collect Security Deposit"
-                                    className="h-7 w-7 p-0 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
-                                  >
-                                    <ShieldCheck size={13} />
-                                  </Button>
-                                )}
+                              {/* Secondary actions live in the shared popup, so the column
+                                  stays a fixed width and the workflow button below is the
+                                  one thing that stands out. Each entry keeps the exact
+                                  condition it had as an inline icon button. */}
+                              <ContractActionsMenu
+                                label="Job Actions"
+                                actions={[
+                                  {
+                                    key: 'contract',
+                                    icon: <ContractDocMark />,
+                                    label: 'View Contract',
+                                    description: 'Open the contract this job belongs to',
+                                    loading: contractLoading === req.id,
+                                    onClick: () => handleViewContract(req),
+                                  },
+                                  ...(req.currentProductId
+                                    ? [
+                                        {
+                                          key: 'product',
+                                          icon: <ViewProductMark />,
+                                          label: 'View Machine',
+                                          description: req.currentSerialNumber
+                                            ? `Serial ${req.currentSerialNumber}`
+                                            : 'Machine on this job',
+                                          onClick: () => setViewProductId(req.currentProductId!),
+                                        },
+                                      ]
+                                    : []),
+                                  // Sale-only: Rent/Lease machines are replaced by Finance/Admin
+                                  // from the contract screen, so the meter readings needed for
+                                  // billing get captured.
+                                  ...(req.currentProductId &&
+                                  req.status !== 'PENDING' &&
+                                  !isRentLease
+                                    ? [
+                                        {
+                                          key: 'swap',
+                                          icon: <MachineSwapMark />,
+                                          label: 'Change Machine',
+                                          description: 'Swap the unit on this job',
+                                          onClick: () => {
+                                            setSwapTarget(req);
+                                            setSwapOpen(true);
+                                          },
+                                        },
+                                      ]
+                                    : []),
+                                  // Sometimes the Employee doesn't collect the deposit at
+                                  // conversion — this is the fallback so it's never left
+                                  // uncollected indefinitely.
+                                  ...(isRentLease &&
+                                  (req.securityDepositAmount ?? 0) > 0 &&
+                                  !req.securityDepositCollected
+                                    ? [
+                                        {
+                                          key: 'deposit',
+                                          icon: <SecurityBillMark />,
+                                          label: 'Collect Security Deposit',
+                                          description: 'Record the refundable deposit',
+                                          onClick: () => setDepositTarget(req),
+                                        },
+                                      ]
+                                    : []),
+                                ]}
+                              />
                               {req.status === 'ASSIGNED' && (
-                                <Button
-                                  size="sm"
+                                <PowerActionButton
+                                  label="Start installation"
+                                  tone="green"
+                                  loading={isActing}
                                   onClick={() => handleStart(req.id)}
-                                  disabled={isActing}
-                                  className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[9px] uppercase tracking-widest px-3 rounded-lg"
-                                >
-                                  {isActing ? (
-                                    <Loader2 size={12} className="animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Play size={10} className="mr-1" />
-                                      Start
-                                    </>
-                                  )}
-                                </Button>
+                                />
                               )}
                               {req.status === 'IN_PROGRESS' && (
                                 <Button
@@ -612,15 +609,15 @@ export default function InstallationRequestsPage() {
                                 </Button>
                               )}
                               {req.status === 'COMPLETED' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
+                                <button
+                                  type="button"
                                   onClick={() => setReportRequestId(req.id)}
                                   title="Installation report & customer signature"
-                                  className="h-7 w-7 p-0 text-violet-500 hover:text-violet-700 hover:bg-violet-50 rounded-lg"
+                                  className="inline-flex items-center gap-1.5 h-8 pl-1.5 pr-3 rounded-full bg-violet-50 text-violet-700 font-black text-[9px] uppercase tracking-widest ring-1 ring-violet-200 transition-all hover:bg-violet-100 hover:ring-violet-300 active:translate-y-px"
                                 >
-                                  <ClipboardCheck size={14} />
-                                </Button>
+                                  <ReportMark size={20} />
+                                  Report
+                                </button>
                               )}
                               {req.status === 'COMPLETED' && (
                                 <span className="flex items-center gap-1 text-emerald-500">
@@ -652,7 +649,6 @@ export default function InstallationRequestsPage() {
         open={!!viewProductId}
         onClose={() => setViewProductId(null)}
         hideVendorDetails
-        hideLotDetails={isServiceTechnician}
       />
 
       {swapTarget && (

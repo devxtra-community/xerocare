@@ -24,7 +24,6 @@ import {
   PlusCircle,
   DollarSign,
   RefreshCw,
-  ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -32,6 +31,7 @@ import { InvoiceDetailsDialog } from '../invoice/InvoiceDetailsDialog';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import UsageRecordingModal from './UsageRecordingModal';
 import UsageHistoryDialog from './UsageHistoryDialog';
+import { SecurityBillMark, AdvancePaymentMark } from '@/components/ui/BrandMarks';
 import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getActiveCurrency } from '@/lib/currency';
@@ -492,7 +492,7 @@ export default function MonthlyCollectionTable({
               variant="ghost"
               onClick={() => handleGenerateOrViewAdvanceBill(alertItem)}
               disabled={generatingAdvanceBillFor === alertItem.contractId}
-              className="h-8 w-8 p-0 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-full transition-all"
+              className="h-9 w-9 p-0 rounded-full transition-all hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200"
               title={
                 advanceBillStatusMap[alertItem.contractId]?.advanceBillId
                   ? securityDepositBillStatusMap[alertItem.contractId]?.hasSecurityDepositPayment
@@ -504,9 +504,11 @@ export default function MonthlyCollectionTable({
               }
             >
               {generatingAdvanceBillFor === alertItem.contractId ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
+                <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />
               ) : (
-                <FileText className="h-4 w-4" />
+                // Same mark the Rent/Lease Contract Actions menu uses for this bill, so
+                // one action looks the same wherever Finance meets it.
+                <SecurityBillMark size={22} />
               )}
             </Button>
           )}
@@ -521,7 +523,7 @@ export default function MonthlyCollectionTable({
                 variant="ghost"
                 onClick={() => handleGenerateOrViewSecurityDepositBill(alertItem)}
                 disabled={generatingSecurityDepositBillFor === alertItem.contractId}
-                className="h-8 w-8 p-0 text-teal-500 hover:text-teal-700 hover:bg-teal-50 rounded-full transition-all"
+                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200"
                 title={
                   securityDepositBillStatusMap[alertItem.contractId]?.securityDepositBillId
                     ? 'View Security Deposit Bill'
@@ -529,9 +531,9 @@ export default function MonthlyCollectionTable({
                 }
               >
                 {generatingSecurityDepositBillFor === alertItem.contractId ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <RefreshCw className="h-4 w-4 animate-spin text-emerald-600" />
                 ) : (
-                  <ShieldCheck className="h-4 w-4" />
+                  <SecurityBillMark size={22} />
                 )}
               </Button>
             )}
@@ -542,10 +544,10 @@ export default function MonthlyCollectionTable({
                 size="sm"
                 variant="ghost"
                 onClick={() => setDepositCollectTarget(alertItem)}
-                className="h-8 w-8 p-0 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded-full transition-all"
+                className="h-9 w-9 p-0 rounded-full transition-all hover:bg-blue-50 hover:ring-1 hover:ring-blue-200"
                 title="Collect Security Deposit — not yet recorded for this contract"
               >
-                <DollarSign className="h-4 w-4" />
+                <AdvancePaymentMark size={22} />
               </Button>
             )}
 

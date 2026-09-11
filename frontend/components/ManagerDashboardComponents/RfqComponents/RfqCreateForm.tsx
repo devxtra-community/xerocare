@@ -12,7 +12,7 @@ import {
   RfqStatus,
 } from '@/lib/rfq';
 import { getVendors, Vendor } from '@/lib/vendor';
-import { getAllModels, Model } from '@/lib/model';
+import { getAllModels, Model, formatModelLabel } from '@/lib/model';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { getAllProducts, Product } from '@/lib/product';
 import { getBrands, Brand } from '@/lib/brand';
@@ -614,7 +614,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
                         <SearchableSelect
                           options={models.map((m) => ({
                             value: m.id,
-                            label: `${m.model_no} - ${m.model_name}`,
+                            label: formatModelLabel(m),
                           }))}
                           value={item.modelId || ''}
                           onValueChange={(val) => updateItem(index, 'modelId', val)}

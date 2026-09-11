@@ -369,7 +369,10 @@ export const generateSigningToken = async (req: Request, res: Response, next: Ne
     if (agreement.branchId !== branchId) throw new AppError('Access denied', 403);
 
     const { token } = await issueSigningToken(agreement);
-    res.json({ success: true, data: { token, expiresAt: agreement.signingTokenExpiresAt } });
+    res.json({
+      success: true,
+      data: { token, expiresAt: agreement.signingTokenExpiresAt, link: signingLinkUrl(token) },
+    });
   } catch (err) {
     next(err);
   }
@@ -1064,7 +1067,10 @@ export const generateBillSigningToken = async (req: Request, res: Response, next
     const { branchId } = req.user!;
     const { usage } = await loadBillForBranch(req.params.id as string, branchId);
     const { token } = await issueBillSigningToken(usage);
-    res.json({ success: true, data: { token, expiresAt: usage.signingTokenExpiresAt } });
+    res.json({
+      success: true,
+      data: { token, expiresAt: usage.signingTokenExpiresAt, link: billSigningLinkUrl(token) },
+    });
   } catch (err) {
     next(err);
   }
@@ -1344,8 +1350,13 @@ export const rejectBillRemote = async (req: Request, res: Response, next: NextFu
 // attach a bill approval to.
 export const markBillApprovedManually = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { role, branchId } = req.user!;
-    if (!['FINANCE', 'ADMIN', 'MANAGER', 'SUPER_ADMIN'].includes(role)) {
+    const { role, branchId, userId } = req.user!;
+    // Employees are included deliberately: the employee is usually the one standing in
+    // front of the customer, so restricting this to Finance meant the person who actually
+    // took the approval could not record it. It stays an evidence-free override, so the
+    // safeguards matter — a required note saying HOW the customer approved, the recorder's
+    // identity saying WHO asserted it, and loadBillForBranch keeping it to their own branch.
+    if (!['FINANCE', 'ADMIN', 'MANAGER', 'SUPER_ADMIN', 'EMPLOYEE'].includes(role)) {
       throw new AppError('Insufficient role to approve a bill manually', 403);
     }
     const { customerName, approvalNote } = req.body;
@@ -1363,6 +1374,10 @@ export const markBillApprovedManually = async (req: Request, res: Response, next
     usage.customerApprovedAt = new Date();
     usage.customerApprovalMethod = 'FINANCE_MANUAL';
     usage.customerApprovalNote = approvalNote.trim();
+    // The stored method string stays 'FINANCE_MANUAL' so existing rows and every reader of
+    // that value keep working — it now means "recorded by staff", and these say which.
+    usage.customerApprovalRecordedById = userId;
+    usage.customerApprovalRecordedByName = await fetchEmployeeName(userId);
     await Source.getRepository(UsageRecord).save(usage);
 
     res.json({ success: true, data: usage });
@@ -3746,6 +3761,10 @@ export const getInstallationReport = async (req: Request, res: Response, next: N
   }
 };
 
+function installationSigningLinkUrl(token: string): string {
+  return `${publicAppUrl()}/public/installation/sign/${token}`;
+}
+
 /** POST /installation-requests/:id/signing-token */
 export const generateInstallationSigningToken = async (
   req: Request,
@@ -3754,7 +3773,10 @@ export const generateInstallationSigningToken = async (
 ) => {
   try {
     const { token, expiresAt } = await issueInstallationSigningToken(req.params.id as string);
-    res.json({ success: true, data: { token, expiresAt } });
+    res.json({
+      success: true,
+      data: { token, expiresAt, link: installationSigningLinkUrl(token) },
+    });
   } catch (err) {
     next(err);
   }

@@ -3,17 +3,33 @@
 import * as React from 'react';
 import { Card, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 
+/**
+ * Tone of the headline figure.
+ *
+ * A closed set rather than a free className: the point of this component is that every
+ * stats strip in the app looks the same, which an arbitrary style string would undo.
+ * `negative` is for money leaving (fees, write-offs), `positive` for money landing.
+ */
+export type StatTone = 'default' | 'positive' | 'negative';
+
+const TONE_CLASS: Record<StatTone, string> = {
+  default: 'text-primary',
+  positive: 'text-emerald-600',
+  negative: 'text-red-600',
+};
+
 type StatCardProps = {
   title: string;
   value: string;
   subtitle?: string;
+  tone?: StatTone;
 };
 
 /**
  * Reusable statistics card component.
  * Displays a title, value, and optional subtitle with responsive font sizing.
  */
-export default function StatCard({ title, value, subtitle }: StatCardProps) {
+export default function StatCard({ title, value, subtitle, tone = 'default' }: StatCardProps) {
   // Logic to decrease font size for longer content
   const getFontSizeClass = (text: string) => {
     const len = text ? text.length : 0;
@@ -30,7 +46,7 @@ export default function StatCard({ title, value, subtitle }: StatCardProps) {
         </CardTitle>
 
         <div
-          className={`font-bold text-primary leading-snug w-full text-center flex items-center justify-center ${getFontSizeClass(value)}`}
+          className={`font-bold leading-snug w-full text-center flex items-center justify-center ${TONE_CLASS[tone]} ${getFontSizeClass(value)}`}
           suppressHydrationWarning
         >
           {value || '0'}

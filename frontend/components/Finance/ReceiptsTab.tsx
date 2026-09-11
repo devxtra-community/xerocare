@@ -49,6 +49,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import StatCard from '@/components/StatCard';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -69,7 +70,6 @@ import {
   DollarSign,
   CheckCircle2,
   XCircle,
-  Clock,
   Search,
   Loader2,
   RefreshCw,
@@ -314,6 +314,21 @@ const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | null => {
 // A deposit is never rent revenue (excluded from InvoiceLedger and every AR sum — see
 // accountsShared.ts), so it needs to be visibly distinct at the one place a human decides
 // whether to approve it.
+/**
+ * Column header and row metrics for the receipts table.
+ *
+ * Everything here was pitched a step or two below the rest of the app — 8px type badges,
+ * 9px status pills, 13px icons in 28px buttons — which made the densest table in Accounts
+ * also the hardest to read. These two constants set the scale in one place so the header,
+ * the rows and the action buttons stay in proportion to each other.
+ */
+const TH = 'h-12 text-[11px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap';
+
+/** Row action button: a 36px circular target. Tint is supplied per action, never here,
+ *  so no row can end up with two competing `hover:bg-*` classes. */
+const ACTION_BTN =
+  'h-9 w-9 p-0 rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed';
+
 function PaymentTypeBadges({
   paymentContext,
   isSecurityDeposit,
@@ -322,16 +337,16 @@ function PaymentTypeBadges({
   isSecurityDeposit?: boolean;
 }) {
   return (
-    <span className="inline-flex items-center gap-1">
-      <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-blue-50 text-blue-600">
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-blue-50 text-blue-600">
         {ctxType(paymentContext) ?? '—'}
       </span>
       {isSecurityDeposit && (
         <span
-          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-teal-50 text-teal-700"
+          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wide bg-teal-50 text-teal-700"
           title="Refundable security deposit — not rent/revenue"
         >
-          <ShieldCheck size={9} />
+          <ShieldCheck size={12} />
           Deposit
         </span>
       )}
@@ -850,7 +865,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     const cfg = map[status] || { label: status, color: 'bg-slate-100 text-slate-500' };
     return (
       <span
-        className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${cfg.color}`}
+        className={`px-2.5 py-1 rounded-full text-[10px] leading-none font-black uppercase tracking-wider ${cfg.color}`}
       >
         {cfg.label}
       </span>
@@ -871,7 +886,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     if (!cfg) return null;
     return (
       <span
-        className={`ml-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-current/10 ${cfg.color}`}
+        className={`px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wider border border-current/10 ${cfg.color}`}
         title="Advance Bill customer sign-off — separate from the payment approval status"
       >
         {cfg.label}
@@ -886,7 +901,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     if (!payment.isRefunded) return null;
     return (
       <span
-        className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border border-current/10 bg-teal-50 text-teal-600"
+        className="px-2 py-1 rounded-md text-[10px] leading-none font-black uppercase tracking-wider border border-current/10 bg-teal-50 text-teal-600"
         title={
           payment.refundedAt
             ? `Refunded ${new Date(payment.refundedAt).toLocaleDateString('en-GB')}${payment.refundedByName ? ` by ${payment.refundedByName}` : ''}`
@@ -939,76 +954,68 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-5 gap-3">
+      {/* Same StatCard the Rent and Installation pages use. These stay buttons — each
+          one filters the table below — so the card sits inside the button and the
+          selected ring goes on the button, keeping the filter affordance. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
         {(
           [
             {
               key: 'PENDING',
               label: 'Pending',
-              icon: Clock,
-              color: 'text-amber-600',
-              bg: 'bg-amber-50',
+              hint: 'Awaiting approval',
               count: counts.PENDING,
               amount: amounts.PENDING,
             },
             {
               key: 'APPROVED',
               label: 'Approved',
-              icon: CheckCircle2,
-              color: 'text-emerald-600',
-              bg: 'bg-emerald-50',
+              hint: 'Cleared receipts',
               count: counts.APPROVED,
               amount: amounts.APPROVED,
             },
             {
               key: 'REJECTED',
               label: 'Rejected',
-              icon: XCircle,
-              color: 'text-red-500',
-              bg: 'bg-red-50',
+              hint: 'Declined receipts',
               count: counts.REJECTED,
               amount: amounts.REJECTED,
             },
             {
               key: 'ALL',
               label: 'All Payments',
-              icon: DollarSign,
-              color: 'text-indigo-600',
-              bg: 'bg-indigo-50',
+              hint: 'Every receipt',
               count: counts.ALL,
               amount: amounts.ALL,
             },
             {
               key: 'CUSTOMERS',
               label: 'By Customer',
-              icon: Users,
-              color: 'text-teal-600',
-              bg: 'bg-teal-50',
+              hint: 'Unique customers',
               count: uniqueCustomers,
               amount: undefined,
             },
           ] as const
-        ).map(({ key, label, icon: Icon, color, bg, count, amount }) => (
+        ).map(({ key, label, hint, count, amount }) => (
           <button
             key={key}
             onClick={() => setTab(key as FilterTab)}
-            className={`${bg} rounded-2xl p-4 text-left transition-all ${tab === key ? 'ring-2 ring-offset-1 ring-indigo-300' : 'hover:ring-1 hover:ring-slate-200'}`}
+            className={`rounded-2xl text-left transition-all ${tab === key ? 'ring-2 ring-offset-1 ring-indigo-300' : 'hover:ring-1 hover:ring-slate-200'}`}
           >
-            <div className="flex items-center gap-2 mb-1">
-              <Icon size={14} className={color} />
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                {label}
-              </p>
-            </div>
-            <p className={`text-2xl font-black ${color}`}>{count}</p>
-            {/* Reflects every active filter (employee, type, mode, deposit, date range) —
-                not just the raw count, so selecting e.g. an employee shows what they're
-                actually responsible for in each bucket, not the branch-wide total. */}
-            {hasSecondaryFilters && amount !== undefined && (
-              <p className={`text-[10px] font-bold mt-0.5 ${color} opacity-80`}>
-                {currency} {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-            )}
+            <StatCard
+              title={label}
+              value={String(count)}
+              // The amount reflects every active filter (employee, type, mode, deposit,
+              // date range) — not just the raw count — so selecting e.g. an employee shows
+              // what they are actually responsible for in each bucket, not the branch-wide
+              // total. With no filters on there is nothing to qualify, so the card falls
+              // back to saying what the bucket means.
+              subtitle={
+                hasSecondaryFilters && amount !== undefined
+                  ? `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                  : hint
+              }
+            />
           </button>
         ))}
       </div>
@@ -1275,8 +1282,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                       {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
                                     </td>
                                     <td className="py-1.5 pr-4">
-                                      {statusBadge(pmt.status)}
-                                      {refundBadge(pmt)}
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {statusBadge(pmt.status)}
+                                        {refundBadge(pmt)}
+                                      </div>
                                     </td>
                                     <td className="py-1.5 text-right">
                                       <Button
@@ -1318,46 +1327,26 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/70">
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Request No.
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Invoice
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Customer
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Type
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Mode
-                    </TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Amount
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Date
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Recorded By
-                    </TableHead>
-                    <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Status
-                    </TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      Actions
-                    </TableHead>
+                  <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
+                    <TableHead className={TH}>Request No.</TableHead>
+                    <TableHead className={TH}>Invoice</TableHead>
+                    <TableHead className={TH}>Customer</TableHead>
+                    <TableHead className={TH}>Type</TableHead>
+                    <TableHead className={TH}>Mode</TableHead>
+                    <TableHead className={`${TH} text-right`}>Amount</TableHead>
+                    <TableHead className={TH}>Date</TableHead>
+                    <TableHead className={TH}>Recorded By</TableHead>
+                    <TableHead className={TH}>Status</TableHead>
+                    <TableHead className={`${TH} text-right`}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.map((pmt) => (
-                    <TableRow key={pmt.id} className="hover:bg-slate-50/50">
-                      <TableCell className="font-black text-slate-800 text-xs">
+                    <TableRow key={pmt.id} className="hover:bg-slate-50/50 [&>td]:py-4">
+                      <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
                         {pmt.requestNo}
                       </TableCell>
-                      <TableCell className="font-bold text-slate-700 text-sm">
+                      <TableCell className="font-bold text-slate-700 text-sm whitespace-nowrap">
                         {pmt.invoiceNumber}
                       </TableCell>
                       <TableCell className="font-bold text-slate-600 text-sm">
@@ -1370,7 +1359,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         />
                       </TableCell>
                       <TableCell>
-                        <span className="text-[10px] font-black text-slate-500 uppercase">
+                        <span className="text-[11px] font-black text-slate-600 uppercase whitespace-nowrap">
                           {pmt.paymentMode === 'ONLINE_PAYMENT'
                             ? 'ONLINE (CARD)'
                             : pmt.paymentMode.replace('_', ' ')}
@@ -1381,7 +1370,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-black text-slate-800">
+                      <TableCell className="text-right font-black text-slate-800 text-[15px] whitespace-nowrap">
                         {pmt.currency}{' '}
                         {Number(pmt.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         {/* What the customer paid is the figure above; what the bank
@@ -1407,27 +1396,29 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                             </span>
                           )}
                       </TableCell>
-                      <TableCell className="text-[11px] font-bold text-slate-500">
+                      <TableCell className="text-xs font-bold text-slate-500 whitespace-nowrap">
                         {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
                       </TableCell>
-                      <TableCell className="text-[11px] font-bold text-slate-500">
+                      <TableCell className="text-xs font-bold text-slate-500">
                         {pmt.recordedByEmployeeName}
                       </TableCell>
                       <TableCell>
-                        {statusBadge(pmt.status)}
-                        {advanceBillBadge(pmt)}
-                        {refundBadge(pmt)}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {statusBadge(pmt.status)}
+                          {advanceBillBadge(pmt)}
+                          {refundBadge(pmt)}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1.5">
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => openReceiptView(pmt)}
-                            className="h-7 w-7 p-0 text-slate-400 hover:bg-slate-100"
+                            className={`${ACTION_BTN} text-slate-400 hover:text-blue-600 hover:bg-slate-100 hover:ring-1 hover:ring-slate-200`}
                             title="View Receipt"
                           >
-                            <Eye size={13} />
+                            <Eye size={18} />
                           </Button>
                           {pmt.status === 'PENDING' && (
                             <>
@@ -1438,10 +1429,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   setActionTarget(pmt);
                                   setActionType('approve');
                                 }}
-                                className="h-7 w-7 p-0 text-emerald-500 hover:bg-emerald-50"
+                                className={`${ACTION_BTN} text-emerald-600 hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200`}
                                 title="Approve"
                               >
-                                <CheckCircle2 size={13} />
+                                <CheckCircle2 size={18} />
                               </Button>
                               <Button
                                 size="sm"
@@ -1452,10 +1443,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   setRejectReason('');
                                   setApprovingAccountId('');
                                 }}
-                                className="h-7 w-7 p-0 text-red-400 hover:bg-red-50"
+                                className={`${ACTION_BTN} text-red-500 hover:bg-red-50 hover:ring-1 hover:ring-red-200`}
                                 title="Reject"
                               >
-                                <XCircle size={13} />
+                                <XCircle size={18} />
                               </Button>
                             </>
                           )}
@@ -1467,10 +1458,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                 variant="ghost"
                                 disabled={isActing}
                                 onClick={() => handleReverseApplication(pmt)}
-                                className="h-7 w-7 p-0 text-amber-500 hover:bg-amber-50"
+                                className={`${ACTION_BTN} text-amber-500 hover:bg-amber-50 hover:ring-1 hover:ring-amber-200`}
                                 title={`Reverse the ${pmt.currency} ${Number(pmt.appliedAmount).toFixed(2)} applied from this deposit`}
                               >
-                                <RotateCcw size={13} />
+                                <RotateCcw size={18} />
                               </Button>
                             )}
                           {pmt.isSecurityDeposit &&
@@ -1481,10 +1472,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => openApplyDeposit(pmt)}
-                                className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50"
+                                className={`${ACTION_BTN} text-indigo-500 hover:bg-indigo-50 hover:ring-1 hover:ring-indigo-200`}
                                 title="Apply deposit to an outstanding bill"
                               >
-                                <Wallet size={13} />
+                                <Wallet size={18} />
                               </Button>
                             )}
                           {pmt.isSecurityDeposit &&
@@ -1501,10 +1492,10 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                                   setRefundAccountId('');
                                   setRefundRemarks('');
                                 }}
-                                className="h-7 w-7 p-0 text-teal-500 hover:bg-teal-50"
+                                className={`${ACTION_BTN} text-teal-500 hover:bg-teal-50 hover:ring-1 hover:ring-teal-200`}
                                 title="Refund Security Deposit"
                               >
-                                <Undo2 size={13} />
+                                <Undo2 size={18} />
                               </Button>
                             )}
                         </div>

@@ -1,20 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Search,
-  Loader2,
-  Eye,
-  FileText,
-  Plus,
-  Clock,
-  Send,
-  ClipboardList,
-  Activity,
-  Receipt,
-  ShieldCheck,
-  RefreshCw,
-} from 'lucide-react';
+import { Search, Loader2, Eye, FileText, Plus, Clock, Activity } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getUserFromToken } from '@/lib/auth';
 import { QuotationConversionFlow } from './QuotationConversionFlow';
@@ -43,6 +30,13 @@ import {
   SecurityDepositBillStatus,
 } from '@/lib/saleWorkflow';
 import { getApiErrorMessage } from '@/lib/apiError';
+import { ContractActionsMenu } from './ContractActionsMenu';
+import {
+  AdvancePaymentMark,
+  SecurityBillMark,
+  SendMark,
+  MeterReadingMark,
+} from '@/components/ui/BrandMarks';
 import {
   Dialog,
   DialogContent,
@@ -547,36 +541,93 @@ export default function EmployeeLeaseTable({
                           </Button>
                         )}
 
-                        {inv.status === 'DRAFT' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-emerald-600 hover:bg-emerald-50"
-                            onClick={() => {
-                              setSelectedInvoice(inv);
-                              handleSendForApproval();
-                            }}
-                            title="Send to Finance"
-                          >
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        )}
+                        {/* Collapsed into one popover — see ContractActionsMenu. Each entry
+                            keeps the exact condition it had as an inline icon button. */}
+                        <ContractActionsMenu
+                          actions={[
+                            ...(inv.status === 'DRAFT'
+                              ? [
+                                  {
+                                    key: 'send',
+                                    icon: <SendMark />,
+                                    label: 'Send to Finance',
+                                    description: 'Submit this draft for approval',
+                                    onClick: () => {
+                                      setSelectedInvoice(inv);
+                                      handleSendForApproval();
+                                    },
+                                  },
+                                ]
+                              : []),
+                            ...(inv.status !== 'DRAFT' && inv.contractStatus !== 'COMPLETED'
+                              ? [
+                                  {
+                                    key: 'meter',
+                                    icon: <MeterReadingMark />,
+                                    label: 'Submit Meter Reading',
+                                    description: 'Record this period\u2019s usage',
+                                    onClick: () => {
+                                      setSelectedInvoice(inv);
+                                      setIsUsageModalOpen(true);
+                                    },
+                                  },
+                                ]
+                              : []),
+                            ...(!!inv.contractStatus && inv.contractStatus !== 'CANCELLED'
+                              ? [
+                                  {
+                                    key: 'receipts',
+                                    icon: <AdvancePaymentMark />,
+                                    label: 'Advance Payment Receipts',
+                                    description: 'Record and view collections',
+                                    onClick: () => setCollectionTarget(inv),
+                                  },
+                                ]
+                              : []),
+                            ...(advanceBillStatusMap[inv.id]?.hasAdvancePayment
+                              ? [
+                                  {
+                                    key: 'advance-bill',
+                                    icon: <SecurityBillMark />,
+                                    label: advanceBillStatusMap[inv.id]?.advanceBillId
+                                      ? securityDepositBillStatusMap[inv.id]
+                                          ?.hasSecurityDepositPayment
+                                        ? 'View Advance & Security Deposit Bill'
+                                        : 'View Advance Bill'
+                                      : securityDepositBillStatusMap[inv.id]
+                                            ?.hasSecurityDepositPayment
+                                        ? 'Generate Advance & Security Deposit Bill'
+                                        : 'Generate Advance Bill',
+                                    description: 'Customer-facing bill document',
+                                    loading: generatingAdvanceBillFor === inv.id,
+                                    onClick: () => handleGenerateOrViewAdvanceBill(inv),
+                                  },
+                                ]
+                              : []),
+                            // A deposit collected alongside an advance shows as a section
+                            // within that Advance Bill above — this standalone entry is only
+                            // for the edge case where a deposit exists with no advance at all.
+                            ...(securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment &&
+                            !advanceBillStatusMap[inv.id]?.hasAdvancePayment
+                              ? [
+                                  {
+                                    key: 'deposit-bill',
+                                    icon: <SecurityBillMark />,
+                                    label: securityDepositBillStatusMap[inv.id]
+                                      ?.securityDepositBillId
+                                      ? 'View Security Deposit Bill'
+                                      : 'Generate Security Deposit Bill',
+                                    description: 'Refundable deposit document',
+                                    loading: generatingSecurityDepositBillFor === inv.id,
+                                    onClick: () => handleGenerateOrViewSecurityDepositBill(inv),
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
 
-                        {inv.status !== 'DRAFT' && inv.contractStatus !== 'COMPLETED' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                            onClick={() => {
-                              setSelectedInvoice(inv);
-                              setIsUsageModalOpen(true);
-                            }}
-                            title="Submit Meter Reading"
-                          >
-                            <ClipboardList className="h-4 w-4" />
-                          </Button>
-                        )}
-
+                        {/* Replacement keeps its own inline button: it carries a status
+                            badge of its own that a menu row would hide. */}
                         <ReplacementActionButton
                           contractId={inv.id}
                           contractStatus={inv.contractStatus}
@@ -586,68 +637,6 @@ export default function EmployeeLeaseTable({
                             fetchInvoices();
                           }}
                         />
-
-                        {!!inv.contractStatus && inv.contractStatus !== 'CANCELLED' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
-                            onClick={() => setCollectionTarget(inv)}
-                            title="Advance Payment Receipt"
-                          >
-                            <Receipt className="h-4 w-4" />
-                          </Button>
-                        )}
-
-                        {advanceBillStatusMap[inv.id]?.hasAdvancePayment && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleGenerateOrViewAdvanceBill(inv)}
-                            disabled={generatingAdvanceBillFor === inv.id}
-                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
-                            title={
-                              advanceBillStatusMap[inv.id]?.advanceBillId
-                                ? securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment
-                                  ? 'View Advance & Security Deposit Bill'
-                                  : 'View Advance Bill'
-                                : securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment
-                                  ? 'Generate Advance & Security Deposit Bill'
-                                  : 'Generate Advance Bill'
-                            }
-                          >
-                            {generatingAdvanceBillFor === inv.id ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <FileText className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-
-                        {/* A deposit collected alongside an advance now shows as a section
-                            within that Advance Bill above — this standalone button is only
-                            for the edge case where a deposit exists with no advance at all. */}
-                        {securityDepositBillStatusMap[inv.id]?.hasSecurityDepositPayment &&
-                          !advanceBillStatusMap[inv.id]?.hasAdvancePayment && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleGenerateOrViewSecurityDepositBill(inv)}
-                              disabled={generatingSecurityDepositBillFor === inv.id}
-                              className="h-8 w-8 text-teal-500 hover:text-teal-600 hover:bg-teal-50"
-                              title={
-                                securityDepositBillStatusMap[inv.id]?.securityDepositBillId
-                                  ? 'View Security Deposit Bill'
-                                  : 'Generate Security Deposit Bill'
-                              }
-                            >
-                              {generatingSecurityDepositBillFor === inv.id ? (
-                                <RefreshCw className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <ShieldCheck className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
 
                         {/* Edit button removed to enforce quotation-to-transaction workflow */}
                       </div>

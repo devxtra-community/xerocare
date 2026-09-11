@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Loader2, FileText, Eye, PlusCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Eye, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { getBillsForContract, type BillForContract } from '@/lib/saleWorkflow';
@@ -20,6 +20,7 @@ import { UsageBillCollectionDialog, type CollectionTarget } from './UsageBillCol
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getApiErrorMessage } from '@/lib/apiError';
+import { BillsMark, AdvancePaymentMark } from '@/components/ui/BrandMarks';
 
 const safeFormatDate = (
   dateVal: string | number | Date | null | undefined,
@@ -43,6 +44,14 @@ interface Props {
   invoiceNumber: string;
   onClose: () => void;
 }
+
+/** Row action shell. Carries no hover tint of its own — each call site adds one, so
+ *  two competing `hover:bg-*` classes can never both land in the class list. */
+const ACTION_BTN =
+  'group inline-flex h-9 w-9 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed';
+
+const TH =
+  'h-11 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 whitespace-nowrap';
 
 const STATUS_META: Record<string, { label: string; className: string }> = {
   PENDING_APPROVAL: {
@@ -90,39 +99,50 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
   return (
     <>
       <Dialog open onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-2xl border border-slate-200 shadow-2xl max-h-[85vh] flex flex-col">
+        {/* `sm:max-w-*`, not `max-w-*`: the base DialogContent sets `sm:max-w-xl`, and
+              twMerge treats the two as different groups — a bare `max-w-5xl` here would
+              lose to it at every width above the sm breakpoint. */}
+        <DialogContent className="sm:max-w-5xl p-0 overflow-hidden rounded-2xl border border-slate-200 shadow-2xl max-h-[88vh] flex flex-col">
           <DialogTitle className="sr-only">Bills — {invoiceNumber}</DialogTitle>
 
-          <div className="bg-white border-b border-slate-200 px-5 py-4 shrink-0 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                <FileText size={14} className="text-slate-500" />
+          {/* pr-16 keeps Refresh clear of the dialog's own close button, which is
+              positioned absolutely at top-6 right-6 and was landing on top of it. */}
+          <div className="bg-white border-b border-slate-200 px-6 py-5 pr-16 shrink-0 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="shrink-0">
+                <BillsMark size={34} />
               </div>
               <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none mb-0.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">
                   Bills
                 </p>
-                <p className="text-sm font-black text-slate-800 leading-none">{invoiceNumber}</p>
+                <p className="text-base font-black text-slate-800 leading-none">{invoiceNumber}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={load}
+              disabled={loading}
+              className="h-9 shrink-0"
+            >
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5">
-            <div className="overflow-hidden rounded-lg border border-slate-200">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="overflow-hidden rounded-xl border border-slate-200">
               <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead>TYPE</TableHead>
-                    <TableHead>PERIOD</TableHead>
-                    <TableHead>STATUS</TableHead>
-                    <TableHead className="text-right">TOTAL</TableHead>
-                    <TableHead className="text-right">COLLECTED</TableHead>
-                    <TableHead className="text-right">PENDING</TableHead>
-                    <TableHead className="text-right">ACTIONS</TableHead>
+                <TableHeader className="bg-slate-50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className={TH}>Type</TableHead>
+                    <TableHead className={TH}>Period</TableHead>
+                    <TableHead className={TH}>Status</TableHead>
+                    <TableHead className={`${TH} text-right`}>Total</TableHead>
+                    <TableHead className={`${TH} text-right`}>Collected</TableHead>
+                    <TableHead className={`${TH} text-right`}>Pending</TableHead>
+                    <TableHead className={`${TH} text-right pr-5`}>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -143,8 +163,16 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                       const status = STATUS_META[b.billStatus] || STATUS_META.PENDING_APPROVAL;
                       const isApproved = b.billStatus === 'CUSTOMER_APPROVED';
                       const isAdvance = b.billType === 'ADVANCE';
+                      // Same gate as before, named once so the button and its tooltip
+                      // can't drift apart.
+                      const collectable = isApproved && b.amountPending > 0.01;
+                      const collectHint = !isApproved
+                        ? 'Blocked until the customer approves this bill'
+                        : b.amountPending <= 0.01
+                          ? 'Already fully collected'
+                          : 'Collect against this bill';
                       return (
-                        <TableRow key={b.usageRecordId}>
+                        <TableRow key={b.usageRecordId} className="[&>td]:py-3.5">
                           <TableCell>
                             <span
                               className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
@@ -156,7 +184,7 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                               {isAdvance ? 'Advance' : 'Usage'}
                             </span>
                           </TableCell>
-                          <TableCell className="text-sm">
+                          <TableCell className="text-sm whitespace-nowrap">
                             {isAdvance
                               ? safeFormatDate(b.billingPeriodStart, 'MMM dd, yyyy')
                               : (() => {
@@ -181,10 +209,10 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                               {status.label}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right text-sm text-slate-700">
+                          <TableCell className="text-right text-sm font-semibold text-slate-700 whitespace-nowrap">
                             {formatCurrency(b.totalCharge, currency)}
                           </TableCell>
-                          <TableCell className="text-right text-sm text-emerald-600 font-medium">
+                          <TableCell className="text-right text-sm text-emerald-600 font-semibold whitespace-nowrap">
                             {formatCurrency(b.amountGiven, currency)}
                             {Number(b.depositApplied ?? 0) > 0 && (
                               <span className="block text-[10px] font-bold text-indigo-500">
@@ -193,38 +221,37 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
                               </span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right text-sm font-bold text-amber-600">
+                          <TableCell className="text-right text-sm font-bold text-amber-600 whitespace-nowrap">
                             {formatCurrency(b.amountPending, currency)}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
+                          <TableCell className="text-right pr-5">
+                            <div className="flex items-center justify-end gap-1.5">
                               <button
                                 onClick={() => setViewingBillId(b.usageRecordId)}
-                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                                title="View Bill"
+                                className={`${ACTION_BTN} hover:bg-slate-100 hover:ring-1 hover:ring-slate-200`}
+                                title="View this bill"
+                                aria-label="View this bill"
                               >
-                                <Eye className="h-3.5 w-3.5" />
+                                <Eye className="h-4 w-4 text-slate-400 transition-colors group-hover:text-blue-600" />
                               </button>
                               <button
                                 onClick={() =>
-                                  isApproved &&
                                   setCollectTarget({
                                     usageRecordId: b.usageRecordId,
                                     invoiceNumber,
                                     amountPending: b.amountPending,
                                   })
                                 }
-                                disabled={!isApproved || b.amountPending <= 0.01}
-                                className="p-1.5 rounded-md hover:bg-emerald-50 text-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                title={
-                                  !isApproved
-                                    ? 'Blocked until the customer approves this bill'
-                                    : b.amountPending <= 0.01
-                                      ? 'Already fully collected'
-                                      : 'Add Collect Amount'
-                                }
+                                disabled={!collectable}
+                                className={`${ACTION_BTN} enabled:hover:bg-blue-50 enabled:hover:ring-1 enabled:hover:ring-blue-200`}
+                                title={collectHint}
+                                aria-label={collectHint}
                               >
-                                <PlusCircle className="h-3.5 w-3.5" />
+                                {/* A full-colour disc at 30% opacity just reads as a smudge,
+                                    so the disabled state desaturates it as well as fading it. */}
+                                <span className={collectable ? '' : 'opacity-40 grayscale'}>
+                                  <AdvancePaymentMark size={22} />
+                                </span>
                               </button>
                             </div>
                           </TableCell>
@@ -237,12 +264,13 @@ export function BillsDrilldownModal({ contractId, invoiceNumber, onClose }: Prop
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end shrink-0">
-            <Button
-              variant="ghost"
-              onClick={onClose}
-              className="text-[10px] font-black uppercase tracking-widest text-slate-400 h-9"
-            >
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-4 shrink-0">
+            <p className="text-xs text-slate-500">
+              {bills.length === 0
+                ? ''
+                : `${bills.length} bill${bills.length === 1 ? '' : 's'} on this contract`}
+            </p>
+            <Button variant="outline" onClick={onClose} className="h-9 px-6 text-xs font-bold">
               Close
             </Button>
           </div>
