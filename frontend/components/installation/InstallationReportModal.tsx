@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Link2, Copy, Printer, CheckCircle2, ClipboardCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
+import { publicAppLink } from '@/lib/publicAppUrl';
 import { ESignatureCanvas } from '@/components/employeeComponents/ESignatureCanvas';
 import { InstallationReportView } from './InstallationReportView';
 import {
@@ -64,9 +65,11 @@ export function InstallationReportModal({
   const makeLink = async () => {
     setGeneratingLink(true);
     try {
-      const { token } = await generateInstallationSigningToken(requestId);
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      setLink(`${origin}/public/installation/sign/${token}`);
+      const { token, link } = await generateInstallationSigningToken(requestId);
+      // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
+      // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
+      // which is unreachable for the customer the link is being sent to.
+      setLink(link || publicAppLink(`/public/installation/sign/${token}`));
       toast.success('Signing link ready — valid for 72 hours');
     } catch (err) {
       toast.error('Could not generate a link', { description: getApiErrorMessage(err) });

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Loader2, ArrowRightLeft, Send, Mail, Phone, Copy, ClipboardList } from 'lucide-react';
+import { Loader2, ArrowRightLeft, Send, Copy, ClipboardList, Printer } from 'lucide-react';
+import { GmailMark, WhatsAppMark } from '@/components/ui/BrandMarks';
 import { useRouter } from 'next/navigation';
 import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
 import { Button } from '@/components/ui/button';
@@ -696,7 +697,10 @@ export function QuotationViewDialog({
       modelNo: exMN || item.metadata?.model?.model_no || item.metadata?.model_no || 'Generic',
       modelName: item.metadata?.model?.model_name || item.metadata?.model_name || 'N/A',
       slNo: item.allocation?.serialNumber || item.sn || item.serialNumber || 'TBD',
-      description: (hsCodePart + cleanDesc).trim(),
+      // The product's own description first, the invoice line second — an invoice line's
+      // description holds the product NAME, and the layouts hide that cell when it merely
+      // repeats the name. The two other item mappings in this file already do this.
+      description: (hsCodePart + (item.metadata?.description || cleanDesc)).trim(),
       features: (item.metadata?.features as { subHeading: string; description: string }[]) || [],
       qty: qty,
       unitPrice: unitP,
@@ -1500,7 +1504,7 @@ export function QuotationViewDialog({
             )}
           </div>
           {/* Footer Actions */}
-          <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center">
+          <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 flex justify-between items-center print:hidden">
             <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
               <span className="text-[9px] font-normal uppercase tracking-widest text-slate-400">
                 Status:
@@ -1528,21 +1532,29 @@ export function QuotationViewDialog({
                       size="sm"
                       onClick={() => handleSendCustomer('EMAIL')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 gap-2"
                     >
-                      <Mail size={14} /> Gmail
+                      <GmailMark /> Gmail
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleSendCustomer('WHATSAPP')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 gap-2"
                     >
-                      <Phone size={14} /> WhatsApp
+                      <WhatsAppMark /> WhatsApp
                     </Button>
                   </div>
                 )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 gap-2"
+              >
+                <Printer size={16} className="shrink-0" /> Print
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -2913,7 +2925,7 @@ export function QuotationViewDialog({
           </div>
 
           {/* Footer Actions Row - OUTSIDE Print Content wrapper */}
-          <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 mt-0 z-20 flex justify-between items-center">
+          <div className="px-6 pb-4 pt-4 bg-slate-50 shrink-0 border-t border-slate-200 mt-0 z-20 flex justify-between items-center print:hidden">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
                 <span className="text-[9px] font-normal uppercase tracking-widest text-slate-400">
@@ -2970,22 +2982,30 @@ export function QuotationViewDialog({
                       size="sm"
                       onClick={() => handleSendCustomer('EMAIL')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300 gap-2"
                     >
-                      <Mail size={14} /> Gmail
+                      <GmailMark /> Gmail
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleSendCustomer('WHATSAPP')}
                       disabled={isSendingCustomer}
-                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-green-200 text-emerald-700 hover:bg-green-50 gap-2"
+                      className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 gap-2"
                     >
-                      <Phone size={14} /> WhatsApp
+                      <WhatsAppMark /> WhatsApp
                     </Button>
                   </div>
                 )}
 
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="h-9 px-4 rounded-md font-normal uppercase text-[11px] tracking-widest border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 gap-2"
+              >
+                <Printer size={16} className="shrink-0" /> Print
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

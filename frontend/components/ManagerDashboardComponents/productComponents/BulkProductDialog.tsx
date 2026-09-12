@@ -33,6 +33,7 @@ import { useBranchTax } from '@/hooks/useBranchTax';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { formatModelLabel } from '@/lib/model';
 
 interface BulkProductDialogProps {
   open: boolean;
@@ -1064,7 +1065,7 @@ export function BulkProductDialog({
                                   )
                                   .map((m) => ({
                                     value: m.id || '',
-                                    label: `${m.model_no} - ${m.model_name}`,
+                                    label: formatModelLabel(m),
                                   }))}
                                 placeholder="Select Model"
                                 emptyText="No models"

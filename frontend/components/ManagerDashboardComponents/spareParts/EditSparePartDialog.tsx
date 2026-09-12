@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { BulletDescriptionInput } from '@/components/ui/bullet-description-input';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { formatModelLabel } from '@/lib/model';
 interface EditSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -308,7 +309,7 @@ export default function EditSparePartDialog({
                     : models
                   ).map((m) => ({
                     value: m.id,
-                    label: `${m.model_no} - ${m.model_name}`,
+                    label: formatModelLabel(m),
                     description: '',
                   })),
                 ]}

@@ -30,6 +30,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { ContractActionsMenu } from '@/components/employeeComponents/ContractActionsMenu';
+import { SignContractMark, InstallationMark } from '@/components/ui/BrandMarks';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -57,8 +59,6 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
-import { getUserFromToken } from '@/lib/auth';
-import { EmployeeJob } from '@/lib/employeeJob';
 
 interface SaleContractRow extends SaleContract {
   payments?: SalePaymentRequest[];
@@ -71,10 +71,6 @@ export default function SaleContractsPage() {
   // Vendor purchasing/contact info isn't relevant to servicing a customer's
   // contract, so it's always hidden on this Service Desk page. Lot info is only
   // additionally hidden for Service Technicians specifically.
-  const [isServiceTechnician, setIsServiceTechnician] = useState(false);
-  useEffect(() => {
-    setIsServiceTechnician(getUserFromToken()?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN);
-  }, []);
   const [contracts, setContracts] = useState<SaleContractRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -513,33 +509,36 @@ export default function SaleContractsPage() {
                                 <Eye size={14} />
                               </Button>
                             )}
-                            {!isSaleType(contract.saleType) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openAgreement(contract)}
-                                disabled={agreementLoading && agreementTarget?.id === contract.id}
-                                className="h-7 w-7 p-0 text-indigo-500 hover:bg-indigo-50"
-                                title="Contract Agreement"
-                              >
-                                {agreementLoading && agreementTarget?.id === contract.id ? (
-                                  <Loader2 size={14} className="animate-spin" />
-                                ) : (
-                                  <FileSignature size={14} />
-                                )}
-                              </Button>
-                            )}
-                            {contract.deliveryStatus === 'DELIVERED' && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openInstall(contract)}
-                                className="h-7 w-7 p-0 text-slate-400 hover:bg-slate-50"
-                                title="Installation Request"
-                              >
-                                <Wrench size={14} />
-                              </Button>
-                            )}
+                            {/* Same popup the Rent/Lease tables use, so the desk's actions
+                                read identically and the column stays a fixed width. */}
+                            <ContractActionsMenu
+                              actions={[
+                                ...(!isSaleType(contract.saleType)
+                                  ? [
+                                      {
+                                        key: 'agreement',
+                                        icon: <SignContractMark />,
+                                        label: 'Contract Agreement',
+                                        description: 'Review, sign or send for signature',
+                                        loading:
+                                          agreementLoading && agreementTarget?.id === contract.id,
+                                        onClick: () => openAgreement(contract),
+                                      },
+                                    ]
+                                  : []),
+                                ...(contract.deliveryStatus === 'DELIVERED'
+                                  ? [
+                                      {
+                                        key: 'installation',
+                                        icon: <InstallationMark />,
+                                        label: 'Installation Request',
+                                        description: 'Schedule and assign a technician',
+                                        onClick: () => openInstall(contract),
+                                      },
+                                    ]
+                                  : []),
+                              ]}
+                            />
                           </div>
                         </TableCell>
                       </TableRow>
@@ -729,7 +728,6 @@ export default function SaleContractsPage() {
         open={!!viewProductId}
         onClose={() => setViewProductId(null)}
         hideVendorDetails
-        hideLotDetails={isServiceTechnician}
       />
 
       {/* Installation Request Modal */}

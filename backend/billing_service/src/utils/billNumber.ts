@@ -22,9 +22,11 @@ export async function generateBillNumber(manager: EntityManager): Promise<string
 
   // Ordered by the numeric suffix rather than the whole string: once the sequence passes
   // 9999 the padding stops equalising width, and '9999' sorts above '10000' as text.
+  // The `::int` cast on the parameter is load-bearing — see invoiceNumber.ts for why
+  // omitting it makes Postgres read the offset as a regex and return NULL.
   const latest = await manager
     .createQueryBuilder(UsageRecord, 'u')
-    .select('MAX(SUBSTRING(u."billNumber" FROM :from)::int)', 'max')
+    .select('MAX(SUBSTRING(u."billNumber" FROM :from::int)::int)', 'max')
     .where('u."billNumber" LIKE :pattern', { pattern: `${prefix}%` })
     .setParameter('from', prefix.length + 1)
     .getRawOne<{ max: number | null }>();

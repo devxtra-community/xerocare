@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import api from '@/lib/api';
 import { GCC_COUNTRIES, CARD_NETWORK_LABEL, CardNetwork } from '@/lib/payments/gccCards';
+import StatCard from '@/components/StatCard';
 
 /**
  * Card settlement reconciliation.
@@ -191,22 +192,33 @@ export default function CardSettlementsReport() {
       </div>
 
       {totals && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          {[
-            { label: 'Card Receipts', value: totals.count, plain: true },
-            { label: 'Gross Collected', value: totals.gross, tone: 'text-slate-800' },
-            { label: 'Processing Fees', value: totals.commission, tone: 'text-red-600' },
-            { label: 'Net to Bank', value: totals.net, tone: 'text-emerald-700' },
-          ].map((c) => (
-            <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                {c.label}
-              </p>
-              <p className={`mt-1 text-lg font-black ${c.tone ?? 'text-slate-800'}`}>
-                {c.plain ? c.value : `${currency} ${fmt(c.value)}`}
-              </p>
-            </div>
-          ))}
+        /* The shared StatCard the Rent, Quotations, Receipts and Installation pages use.
+           The red/green on the last two is the one thing this strip needs that a plain
+           StatCard could not say, which is why StatCard now takes a `tone`: fees are
+           money leaving, net is money landing. */
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 md:gap-4 lg:grid-cols-4">
+          <StatCard
+            title="Card Receipts"
+            value={String(totals.count)}
+            subtitle="Card payments in range"
+          />
+          <StatCard
+            title="Gross Collected"
+            value={`${currency} ${fmt(totals.gross)}`}
+            subtitle="What customers paid"
+          />
+          <StatCard
+            title="Processing Fees"
+            value={`${currency} ${fmt(totals.commission)}`}
+            subtitle="Acquirer commission"
+            tone="negative"
+          />
+          <StatCard
+            title="Net to Bank"
+            value={`${currency} ${fmt(totals.net)}`}
+            subtitle="Should reach the bank"
+            tone="positive"
+          />
         </div>
       )}
 

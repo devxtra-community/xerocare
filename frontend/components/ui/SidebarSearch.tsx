@@ -121,7 +121,13 @@ export function SidebarSearch({ items }: { items: SearchableNavItem[] }) {
                 <div className="py-1">
                   {results.map((item, i) => (
                     <button
-                      key={item.href}
+                      // Keyed on position as well as href: two menu entries legitimately
+                      // point at one page from time to time (a shortcut in one group and
+                      // the canonical entry in another), and keying on href alone turns
+                      // that harmless duplication into a React duplicate-key error that
+                      // can drop or duplicate results. Order is stable within a render,
+                      // so this stays a valid identity for the list.
+                      key={`${i}-${item.href}`}
                       onClick={() => navigate(item.href)}
                       className={`flex items-center gap-2.5 w-full px-3 py-2 text-left transition-colors ${
                         i === activeIdx

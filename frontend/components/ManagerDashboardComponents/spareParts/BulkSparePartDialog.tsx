@@ -29,6 +29,7 @@ import * as XLSX from 'xlsx';
 import { getMyBranch } from '@/lib/branch';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { formatModelLabel } from '@/lib/model';
 interface BulkSparePartDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -774,7 +775,7 @@ export default function BulkSparePartDialog({
                                 },
                                 ...filteredModels.map((m) => ({
                                   value: m.id,
-                                  label: `${m.model_no} - ${m.model_name}`,
+                                  label: formatModelLabel(m),
                                   description: '',
                                 })),
                               ]}

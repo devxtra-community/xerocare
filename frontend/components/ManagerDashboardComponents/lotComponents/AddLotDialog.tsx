@@ -25,7 +25,7 @@ import {
 import { Plus, Trash2, Upload, FileSpreadsheet, Download, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { LotItemType, lotService, Vendor } from '@/lib/lot';
-import { getAllModels, Model } from '@/lib/model';
+import { getAllModels, Model, formatModelLabel } from '@/lib/model';
 import { getVendors } from '@/lib/vendor';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { getUserFromToken } from '@/lib/auth';
@@ -742,7 +742,7 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                                                       )
                                                       .map((m) => ({
                                                         value: m.id,
-                                                        label: `${m.model_no} - ${m.model_name}`,
+                                                        label: formatModelLabel(m),
                                                       }))}
                                                     value={modelField.value || ''}
                                                     onValueChange={modelField.onChange}

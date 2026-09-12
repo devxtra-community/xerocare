@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
   Loader2,
+  RefreshCw,
   FileSignature,
   Send,
   CheckCircle2,
@@ -23,6 +24,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/apiError';
+import { publicAppLink } from '@/lib/publicAppUrl';
 import {
   ContractAgreement,
   createOrGetContractAgreement,
@@ -189,11 +191,10 @@ export function ContractAgreementModal({
     setIsGeneratingLink(true);
     try {
       const result = await generateSigningToken(invoice.id);
-      const baseUrl =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}/public/contract/sign/${result.token}`
-          : `/public/contract/sign/${result.token}`;
-      setRemoteLink(baseUrl);
+      // Prefer the link the server built from PUBLIC_APP_URL. window.location.origin is
+      // whatever THIS browser is on — localhost in dev, an internal host on the LAN —
+      // which is unreachable for the customer the link is being sent to.
+      setRemoteLink(result.link || publicAppLink(`/public/contract/sign/${result.token}`));
     } catch (err) {
       toast.error('Failed to generate signing link', { description: getApiErrorMessage(err) });
     } finally {
@@ -626,6 +627,25 @@ export function ContractAgreementModal({
                           <p className="text-[10px] text-slate-400 font-bold text-center">
                             Link expires in 72 hours • Single use
                           </p>
+                          {/* A link is single-use and expires after 72 hours, so a customer
+                              who let it lapse — or opened it once already — needs a fresh
+                              one. The generate button disappears once a link exists, which
+                              left no way to reissue without closing and reopening. */}
+                          <Button
+                            variant="outline"
+                            onClick={handleGenerateRemoteLink}
+                            disabled={isGeneratingLink}
+                            className="w-full h-9 rounded-xl text-[10px] font-black uppercase tracking-widest border-slate-200 text-slate-600 hover:bg-slate-50"
+                          >
+                            {isGeneratingLink ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <>
+                                <RefreshCw size={13} className="mr-2" />
+                                Generate New Link
+                              </>
+                            )}
+                          </Button>
                           <div className="grid grid-cols-3 gap-2">
                             <Button
                               variant="outline"

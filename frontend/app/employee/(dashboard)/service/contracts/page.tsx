@@ -67,8 +67,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
-import { getUserFromToken } from '@/lib/auth';
-import { EmployeeJob } from '@/lib/employeeJob';
 
 import { getActiveCurrency } from '@/lib/currency';
 interface CustomerMachine {
@@ -187,10 +185,6 @@ export default function ServiceContractsPage() {
   const router = useRouter();
   // Vendor purchasing/contact info isn't relevant here (Service Desk); Lot info is
   // additionally hidden for Service Technicians specifically, who also use this page.
-  const [isServiceTechnician, setIsServiceTechnician] = useState(false);
-  useEffect(() => {
-    setIsServiceTechnician(getUserFromToken()?.employeeJob === EmployeeJob.SERVICE_TECHNICIAN);
-  }, []);
   const [viewProductId, setViewProductId] = useState<string | null>(null);
   const [contracts, setContracts] = useState<ServiceContract[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -2874,7 +2868,6 @@ export default function ServiceContractsPage() {
         open={!!viewProductId}
         onClose={() => setViewProductId(null)}
         hideVendorDetails
-        hideLotDetails={isServiceTechnician}
       />
     </div>
   );

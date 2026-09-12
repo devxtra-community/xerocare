@@ -1046,7 +1046,9 @@ function ApprovalSection({ bill }: { bill: Partial<Bill> }) {
             Approved by <span className="font-bold">{bill.customerApprovedByName}</span>
             {bill.customerApprovedAt ? ` on ${fmtDate(bill.customerApprovedAt)}` : ''}
             {bill.customerApprovalMethod === 'FINANCE_MANUAL'
-              ? ' (recorded by Finance)'
+              ? bill.customerApprovalRecordedByName
+                ? ` (recorded by ${bill.customerApprovalRecordedByName})`
+                : ' (recorded by staff)'
               : ' (remote link)'}
           </p>
         )}

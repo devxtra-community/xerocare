@@ -272,8 +272,8 @@ export const signContractCustomerByUpload = async (
 
 export const generateSigningToken = async (
   invoiceId: string,
-): Promise<{ token: string; expiresAt: string }> => {
-  const res = await api.post<ApiResponse<{ token: string; expiresAt: string }>>(
+): Promise<{ token: string; expiresAt: string; link?: string }> => {
+  const res = await api.post<ApiResponse<{ token: string; expiresAt: string; link?: string }>>(
     `/b/invoices/${invoiceId}/contract-agreement/signing-token`,
   );
   return res.data.data;
@@ -707,6 +707,10 @@ export interface Bill {
   customerApprovedAt?: string;
   customerApprovalMethod?: BillApprovalMethod;
   customerApprovalNote?: string;
+  /** Staff member who recorded a manual approval — a manual approval carries no
+   *  signature, so this is what makes it attributable. Absent on remote-link
+   *  approvals and on manual ones recorded before this was captured. */
+  customerApprovalRecordedByName?: string;
   customerRejectionReason?: string;
   customerRejectedAt?: string;
   items?: Array<{
@@ -852,8 +856,8 @@ export const getBillsForContract = async (contractId: string): Promise<BillForCo
 
 export const generateBillSigningToken = async (
   usageRecordId: string,
-): Promise<{ token: string; expiresAt: string }> => {
-  const res = await api.post<ApiResponse<{ token: string; expiresAt: string }>>(
+): Promise<{ token: string; expiresAt: string; link?: string }> => {
+  const res = await api.post<ApiResponse<{ token: string; expiresAt: string; link?: string }>>(
     `/b/usage/${usageRecordId}/bill/signing-token`,
   );
   return res.data.data;

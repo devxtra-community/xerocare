@@ -510,7 +510,12 @@ export function InvoiceViewDialog({
       modelNo: exMN || item.metadata?.model?.model_no || item.metadata?.model_no || 'Generic',
       modelName: item.metadata?.model?.model_name || item.metadata?.model_name || 'N/A',
       slNo: item.allocation?.serialNumber || item.metadata?.serial_no || 'TBD',
-      description: cleanDesc,
+      // The product's own description first, the invoice line second. An invoice line's
+      // description is the product NAME ("HP LASER JET 1020"), not a description — and the
+      // layouts deliberately hide that cell when it just repeats the product name, so
+      // reading it from here left the Description column blank on every quotation. The
+      // other two item mappings in this file already prefer the product metadata.
+      description: item.metadata?.description || cleanDesc,
       qty: qty,
       unitPrice: unitP,
       specialPrice: discountedPrice,

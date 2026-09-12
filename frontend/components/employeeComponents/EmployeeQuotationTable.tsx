@@ -4217,6 +4217,19 @@ function QuotationFormModal({
                               className="h-9 text-sm"
                             />
                           </div>
+                          {securityDepositMode === 'CHEQUE' && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Name of the Bank
+                              </label>
+                              <Input
+                                placeholder="e.g. QNB"
+                                value={securityDepositBank}
+                                onChange={(e) => setSecurityDepositBank(e.target.value)}
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -4262,35 +4275,6 @@ function QuotationFormModal({
                           className="h-9 text-sm bg-slate-50 text-right opacity-70 border-slate-200"
                         />
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                      {securityDepositMode === 'CHEQUE' && (
-                        <>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Name of the Bank
-                            </label>
-                            <Input
-                              placeholder="e.g. QNB"
-                              value={securityDepositBank}
-                              onChange={(e) => setSecurityDepositBank(e.target.value)}
-                              className="h-9 text-sm border-slate-200"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Cheque/Ref Number
-                            </label>
-                            <Input
-                              placeholder="Reference #"
-                              value={securityDepositReference}
-                              onChange={(e) => setSecurityDepositReference(e.target.value)}
-                              className="h-9 text-sm border-slate-200"
-                            />
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -5008,6 +4992,19 @@ function QuotationFormModal({
                               className="h-9 text-sm"
                             />
                           </div>
+                          {securityDepositMode === 'CHEQUE' && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                Name of the Bank
+                              </label>
+                              <Input
+                                placeholder="e.g. QNB"
+                                value={securityDepositBank}
+                                onChange={(e) => setSecurityDepositBank(e.target.value)}
+                                className="h-9 text-sm"
+                              />
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -5056,35 +5053,6 @@ function QuotationFormModal({
                           className="h-9 text-sm bg-slate-50 text-right opacity-70 border-slate-200"
                         />
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                      {securityDepositMode === 'CHEQUE' && (
-                        <>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Name of the Bank
-                            </label>
-                            <Input
-                              placeholder="e.g. QNB"
-                              value={securityDepositBank}
-                              onChange={(e) => setSecurityDepositBank(e.target.value)}
-                              className="h-9 text-sm border-slate-200"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                              Cheque/Ref Number
-                            </label>
-                            <Input
-                              placeholder="Reference #"
-                              value={securityDepositReference}
-                              onChange={(e) => setSecurityDepositReference(e.target.value)}
-                              className="h-9 text-sm border-slate-200"
-                            />
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
 
