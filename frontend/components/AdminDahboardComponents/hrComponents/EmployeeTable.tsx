@@ -208,19 +208,21 @@ export default function EmployeeTable() {
 
   const handleFormSubmit = async (formData: FormData) => {
     try {
+      let employeeId = selectedEmployee?.id;
       if (selectedEmployee) {
         await updateEmployee(selectedEmployee.id, formData);
         toast.success('Employee updated successfully');
       } else {
-        await createEmployee(formData);
+        const res = await createEmployee(formData);
+        employeeId = res?.data?.id;
         toast.success('Employee created successfully');
       }
       fetchEmployees(pagination.page);
-      return true;
+      return { ok: true, employeeId };
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Action failed');
-      return false;
+      return { ok: false };
     }
   };
 

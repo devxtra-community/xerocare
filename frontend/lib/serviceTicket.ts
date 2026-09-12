@@ -370,8 +370,21 @@ export const rejectEstimateFinance = async (
   return response.data.data;
 };
 
-export const approveEstimateCustomer = async (estimateId: string): Promise<ServiceEstimate> => {
-  const response = await api.post(`/i/service/estimates/${estimateId}/approve-customer`);
+/** How the customer's off-system decision reached the staff member recording it. */
+export type CustomerDecisionChannel = 'IN_PERSON' | 'PHONE' | 'WHATSAPP' | 'EMAIL';
+
+export interface RecordCustomerDecisionMeta {
+  /** Name of the customer / person who gave the decision. */
+  customerName: string;
+  confirmedVia: CustomerDecisionChannel;
+  note?: string;
+}
+
+export const approveEstimateCustomer = async (
+  estimateId: string,
+  meta?: RecordCustomerDecisionMeta,
+): Promise<ServiceEstimate> => {
+  const response = await api.post(`/i/service/estimates/${estimateId}/approve-customer`, meta);
   return response.data.data;
 };
 
@@ -383,6 +396,9 @@ export const rejectEstimateCustomer = async (
     accountId?: string;
     reason: string;
     discountAmount?: number;
+    customerName?: string;
+    confirmedVia?: CustomerDecisionChannel;
+    note?: string;
   },
 ): Promise<ServiceEstimate> => {
   const response = await api.post(`/i/service/estimates/${estimateId}/reject-customer`, body);
@@ -599,6 +615,82 @@ export const sendCompletionBillDoc = async (
   const response = await api.post(`/i/service/tickets/${id}/send-completion-bill`, payload);
   return response.data;
 };
+
+// ─── Public remote estimate approval (no auth header needed — token is the credential) ──
+export interface ServiceEstimateForSigning {
+  ticket: {
+    ticketNumber: string;
+    productBrand: string;
+    productModel: string;
+    serialNumber: string;
+    status: string;
+  };
+  branch: { name: string; currencyCode?: string | null; taxName?: string | null } | null;
+  customerName: string | null;
+  estimate: {
+    labourCost: number;
+    partsCost: number;
+    visitChargeAmount: number;
+    transportChargeAmount: number;
+    discountAmount: number;
+    totalCost: number;
+    currencyCode?: string | null;
+    version: number;
+    status: string;
+    items: {
+      partName: string;
+      sku?: string | null;
+      quantity: number;
+      unitPrice?: number | null;
+      totalPrice?: number | null;
+      isFree: boolean;
+    }[];
+  };
+  validUntil: string | null;
+  expired: boolean;
+  alreadyDecided: boolean;
+  decision: {
+    status: string;
+    approvedByName?: string | null;
+    approvedAt?: string | null;
+    rejectionReason?: string | null;
+    rejectedAt?: string | null;
+  } | null;
+  linkUsed: boolean;
+  linkExpiresAt: string | null;
+}
+
+export const getServiceEstimateForSigning = async (
+  token: string,
+): Promise<ServiceEstimateForSigning> => {
+  const response = await api.get(`/i/service/public/service-estimate/sign/${token}`);
+  return response.data.data;
+};
+
+export const approveServiceEstimateRemote = async (
+  token: string,
+  customerName: string,
+): Promise<{ approvedAt: string }> => {
+  const response = await api.post(`/i/service/public/service-estimate/sign/${token}/approve`, {
+    customerName,
+  });
+  return response.data.data;
+};
+
+export const rejectServiceEstimateRemote = async (
+  token: string,
+  reason: string,
+  customerName?: string,
+): Promise<{ rejectedAt: string }> => {
+  const response = await api.post(`/i/service/public/service-estimate/sign/${token}/reject`, {
+    reason,
+    customerName,
+  });
+  return response.data.data;
+};
+
+export const serviceEstimateSigningPdfUrl = (token: string): string =>
+  `${api.defaults.baseURL ?? ''}/i/service/public/service-estimate/sign/${token}/pdf`;
 
 export const reviseServiceEstimate = async (
   id: string,

@@ -815,6 +815,31 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                               </>
                             );
                           })()}
+                          {/* Vendor-declared tax treatment — informational chip only */}
+                          {!vs.allOutOfStock &&
+                            (vs.taxIncluded != null ||
+                              vs.taxRatePercent != null ||
+                              !!vs.taxRateMixed) && (
+                              <div className="mt-2 flex justify-center">
+                                {vs.taxIncluded === true ? (
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-2 font-semibold">
+                                    Tax included
+                                  </Badge>
+                                ) : vs.taxRateMixed ? (
+                                  <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
+                                    Tax: mixed rates
+                                  </Badge>
+                                ) : vs.taxRatePercent != null ? (
+                                  <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
+                                    + {Number(vs.taxRatePercent)}% tax on top
+                                  </Badge>
+                                ) : vs.taxIncluded === false ? (
+                                  <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
+                                    Tax added on top
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            )}
                           {!vs.allOutOfStock &&
                             !!(vs as { isCheapest?: boolean }).isCheapest &&
                             (comparison.vendorsSummary as unknown[]).length > 1 && (

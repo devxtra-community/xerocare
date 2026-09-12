@@ -116,7 +116,16 @@ export default function ManagerLotTable() {
               id: 'vendor',
               header: 'VENDOR',
               cell: (lot: Lot) =>
-                lot.vendor?.name ?? (lot.transferOrigin ? 'Internal Transfer' : '—'),
+                lot.vendor?.id ? (
+                  <button
+                    className="text-primary hover:underline font-semibold text-[11px] uppercase"
+                    onClick={() => router.push(`/manager/vendors/${lot.vendor!.id}`)}
+                  >
+                    {lot.vendor.name}
+                  </button>
+                ) : (
+                  (lot.vendor?.name ?? (lot.transferOrigin ? 'Internal Transfer' : '—'))
+                ),
               className: 'font-semibold text-[11px] text-primary uppercase',
             },
             {

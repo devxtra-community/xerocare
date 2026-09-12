@@ -11,6 +11,7 @@ import { LeaveApplication } from '../entities/leaveApplicationEntity';
 import { Payroll } from '../entities/payrollEntity'; // [x] Define `Payroll` entity
 import { Notification } from '../entities/notificationEntity';
 import { LateMark } from '../entities/lateMarkEntity';
+import { EmployeeDocument } from '../entities/employeeDocumentEntity';
 
 import { logger } from './logger';
 import { seedAdmin } from '../utils/seedAdmin';
@@ -22,7 +23,17 @@ export const Source = new DataSource({
     ? { rejectUnauthorized: false }
     : false,
   synchronize: false,
-  entities: [Admin, Employee, Auth, Branch, LeaveApplication, Payroll, Notification, LateMark],
+  entities: [
+    Admin,
+    Employee,
+    Auth,
+    Branch,
+    LeaveApplication,
+    Payroll,
+    Notification,
+    LateMark,
+    EmployeeDocument,
+  ],
   poolSize: 1,
   extra: {
     max: 1,
@@ -259,6 +270,32 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.info('Guaranteed employee.phone column exists.');
         } catch (err) {
           logger.error('Failed to add phone column to employee table:', err);
+        }
+
+        // Guaranteed on every boot — added after most environments were synchronized.
+        try {
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS employee_documents (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              employee_id UUID NOT NULL,
+              doc_type VARCHAR(40) NOT NULL,
+              label VARCHAR(200) NULL,
+              document_number VARCHAR(120) NULL,
+              issue_date DATE NULL,
+              expiry_date DATE NULL,
+              file_key VARCHAR(500) NOT NULL,
+              file_name VARCHAR(300) NULL,
+              file_mime VARCHAR(100) NULL,
+              uploaded_by UUID NULL,
+              "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_employee_documents_employee_id ON employee_documents (employee_id);
+            CREATE INDEX IF NOT EXISTS idx_employee_documents_expiry_date ON employee_documents (expiry_date);
+          `);
+          logger.info('Guaranteed employee_documents table exists.');
+        } catch (err) {
+          logger.error('Failed to create employee_documents table:', err);
         }
 
         await seedAdmin(Source);

@@ -6,6 +6,14 @@ import { roleMiddleware, requireServiceRole } from '../middlewares/roleMiddlewar
 const router = Router();
 const controller = new ServiceController();
 
+// Public (no auth) — customer remote estimate approval. The single-use 72-hour
+// signing token IS the credential, same as billing's /bill/sign/:token routes.
+// MUST be registered before router.use(authMiddleware) below.
+router.get('/public/service-estimate/sign/:token', controller.getEstimateForSigning);
+router.get('/public/service-estimate/sign/:token/pdf', controller.getSigningQuotationPdf);
+router.post('/public/service-estimate/sign/:token/approve', controller.approveEstimateRemote);
+router.post('/public/service-estimate/sign/:token/reject', controller.rejectEstimateRemote);
+
 router.use(authMiddleware);
 
 router.post('/tickets', controller.createTicket);

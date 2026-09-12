@@ -126,6 +126,13 @@ export default function SendDocumentModal({
           <DialogDescription className="text-xs text-slate-500">
             Download or deliver the {docLabel.toLowerCase()} to {customerName} for ticket{' '}
             {ticketNumber}.
+            {docType === 'quotation' && (
+              <>
+                {' '}
+                The customer receives a secure link to approve or decline the quotation online,
+                valid for 72 hours.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 

@@ -22,6 +22,9 @@ export interface PurchaseCost {
   description?: string;
   costDate: string;
   attachmentUrl?: string;
+  createdAt?: string;
+  /** How this line is spread across the lot's items by landed-cost allocation. */
+  splitMethod?: 'BY_VALUE' | 'BY_QUANTITY' | 'EQUAL';
 }
 
 export interface Purchase {

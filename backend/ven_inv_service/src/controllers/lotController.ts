@@ -5,8 +5,10 @@ import { LotStatus } from '../entities/lotEntity';
 import { LotDocumentType } from '../entities/lotDocumentEntity';
 import { TransportMode, MODE_DETAIL_FIELDS } from '../entities/enums/transportMode';
 import { ShipmentStatus } from '../entities/enums/shipmentStatus';
+import { LandedCostService, SplitMethod } from '../services/landedCostService';
 
 const lotService = new LotService();
+const landedCostService = new LandedCostService();
 import { getRabbitChannel } from '../config/rabbitmq';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
@@ -458,6 +460,49 @@ export const deleteLotDocument = async (req: Request, res: Response, next: NextF
 
     await lotService.deleteLotDocument(id, documentId);
     res.status(200).json({ success: true, message: 'Document deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /lots/:id/allocate-landed-costs
+ * Spreads the lot's additional costs (purchase_costs) across its items,
+ * recomputing landed_cost_unit_cost from the original unit price every time —
+ * safe to re-run after changing a cost's split method. Only allowed once the
+ * lot is RECEIVED.
+ */
+export const allocateLandedCosts = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? undefined : req.user?.branchId;
+    const splitMethods = req.body?.splitMethods as Record<string, SplitMethod> | undefined;
+
+    const result = await landedCostService.allocateLandedCosts(id, branchId, splitMethods);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * DELETE /lots/:id/allocate-landed-costs
+ * Clears any allocation on this lot's items — restores the vendor-quoted
+ * unit price as the only unit cost figure.
+ */
+export const resetLandedCostAllocation = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const isAdmin = req.user?.role === 'ADMIN';
+    const branchId = isAdmin ? undefined : req.user?.branchId;
+
+    await landedCostService.resetLandedCostAllocation(id, branchId);
+    res.status(200).json({ success: true, message: 'Landed cost allocation reset' });
   } catch (err) {
     next(err);
   }

@@ -98,6 +98,13 @@ export async function uploadExcelQuote(id: string, vendorId: string, file: File)
   return res.data;
 }
 
+/**
+ * Vendor quote comparison. Beyond price/stock/shipment fields, each entry carries
+ * vendor-declared tax info (informational — never used in ranking):
+ *  - `items[].vendorPrices[]`: `taxIncluded` (bool|null), `taxRatePercent` (number|null)
+ *  - `vendorsSummary[]`: `taxIncluded` (bool|null across the vendor's lines),
+ *    `taxRatePercent` (single distinct rate or null), `taxRateMixed` (bool)
+ */
 export async function getRfqComparison(id: string) {
   const res = await api.get(`/i/rfq/${id}/comparison`);
   return res.data.data;

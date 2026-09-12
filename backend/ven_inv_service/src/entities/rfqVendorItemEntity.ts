@@ -28,6 +28,16 @@ export class RfqVendorItem {
   @Column({ type: 'decimal', precision: 15, scale: 2, nullable: true })
   total_price?: number;
 
+  // Vendor-declared tax treatment for this line. Purely informational — helps the
+  // manager read the quote. No amount is derived from it; customs duty, freight and
+  // every other landing cost are entered separately on the lot.
+  // true = quoted price already includes tax, false = tax added on top, null = not stated.
+  @Column({ type: 'boolean', nullable: true })
+  tax_included?: boolean;
+
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
+  tax_rate_percent?: number;
+
   @Column({
     type: 'enum',
     enum: ['IN_STOCK', 'OUT_OF_STOCK', 'ON_PRODUCTION'],

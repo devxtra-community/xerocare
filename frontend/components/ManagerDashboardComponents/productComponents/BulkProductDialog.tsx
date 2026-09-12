@@ -218,7 +218,7 @@ export function BulkProductDialog({
                   brand: brandName,
                   vendor_id: vendorId,
                   warehouse_id: lot.warehouseId || lot.warehouse_id || '',
-                  purchase_price: Number(item.unitPrice) || 0,
+                  purchase_price: Number(item.landedCostUnitCost) || Number(item.unitPrice) || 0,
                   sale_price: Number(item.sellingPrice) || 0,
                   name: item.customProductName || model?.model_name || '',
                   description: model?.description || '',
@@ -965,7 +965,10 @@ export function BulkProductDialog({
                                     updateRow(
                                       i,
                                       'purchase_price',
-                                      Number(item.unitPrice) || row.purchase_price || 0,
+                                      Number(item.landedCostUnitCost) ||
+                                        Number(item.unitPrice) ||
+                                        row.purchase_price ||
+                                        0,
                                     );
                                     updateRow(
                                       i,

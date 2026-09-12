@@ -34,6 +34,12 @@ export class PurchaseCost {
   @Column({ name: 'cost_type', type: 'varchar', length: 50 })
   costType!: string;
 
+  /** How this cost line is spread across the lot's items when landed-cost
+   * allocation runs. BY_VALUE = proportional to item total value, BY_QUANTITY =
+   * proportional to unit count, EQUAL = split evenly across item rows. */
+  @Column({ name: 'split_method', type: 'varchar', length: 20, default: 'BY_VALUE' })
+  splitMethod!: 'BY_VALUE' | 'BY_QUANTITY' | 'EQUAL';
+
   @Column({ name: 'cost_date', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   costDate!: Date;
 

@@ -17,7 +17,7 @@ import { logger } from '../config/logger';
 import { Vendor } from '../entities/vendorEntity';
 import { Branch } from '../entities/branchEntity';
 import { Warehouse } from '../entities/warehouseEntity';
-import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
+import { classifyPurchaseOrigin, PurchaseOrigin } from '../entities/enums/purchaseOrigin';
 import { getExchangeRate, round2 } from '../utils/exchangeRate';
 
 interface CreateRfqDto {
@@ -50,7 +50,18 @@ interface QuoteItemDto {
   availableQuantity: number;
   estimatedShipmentDate?: Date;
   vendorNote?: string;
+  /** Vendor-declared: is tax already in the quoted price? Informational only. */
+  taxIncluded?: boolean;
+  /** Vendor-declared tax %. Informational only — no amount is derived from it. */
+  taxRatePercent?: number;
 }
+
+/** Light-yellow fill marking a vendor-fill cell on the RFQ response sheet. */
+const TAX_CELL_FILL = {
+  type: 'pattern' as const,
+  pattern: 'solid' as const,
+  fgColor: { argb: 'FFFFF9C4' },
+};
 
 export class RfqService {
   constructor(private readonly dataSource: DataSource) {}
@@ -363,6 +374,78 @@ export class RfqService {
     });
   }
 
+  /**
+   * Shared post-processing for the two RFQ vendor-response sheets: dropdowns and
+   * date validation resolved by column key (so inserted columns can't shift them),
+   * the two vendor-fill tax columns (light-yellow fill + header notes + Yes/No
+   * dropdown), and — for the blank template only — the total_price autofill formula.
+   */
+  private decorateResponseSheet(
+    worksheet: ExcelJS.Worksheet,
+    opts: { totalPriceFormula: boolean },
+  ): void {
+    const col = (k: string) => worksheet.getColumn(k).letter;
+    const stockCol = col('stock_status');
+    const dateCol = col('estimated_shipment_date');
+    const unitCol = col('unit_price');
+    const qtyCol = col('available_quantity');
+    const totalCol = col('total_price');
+    const taxIncludedCol = col('tax_included');
+    const taxRateCol = col('tax_rate_percent');
+
+    worksheet.getCell(`${taxIncludedCol}1`).note =
+      'Enter Yes if your quoted price already includes tax, or No if tax is added on top.';
+    worksheet.getCell(`${taxRateCol}1`).note = 'Enter tax % (e.g. 5 for 5%)';
+    worksheet.getCell(`${taxIncludedCol}1`).fill = TAX_CELL_FILL;
+    worksheet.getCell(`${taxRateCol}1`).fill = TAX_CELL_FILL;
+
+    const rowCount = worksheet.rowCount;
+    for (let i = 2; i <= Math.max(rowCount, 100); i++) {
+      worksheet.getCell(`${stockCol}${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Status',
+        error: 'Please select a valid stock status from the dropdown list.',
+      };
+
+      worksheet.getCell(`${dateCol}${i}`).dataValidation = {
+        type: 'date',
+        operator: 'greaterThanOrEqual',
+        showErrorMessage: true,
+        allowBlank: true,
+        formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
+        errorStyle: 'error',
+        errorTitle: 'Invalid Date',
+        error: 'Please enter a valid present or future date (YYYY-MM-DD).',
+      };
+      worksheet.getCell(`${dateCol}${i}`).numFmt = 'yyyy-mm-dd';
+      worksheet.getCell(`${dateCol}${i}`).font = { color: { argb: 'FF0000FF' }, underline: true };
+
+      worksheet.getCell(`${taxIncludedCol}${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"Yes,No"'],
+        showErrorMessage: true,
+        errorTitle: 'Invalid Option',
+        error: 'Please enter Yes or No.',
+      };
+      worksheet.getCell(`${taxIncludedCol}${i}`).fill = TAX_CELL_FILL;
+      worksheet.getCell(`${taxRateCol}${i}`).fill = TAX_CELL_FILL;
+      worksheet.getCell(`${taxRateCol}${i}`).numFmt = '0.00';
+    }
+
+    if (opts.totalPriceFormula) {
+      // total_price autofills from unit_price × available_quantity.
+      for (let i = 2; i <= rowCount; i++) {
+        worksheet.getCell(`${totalCol}${i}`).value = {
+          formula: `IF(OR($${unitCol}${i}="",$${qtyCol}${i}=""),"",$${unitCol}${i}*$${qtyCol}${i})`,
+        };
+      }
+    }
+  }
+
   private async generateRfqExcel(rfq: Rfq, manager?: EntityManager): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('RFQ_Response');
@@ -398,6 +481,8 @@ export class RfqService {
       { header: 'available_quantity', key: 'available_quantity', width: 20 },
       { header: 'unit_price', key: 'unit_price', width: 15 },
       { header: 'total_price', key: 'total_price', width: 15 },
+      { header: 'tax_included', key: 'tax_included', width: 15 },
+      { header: 'tax_rate_percent', key: 'tax_rate_percent', width: 18 },
       { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
       { header: 'vendor_note', key: 'vendor_note', width: 30 },
       { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
@@ -479,38 +564,7 @@ export class RfqService {
       });
     }
 
-    const rowCount = worksheet.rowCount;
-    // Add validations for stock_status (Column I) and estimated_shipment_date (Column M)
-    for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`I${i}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
-        showErrorMessage: true,
-        errorTitle: 'Invalid Status',
-        error: 'Please select a valid stock status from the dropdown list.',
-      };
-
-      worksheet.getCell(`M${i}`).dataValidation = {
-        type: 'date',
-        operator: 'greaterThanOrEqual',
-        showErrorMessage: true,
-        allowBlank: true,
-        formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
-        errorStyle: 'error',
-        errorTitle: 'Invalid Date',
-        error: 'Please enter a valid present or future date (YYYY-MM-DD).',
-      };
-      worksheet.getCell(`M${i}`).numFmt = 'yyyy-mm-dd';
-      worksheet.getCell(`M${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
-    }
-
-    // total_price (L) autofills from unit_price (K) × available_quantity (J).
-    for (let i = 2; i <= rowCount; i++) {
-      worksheet.getCell(`L${i}`).value = {
-        formula: `IF(OR($K${i}="",$J${i}=""),"",$K${i}*$J${i})`,
-      };
-    }
+    this.decorateResponseSheet(worksheet, { totalPriceFormula: true });
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
@@ -554,6 +608,8 @@ export class RfqService {
       { header: 'available_quantity', key: 'available_quantity', width: 20 },
       { header: 'unit_price', key: 'unit_price', width: 15 },
       { header: 'total_price', key: 'total_price', width: 15 },
+      { header: 'tax_included', key: 'tax_included', width: 15 },
+      { header: 'tax_rate_percent', key: 'tax_rate_percent', width: 18 },
       { header: 'estimated_shipment_date', key: 'estimated_shipment_date', width: 25 },
       { header: 'vendor_note', key: 'vendor_note', width: 30 },
       { header: 'rfq_item_id', key: 'rfq_item_id', width: 25 },
@@ -637,6 +693,9 @@ export class RfqService {
         quantity: item.quantity,
         unit_price: vendorItem?.unit_price ?? undefined,
         total_price: vendorItem?.total_price ?? undefined,
+        tax_included:
+          vendorItem?.tax_included == null ? undefined : vendorItem.tax_included ? 'Yes' : 'No',
+        tax_rate_percent: vendorItem?.tax_rate_percent ?? undefined,
         stock_status: vendorItem?.stock_status ?? undefined,
         available_quantity: vendorItem?.available_quantity ?? undefined,
         estimated_shipment_date: vendorItem?.estimated_shipment_date
@@ -647,31 +706,7 @@ export class RfqService {
       });
     }
 
-    const rowCount = worksheet.rowCount;
-    // Add validations for stock_status (Column I) and estimated_shipment_date (Column M)
-    for (let i = 2; i <= Math.max(rowCount, 100); i++) {
-      worksheet.getCell(`I${i}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: ['"IN_STOCK,OUT_OF_STOCK,ON_PRODUCTION"'],
-        showErrorMessage: true,
-        errorTitle: 'Invalid Status',
-        error: 'Please select a valid stock status from the dropdown list.',
-      };
-
-      worksheet.getCell(`M${i}`).dataValidation = {
-        type: 'date',
-        operator: 'greaterThanOrEqual',
-        showErrorMessage: true,
-        allowBlank: true,
-        formulae: [new Date(new Date().setHours(0, 0, 0, 0))],
-        errorStyle: 'error',
-        errorTitle: 'Invalid Date',
-        error: 'Please enter a valid present or future date (YYYY-MM-DD).',
-      };
-      worksheet.getCell(`M${i}`).numFmt = 'yyyy-mm-dd';
-      worksheet.getCell(`M${i}`).font = { color: { argb: 'FF0000FF' }, underline: true }; // Visual hint for interactable cell
-    }
+    this.decorateResponseSheet(worksheet, { totalPriceFormula: false });
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
@@ -781,6 +816,9 @@ export class RfqService {
           available_quantity: quote.availableQuantity,
           estimated_shipment_date: quote.estimatedShipmentDate,
           vendor_note: quote.vendorNote,
+          // Vendor-declared tax treatment — stored as-is, informational only.
+          tax_included: quote.taxIncluded ?? undefined,
+          tax_rate_percent: quote.taxRatePercent ?? undefined,
         });
         vendorItemsToSave.push(vendorItem);
       }
@@ -876,6 +914,9 @@ export class RfqService {
             convertedUnitPrice:
               unitPrice !== null && rate !== null ? round2(unitPrice * rate) : null,
             estimatedShipmentDate: vi ? vi.estimated_shipment_date : null,
+            // Vendor-declared tax treatment — display only, not used in ranking.
+            taxIncluded: vi?.tax_included ?? null,
+            taxRatePercent: vi?.tax_rate_percent != null ? Number(vi.tax_rate_percent) : null,
           };
         })
         .filter((vp) => vp.unitPrice !== null);
@@ -938,19 +979,41 @@ export class RfqService {
       rfqId: rfq.id,
       status: rfq.status,
       items: itemComparisons,
-      vendorsSummary: validQuotes.map((vq) => ({
-        vendorId: vq.vendor_id,
-        vendorName: vq.vendor?.name,
-        totalAmount: Number(vq.total_quoted_amount),
-        allOutOfStock: isVendorAllOutOfStock(vq),
-        vendorCurrency: vq.vendor_currency_code || vq.vendor?.currency || 'QAR',
-        branchCurrency: vq.branch_currency_code || null,
-        convertedAmount:
-          vq.branch_converted_amount != null ? Number(vq.branch_converted_amount) : null,
-        exchangeRate: vq.exchange_rate_snapshot != null ? Number(vq.exchange_rate_snapshot) : null,
-        rateFetchedAt: vq.exchange_rate_fetched_at ?? null,
-        isCheapest: cheapestVendor ? vq.id === cheapestVendor.id : false,
-      })),
+      vendorsSummary: validQuotes.map((vq) => {
+        // The vendor's tax treatment across all priced lines, for a single chip in
+        // the comparison. Display only — never feeds ranking.
+        const pricedItems = (vq.items ?? []).filter((i) => i.unit_price != null);
+        const taxFlags = new Set(
+          pricedItems.map((i) => (i.tax_included == null ? 'null' : String(i.tax_included))),
+        );
+        const taxIncluded =
+          taxFlags.size === 1 && !taxFlags.has('null') ? taxFlags.has('true') : null;
+        const rates = [
+          ...new Set(
+            pricedItems
+              .map((i) => (i.tax_rate_percent != null ? Number(i.tax_rate_percent) : null))
+              .filter((r): r is number => r != null && r > 0),
+          ),
+        ];
+        return {
+          vendorId: vq.vendor_id,
+          vendorName: vq.vendor?.name,
+          totalAmount: Number(vq.total_quoted_amount),
+          allOutOfStock: isVendorAllOutOfStock(vq),
+          vendorCurrency: vq.vendor_currency_code || vq.vendor?.currency || 'QAR',
+          branchCurrency: vq.branch_currency_code || null,
+          convertedAmount:
+            vq.branch_converted_amount != null ? Number(vq.branch_converted_amount) : null,
+          exchangeRate:
+            vq.exchange_rate_snapshot != null ? Number(vq.exchange_rate_snapshot) : null,
+          rateFetchedAt: vq.exchange_rate_fetched_at ?? null,
+          isCheapest: cheapestVendor ? vq.id === cheapestVendor.id : false,
+          // Vendor-declared tax — informational chip only.
+          taxIncluded,
+          taxRatePercent: rates.length === 1 ? rates[0] : null,
+          taxRateMixed: rates.length > 1,
+        };
+      }),
     };
   }
 
@@ -1160,11 +1223,55 @@ export class RfqService {
       const date = new Date();
       const lotNumber = `LOT-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+      const isInternational = rfq.purchase_origin === PurchaseOrigin.INTERNATIONAL;
+
+      // The vendor-declared tax on each line changes what the item actually costs:
+      // - tax NOT included → the vendor's price excludes tax, so tax is added on top
+      //   to get the real unit cost.
+      // - tax included → the vendor's quoted price already covers it; the unit cost
+      //   is unchanged, the tax portion is only broken out for display.
+      // Computed here (in the vendor's own currency) before anything is saved to the
+      // lot, so the lot item, the lot total, and everything inventory reads from the
+      // lot item (base_price / sale_price on GRN) all reflect the real cost.
+      const itemCalcs = awardedVendor.items.map((quotedItem) => {
+        if (!quotedItem.rfq_item) throw new AppError('RFQ item reference missing in quote', 500);
+
+        const rawUnitPrice = Number(quotedItem.unit_price);
+        const taxRatePercent =
+          quotedItem.tax_rate_percent != null ? Number(quotedItem.tax_rate_percent) : 0;
+        const qty = quotedItem.available_quantity ?? quotedItem.rfq_item.quantity;
+
+        let effectiveUnitPrice = rawUnitPrice;
+        let taxAmountPerUnit = 0;
+
+        if (isInternational && taxRatePercent > 0) {
+          if (quotedItem.tax_included === false) {
+            taxAmountPerUnit = round2(rawUnitPrice * (taxRatePercent / 100));
+            effectiveUnitPrice = round2(rawUnitPrice + taxAmountPerUnit);
+          } else if (quotedItem.tax_included === true) {
+            taxAmountPerUnit = round2(rawUnitPrice - rawUnitPrice / (1 + taxRatePercent / 100));
+            effectiveUnitPrice = rawUnitPrice;
+          }
+        }
+
+        return {
+          quotedItem,
+          qty,
+          effectiveUnitPrice,
+          taxAmountPerUnit,
+          effectiveLineTotal: round2(effectiveUnitPrice * qty),
+        };
+      });
+
+      const effectiveVendorTotal = round2(
+        itemCalcs.reduce((sum, c) => sum + c.effectiveLineTotal, 0),
+      );
+
       const lot = manager.create(Lot, {
         lotNumber,
         vendorId: awardedVendor.vendor_id,
         purchaseDate: new Date(),
-        totalAmount: round2(Number(awardedVendor.total_quoted_amount) * rate),
+        totalAmount: round2(effectiveVendorTotal * rate),
         status: LotStatus.PENDING,
         branch_id: rfq.branch_id,
         warehouse_id: finalWarehouseId,
@@ -1180,9 +1287,7 @@ export class RfqService {
 
       const lotItemsToSave: LotItem[] = [];
 
-      for (const quotedItem of awardedVendor.items) {
-        if (!quotedItem.rfq_item) throw new AppError('RFQ item reference missing in quote', 500);
-
+      for (const { quotedItem, qty, effectiveUnitPrice, taxAmountPerUnit } of itemCalcs) {
         const itemType =
           quotedItem.rfq_item.item_type === ItemType.PRODUCT
             ? LotItemType.MODEL
@@ -1239,10 +1344,13 @@ export class RfqService {
           hsCode: quotedItem.rfq_item.hs_code,
           compatibleModels: quotedItem.rfq_item.compatible_models,
           modelIds: quotedItem.rfq_item.modelIds,
-          expectedQuantity: quotedItem.available_quantity ?? quotedItem.rfq_item.quantity,
-          // Quoted in the vendor's currency — stored in branch currency.
-          unitPrice: round2(Number(quotedItem.unit_price) * rate),
-          totalPrice: round2(Number(quotedItem.total_price) * rate),
+          expectedQuantity: qty,
+          // Tax-adjusted (see itemCalcs above) and converted to branch currency —
+          // this is the real unit cost that inventory (base_price / sale_price on
+          // GRN) is priced from, not the vendor's raw quoted price.
+          unitPrice: round2(effectiveUnitPrice * rate),
+          totalPrice: round2(effectiveUnitPrice * qty * rate),
+          taxAmountPerUnit: taxAmountPerUnit > 0 ? round2(taxAmountPerUnit * rate) : undefined,
         });
 
         lotItemsToSave.push(lotItem);

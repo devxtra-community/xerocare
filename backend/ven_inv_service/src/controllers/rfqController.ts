@@ -161,6 +161,28 @@ export class RfqController {
         const estimatedShipmentDate = row.estimated_shipment_date;
         const vendorNote = (row.vendor_note as string) || undefined;
 
+        // Vendor-declared tax treatment — informational only, no amount derived.
+        const taxIncludedRaw = String(row.tax_included ?? '')
+          .trim()
+          .toLowerCase();
+        const taxIncluded =
+          taxIncludedRaw === 'yes' || taxIncludedRaw === 'true'
+            ? true
+            : taxIncludedRaw === 'no' || taxIncludedRaw === 'false'
+              ? false
+              : undefined;
+        let taxRatePercent: number | undefined;
+        if (row.tax_rate_percent !== undefined && String(row.tax_rate_percent).trim() !== '') {
+          const parsed = parseFloat(row.tax_rate_percent as string);
+          if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+            throw new AppError(
+              `Invalid tax_rate_percent for item ${rfqItemId}. Enter a value between 0 and 100.`,
+              400,
+            );
+          }
+          taxRatePercent = parsed;
+        }
+
         let parsedShipmentDate: Date | undefined = undefined;
         if (estimatedShipmentDate) {
           const d = new Date(estimatedShipmentDate as string | number | Date);
@@ -176,6 +198,8 @@ export class RfqController {
           availableQuantity: isNaN(availableQuantity) ? 0 : availableQuantity,
           estimatedShipmentDate: parsedShipmentDate,
           vendorNote,
+          taxIncluded,
+          taxRatePercent,
         };
       });
 

@@ -13,9 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ImagePlus, FileText, X } from 'lucide-react';
+import { ImagePlus, FileText, X, Plus, Trash2, Loader2, ExternalLink } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Employee } from '@/lib/employee';
+import {
+  listEmployeeDocuments,
+  uploadEmployeeDocument,
+  deleteEmployeeDocument,
+  documentExpiryStatus,
+  EMPLOYEE_DOCUMENT_TYPE_OPTIONS,
+  EMPLOYEE_DOCUMENT_TYPE_LABELS,
+  type EmployeeDocument,
+  type EmployeeDocumentType,
+} from '@/lib/employeeDocument';
+import { toast } from 'sonner';
 import { getBranches, Branch } from '@/lib/branch';
 import { getEmployeeJobOptions, EmployeeJob } from '@/lib/employeeJob';
 import { getFinanceJobOptions, FinanceJob } from '@/lib/financeJob';
@@ -32,8 +43,33 @@ interface EmployeeFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData?: Employee | null;
-  onSubmit: (formData: FormData) => Promise<boolean>;
+  /**
+   * Persist the core employee record. Returns `ok` plus the employee id so the
+   * dialog can flush staged document uploads/deletions against it afterwards
+   * (the id isn't known up-front when creating).
+   */
+  onSubmit: (formData: FormData) => Promise<{ ok: boolean; employeeId?: string }>;
 }
+
+interface DraftDocument {
+  tempId: string;
+  file: File | null;
+  docType: EmployeeDocumentType | '';
+  label: string;
+  documentNumber: string;
+  issueDate: string;
+  expiryDate: string;
+}
+
+const emptyDraft = (): DraftDocument => ({
+  tempId: Math.random().toString(36).slice(2),
+  file: null,
+  docType: '',
+  label: '',
+  documentNumber: '',
+  issueDate: '',
+  expiryDate: '',
+});
 
 /**
  * Form dialog for creating or updating employee details.
@@ -68,6 +104,12 @@ export default function EmployeeFormDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [currentUserBranch, setCurrentUserBranch] = useState<Branch | null>(null);
+
+  // Multi-document store
+  const [existingDocs, setExistingDocs] = useState<EmployeeDocument[]>([]);
+  const [docsToDelete, setDocsToDelete] = useState<string[]>([]);
+  const [draftDocs, setDraftDocs] = useState<DraftDocument[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
 
   const profileInputRef = useRef<HTMLInputElement>(null);
   const idProofInputRef = useRef<HTMLInputElement>(null);
@@ -147,7 +189,34 @@ export default function EmployeeFormDialog({
       setProfileImage(null);
       setIdProof(null);
     }
+    // Reset document staging whenever the dialog re-opens / target changes.
+    setDocsToDelete([]);
+    setDraftDocs([]);
+    setExistingDocs([]);
   }, [initialData, open, isAdmin, userBranchId]);
+
+  // Load the employee's stored documents when editing.
+  useEffect(() => {
+    if (!open || !initialData?.id) return;
+    let cancelled = false;
+    setDocsLoading(true);
+    listEmployeeDocuments(initialData.id)
+      .then((docs) => {
+        if (!cancelled) setExistingDocs(docs);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error('Failed to load employee documents');
+      })
+      .finally(() => {
+        if (!cancelled) setDocsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialData?.id]);
+
+  const updateDraft = (tempId: string, patch: Partial<DraftDocument>) =>
+    setDraftDocs((prev) => prev.map((d) => (d.tempId === tempId ? { ...d, ...patch } : d)));
 
   const dialCode = dialCodeFor(country);
 
@@ -195,8 +264,17 @@ export default function EmployeeFormDialog({
     }
   };
 
+  const readyDrafts = draftDocs.filter((d) => d.file && d.docType);
+  const incompleteDrafts = draftDocs.filter(
+    (d) => (d.file && !d.docType) || (!d.file && d.docType),
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (incompleteDrafts.length > 0) {
+      toast.error('Each new document needs both a type and a file — or remove the empty row.');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const data = new FormData();
@@ -227,10 +305,34 @@ export default function EmployeeFormDialog({
         data.append('id_proof', idProof);
       }
 
-      const success = await onSubmit(data);
-      if (success) {
-        onOpenChange(false);
+      const result = await onSubmit(data);
+      if (!result?.ok) return;
+
+      const employeeId = result.employeeId || initialData?.id;
+      if (employeeId && (docsToDelete.length > 0 || readyDrafts.length > 0)) {
+        try {
+          for (const docId of docsToDelete) {
+            await deleteEmployeeDocument(employeeId, docId);
+          }
+          for (const d of readyDrafts) {
+            await uploadEmployeeDocument(employeeId, {
+              file: d.file as File,
+              docType: d.docType as EmployeeDocumentType,
+              label: d.label.trim() || undefined,
+              documentNumber: d.documentNumber.trim() || undefined,
+              issueDate: d.issueDate || undefined,
+              expiryDate: d.expiryDate || undefined,
+            });
+          }
+        } catch (err) {
+          const message =
+            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            'Employee saved, but some documents failed to upload.';
+          toast.error(message);
+        }
       }
+
+      onOpenChange(false);
     } catch {
       // Error is handled in the onSubmit parent function
     } finally {
@@ -531,6 +633,211 @@ export default function EmployeeFormDialog({
               accept=".pdf,.jpg,.jpeg,.png"
               onChange={(e) => handleFileChange(e, 'id_proof')}
             />
+          </div>
+
+          {/* Legal Documents (Passport / Visa / Contract / License …) */}
+          <div className="space-y-3 border-t border-gray-100 pt-5">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Legal Documents
+              </label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 rounded-lg text-xs"
+                onClick={() => setDraftDocs((prev) => [...prev, emptyDraft()])}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add document
+              </Button>
+            </div>
+
+            {docsLoading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading documents…
+              </div>
+            )}
+
+            {/* Existing documents (edit mode) */}
+            {existingDocs.map((doc) => {
+              const pendingDelete = docsToDelete.includes(doc.id);
+              const status = documentExpiryStatus(doc.expiry_date);
+              return (
+                <div
+                  key={doc.id}
+                  className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm ${
+                    pendingDelete
+                      ? 'border-red-100 bg-red-50/60 opacity-60'
+                      : 'border-gray-100 bg-muted/40'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">
+                        {EMPLOYEE_DOCUMENT_TYPE_LABELS[doc.doc_type] || doc.doc_type}
+                      </span>
+                      {doc.label && (
+                        <span className="text-xs text-muted-foreground">· {doc.label}</span>
+                      )}
+                      {doc.document_number && (
+                        <span className="text-xs text-muted-foreground">
+                          · {doc.document_number}
+                        </span>
+                      )}
+                      {status === 'expired' && (
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                          EXPIRED
+                        </span>
+                      )}
+                      {status === 'soon' && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                          EXPIRES SOON
+                        </span>
+                      )}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {doc.expiry_date ? `Expiry ${doc.expiry_date}` : 'No expiry'} ·{' '}
+                      {doc.file_name || 'file'}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {doc.viewUrl && !pendingDelete && (
+                      <a
+                        href={doc.viewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-full p-1.5 text-blue-600 hover:bg-blue-50"
+                        title="Open document"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      className="rounded-full p-1.5 text-red-600 hover:bg-red-50"
+                      title={pendingDelete ? 'Keep document' : 'Remove document'}
+                      onClick={() =>
+                        setDocsToDelete((prev) =>
+                          pendingDelete ? prev.filter((x) => x !== doc.id) : [...prev, doc.id],
+                        )
+                      }
+                    >
+                      {pendingDelete ? <X className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* New document drafts */}
+            {draftDocs.map((d) => (
+              <div
+                key={d.tempId}
+                className="space-y-3 rounded-xl border border-dashed border-blue-200 bg-blue-50/40 p-4"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-500">
+                    New document
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded-full p-1 text-gray-500 hover:bg-white"
+                    onClick={() =>
+                      setDraftDocs((prev) => prev.filter((x) => x.tempId !== d.tempId))
+                    }
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Type *
+                    </label>
+                    <Select
+                      value={d.docType}
+                      onValueChange={(val) =>
+                        updateDraft(d.tempId, { docType: val as EmployeeDocumentType })
+                      }
+                    >
+                      <SelectTrigger className="h-10 rounded-lg bg-white text-sm">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        {EMPLOYEE_DOCUMENT_TYPE_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Document No.
+                    </label>
+                    <Input
+                      value={d.documentNumber}
+                      onChange={(e) => updateDraft(d.tempId, { documentNumber: e.target.value })}
+                      placeholder="e.g. A1234567"
+                      className="h-10 rounded-lg bg-white text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      Label
+                    </label>
+                    <Input
+                      value={d.label}
+                      onChange={(e) => updateDraft(d.tempId, { label: e.target.value })}
+                      placeholder="Optional note"
+                      className="h-10 rounded-lg bg-white text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Issue date
+                      </label>
+                      <Input
+                        type="date"
+                        value={d.issueDate}
+                        onChange={(e) => updateDraft(d.tempId, { issueDate: e.target.value })}
+                        className="h-10 rounded-lg bg-white text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Expiry date
+                      </label>
+                      <Input
+                        type="date"
+                        value={d.expiryDate}
+                        onChange={(e) => updateDraft(d.tempId, { expiryDate: e.target.value })}
+                        className="h-10 rounded-lg bg-white text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    File *
+                  </label>
+                  <Input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    onChange={(e) => updateDraft(d.tempId, { file: e.target.files?.[0] ?? null })}
+                    className="h-10 rounded-lg bg-white text-sm file:mr-3 file:rounded file:border-0 file:bg-blue-100 file:px-2 file:py-1 file:text-xs file:font-semibold"
+                  />
+                </div>
+              </div>
+            ))}
+
+            {!docsLoading && existingDocs.length === 0 && draftDocs.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No documents yet. Add passport, visa, labour contract, licenses, etc.
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end items-center gap-6 pt-6">
