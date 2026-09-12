@@ -431,7 +431,15 @@ export default function LotDetailPage() {
     );
   }
 
-  const itemsTotal = (lot.items || []).reduce((sum, item) => sum + Number(item.totalPrice), 0);
+  // Landed-cost-inclusive line total once allocation has run — keeps this total
+  // consistent with the per-unit price shown next to it (which already switches
+  // to landedCostUnitCost), instead of silently reverting to the pre-allocation
+  // vendor total.
+  const lineTotal = (item: Lot['items'][number]) =>
+    item.landedCostUnitCost != null
+      ? Number(item.landedCostUnitCost) * item.expectedQuantity
+      : Number(item.totalPrice);
+  const itemsTotal = (lot.items || []).reduce((sum, item) => sum + lineTotal(item), 0);
   const hasProducts = (lot.items || []).some((item) => item.itemType === LotItemType.MODEL);
   const hasSpareParts = (lot.items || []).some((item) => item.itemType === LotItemType.SPARE_PART);
   const hasRegisteredProducts = (lot.items || []).some(
@@ -829,11 +837,11 @@ export default function LotDetailPage() {
                         )}
                         <TableCell className="text-right text-slate-600">
                           {item.landedCostUnitCost != null ? (
-                            <div
-                              className="inline-flex flex-col items-end"
-                              title={`Vendor unit price: ${formatCurrency(Number(item.unitPrice), currency)}`}
-                            >
-                              <span>
+                            <div className="inline-flex flex-col items-end">
+                              <span className="text-[10px] text-slate-400 line-through">
+                                {formatCurrency(Number(item.unitPrice), currency)}
+                              </span>
+                              <span className="font-bold text-slate-900">
                                 {formatCurrency(Number(item.landedCostUnitCost), currency)}
                               </span>
                               <span className="text-[9px] font-bold uppercase tracking-wide text-blue-500">
@@ -845,7 +853,16 @@ export default function LotDetailPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right font-bold text-slate-900">
-                          {formatCurrency(Number(item.totalPrice), currency)}
+                          {item.landedCostUnitCost != null ? (
+                            <div className="inline-flex flex-col items-end">
+                              <span className="text-[10px] font-normal text-slate-400 line-through">
+                                {formatCurrency(Number(item.totalPrice), currency)}
+                              </span>
+                              <span>{formatCurrency(lineTotal(item), currency)}</span>
+                            </div>
+                          ) : (
+                            formatCurrency(Number(item.totalPrice), currency)
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -1290,33 +1307,36 @@ export default function LotDetailPage() {
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1 gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                      onClick={() => setShowCostModal(true)}
-                    >
-                      <Plus size={16} /> Add Cost
-                    </Button>
-                    <span
-                      title={
-                        lot.status === LotStatus.RECEIVED
-                          ? undefined
-                          : 'Mark the lot as received before allocating costs'
-                      }
-                    >
+                  <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
-                        disabled={lot.status !== LotStatus.RECEIVED}
-                        onClick={() => setShowAllocateModal(true)}
+                        className="flex-1 gap-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                        onClick={() => setShowCostModal(true)}
                       >
-                        <Settings size={16} /> Allocate Costs
+                        <Plus size={16} /> Add Cost
                       </Button>
-                    </span>
+                      <span
+                        className="flex-1"
+                        title={
+                          lot.status === LotStatus.RECEIVED
+                            ? undefined
+                            : 'Mark the lot as received before allocating costs'
+                        }
+                      >
+                        <Button
+                          variant="outline"
+                          className="w-full gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                          disabled={lot.status !== LotStatus.RECEIVED}
+                          onClick={() => setShowAllocateModal(true)}
+                        >
+                          <Settings size={16} /> Allocate Costs
+                        </Button>
+                      </span>
+                    </div>
                     <Button
                       variant="default"
-                      className="flex-1 gap-2 shadow-md bg-primary hover:bg-primary/90"
+                      className="w-full gap-2 shadow-md bg-primary hover:bg-primary/90"
                       onClick={() => setShowPaymentModal(true)}
                       disabled={purchaseRecord.paidAmount >= purchaseRecord.purchaseAmount}
                     >

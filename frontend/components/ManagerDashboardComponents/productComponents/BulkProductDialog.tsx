@@ -88,6 +88,7 @@ export function BulkProductDialog({
     MFD: string;
     product_status: BulkProductRow['product_status'];
     imageUrl: string;
+    description: string;
   }>({
     warehouse_id: '',
     vendor_id: '',
@@ -100,6 +101,7 @@ export function BulkProductDialog({
     MFD: '',
     product_status: 'AVAILABLE',
     imageUrl: '',
+    description: '',
   });
   // Same-batch units share one product photo; upload it once here instead of
   // per row. Kept separate from `rows` so the upload spinner is dialog-level.
@@ -720,6 +722,19 @@ export function BulkProductDialog({
                     applyBulkField('hs_code', raw);
                   }}
                   placeholder="HS Code"
+                />
+              </BulkFillField>
+
+              <BulkFillField label="Description">
+                <Textarea
+                  className="w-56 h-9 min-h-9 resize-none py-1.5"
+                  value={bulkFill.description}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setBulkFill((p) => ({ ...p, description: raw }));
+                    applyBulkField('description', raw);
+                  }}
+                  placeholder="Product description"
                 />
               </BulkFillField>
 

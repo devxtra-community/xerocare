@@ -74,12 +74,15 @@ export class LandedCostService {
       }
     } else {
       // BY_VALUE (default) — proportional to each item's original total value.
+      // Decimal columns come back from Postgres as strings, so every read is
+      // wrapped in Number() — see the baseline fix below for what skipping this
+      // silently does.
       const totalValue = items.reduce(
-        (sum, i) => sum + (i.originalUnitPrice ?? i.unitPrice) * i.expectedQuantity,
+        (sum, i) => sum + Number(i.originalUnitPrice ?? i.unitPrice) * i.expectedQuantity,
         0,
       );
       for (const item of items) {
-        const itemValue = (item.originalUnitPrice ?? item.unitPrice) * item.expectedQuantity;
+        const itemValue = Number(item.originalUnitPrice ?? item.unitPrice) * item.expectedQuantity;
         shares.set(item.id, totalValue > 0 ? itemValue / totalValue : 0);
       }
     }
@@ -129,7 +132,12 @@ export class LandedCostService {
 
       const breakdown: AllocationBreakdownItem[] = [];
       for (const item of items) {
-        const baseline = item.originalUnitPrice ?? item.unitPrice;
+        // BUG FIX: originalUnitPrice/unitPrice are Postgres decimal columns —
+        // TypeORM returns them as strings, not numbers. Without Number() here,
+        // `baseline + allocated/qty` below is STRING CONCATENATION ("550.00" +
+        // 300 -> "550.00300"), which round2() then rounds right back down to
+        // ~the original price — allocation silently had zero effect.
+        const baseline = Number(item.originalUnitPrice ?? item.unitPrice);
         const allocated = round2(totals.get(item.id) ?? 0);
 
         item.originalUnitPrice = baseline;
