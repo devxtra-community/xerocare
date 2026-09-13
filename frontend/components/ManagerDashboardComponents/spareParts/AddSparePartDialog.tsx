@@ -178,7 +178,12 @@ export default function AddSparePartDialog({
             brand: brandName,
             model_ids: sp?.model_id ? [sp.model_id] : selectedItem.modelIds || [],
             base_price: '',
-            purchase_price: selectedItem.unitPrice ? selectedItem.unitPrice.toString() : '',
+            // Use the landed cost (vendor price + allocated additional costs) once
+            // allocation has run on this lot — falls back to the plain unit price.
+            purchase_price:
+              (selectedItem.landedCostUnitCost ?? selectedItem.unitPrice)
+                ? (selectedItem.landedCostUnitCost ?? selectedItem.unitPrice).toString()
+                : '',
             wholesale_price: sp?.wholesale_price?.toString() || '',
             warehouse_id: selectedLot.warehouse_id || selectedLot.warehouseId || '',
             vendor_id: selectedLot.vendorId || selectedLot.vendor?.id || '',
@@ -405,7 +410,9 @@ export default function AddSparePartDialog({
                         part_name: sp?.part_name || selectedItem.customSparePartName || '',
                         brand: brandName,
                         base_price: '',
-                        purchase_price: selectedItem.unitPrice.toString(),
+                        purchase_price: (
+                          selectedItem.landedCostUnitCost ?? selectedItem.unitPrice
+                        ).toString(),
                         wholesale_price: sp?.wholesale_price?.toString() || '',
                         model_ids: sp?.model_id ? [sp.model_id] : selectedItem.modelIds || [],
                         mpn: selectedItem.mpn || sp?.mpn || '',
@@ -430,7 +437,7 @@ export default function AddSparePartDialog({
                       return {
                         value: item.id,
                         label: `${sku} - ${name}`,
-                        description: `Available: ${available} / ${item.receivedQuantity} | Price: ${getActiveCurrency()} ${item.unitPrice}`,
+                        description: `Available: ${available} / ${item.receivedQuantity} | Price: ${getActiveCurrency()} ${item.landedCostUnitCost ?? item.unitPrice}`,
                       };
                     });
                   })()}

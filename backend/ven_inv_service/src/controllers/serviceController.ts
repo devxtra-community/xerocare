@@ -11,6 +11,8 @@ import {
 } from '../utils/servicePdfGenerator';
 import { sendServicePdfEmail, sendServiceEmail } from '../utils/emailService';
 import { sendWhatsappMessage } from '../utils/whatsapp';
+import { r2ViewUrl } from '../utils/r2Url';
+import { MulterS3File } from '../types/multer-s3-file';
 import {
   ServiceTicket,
   ServiceTicketStatus,
@@ -67,6 +69,7 @@ import {
   WarrantyEvaluation,
 } from '../helpers/warrantyHelper';
 import { deleteCached } from '../utils/cacheUtil';
+import { randomBytes } from 'crypto';
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET;
 if (!ACCESS_SECRET) {
@@ -75,6 +78,69 @@ if (!ACCESS_SECRET) {
 const CRM_SERVICE_URL = process.env.CRM_SERVICE_URL || 'http://localhost:3005';
 const BILLING_SERVICE_URL = process.env.BILLING_SERVICE_URL || 'http://localhost:3004';
 const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
+
+/**
+ * Public, customer-facing base URL for links we email/WhatsApp out (estimate
+ * approval page). Mirrors billing_service's publicAppUrl() — localhost is only
+ * reachable from the server itself, so warn loudly when PUBLIC_APP_URL is unset.
+ */
+function publicAppUrl(): string {
+  const base = process.env.PUBLIC_APP_URL;
+  if (!base) {
+    logger.warn(
+      'PUBLIC_APP_URL is not set — customer-facing estimate links are falling back to ' +
+        'http://localhost:3000, which is unreachable from anywhere but this machine.',
+    );
+    return 'http://localhost:3000';
+  }
+  return base.replace(/\/+$/, '');
+}
+
+function estimateSigningLinkUrl(token: string): string {
+  return `${publicAppUrl()}/public/service-estimate/sign/${token}`;
+}
+
+const ESTIMATE_SIGNING_TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
+
+// How a customer's approve/reject decision reached us.
+const CUSTOMER_DECISION_CHANNELS = [
+  'REMOTE_LINK', // customer opened the emailed/WhatsApped link themselves
+  'IN_PERSON', // staff recording a decision the customer gave face to face
+  'PHONE',
+  'WHATSAPP',
+  'EMAIL',
+  'FINANCE_MANUAL',
+] as const;
+type CustomerDecisionChannel = (typeof CUSTOMER_DECISION_CHANNELS)[number];
+
+function normalizeDecisionChannel(
+  value: unknown,
+  fallback: CustomerDecisionChannel,
+): CustomerDecisionChannel {
+  return typeof value === 'string' &&
+    (CUSTOMER_DECISION_CHANNELS as readonly string[]).includes(value)
+    ? (value as CustomerDecisionChannel)
+    : fallback;
+}
+
+function decisionChannelLabel(channel: string): string {
+  switch (channel) {
+    case 'REMOTE_LINK':
+      return 'via the secure link';
+    case 'IN_PERSON':
+      return 'in person';
+    case 'PHONE':
+      return 'by phone';
+    case 'WHATSAPP':
+      return 'over WhatsApp';
+    case 'EMAIL':
+      return 'by email';
+    case 'FINANCE_MANUAL':
+      return 'recorded by Finance';
+    default:
+      return '';
+  }
+}
 
 interface ReviseEstimateItem {
   itemSource?: ServiceItemSource;
@@ -219,6 +285,244 @@ export class ServiceController {
       status: 'RESERVED',
     });
     await reservationRepo.save(reservation);
+  }
+
+  /**
+   * Issue a fresh single-use 72-hour signing token on an estimate and persist it.
+   * Mirrors billing_service's issueBillSigningToken.
+   */
+  private async issueEstimateSigningToken(estimate: ServiceEstimate): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    estimate.signingToken = token;
+    estimate.signingTokenExpiresAt = new Date(Date.now() + ESTIMATE_SIGNING_TOKEN_TTL_MS);
+    estimate.signingTokenUsed = false;
+    await Source.getRepository(ServiceEstimate).save(estimate);
+    return token;
+  }
+
+  /**
+   * Resolve a public signing token to its estimate, enforcing the same rules the
+   * bill signing endpoints use: unknown token → 404, already-used or expired →
+   * 410. Pass allowUsed when the customer should still be able to *view* the
+   * document after they have decided (the read-only / PDF routes).
+   */
+  private async loadEstimateBySigningToken(
+    token: string,
+    { allowUsed = false }: { allowUsed?: boolean } = {},
+  ): Promise<ServiceEstimate> {
+    const estimate = await Source.getRepository(ServiceEstimate).findOne({
+      where: { signingToken: String(token) },
+      relations: ['items'],
+    });
+    if (!estimate) throw new AppError('Invalid or expired estimate link', 404);
+    if (!allowUsed && estimate.signingTokenUsed) {
+      throw new AppError('This estimate link has already been used', 410);
+    }
+    if (estimate.signingTokenExpiresAt && estimate.signingTokenExpiresAt < new Date()) {
+      throw new AppError('This estimate link has expired', 410);
+    }
+    return estimate;
+  }
+
+  /**
+   * Shared "customer approved this estimate" transition, used by both the in-app
+   * technician path (approveEstimateCustomer) and the public remote link
+   * (approveEstimateRemote). Sets both statuses to CUSTOMER_APPROVED, reserves
+   * inventory, converts a CRM lead, logs the activity and notifies the assigned
+   * technician plus the help-desk user who opened the ticket.
+   */
+  /**
+   * Turns a stored customerSignedDocumentUrl (an R2 key) into a short-lived
+   * viewable link before the estimate goes back to the client. No-op when
+   * there's no uploaded document (drawn signatures are stored as a plain
+   * base64 data URI and need no signing).
+   */
+  private async withSignedEstimateDoc(estimate: ServiceEstimate): Promise<ServiceEstimate> {
+    if (!estimate.customerSignedDocumentUrl) return estimate;
+    return {
+      ...estimate,
+      customerSignedDocumentUrl:
+        (await r2ViewUrl(estimate.customerSignedDocumentUrl)) ?? estimate.customerSignedDocumentUrl,
+    };
+  }
+
+  private async applyCustomerEstimateApproval(
+    estimate: ServiceEstimate,
+    ticket: ServiceTicket,
+    opts: {
+      method: CustomerDecisionChannel;
+      byName?: string | null;
+      note?: string | null;
+      actorId?: string;
+      authHeader?: string;
+      /** Drawn signature, base64 PNG data URI. */
+      signatureData?: string | null;
+      /** R2 key of an uploaded photo/PDF of a physically-signed copy. */
+      signedDocumentUrl?: string | null;
+      /** Required attestation note accompanying signedDocumentUrl. */
+      signedDocumentNote?: string | null;
+    },
+  ): Promise<void> {
+    // Same expiry gate as before — an expired estimate always blocks approval,
+    // Finance must extend validity first.
+    const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+    const latestRevision = await revisionRepo.findOne({
+      where: { ticketId: ticket.id },
+      order: { submittedAt: 'DESC' },
+    });
+    if (latestRevision?.validUntil && new Date() > new Date(latestRevision.validUntil)) {
+      throw new AppError(
+        'Estimate validity has expired. Send it back to Finance to extend the validity before it can be approved.',
+        400,
+      );
+    }
+
+    // A staff-recorded decision must carry proof — either a signature drawn live
+    // (customer present) or an uploaded photo/PDF of a physically-signed copy
+    // (customer not present). The customer's own remote self-approval link
+    // (REMOTE_LINK) is unchanged — clicking their unique, single-use link is
+    // itself the proof there.
+    const staffRecorded = opts.method !== 'REMOTE_LINK';
+    if (staffRecorded && !opts.signatureData && !opts.signedDocumentUrl) {
+      throw new AppError(
+        'A customer signature (drawn or uploaded) is required to record approval',
+        400,
+      );
+    }
+
+    const estimateRepo = Source.getRepository(ServiceEstimate);
+    const ticketRepo = Source.getRepository(ServiceTicket);
+
+    estimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
+    estimate.customerApprovalMethod = opts.method;
+    estimate.customerApprovedByName = opts.byName ?? null;
+    estimate.customerDecisionNote = opts.note ?? null;
+    estimate.customerApprovedAt = new Date();
+    if (opts.signatureData) estimate.customerSignatureData = opts.signatureData;
+    if (opts.signedDocumentUrl) {
+      estimate.customerSignedDocumentUrl = opts.signedDocumentUrl;
+      estimate.customerSignedDocumentNote = opts.signedDocumentNote ?? null;
+    }
+    await estimateRepo.save(estimate);
+
+    ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
+    await ticketRepo.save(ticket);
+
+    for (const item of estimate.items ?? []) {
+      if (item.itemSource === ServiceEstimateItemSource.SPARE_PART && item.sparePartId) {
+        await this.reserveSparePart(ticket.id, item.sparePartId, item.quantity);
+      }
+    }
+
+    if (ticket.leadId) {
+      try {
+        const authHeader =
+          opts.authHeader ||
+          `Bearer ${sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+            expiresIn: '1m',
+          })}`;
+        const convertRes = await axios.post(
+          `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
+          { location: 'Service Site Location' },
+          { headers: { Authorization: authHeader } },
+        );
+        if (convertRes.data && convertRes.data.success) {
+          ticket.customerId = convertRes.data.data.customerId;
+          ticket.leadId = null;
+          await ticketRepo.save(ticket);
+          logger.info(`Lead converted to customer: ${ticket.customerId}`);
+        }
+      } catch (err) {
+        logger.error('Failed to convert CRM lead upon customer approval:', err);
+      }
+    }
+
+    const via = decisionChannelLabel(opts.method);
+    await this.logActivity(
+      ticket.id,
+      'ESTIMATE_CUSTOMER_APPROVED',
+      `Estimate approved by Customer${opts.byName ? ` (${opts.byName})` : ''}${via ? ` ${via}` : ''}` +
+        `${staffRecorded ? ', recorded by staff' : ''}.` +
+        `${opts.note ? ` Note: ${opts.note}` : ''} Inventory parts reserved.`,
+      opts.actorId,
+    );
+
+    const recipients = new Set<string>();
+    if (ticket.assignedTechnicianId) recipients.add(ticket.assignedTechnicianId);
+    if (ticket.createdBy) recipients.add(ticket.createdBy);
+    for (const recipientId of recipients) {
+      await NotificationPublisher.publishInAppRequest({
+        recipientId,
+        title: 'Customer Approved Service',
+        message: `Customer approved the service estimate for ticket ${ticket.ticketNumber}. Repair work can start.`,
+        type: 'TASK',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
+    }
+  }
+
+  /**
+   * Shared "customer rejected this estimate" transition for the public remote
+   * link. The in-app technician path (rejectEstimateCustomer) keeps its own
+   * richer flow (discount negotiation, visit-charge collection).
+   */
+  private async applyCustomerEstimateRejection(
+    estimate: ServiceEstimate,
+    ticket: ServiceTicket,
+    reason: string,
+    opts: {
+      method: CustomerDecisionChannel;
+      byName?: string | null;
+      note?: string | null;
+      actorId?: string;
+    },
+  ): Promise<void> {
+    const estimateRepo = Source.getRepository(ServiceEstimate);
+    const ticketRepo = Source.getRepository(ServiceTicket);
+
+    estimate.status = ServiceEstimateStatus.REJECTED;
+    estimate.customerApprovalMethod = opts.method;
+    estimate.customerApprovedByName = opts.byName ?? null;
+    estimate.customerDecisionNote = opts.note ?? null;
+    estimate.customerRejectionReason = reason;
+    estimate.customerRejectedAt = new Date();
+    await estimateRepo.save(estimate);
+
+    ticket.status = ServiceTicketStatus.CUSTOMER_REJECTED;
+    await ticketRepo.save(ticket);
+
+    const via = decisionChannelLabel(opts.method);
+    const staffRecorded = opts.method !== 'REMOTE_LINK';
+    await this.logActivity(
+      ticket.id,
+      'ESTIMATE_CUSTOMER_REJECTED',
+      `Estimate rejected by Customer${opts.byName ? ` (${opts.byName})` : ''}${via ? ` ${via}` : ''}` +
+        `${staffRecorded ? ', recorded by staff' : ''}. Reason: ${reason}` +
+        `${opts.note ? `. Note: ${opts.note}` : ''}`,
+      opts.actorId,
+    );
+
+    const recipients = new Set<string>();
+    if (ticket.assignedTechnicianId) recipients.add(ticket.assignedTechnicianId);
+    if (ticket.createdBy) recipients.add(ticket.createdBy);
+    for (const recipientId of recipients) {
+      await NotificationPublisher.publishInAppRequest({
+        recipientId,
+        title: 'Customer Rejected Estimate',
+        message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
+        type: 'WARNING',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
+    }
+    await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+      title: 'Customer Rejected Estimate',
+      message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
+      type: 'WARNING',
+      referenceId: ticket.id,
+      referenceType: 'SERVICE',
+    });
   }
 
   /**
@@ -720,10 +1024,16 @@ export class ServiceController {
       ticket.productName ||
       'your machine';
 
+    // Amounts always go out in the branch's own currency, not a hardcoded one.
+    const branch = ticket.branchId
+      ? await Source.getRepository(Branch).findOne({ where: { id: ticket.branchId } })
+      : null;
+    const currency = branch?.currency_code || 'QAR';
+
     const coverageLine = chargeableVisit
       ? Number(ticket.visitChargeAmount) > 0
-        ? `A visit charge of QAR ${Number(ticket.visitChargeAmount).toFixed(2)} applies for this service call, since ${machine} is not currently under an active rental, lease, warranty, or service contract. You're welcome to pay it now or at the time of service — payment is not required before we send a technician.`
-        : `This machine is not currently under an active rental, lease, warranty, or service contract, so a visit charge applies. Our team will confirm the exact amount shortly.`
+        ? `A visit charge of ${currency} ${Number(ticket.visitChargeAmount).toFixed(2)} applies for this service call. Paying the visit charge also covers the labour cost of the repair for one month — within that period you would only pay for any spare parts required. You're welcome to pay it now or at the time of service — payment is not required before we send a technician.`
+        : `A visit charge applies for this service call, and paying it also covers the labour cost of the repair for one month (within that period you would only pay for any spare parts required). Our team will confirm the exact amount shortly.`
       : `Good news — ${machine} is currently covered (active rental, lease, warranty, or service contract), so this service visit is FREE of charge.`;
 
     const subject = `Service Ticket ${ticket.ticketNumber} Confirmed`;
@@ -784,6 +1094,14 @@ Xerocare Technical Services`;
       const previousTechnicianId = ticket.assignedTechnicianId;
       const isReassignment =
         !!previousTechnicianId && previousTechnicianId !== assignedTechnicianId;
+
+      // Once the technician has physically started the repair, swapping them
+      // out mid-job (parts already being used, labour already underway) makes
+      // no operational sense — reassignment stays open through diagnosis,
+      // estimate, and customer-approval waiting, and locks only here.
+      if (isReassignment && ticket.repairStartedAt) {
+        throw new AppError('Cannot reassign — the technician has already started repair work', 400);
+      }
 
       // Reassignment releases the previous technician's claim (a manager's claim survives).
       if (
@@ -1797,69 +2115,255 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
       if (!ticket) throw new Error('Ticket not found');
 
-      // Same expiry gate as the ticket-level customer-approve path — an expired
-      // estimate always blocks approval, Finance must extend validity first.
+      // Staff recording a decision the customer gave off-system (phone, WhatsApp,
+      // in person). The front end gates this behind an explicit confirmation
+      // and a captured signature.
+      await this.applyCustomerEstimateApproval(estimate, ticket, {
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        byName: (req.body?.customerName as string)?.trim() || null,
+        note: (req.body?.note as string)?.trim() || null,
+        actorId: req.user?.userId,
+        authHeader: req.headers.authorization,
+        signatureData: (req.body?.signatureData as string) || null,
+      });
+
+      res.status(200).json({ success: true, data: await this.withSignedEstimateDoc(estimate) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/estimates/:estimateId/approve-customer-upload
+   * Same as approveEstimateCustomer, but the customer's proof is an uploaded
+   * photo/PDF of a physically-signed copy (customer not physically present)
+   * instead of a live-drawn signature.
+   */
+  approveEstimateCustomerUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const estimateId = req.params.estimateId as string;
+      const attestationNote = (req.body?.attestationNote as string)?.trim();
+      if (!attestationNote) {
+        throw new AppError(
+          'Attestation note is required — document how/when the signed copy was obtained',
+          400,
+        );
+      }
+      const uploadedFile = req.file as MulterS3File | undefined;
+      if (!uploadedFile) throw new AppError('Signed document file is required', 400);
+
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { id: String(estimateId) },
+        relations: ['items'],
+      });
+      if (!estimate) throw new Error('Estimate not found');
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      await this.applyCustomerEstimateApproval(estimate, ticket, {
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        byName: (req.body?.customerName as string)?.trim() || null,
+        note: (req.body?.note as string)?.trim() || null,
+        actorId: req.user?.userId,
+        authHeader: req.headers.authorization,
+        signedDocumentUrl: uploadedFile.key,
+        signedDocumentNote: attestationNote,
+      });
+
+      res.status(200).json({ success: true, data: await this.withSignedEstimateDoc(estimate) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/public/service-estimate/sign/:token
+   * Public (no auth) — the token IS the credential. Returns a safe subset for
+   * the customer-facing approval page. Mirrors billing's getBillForSigning.
+   */
+  getEstimateForSigning = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const estimate = await this.loadEstimateBySigningToken(req.params.token as string, {
+        allowUsed: true,
+      });
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new AppError('Service ticket not found', 404);
+
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+
       const revisionRepo = Source.getRepository(ServiceEstimateRevision);
       const latestRevision = await revisionRepo.findOne({
         where: { ticketId: ticket.id },
         order: { submittedAt: 'DESC' },
       });
-      if (latestRevision?.validUntil && new Date() > new Date(latestRevision.validUntil)) {
-        throw new AppError(
-          'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
-          400,
-        );
-      }
 
-      estimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
-      await estimateRepo.save(estimate);
+      const alreadyDecided =
+        estimate.status === ServiceEstimateStatus.CUSTOMER_APPROVED ||
+        estimate.status === ServiceEstimateStatus.REJECTED;
 
-      ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
-      await ticketRepo.save(ticket);
+      res.status(200).json({
+        success: true,
+        data: {
+          ticket: {
+            ticketNumber: ticket.ticketNumber,
+            productBrand: ticket.productBrand,
+            productModel: ticket.productModel,
+            serialNumber: ticket.serialNumber,
+            status: ticket.status,
+          },
+          branch: branch
+            ? { name: branch.name, currencyCode: branch.currency_code, taxName: branch.tax_name }
+            : null,
+          customerName: customer
+            ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || null
+            : null,
+          estimate: {
+            labourCost: estimate.labourCost,
+            partsCost: estimate.partsCost,
+            visitChargeAmount: estimate.visitChargeAmount,
+            transportChargeAmount: estimate.transportChargeAmount,
+            discountAmount: estimate.discountAmount,
+            totalCost: estimate.totalCost,
+            currencyCode: estimate.currencyCode,
+            version: estimate.version,
+            status: estimate.status,
+            items: (estimate.items ?? []).map((it) => ({
+              partName: it.partName,
+              sku: it.sku,
+              quantity: it.quantity,
+              unitPrice: it.unitPrice,
+              totalPrice: it.totalPrice,
+              isFree: it.isFree,
+            })),
+          },
+          validUntil: latestRevision?.validUntil ?? null,
+          expired:
+            !!latestRevision?.validUntil &&
+            new Date() > new Date(latestRevision.validUntil as unknown as string),
+          alreadyDecided,
+          decision: alreadyDecided
+            ? {
+                status: estimate.status,
+                method: estimate.customerApprovalMethod,
+                approvedByName: estimate.customerApprovedByName,
+                approvedAt: estimate.customerApprovedAt,
+                rejectionReason: estimate.customerRejectionReason,
+                rejectedAt: estimate.customerRejectedAt,
+                note: estimate.customerDecisionNote,
+              }
+            : null,
+          linkUsed: estimate.signingTokenUsed,
+          linkExpiresAt: estimate.signingTokenExpiresAt,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
-      for (const item of estimate.items) {
-        if (item.itemSource === ServiceEstimateItemSource.SPARE_PART && item.sparePartId) {
-          await this.reserveSparePart(ticket.id, item.sparePartId, item.quantity);
-        }
-      }
+  /**
+   * POST /service/public/service-estimate/sign/:token/approve
+   * Public (no auth) — customer approves the estimate from their own device.
+   */
+  approveEstimateRemote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const customerName = (req.body?.customerName as string)?.trim();
+      if (!customerName) throw new AppError('Your name is required', 400);
 
-      if (ticket.leadId) {
-        try {
-          const convertRes = await axios.post(
-            `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
-            { location: 'Service Site Location' },
-            { headers: { Authorization: req.headers.authorization } },
-          );
-          if (convertRes.data && convertRes.data.success) {
-            ticket.customerId = convertRes.data.data.customerId;
-            ticket.leadId = null;
-            await ticketRepo.save(ticket);
-            logger.info(`Lead converted to customer: ${ticket.customerId}`);
-          }
-        } catch (err) {
-          logger.error('Failed to convert CRM lead upon customer approval:', err);
-        }
-      }
+      const estimate = await this.loadEstimateBySigningToken(req.params.token as string);
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new AppError('Service ticket not found', 404);
 
-      await this.logActivity(
-        ticket.id,
-        'ESTIMATE_CUSTOMER_APPROVED',
-        `Estimate approved by Customer. Inventory parts reserved.`,
-        req.user?.userId,
+      await this.applyCustomerEstimateApproval(estimate, ticket, {
+        method: 'REMOTE_LINK',
+        byName: customerName,
+      });
+
+      estimate.signingTokenUsed = true;
+      await Source.getRepository(ServiceEstimate).save(estimate);
+
+      res.status(200).json({ success: true, data: { approvedAt: estimate.customerApprovedAt } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/public/service-estimate/sign/:token/reject
+   * Public (no auth) — customer rejects the estimate from their own device.
+   */
+  rejectEstimateRemote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reason = (req.body?.reason as string)?.trim();
+      if (!reason) throw new AppError('A reason is required to reject this estimate', 400);
+
+      const estimate = await this.loadEstimateBySigningToken(req.params.token as string);
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new AppError('Service ticket not found', 404);
+
+      await this.applyCustomerEstimateRejection(estimate, ticket, reason, {
+        method: 'REMOTE_LINK',
+        byName: (req.body?.customerName as string)?.trim() || null,
+      });
+
+      estimate.signingTokenUsed = true;
+      await Source.getRepository(ServiceEstimate).save(estimate);
+
+      res.status(200).json({ success: true, data: { rejectedAt: estimate.customerRejectedAt } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/public/service-estimate/sign/:token/pdf
+   * Public (no auth) — the quotation PDF behind the signing link. Still readable
+   * after the customer has decided so they keep a copy.
+   */
+  getSigningQuotationPdf = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const estimate = await this.loadEstimateBySigningToken(req.params.token as string, {
+        allowUsed: true,
+      });
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new AppError('Service ticket not found', 404);
+
+      const customer = await this.fetchCustomerDetails(ticket.customerId);
+      const branchRepo = Source.getRepository(Branch);
+      const branch = await branchRepo.findOne({ where: { id: ticket.branchId } });
+
+      const activityRepo = Source.getRepository(ServiceTicketActivity);
+      const activity = await activityRepo.findOne({
+        where: { ticketId: ticket.id, activityType: 'FINANCE_APPROVED' },
+        order: { created_at: 'DESC' },
+      });
+      const financeApprover =
+        activity && activity.performedBy
+          ? await this.fetchEmployeeDetails(activity.performedBy)
+          : null;
+
+      const pdfBuffer = await generateServiceQuotationPdf(
+        ticket,
+        estimate,
+        customer,
+        branch,
+        financeApprover,
       );
 
-      if (ticket.assignedTechnicianId) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: ticket.assignedTechnicianId,
-          title: 'Customer Approved Service',
-          message: `Customer approved service estimate for ticket ${ticket.ticketNumber}. You can start repair work.`,
-          type: 'TASK',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
-
-      res.status(200).json({ success: true, data: estimate });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=Quotation_${ticket.ticketNumber}.pdf`);
+      return res.end(pdfBuffer);
     } catch (error) {
       next(error);
     }
@@ -1878,7 +2382,16 @@ Xerocare Technical Services`;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
 
-      const { collectVisitCharge, paymentMode, accountId, reason, discountAmount } = req.body ?? {};
+      const {
+        collectVisitCharge,
+        paymentMode,
+        accountId,
+        reason,
+        discountAmount,
+        customerName,
+        confirmedVia,
+        note,
+      } = req.body ?? {};
 
       if (!reason || !String(reason).trim()) {
         throw new AppError('A reason is required, whether rejecting or offering a discount', 400);
@@ -1924,7 +2437,14 @@ Xerocare Technical Services`;
         });
       }
 
+      const rejectChannel = normalizeDecisionChannel(confirmedVia, 'IN_PERSON');
+      const rejectNote = (note as string)?.trim() || null;
       estimate.status = ServiceEstimateStatus.REJECTED;
+      estimate.customerApprovalMethod = rejectChannel;
+      estimate.customerApprovedByName = (customerName as string)?.trim() || null;
+      estimate.customerRejectionReason = String(reason).trim();
+      estimate.customerDecisionNote = rejectNote;
+      estimate.customerRejectedAt = new Date();
       await estimateRepo.save(estimate);
 
       if (ticket) {
@@ -1944,7 +2464,11 @@ Xerocare Technical Services`;
         await this.logActivity(
           ticket.id,
           'ESTIMATE_CUSTOMER_REJECTED',
-          `Estimate rejected by Customer. Reason: ${reason}`,
+          `Estimate rejected by Customer${
+            (customerName as string)?.trim() ? ` (${(customerName as string).trim()})` : ''
+          } ${decisionChannelLabel(rejectChannel)}, recorded by staff. Reason: ${reason}${
+            rejectNote ? `. Note: ${rejectNote}` : ''
+          }`,
           req.user?.userId,
         );
 
@@ -2721,7 +3245,11 @@ Xerocare Technical Services`;
         relations: ['items'],
       });
 
-      res.status(200).json({ success: true, data: { estimates, revisions } });
+      const signedEstimates = await Promise.all(
+        estimates.map((e) => this.withSignedEstimateDoc(e)),
+      );
+
+      res.status(200).json({ success: true, data: { estimates: signedEstimates, revisions } });
     } catch (error) {
       next(error);
     }
@@ -3687,6 +4215,181 @@ Xerocare Technical Services`;
   /**
    * POST /service/tickets/:id/customer-approve
    */
+  /**
+   * Shared validity/labour-waiver check for Track A's ticket-level quote
+   * (submitServiceQuotation / ticket.serviceQuotationId — a simple lump-sum
+   * billing invoice, distinct from Track B's itemized ServiceEstimate). Throws
+   * if the quote's validity has expired; otherwise waives labour on timely
+   * approval for non-travel-covered contexts. No-op if the ticket has no
+   * ticket-level quotation at all.
+   */
+  private async checkTrackAQuotationValidity(
+    ticket: ServiceTicket,
+    actorId?: string,
+  ): Promise<void> {
+    if (!ticket.serviceQuotationId) return;
+
+    const approvalTravelCovered = [
+      ServiceContext.AMC,
+      ServiceContext.SMA,
+      ServiceContext.FSMA,
+      ServiceContext.RENT,
+      ServiceContext.LEASE_CPC,
+      ServiceContext.WARRANTY,
+      ServiceContext.LEASE_UNDER_WARRANTY,
+    ].includes(ticket.serviceContext);
+
+    const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+      expiresIn: '1m',
+    });
+    let estimateExpired = false;
+    let invoiceFetched = false;
+    try {
+      const invRes = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const invoice = invRes.data?.data;
+      invoiceFetched = !!invoice;
+      if (invoice?.estimateValidUntil) {
+        estimateExpired = new Date() > new Date(invoice.estimateValidUntil);
+      }
+    } catch (err) {
+      logger.error('Failed to fetch estimate for validity check:', err);
+    }
+
+    if (estimateExpired) {
+      throw new AppError(
+        'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
+        400,
+      );
+    }
+
+    if (invoiceFetched && !approvalTravelCovered) {
+      // Timely approval — waive the labour line on the billing estimate.
+      try {
+        await axios.post(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
+          { reason: `Customer approved ticket ${ticket.ticketNumber} within validity` },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        await this.logActivity(
+          ticket.id,
+          'LABOUR_WAIVED',
+          'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
+          actorId,
+        );
+      } catch (err) {
+        logger.error('Failed to waive labour on billing estimate:', err);
+      }
+    }
+  }
+
+  /**
+   * Shared tail for Track A's ticket-level customer approval (customerApprove /
+   * customerApproveUpload): records the signature onto the ticket's latest
+   * ServiceEstimate (same row Track B writes to — see applyCustomerEstimateApproval),
+   * converts a CRM lead, saves the ticket, syncs the linked billing invoice, and
+   * notifies the assigned technician. Requires a signature — either drawn or
+   * uploaded — same rule as Track B.
+   */
+  private async finalizeTicketCustomerApproval(
+    ticket: ServiceTicket,
+    req: Request,
+    opts: {
+      byName?: string | null;
+      method?: string | null;
+      note?: string | null;
+      signatureData?: string | null;
+      signedDocumentUrl?: string | null;
+      signedDocumentNote?: string | null;
+    },
+  ): Promise<void> {
+    if (!opts.signatureData && !opts.signedDocumentUrl) {
+      throw new AppError(
+        'A customer signature (drawn or uploaded) is required to record approval',
+        400,
+      );
+    }
+
+    const ticketRepo = Source.getRepository(ServiceTicket);
+    ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
+
+    // Record everything on the ticket's latest estimate — the same row Track B
+    // (approveEstimateCustomer) writes to — so "show it on the service estimate"
+    // works uniformly regardless of which track approved it, and every
+    // downstream read filtering on estimate.status === CUSTOMER_APPROVED
+    // (labour cost at completion, COGS report, finance dashboards) sees it too.
+    try {
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const latestEstimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        order: { created_at: 'DESC' },
+      });
+      if (latestEstimate) {
+        latestEstimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
+        latestEstimate.customerApprovalMethod = opts.method ?? 'IN_PERSON';
+        latestEstimate.customerApprovedByName = opts.byName ?? null;
+        latestEstimate.customerDecisionNote = opts.note ?? null;
+        latestEstimate.customerApprovedAt = new Date();
+        if (opts.signatureData) latestEstimate.customerSignatureData = opts.signatureData;
+        if (opts.signedDocumentUrl) {
+          latestEstimate.customerSignedDocumentUrl = opts.signedDocumentUrl;
+          latestEstimate.customerSignedDocumentNote = opts.signedDocumentNote ?? null;
+        }
+        await estimateRepo.save(latestEstimate);
+      }
+    } catch (err) {
+      logger.error('Failed to sync estimate status/signature on customer approval:', err);
+    }
+
+    if (ticket.leadId) {
+      try {
+        const convertRes = await axios.post(
+          `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
+          { location: 'Service Delivery Location' },
+          { headers: { Authorization: req.headers.authorization } },
+        );
+
+        if (convertRes.data && convertRes.data.success) {
+          ticket.customerId = convertRes.data.data.customerId;
+          ticket.leadId = null;
+        }
+      } catch (crmErr) {
+        logger.error('Failed to convert CRM lead to customer:', crmErr);
+      }
+    }
+
+    await ticketRepo.save(ticket);
+
+    // Keep the billing estimate in sync so finance sees the same state.
+    if (ticket.serviceQuotationId) {
+      try {
+        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+          expiresIn: '1m',
+        });
+        await axios.put(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/status`,
+          { status: 'CUSTOMER_ACCEPTED' },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+      } catch (err) {
+        logger.error('Failed to sync CUSTOMER_ACCEPTED status to billing invoice:', err);
+      }
+    }
+
+    if (ticket.assignedTechnicianId) {
+      await NotificationPublisher.publishInAppRequest({
+        recipientId: ticket.assignedTechnicianId,
+        title: 'Customer Approved Service',
+        message: `Customer approved service for ticket ${ticket.ticketNumber}. You can start work.`,
+        type: 'TASK',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
+    }
+  }
+
   customerApprove = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id as string;
@@ -3694,143 +4397,52 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      // Validity rules: the up-front visit/estimate charge pays for the labour
-      // of making the estimate — a customer approving within the 1-month
-      // validity is not charged labour again. An expired estimate always
-      // blocks approval — Finance must extend the validity first, regardless
-      // of service context — so a customer can never approve stale pricing.
-      const approvalTravelCovered = [
-        ServiceContext.AMC,
-        ServiceContext.SMA,
-        ServiceContext.FSMA,
-        ServiceContext.RENT,
-        ServiceContext.LEASE_CPC,
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-      ].includes(ticket.serviceContext);
-
-      if (ticket.serviceQuotationId) {
-        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
-          expiresIn: '1m',
-        });
-        let estimateExpired = false;
-        let invoiceFetched = false;
-        try {
-          const invRes = await axios.get(
-            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-          const invoice = invRes.data?.data;
-          invoiceFetched = !!invoice;
-          if (invoice?.estimateValidUntil) {
-            estimateExpired = new Date() > new Date(invoice.estimateValidUntil);
-          }
-        } catch (err) {
-          logger.error('Failed to fetch estimate for validity check:', err);
-        }
-
-        if (estimateExpired) {
-          throw new AppError(
-            'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
-            400,
-          );
-        }
-
-        if (invoiceFetched && !approvalTravelCovered) {
-          // Timely approval — waive the labour line on the billing estimate.
-          try {
-            await axios.post(
-              `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
-              { reason: `Customer approved ticket ${ticket.ticketNumber} within validity` },
-              { headers: { Authorization: `Bearer ${token}` } },
-            );
-            await this.logActivity(
-              ticket.id,
-              'LABOUR_WAIVED',
-              'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
-              req.user?.userId,
-            );
-          } catch (err) {
-            logger.error('Failed to waive labour on billing estimate:', err);
-          }
-        }
-      }
-
-      ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
-
-      // Keep the estimate's own status in sync with the ticket — the estimate-level
-      // approval path (approveEstimateCustomer) already does this; this ticket-level
-      // path must too, or every downstream read that filters on
-      // estimate.status === CUSTOMER_APPROVED (labour cost at completion, COGS report,
-      // finance dashboards) silently misses tickets approved from this button.
-      try {
-        const estimateRepo = Source.getRepository(ServiceEstimate);
-        const latestEstimate = await estimateRepo.findOne({
-          where: { ticketId: ticket.id },
-          order: { created_at: 'DESC' },
-        });
-        if (latestEstimate && latestEstimate.status !== ServiceEstimateStatus.CUSTOMER_APPROVED) {
-          latestEstimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
-          await estimateRepo.save(latestEstimate);
-        }
-      } catch (err) {
-        logger.error('Failed to sync estimate status on customer approval:', err);
-      }
-
-      if (ticket.leadId) {
-        try {
-          const convertRes = await axios.post(
-            `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
-            { location: 'Service Delivery Location' },
-            { headers: { Authorization: req.headers.authorization } },
-          );
-
-          if (convertRes.data && convertRes.data.success) {
-            ticket.customerId = convertRes.data.data.customerId;
-            ticket.leadId = null;
-          }
-        } catch (crmErr) {
-          logger.error('Failed to convert CRM lead to customer:', crmErr);
-        }
-      }
-
-      await ticketRepo.save(ticket);
-
-      // Keep the billing estimate in sync so finance sees the same state.
-      if (ticket.serviceQuotationId) {
-        try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-          await axios.put(
-            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/status`,
-            { status: 'CUSTOMER_ACCEPTED' },
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-        } catch (err) {
-          logger.error('Failed to sync CUSTOMER_ACCEPTED status to billing invoice:', err);
-        }
-      }
-
-      if (ticket.assignedTechnicianId) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: ticket.assignedTechnicianId,
-          title: 'Customer Approved Service',
-          message: `Customer approved service for ticket ${ticket.ticketNumber}. You can start work.`,
-          type: 'TASK',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        data: ticket,
+      await this.checkTrackAQuotationValidity(ticket, req.user?.userId);
+      await this.finalizeTicketCustomerApproval(ticket, req, {
+        byName: (req.body?.customerName as string)?.trim() || null,
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        note: (req.body?.note as string)?.trim() || null,
+        signatureData: (req.body?.signatureData as string) || null,
       });
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/tickets/:id/customer-approve-upload
+   * Same as customerApprove, but the customer's proof is an uploaded photo/PDF
+   * of a physically-signed copy instead of a live-drawn signature.
+   */
+  customerApproveUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const attestationNote = (req.body?.attestationNote as string)?.trim();
+      if (!attestationNote) {
+        throw new AppError(
+          'Attestation note is required — document how/when the signed copy was obtained',
+          400,
+        );
+      }
+      const uploadedFile = req.file as MulterS3File | undefined;
+      if (!uploadedFile) throw new AppError('Signed document file is required', 400);
+
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      await this.checkTrackAQuotationValidity(ticket, req.user?.userId);
+      await this.finalizeTicketCustomerApproval(ticket, req, {
+        byName: (req.body?.customerName as string)?.trim() || null,
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        note: (req.body?.note as string)?.trim() || null,
+        signedDocumentUrl: uploadedFile.key,
+        signedDocumentNote: attestationNote,
+      });
+
+      res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
     }
@@ -5008,18 +5620,53 @@ Xerocare Technical Services`;
    */
   getMachineHistory = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let productId = req.params.productId as string;
+      const rawParam = req.params.productId as string;
+      let productId = rawParam;
       const ticketRepo = Source.getRepository(ServiceTicket);
+      const isUuid = (v: string) =>
+        !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
-      // If productId is not a UUID, check if it's a serial number
-      if (
-        productId &&
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(productId)
-      ) {
-        const ticket = await ticketRepo.findOne({ where: { serialNumber: productId } });
-        if (ticket && ticket.productId) {
-          productId = ticket.productId;
+      // The param may be a serial number rather than a product UUID (external
+      // machines, or a catalogue machine referenced before its first ticket).
+      // Resolve it to a product UUID via an existing ticket, then the product
+      // catalogue.
+      if (!isUuid(productId)) {
+        const ticketBySerial = await ticketRepo.findOne({
+          where: { serialNumber: productId },
+        });
+        if (ticketBySerial?.productId) {
+          productId = ticketBySerial.productId;
+        } else {
+          const productBySerial = await Source.getRepository(Product).findOne({
+            where: { serial_no: rawParam },
+          });
+          if (productBySerial?.id) productId = productBySerial.id;
         }
+      }
+
+      // Still not a UUID → this machine has no catalogue product (a brand-new
+      // external / chargeable machine). It can only have tickets keyed by
+      // serial number; everything else keyed on productId (uuid column) would
+      // throw on the cast. Return whatever serial-keyed history exists.
+      if (!isUuid(productId)) {
+        const serialTickets = await ticketRepo.find({
+          where: { serialNumber: rawParam },
+          relations: ['items'],
+          order: { created_at: 'DESC' },
+        });
+        const serialReadings = serialTickets.map((t) =>
+          Math.max(Number(t.meterReadingAtService) || 0, Number(t.meterReadingAtCreation) || 0),
+        );
+        return res.status(200).json({
+          success: true,
+          data: {
+            history: null,
+            currentMeterReading: serialReadings.length ? Math.max(...serialReadings) : null,
+            tickets: serialTickets,
+            partLogs: [],
+            yields: [],
+          },
+        });
       }
 
       const historyRepo = Source.getRepository(MachineServiceHistory);
@@ -5257,6 +5904,40 @@ Xerocare Technical Services`;
         return res.status(404).json({ success: false, message: 'Service ticket not found' });
       }
 
+      // Only specific people may push the finance-approved estimate to the
+      // customer: branch manager, admin, finance, the assigned technician, or
+      // the help-desk user who opened the ticket. (ADMIN/MANAGER covered by role
+      // or employeeJob, same as assignTechnician.)
+      const callerRole = req.user?.role;
+      const callerJob = req.user?.employeeJob;
+      const callerId = req.user?.userId;
+      const maySend =
+        callerRole === 'ADMIN' ||
+        callerRole === 'MANAGER' ||
+        callerJob === 'MANAGER' ||
+        callerRole === 'FINANCE' ||
+        callerJob === 'SERVICE_HELP_DESK' ||
+        (callerJob === 'SERVICE_TECHNICIAN' && ticket.assignedTechnicianId === callerId) ||
+        ticket.createdBy === callerId;
+      if (!maySend) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorised to send this estimate to the customer',
+        });
+      }
+
+      // The customer can only be sent an estimate Finance has actually approved.
+      if (
+        ticket.status !== ServiceTicketStatus.FINANCE_APPROVED &&
+        ticket.status !== ServiceTicketStatus.FINANCE_APPROVED_2
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'The estimate must be approved by Finance before it can be sent to the customer.',
+        });
+      }
+
       const estimateRepo = Source.getRepository(ServiceEstimate);
       const estimate = await estimateRepo.findOne({
         where: { ticketId: ticket.id },
@@ -5267,6 +5948,12 @@ Xerocare Technical Services`;
       if (!estimate) {
         return res.status(404).json({ success: false, message: 'Estimate not found' });
       }
+
+      // Fresh single-use 72-hour link for the customer's remote approval page.
+      const signingToken = await this.issueEstimateSigningToken(estimate);
+      const approvalLink = estimateSigningLinkUrl(signingToken);
+      estimate.estimateSentAt = new Date();
+      await estimateRepo.save(estimate);
 
       const customer = await this.fetchCustomerDetails(ticket.customerId);
       const branchRepo = Source.getRepository(Branch);
@@ -5316,7 +6003,8 @@ Serial No: ${ticket.serialNumber}
 
 Total Estimated cost: QAR ${Number(estimate.totalCost).toFixed(2)}
 
-Please review and approve the quotation to start the service.
+Review and approve (or reject) the quotation online — this secure link is valid for 72 hours:
+${approvalLink}
 
 Best regards,
 Xerocare Technical Services`;
@@ -5332,7 +6020,6 @@ Xerocare Technical Services`;
       }
 
       if (phoneToUse) {
-        const downloadUrl = `http://localhost:3001/i/service/tickets/${ticket.id}/quotation-pdf`;
         const customerName = customer
           ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
           : 'Valued Customer';
@@ -5347,7 +6034,7 @@ Your service quotation is ready.
 🖨️ *Machine:* ${ticket.productBrand} ${ticket.productModel} (SN: ${ticket.serialNumber})
 💰 *Total Estimate:* QAR ${Number(estimate.totalCost).toFixed(2)}
 
-Download your quotation: ${downloadUrl}
+Review & approve your quotation (link valid 72 hours): ${approvalLink}
 
 For queries contact us at +974 4455 6677`;
 
@@ -5355,10 +6042,19 @@ For queries contact us at +974 4455 6677`;
         whatsappSent = true;
       }
 
+      await this.logActivity(
+        ticket.id,
+        'ESTIMATE_SENT_TO_CUSTOMER',
+        `Estimate sent to customer for online approval${emailSent ? ' (email)' : ''}${
+          whatsappSent ? ' (WhatsApp)' : ''
+        }.`,
+        callerId,
+      );
+
       return res.status(200).json({
         success: true,
         message: 'Quotation sent successfully',
-        data: { emailSent, whatsappSent, emailToUse, phoneToUse },
+        data: { emailSent, whatsappSent, emailToUse, phoneToUse, approvalLink },
       });
     } catch (error) {
       next(error);

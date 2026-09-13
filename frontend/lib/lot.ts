@@ -165,6 +165,18 @@ export interface LotItem {
   usedQuantity: number;
   unitPrice: number;
   totalPrice: number;
+  /**
+   * Landed-cost allocation (LandedCostService) — spreads the lot's additional
+   * costs across items. `unitPrice`/`totalPrice` above stay the vendor-quoted
+   * price; these are the separate inventory-costing figures. Undefined/null
+   * until allocation has run.
+   */
+  landedCostAllocated?: number;
+  landedCostUnitCost?: number | null;
+  originalUnitPrice?: number | null;
+  /** Bumped whenever the item is saved — including by allocation — so the UI can
+   * tell whether a cost line was added/edited after the last allocation ran. */
+  updatedAt?: string;
   customProductName?: string;
   customSparePartName?: string;
   /** Brand for a spare-part item with no catalog SparePart link (custom RFQ-quoted part). */
@@ -401,4 +413,42 @@ export const lotService = {
   deleteLotDocument: async (lotId: string, documentId: string): Promise<void> => {
     await api.delete(`/i/lots/${lotId}/documents/${documentId}`);
   },
+
+  /**
+   * Spreads the lot's additional costs across its items — recomputed from the
+   * original unit price every time, safe to re-run after changing a cost's
+   * split method. Only allowed once the lot is RECEIVED. `splitMethods` lets
+   * the caller update a cost line's method in the same call (only rows that
+   * changed need to be included).
+   */
+  allocateLandedCosts: async (
+    lotId: string,
+    splitMethods?: Record<string, SplitMethod>,
+  ): Promise<LandedCostAllocationResult> => {
+    const response = await api.post<ApiResponse<LandedCostAllocationResult>>(
+      `/i/lots/${lotId}/allocate-landed-costs`,
+      { splitMethods },
+    );
+    return response.data.data;
+  },
+
+  /** Clears any allocation on this lot's items — restores the plain vendor unit price. */
+  resetLandedCostAllocation: async (lotId: string): Promise<void> => {
+    await api.delete(`/i/lots/${lotId}/allocate-landed-costs`);
+  },
 };
+
+export type SplitMethod = 'BY_VALUE' | 'BY_QUANTITY' | 'EQUAL';
+
+export interface LandedCostAllocationBreakdownItem {
+  lotItemId: string;
+  originalUnitPrice: number;
+  quantity: number;
+  landedCostAllocated: number;
+  landedCostUnitCost: number;
+}
+
+export interface LandedCostAllocationResult {
+  items: LandedCostAllocationBreakdownItem[];
+  costsSnapshotAt: string | null;
+}

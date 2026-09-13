@@ -11,9 +11,15 @@ import {
   getAllBranches,
   resendWelcomeEmail,
 } from '../controllers/employeeController';
+import {
+  listEmployeeDocuments,
+  uploadEmployeeDocument as uploadEmployeeDocumentHandler,
+  updateEmployeeDocument,
+  deleteEmployeeDocument,
+} from '../controllers/employeeDocumentController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import { requireRole } from '../middleware/roleMiddleware';
-import { uploadEmployeeFiles } from '../middleware/uploadEmployeeFiles';
+import { uploadEmployeeFiles, uploadEmployeeDocument } from '../middleware/uploadEmployeeFiles';
 
 /**
  * This file handles all administrative tasks related to staff members:
@@ -45,6 +51,26 @@ employeeRouter.post(
  * Restricted to HR and Management for privacy.
  */
 employeeRouter.get('/:id/id-proof', authMiddleware, requireRole('ADMIN', 'HR'), getEmployeeIdProof);
+
+// --- Employee legal documents (passport, visa, labour contract, licenses, …) ---
+// HR/Admin company-wide, Manager only their own branch (enforced in the controller).
+employeeRouter.get('/:id/documents', requireRole('ADMIN', 'HR', 'MANAGER'), listEmployeeDocuments);
+employeeRouter.post(
+  '/:id/documents',
+  requireRole('ADMIN', 'HR', 'MANAGER'),
+  uploadEmployeeDocument.single('file'),
+  uploadEmployeeDocumentHandler,
+);
+employeeRouter.patch(
+  '/:id/documents/:docId',
+  requireRole('ADMIN', 'HR', 'MANAGER'),
+  updateEmployeeDocument,
+);
+employeeRouter.delete(
+  '/:id/documents/:docId',
+  requireRole('ADMIN', 'HR', 'MANAGER'),
+  deleteEmployeeDocument,
+);
 
 /**
  * Remove a staff member from our active records.

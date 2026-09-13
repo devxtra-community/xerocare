@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getUserFromToken } from '@/lib/auth';
 import { getBranches, Branch } from '@/lib/branch';
 import { getCustomers, Customer, createCustomer, CreateCustomerData } from '@/lib/customer';
@@ -16,6 +16,7 @@ import { Modal } from '@/components/ui/Modal';
 import { DetailDialog } from '@/components/ui/DetailDialog';
 import { useToast } from '@/components/ui/ToastProvider';
 import SendDocumentModal from '@/components/SendDocumentModal';
+import { RecordCustomerApprovalDialog } from '@/components/service/RecordCustomerApprovalDialog';
 import { AddBrandDialog } from '@/components/ManagerDashboardComponents/BrandComponents/AddBrandDialog';
 import { ModelFormModal } from '@/components/ManagerDashboardComponents/productComponents/ModelFormModal';
 import { Play, UserPlus, Send } from 'lucide-react';
@@ -27,6 +28,7 @@ import {
   diagnoseServiceTicket,
   submitServiceQuotation,
   approveServiceQuotation,
+  approveServiceQuotationByUpload,
   rejectServiceQuotation,
   completeServiceTicket,
   cancelServiceTicket,
@@ -45,6 +47,7 @@ import {
   approveEstimateFinance,
   rejectEstimateFinance,
   approveEstimateCustomer,
+  approveEstimateCustomerByUpload,
   rejectEstimateCustomer,
   createEstimateRevision,
   approveRevisionFinance,
@@ -63,6 +66,8 @@ import {
   WarrantyInfo,
   fetchServiceCashBankAccounts,
   collectVisitCharge,
+  type RecordCustomerDecisionMeta,
+  type CustomerDecisionChannel,
 } from '@/lib/serviceTicket';
 import { ServiceContract, getServiceContracts } from '@/lib/serviceContract';
 import {
@@ -293,6 +298,18 @@ export default function ServiceDashboardPage() {
   const [rejectAccountId, setRejectAccountId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectDiscountAmount, setRejectDiscountAmount] = useState('');
+  // Staff recording the customer's decision on their behalf (phone/in person).
+  const [rejectCustomerName, setRejectCustomerName] = useState('');
+  const [rejectConfirmedVia, setRejectConfirmedVia] =
+    useState<CustomerDecisionChannel>('IN_PERSON');
+  const [rejectAck, setRejectAck] = useState(false);
+  // One dialog, two backing endpoints — mirrors rejectVCModal's kind discriminator
+  // just below (ticket-level Track A quote vs estimate-level Track B).
+  const [approveModal, setApproveModal] = useState<
+    | { kind: 'ticket'; ticketId: string; ticketNumber?: string; total?: number }
+    | { kind: 'estimate'; estimateId: string; ticketNumber?: string; total?: number }
+    | null
+  >(null);
   const isVisitChargeCollectionEligible = (t: ServiceTicket) =>
     t.serviceContext === 'CHARGEABLE' &&
     Number(t.visitChargeAmount || 0) > 0 &&
@@ -379,46 +396,45 @@ export default function ServiceDashboardPage() {
     } | null;
   } | null>(null);
 
+  const fetchMachineContext = useCallback((serial: string, reading?: number) => {
+    setMachineContextLoading(true);
+    import('@/lib/serviceTicket').then(({ getMachineContext }) => {
+      // For an existing catalogue machine the type is whatever the product
+      // record says — the server derives and returns it, and we lock the form to it.
+      getMachineContext(serial, reading)
+        .then((res) => {
+          setMachineContextData(res);
+          setNewTicket((prev) => ({
+            ...prev,
+            serviceContext: res.serviceContext,
+            contractReferenceId: res.contractReferenceId || '',
+            machineType: res.machineType || prev.machineType,
+          }));
+        })
+        .catch((err) => {
+          console.error('Error fetching machine context:', err);
+          setMachineContextData(null);
+        })
+        .finally(() => {
+          setMachineContextLoading(false);
+        });
+    });
+  }, []);
+
+  // Selecting a machine loads its coverage once, and clears any previously
+  // typed reading. The meter reading is deliberately NOT a dependency here —
+  // re-checking on every keystroke unmounts this whole panel (and the input
+  // with it) behind "Checking coverage...", making the field impossible to
+  // type a multi-digit number into. The reading is re-sent on blur instead
+  // (see the Current Meter Reading input's onBlur).
   useEffect(() => {
     if (!selectedMachine?.serialNumber) {
       setMachineContextData(null);
       return;
     }
-    // Debounced so typing a meter reading re-evaluates coverage live
-    // without firing a request per keystroke.
-    const serial = selectedMachine.serialNumber;
-    const reading = meterReadingInput !== '' ? Number(meterReadingInput) : undefined;
-    setMachineContextLoading(true);
-    const timer = setTimeout(() => {
-      import('@/lib/serviceTicket').then(({ getMachineContext }) => {
-        // For an existing catalogue machine the type is whatever the product
-        // record says — the server derives and returns it, and we lock the form to it.
-        getMachineContext(serial, reading)
-          .then((res) => {
-            setMachineContextData(res);
-            setNewTicket((prev) => ({
-              ...prev,
-              serviceContext: res.serviceContext,
-              contractReferenceId: res.contractReferenceId || '',
-              machineType: res.machineType || prev.machineType,
-            }));
-          })
-          .catch((err) => {
-            console.error('Error fetching machine context:', err);
-            setMachineContextData(null);
-          })
-          .finally(() => {
-            setMachineContextLoading(false);
-          });
-      });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [selectedMachine?.serialNumber, meterReadingInput]);
-
-  // A fresh machine selection invalidates any previously typed reading.
-  useEffect(() => {
     setMeterReadingInput('');
-  }, [selectedMachine?.serialNumber]);
+    fetchMachineContext(selectedMachine.serialNumber);
+  }, [selectedMachine?.serialNumber, fetchMachineContext]);
 
   const [isOtherMachine, setIsOtherMachine] = useState(false);
   const [modalIntelData, setModalIntelData] = useState<CustomerServiceHistory | null>(null);
@@ -1247,13 +1263,14 @@ export default function ServiceDashboardPage() {
     }
   };
 
-  const handleApproveCustomer = async (estimateId: string) => {
+  const handleApproveCustomer = async (estimateId: string, meta?: RecordCustomerDecisionMeta) => {
     try {
       setSubmitting(true);
-      await approveEstimateCustomer(estimateId);
+      await approveEstimateCustomer(estimateId, meta);
+      setApproveModal(null);
       if (selectedTicket) await fetchEstimates(selectedTicket.id);
       await fetchInitialData();
-      toastSuccess('Customer approved the estimate!');
+      toastSuccess("Customer's approval recorded.");
     } catch (err: unknown) {
       console.error(err);
       const error = err as { response?: { data?: { message?: string } } };
@@ -1262,6 +1279,34 @@ export default function ServiceDashboardPage() {
       // Expired estimate — refetch so the expiry banner (and Finance's Extend
       // Validity control, already shown in this same modal) appears.
       if (message.toLowerCase().includes('validity has expired') && selectedTicket) {
+        setApproveModal(null);
+        await fetchEstimates(selectedTicket.id);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveCustomerUpload = async (
+    estimateId: string,
+    file: File,
+    attestationNote: string,
+    meta?: RecordCustomerDecisionMeta,
+  ) => {
+    try {
+      setSubmitting(true);
+      await approveEstimateCustomerByUpload(estimateId, file, attestationNote, meta);
+      setApproveModal(null);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess("Customer's approval recorded.");
+    } catch (err: unknown) {
+      console.error(err);
+      const error = err as { response?: { data?: { message?: string } } };
+      const message = error.response?.data?.message || 'Failed to approve estimate.';
+      toastError(message);
+      if (message.toLowerCase().includes('validity has expired') && selectedTicket) {
+        setApproveModal(null);
         await fetchEstimates(selectedTicket.id);
       }
     } finally {
@@ -1277,6 +1322,9 @@ export default function ServiceDashboardPage() {
       accountId?: string;
       reason: string;
       discountAmount?: number;
+      customerName?: string;
+      confirmedVia?: CustomerDecisionChannel;
+      note?: string;
     },
   ) => {
     try {
@@ -1455,10 +1503,14 @@ export default function ServiceDashboardPage() {
     setConfirmOpen(true);
   };
 
-  const handleApproveQuotation = async (ticket: ServiceTicket) => {
+  const handleApproveQuotation = async (
+    ticket: ServiceTicket,
+    meta?: RecordCustomerDecisionMeta,
+  ) => {
     try {
       setLoading(true);
-      await approveServiceQuotation(ticket.id);
+      await approveServiceQuotation(ticket.id, meta);
+      setApproveModal(null);
       toastSuccess('Customer approval recorded.');
       await fetchInitialData();
     } catch (error: unknown) {
@@ -1470,6 +1522,34 @@ export default function ServiceDashboardPage() {
       // Expired estimate — land them on the Estimates view, which already
       // surfaces the expiry banner (and Finance's Extend Validity control).
       if (message.toLowerCase().includes('validity has expired')) {
+        setApproveModal(null);
+        await handleOpenEstimates(ticket);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveQuotationUpload = async (
+    ticket: ServiceTicket,
+    file: File,
+    attestationNote: string,
+    meta?: RecordCustomerDecisionMeta,
+  ) => {
+    try {
+      setLoading(true);
+      await approveServiceQuotationByUpload(ticket.id, file, attestationNote, meta);
+      setApproveModal(null);
+      toastSuccess('Customer approval recorded.');
+      await fetchInitialData();
+    } catch (error: unknown) {
+      console.error('Failed to approve:', error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const message =
+        err.response?.data?.message || 'Failed to record customer approval. Please try again.';
+      toastError(message);
+      if (message.toLowerCase().includes('validity has expired')) {
+        setApproveModal(null);
         await handleOpenEstimates(ticket);
       }
     } finally {
@@ -1974,7 +2054,8 @@ export default function ServiceDashboardPage() {
                                 original technician becomes unavailable mid-flow). Whoever ends
                                 up assigned when the ticket completes gets the target credit. */}
                           {(isHelpDesk || isManagerOrAdmin) &&
-                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) && (
+                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) &&
+                            (!ticket.assignedTechnicianId || !ticket.repairStartedAt) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1990,6 +2071,19 @@ export default function ServiceDashboardPage() {
                                 <UserPlus className="size-3.5" />
                                 {ticket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
                               </Button>
+                            )}
+                          {/* Reassignment locks once repair has actually started — a swap
+                              mid-job (parts/labour already underway) doesn't make sense. */}
+                          {(isHelpDesk || isManagerOrAdmin) &&
+                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) &&
+                            ticket.assignedTechnicianId &&
+                            ticket.repairStartedAt && (
+                              <span
+                                className="text-[10px] font-medium text-slate-400 italic"
+                                title="Repair is already in progress"
+                              >
+                                Technician locked — repair in progress
+                              </span>
                             )}
 
                           {/* Pay-now for the visit charge — available any time before
@@ -2028,7 +2122,16 @@ export default function ServiceDashboardPage() {
                                 <Button
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => handleApproveQuotation(ticket)}
+                                  onClick={() =>
+                                    setApproveModal({
+                                      kind: 'ticket',
+                                      ticketId: ticket.id,
+                                      ticketNumber: ticket.ticketNumber,
+                                      // No reliable quoted total at the row level for this
+                                      // path (the linked billing quotation isn't fetched
+                                      // here) — the dialog falls back to generic wording.
+                                    })
+                                  }
                                 >
                                   <CheckCircle2 className="size-3.5" />
                                   Approve
@@ -2044,6 +2147,9 @@ export default function ServiceDashboardPage() {
                                     setRejectAccountId('');
                                     setRejectReason('');
                                     setRejectDiscountAmount('');
+                                    setRejectCustomerName('');
+                                    setRejectConfirmedVia('IN_PERSON');
+                                    setRejectAck(false);
                                     if (eligible) loadCashBankAccounts(ticket.branchId);
                                     setRejectVCModal({
                                       kind: 'quotation',
@@ -3120,6 +3226,24 @@ export default function ServiceDashboardPage() {
                                     placeholder="Ask the customer for the machine's current meter reading..."
                                     value={meterReadingInput}
                                     onChange={(e) => setMeterReadingInput(e.target.value)}
+                                    // Re-check warranty/coverage only once the full number is
+                                    // entered — on blur, or on Enter — not per digit.
+                                    onBlur={() => {
+                                      if (selectedMachine?.serialNumber) {
+                                        fetchMachineContext(
+                                          selectedMachine.serialNumber,
+                                          meterReadingInput !== ''
+                                            ? Number(meterReadingInput)
+                                            : undefined,
+                                        );
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
                                     className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
                                   />
                                   {machineContextData?.warrantyInfo && (
@@ -4915,7 +5039,9 @@ export default function ServiceDashboardPage() {
                       )}
 
                       {(isHelpDesk || isManagerOrAdmin) &&
-                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) && (
+                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) &&
+                        (!selectedTicket.assignedTechnicianId ||
+                          !selectedTicket.repairStartedAt) && (
                           <Button
                             size="sm"
                             className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
@@ -4930,6 +5056,17 @@ export default function ServiceDashboardPage() {
                             <UserPlus className="size-3.5" />
                             {selectedTicket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
                           </Button>
+                        )}
+                      {(isHelpDesk || isManagerOrAdmin) &&
+                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) &&
+                        selectedTicket.assignedTechnicianId &&
+                        selectedTicket.repairStartedAt && (
+                          <span
+                            className="text-[10px] font-medium text-slate-400 italic"
+                            title="Repair is already in progress"
+                          >
+                            Technician locked — repair in progress
+                          </span>
                         )}
 
                       {isTechnician &&
@@ -5691,9 +5828,16 @@ export default function ServiceDashboardPage() {
                                 <Button
                                   size="sm"
                                   className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
-                                  onClick={() => handleApproveCustomer(est.id)}
+                                  onClick={() =>
+                                    setApproveModal({
+                                      kind: 'estimate',
+                                      estimateId: est.id,
+                                      ticketNumber: selectedTicket?.ticketNumber,
+                                      total: Number(est.totalCost) || 0,
+                                    })
+                                  }
                                 >
-                                  Approve (Customer)
+                                  Mark Customer Approval
                                 </Button>
                                 <Button
                                   size="sm"
@@ -5709,6 +5853,9 @@ export default function ServiceDashboardPage() {
                                     setRejectAccountId('');
                                     setRejectReason('');
                                     setRejectDiscountAmount('');
+                                    setRejectCustomerName('');
+                                    setRejectConfirmedVia('IN_PERSON');
+                                    setRejectAck(false);
                                     if (eligible && selectedTicket)
                                       loadCashBankAccounts(selectedTicket.branchId);
                                     setRejectVCModal({
@@ -5719,9 +5866,53 @@ export default function ServiceDashboardPage() {
                                     });
                                   }}
                                 >
-                                  Reject (Customer)
+                                  Mark Customer Rejection
                                 </Button>
                               </div>
+                            </div>
+                          )}
+
+                        {/* Signature proof of customer approval — mirrors ContractAgreementModal's
+                            already-signed view. */}
+                        {est.status === 'CUSTOMER_APPROVED' &&
+                          (est.customerSignatureData || est.customerSignedDocumentUrl) && (
+                            <div className="space-y-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-emerald-800">
+                                  ✓ Customer Approved
+                                  {est.customerApprovedByName
+                                    ? ` — ${est.customerApprovedByName}`
+                                    : ''}
+                                </span>
+                                <span className="text-[9px] text-emerald-600">
+                                  {est.customerApprovedAt
+                                    ? new Date(est.customerApprovedAt).toLocaleString()
+                                    : ''}
+                                </span>
+                              </div>
+                              {est.customerSignatureData ? (
+                                <img
+                                  src={est.customerSignatureData}
+                                  alt="Customer signature"
+                                  className="h-16 rounded border border-emerald-200 bg-white"
+                                />
+                              ) : (
+                                <div className="space-y-1">
+                                  <a
+                                    href={est.customerSignedDocumentUrl ?? undefined}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] font-bold text-emerald-700 underline"
+                                  >
+                                    View signed document
+                                  </a>
+                                  {est.customerSignedDocumentNote && (
+                                    <p className="text-[10px] text-slate-500">
+                                      {est.customerSignedDocumentNote}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -6522,6 +6713,44 @@ export default function ServiceDashboardPage() {
               </p>
             </div>
 
+            {rejectVCModal.kind === 'estimate' && !rejectHasDiscount && (
+              <div className="space-y-2 rounded-xl border border-red-100 bg-red-50/50 p-3">
+                <p className="text-[11px] font-semibold text-red-800">
+                  You&apos;re recording a decision the customer has already made. This locks the
+                  estimate as rejected and cannot be undone.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    value={rejectCustomerName}
+                    onChange={(e) => setRejectCustomerName(e.target.value)}
+                    placeholder="Who rejected it? (full name)"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                  />
+                  <select
+                    value={rejectConfirmedVia}
+                    onChange={(e) =>
+                      setRejectConfirmedVia(e.target.value as CustomerDecisionChannel)
+                    }
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs"
+                  >
+                    <option value="IN_PERSON">Confirmed in person</option>
+                    <option value="PHONE">Confirmed by phone</option>
+                    <option value="WHATSAPP">Confirmed over WhatsApp</option>
+                    <option value="EMAIL">Confirmed by email</option>
+                  </select>
+                </div>
+                <label className="flex cursor-pointer items-start gap-2 text-[11px] text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={rejectAck}
+                    onChange={(e) => setRejectAck(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>I confirm the customer has declined this quotation.</span>
+                </label>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setRejectVCModal(null)}>
                 Cancel
@@ -6530,6 +6759,9 @@ export default function ServiceDashboardPage() {
                 variant={rejectHasDiscount ? 'default' : 'destructive'}
                 disabled={
                   !rejectReason.trim() ||
+                  (rejectVCModal.kind === 'estimate' &&
+                    !rejectHasDiscount &&
+                    (!rejectAck || rejectCustomerName.trim().length < 2)) ||
                   (!rejectHasDiscount &&
                     rejectVCModal.eligible &&
                     rejectCollect &&
@@ -6544,12 +6776,20 @@ export default function ServiceDashboardPage() {
                           accountId: rejectPaymentMode === 'CHEQUE' ? undefined : rejectAccountId,
                         }
                       : { collectVisitCharge: false };
+                  const modal = rejectVCModal;
+                  const decisionMeta =
+                    modal.kind === 'estimate' && !rejectHasDiscount
+                      ? {
+                          customerName: rejectCustomerName.trim(),
+                          confirmedVia: rejectConfirmedVia,
+                        }
+                      : {};
                   const body = {
                     ...visitChargeBody,
+                    ...decisionMeta,
                     reason: rejectReason.trim(),
                     ...(rejectHasDiscount ? { discountAmount: Number(rejectDiscountAmount) } : {}),
                   };
-                  const modal = rejectVCModal;
                   if (modal.kind === 'quotation') {
                     await handleRejectQuotation(modal.ticketId, body);
                   } else {
@@ -6558,12 +6798,39 @@ export default function ServiceDashboardPage() {
                   setRejectVCModal(null);
                 }}
               >
-                {rejectHasDiscount ? 'Offer Discount' : 'Reject Ticket'}
+                {rejectHasDiscount ? 'Offer Discount' : 'Record Rejection'}
               </Button>
             </div>
           </div>
         )}
       </Modal>
+
+      <RecordCustomerApprovalDialog
+        open={!!approveModal}
+        onClose={() => setApproveModal(null)}
+        onConfirm={(meta) => {
+          if (!approveModal) return;
+          if (approveModal.kind === 'ticket') {
+            const ticket = filteredTickets.find((t) => t.id === approveModal.ticketId);
+            if (ticket) handleApproveQuotation(ticket, meta);
+          } else {
+            handleApproveCustomer(approveModal.estimateId, meta);
+          }
+        }}
+        onConfirmUpload={(meta, file, attestationNote) => {
+          if (!approveModal) return;
+          if (approveModal.kind === 'ticket') {
+            const ticket = filteredTickets.find((t) => t.id === approveModal.ticketId);
+            if (ticket) handleApproveQuotationUpload(ticket, file, attestationNote, meta);
+          } else {
+            handleApproveCustomerUpload(approveModal.estimateId, file, attestationNote, meta);
+          }
+        }}
+        ticketNumber={approveModal?.ticketNumber}
+        estimateTotal={approveModal?.total}
+        currency={getActiveCurrency()}
+        submitting={submitting}
+      />
     </div>
   );
 }

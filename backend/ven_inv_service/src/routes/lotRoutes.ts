@@ -15,6 +15,8 @@ import {
   uploadLotDocument,
   getLotDocuments,
   deleteLotDocument,
+  allocateLandedCosts,
+  resetLandedCostAllocation,
 } from '../controllers/lotController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { uploadLotDocuments } from '../middlewares/uploadLotDocuments';
@@ -39,6 +41,10 @@ router.patch('/:id/receive', updateReceivingQuantities);
 router.post('/:id/confirm', confirmLotReceived);
 // Shipment/logistics info — separate from the receiving workflow above.
 router.patch('/:id/shipment', updateLotShipment);
+
+// Landed cost allocation — spreads additional costs across items once RECEIVED.
+router.post('/:id/allocate-landed-costs', allocateLandedCosts);
+router.delete('/:id/allocate-landed-costs', resetLandedCostAllocation);
 
 // Shipping/customs document attachments (bill of lading, customs declaration, etc.)
 router.post('/:id/documents', uploadLotDocuments.single('file'), uploadLotDocument);

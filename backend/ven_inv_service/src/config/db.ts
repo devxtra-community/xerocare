@@ -207,6 +207,39 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed rfq_vendors currency columns exist.');
 
+        // --- Vendor-declared tax fields on rfq_vendor_items (informational only) ---
+        await Source.query(`
+          ALTER TABLE rfq_vendor_items
+          ADD COLUMN IF NOT EXISTS tax_included BOOLEAN,
+          ADD COLUMN IF NOT EXISTS tax_rate_percent DECIMAL(5,2);
+        `);
+        logger.info('Guaranteed rfq_vendor_items tax columns exist.');
+
+        // --- Tax-adjusted unit cost breakdown on lot_items ---
+        // lot_items.unit_price/total_price already fold the vendor's declared tax
+        // in (see RfqService.createLotFromRfq); this column is just the per-unit
+        // breakdown for display.
+        await Source.query(`
+          ALTER TABLE lot_items
+          ADD COLUMN IF NOT EXISTS tax_amount_per_unit DECIMAL(12,2);
+        `);
+        logger.info('Guaranteed lot_items.tax_amount_per_unit column exists.');
+
+        // --- Landed cost allocation ---
+        await Source.query(`
+          ALTER TABLE lot_items
+          ADD COLUMN IF NOT EXISTS landed_cost_allocated DECIMAL(12,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS landed_cost_unit_cost DECIMAL(12,2) DEFAULT NULL,
+          ADD COLUMN IF NOT EXISTS original_unit_price DECIMAL(12,2) DEFAULT NULL;
+        `);
+        logger.info('Guaranteed lot_items landed-cost-allocation columns exist.');
+
+        await Source.query(`
+          ALTER TABLE purchase_costs
+          ADD COLUMN IF NOT EXISTS split_method VARCHAR(20) DEFAULT 'BY_VALUE';
+        `);
+        logger.info('Guaranteed purchase_costs.split_method column exists.');
+
         // --- Vendor country, currency & bank accounts columns ---
         await Source.query(`
           ALTER TABLE vendors
@@ -331,6 +364,38 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(12,2) DEFAULT 0;
         `);
         logger.info('Guaranteed service_estimates visit charge/discount breakdown columns exist.');
+
+        // --- Customer remote-approval link + decision capture on service_estimates ---
+        // Mirrors the bill (usage_records) signing-token mechanism: a single-use
+        // 72-hour token is the credential for the public estimate-approval page.
+        await Source.query(`
+          ALTER TABLE service_estimates
+          ADD COLUMN IF NOT EXISTS signing_token VARCHAR(128),
+          ADD COLUMN IF NOT EXISTS signing_token_expires_at TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS signing_token_used BOOLEAN DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS estimate_sent_at TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS customer_approval_method VARCHAR(30),
+          ADD COLUMN IF NOT EXISTS customer_decision_note TEXT,
+          ADD COLUMN IF NOT EXISTS customer_approved_by_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_approved_at TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS customer_rejection_reason TEXT,
+          ADD COLUMN IF NOT EXISTS customer_rejected_at TIMESTAMP;
+        `);
+        logger.info('Guaranteed service_estimates customer remote-approval columns exist.');
+
+        // --- Customer signature capture on service_estimates ---
+        // Mirrors ContractAgreement's customerSignatureData / customerSignedDocumentUrl
+        // / customerSignedDocumentNote for the RENT/LEASE contract signing flow — a
+        // staff-recorded customer approval must carry proof: either a drawn signature
+        // (base64 PNG) or an uploaded photo/PDF of a physically-signed copy plus a
+        // required note on how it was obtained.
+        await Source.query(`
+          ALTER TABLE service_estimates
+          ADD COLUMN IF NOT EXISTS customer_signature_data TEXT,
+          ADD COLUMN IF NOT EXISTS customer_signed_document_url VARCHAR(500),
+          ADD COLUMN IF NOT EXISTS customer_signed_document_note TEXT;
+        `);
+        logger.info('Guaranteed service_estimates customer signature columns exist.');
         // Ensure tax_rate and max_discount_amount exist on spare_parts table
         await Source.query(`
           ALTER TABLE spare_parts 

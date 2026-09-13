@@ -110,6 +110,56 @@ export class LotItem {
   @Column({ name: 'total_price', type: 'decimal', precision: 12, scale: 2 })
   totalPrice!: number;
 
+  /**
+   * Vendor-declared tax folded into `unitPrice`/`totalPrice` above (added on top when
+   * the vendor's price excludes tax, extracted-for-display when it's already
+   * included) — set only for RFQ-awarded international lots with a declared tax
+   * rate. Per-unit, in the lot's currency. Purely a breakdown of unitPrice, not an
+   * additional charge.
+   */
+  @Column({ name: 'tax_amount_per_unit', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxAmountPerUnit?: number;
+
+  /**
+   * Landed-cost allocation (LandedCostService.allocateLandedCosts) — spreads the
+   * lot's additional costs (purchase_costs rows: labour, handling, shipping, etc.)
+   * across items. `unitPrice`/`totalPrice` above stay the vendor-quoted price;
+   * these three are the separate inventory-costing figures.
+   */
+  @Column({
+    name: 'landed_cost_allocated',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    default: 0,
+  })
+  landedCostAllocated!: number;
+
+  /** unit_price + (allocated / quantity). Null until allocation has run. */
+  @Column({
+    name: 'landed_cost_unit_cost',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+  })
+  landedCostUnitCost?: number | null;
+
+  /**
+   * unit_price as it stood before the first allocation ever ran. Set once, never
+   * overwritten — every re-allocation recomputes from this baseline, not from a
+   * previous landedCostUnitCost, so re-running with a different split method never
+   * compounds. Cleared back to null on reset.
+   */
+  @Column({
+    name: 'original_unit_price',
+    type: 'decimal',
+    precision: 12,
+    scale: 2,
+    nullable: true,
+  })
+  originalUnitPrice?: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

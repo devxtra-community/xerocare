@@ -129,7 +129,9 @@ export default function BulkSparePartDialog({
           partName,
           brand: sp?.brand || item.brand || '',
           modelIds: sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'],
-          purchasePrice: item.unitPrice || sp?.purchase_price || 0,
+          // Landed cost (vendor price + allocated additional costs) once
+          // allocation has run on this lot — falls back to the plain unit price.
+          purchasePrice: item.landedCostUnitCost || item.unitPrice || sp?.purchase_price || 0,
           // Selling price is intentionally NOT defaulted from unitPrice (purchase
           // cost) — the two are unrelated, and copying one into the other used to
           // silently pre-fill an incorrect selling price the user rarely noticed.
@@ -222,7 +224,11 @@ export default function BulkSparePartDialog({
             part_name: sp?.part_name || item.customSparePartName || '',
             brand: sp?.brand || item.brand || '',
             model_ids: sp?.model_id ? [sp.model_id] : item.modelIds || ['universal'],
-            purchase_price: Number(item.unitPrice) || Number(sp?.purchase_price) || 0,
+            purchase_price:
+              Number(item.landedCostUnitCost) ||
+              Number(item.unitPrice) ||
+              Number(sp?.purchase_price) ||
+              0,
             base_price: Number(item.sellingPrice) || Number(sp?.base_price) || 0,
             wholesale_price: Number(sp?.wholesale_price) || 0,
             quantity: item.receivedQuantity - item.usedQuantity,

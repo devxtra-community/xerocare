@@ -19,14 +19,14 @@ export default function EmployeesPage() {
 
   const handleAddSubmit = async (formData: FormData) => {
     try {
-      await createEmployee(formData);
+      const res = await createEmployee(formData);
       toast.success('Employee created successfully');
       setTableKey((k) => k + 1);
-      return true;
+      return { ok: true, employeeId: res?.data?.id as string | undefined };
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to create employee');
-      return false;
+      return { ok: false };
     }
   };
 

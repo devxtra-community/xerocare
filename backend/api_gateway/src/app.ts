@@ -342,6 +342,12 @@ app.post(
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.post(
+  '/i/service/tickets/:id/customer-approve-upload',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
   '/i/service/tickets/:id/customer-reject',
   authMiddleware,
   requireServiceRole(['SERVICE_TECHNICIAN']),

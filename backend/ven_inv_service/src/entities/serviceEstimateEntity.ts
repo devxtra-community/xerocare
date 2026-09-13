@@ -71,6 +71,56 @@ export class ServiceEstimate {
   })
   exchangeRateSnapshot?: number;
 
+  // --- Customer remote-approval link (mirrors UsageRecord's bill signing token) ---
+  // The single-use 72-hour token IS the credential for the public approval page.
+  @Column({ name: 'signing_token', type: 'varchar', nullable: true })
+  signingToken?: string | null;
+
+  @Column({ name: 'signing_token_expires_at', type: 'timestamp', nullable: true })
+  signingTokenExpiresAt?: Date | null;
+
+  @Column({ name: 'signing_token_used', type: 'boolean', default: false })
+  signingTokenUsed!: boolean;
+
+  @Column({ name: 'estimate_sent_at', type: 'timestamp', nullable: true })
+  estimateSentAt?: Date | null;
+
+  // How the customer's decision was captured:
+  // REMOTE_LINK (customer clicked the emailed link) | IN_PERSON | PHONE | WHATSAPP
+  // | EMAIL (staff relaying a decision the customer made off-system) | FINANCE_MANUAL
+  @Column({ name: 'customer_approval_method', type: 'varchar', nullable: true })
+  customerApprovalMethod?: string | null;
+
+  // Free-text note the staff member adds when recording an off-system decision
+  // ("Confirmed with Mr. Rahul by phone at 3:15pm").
+  @Column({ name: 'customer_decision_note', type: 'text', nullable: true })
+  customerDecisionNote?: string | null;
+
+  @Column({ name: 'customer_approved_by_name', type: 'varchar', nullable: true })
+  customerApprovedByName?: string | null;
+
+  @Column({ name: 'customer_approved_at', type: 'timestamp', nullable: true })
+  customerApprovedAt?: Date | null;
+
+  @Column({ name: 'customer_rejection_reason', type: 'text', nullable: true })
+  customerRejectionReason?: string | null;
+
+  @Column({ name: 'customer_rejected_at', type: 'timestamp', nullable: true })
+  customerRejectedAt?: Date | null;
+
+  // Proof of the customer's approval — required for every staff-recorded decision
+  // (method !== REMOTE_LINK). Exactly one of the two is set: a live-drawn
+  // signature, or an uploaded photo/PDF of a physically-signed copy (with its
+  // required attestation note). Mirrors ContractAgreement's own signature columns.
+  @Column({ name: 'customer_signature_data', type: 'text', nullable: true })
+  customerSignatureData?: string | null;
+
+  @Column({ name: 'customer_signed_document_url', type: 'varchar', length: 500, nullable: true })
+  customerSignedDocumentUrl?: string | null;
+
+  @Column({ name: 'customer_signed_document_note', type: 'text', nullable: true })
+  customerSignedDocumentNote?: string | null;
+
   @OneToMany(() => ServiceEstimateItem, (item) => item.estimate, { cascade: true })
   items!: ServiceEstimateItem[];
 

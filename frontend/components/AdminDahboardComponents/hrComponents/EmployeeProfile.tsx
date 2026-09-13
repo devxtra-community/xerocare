@@ -13,6 +13,7 @@ import {
   Download,
   AlertCircle,
   Clock,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,12 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from 'next/navigation';
 import { getEmployeeById, getEmployeeIdProof, Employee } from '@/lib/employee';
+import {
+  listEmployeeDocuments,
+  documentExpiryStatus,
+  EMPLOYEE_DOCUMENT_TYPE_LABELS,
+  type EmployeeDocument,
+} from '@/lib/employeeDocument';
 import { getEmployeeLeaveCount } from '@/lib/leaveApplicationService';
 import { markLate, getEmployeeLateCount } from '@/lib/lateMarkService';
 import { getUserFromToken } from '@/lib/auth';
@@ -61,6 +68,7 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
   const [isSubmittingLate, setIsSubmittingLate] = useState(false);
   const [isSessionsOpen, setIsSessionsOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
 
   const tokenUser = getUserFromToken();
   const viewerRole = tokenUser?.role;
@@ -100,6 +108,13 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
     };
     fetchEmployee();
     loadStats();
+    if (canViewDocs) {
+      listEmployeeDocuments(id)
+        .then(setDocuments)
+        .catch(() => {
+          /* non-blocking */
+        });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, router]);
 
@@ -322,6 +337,68 @@ export default function EmployeeProfile({ id }: EmployeeProfileProps) {
               )}
             </div>
           </div>
+
+          {canViewDocs && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+              <h4 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Legal Documents ({documents.length})
+              </h4>
+              {documents.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No documents on file. Add them via Edit Employee.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {documents.map((doc) => {
+                    const status = documentExpiryStatus(doc.expiry_date);
+                    return (
+                      <li
+                        key={doc.id}
+                        className="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-muted/40 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-foreground">
+                            {EMPLOYEE_DOCUMENT_TYPE_LABELS[doc.doc_type] || doc.doc_type}
+                            {doc.document_number && (
+                              <span className="text-xs font-normal text-muted-foreground">
+                                · {doc.document_number}
+                              </span>
+                            )}
+                            {status === 'expired' && (
+                              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
+                                EXPIRED
+                              </span>
+                            )}
+                            {status === 'soon' && (
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                                EXPIRES SOON
+                              </span>
+                            )}
+                          </div>
+                          <p className="truncate text-[11px] text-muted-foreground">
+                            {doc.expiry_date ? `Expires ${doc.expiry_date}` : 'No expiry'}
+                            {doc.label ? ` · ${doc.label}` : ''}
+                          </p>
+                        </div>
+                        {doc.viewUrl && (
+                          <a
+                            href={doc.viewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 text-blue-600 hover:text-blue-700"
+                            title="Open document"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Column - Work Details */}
