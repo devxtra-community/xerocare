@@ -11,6 +11,8 @@ import {
 } from '../utils/servicePdfGenerator';
 import { sendServicePdfEmail, sendServiceEmail } from '../utils/emailService';
 import { sendWhatsappMessage } from '../utils/whatsapp';
+import { r2ViewUrl } from '../utils/r2Url';
+import { MulterS3File } from '../types/multer-s3-file';
 import {
   ServiceTicket,
   ServiceTicketStatus,
@@ -329,6 +331,21 @@ export class ServiceController {
    * inventory, converts a CRM lead, logs the activity and notifies the assigned
    * technician plus the help-desk user who opened the ticket.
    */
+  /**
+   * Turns a stored customerSignedDocumentUrl (an R2 key) into a short-lived
+   * viewable link before the estimate goes back to the client. No-op when
+   * there's no uploaded document (drawn signatures are stored as a plain
+   * base64 data URI and need no signing).
+   */
+  private async withSignedEstimateDoc(estimate: ServiceEstimate): Promise<ServiceEstimate> {
+    if (!estimate.customerSignedDocumentUrl) return estimate;
+    return {
+      ...estimate,
+      customerSignedDocumentUrl:
+        (await r2ViewUrl(estimate.customerSignedDocumentUrl)) ?? estimate.customerSignedDocumentUrl,
+    };
+  }
+
   private async applyCustomerEstimateApproval(
     estimate: ServiceEstimate,
     ticket: ServiceTicket,
@@ -338,6 +355,12 @@ export class ServiceController {
       note?: string | null;
       actorId?: string;
       authHeader?: string;
+      /** Drawn signature, base64 PNG data URI. */
+      signatureData?: string | null;
+      /** R2 key of an uploaded photo/PDF of a physically-signed copy. */
+      signedDocumentUrl?: string | null;
+      /** Required attestation note accompanying signedDocumentUrl. */
+      signedDocumentNote?: string | null;
     },
   ): Promise<void> {
     // Same expiry gate as before — an expired estimate always blocks approval,
@@ -354,6 +377,19 @@ export class ServiceController {
       );
     }
 
+    // A staff-recorded decision must carry proof — either a signature drawn live
+    // (customer present) or an uploaded photo/PDF of a physically-signed copy
+    // (customer not present). The customer's own remote self-approval link
+    // (REMOTE_LINK) is unchanged — clicking their unique, single-use link is
+    // itself the proof there.
+    const staffRecorded = opts.method !== 'REMOTE_LINK';
+    if (staffRecorded && !opts.signatureData && !opts.signedDocumentUrl) {
+      throw new AppError(
+        'A customer signature (drawn or uploaded) is required to record approval',
+        400,
+      );
+    }
+
     const estimateRepo = Source.getRepository(ServiceEstimate);
     const ticketRepo = Source.getRepository(ServiceTicket);
 
@@ -362,6 +398,11 @@ export class ServiceController {
     estimate.customerApprovedByName = opts.byName ?? null;
     estimate.customerDecisionNote = opts.note ?? null;
     estimate.customerApprovedAt = new Date();
+    if (opts.signatureData) estimate.customerSignatureData = opts.signatureData;
+    if (opts.signedDocumentUrl) {
+      estimate.customerSignedDocumentUrl = opts.signedDocumentUrl;
+      estimate.customerSignedDocumentNote = opts.signedDocumentNote ?? null;
+    }
     await estimateRepo.save(estimate);
 
     ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
@@ -397,7 +438,6 @@ export class ServiceController {
     }
 
     const via = decisionChannelLabel(opts.method);
-    const staffRecorded = opts.method !== 'REMOTE_LINK';
     await this.logActivity(
       ticket.id,
       'ESTIMATE_CUSTOMER_APPROVED',
@@ -1054,6 +1094,14 @@ Xerocare Technical Services`;
       const previousTechnicianId = ticket.assignedTechnicianId;
       const isReassignment =
         !!previousTechnicianId && previousTechnicianId !== assignedTechnicianId;
+
+      // Once the technician has physically started the repair, swapping them
+      // out mid-job (parts already being used, labour already underway) makes
+      // no operational sense — reassignment stays open through diagnosis,
+      // estimate, and customer-approval waiting, and locks only here.
+      if (isReassignment && ticket.repairStartedAt) {
+        throw new AppError('Cannot reassign — the technician has already started repair work', 400);
+      }
 
       // Reassignment releases the previous technician's claim (a manager's claim survives).
       if (
@@ -2068,16 +2116,64 @@ Xerocare Technical Services`;
       if (!ticket) throw new Error('Ticket not found');
 
       // Staff recording a decision the customer gave off-system (phone, WhatsApp,
-      // in person). The front end gates this behind an explicit confirmation.
+      // in person). The front end gates this behind an explicit confirmation
+      // and a captured signature.
       await this.applyCustomerEstimateApproval(estimate, ticket, {
         method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
         byName: (req.body?.customerName as string)?.trim() || null,
         note: (req.body?.note as string)?.trim() || null,
         actorId: req.user?.userId,
         authHeader: req.headers.authorization,
+        signatureData: (req.body?.signatureData as string) || null,
       });
 
-      res.status(200).json({ success: true, data: estimate });
+      res.status(200).json({ success: true, data: await this.withSignedEstimateDoc(estimate) });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/estimates/:estimateId/approve-customer-upload
+   * Same as approveEstimateCustomer, but the customer's proof is an uploaded
+   * photo/PDF of a physically-signed copy (customer not physically present)
+   * instead of a live-drawn signature.
+   */
+  approveEstimateCustomerUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const estimateId = req.params.estimateId as string;
+      const attestationNote = (req.body?.attestationNote as string)?.trim();
+      if (!attestationNote) {
+        throw new AppError(
+          'Attestation note is required — document how/when the signed copy was obtained',
+          400,
+        );
+      }
+      const uploadedFile = req.file as MulterS3File | undefined;
+      if (!uploadedFile) throw new AppError('Signed document file is required', 400);
+
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimate = await estimateRepo.findOne({
+        where: { id: String(estimateId) },
+        relations: ['items'],
+      });
+      if (!estimate) throw new Error('Estimate not found');
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      await this.applyCustomerEstimateApproval(estimate, ticket, {
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        byName: (req.body?.customerName as string)?.trim() || null,
+        note: (req.body?.note as string)?.trim() || null,
+        actorId: req.user?.userId,
+        authHeader: req.headers.authorization,
+        signedDocumentUrl: uploadedFile.key,
+        signedDocumentNote: attestationNote,
+      });
+
+      res.status(200).json({ success: true, data: await this.withSignedEstimateDoc(estimate) });
     } catch (error) {
       next(error);
     }
@@ -3149,7 +3245,11 @@ Xerocare Technical Services`;
         relations: ['items'],
       });
 
-      res.status(200).json({ success: true, data: { estimates, revisions } });
+      const signedEstimates = await Promise.all(
+        estimates.map((e) => this.withSignedEstimateDoc(e)),
+      );
+
+      res.status(200).json({ success: true, data: { estimates: signedEstimates, revisions } });
     } catch (error) {
       next(error);
     }
@@ -4115,6 +4215,181 @@ Xerocare Technical Services`;
   /**
    * POST /service/tickets/:id/customer-approve
    */
+  /**
+   * Shared validity/labour-waiver check for Track A's ticket-level quote
+   * (submitServiceQuotation / ticket.serviceQuotationId — a simple lump-sum
+   * billing invoice, distinct from Track B's itemized ServiceEstimate). Throws
+   * if the quote's validity has expired; otherwise waives labour on timely
+   * approval for non-travel-covered contexts. No-op if the ticket has no
+   * ticket-level quotation at all.
+   */
+  private async checkTrackAQuotationValidity(
+    ticket: ServiceTicket,
+    actorId?: string,
+  ): Promise<void> {
+    if (!ticket.serviceQuotationId) return;
+
+    const approvalTravelCovered = [
+      ServiceContext.AMC,
+      ServiceContext.SMA,
+      ServiceContext.FSMA,
+      ServiceContext.RENT,
+      ServiceContext.LEASE_CPC,
+      ServiceContext.WARRANTY,
+      ServiceContext.LEASE_UNDER_WARRANTY,
+    ].includes(ticket.serviceContext);
+
+    const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+      expiresIn: '1m',
+    });
+    let estimateExpired = false;
+    let invoiceFetched = false;
+    try {
+      const invRes = await axios.get(
+        `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const invoice = invRes.data?.data;
+      invoiceFetched = !!invoice;
+      if (invoice?.estimateValidUntil) {
+        estimateExpired = new Date() > new Date(invoice.estimateValidUntil);
+      }
+    } catch (err) {
+      logger.error('Failed to fetch estimate for validity check:', err);
+    }
+
+    if (estimateExpired) {
+      throw new AppError(
+        'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
+        400,
+      );
+    }
+
+    if (invoiceFetched && !approvalTravelCovered) {
+      // Timely approval — waive the labour line on the billing estimate.
+      try {
+        await axios.post(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
+          { reason: `Customer approved ticket ${ticket.ticketNumber} within validity` },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        await this.logActivity(
+          ticket.id,
+          'LABOUR_WAIVED',
+          'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
+          actorId,
+        );
+      } catch (err) {
+        logger.error('Failed to waive labour on billing estimate:', err);
+      }
+    }
+  }
+
+  /**
+   * Shared tail for Track A's ticket-level customer approval (customerApprove /
+   * customerApproveUpload): records the signature onto the ticket's latest
+   * ServiceEstimate (same row Track B writes to — see applyCustomerEstimateApproval),
+   * converts a CRM lead, saves the ticket, syncs the linked billing invoice, and
+   * notifies the assigned technician. Requires a signature — either drawn or
+   * uploaded — same rule as Track B.
+   */
+  private async finalizeTicketCustomerApproval(
+    ticket: ServiceTicket,
+    req: Request,
+    opts: {
+      byName?: string | null;
+      method?: string | null;
+      note?: string | null;
+      signatureData?: string | null;
+      signedDocumentUrl?: string | null;
+      signedDocumentNote?: string | null;
+    },
+  ): Promise<void> {
+    if (!opts.signatureData && !opts.signedDocumentUrl) {
+      throw new AppError(
+        'A customer signature (drawn or uploaded) is required to record approval',
+        400,
+      );
+    }
+
+    const ticketRepo = Source.getRepository(ServiceTicket);
+    ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
+
+    // Record everything on the ticket's latest estimate — the same row Track B
+    // (approveEstimateCustomer) writes to — so "show it on the service estimate"
+    // works uniformly regardless of which track approved it, and every
+    // downstream read filtering on estimate.status === CUSTOMER_APPROVED
+    // (labour cost at completion, COGS report, finance dashboards) sees it too.
+    try {
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const latestEstimate = await estimateRepo.findOne({
+        where: { ticketId: ticket.id },
+        order: { created_at: 'DESC' },
+      });
+      if (latestEstimate) {
+        latestEstimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
+        latestEstimate.customerApprovalMethod = opts.method ?? 'IN_PERSON';
+        latestEstimate.customerApprovedByName = opts.byName ?? null;
+        latestEstimate.customerDecisionNote = opts.note ?? null;
+        latestEstimate.customerApprovedAt = new Date();
+        if (opts.signatureData) latestEstimate.customerSignatureData = opts.signatureData;
+        if (opts.signedDocumentUrl) {
+          latestEstimate.customerSignedDocumentUrl = opts.signedDocumentUrl;
+          latestEstimate.customerSignedDocumentNote = opts.signedDocumentNote ?? null;
+        }
+        await estimateRepo.save(latestEstimate);
+      }
+    } catch (err) {
+      logger.error('Failed to sync estimate status/signature on customer approval:', err);
+    }
+
+    if (ticket.leadId) {
+      try {
+        const convertRes = await axios.post(
+          `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
+          { location: 'Service Delivery Location' },
+          { headers: { Authorization: req.headers.authorization } },
+        );
+
+        if (convertRes.data && convertRes.data.success) {
+          ticket.customerId = convertRes.data.data.customerId;
+          ticket.leadId = null;
+        }
+      } catch (crmErr) {
+        logger.error('Failed to convert CRM lead to customer:', crmErr);
+      }
+    }
+
+    await ticketRepo.save(ticket);
+
+    // Keep the billing estimate in sync so finance sees the same state.
+    if (ticket.serviceQuotationId) {
+      try {
+        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+          expiresIn: '1m',
+        });
+        await axios.put(
+          `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/status`,
+          { status: 'CUSTOMER_ACCEPTED' },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+      } catch (err) {
+        logger.error('Failed to sync CUSTOMER_ACCEPTED status to billing invoice:', err);
+      }
+    }
+
+    if (ticket.assignedTechnicianId) {
+      await NotificationPublisher.publishInAppRequest({
+        recipientId: ticket.assignedTechnicianId,
+        title: 'Customer Approved Service',
+        message: `Customer approved service for ticket ${ticket.ticketNumber}. You can start work.`,
+        type: 'TASK',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
+    }
+  }
+
   customerApprove = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id as string;
@@ -4122,143 +4397,52 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      // Validity rules: the up-front visit/estimate charge pays for the labour
-      // of making the estimate — a customer approving within the 1-month
-      // validity is not charged labour again. An expired estimate always
-      // blocks approval — Finance must extend the validity first, regardless
-      // of service context — so a customer can never approve stale pricing.
-      const approvalTravelCovered = [
-        ServiceContext.AMC,
-        ServiceContext.SMA,
-        ServiceContext.FSMA,
-        ServiceContext.RENT,
-        ServiceContext.LEASE_CPC,
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-      ].includes(ticket.serviceContext);
-
-      if (ticket.serviceQuotationId) {
-        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
-          expiresIn: '1m',
-        });
-        let estimateExpired = false;
-        let invoiceFetched = false;
-        try {
-          const invRes = await axios.get(
-            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}`,
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-          const invoice = invRes.data?.data;
-          invoiceFetched = !!invoice;
-          if (invoice?.estimateValidUntil) {
-            estimateExpired = new Date() > new Date(invoice.estimateValidUntil);
-          }
-        } catch (err) {
-          logger.error('Failed to fetch estimate for validity check:', err);
-        }
-
-        if (estimateExpired) {
-          throw new AppError(
-            'Estimate validity has expired. Send it back to Finance to extend the validity before the customer can approve.',
-            400,
-          );
-        }
-
-        if (invoiceFetched && !approvalTravelCovered) {
-          // Timely approval — waive the labour line on the billing estimate.
-          try {
-            await axios.post(
-              `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
-              { reason: `Customer approved ticket ${ticket.ticketNumber} within validity` },
-              { headers: { Authorization: `Bearer ${token}` } },
-            );
-            await this.logActivity(
-              ticket.id,
-              'LABOUR_WAIVED',
-              'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
-              req.user?.userId,
-            );
-          } catch (err) {
-            logger.error('Failed to waive labour on billing estimate:', err);
-          }
-        }
-      }
-
-      ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
-
-      // Keep the estimate's own status in sync with the ticket — the estimate-level
-      // approval path (approveEstimateCustomer) already does this; this ticket-level
-      // path must too, or every downstream read that filters on
-      // estimate.status === CUSTOMER_APPROVED (labour cost at completion, COGS report,
-      // finance dashboards) silently misses tickets approved from this button.
-      try {
-        const estimateRepo = Source.getRepository(ServiceEstimate);
-        const latestEstimate = await estimateRepo.findOne({
-          where: { ticketId: ticket.id },
-          order: { created_at: 'DESC' },
-        });
-        if (latestEstimate && latestEstimate.status !== ServiceEstimateStatus.CUSTOMER_APPROVED) {
-          latestEstimate.status = ServiceEstimateStatus.CUSTOMER_APPROVED;
-          await estimateRepo.save(latestEstimate);
-        }
-      } catch (err) {
-        logger.error('Failed to sync estimate status on customer approval:', err);
-      }
-
-      if (ticket.leadId) {
-        try {
-          const convertRes = await axios.post(
-            `${CRM_SERVICE_URL}${CRM_ENDPOINTS.LEAD_CONVERT.replace(':id', ticket.leadId)}`,
-            { location: 'Service Delivery Location' },
-            { headers: { Authorization: req.headers.authorization } },
-          );
-
-          if (convertRes.data && convertRes.data.success) {
-            ticket.customerId = convertRes.data.data.customerId;
-            ticket.leadId = null;
-          }
-        } catch (crmErr) {
-          logger.error('Failed to convert CRM lead to customer:', crmErr);
-        }
-      }
-
-      await ticketRepo.save(ticket);
-
-      // Keep the billing estimate in sync so finance sees the same state.
-      if (ticket.serviceQuotationId) {
-        try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-          await axios.put(
-            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/status`,
-            { status: 'CUSTOMER_ACCEPTED' },
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-        } catch (err) {
-          logger.error('Failed to sync CUSTOMER_ACCEPTED status to billing invoice:', err);
-        }
-      }
-
-      if (ticket.assignedTechnicianId) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: ticket.assignedTechnicianId,
-          title: 'Customer Approved Service',
-          message: `Customer approved service for ticket ${ticket.ticketNumber}. You can start work.`,
-          type: 'TASK',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        data: ticket,
+      await this.checkTrackAQuotationValidity(ticket, req.user?.userId);
+      await this.finalizeTicketCustomerApproval(ticket, req, {
+        byName: (req.body?.customerName as string)?.trim() || null,
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        note: (req.body?.note as string)?.trim() || null,
+        signatureData: (req.body?.signatureData as string) || null,
       });
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/tickets/:id/customer-approve-upload
+   * Same as customerApprove, but the customer's proof is an uploaded photo/PDF
+   * of a physically-signed copy instead of a live-drawn signature.
+   */
+  customerApproveUpload = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const attestationNote = (req.body?.attestationNote as string)?.trim();
+      if (!attestationNote) {
+        throw new AppError(
+          'Attestation note is required — document how/when the signed copy was obtained',
+          400,
+        );
+      }
+      const uploadedFile = req.file as MulterS3File | undefined;
+      if (!uploadedFile) throw new AppError('Signed document file is required', 400);
+
+      const id = req.params.id as string;
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
+      if (!ticket) throw new Error('Ticket not found');
+
+      await this.checkTrackAQuotationValidity(ticket, req.user?.userId);
+      await this.finalizeTicketCustomerApproval(ticket, req, {
+        byName: (req.body?.customerName as string)?.trim() || null,
+        method: normalizeDecisionChannel(req.body?.confirmedVia, 'IN_PERSON'),
+        note: (req.body?.note as string)?.trim() || null,
+        signedDocumentUrl: uploadedFile.key,
+        signedDocumentNote: attestationNote,
+      });
+
+      res.status(200).json({ success: true, data: ticket });
     } catch (error) {
       next(error);
     }

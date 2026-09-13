@@ -168,8 +168,29 @@ export const submitServiceQuotation = async (
   return response.data.data;
 };
 
-export const approveServiceQuotation = async (id: string): Promise<ServiceTicket> => {
-  const response = await api.post(`/i/service/tickets/${id}/customer-approve`);
+export const approveServiceQuotation = async (
+  id: string,
+  meta?: RecordCustomerDecisionMeta,
+): Promise<ServiceTicket> => {
+  const response = await api.post(`/i/service/tickets/${id}/customer-approve`, meta);
+  return response.data.data;
+};
+
+export const approveServiceQuotationByUpload = async (
+  id: string,
+  file: File,
+  attestationNote: string,
+  meta?: RecordCustomerDecisionMeta,
+): Promise<ServiceTicket> => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('attestationNote', attestationNote);
+  if (meta?.customerName) form.append('customerName', meta.customerName);
+  if (meta?.confirmedVia) form.append('confirmedVia', meta.confirmedVia);
+  if (meta?.note) form.append('note', meta.note);
+  const response = await api.post(`/i/service/tickets/${id}/customer-approve-upload`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data.data;
 };
 
@@ -306,6 +327,16 @@ export interface ServiceEstimate {
   version: number;
   items: ServiceEstimateItem[];
   created_at: string;
+  /** How the customer's decision was captured — IN_PERSON | PHONE | WHATSAPP | EMAIL | REMOTE_LINK | FINANCE_MANUAL. */
+  customerApprovalMethod?: string | null;
+  customerApprovedByName?: string | null;
+  customerApprovedAt?: string | null;
+  customerDecisionNote?: string | null;
+  /** Live-drawn signature, base64 PNG data URI. */
+  customerSignatureData?: string | null;
+  /** Viewable URL of an uploaded photo/PDF of a physically-signed copy. */
+  customerSignedDocumentUrl?: string | null;
+  customerSignedDocumentNote?: string | null;
 }
 
 export interface ServiceEstimateRevision {
@@ -378,6 +409,8 @@ export interface RecordCustomerDecisionMeta {
   customerName: string;
   confirmedVia: CustomerDecisionChannel;
   note?: string;
+  /** Live-drawn signature, base64 PNG data URI — required to approve (not used for rejection). */
+  signatureData?: string;
 }
 
 export const approveEstimateCustomer = async (
@@ -385,6 +418,26 @@ export const approveEstimateCustomer = async (
   meta?: RecordCustomerDecisionMeta,
 ): Promise<ServiceEstimate> => {
   const response = await api.post(`/i/service/estimates/${estimateId}/approve-customer`, meta);
+  return response.data.data;
+};
+
+export const approveEstimateCustomerByUpload = async (
+  estimateId: string,
+  file: File,
+  attestationNote: string,
+  meta?: RecordCustomerDecisionMeta,
+): Promise<ServiceEstimate> => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('attestationNote', attestationNote);
+  if (meta?.customerName) form.append('customerName', meta.customerName);
+  if (meta?.confirmedVia) form.append('confirmedVia', meta.confirmedVia);
+  if (meta?.note) form.append('note', meta.note);
+  const response = await api.post(
+    `/i/service/estimates/${estimateId}/approve-customer-upload`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
   return response.data.data;
 };
 

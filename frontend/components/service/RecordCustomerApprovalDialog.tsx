@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, FileText, Loader2, PenLine, ShieldCheck, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import type { CustomerDecisionChannel, RecordCustomerDecisionMeta } from '@/lib/serviceTicket';
+import { ESignatureCanvas } from '@/components/employeeComponents/ESignatureCanvas';
 
 const CHANNELS: { value: CustomerDecisionChannel; label: string }[] = [
   { value: 'IN_PERSON', label: 'In person' },
@@ -16,7 +18,14 @@ const CHANNELS: { value: CustomerDecisionChannel; label: string }[] = [
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Capture path — a signature was drawn live. */
   onConfirm: (meta: RecordCustomerDecisionMeta) => void | Promise<void>;
+  /** Upload path — a photo/PDF of a physically-signed copy. */
+  onConfirmUpload: (
+    meta: RecordCustomerDecisionMeta,
+    file: File,
+    attestationNote: string,
+  ) => void | Promise<void>;
   ticketNumber?: string;
   estimateTotal?: number;
   currency?: string;
@@ -27,6 +36,7 @@ export function RecordCustomerApprovalDialog({
   open,
   onClose,
   onConfirm,
+  onConfirmUpload,
   ticketNumber,
   estimateTotal,
   currency = 'QAR',
@@ -37,12 +47,25 @@ export function RecordCustomerApprovalDialog({
   const [note, setNote] = useState('');
   const [ack, setAck] = useState(false);
 
+  // Signature — required either way: drawn live (customer physically present)
+  // or an uploaded photo/PDF of a copy they signed elsewhere, same rule as the
+  // RENT/LEASE contract signing flow (ContractAgreementModal).
+  const [signMethod, setSignMethod] = useState<'CAPTURE' | 'UPLOAD'>('CAPTURE');
+  const [sigData, setSigData] = useState<string | null>(null);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [attestationNote, setAttestationNote] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (open) {
       setCustomerName('');
       setConfirmedVia('IN_PERSON');
       setNote('');
       setAck(false);
+      setSignMethod('CAPTURE');
+      setSigData(null);
+      setUploadFile(null);
+      setAttestationNote('');
     }
   }, [open]);
 
@@ -54,7 +77,24 @@ export function RecordCustomerApprovalDialog({
         })}`
       : 'the quoted amount';
 
-  const canSubmit = customerName.trim().length > 1 && ack && !submitting;
+  const hasSignature =
+    signMethod === 'CAPTURE' ? !!sigData : !!uploadFile && attestationNote.trim().length > 0;
+  const canSubmit = customerName.trim().length > 1 && ack && hasSignature && !submitting;
+
+  const handleSubmit = () => {
+    const meta: RecordCustomerDecisionMeta = {
+      customerName: customerName.trim(),
+      confirmedVia,
+      note: note.trim() || undefined,
+    };
+    if (signMethod === 'CAPTURE') {
+      if (!sigData) return;
+      onConfirm({ ...meta, signatureData: sigData });
+    } else {
+      if (!uploadFile) return;
+      onConfirmUpload(meta, uploadFile, attestationNote.trim());
+    }
+  };
 
   return (
     <Modal isOpen={open} onClose={onClose} maxWidth="sm" title="Record the customer's approval">
@@ -119,6 +159,114 @@ export function RecordCustomerApprovalDialog({
           />
         </div>
 
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+            Customer signature <span className="text-red-500">*</span>
+          </label>
+
+          <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setSignMethod('CAPTURE')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                signMethod === 'CAPTURE'
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-white text-slate-400 hover:bg-slate-50'
+              }`}
+            >
+              <PenLine size={12} />
+              Capture Signature
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignMethod('UPLOAD')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                signMethod === 'UPLOAD'
+                  ? 'bg-slate-800 text-white'
+                  : 'bg-white text-slate-400 hover:bg-slate-50'
+              }`}
+            >
+              <Upload size={12} />
+              Upload Signed Doc
+            </button>
+          </div>
+
+          {signMethod === 'CAPTURE' ? (
+            <div className="mt-2.5">
+              <p className="mb-1.5 text-[11px] font-bold text-slate-500">
+                Hand the device to the customer to sign below
+              </p>
+              <ESignatureCanvas
+                label=""
+                width={360}
+                height={130}
+                onSave={setSigData}
+                onClear={() => setSigData(null)}
+              />
+            </div>
+          ) : (
+            <div className="mt-2.5 space-y-2.5">
+              <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-[11px] font-bold leading-relaxed text-amber-700">
+                Upload a photo or scan of the physically-signed estimate. This is recorded as the
+                customer&apos;s consent proof.
+              </div>
+
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer rounded-xl border-2 border-dashed border-slate-200 p-3 text-center transition-all hover:border-slate-400 hover:bg-slate-50"
+              >
+                {uploadFile ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText size={14} className="text-slate-500" />
+                    <span className="max-w-[180px] truncate text-xs font-bold text-slate-700">
+                      {uploadFile.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      ({(uploadFile.size / 1024 / 1024).toFixed(1)} MB)
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <Upload size={18} className="mx-auto mb-1 text-slate-300" />
+                    <p className="text-xs font-bold text-slate-400">Click to select file</p>
+                    <p className="mt-0.5 text-[10px] text-slate-300">JPG, PNG, PDF · max 15 MB</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f && f.size > 15 * 1024 * 1024) {
+                    toast.error('File too large', { description: 'Maximum file size is 15 MB.' });
+                    return;
+                  }
+                  setUploadFile(f);
+                }}
+              />
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                  How was the signed copy obtained? <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={attestationNote}
+                  onChange={(e) => setAttestationNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Signed copy received via WhatsApp from customer on 2026-09-13"
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                />
+                <p className="mt-1 text-[10px] text-slate-400">
+                  This note is required and stored as an audit record.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
           <input
             type="checkbox"
@@ -140,13 +288,7 @@ export function RecordCustomerApprovalDialog({
             variant="success"
             className="bg-green-600 text-white hover:bg-green-700"
             disabled={!canSubmit}
-            onClick={() =>
-              onConfirm({
-                customerName: customerName.trim(),
-                confirmedVia,
-                note: note.trim() || undefined,
-              })
-            }
+            onClick={handleSubmit}
           >
             {submitting ? (
               <>

@@ -382,6 +382,20 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS customer_rejected_at TIMESTAMP;
         `);
         logger.info('Guaranteed service_estimates customer remote-approval columns exist.');
+
+        // --- Customer signature capture on service_estimates ---
+        // Mirrors ContractAgreement's customerSignatureData / customerSignedDocumentUrl
+        // / customerSignedDocumentNote for the RENT/LEASE contract signing flow — a
+        // staff-recorded customer approval must carry proof: either a drawn signature
+        // (base64 PNG) or an uploaded photo/PDF of a physically-signed copy plus a
+        // required note on how it was obtained.
+        await Source.query(`
+          ALTER TABLE service_estimates
+          ADD COLUMN IF NOT EXISTS customer_signature_data TEXT,
+          ADD COLUMN IF NOT EXISTS customer_signed_document_url VARCHAR(500),
+          ADD COLUMN IF NOT EXISTS customer_signed_document_note TEXT;
+        `);
+        logger.info('Guaranteed service_estimates customer signature columns exist.');
         // Ensure tax_rate and max_discount_amount exist on spare_parts table
         await Source.query(`
           ALTER TABLE spare_parts 

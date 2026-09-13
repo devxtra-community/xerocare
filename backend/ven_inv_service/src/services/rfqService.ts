@@ -884,6 +884,27 @@ export class RfqService {
     });
   }
 
+  /**
+   * The amount a vendor's quoted figure (unit or line total, in the vendor's own
+   * currency) becomes once their declared tax is folded in — purely a display
+   * computation for the comparison/award screens, so a manager isn't reading a
+   * tax-exclusive price without realising it. Never persisted, never used for
+   * ranking (see getComparison's comparableTotal, unchanged).
+   *   tax_included = false (vendor's price excludes tax) -> tax is added on top
+   *   tax_included = true  (vendor's price already has tax) -> amount unchanged
+   *   no rate / tax_included unknown -> amount unchanged
+   */
+  private taxInclusiveAmount(
+    amount: number,
+    taxIncluded: boolean | null | undefined,
+    taxRatePercent: number | null | undefined,
+  ): number {
+    if (taxIncluded === false && taxRatePercent != null && taxRatePercent > 0) {
+      return round2(amount * (1 + taxRatePercent / 100));
+    }
+    return round2(amount);
+  }
+
   async getComparison(rfqId: string) {
     const rfq = await this.dataSource.getRepository(Rfq).findOne({
       where: { id: rfqId },
@@ -904,19 +925,38 @@ export class RfqService {
           const vi = vq.items?.find((i) => i.rfq_item_id === item.id);
           const rate = vq.exchange_rate_snapshot != null ? Number(vq.exchange_rate_snapshot) : null;
           const unitPrice = vi ? Number(vi.unit_price) : null;
+          const totalPrice = vi ? Number(vi.total_price) : null;
+          const taxIncluded = vi?.tax_included ?? null;
+          const taxRatePercent = vi?.tax_rate_percent != null ? Number(vi.tax_rate_percent) : null;
+          // With tax folded in, per the vendor's own declaration — what the item
+          // actually costs, not just what they typed in the price cell.
+          const taxInclusiveUnitPrice =
+            unitPrice !== null
+              ? this.taxInclusiveAmount(unitPrice, taxIncluded, taxRatePercent)
+              : null;
+          const taxInclusiveTotalPrice =
+            totalPrice !== null
+              ? this.taxInclusiveAmount(totalPrice, taxIncluded, taxRatePercent)
+              : null;
           return {
             vendorId: vq.vendor_id,
             vendorName: vq.vendor?.name,
             stockStatus: vi?.stock_status ?? null,
             unitPrice,
-            totalPrice: vi ? Number(vi.total_price) : null,
+            totalPrice,
             // Branch-currency equivalents (null when no rate was snapshotted).
             convertedUnitPrice:
               unitPrice !== null && rate !== null ? round2(unitPrice * rate) : null,
             estimatedShipmentDate: vi ? vi.estimated_shipment_date : null,
-            // Vendor-declared tax treatment — display only, not used in ranking.
-            taxIncluded: vi?.tax_included ?? null,
-            taxRatePercent: vi?.tax_rate_percent != null ? Number(vi.tax_rate_percent) : null,
+            // Vendor-declared tax treatment, and the amount with it folded in.
+            taxIncluded,
+            taxRatePercent,
+            taxInclusiveUnitPrice,
+            taxInclusiveTotalPrice,
+            convertedTaxInclusiveUnitPrice:
+              taxInclusiveUnitPrice !== null && rate !== null
+                ? round2(taxInclusiveUnitPrice * rate)
+                : null,
           };
         })
         .filter((vp) => vp.unitPrice !== null);
@@ -995,6 +1035,26 @@ export class RfqService {
               .filter((r): r is number => r != null && r > 0),
           ),
         ];
+
+        // Vendor's grand total with each line's own declared tax folded in — the
+        // "what will this actually cost me" figure the manager wants to see
+        // before awarding. Summed per-line (not on the vendor total as a whole)
+        // since different lines can carry different rates / inclusion flags.
+        const rate = vq.exchange_rate_snapshot != null ? Number(vq.exchange_rate_snapshot) : null;
+        const taxInclusiveTotalAmount = round2(
+          pricedItems.reduce(
+            (sum, i) =>
+              sum +
+              this.taxInclusiveAmount(
+                Number(i.total_price),
+                i.tax_included ?? null,
+                i.tax_rate_percent != null ? Number(i.tax_rate_percent) : null,
+              ),
+            0,
+          ),
+        );
+        const hasTax = rates.length > 0 || taxIncluded != null;
+
         return {
           vendorId: vq.vendor_id,
           vendorName: vq.vendor?.name,
@@ -1012,6 +1072,12 @@ export class RfqService {
           taxIncluded,
           taxRatePercent: rates.length === 1 ? rates[0] : null,
           taxRateMixed: rates.length > 1,
+          hasTax,
+          // Grand total with tax folded in, vendor currency + branch-currency
+          // equivalent. Equal to totalAmount when no line declared exclusive tax.
+          taxInclusiveTotalAmount,
+          convertedTaxInclusiveTotalAmount:
+            rate !== null ? round2(taxInclusiveTotalAmount * rate) : null,
         };
       }),
     };

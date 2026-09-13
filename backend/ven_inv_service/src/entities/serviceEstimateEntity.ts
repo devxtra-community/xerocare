@@ -108,6 +108,19 @@ export class ServiceEstimate {
   @Column({ name: 'customer_rejected_at', type: 'timestamp', nullable: true })
   customerRejectedAt?: Date | null;
 
+  // Proof of the customer's approval — required for every staff-recorded decision
+  // (method !== REMOTE_LINK). Exactly one of the two is set: a live-drawn
+  // signature, or an uploaded photo/PDF of a physically-signed copy (with its
+  // required attestation note). Mirrors ContractAgreement's own signature columns.
+  @Column({ name: 'customer_signature_data', type: 'text', nullable: true })
+  customerSignatureData?: string | null;
+
+  @Column({ name: 'customer_signed_document_url', type: 'varchar', length: 500, nullable: true })
+  customerSignedDocumentUrl?: string | null;
+
+  @Column({ name: 'customer_signed_document_note', type: 'text', nullable: true })
+  customerSignedDocumentNote?: string | null;
+
   @OneToMany(() => ServiceEstimateItem, (item) => item.estimate, { cascade: true })
   items!: ServiceEstimateItem[];
 

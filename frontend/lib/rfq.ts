@@ -100,10 +100,17 @@ export async function uploadExcelQuote(id: string, vendorId: string, file: File)
 
 /**
  * Vendor quote comparison. Beyond price/stock/shipment fields, each entry carries
- * vendor-declared tax info (informational — never used in ranking):
- *  - `items[].vendorPrices[]`: `taxIncluded` (bool|null), `taxRatePercent` (number|null)
+ * vendor-declared tax info — the rate/inclusion flag itself is purely informational
+ * (never used for ranking), but the *amount* with it folded in is computed for
+ * display so a manager can see the real cost before awarding:
+ *  - `items[].vendorPrices[]`: `taxIncluded` (bool|null), `taxRatePercent` (number|null),
+ *    `taxInclusiveUnitPrice`/`taxInclusiveTotalPrice` (number|null — equal to the raw
+ *    price when tax is already included or no rate was declared),
+ *    `convertedTaxInclusiveUnitPrice` (branch-currency equivalent, or null)
  *  - `vendorsSummary[]`: `taxIncluded` (bool|null across the vendor's lines),
- *    `taxRatePercent` (single distinct rate or null), `taxRateMixed` (bool)
+ *    `taxRatePercent` (single distinct rate or null), `taxRateMixed` (bool),
+ *    `hasTax` (bool), `taxInclusiveTotalAmount` + `convertedTaxInclusiveTotalAmount`
+ *    — the vendor's true landed total with each line's own declared tax applied
  */
 export async function getRfqComparison(id: string) {
   const res = await api.get(`/i/rfq/${id}/comparison`);

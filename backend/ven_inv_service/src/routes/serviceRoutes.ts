@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ServiceController } from '../controllers/serviceController';
 import { authMiddleware } from '../middlewares/authMiddleware';
 import { roleMiddleware, requireServiceRole } from '../middlewares/roleMiddleware';
+import { uploadServiceSignature } from '../middlewares/uploadServiceSignature';
 
 const router = Router();
 const controller = new ServiceController();
@@ -65,6 +66,12 @@ router.post(
   controller.approveEstimateCustomer,
 );
 router.post(
+  '/estimates/:estimateId/approve-customer-upload',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  uploadServiceSignature.single('file'),
+  controller.approveEstimateCustomerUpload,
+);
+router.post(
   '/estimates/:estimateId/reject-customer',
   requireServiceRole(['SERVICE_TECHNICIAN']),
   controller.rejectEstimateCustomer,
@@ -114,6 +121,12 @@ router.post(
   '/tickets/:id/customer-approve',
   requireServiceRole(['SERVICE_TECHNICIAN']),
   controller.customerApprove,
+);
+router.post(
+  '/tickets/:id/customer-approve-upload',
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  uploadServiceSignature.single('file'),
+  controller.customerApproveUpload,
 );
 router.post(
   '/tickets/:id/customer-reject',

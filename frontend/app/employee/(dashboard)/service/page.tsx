@@ -28,6 +28,7 @@ import {
   diagnoseServiceTicket,
   submitServiceQuotation,
   approveServiceQuotation,
+  approveServiceQuotationByUpload,
   rejectServiceQuotation,
   completeServiceTicket,
   cancelServiceTicket,
@@ -46,6 +47,7 @@ import {
   approveEstimateFinance,
   rejectEstimateFinance,
   approveEstimateCustomer,
+  approveEstimateCustomerByUpload,
   rejectEstimateCustomer,
   createEstimateRevision,
   approveRevisionFinance,
@@ -301,11 +303,13 @@ export default function ServiceDashboardPage() {
   const [rejectConfirmedVia, setRejectConfirmedVia] =
     useState<CustomerDecisionChannel>('IN_PERSON');
   const [rejectAck, setRejectAck] = useState(false);
-  const [approveCustModal, setApproveCustModal] = useState<{
-    estimateId: string;
-    ticketNumber?: string;
-    total: number;
-  } | null>(null);
+  // One dialog, two backing endpoints — mirrors rejectVCModal's kind discriminator
+  // just below (ticket-level Track A quote vs estimate-level Track B).
+  const [approveModal, setApproveModal] = useState<
+    | { kind: 'ticket'; ticketId: string; ticketNumber?: string; total?: number }
+    | { kind: 'estimate'; estimateId: string; ticketNumber?: string; total?: number }
+    | null
+  >(null);
   const isVisitChargeCollectionEligible = (t: ServiceTicket) =>
     t.serviceContext === 'CHARGEABLE' &&
     Number(t.visitChargeAmount || 0) > 0 &&
@@ -1263,7 +1267,7 @@ export default function ServiceDashboardPage() {
     try {
       setSubmitting(true);
       await approveEstimateCustomer(estimateId, meta);
-      setApproveCustModal(null);
+      setApproveModal(null);
       if (selectedTicket) await fetchEstimates(selectedTicket.id);
       await fetchInitialData();
       toastSuccess("Customer's approval recorded.");
@@ -1275,7 +1279,34 @@ export default function ServiceDashboardPage() {
       // Expired estimate — refetch so the expiry banner (and Finance's Extend
       // Validity control, already shown in this same modal) appears.
       if (message.toLowerCase().includes('validity has expired') && selectedTicket) {
-        setApproveCustModal(null);
+        setApproveModal(null);
+        await fetchEstimates(selectedTicket.id);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApproveCustomerUpload = async (
+    estimateId: string,
+    file: File,
+    attestationNote: string,
+    meta?: RecordCustomerDecisionMeta,
+  ) => {
+    try {
+      setSubmitting(true);
+      await approveEstimateCustomerByUpload(estimateId, file, attestationNote, meta);
+      setApproveModal(null);
+      if (selectedTicket) await fetchEstimates(selectedTicket.id);
+      await fetchInitialData();
+      toastSuccess("Customer's approval recorded.");
+    } catch (err: unknown) {
+      console.error(err);
+      const error = err as { response?: { data?: { message?: string } } };
+      const message = error.response?.data?.message || 'Failed to approve estimate.';
+      toastError(message);
+      if (message.toLowerCase().includes('validity has expired') && selectedTicket) {
+        setApproveModal(null);
         await fetchEstimates(selectedTicket.id);
       }
     } finally {
@@ -1472,10 +1503,14 @@ export default function ServiceDashboardPage() {
     setConfirmOpen(true);
   };
 
-  const handleApproveQuotation = async (ticket: ServiceTicket) => {
+  const handleApproveQuotation = async (
+    ticket: ServiceTicket,
+    meta?: RecordCustomerDecisionMeta,
+  ) => {
     try {
       setLoading(true);
-      await approveServiceQuotation(ticket.id);
+      await approveServiceQuotation(ticket.id, meta);
+      setApproveModal(null);
       toastSuccess('Customer approval recorded.');
       await fetchInitialData();
     } catch (error: unknown) {
@@ -1487,6 +1522,34 @@ export default function ServiceDashboardPage() {
       // Expired estimate — land them on the Estimates view, which already
       // surfaces the expiry banner (and Finance's Extend Validity control).
       if (message.toLowerCase().includes('validity has expired')) {
+        setApproveModal(null);
+        await handleOpenEstimates(ticket);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveQuotationUpload = async (
+    ticket: ServiceTicket,
+    file: File,
+    attestationNote: string,
+    meta?: RecordCustomerDecisionMeta,
+  ) => {
+    try {
+      setLoading(true);
+      await approveServiceQuotationByUpload(ticket.id, file, attestationNote, meta);
+      setApproveModal(null);
+      toastSuccess('Customer approval recorded.');
+      await fetchInitialData();
+    } catch (error: unknown) {
+      console.error('Failed to approve:', error);
+      const err = error as { response?: { data?: { message?: string } } };
+      const message =
+        err.response?.data?.message || 'Failed to record customer approval. Please try again.';
+      toastError(message);
+      if (message.toLowerCase().includes('validity has expired')) {
+        setApproveModal(null);
         await handleOpenEstimates(ticket);
       }
     } finally {
@@ -1991,7 +2054,8 @@ export default function ServiceDashboardPage() {
                                 original technician becomes unavailable mid-flow). Whoever ends
                                 up assigned when the ticket completes gets the target credit. */}
                           {(isHelpDesk || isManagerOrAdmin) &&
-                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) && (
+                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) &&
+                            (!ticket.assignedTechnicianId || !ticket.repairStartedAt) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -2007,6 +2071,19 @@ export default function ServiceDashboardPage() {
                                 <UserPlus className="size-3.5" />
                                 {ticket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
                               </Button>
+                            )}
+                          {/* Reassignment locks once repair has actually started — a swap
+                              mid-job (parts/labour already underway) doesn't make sense. */}
+                          {(isHelpDesk || isManagerOrAdmin) &&
+                            !['COMPLETED', 'CANCELLED'].includes(ticket.status) &&
+                            ticket.assignedTechnicianId &&
+                            ticket.repairStartedAt && (
+                              <span
+                                className="text-[10px] font-medium text-slate-400 italic"
+                                title="Repair is already in progress"
+                              >
+                                Technician locked — repair in progress
+                              </span>
                             )}
 
                           {/* Pay-now for the visit charge — available any time before
@@ -2045,7 +2122,16 @@ export default function ServiceDashboardPage() {
                                 <Button
                                   size="sm"
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2 rounded-md text-[11px] font-medium gap-1"
-                                  onClick={() => handleApproveQuotation(ticket)}
+                                  onClick={() =>
+                                    setApproveModal({
+                                      kind: 'ticket',
+                                      ticketId: ticket.id,
+                                      ticketNumber: ticket.ticketNumber,
+                                      // No reliable quoted total at the row level for this
+                                      // path (the linked billing quotation isn't fetched
+                                      // here) — the dialog falls back to generic wording.
+                                    })
+                                  }
                                 >
                                   <CheckCircle2 className="size-3.5" />
                                   Approve
@@ -4953,7 +5039,9 @@ export default function ServiceDashboardPage() {
                       )}
 
                       {(isHelpDesk || isManagerOrAdmin) &&
-                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) && (
+                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) &&
+                        (!selectedTicket.assignedTechnicianId ||
+                          !selectedTicket.repairStartedAt) && (
                           <Button
                             size="sm"
                             className="bg-blue-600 hover:bg-[#1e3a8a] text-white h-8 px-3 rounded-lg font-bold gap-1"
@@ -4968,6 +5056,17 @@ export default function ServiceDashboardPage() {
                             <UserPlus className="size-3.5" />
                             {selectedTicket.assignedTechnicianId ? 'Change Tech' : 'Assign Tech'}
                           </Button>
+                        )}
+                      {(isHelpDesk || isManagerOrAdmin) &&
+                        !['COMPLETED', 'CANCELLED'].includes(selectedTicket.status) &&
+                        selectedTicket.assignedTechnicianId &&
+                        selectedTicket.repairStartedAt && (
+                          <span
+                            className="text-[10px] font-medium text-slate-400 italic"
+                            title="Repair is already in progress"
+                          >
+                            Technician locked — repair in progress
+                          </span>
                         )}
 
                       {isTechnician &&
@@ -5730,7 +5829,8 @@ export default function ServiceDashboardPage() {
                                   size="sm"
                                   className="bg-green-600 hover:bg-green-700 text-white text-[11px] h-8 px-3 rounded-lg"
                                   onClick={() =>
-                                    setApproveCustModal({
+                                    setApproveModal({
+                                      kind: 'estimate',
                                       estimateId: est.id,
                                       ticketNumber: selectedTicket?.ticketNumber,
                                       total: Number(est.totalCost) || 0,
@@ -5769,6 +5869,50 @@ export default function ServiceDashboardPage() {
                                   Mark Customer Rejection
                                 </Button>
                               </div>
+                            </div>
+                          )}
+
+                        {/* Signature proof of customer approval — mirrors ContractAgreementModal's
+                            already-signed view. */}
+                        {est.status === 'CUSTOMER_APPROVED' &&
+                          (est.customerSignatureData || est.customerSignedDocumentUrl) && (
+                            <div className="space-y-2 rounded-lg border border-emerald-100 bg-emerald-50/50 p-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-emerald-800">
+                                  ✓ Customer Approved
+                                  {est.customerApprovedByName
+                                    ? ` — ${est.customerApprovedByName}`
+                                    : ''}
+                                </span>
+                                <span className="text-[9px] text-emerald-600">
+                                  {est.customerApprovedAt
+                                    ? new Date(est.customerApprovedAt).toLocaleString()
+                                    : ''}
+                                </span>
+                              </div>
+                              {est.customerSignatureData ? (
+                                <img
+                                  src={est.customerSignatureData}
+                                  alt="Customer signature"
+                                  className="h-16 rounded border border-emerald-200 bg-white"
+                                />
+                              ) : (
+                                <div className="space-y-1">
+                                  <a
+                                    href={est.customerSignedDocumentUrl ?? undefined}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] font-bold text-emerald-700 underline"
+                                  >
+                                    View signed document
+                                  </a>
+                                  {est.customerSignedDocumentNote && (
+                                    <p className="text-[10px] text-slate-500">
+                                      {est.customerSignedDocumentNote}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -6662,13 +6806,28 @@ export default function ServiceDashboardPage() {
       </Modal>
 
       <RecordCustomerApprovalDialog
-        open={!!approveCustModal}
-        onClose={() => setApproveCustModal(null)}
+        open={!!approveModal}
+        onClose={() => setApproveModal(null)}
         onConfirm={(meta) => {
-          if (approveCustModal) handleApproveCustomer(approveCustModal.estimateId, meta);
+          if (!approveModal) return;
+          if (approveModal.kind === 'ticket') {
+            const ticket = filteredTickets.find((t) => t.id === approveModal.ticketId);
+            if (ticket) handleApproveQuotation(ticket, meta);
+          } else {
+            handleApproveCustomer(approveModal.estimateId, meta);
+          }
         }}
-        ticketNumber={approveCustModal?.ticketNumber}
-        estimateTotal={approveCustModal?.total}
+        onConfirmUpload={(meta, file, attestationNote) => {
+          if (!approveModal) return;
+          if (approveModal.kind === 'ticket') {
+            const ticket = filteredTickets.find((t) => t.id === approveModal.ticketId);
+            if (ticket) handleApproveQuotationUpload(ticket, file, attestationNote, meta);
+          } else {
+            handleApproveCustomerUpload(approveModal.estimateId, file, attestationNote, meta);
+          }
+        }}
+        ticketNumber={approveModal?.ticketNumber}
+        estimateTotal={approveModal?.total}
         currency={getActiveCurrency()}
         submitting={submitting}
       />

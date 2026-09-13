@@ -815,31 +815,41 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                               </>
                             );
                           })()}
-                          {/* Vendor-declared tax treatment — informational chip only */}
-                          {!vs.allOutOfStock &&
-                            (vs.taxIncluded != null ||
-                              vs.taxRatePercent != null ||
-                              !!vs.taxRateMixed) && (
-                              <div className="mt-2 flex justify-center">
-                                {vs.taxIncluded === true ? (
-                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-2 font-semibold">
-                                    Tax included
-                                  </Badge>
-                                ) : vs.taxRateMixed ? (
-                                  <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
-                                    Tax: mixed rates
-                                  </Badge>
-                                ) : vs.taxRatePercent != null ? (
-                                  <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
-                                    + {Number(vs.taxRatePercent)}% tax on top
-                                  </Badge>
-                                ) : vs.taxIncluded === false ? (
-                                  <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
-                                    Tax added on top
-                                  </Badge>
-                                ) : null}
-                              </div>
-                            )}
+                          {/* Vendor-declared tax treatment, and the amount with it folded in
+                              — so "cheapest quoted price" doesn't hide who's actually
+                              cheapest once their own tax is added. */}
+                          {!vs.allOutOfStock && !!vs.hasTax && (
+                            <div className="mt-2 flex flex-col items-center gap-1">
+                              {vs.taxIncluded === true ? (
+                                <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-2 font-semibold">
+                                  Tax included
+                                </Badge>
+                              ) : vs.taxRateMixed ? (
+                                <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
+                                  Tax: mixed rates
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
+                                  +{' '}
+                                  {vs.taxRatePercent != null
+                                    ? `${Number(vs.taxRatePercent)}% `
+                                    : ''}
+                                  tax on top
+                                </Badge>
+                              )}
+                              {vs.taxIncluded !== true &&
+                                vs.taxInclusiveTotalAmount != null &&
+                                Number(vs.taxInclusiveTotalAmount) !== Number(vs.totalAmount) && (
+                                  <div className="text-xs font-bold text-orange-700">
+                                    Incl. tax:{' '}
+                                    {formatCurrency(
+                                      vs.taxInclusiveTotalAmount as number,
+                                      (vs.vendorCurrency as string) || getActiveCurrency(),
+                                    )}
+                                  </div>
+                                )}
+                            </div>
+                          )}
                           {!vs.allOutOfStock &&
                             !!(vs as { isCheapest?: boolean }).isCheapest &&
                             (comparison.vendorsSummary as unknown[]).length > 1 && (
@@ -905,6 +915,63 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               Are you sure you want to award this quotation to the selected vendor? This action is
               final and will generate a lot for the awarded items.
             </AlertDialogDescription>
+            {(() => {
+              const vs = (
+                comparison?.vendorsSummary as Record<string, unknown>[] | undefined
+              )?.find((v) => v.vendorId === vendorToAward);
+              if (!vs || !vs.hasTax) return null;
+
+              // Vendor marked at least one line as tax-exclusive (or declared
+              // tax is already included) — show what this quote actually costs
+              // with that tax folded in, not just the raw price they typed.
+              const taxExclusive = vs.taxIncluded !== true;
+              const currencyDiffers =
+                vs.convertedTaxInclusiveTotalAmount != null &&
+                !!vs.branchCurrency &&
+                vs.branchCurrency !== vs.vendorCurrency;
+
+              return (
+                <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 text-center space-y-1">
+                  <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+                    {vs.taxIncluded === true
+                      ? 'Price Already Includes Tax'
+                      : vs.taxRateMixed
+                        ? 'Tax Varies by Item'
+                        : `Tax Not Included${vs.taxRatePercent != null ? ` (${vs.taxRatePercent}%)` : ''}`}
+                  </div>
+                  {taxExclusive ? (
+                    <>
+                      <div className="text-lg font-black text-slate-800">
+                        {formatCurrency(vs.totalAmount as number, vs.vendorCurrency as string)}{' '}
+                        <span className="text-slate-400 font-semibold">+ tax →</span>{' '}
+                        {formatCurrency(
+                          vs.taxInclusiveTotalAmount as number,
+                          vs.vendorCurrency as string,
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        This is what you&apos;ll actually pay this vendor, tax included.
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-lg font-black text-slate-800">
+                      {formatCurrency(vs.totalAmount as number, vs.vendorCurrency as string)}
+                    </div>
+                  )}
+                  {currencyDiffers && (
+                    <div className="text-[11px] text-slate-500">
+                      ≈{' '}
+                      {formatCurrency(
+                        vs.convertedTaxInclusiveTotalAmount as number,
+                        vs.branchCurrency as string,
+                      )}{' '}
+                      in {vs.branchCurrency as string}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {(() => {
               const vs = (
                 comparison?.vendorsSummary as Record<string, unknown>[] | undefined
