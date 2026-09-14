@@ -60,9 +60,17 @@ export interface Purchase {
   goodsOrService?: 'GOODS' | 'SERVICE' | null;
 
   // ─── Tax fields ─────────────────────────────────────────────────────────────
+  /** Goods value excluding tax, plus the other taxable cost components. */
   taxableAmount?: number | null;
   taxPercent?: number | null;
   taxName?: string | null;
+  /** True when the vendor quoted tax-inclusively, so `purchaseAmount` already contains
+   *  their tax rather than having it added on top. Null when they declared nothing. */
+  taxIncluded?: boolean | null;
+  /** The vendor's goods value excluding tax — purchaseAmount − vendorTaxAmount. */
+  vendorNetAmount?: number | null;
+  /** The tax on the vendor's goods alone. */
+  vendorTaxAmount?: number | null;
   inputVatAmount?: number | null;
   reverseChargeVatAmount?: number | null;
   vatClaimable?: boolean;

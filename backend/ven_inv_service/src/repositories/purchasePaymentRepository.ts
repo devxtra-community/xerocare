@@ -76,7 +76,25 @@ export class PurchasePaymentRepository {
       const generatedRef = await generatePaymentReference(data.paymentMethod, payment.paymentDate);
       payment.referenceNumber = generatedRef ?? data.referenceNumber;
 
-      return await manager.save(PurchasePayment, payment);
+      const saved = await manager.save(PurchasePayment, payment);
+
+      // Settling the vendor's invoice settles its tax with it.
+      //
+      // tax_status had no transition at all: every purchase was written PENDING and
+      // nothing — no endpoint caller, no UI, no event — ever moved it, so the Tax Report
+      // showed input VAT as outstanding forever, including on invoices that were paid in
+      // full months ago. Once the last of the invoice is paid the input VAT has
+      // definitively been incurred and handed to the vendor, which is exactly what
+      // RECORDED means. FILED stays manual: that asserts the VAT return was actually
+      // submitted, which only Finance can know, and is never downgraded here.
+      if (alreadyPaid + Number(data.amount) >= Number(purchase.purchaseAmount) - 0.01) {
+        if (purchase.taxStatus === 'PENDING') {
+          purchase.taxStatus = 'RECORDED';
+          await manager.save(Purchase, purchase);
+        }
+      }
+
+      return saved;
     });
   }
 
@@ -91,10 +109,35 @@ export class PurchasePaymentRepository {
   }
 
   async voidPayment(paymentId: string, branchId: string): Promise<void> {
-    const payment = await this.repo.findOne({ where: { id: paymentId, branchId } });
-    if (!payment) {
-      throw new AppError('Purchase payment not found', 404);
-    }
-    await this.repo.remove(payment);
+    await Source.transaction(async (manager: EntityManager) => {
+      const payment = await manager.findOne(PurchasePayment, {
+        where: { id: paymentId, branchId },
+      });
+      if (!payment) {
+        throw new AppError('Purchase payment not found', 404);
+      }
+      const purchaseId = payment.purchaseId;
+      await manager.remove(PurchasePayment, payment);
+
+      // Voiding a payment can take the invoice back below fully-paid, so the tax it
+      // settled is outstanding again. Without this the status would stay RECORDED on an
+      // invoice that is once more unpaid. FILED is left alone — a submitted VAT return
+      // is not undone by a payment correction here, and quietly reopening it would hide
+      // a real discrepancy that Finance needs to see and handle deliberately.
+      const purchase = await manager.findOne(Purchase, {
+        where: { id: purchaseId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (purchase && purchase.taxStatus === 'RECORDED') {
+        const remainingPayments = await manager.find(PurchasePayment, {
+          where: { purchaseId },
+        });
+        const stillPaid = remainingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+        if (stillPaid < Number(purchase.purchaseAmount) - 0.01) {
+          purchase.taxStatus = 'PENDING';
+          await manager.save(Purchase, purchase);
+        }
+      }
+    });
   }
 }

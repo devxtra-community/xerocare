@@ -35,6 +35,12 @@ router.post('/internal/record-payment', (req, res, next) =>
   purchaseController.recordPaymentInternal(req, res, next),
 );
 
+// Approved additional cost (shipping, labour, documentation…) — paid to a third party,
+// so it records a cost line and leaves the vendor's outstanding untouched.
+router.post('/internal/record-cost', (req, res, next) =>
+  purchaseController.recordCostInternal(req, res, next),
+);
+
 // Internal endpoint: billing_service voids a PurchasePayment on Finance rejection
 router.post('/internal/void-payment', (req, res, next) =>
   purchaseController.voidPaymentInternal(req, res, next),

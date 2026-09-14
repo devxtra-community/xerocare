@@ -33,6 +33,10 @@ export interface ExpenseRequest {
   vendorName?: string;
   /** DOMESTIC (local) or INTERNATIONAL — snapshotted from the purchase */
   purchaseOrigin?: string;
+  /** Set when this request pays an additional cost on the lot (Shipping, Labour,
+   *  Documentation…) rather than the vendor's invoice. Approving it records a cost line
+   *  and leaves the vendor's outstanding untouched. */
+  purchaseCostType?: string;
   paymentMode?: string;
   paidFromAccountId?: string;
   purchasePaymentId?: string;
@@ -143,6 +147,13 @@ export interface ManagerPurchasePaymentRequestPayload {
   referenceNumber?: string;
   paymentDate?: string;
   currency?: string;
+  /**
+   * Set when the payment settles an additional cost on the lot (Shipping, Labour,
+   * Documentation…) rather than the vendor's own invoice. Its presence is what makes
+   * the approval record a cost line and leave the vendor's outstanding untouched —
+   * paying a freight forwarder must never mark the vendor as paid.
+   */
+  purchaseCostType?: string;
 }
 
 export const createManagerPurchasePaymentRequest = (

@@ -1,4 +1,5 @@
 import { EntityManager, FindOptionsWhere } from 'typeorm';
+import { computePurchaseTaxFields } from '../utils/purchaseTax';
 import { Source } from '../config/db';
 import { Lot, LotStatus } from '../entities/lotEntity';
 import { LotItem, LotItemType } from '../entities/lotItemEntity';
@@ -249,24 +250,31 @@ export class LotRepository {
         ? Number(finalLot.exchangeRateSnapshot)
         : null;
 
-      // Tax rate and name from branch
-      purchase.taxPercent = branch?.tax_percent != null ? Number(branch.tax_percent) : null;
+      // A lot carrying a vendor-declared rate (RFQ-awarded) uses it; otherwise the
+      // branch rate stands in.
+      purchase.taxPercent =
+        finalLot.taxRatePercent != null
+          ? Number(finalLot.taxRatePercent)
+          : branch?.tax_percent != null
+            ? Number(branch.tax_percent)
+            : null;
       purchase.taxName = branch?.tax_name ?? null;
+      purchase.taxIncluded = finalLot.taxIncluded ?? null;
 
-      // Taxable amount (initially purchaseAmount since labour, shipping, etc. are 0)
-      purchase.taxableAmount = itemsTotal;
-
-      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
-        if (purchase.purchaseOrigin === 'DOMESTIC') {
-          purchase.inputVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.reverseChargeVatAmount = null;
-        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
-          purchase.reverseChargeVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.inputVatAmount = null;
-        }
-      }
+      // itemsTotal is what the vendor invoices, so the tax comes out of it. A manually
+      // entered lot with no declaration is treated the same way — the figure a manager
+      // keys in is the one the vendor billed, which is also what the payable already
+      // assumes, so extracting keeps those two consistent instead of claiming tax on
+      // top of a total nobody owes.
+      Object.assign(
+        purchase,
+        computePurchaseTaxFields({
+          purchaseAmount: itemsTotal,
+          taxRatePercent: purchase.taxPercent,
+          additionalTaxableCosts: 0,
+          purchaseOrigin: purchase.purchaseOrigin,
+        }),
+      );
       purchase.vatClaimable = true;
       purchase.taxStatus = 'PENDING';
 

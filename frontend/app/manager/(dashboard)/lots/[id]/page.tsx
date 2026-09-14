@@ -71,6 +71,7 @@ import AddCostModal from '@/components/ManagerDashboardComponents/purchaseCompon
 import ShipmentInfoCard from '@/components/ManagerDashboardComponents/lotComponents/ShipmentInfoCard';
 import AllocateLandedCostsModal from '@/components/ManagerDashboardComponents/lotComponents/AllocateLandedCostsModal';
 import api from '@/lib/api';
+import { COST_LINE_ORDER, costLineForType } from '@/lib/purchaseCostTypes';
 import { getUserFromToken } from '@/lib/auth';
 
 /**
@@ -87,6 +88,42 @@ export default function LotDetailPage() {
   const [lot, setLot] = useState<Lot | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchaseRecord, setPurchaseRecord] = useState<Purchase | null>(null);
+
+  /**
+   * The lot's additional costs, per category, from both places one can live: the
+   * purchase's typed column and any itemised cost rows of that kind. Kept together so
+   * the breakdown, the total, and the Add Cost form all quote the same figure.
+   */
+  const additionalCostLines = React.useMemo(() => {
+    const typed: Record<string, number> = {
+      Documentation: Number(purchaseRecord?.documentationFee ?? 0),
+      Labour: Number(purchaseRecord?.labourCost ?? 0),
+      Handling: Number(purchaseRecord?.handlingFee ?? 0),
+      Transportation: Number(purchaseRecord?.transportationCost ?? 0),
+      Shipping: Number(purchaseRecord?.shippingCost ?? 0),
+      Groundfield: Number(purchaseRecord?.groundfieldCost ?? 0),
+      'Customs Duty': Number(purchaseRecord?.customsDuty ?? 0),
+      Other: 0,
+    };
+    const itemised: Record<string, number> = {};
+    for (const c of purchaseRecord?.costs ?? []) {
+      const line = costLineForType(c.costType);
+      itemised[line] = (itemised[line] ?? 0) + Number(c.amount ?? 0);
+    }
+    return COST_LINE_ORDER.map((label) => ({
+      label,
+      typed: typed[label] ?? 0,
+      itemised: itemised[label] ?? 0,
+      total: (typed[label] ?? 0) + (itemised[label] ?? 0),
+      // Categories with nothing in them at all are still listed, so the breakdown keeps
+      // a stable shape — except "Other", which only appears once something lands in it.
+    })).filter((l) => l.label !== 'Other' || l.total > 0);
+  }, [purchaseRecord]);
+
+  const totalAdditionalCosts = React.useMemo(
+    () => additionalCostLines.reduce((sum, l) => sum + l.total, 0),
+    [additionalCostLines],
+  );
   const [loadingPurchase, setLoadingPurchase] = useState(true);
   const [isReceiving, setIsReceiving] = useState(false);
   const [receivedItems, setReceivedItems] = useState<
@@ -1168,6 +1205,39 @@ export default function LotDetailPage() {
                     </span>
                   </div>
 
+                  {/* How that figure splits between the vendor and the tax authority.
+                      Shown whenever a tax was actually charged, because the two halves
+                      settle to different places: the whole of it is owed to the vendor,
+                      but only the net is a cost — the tax is reclaimed. */}
+                  {Number(purchaseRecord.vendorTaxAmount ?? 0) > 0 && (
+                    <div className="pl-3 border-l-2 border-slate-100 space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">Vendor Amount (excl. tax)</span>
+                        <span className="font-bold text-slate-700">
+                          {formatCurrency(Number(purchaseRecord.vendorNetAmount ?? 0), currency)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">
+                          {purchaseRecord.taxName || 'Tax'}
+                          {purchaseRecord.taxPercent != null &&
+                            ` (${Number(purchaseRecord.taxPercent)}%)`}
+                          <span className="ml-1 text-slate-400">
+                            {purchaseRecord.taxIncluded === false ? 'added on top' : 'included'}
+                          </span>
+                        </span>
+                        <span className="font-bold text-slate-700">
+                          {formatCurrency(Number(purchaseRecord.vendorTaxAmount ?? 0), currency)}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-snug">
+                        {purchaseRecord.taxIncluded === false
+                          ? 'The vendor quoted before tax, so the tax was added to reach the invoice above.'
+                          : "The vendor's quoted price already covered the tax, so it is shown split out of the amount above — not added to it."}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="pt-3 border-t border-dashed">
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
@@ -1182,24 +1252,37 @@ export default function LotDetailPage() {
                         <Pencil size={10} /> Edit
                       </Button>
                     </div>
+                    {/* Each line sums BOTH places a cost can live: the purchase's own
+                        typed column and any itemised cost rows of that kind. They are
+                        parallel stores — "Add Cost" writes only rows and leaves every
+                        column at zero — so reading the column alone showed "Shipping
+                        0.00" on a lot that plainly had a shipping charge, with the real
+                        figure stranded in a separate list further down. */}
                     <div className="space-y-2 pl-3 border-l-2 border-slate-100">
-                      {[
-                        { label: 'Documentation', value: purchaseRecord.documentationFee },
-                        { label: 'Labour', value: purchaseRecord.labourCost },
-                        { label: 'Handling', value: purchaseRecord.handlingFee },
-                        { label: 'Transportation', value: purchaseRecord.transportationCost },
-                        { label: 'Shipping', value: purchaseRecord.shippingCost },
-                        { label: 'Groundfield', value: purchaseRecord.groundfieldCost },
-                      ].map((item, idx) => (
-                        <div key={idx} className="flex justify-between text-xs">
-                          <span className="text-slate-500">{item.label}</span>
+                      {additionalCostLines.map((item) => (
+                        <div key={item.label} className="flex justify-between text-xs">
+                          <span className="text-slate-500">
+                            {item.label}
+                            {item.itemised > 0 && item.typed > 0 && (
+                              <span className="ml-1 text-[9px] text-slate-400">
+                                ({formatCurrency(item.typed, currency)} +{' '}
+                                {formatCurrency(item.itemised, currency)} itemised)
+                              </span>
+                            )}
+                          </span>
                           <span
-                            className={`font-bold ${Number(item.value) > 0 ? 'text-slate-700' : 'text-slate-300'}`}
+                            className={`font-bold ${item.total > 0 ? 'text-slate-700' : 'text-slate-300'}`}
                           >
-                            {formatCurrency(Number(item.value), currency)}
+                            {formatCurrency(item.total, currency)}
                           </span>
                         </div>
                       ))}
+                      <div className="flex justify-between border-t border-dashed border-slate-200 pt-2 text-xs">
+                        <span className="font-bold text-slate-600">Total Additional Costs</span>
+                        <span className="font-bold text-slate-800">
+                          {formatCurrency(totalAdditionalCosts, currency)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1226,6 +1309,32 @@ export default function LotDetailPage() {
                         {formatCurrency(purchaseRecord.remainingAmount, currency)}
                       </span>
                     </div>
+
+                    {/* Stated here so the balance above is not misread. The tax is inside
+                        what is owed to the vendor, never an extra debt on top of it —
+                        it is separately recoverable from the tax authority. */}
+                    {Number(
+                      purchaseRecord.inputVatAmount ?? purchaseRecord.reverseChargeVatAmount ?? 0,
+                    ) > 0 && (
+                      <div className="flex justify-between text-xs pt-1">
+                        <span className="text-slate-500">
+                          {purchaseRecord.reverseChargeVatAmount != null
+                            ? 'Reverse-charge tax (self-assessed)'
+                            : `${purchaseRecord.taxName || 'Tax'} reclaimable`}
+                          <span className="ml-1 text-slate-400">— not owed to vendor</span>
+                        </span>
+                        <span className="font-bold text-blue-600">
+                          {formatCurrency(
+                            Number(
+                              purchaseRecord.inputVatAmount ??
+                                purchaseRecord.reverseChargeVatAmount ??
+                                0,
+                            ),
+                            currency,
+                          )}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {purchaseRecord.payments && purchaseRecord.payments.length > 0 && (
@@ -1269,8 +1378,15 @@ export default function LotDetailPage() {
 
                   {purchaseRecord.costs && purchaseRecord.costs.length > 0 && (
                     <div className="pt-3 border-t border-dashed">
+                      {/* Detail behind the breakdown above, not a separate bucket — each
+                          of these is already counted in its own Additional Costs line.
+                          Labelled as such because the old "Additional Dynamic Costs"
+                          heading read as a second, parallel total. */}
                       <div className="text-[10px] text-emerald-600 uppercase font-bold tracking-wider mb-2">
-                        Additional Dynamic Costs
+                        Cost Entries
+                        <span className="ml-1 normal-case font-medium text-slate-400">
+                          (included in the breakdown above)
+                        </span>
                       </div>
                       <div className="space-y-2">
                         {purchaseRecord.costs.map((c, i) => (
@@ -1376,8 +1492,14 @@ export default function LotDetailPage() {
           open={showPaymentModal}
           onOpenChange={(open) => setShowPaymentModal(open)}
           purchaseId={purchaseRecord.id}
+          purchaseRef={lot?.lotNumber}
+          vendorName={lot?.vendor?.name}
+          purchaseCurrency={purchaseRecord.currencyCode}
           payableAmount={purchaseRecord.purchaseAmount}
           paidAmount={purchaseRecord.paidAmount}
+          // So the Additional Cost mode can show what this lot already carries for the
+          // chosen cost type instead of asking blind.
+          existingCostLines={additionalCostLines}
           onSuccess={() => {
             fetchPurchase();
             setShowPaymentModal(false);

@@ -2239,6 +2239,28 @@ export const getInputTaxInternational = (filters: TaxReportFilters = {}) =>
     }>('/i/purchases/tax-report/international', { params: filters })
     .then((r) => r.data.data);
 
+/**
+ * Marks a purchase's input VAT as Recorded or Filed.
+ *
+ * The endpoint has existed since the tax report was built but had no caller anywhere —
+ * every purchase was written PENDING and nothing could ever move it, so the report
+ * showed input VAT as outstanding indefinitely. Full payment now advances a purchase to
+ * RECORDED on its own; this is what lets Finance mark a return as actually FILED, or
+ * correct a status by hand.
+ */
+export const updatePurchaseTaxStatus = (
+  purchaseId: string,
+  taxStatus: 'PENDING' | 'RECORDED' | 'FILED',
+) =>
+  api
+    .patch<{ success: boolean; data: unknown }>(
+      `/i/purchases/tax-report/${purchaseId}/tax-status`,
+      {
+        taxStatus,
+      },
+    )
+    .then((r) => r.data.data);
+
 export const sendTaxDocumentEmail = (payload: {
   recipient: string;
   subject: string;

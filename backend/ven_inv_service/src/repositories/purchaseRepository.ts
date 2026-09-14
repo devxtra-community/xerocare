@@ -1,4 +1,5 @@
 import { EntityManager } from 'typeorm';
+import { computePurchaseTaxFields } from '../utils/purchaseTax';
 import { Source } from '../config/db';
 import { Purchase } from '../entities/purchaseEntity';
 import { Lot } from '../entities/lotEntity';
@@ -107,34 +108,38 @@ export class PurchaseRepository {
       purchase.customsDuty = data.customsDuty != null ? Number(data.customsDuty) : null;
       purchase.goodsOrService = data.goodsOrService ?? null;
 
-      // taxableAmount: all cost components except documentationFee (non-taxable admin charge),
-      // plus customsDuty — standard import-VAT practice (UAE/KSA/Qatar FTA) assesses reverse-charge
-      // VAT on customs value + duty, not duty-exclusive. customsDuty is 0 for DOMESTIC purchases
-      // (never populated there) so this is a no-op outside INTERNATIONAL purchases.
-      purchase.taxableAmount =
-        purchaseAmount +
-        Number(data.labourCost) +
-        Number(data.handlingFee) +
-        Number(data.transportationCost) +
-        Number(data.shippingCost) +
-        Number(data.groundfieldCost) +
-        Number(purchase.customsDuty ?? 0);
-
-      // Tax rate and name (caller may supply from branch config or country_tax_rules)
-      purchase.taxPercent = data.taxPercent != null ? Number(data.taxPercent) : null;
+      // Tax rate and name. A lot awarded from an RFQ carries the vendor's own declared
+      // rate, which governs their invoice; an explicit caller value or the branch rate
+      // stands in when there is no declaration.
+      purchase.taxPercent =
+        lot.taxRatePercent != null
+          ? Number(lot.taxRatePercent)
+          : data.taxPercent != null
+            ? Number(data.taxPercent)
+            : null;
       purchase.taxName = data.taxName ?? null;
+      purchase.taxIncluded = lot.taxIncluded ?? null;
 
-      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
-        if (purchase.purchaseOrigin === 'DOMESTIC') {
-          purchase.inputVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.reverseChargeVatAmount = null;
-        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
-          purchase.reverseChargeVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.inputVatAmount = null;
-        }
-      }
+      // The vendor's tax comes out of purchaseAmount, not on top of it — that figure is
+      // the invoice. The other cost components are separate supplies entered net, and
+      // customsDuty joins them because standard import-VAT practice (UAE/KSA/Qatar FTA)
+      // assesses reverse-charge VAT on customs value plus duty. documentationFee stays
+      // out as a non-taxable admin charge.
+      Object.assign(
+        purchase,
+        computePurchaseTaxFields({
+          purchaseAmount,
+          taxRatePercent: purchase.taxPercent,
+          additionalTaxableCosts:
+            Number(data.labourCost) +
+            Number(data.handlingFee) +
+            Number(data.transportationCost) +
+            Number(data.shippingCost) +
+            Number(data.groundfieldCost) +
+            Number(purchase.customsDuty ?? 0),
+          purchaseOrigin: purchase.purchaseOrigin,
+        }),
+      );
       purchase.vatClaimable = data.vatClaimable !== false; // default true
       purchase.taxStatus = 'PENDING';
 
@@ -275,28 +280,25 @@ export class PurchaseRepository {
         Number(purchase.groundfieldCost) +
         dynamicCostsTotal;
 
-      // Recalculate taxable amount and VAT whenever costs change. Includes customsDuty —
+      // Recalculate the tax whenever costs change, the same way it was first computed:
+      // the vendor's tax is extracted from purchaseAmount (their invoice), the other
+      // components are separate net supplies taxed on top. Includes customsDuty —
       // standard import-VAT practice assesses reverse-charge VAT on customs value + duty.
-      purchase.taxableAmount =
-        purchaseAmount +
-        Number(purchase.labourCost) +
-        Number(purchase.handlingFee) +
-        Number(purchase.transportationCost) +
-        Number(purchase.shippingCost) +
-        Number(purchase.groundfieldCost) +
-        Number(purchase.customsDuty ?? 0);
-
-      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
-        if (purchase.purchaseOrigin === 'DOMESTIC') {
-          purchase.inputVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.reverseChargeVatAmount = null;
-        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
-          purchase.reverseChargeVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.inputVatAmount = null;
-        }
-      }
+      Object.assign(
+        purchase,
+        computePurchaseTaxFields({
+          purchaseAmount,
+          taxRatePercent: purchase.taxPercent,
+          additionalTaxableCosts:
+            Number(purchase.labourCost) +
+            Number(purchase.handlingFee) +
+            Number(purchase.transportationCost) +
+            Number(purchase.shippingCost) +
+            Number(purchase.groundfieldCost) +
+            Number(purchase.customsDuty ?? 0),
+          purchaseOrigin: purchase.purchaseOrigin,
+        }),
+      );
 
       return await manager.save(Purchase, purchase);
     });

@@ -1014,7 +1014,8 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "chequeNumber" VARCHAR NULL,
         ADD COLUMN IF NOT EXISTS "chequeBankName" VARCHAR NULL,
         ADD COLUMN IF NOT EXISTS "chequeDueDate" DATE NULL,
-        ADD COLUMN IF NOT EXISTS "purchaseOrigin" VARCHAR NULL;
+        ADD COLUMN IF NOT EXISTS "purchaseOrigin" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "purchaseCostType" VARCHAR NULL;
     `);
     logger.info('Manager purchase payment request columns on expense_requests ensured.');
     // ─── Cash & Bank extended columns + reconciliation table ─────────────────

@@ -45,8 +45,18 @@ export class Lot {
   @Column({ name: 'purchase_date', type: 'date' })
   purchaseDate!: Date;
 
+  /** What the vendor invoices for the goods — always tax-inclusive, whichever way the
+   *  vendor quoted. See Lot.taxIncluded / purchaseTax.splitPurchaseTax. */
   @Column({ name: 'total_amount', type: 'decimal', precision: 12, scale: 2, default: 0 })
   totalAmount!: number;
+
+  /** Vendor-declared tax treatment, carried from the awarded RFQ quote so the purchase
+   *  record and every recomputation after it can split `totalAmount` the same way. */
+  @Column({ name: 'tax_included', type: 'boolean', nullable: true })
+  taxIncluded?: boolean | null;
+
+  @Column({ name: 'tax_rate_percent', type: 'decimal', precision: 5, scale: 2, nullable: true })
+  taxRatePercent?: number | null;
 
   @Column({ type: 'enum', enum: LotStatus, default: LotStatus.PENDING })
   status!: LotStatus;

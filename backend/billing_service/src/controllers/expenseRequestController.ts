@@ -540,8 +540,10 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
             accountId,
             entryType: 'PAYMENT',
             amount: request.amount,
-            category: 'Vendor Purchase',
-            description: `Vendor payment: ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
+            category: request.purchaseCostType ? 'Purchase Additional Cost' : 'Vendor Purchase',
+            description: request.purchaseCostType
+              ? `${request.purchaseCostType} cost: ${request.purchaseRef || request.requestNo} (${request.vendorName || 'vendor'} lot)`
+              : `Vendor payment: ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
             paymentMode: request.paymentMode || 'Cash',
             notes: notes || request.notes,
             createdBy: userId,
@@ -560,35 +562,63 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
           try {
             const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
             const serviceToken = makeServiceToken();
-            const venInvRes = await fetch(`${venInvUrl}/purchases/internal/record-payment`, {
+            // An additional cost is money paid to a third party, so it is recorded as a
+            // cost line on the lot and must NOT reduce what the vendor is still owed.
+            // Only a genuine vendor payment settles the vendor's invoice.
+            const isCostPayment = !!request.purchaseCostType;
+            const endpoint = isCostPayment
+              ? `${venInvUrl}/purchases/internal/record-cost`
+              : `${venInvUrl}/purchases/internal/record-payment`;
+            const payload = isCostPayment
+              ? {
+                  purchaseId: request.purchaseId,
+                  branchId: request.branchId,
+                  amount: Number(request.amount),
+                  costType: request.purchaseCostType,
+                  description:
+                    request.description ||
+                    `${request.purchaseCostType} — ${request.purchaseRef || request.requestNo}`,
+                  costDate: new Date().toISOString().split('T')[0],
+                  createdBy: userId,
+                  attachmentUrl: request.receiptUrl,
+                }
+              : {
+                  purchaseId: request.purchaseId,
+                  branchId: request.branchId,
+                  amount: Number(request.amount),
+                  paymentMethod: request.paymentMode,
+                  description: `Vendor payment — ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
+                  paymentDate: new Date().toISOString().split('T')[0],
+                  createdBy: userId,
+                  attachmentUrl: request.receiptUrl,
+                };
+            const venInvRes = await fetch(endpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${serviceToken}`,
                 'x-internal-service': 'billing',
               },
-              body: JSON.stringify({
-                purchaseId: request.purchaseId,
-                branchId: request.branchId,
-                amount: Number(request.amount),
-                paymentMethod: request.paymentMode,
-                description: `Vendor payment — ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
-                paymentDate: new Date().toISOString().split('T')[0],
-                createdBy: userId,
-                attachmentUrl: request.receiptUrl,
-              }),
+              body: JSON.stringify(payload),
             });
             if (venInvRes.ok) {
               const venInvData = await venInvRes.json();
-              request.purchasePaymentId = venInvData.data?.id;
-              await Source.getRepository(EmployeeExpenseRequest).save(request);
+              // Only a vendor payment yields a PurchasePayment; a cost yields a cost
+              // line, which has no bearing on what the vendor is owed.
+              if (!isCostPayment) {
+                request.purchasePaymentId = venInvData.data?.id;
+                await Source.getRepository(EmployeeExpenseRequest).save(request);
+              }
             } else {
               const errText = await venInvRes.text();
               logger.error(
-                '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
+                isCostPayment
+                  ? '[approveExpenseRequest] Failed to record purchase cost after approval — cash was deducted but the cost was not added to the lot'
+                  : '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
                 {
                   requestId: request.id,
                   purchaseId: request.purchaseId,
+                  costType: request.purchaseCostType,
                   status: venInvRes.status,
                   errText,
                 },
@@ -596,20 +626,28 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
             }
           } catch (err) {
             logger.error(
-              '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
-              { requestId: request.id, purchaseId: request.purchaseId, err },
+              '[approveExpenseRequest] Failed to record the approved purchase outcome — cash was deducted but the purchase was not updated',
+              {
+                requestId: request.id,
+                purchaseId: request.purchaseId,
+                costType: request.purchaseCostType,
+                err,
+              },
             );
           }
         }
       }
 
       // Notify the Manager
+      const payeeLabel = request.purchaseCostType
+        ? `${request.purchaseCostType} cost on ${request.purchaseRef || 'the purchase'}`
+        : `payment to ${request.vendorName || 'vendor'}`;
       await sendNotification(
         request.employeeId,
-        'Purchase Payment Approved ✅',
+        request.purchaseCostType ? 'Purchase Cost Approved ✅' : 'Purchase Payment Approved ✅',
         isCheque
-          ? `Your ${request.currency} ${Number(request.amount).toFixed(2)} cheque payment to ${request.vendorName || 'vendor'} has been approved. Cheque is now ISSUED (PENDING clearance).`
-          : `Your ${request.currency} ${Number(request.amount).toFixed(2)} payment to ${request.vendorName || 'vendor'} has been approved and funds deducted.`,
+          ? `Your ${request.currency} ${Number(request.amount).toFixed(2)} cheque ${payeeLabel} has been approved. Cheque is now ISSUED (PENDING clearance).`
+          : `Your ${request.currency} ${Number(request.amount).toFixed(2)} ${payeeLabel} has been approved and funds deducted.`,
         'EXPENSE_APPROVED',
       );
 
@@ -797,7 +835,11 @@ export const rejectExpenseRequest = async (req: Request, res: Response, next: Ne
       await sendNotification(
         request.employeeId,
         'Purchase Payment Rejected ❌',
-        `Your ${request.currency} ${Number(request.amount).toFixed(2)} payment request to ${request.vendorName || 'vendor'} was rejected. Reason: ${rejection_reason}. No cash was moved and the purchase's outstanding balance is unchanged.`,
+        `Your ${request.currency} ${Number(request.amount).toFixed(2)} ${
+          request.purchaseCostType
+            ? `${request.purchaseCostType} cost request on ${request.purchaseRef || 'the purchase'}`
+            : `payment request to ${request.vendorName || 'vendor'}`
+        } was rejected. Reason: ${rejection_reason}. No cash was moved and the purchase's outstanding balance is unchanged.`,
         'EXPENSE_REJECTED',
       );
     } else {
@@ -865,6 +907,9 @@ export const createManagerPurchasePaymentRequest = async (
       referenceNumber,
       paymentDate,
       currency,
+      // Present when the Manager is paying an additional cost on the lot (shipping,
+      // labour, documentation…) rather than the vendor's own invoice.
+      purchaseCostType,
     } = req.body;
 
     if (!purchaseId || !amount || !paymentMethod) {
@@ -988,10 +1033,15 @@ export const createManagerPurchasePaymentRequest = async (
       branchId: empBranchId,
       branchName,
       date: paymentDate ? new Date(paymentDate) : new Date(),
-      category: 'Vendor Purchase',
-      subCategory: paymentMethod,
+      // Categorised apart from a vendor payment so Finance can see at a glance that this
+      // settles a third party (freight forwarder, labourer, broker), not the vendor.
+      category: purchaseCostType ? 'Purchase Additional Cost' : 'Vendor Purchase',
+      subCategory: purchaseCostType ? `${purchaseCostType} · ${paymentMethod}` : paymentMethod,
       description:
-        description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+        description ||
+        (purchaseCostType
+          ? `${purchaseCostType} cost — ${purchaseRef || 'purchase'} (${vendorName || 'vendor'} lot)`
+          : `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`),
       amount: parseFloat(String(amount)),
       currency: currency || 'AED',
       status: 'SUBMITTED',
@@ -1001,6 +1051,7 @@ export const createManagerPurchasePaymentRequest = async (
       purchaseRef: purchaseRef || undefined,
       vendorName: vendorName || undefined,
       purchaseOrigin: purchaseOrigin || undefined,
+      purchaseCostType: purchaseCostType || undefined,
       receiptUrl: proofUrl,
       paymentMode: paymentMethod,
       paidFromAccountId: paidFromAccountId || undefined,
