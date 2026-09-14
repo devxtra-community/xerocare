@@ -10,7 +10,7 @@ import api from './api';
 export type NavCounts = Record<string, number>;
 
 export const fetchNavCounts = async (): Promise<NavCounts> => {
-  const res = await api.get('/b/invoices/nav-counts');
+  const res = await api.get('/b/invoices/nav-counts', { skipErrorToast: true });
   return res.data?.data ?? {};
 };
 
