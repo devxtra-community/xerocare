@@ -60,7 +60,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
 
   const fetchNotifications = async () => {
     try {
-      const response = await api.get('/e/notifications/my');
+      const response = await api.get('/e/notifications/my', { skipErrorToast: true });
       const data = response.data;
       // Support both old array shape and new { notifications, unreadCount } shape
       if (Array.isArray(data)) {

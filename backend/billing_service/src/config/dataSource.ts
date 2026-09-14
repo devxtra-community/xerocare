@@ -2258,6 +2258,21 @@ async function runPreMigrations() {
     logger.info(
       `Backfill: ${accessoryBackfill.rowCount ?? 0} pre-existing accessory allocation(s) corrected from PRODUCT to ACCESSORY.`,
     );
+
+    // nav-counts polls every open sidebar every 30s and filters invoices by
+    // branchId+status and usage_records by contractId/billStatus — neither had an
+    // index, so both were sequential scans that occasionally pushed the poll past
+    // the frontend's 30s timeout and surfaced a "server is taking too long" toast.
+    try {
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_invoices_branchId_status" ON invoices ("branchId", status);
+        CREATE INDEX IF NOT EXISTS "IDX_usage_records_contractId" ON usage_records ("contractId");
+        CREATE INDEX IF NOT EXISTS "IDX_usage_records_billStatus" ON usage_records ("billStatus");
+      `);
+      logger.info('nav-counts indexes ensured on invoices and usage_records.');
+    } catch (err) {
+      logger.warn(`Could not create nav-counts indexes: ${(err as Error).message}`);
+    }
   } catch (err) {
     logger.error('Failed to run pre-migrations:', err);
     throw err;
