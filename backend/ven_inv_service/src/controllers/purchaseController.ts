@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { purchaseService } from '../services/purchaseService';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
+import { COST_TYPE_BUCKET_SQL } from '../utils/purchaseCostBuckets';
 
 export class PurchaseController {
   async getAllPurchases(req: Request, res: Response, next: NextFunction) {
@@ -190,6 +191,15 @@ export class PurchaseController {
       //   5005 shipping_handling  = shipping_cost + handling_fee + transportation_cost + groundfield_cost
       //   5014 import_labour_cost = labour_cost (import/purchase labour — distinct from 5002 Technician Labour)
       //   5015 customs_duty       = customs_duty (expensed directly, not capitalized into inventory)
+      //
+      // Cost is taken NET of reclaimable tax. A vendor invoice of 50,000 that already
+      // contains 2,380.95 of recoverable VAT cost the business 47,619.05 — the VAT comes
+      // back from the tax authority and is claimed as input VAT further down this same
+      // query. Capitalising the gross would put that 2,380.95 into inventory and then
+      // into COGS, while simultaneously crediting it against VAT Payable: the same money
+      // relieved twice. Where the tax is NOT claimable (vat_claimable = false) it never
+      // comes back, so there it genuinely is part of the cost and the gross stands.
+      // COALESCE covers purchases written before vendor_net_amount existed.
       const rows = await Source.query<
         {
           currency_code: string | null;
@@ -205,14 +215,37 @@ export class PurchaseController {
         `
         SELECT
           COALESCE(p.currency_code, 'AED') AS currency_code,
-          COALESCE(SUM(p.purchase_amount + p.documentation_fee), 0) AS purchase_cost,
-          COALESCE(SUM(p.purchase_amount), 0) AS purchase_goods_cost,
-          COALESCE(SUM(p.shipping_cost + p.handling_fee + p.transportation_cost + p.groundfield_cost), 0) AS shipping_handling,
-          COALESCE(SUM(p.labour_cost), 0) AS import_labour_cost,
-          COALESCE(SUM(p.customs_duty), 0) AS customs_duty,
+          COALESCE(SUM(
+            CASE WHEN p.vat_claimable IS NOT FALSE
+                 THEN COALESCE(p.vendor_net_amount, p.purchase_amount)
+                 ELSE p.purchase_amount END
+            + p.documentation_fee), 0) + COALESCE(MAX(c.documentation), 0) AS purchase_cost,
+          COALESCE(SUM(
+            CASE WHEN p.vat_claimable IS NOT FALSE
+                 THEN COALESCE(p.vendor_net_amount, p.purchase_amount)
+                 ELSE p.purchase_amount END), 0) AS purchase_goods_cost,
+          COALESCE(SUM(p.shipping_cost + p.handling_fee + p.transportation_cost + p.groundfield_cost), 0)
+            + COALESCE(MAX(c.shipping_handling), 0) AS shipping_handling,
+          COALESCE(SUM(p.labour_cost), 0) + COALESCE(MAX(c.import_labour), 0) AS import_labour_cost,
+          COALESCE(SUM(p.customs_duty), 0) + COALESCE(MAX(c.customs_duty), 0) AS customs_duty,
           COALESCE(SUM(p.input_vat_amount) FILTER (WHERE p.vat_claimable IS NOT FALSE), 0) AS input_vat_amount,
           COALESCE(SUM(p.reverse_charge_vat_amount) FILTER (WHERE p.vat_claimable IS NOT FALSE), 0) AS reverse_charge_vat_amount
         FROM purchases p
+        LEFT JOIN (
+          -- Itemised costs recorded against a purchase, folded into the same buckets as
+          -- the typed columns. These are a parallel store, not a duplicate of them: the
+          -- "Add Cost" flow writes only here and leaves every typed column at zero, so
+          -- before this join an itemised shipping charge raised the lot's total and then
+          -- never reached the P&L at all.
+          SELECT
+            pc.purchase_id,
+            SUM(pc.amount) FILTER (WHERE ${COST_TYPE_BUCKET_SQL} = 'SHIPPING_HANDLING') AS shipping_handling,
+            SUM(pc.amount) FILTER (WHERE ${COST_TYPE_BUCKET_SQL} = 'IMPORT_LABOUR')     AS import_labour,
+            SUM(pc.amount) FILTER (WHERE ${COST_TYPE_BUCKET_SQL} = 'CUSTOMS_DUTY')      AS customs_duty,
+            SUM(pc.amount) FILTER (WHERE ${COST_TYPE_BUCKET_SQL} = 'DOCUMENTATION')     AS documentation
+          FROM purchase_costs pc
+          GROUP BY pc.purchase_id
+        ) c ON c.purchase_id = p.id
         WHERE 1=1
           ${branchClause}
           ${dateFromClause}
@@ -289,6 +322,55 @@ export class PurchaseController {
 
   // Internal: billing_service calls this when Finance approves a Manager purchase payment request.
   // Records the PurchasePayment without firing the billing notification callback (avoids circular call).
+  /**
+   * Records an additional purchase cost that Finance has just approved and paid.
+   *
+   * The sibling of recordPaymentInternal, and deliberately separate from it: a shipping
+   * or labour charge is money paid to a freight forwarder or a labourer, not to the
+   * vendor, so it must NOT reduce what the vendor is still owed. Routing both through
+   * record-payment would have settled the vendor's invoice with money that never reached
+   * them. This writes the itemised cost row instead, which the cost report above folds
+   * into the right expense bucket.
+   */
+  async recordCostInternal(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (req.headers['x-internal-service'] !== 'billing') {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+      const {
+        purchaseId,
+        branchId,
+        amount,
+        costType,
+        description,
+        costDate,
+        createdBy,
+        attachmentUrl,
+      } = req.body;
+      if (!purchaseId || !branchId || !amount || !costType) {
+        return res.status(400).json({
+          success: false,
+          message: 'purchaseId, branchId, amount, costType are required',
+        });
+      }
+      const cost = await purchaseService.addCost(
+        purchaseId,
+        {
+          amount: Number(amount),
+          costType: String(costType),
+          description,
+          costDate: costDate ? new Date(costDate) : new Date(),
+          createdBy,
+          attachmentUrl,
+        },
+        branchId,
+      );
+      return res.status(201).json({ success: true, data: cost });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async recordPaymentInternal(req: Request, res: Response, next: NextFunction) {
     try {
       if (req.headers['x-internal-service'] !== 'billing') {

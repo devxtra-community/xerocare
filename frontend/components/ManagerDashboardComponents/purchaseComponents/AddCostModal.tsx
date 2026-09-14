@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PURCHASE_COST_TYPES } from '@/lib/purchaseCostTypes';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -19,15 +20,8 @@ import { Calendar, FileText, Banknote, Paperclip, X } from 'lucide-react';
 
 import { getActiveCurrency } from '@/lib/currency';
 
-const COST_TYPE_OPTIONS = [
-  'Labour',
-  'Handling',
-  'Shipping',
-  'Documentation',
-  'Transportation',
-  'Groundfield',
-  'Other',
-];
+// Shared with AddPaymentModal's Additional Cost mode — see lib/purchaseCostTypes.
+const COST_TYPE_OPTIONS = PURCHASE_COST_TYPES;
 
 interface AddCostModalProps {
   open: boolean;

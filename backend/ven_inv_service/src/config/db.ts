@@ -149,6 +149,27 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed branch currency & tax columns exist.');
 
+        // --- Vendor-declared tax treatment on purchases and lots ---
+        // A vendor quotes either tax-inclusively or tax-exclusively, and the two produce
+        // a different amount owed, a different taxable base and a different reclaimable
+        // VAT. Before these columns that declaration was read off the RFQ quote and then
+        // thrown away, and the branch rate was applied on top of whatever figure had been
+        // stored — taxing an amount that, for an inclusive quote, already contained the
+        // tax. These carry the declaration through to the purchase so the split is made
+        // once, from the vendor's own terms.
+        await Source.query(`
+          ALTER TABLE purchases
+          ADD COLUMN IF NOT EXISTS tax_included BOOLEAN,
+          ADD COLUMN IF NOT EXISTS vendor_net_amount DECIMAL(12,2),
+          ADD COLUMN IF NOT EXISTS vendor_tax_amount DECIMAL(12,2);
+        `);
+        await Source.query(`
+          ALTER TABLE lots
+          ADD COLUMN IF NOT EXISTS tax_included BOOLEAN,
+          ADD COLUMN IF NOT EXISTS tax_rate_percent DECIMAL(5,2);
+        `);
+        logger.info('Guaranteed purchase/lot vendor tax columns exist.');
+
         // --- Warehouse country + contact person columns ---
         // contact_person_* is denormalised: employees live in employee_service,
         // so we keep the id for reference and the name/email for display.

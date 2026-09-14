@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Mail, Send, Link2, Copy, Printer, CheckCircle2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/lib/apiError';
+import { publicAppLink } from '@/lib/publicAppUrl';
 import {
   getReplacement,
   sendReplacementReport,
@@ -84,8 +85,11 @@ export function ReplacementReportModal({
     setGeneratingLink(true);
     try {
       const { token } = await generateReplacementSigningToken(requestId);
-      const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/public/replacement/sign/${token}`;
-      setLink(url);
+      // window.location.origin is whatever THIS browser is on — localhost in dev, an
+      // internal host on the LAN — which is unreachable for the customer the link is
+      // being sent to. The other three signing modals were moved off it; this one was
+      // missed.
+      setLink(publicAppLink(`/public/replacement/sign/${token}`));
     } catch (err) {
       toast.error('Could not generate a link', { description: getApiErrorMessage(err) });
     } finally {

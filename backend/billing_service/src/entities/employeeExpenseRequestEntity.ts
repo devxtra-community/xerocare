@@ -105,6 +105,19 @@ export class EmployeeExpenseRequest {
   @Column({ type: 'varchar', nullable: true })
   purchaseOrigin?: string;
 
+  /**
+   * Set when this request pays an additional purchase cost (Shipping, Labour,
+   * Documentation, Transportation, Groundfield…) rather than the vendor's own invoice.
+   *
+   * The distinction decides where the money lands on approval: a vendor payment reduces
+   * what the vendor is owed, while a cost is paid to a freight forwarder, a labourer or
+   * a broker and must leave the vendor's outstanding untouched — settling the vendor's
+   * invoice with money that never reached them would show the purchase as paid off while
+   * the debt was still open. Null means an ordinary vendor payment.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  purchaseCostType?: string;
+
   // paymentMode selected by Manager (Cash / Bank Transfer / Cheque)
   @Column({ type: 'varchar', nullable: true })
   paymentMode?: string;

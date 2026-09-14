@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { costLineForType } from '@/lib/purchaseCostTypes';
+import { PURCHASE_COST_TYPES } from '@/lib/purchaseCostTypes';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -43,6 +45,10 @@ interface AddPaymentModalProps {
   /** Currency totalAmount/remainingAmount are recorded in (purchase.currencyCode) — may differ
    * from the branch currency the payment amount below is actually collected in. */
   purchaseCurrency?: string | null;
+  /** What the lot already carries per cost category, so the Additional Cost mode can
+   *  show the running figure rather than asking for an amount blind. Each line sums the
+   *  purchase's typed column and any itemised rows of that kind. */
+  existingCostLines?: { label: string; typed: number; itemised: number; total: number }[];
   exchangeRate?: number | null;
   onSuccess: () => void;
 }
@@ -57,6 +63,7 @@ export default function AddPaymentModal({
   paidAmount,
   purchaseCurrency,
   exchangeRate,
+  existingCostLines = [],
   onSuccess,
 }: AddPaymentModalProps) {
   const remainingAmount = Math.max(0, payableAmount - paidAmount);
@@ -73,6 +80,12 @@ export default function AddPaymentModal({
     { id: string; name: string; type: string; currentBalance: number; currency: string }[]
   >([]);
   const [paidFromAccount, setPaidFromAccount] = useState('');
+  // What this payment settles. A vendor payment reduces the vendor's invoice; an
+  // additional cost pays a third party (freight forwarder, labourer, broker) and leaves
+  // the vendor's outstanding untouched, so the two are capped and posted differently.
+  const [payFor, setPayFor] = useState<'VENDOR' | 'COST'>('VENDOR');
+  const [costType, setCostType] = useState<string>('Shipping');
+  const [customCostType, setCustomCostType] = useState('');
   const [formData, setFormData] = useState<AddPaymentDto>({
     amount: 0,
     paymentMethod: 'Bank Transfer',
@@ -91,6 +104,9 @@ export default function AddPaymentModal({
     } else {
       setAttachment(null);
       setPaidFromAccount('');
+      setPayFor('VENDOR');
+      setCostType('Shipping');
+      setCustomCostType('');
     }
     // Only re-run on open/close — account selection itself is driven by the
     // payment-method effect below, not by re-fetching.
@@ -101,6 +117,18 @@ export default function AddPaymentModal({
   // method changes (or the account list first loads), drop a now-invalid selection
   // and default to the first matching account rather than leaving a stale, mismatched
   // one selected.
+  // What this lot already carries for the cost type being entered, and across all of
+  // them — so the manager adds to a known figure instead of guessing.
+  const selectedCostLine = useMemo(() => {
+    const label = costType === 'Other' ? costLineForType(customCostType) : costType;
+    return existingCostLines.find((l) => l.label === label) ?? null;
+  }, [costType, customCostType, existingCostLines]);
+
+  const totalExistingCosts = useMemo(
+    () => existingCostLines.reduce((sum, l) => sum + l.total, 0),
+    [existingCostLines],
+  );
+
   const matchingAccounts = filterAccountsByPaymentMode(accounts, formData.paymentMethod);
   useEffect(() => {
     if (matchingAccounts.some((a) => a.id === paidFromAccount)) return;
@@ -140,10 +168,22 @@ export default function AddPaymentModal({
       return;
     }
 
-    if (Number(formData.amount) > remainingAmount + 0.01) {
+    // Only a vendor payment is capped by the vendor's outstanding. An additional cost is
+    // owed to a different party entirely, so capping it against the vendor's invoice
+    // would refuse a perfectly real freight bill on a fully-paid lot.
+    if (payFor === 'VENDOR' && Number(formData.amount) > remainingAmount + 0.01) {
       toast.error(
         `Amount exceeds remaining payable: ${formatCurrency(remainingAmount, currencyCode)}`,
       );
+      setLoading(false);
+      return;
+    }
+
+    const resolvedCostType =
+      payFor === 'COST' ? (costType === 'Other' ? customCostType.trim() : costType) : undefined;
+
+    if (payFor === 'COST' && !resolvedCostType) {
+      toast.error('Enter a name for this cost');
       setLoading(false);
       return;
     }
@@ -199,6 +239,9 @@ export default function AddPaymentModal({
             referenceNumber: isCheque ? chequeNumber : undefined,
             paymentDate: formData.paymentDate,
             currency: currencyCode,
+            // Set only for an additional cost — its presence is what tells the approval
+            // to record a cost line rather than settle the vendor's invoice.
+            purchaseCostType: resolvedCostType,
           },
           attachment,
         );
@@ -207,11 +250,31 @@ export default function AddPaymentModal({
           toast.success(
             'PENDING cheque created. Go to Accounts → Cheques to issue when handed to vendor.',
           );
+        } else if (payFor === 'COST') {
+          toast.success(
+            `${resolvedCostType} cost submitted for Finance approval. It will be added to the lot and funds deducted once approved.`,
+          );
         } else {
           toast.success(
             'Payment request submitted for Finance approval. Funds will be deducted once approved.',
           );
         }
+      } else if (payFor === 'COST') {
+        // Finance / Admin recording an additional cost directly. Deliberately NOT
+        // addPayment: that would settle the vendor's invoice with money paid to a
+        // freight forwarder or a labourer, showing the vendor as paid while the debt
+        // was still open.
+        await purchaseService.addCost(
+          purchaseId,
+          {
+            amount: formData.amount,
+            costType: resolvedCostType as string,
+            description: formData.description || undefined,
+            costDate: formData.paymentDate,
+          },
+          attachment,
+        );
+        toast.success(`${resolvedCostType} cost recorded on this lot`);
       } else {
         // Finance / Admin — immediate payment, existing flow
         await purchaseService.addPayment(
@@ -275,23 +338,29 @@ export default function AddPaymentModal({
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <CreditCard className="text-blue-400" />
-              Add Vendor Payment
+              {payFor === 'COST' ? 'Add Purchase Cost' : 'Add Vendor Payment'}
             </DialogTitle>
           </DialogHeader>
-          <div className="mt-2 text-slate-400 text-xs">
-            Remaining to pay:{' '}
-            <span className="text-white font-bold">
-              {isForeignPurchase
-                ? formatDualCurrency(
-                    remainingAmount,
-                    purchaseCurrency,
-                    currencyCode,
-                    rates,
-                    exchangeRate,
-                  )
-                : formatCurrency(remainingAmount, currencyCode)}
-            </span>
-          </div>
+          {payFor === 'COST' ? (
+            <div className="mt-2 text-slate-400 text-xs">
+              Paid to a third party — the vendor&apos;s outstanding is unchanged.
+            </div>
+          ) : (
+            <div className="mt-2 text-slate-400 text-xs">
+              Remaining to pay:{' '}
+              <span className="text-white font-bold">
+                {isForeignPurchase
+                  ? formatDualCurrency(
+                      remainingAmount,
+                      purchaseCurrency,
+                      currencyCode,
+                      rates,
+                      exchangeRate,
+                    )
+                  : formatCurrency(remainingAmount, currencyCode)}
+              </span>
+            </div>
+          )}
           {isForeignPurchase && (
             <p className="mt-1.5 text-[11px] text-amber-300">
               This purchase is recorded in {purchaseCurrency}. Enter the payment amount below in{' '}
@@ -302,9 +371,115 @@ export default function AddPaymentModal({
 
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col bg-white">
           <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-5">
+            {/* What this money settles. The vendor's goods invoice and the lot's other
+                costs are owed to different parties, so they are capped differently and
+                post to different accounts — asking once here keeps the two apart. */}
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-500 uppercase">Paying For</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    {
+                      key: 'VENDOR',
+                      label: 'Vendor Invoice',
+                      hint: 'Reduces what the vendor is owed',
+                    },
+                    {
+                      key: 'COST',
+                      label: 'Additional Cost',
+                      hint: 'Shipping, labour, documentation…',
+                    },
+                  ] as const
+                ).map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    onClick={() => setPayFor(o.key)}
+                    className={`rounded-xl border px-3 py-2 text-left transition ${
+                      payFor === o.key
+                        ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
+                        : 'border-slate-200 bg-white hover:border-blue-300'
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-slate-800">{o.label}</span>
+                    <span className="block text-[10px] leading-tight text-slate-500">{o.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {payFor === 'COST' && (
+              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase">Cost Type</Label>
+                  <Select value={costType} onValueChange={setCostType}>
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PURCHASE_COST_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {costType === 'Other' && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-slate-500 uppercase">
+                      Cost Name *
+                    </Label>
+                    <Input
+                      value={customCostType}
+                      onChange={(e) => setCustomCostType(e.target.value)}
+                      placeholder="e.g. Port storage charges"
+                      className="bg-white"
+                    />
+                  </div>
+                )}
+                <div className="rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">
+                      Already on this lot for{' '}
+                      <span className="font-semibold text-slate-700">
+                        {costType === 'Other'
+                          ? costLineForType(customCostType) || 'this cost'
+                          : costType}
+                      </span>
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      {formatCurrency(selectedCostLine?.total ?? 0, currencyCode)}
+                    </span>
+                  </div>
+                  {formData.amount > 0 && (
+                    <div className="mt-1 flex justify-between border-t border-dashed border-slate-200 pt-1">
+                      <span className="text-slate-500">After this cost</span>
+                      <span className="font-bold text-emerald-700">
+                        {formatCurrency(
+                          (selectedCostLine?.total ?? 0) + Number(formData.amount),
+                          currencyCode,
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <div className="mt-1 flex justify-between text-slate-400">
+                    <span>All additional costs on the lot</span>
+                    <span className="font-semibold">
+                      {formatCurrency(totalExistingCosts, currencyCode)}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[10px] leading-snug text-amber-700">
+                  This is added to the lot&apos;s additional costs and posted to its own expense
+                  account. It does not reduce the vendor&apos;s balance.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-xs font-bold text-slate-500 uppercase">
-                Payment Amount
+                {payFor === 'COST' ? 'Cost Amount' : 'Payment Amount'}
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
@@ -322,12 +497,15 @@ export default function AddPaymentModal({
                   autoFocus
                 />
               </div>
-              {formData.amount > 0 && formData.amount < remainingAmount && (
+              {/* Partial/full only describe progress against the vendor's invoice — a
+                  third-party cost settles nothing on it. */}
+              {payFor === 'VENDOR' && formData.amount > 0 && formData.amount < remainingAmount && (
                 <p className="text-[10px] text-yellow-600 font-medium italic">
                   Partial payment recognized
                 </p>
               )}
-              {formData.amount >= remainingAmount - 0.01 &&
+              {payFor === 'VENDOR' &&
+                formData.amount >= remainingAmount - 0.01 &&
                 formData.amount <= remainingAmount + 0.01 && (
                   <p className="text-[10px] text-green-600 font-medium italic">
                     Full payment recognized
@@ -540,8 +718,12 @@ export default function AddPaymentModal({
               {loading
                 ? 'Submitting...'
                 : getUserFromToken()?.role === 'MANAGER'
-                  ? 'Request Payment Approval'
-                  : 'Record Payment'}
+                  ? payFor === 'COST'
+                    ? 'Request Cost Approval'
+                    : 'Request Payment Approval'
+                  : payFor === 'COST'
+                    ? 'Record Cost'
+                    : 'Record Payment'}
             </Button>
           </div>
         </form>

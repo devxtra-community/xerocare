@@ -25,3 +25,21 @@ export function publicAppBase(): string {
 export function publicAppLink(path: string): string {
   return `${publicAppBase()}${path.startsWith('/') ? path : `/${path}`}`;
 }
+
+/**
+ * True when a customer-facing link points somewhere only this machine can reach.
+ *
+ * Worth showing in the UI rather than trusting configuration: when
+ * NEXT_PUBLIC_PUBLIC_APP_URL is missing the fallback below produces a link that looks
+ * completely normal and fails only once it is already in a customer's inbox. Both
+ * halves of that failure are silent, which is how it survived several rounds of
+ * "the link is still localhost".
+ */
+export function isUnreachableLink(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+  } catch {
+    return false;
+  }
+}

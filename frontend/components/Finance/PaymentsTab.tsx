@@ -478,6 +478,14 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                                 {r.purchaseRef}
                               </p>
                             )}
+                            {/* An additional cost is paid to a third party on this lot,
+                                not to the vendor named above — approving it must not be
+                                read as settling the vendor's invoice. */}
+                            {r.purchaseCostType && (
+                              <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                {r.purchaseCostType} cost — not vendor payment
+                              </span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-xs">

@@ -24,7 +24,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/apiError';
-import { publicAppLink } from '@/lib/publicAppUrl';
+import { publicAppLink, isUnreachableLink } from '@/lib/publicAppUrl';
 import {
   ContractAgreement,
   createOrGetContractAgreement,
@@ -627,6 +627,23 @@ export function ContractAgreementModal({
                           <p className="text-[10px] text-slate-400 font-bold text-center">
                             Link expires in 72 hours • Single use
                           </p>
+                          {/* A localhost link looks perfectly normal here and fails only
+                              once it is already in the customer's inbox. Say so on the
+                              screen rather than trusting the deployment to be configured. */}
+                          {isUnreachableLink(remoteLink) && (
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                              <p className="text-[11px] font-black uppercase tracking-wider text-red-700">
+                                This link will not work for the customer
+                              </p>
+                              <p className="mt-1 text-[11px] leading-relaxed text-red-600">
+                                It points at this machine, not the public site. Set{' '}
+                                <code className="font-mono">NEXT_PUBLIC_PUBLIC_APP_URL</code> in{' '}
+                                <code className="font-mono">frontend/.env</code> (and{' '}
+                                <code className="font-mono">PUBLIC_APP_URL</code> for the billing
+                                service), then restart both — do not send this link.
+                              </p>
+                            </div>
+                          )}
                           {/* A link is single-use and expires after 72 hours, so a customer
                               who let it lapse — or opened it once already — needs a fresh
                               one. The generate button disappears once a link exists, which

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { Suspense, useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useSearchParams } from 'next/navigation';
-import { RefreshCw, FileText } from 'lucide-react';
+import { RefreshCw, FileText, ChevronDown } from 'lucide-react';
 import {
   getOutputTax,
   getInputTaxLocal,
@@ -13,6 +14,7 @@ import {
   type InputTaxLocalRow,
   type InputTaxInternationalRow,
   type CountryBreakdownRow,
+  updatePurchaseTaxStatus,
 } from '@/lib/finance/accountsApi';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { fetchBranches } from '@/lib/finance/accounts';
@@ -46,16 +48,6 @@ const TAX_STATUS_COLORS: Record<string, string> = {
   RECORDED: 'bg-blue-100 text-blue-700',
   FILED: 'bg-green-100 text-green-700',
 };
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TAX_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'}`}
-    >
-      {status}
-    </span>
-  );
-}
 
 function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -377,6 +369,57 @@ function OutputTaxTab({
   );
 }
 
+/** Same control as the Finance tax report — see that file for why this exists. */
+function TaxStatusControl({
+  purchaseId,
+  status,
+  onChanged,
+}: {
+  purchaseId: string;
+  status: string;
+  onChanged: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const change = async (next: 'PENDING' | 'RECORDED' | 'FILED') => {
+    if (next === status) return;
+    setSaving(true);
+    try {
+      await updatePurchaseTaxStatus(purchaseId, next);
+      toast.success(`Input VAT marked ${next.toLowerCase()}`);
+      onChanged();
+    } catch {
+      toast.error('Could not update the tax status');
+    } finally {
+      setSaving(false);
+    }
+  };
+  // The control IS the badge. Showing a read-only badge next to a separate picker said
+  // the same thing twice and squeezed both into one narrow column; colouring the select
+  // itself keeps the status just as scannable while leaving room to actually read and
+  // click it.
+  return (
+    <div className="relative inline-block">
+      <select
+        aria-label="Tax status"
+        disabled={saving}
+        value={status}
+        onChange={(e) => change(e.target.value as 'PENDING' | 'RECORDED' | 'FILED')}
+        className={`h-8 w-[120px] cursor-pointer appearance-none rounded-lg border-0 pl-3 pr-7 text-xs font-semibold ring-1 ring-inset ring-black/5 transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-wait disabled:opacity-60 ${
+          TAX_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'
+        }`}
+      >
+        <option value="PENDING">Pending</option>
+        <option value="RECORDED">Recorded</option>
+        <option value="FILED">Filed</option>
+      </select>
+      <ChevronDown
+        size={13}
+        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60"
+      />
+    </div>
+  );
+}
+
 function InputTaxLocalTab({
   filters,
   periodReady,
@@ -391,6 +434,7 @@ function InputTaxLocalTab({
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const [showStatement, setShowStatement] = useState(false);
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['admin-tax-input-local', filters, page],
     queryFn: () => getInputTaxLocal({ ...filters, page, limit: 50 }),
@@ -536,7 +580,13 @@ function InputTaxLocalTab({
                         </span>
                       </TableCell>
                       <TableCell className="pr-4">
-                        <StatusBadge status={r.taxStatus} />
+                        <TaxStatusControl
+                          purchaseId={r.id}
+                          status={r.taxStatus}
+                          onChanged={() =>
+                            queryClient.invalidateQueries({ queryKey: ['admin-tax-input-local'] })
+                          }
+                        />
                       </TableCell>
                       <TableCell className="pr-4">
                         <button
@@ -588,6 +638,7 @@ function InputTaxInternationalTab({
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const [showStatement, setShowStatement] = useState(false);
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['admin-tax-input-intl', filters, page],
     queryFn: () => getInputTaxInternational({ ...filters, page, limit: 50 }),
@@ -751,7 +802,13 @@ function InputTaxInternationalTab({
                         </span>
                       </TableCell>
                       <TableCell className="pr-4">
-                        <StatusBadge status={r.taxStatus} />
+                        <TaxStatusControl
+                          purchaseId={r.id}
+                          status={r.taxStatus}
+                          onChanged={() =>
+                            queryClient.invalidateQueries({ queryKey: ['admin-tax-input-intl'] })
+                          }
+                        />
                       </TableCell>
                       <TableCell className="pr-4">
                         <button

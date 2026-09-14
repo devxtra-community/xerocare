@@ -108,11 +108,37 @@ export class Purchase {
   purchaseCategory?: 'PRODUCT' | 'SPARE_PART' | 'SERVICE' | 'OTHER' | null;
 
   // ─── Tax fields ───────────────────────────────────────────────────────────
-  // taxableAmount = purchaseAmount + labourCost + handlingFee + transportationCost
+  // taxableAmount = vendorNetAmount + labourCost + handlingFee + transportationCost
   //                 + shippingCost + groundfieldCost  (documentationFee excluded — it is
   //                 a non-taxable administrative charge in most Gulf jurisdictions)
+  //
+  // Note it is the vendor's NET that enters the base, not purchaseAmount. When a vendor
+  // quotes tax-inclusively, purchaseAmount is the full invoice and already contains the
+  // tax; feeding that figure back through the rate taxes the tax.
   @Column({ name: 'taxable_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
   taxableAmount?: number | null;
+
+  /**
+   * Whether `purchaseAmount` already contains the vendor's tax.
+   *
+   * This is the vendor's own declaration, carried from the RFQ quote — not a branch
+   * setting — because it is a fact about how this vendor priced this order. It decides
+   * whether the tax is extracted from the quoted figure or added on top of it, and so
+   * decides what is actually owed.
+   *
+   * Null means no declaration was made, and is treated as inclusive: that never invents
+   * a debt the vendor did not quote, nor claims tax that may not have been charged.
+   */
+  @Column({ name: 'tax_included', type: 'boolean', nullable: true })
+  taxIncluded?: boolean | null;
+
+  /** The vendor's goods value excluding tax. purchaseAmount − vendorTaxAmount. */
+  @Column({ name: 'vendor_net_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  vendorNetAmount?: number | null;
+
+  /** The tax on the vendor's goods alone, before any tax on additional costs. */
+  @Column({ name: 'vendor_tax_amount', type: 'decimal', precision: 12, scale: 2, nullable: true })
+  vendorTaxAmount?: number | null;
 
   @Column({ name: 'tax_percent', type: 'decimal', precision: 5, scale: 2, nullable: true })
   taxPercent?: number | null;

@@ -17,8 +17,9 @@ import { logger } from '../config/logger';
 import { Vendor } from '../entities/vendorEntity';
 import { Branch } from '../entities/branchEntity';
 import { Warehouse } from '../entities/warehouseEntity';
-import { classifyPurchaseOrigin, PurchaseOrigin } from '../entities/enums/purchaseOrigin';
+import { classifyPurchaseOrigin } from '../entities/enums/purchaseOrigin';
 import { getExchangeRate, round2 } from '../utils/exchangeRate';
+import { splitPurchaseTax, computePurchaseTaxFields } from '../utils/purchaseTax';
 
 interface CreateRfqDto {
   branchId: string;
@@ -1289,13 +1290,21 @@ export class RfqService {
       const date = new Date();
       const lotNumber = `LOT-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      const isInternational = rfq.purchase_origin === PurchaseOrigin.INTERNATIONAL;
-
       // The vendor-declared tax on each line changes what the item actually costs:
       // - tax NOT included → the vendor's price excludes tax, so tax is added on top
-      //   to get the real unit cost.
+      //   to get the real unit cost, and the vendor will invoice the larger figure.
       // - tax included → the vendor's quoted price already covers it; the unit cost
-      //   is unchanged, the tax portion is only broken out for display.
+      //   is unchanged, the tax portion is only broken out.
+      //
+      // This used to be gated on the purchase being INTERNATIONAL, which silently
+      // discarded the declaration on every domestic lot: a local vendor quoting
+      // "50,000 including 5% VAT" stored no tax at all, and the branch rate was then
+      // applied to the full 50,000 further down — taxing an amount that already
+      // contained the tax. Tax is a property of how the vendor quoted, not of which
+      // side of a border they sit on, so the origin no longer gates it. Origin still
+      // decides where the tax lands (reclaimable input VAT vs self-assessed reverse
+      // charge), which is the distinction it was really meant to draw.
+      //
       // Computed here (in the vendor's own currency) before anything is saved to the
       // lot, so the lot item, the lot total, and everything inventory reads from the
       // lot item (base_price / sale_price on GRN) all reflect the real cost.
@@ -1307,27 +1316,35 @@ export class RfqService {
           quotedItem.tax_rate_percent != null ? Number(quotedItem.tax_rate_percent) : 0;
         const qty = quotedItem.available_quantity ?? quotedItem.rfq_item.quantity;
 
-        let effectiveUnitPrice = rawUnitPrice;
-        let taxAmountPerUnit = 0;
-
-        if (isInternational && taxRatePercent > 0) {
-          if (quotedItem.tax_included === false) {
-            taxAmountPerUnit = round2(rawUnitPrice * (taxRatePercent / 100));
-            effectiveUnitPrice = round2(rawUnitPrice + taxAmountPerUnit);
-          } else if (quotedItem.tax_included === true) {
-            taxAmountPerUnit = round2(rawUnitPrice - rawUnitPrice / (1 + taxRatePercent / 100));
-            effectiveUnitPrice = rawUnitPrice;
-          }
-        }
+        const split = splitPurchaseTax(rawUnitPrice, taxRatePercent, quotedItem.tax_included);
 
         return {
           quotedItem,
           qty,
-          effectiveUnitPrice,
-          taxAmountPerUnit,
-          effectiveLineTotal: round2(effectiveUnitPrice * qty),
+          // Always the tax-inclusive unit price — what the vendor actually charges for
+          // one unit, whichever way they quoted it.
+          effectiveUnitPrice: split.gross,
+          taxAmountPerUnit: split.tax,
+          effectiveLineTotal: round2(split.gross * qty),
         };
       });
+
+      // The declaration itself, carried onto the lot so the purchase record and every
+      // later recomputation split the total the same way rather than guessing.
+      const declaredRates = new Set(
+        awardedVendor.items
+          .map((i) => (i.tax_rate_percent != null ? Number(i.tax_rate_percent) : 0))
+          .filter((r) => r > 0),
+      );
+      const declaredInclusions = new Set(
+        awardedVendor.items.map((i) => i.tax_included).filter((v) => v != null),
+      );
+      // Only carried when the vendor quoted one consistent treatment across the order.
+      // A mixed quote has no single rate to re-derive a total from, so the amounts
+      // computed per line above stand on their own and nothing is claimed at lot level.
+      const lotTaxRatePercent = declaredRates.size === 1 ? [...declaredRates][0] : null;
+      const lotTaxIncluded =
+        declaredInclusions.size === 1 ? ([...declaredInclusions][0] as boolean) : null;
 
       const effectiveVendorTotal = round2(
         itemCalcs.reduce((sum, c) => sum + c.effectiveLineTotal, 0),
@@ -1347,6 +1364,8 @@ export class RfqService {
         exchangeRateSnapshot: isConverted ? rate : undefined,
         // Carry the snapshot down so lot-level spend reporting is tagged too.
         purchaseOrigin: rfq.purchase_origin,
+        taxIncluded: lotTaxIncluded,
+        taxRatePercent: lotTaxRatePercent,
       });
 
       await manager.save(lot);
@@ -1453,25 +1472,26 @@ export class RfqService {
         currencyCode: lot.currencyCode ?? null,
         exchangeRate: lot.exchangeRateSnapshot ? Number(lot.exchangeRateSnapshot) : null,
 
-        // Tax rate and name from branch
-        taxPercent: branch?.tax_percent != null ? Number(branch.tax_percent) : null,
+        // The vendor's own declared rate governs their invoice; the branch rate is only
+        // the fallback for a vendor who quoted no rate at all.
+        taxPercent:
+          lotTaxRatePercent ?? (branch?.tax_percent != null ? Number(branch.tax_percent) : null),
         taxName: branch?.tax_name ?? null,
-
-        // Taxable amount (initially purchaseAmount since labour, shipping, etc. are 0)
-        taxableAmount: lot.totalAmount,
+        taxIncluded: lotTaxIncluded,
       });
 
-      if (purchase.taxPercent != null && purchase.taxableAmount != null) {
-        if (purchase.purchaseOrigin === 'DOMESTIC') {
-          purchase.inputVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.reverseChargeVatAmount = null;
-        } else if (purchase.purchaseOrigin === 'INTERNATIONAL') {
-          purchase.reverseChargeVatAmount =
-            Number(purchase.taxableAmount) * (Number(purchase.taxPercent) / 100);
-          purchase.inputVatAmount = null;
-        }
-      }
+      // lot.totalAmount is the gross vendor invoice (an exclusive quote had its tax
+      // folded into the line prices above), so the tax is extracted from it rather than
+      // added to it. Additional costs are all zero at creation.
+      Object.assign(
+        purchase,
+        computePurchaseTaxFields({
+          purchaseAmount: lot.totalAmount,
+          taxRatePercent: purchase.taxPercent,
+          additionalTaxableCosts: 0,
+          purchaseOrigin: purchase.purchaseOrigin,
+        }),
+      );
       purchase.vatClaimable = true;
       purchase.taxStatus = 'PENDING';
 
