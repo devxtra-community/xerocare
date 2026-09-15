@@ -15,7 +15,9 @@ export const getManualJournalEntries = async (req: Request, res: Response, next:
       qb.andWhere('m.chartOfAccountId = :chartOfAccountId', { chartOfAccountId });
     if (fromDate) qb.andWhere('m.date >= :fromDate', { fromDate });
     if (toDate) qb.andWhere('m.date <= :toDate', { toDate });
-    qb.orderBy('m.date', 'DESC');
+    // Day-precision `date` needs a timestamp tie-break so same-day journals keep a
+    // stable order between renders.
+    qb.orderBy('m.date', 'DESC').addOrderBy('m.createdAt', 'DESC');
     const entries = await qb.getMany();
     res.json({ success: true, data: entries });
   } catch (err) {

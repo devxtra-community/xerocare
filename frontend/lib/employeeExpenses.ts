@@ -37,6 +37,13 @@ export interface ExpenseRequest {
    *  Documentation…) rather than the vendor's invoice. Approving it records a cost line
    *  and leaves the vendor's outstanding untouched. */
   purchaseCostType?: string;
+  /** Set when this request settles a tax liability. Input VAT sits inside the vendor's
+   *  invoice already, so approving this settles the tax record and must never reduce the
+   *  vendor's outstanding. Also the audit link back to the tax row. */
+  taxRecordId?: string;
+  taxType?: string;
+  taxPeriodFrom?: string;
+  taxPeriodTo?: string;
   paymentMode?: string;
   paidFromAccountId?: string;
   purchasePaymentId?: string;
@@ -171,3 +178,30 @@ export const createManagerPurchasePaymentRequest = (
   if (proofFile) form.append('proof', proofFile);
   return api.post(`${BASE}/manager-purchase`, form).then((r) => r.data.data);
 };
+
+export interface TaxPaymentRequestPayload {
+  taxRecordId: string;
+  taxType: 'INPUT_VAT' | 'REVERSE_CHARGE_VAT';
+  amount: number;
+  paymentMethod: string;
+  paidFromAccountId?: string;
+  taxPeriodFrom?: string;
+  taxPeriodTo?: string;
+  vendorName?: string;
+  purchaseRef?: string;
+  description?: string;
+  paymentDate?: string;
+  currency?: string;
+}
+
+/**
+ * Proceed a tax record into the approval queue.
+ *
+ * Settles nothing by itself — the tax stays outstanding and no cash moves until Finance
+ * approves. Idempotent: proceeding the same record twice returns the existing request
+ * (`alreadyExists`) rather than raising a second one.
+ */
+export const createTaxPaymentRequest = (
+  data: TaxPaymentRequestPayload,
+): Promise<{ data: ExpenseRequest; alreadyExists?: boolean; message?: string }> =>
+  api.post(`${BASE}/tax-payment`, data).then((r) => r.data);

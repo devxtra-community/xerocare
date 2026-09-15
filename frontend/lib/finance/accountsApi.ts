@@ -177,8 +177,9 @@ export interface AssetDepreciationRegister {
   assetType: 'PRINTER_PRODUCT' | 'MANUAL_ASSET';
   assetCategory: string;
   assetName?: string;
-  brandId: string;
-  modelId: string;
+  /** Null for manual (non-printer) assets — they have no brand/model. */
+  brandId?: string | null;
+  modelId?: string | null;
   branchId: string;
   purchaseDate: string;
   purchasePrice: number;
@@ -192,11 +193,19 @@ export interface AssetDepreciationRegister {
   disposalValue?: number;
   notes?: string;
   createdAt: string;
-  // computed depreciation fields
+  // Computed depreciation. `accumulated` is what has actually been POSTED through the
+  // monthly close — the same figure the Balance Sheet reads — not a formula on elapsed
+  // time, so the register and the accounts can never disagree.
+  /** What the NEXT close will charge. 0 once the asset reaches salvage. */
   monthlyDep: number;
   accumulated: number;
   nbv: number;
   monthsElapsed: number;
+  /** What the schedule says should have been posted by now. */
+  accruedToDate?: number;
+  /** accruedToDate − accumulated: depreciation for periods that were already closed
+   *  before this asset was registered, and so can never be posted to them. */
+  unpostedDepreciation?: number;
   // enriched product details (only for PRINTER_PRODUCT assets)
   serial_no?: string | null;
   product_status?: string | null;
@@ -708,13 +717,33 @@ export async function fetchManualPayables(params?: {
 // Domestic input VAT the business owes vendors — the same figure the Balance
 // Sheet/Chart of Accounts fold into Accounts Payable (2001), surfaced here so
 // the Payable page's own total can reconcile with them instead of omitting it.
+/** One settleable tax, linked back to the record it came from. */
+export interface InputVatPayableItem {
+  taxRecordId: string;
+  taxType: 'INPUT_VAT';
+  taxName: string;
+  taxPercent: number | null;
+  vendorName: string;
+  invoiceDate: string;
+  amount: number;
+  currency: string;
+  /** True once an approved payment request actually settled it. */
+  settled: boolean;
+  settledAt: string | null;
+  settlementRef: string | null;
+  /** The standing payment request, when one has been raised. */
+  requestNo: string | null;
+  requestStatus: string | null;
+}
+
 export async function fetchInputVatPayable(): Promise<{
   amount: number;
   currency: string;
   dataWarning: string | null;
+  items: InputVatPayableItem[];
 }> {
   const res = await api.get(`${BASE}/payables/input-vat-summary`);
-  return res.data?.data ?? { amount: 0, currency: 'AED', dataWarning: null };
+  return res.data?.data ?? { amount: 0, currency: 'AED', dataWarning: null, items: [] };
 }
 
 export async function createManualPayable(data: Partial<ManualPayable>): Promise<ManualPayable> {
@@ -2152,6 +2181,11 @@ export interface InputTaxLocalRow {
   currencyCode?: string;
   taxStatus: string;
   vatClaimable: boolean;
+  /** Set once an approved payment request actually settled this tax. Null while
+   *  outstanding — this, not the vendor payment, is what makes the tax PAID. */
+  taxSettledAt?: string | null;
+  /** The approved request that settled it. */
+  taxSettlementRef?: string | null;
 }
 
 export interface InputTaxInternationalRow {
@@ -2458,4 +2492,90 @@ export function insufficientBalanceError(
     return `This amount exceeds your account balance. Available balance: ${account.currency ?? 'AED'} ${available.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Please choose a different account or reduce the amount.`;
   }
   return null;
+}
+
+// ─── Credit Note settlement approvals ────────────────────────────────────────
+// The Accounts gate between a Credit Note being agreed and real money moving.
+// `approvalStatus` is Accounts' decision; `settlementStatus` is whether the money has
+// actually moved. They are deliberately separate — an APPROVED request is NOT paid.
+
+export type SettlementApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type SettlementStatus = 'UNSETTLED' | 'PARTIAL' | 'SETTLED';
+export type PaymentDirection = 'CUSTOMER_TO_COMPANY' | 'COMPANY_TO_CUSTOMER';
+
+export interface CreditNoteSettlement {
+  id: string;
+  /** Which ledger holds this row — decides which settle endpoint applies. */
+  ledger: 'RECEIVABLE' | 'PAYABLE';
+  referenceNo: string;
+  creditNoteId?: string;
+  creditNoteNo?: string;
+  type: 'CUSTOMER_REFUND' | 'CREDIT_EXCHANGE_RECEIPT' | 'CREDIT_EXCHANGE_REFUND';
+  paymentDirection?: PaymentDirection;
+  customerName?: string;
+  customerId?: string;
+  branchId: string;
+  currency: string;
+  netAmount: number;
+  taxAmount: number;
+  discountAmount: number;
+  amount: number;
+  amountPaid: number;
+  outstanding: number;
+  reason?: string;
+  approvalStatus: SettlementApprovalStatus;
+  approvedByName?: string;
+  approvedAt?: string | null;
+  rejectionReason?: string;
+  settlementStatus: SettlementStatus;
+  settledAt?: string | null;
+  settlementReference?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export async function fetchCreditNoteSettlements(params?: {
+  approvalStatus?: SettlementApprovalStatus;
+  direction?: PaymentDirection;
+  branchIds?: string;
+}): Promise<CreditNoteSettlement[]> {
+  const res = await api.get(`${BASE}/credit-note-settlements`, { params });
+  return res.data?.data ?? [];
+}
+
+export async function approveCreditNoteSettlement(id: string): Promise<CreditNoteSettlement> {
+  const res = await api.post(`${BASE}/credit-note-settlements/${id}/approve`, {});
+  return res.data?.data;
+}
+
+export async function rejectCreditNoteSettlement(
+  id: string,
+  rejectionReason: string,
+): Promise<CreditNoteSettlement> {
+  const res = await api.post(`${BASE}/credit-note-settlements/${id}/reject`, { rejectionReason });
+  return res.data?.data;
+}
+
+/**
+ * Settle an approved request. Routed to the receivable or payable endpoint depending on
+ * which way the money goes — the same endpoints Accounts already uses for any other
+ * manual receivable/payable, so this adds no second settlement path.
+ * The server re-validates approval and amount; this is convenience, not the control.
+ */
+export async function settleCreditNoteSettlement(
+  row: CreditNoteSettlement,
+  payload: {
+    amount: number;
+    paymentMode: string;
+    accountId?: string;
+    referenceNo?: string;
+    paymentDate: string;
+  },
+): Promise<void> {
+  const body =
+    row.ledger === 'RECEIVABLE'
+      ? { ...payload, paidToAccount: payload.accountId }
+      : { ...payload, paidFromAccount: payload.accountId };
+  const path = row.ledger === 'RECEIVABLE' ? 'receivables' : 'payables';
+  await api.post(`${BASE}/${path}/${row.id}/payment`, body);
 }

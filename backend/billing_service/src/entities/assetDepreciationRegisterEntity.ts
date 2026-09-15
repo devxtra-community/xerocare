@@ -23,11 +23,11 @@ export class AssetDepreciationRegister {
   @Column({ nullable: true })
   assetName?: string; // for non-printer assets
 
-  @Column()
-  brandId!: string;
+  @Column({ type: 'uuid', nullable: true })
+  brandId?: string;
 
-  @Column()
-  modelId!: string;
+  @Column({ type: 'uuid', nullable: true })
+  modelId?: string;
 
   @Column()
   branchId!: string;

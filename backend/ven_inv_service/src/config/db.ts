@@ -168,6 +168,11 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ADD COLUMN IF NOT EXISTS tax_included BOOLEAN,
           ADD COLUMN IF NOT EXISTS tax_rate_percent DECIMAL(5,2);
         `);
+        await Source.query(`
+          ALTER TABLE purchases
+          ADD COLUMN IF NOT EXISTS tax_settled_at TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS tax_settlement_ref VARCHAR(100);
+        `);
         logger.info('Guaranteed purchase/lot vendor tax columns exist.');
 
         // --- Warehouse country + contact person columns ---

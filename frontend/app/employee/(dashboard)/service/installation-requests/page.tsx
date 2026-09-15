@@ -26,7 +26,6 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import StatCard from '@/components/StatCard';
-import { PowerActionButton } from '@/components/ui/PowerActionButton';
 import { ContractActionsMenu } from '@/components/employeeComponents/ContractActionsMenu';
 import {
   ContractDocMark,
@@ -580,12 +579,19 @@ export default function InstallationRequestsPage() {
                                 ]}
                               />
                               {req.status === 'ASSIGNED' && (
-                                <PowerActionButton
-                                  label="Start installation"
-                                  tone="green"
-                                  loading={isActing}
+                                <button
+                                  type="button"
                                   onClick={() => handleStart(req.id)}
-                                />
+                                  disabled={isActing}
+                                  title="Start installation"
+                                  className="inline-flex h-8 items-center justify-center rounded-full border-2 border-slate-800 bg-blue-600 px-4 text-[10px] font-black uppercase tracking-widest text-white transition-colors hover:bg-blue-700 active:translate-y-px disabled:pointer-events-none disabled:opacity-60"
+                                >
+                                  {isActing ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    'Install Now'
+                                  )}
+                                </button>
                               )}
                               {req.status === 'IN_PROGRESS' && (
                                 <Button

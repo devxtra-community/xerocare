@@ -177,6 +177,12 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
     ? (selectedSparePart?.base_price || 0) * replacementQty
     : selectedProduct?.sale_price || 0;
   const variation = newValue - originalValue - discount;
+  // VAT on the exchange difference, mirroring the server: exclusive, and levied on the
+  // consideration after discount. Shown so nobody agrees a figure with the customer that
+  // differs from what Accounts will actually collect or refund.
+  const exchangeTaxPercent = Number(record?.taxPercent ?? 0);
+  const exchangeVat = Math.abs(variation) * (exchangeTaxPercent / 100);
+  const exchangeTotal = Math.abs(variation) + exchangeVat;
 
   const isOutOfStock =
     stockChecked &&
@@ -388,14 +394,29 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                     <span className="font-semibold">- {formatCurrency(discount, currency)}</span>
                   </div>
                 )}
-                <div className="pt-2 border-t border-blue-200 flex justify-between font-bold text-sm">
-                  <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
-                    {variation >= 0 ? 'Payable Gap:' : 'Refundable Balance:'}
-                  </span>
-                  <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                <div className="pt-2 border-t border-blue-200 flex justify-between text-xs text-blue-700">
+                  <span>Net Difference:</span>
+                  <span className="font-semibold">
                     {formatCurrency(Math.abs(variation), currency)}
                   </span>
                 </div>
+                {exchangeTaxPercent > 0 && (
+                  <div className="flex justify-between text-xs text-blue-700">
+                    <span>VAT ({exchangeTaxPercent}%):</span>
+                    <span className="font-semibold">{formatCurrency(exchangeVat, currency)}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-blue-200 flex justify-between font-bold text-sm">
+                  <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                    {variation >= 0 ? 'Customer Pays:' : 'Refund to Customer:'}
+                  </span>
+                  <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                    {formatCurrency(exchangeTotal, currency)}
+                  </span>
+                </div>
+                <p className="pt-1 text-[10px] text-blue-600">
+                  Goes to Accounts for approval — no money moves until it is approved and settled.
+                </p>
               </div>
             </div>
           )}

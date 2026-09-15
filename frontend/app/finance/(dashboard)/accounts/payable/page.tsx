@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PaymentsTab from '@/components/Finance/PaymentsTab';
 import ExpensesTab from '@/components/Finance/ExpensesTab';
+import CreditNoteSettlementsTab from '@/components/finance/CreditNoteSettlementsTab';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Plus,
@@ -686,9 +687,13 @@ function SelectVendorModal({
 export default function AccountsPayablePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const activeTab = (searchParams.get('tab') ?? 'payable') as 'payable' | 'payments' | 'expenses';
+  const activeTab = (searchParams.get('tab') ?? 'payable') as
+    | 'payable'
+    | 'payments'
+    | 'expenses'
+    | 'credit-notes';
 
-  const switchTab = (t: 'payable' | 'payments' | 'expenses') => {
+  const switchTab = (t: 'payable' | 'payments' | 'expenses' | 'credit-notes') => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', t);
     router.replace(`?${params.toString()}`);
@@ -773,29 +778,34 @@ export default function AccountsPayablePage() {
   // are excluded — that PO's own outstanding balance already covers it, so
   // including both would double-count.
   const allPayables = useMemo(() => {
-    // Only include vendor purchases that still have an outstanding balance.
-    // Fully-paid purchases have remainingAmount=0 and should not appear in AP.
-    const fromPurchases = purchases
-      .filter((p) => (p.remainingAmount ?? p.totalAmount ?? 0) > 0)
-      .map((p) => ({
-        id: p.id,
-        referenceNo: `PO-${p.id?.slice(0, 8)}`,
-        type: 'VENDOR_INVOICE',
-        payableTo: p.vendor?.name ?? '',
-        amount: p.totalAmount ?? 0,
-        currency: p.currencyCode ?? currency,
-        issueDate: p.createdAt,
-        dueDate: p.createdAt,
-        amountPaid: p.paidAmount ?? 0,
-        outstanding: Number(p.remainingAmount ?? p.totalAmount ?? 0),
-        status: p.status ?? 'PENDING',
-        branchId: p.branchId,
-        aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
-        isPurchase: true,
-        isExpense: false,
-        isVat: false,
-        source: 'Purchase Order' as const,
-      }));
+    // Settled purchases stay on the list, exactly as a fully-paid invoice stays on
+    // Receivables. Dropping them hid the payment history: the moment a vendor was paid
+    // off, the row and everything you could learn from it — what was owed, when it was
+    // settled — vanished from the only page that showed it.
+    //
+    // No total moves as a result: totalPayable, the AP/accrued subtotals, the aging
+    // buckets and the type/vendor charts all sum `outstanding`, which is 0 on a settled
+    // row. The monthly chart sums amount and amountPaid and is actively improved, since
+    // a fully-settled month previously charted as empty.
+    const fromPurchases = purchases.map((p) => ({
+      id: p.id,
+      referenceNo: `PO-${p.id?.slice(0, 8)}`,
+      type: 'VENDOR_INVOICE',
+      payableTo: p.vendor?.name ?? '',
+      amount: p.totalAmount ?? 0,
+      currency: p.currencyCode ?? currency,
+      issueDate: p.createdAt,
+      dueDate: p.createdAt,
+      amountPaid: p.paidAmount ?? 0,
+      outstanding: Number(p.remainingAmount ?? p.totalAmount ?? 0),
+      status: p.status ?? 'PENDING',
+      branchId: p.branchId,
+      aging: p.createdAt ? agingBucket(p.createdAt) : 'Current',
+      isPurchase: true,
+      isExpense: false,
+      isVat: false,
+      source: 'Purchase Order' as const,
+    }));
     const fromManual = manualPayables
       .filter((p) => !p.linkedPurchaseId)
       .map((p) => ({
@@ -805,34 +815,37 @@ export default function AccountsPayablePage() {
         isVat: false,
         source: 'Manual Entry' as const,
       }));
-    // Domestic input VAT vendors charged us — no per-purchase breakdown is available
-    // (the source endpoint returns one aggregate per currency), so this shows as a
-    // single line rather than one row per purchase, and carries no Record Payment
-    // action since there's no per-purchase VAT settlement to record against.
-    const fromInputVat =
-      inputVatPayable && inputVatPayable.amount > 0
-        ? [
-            {
-              id: 'input-vat-payable',
-              referenceNo: 'VAT-INPUT',
-              type: 'OTHER' as const,
-              payableTo: 'Vendors — Input VAT',
-              amount: inputVatPayable.amount,
-              currency: inputVatPayable.currency,
-              issueDate: today,
-              dueDate: today,
-              amountPaid: 0,
-              outstanding: inputVatPayable.amount,
-              status: 'PENDING',
-              branchId: currentUser?.branchId ?? '',
-              aging: 'Current',
-              isPurchase: false,
-              isExpense: false,
-              isVat: true,
-              source: 'Input VAT' as const,
-            },
-          ]
-        : [];
+    // Domestic input VAT vendors charged us.
+    // One row per tax record, each linked back to the purchase it came from, so the
+    // Proceed → approve → settle workflow has something concrete to act on and the row
+    // can show a real Outstanding/Paid. This replaced a single aggregate line that
+    // carried no link, no payment path and a hardcoded amountPaid of 0 — which is why it
+    // sat permanently unpaid no matter what was settled.
+    const fromInputVat = (inputVatPayable?.items ?? []).map((t) => ({
+      id: `tax-${t.taxRecordId}`,
+      referenceNo: t.requestNo ?? `VAT-${t.taxRecordId.slice(0, 8).toUpperCase()}`,
+      type: 'TAX_PAYABLE',
+      payableTo: `${t.taxName}${t.taxPercent != null ? ` ${Number(t.taxPercent)}%` : ''} — ${t.vendorName}`,
+      amount: t.amount,
+      currency: t.currency,
+      issueDate: t.invoiceDate,
+      dueDate: t.invoiceDate,
+      // Paid is driven by the settlement, never by the vendor's own payment: the VAT
+      // sits inside their invoice, so paying them says nothing about whether the tax has
+      // been settled.
+      amountPaid: t.settled ? t.amount : 0,
+      outstanding: t.settled ? 0 : t.amount,
+      status: t.settled ? 'PAID' : (t.requestStatus ?? 'PENDING'),
+      branchId: currentUser?.branchId ?? '',
+      aging: t.invoiceDate ? agingBucket(t.invoiceDate) : 'Current',
+      isPurchase: false,
+      isExpense: false,
+      isVat: true,
+      source: 'Input VAT' as const,
+      taxRecordId: t.taxRecordId,
+      requestStatus: t.requestStatus,
+      settlementRef: t.settlementRef,
+    }));
     const fromExpenses = approvedExpenses.map((e) => ({
       id: e.id,
       referenceNo: e.expenseNo,
@@ -904,25 +917,44 @@ export default function AccountsPayablePage() {
     ],
   );
 
-  const totalPayable = allPayables.reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
+  // ── The accounting guard ────────────────────────────────────────────────────
+  // Tax rows are shown in this table for the workflow, but they are NOT a vendor
+  // liability and must never be summed into one. A vendor invoice of 15,000 that
+  // contains 714.29 of input VAT is a 15,000 liability — not 15,714.29. The VAT was
+  // already paid to the vendor inside that invoice, and is reclaimable from the tax
+  // authority (the Balance Sheet subtracts it from VAT Payable), so adding it here
+  // would book the same money as owed twice.
+  const liabilityRows = allPayables.filter((p) => !p.isVat);
+
+  const totalPayable = liabilityRows.reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
   // Subtotals mirroring the Chart of Accounts split: PO + non-linked Manual entries
   // reconcile with 2001 (Accounts Payable); Accrued Expense rows reconcile with 2002.
-  const apSubtotal = allPayables
+  const apSubtotal = liabilityRows
     .filter((p) => p.source !== 'Accrued Expense')
     .reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
-  const accruedSubtotal = allPayables
+  const accruedSubtotal = liabilityRows
     .filter((p) => p.source === 'Accrued Expense')
     .reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
+  // Aging measures how overdue a debt is. A tax row is not a debt to anyone here, so it
+  // stays out of the buckets as well — otherwise it would age as if a vendor were owed.
   const agingTotals = AGING_BUCKETS.map((b) => ({
     bucket: b,
-    total: allPayables
+    total: liabilityRows
       .filter((p) => p.aging === b)
       .reduce((s, p) => s + Number(p.outstanding ?? 0), 0),
   }));
+  /** Outstanding tax, reported separately so it is visible without being a liability. */
+  const taxOutstanding = allPayables
+    .filter((p) => p.isVat)
+    .reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
 
   const payCharts = useMemo(() => {
+    // Charts describe the vendor liability, so they read the same filtered set the
+    // totals do — a tax row in "Top vendors" would name a tax as if it were a supplier
+    // we owe money to.
+    const chartRows = allPayables.filter((p) => !p.isVat);
     const typeMap: Record<string, number> = {};
-    allPayables.forEach((p) => {
+    chartRows.forEach((p) => {
       typeMap[p.type] = (typeMap[p.type] ?? 0) + (p.outstanding ?? 0);
     });
     const byType = Object.entries(typeMap)
@@ -930,7 +962,7 @@ export default function AccountsPayablePage() {
       .sort((a, b) => b.value - a.value);
 
     const vendorMap: Record<string, number> = {};
-    allPayables.forEach((p) => {
+    chartRows.forEach((p) => {
       if (!p.payableTo) return;
       vendorMap[p.payableTo] = (vendorMap[p.payableTo] ?? 0) + (p.outstanding ?? 0);
     });
@@ -943,7 +975,7 @@ export default function AccountsPayablePage() {
     // We show both the payable total (what was owed) and the paid amount (what was settled).
     // This way the chart always has data even when no payments have been recorded yet.
     const monthPayableMap: Record<string, { payable: number; paid: number }> = {};
-    allPayables.forEach((p) => {
+    chartRows.forEach((p) => {
       const month = p.issueDate?.slice(0, 7) ?? '';
       if (!month) return;
       if (!monthPayableMap[month]) monthPayableMap[month] = { payable: 0, paid: 0 };
@@ -1052,7 +1084,7 @@ export default function AccountsPayablePage() {
         </div>
         {/* Tab pills */}
         <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl shadow-sm">
-          {(['payable', 'payments', 'expenses'] as const).map((t) => (
+          {(['payable', 'payments', 'expenses', 'credit-notes'] as const).map((t) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
@@ -1062,7 +1094,13 @@ export default function AccountsPayablePage() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {t === 'payable' ? 'Payable' : t === 'payments' ? 'Payments' : 'Expenses'}
+              {t === 'payable'
+                ? 'Payable'
+                : t === 'payments'
+                  ? 'Payments'
+                  : t === 'expenses'
+                    ? 'Expenses'
+                    : 'Credit Notes'}
             </button>
           ))}
         </div>
@@ -1073,6 +1111,11 @@ export default function AccountsPayablePage() {
 
       {/* Expenses tab */}
       {activeTab === 'expenses' && <ExpensesTab />}
+
+      {/* Credit Note settlements — the Accounts approval gate for customer refunds and
+          exchange differences. Lives here because this page is where Accounts already
+          performs money movement, and the queue spans both directions. */}
+      {activeTab === 'credit-notes' && <CreditNoteSettlementsTab />}
 
       {/* Payable tab content */}
       {activeTab === 'payable' && (
@@ -1111,6 +1154,11 @@ export default function AccountsPayablePage() {
                 title="Accrued Expenses"
                 value={formatCurrency(accruedSubtotal, currency)}
                 subtitle="Approved expenses — reconciles with CoA 2002"
+              />
+              <StatCard
+                title="Tax To Settle"
+                value={formatCurrency(taxOutstanding, currency)}
+                subtitle="Not a vendor liability — excluded from Total Payable"
               />
               {AGING_BUCKETS.map((b) => (
                 <StatCard
@@ -1447,9 +1495,11 @@ export default function AccountsPayablePage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-xs">
+                          {/* Only an unsettled row can be late. A paid one keeps its
+                              date in plain text rather than the overdue red. */}
                           <span
                             className={
-                              p.aging !== 'Current'
+                              p.aging !== 'Current' && Number(p.outstanding ?? 0) > 0.001
                                 ? 'text-red-600 font-medium'
                                 : 'text-muted-foreground'
                             }
@@ -1467,17 +1517,26 @@ export default function AccountsPayablePage() {
                           {formatCurrency(p.outstanding ?? 0, p.currency)}
                         </TableCell>
                         <TableCell>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${AGING_COLORS[p.aging] ?? ''}`}
-                          >
-                            {p.aging}
-                          </span>
+                          {/* A settled row has no age — it is not waiting on anything.
+                              Showing its original bucket read as though the money were
+                              still owed and the vendor overdue. */}
+                          {Number(p.outstanding ?? 0) <= 0.001 ? (
+                            <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                              Paid
+                            </span>
+                          ) : (
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${AGING_COLORS[p.aging] ?? ''}`}
+                            >
+                              {p.aging}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="pr-4">
                           <div className="flex items-center gap-1">
                             {p.isVat ? (
                               <span className="text-[10px] text-muted-foreground italic pl-1.5">
-                                Aggregate — no per-purchase detail
+                                Settled from Tax
                               </span>
                             ) : (
                               <button

@@ -3,6 +3,7 @@
 import React, { Suspense, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ProceedTaxModal, { type ProceedTaxTarget } from '@/components/finance/ProceedTaxModal';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, FileText } from 'lucide-react';
 import {
@@ -444,6 +445,7 @@ function InputTaxLocalTab({
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const [showStatement, setShowStatement] = useState(false);
+  const [proceedTarget, setProceedTarget] = useState<ProceedTaxTarget | null>(null);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['admin-tax-input-local', filters, page],
@@ -599,6 +601,30 @@ function InputTaxLocalTab({
                         />
                       </TableCell>
                       <TableCell className="pr-4">
+                        {/* Proceed raises the payment request. Hidden once the tax is
+                            settled — there is nothing left to pay — and while a request
+                            is already standing, which is also enforced server-side. */}
+                        {r.taxStatus === 'PENDING' && Number(r.inputVatAmount ?? 0) > 0 && (
+                          <button
+                            onClick={() =>
+                              setProceedTarget({
+                                taxRecordId: r.id,
+                                taxType: 'INPUT_VAT',
+                                taxName: r.taxName ?? 'Input VAT',
+                                amount: Number(r.inputVatAmount ?? 0),
+                                currency: r.currencyCode ?? currency,
+                                vendorName: r.vendorName,
+                                reference: r.id.slice(0, 8).toUpperCase(),
+                                taxPercent: r.taxPercent,
+                                periodFrom: filters.dateFrom,
+                                periodTo: filters.dateTo,
+                              })
+                            }
+                            className="mr-2 whitespace-nowrap rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                          >
+                            Proceed
+                          </button>
+                        )}
                         <button
                           onClick={() => onGenerate('local', r)}
                           className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
@@ -622,6 +648,7 @@ function InputTaxLocalTab({
           </>
         )}
       </div>
+      <ProceedTaxModal target={proceedTarget} onClose={() => setProceedTarget(null)} />
       {showStatement && (
         <StatementDialog
           open

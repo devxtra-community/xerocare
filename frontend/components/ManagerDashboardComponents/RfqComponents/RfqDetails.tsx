@@ -828,13 +828,23 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                                 <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
                                   Tax: mixed rates
                                 </Badge>
-                              ) : (
+                              ) : vs.taxIncluded === false ? (
                                 <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100 text-[10px] px-2 font-semibold">
                                   +{' '}
                                   {vs.taxRatePercent != null
                                     ? `${Number(vs.taxRatePercent)}% `
                                     : ''}
                                   tax on top
+                                </Badge>
+                              ) : (
+                                /* Null is a third state, not a synonym for "excluded".
+                                   It used to render as "tax on top" while every
+                                   calculation behind it treated the quoted price as
+                                   already final — so the screen promised a figure the
+                                   system never charged. Saying "not declared" is the
+                                   honest reading and matches what is actually computed. */
+                                <Badge className="bg-slate-100 text-slate-600 hover:bg-slate-100 text-[10px] px-2 font-semibold">
+                                  Tax treatment not declared
                                 </Badge>
                               )}
                               {vs.taxIncluded !== true &&
@@ -924,7 +934,10 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
               // Vendor marked at least one line as tax-exclusive (or declared
               // tax is already included) — show what this quote actually costs
               // with that tax folded in, not just the raw price they typed.
-              const taxExclusive = vs.taxIncluded !== true;
+              // Only an explicit "No" adds tax. An undeclared treatment leaves the
+              // quoted price as the amount owed, which is exactly what the purchase
+              // records — see splitPurchaseTax.
+              const taxExclusive = vs.taxIncluded === false;
               const currencyDiffers =
                 vs.convertedTaxInclusiveTotalAmount != null &&
                 !!vs.branchCurrency &&
@@ -937,7 +950,9 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                       ? 'Price Already Includes Tax'
                       : vs.taxRateMixed
                         ? 'Tax Varies by Item'
-                        : `Tax Not Included${vs.taxRatePercent != null ? ` (${vs.taxRatePercent}%)` : ''}`}
+                        : vs.taxIncluded === false
+                          ? `Tax Not Included${vs.taxRatePercent != null ? ` (${vs.taxRatePercent}%)` : ''}`
+                          : 'Tax Treatment Not Declared'}
                   </div>
                   {taxExclusive ? (
                     <>
@@ -1045,9 +1060,19 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             <SearchableSelect
               value={selectedWarehouseId}
               onValueChange={setSelectedWarehouseId}
+              // The id used to be appended to the label. It disambiguates nothing a human
+              // can read, and at ~36 characters it stretched the trigger past the
+              // dialog's own max-width — which is what put a horizontal scrollbar under
+              // the modal and pushed Continue off the right edge. The code and location
+              // tell two same-named warehouses apart far better, and the id stays
+              // searchable via searchText for anyone pasting one in.
               options={warehouses.map((w) => ({
                 value: w.id,
-                label: `${w.warehouseName} (${w.id})`,
+                label: w.warehouseName,
+                description: [w.warehouseCode, w.location].filter(Boolean).join(' · '),
+                searchText: [w.warehouseName, w.warehouseCode, w.location, w.id]
+                  .filter(Boolean)
+                  .join(' '),
               }))}
               placeholder="Search & Select Warehouse"
               emptyText="No warehouses found."

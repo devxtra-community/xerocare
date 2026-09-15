@@ -14,6 +14,7 @@ import {
   payExpenseRequest,
   createExpenseRequestFromPurchasePayment,
   createManagerPurchasePaymentRequest,
+  createTaxPaymentRequest,
 } from '../controllers/expenseRequestController';
 
 const router = Router();
@@ -33,6 +34,10 @@ router.post(
   uploadExpenseProof.single('proof'),
   createManagerPurchasePaymentRequest,
 );
+
+// Proceed a tax record — raises an approval request against it. Reuses the same queue
+// the Payments tab already reads; creates no payment and settles nothing on its own.
+router.post('/tax-payment', authMiddleware, createTaxPaymentRequest);
 
 router.get('/', getExpenseRequests);
 router.post('/', createExpenseRequest);

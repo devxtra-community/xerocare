@@ -86,6 +86,7 @@ const RECEIVABLE_TYPES = [
   'SECURITY_DEPOSIT',
   'ADVANCE_PAYMENT',
   'CREDIT_EXCHANGE_DIFF',
+  'CREDIT_EXCHANGE_RECEIPT',
   'OTHER',
 ];
 const RECEIVABLE_STATUSES = ['OUTSTANDING', 'PENDING', 'PARTIAL', 'OVERDUE', 'PAID', 'WRITTEN_OFF'];
@@ -600,8 +601,13 @@ export default function AccountsReceivablePage() {
       isInvoice: true,
       source: (inv.isOpeningEntry ? 'Opening Balance' : 'Invoice') as 'Invoice' | 'Opening Balance',
     }));
+    // Same rule the Balance Sheet's Manual AR uses: exclude a manual receivable only when
+    // an invoice in this very list is already carrying the balance. Excluding every row
+    // with a non-null linkedInvoiceId hid Credit Exchange differences, which wrote the
+    // credit note's id there — an id no invoice will ever match.
+    const arInvoiceIds = new Set(fromInvoices.map((i) => i.id));
     const fromManual = manualRcv
-      .filter((r) => !r.linkedInvoiceId)
+      .filter((r) => !r.linkedInvoiceId || !arInvoiceIds.has(r.linkedInvoiceId))
       .map((r) => ({ ...r, isInvoice: false, source: 'Manual Entry' as const }));
     return [...fromInvoices, ...fromManual];
   }, [arInvoices, manualRcv]);

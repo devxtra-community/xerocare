@@ -41,6 +41,12 @@ router.post('/internal/record-cost', (req, res, next) =>
   purchaseController.recordCostInternal(req, res, next),
 );
 
+// Approved tax settlement — marks the purchase's tax RECORDED. Creates no
+// PurchasePayment: the VAT is already inside the vendor's invoice.
+router.post('/internal/record-tax-settlement', (req, res, next) =>
+  purchaseController.recordTaxSettlementInternal(req, res, next),
+);
+
 // Internal endpoint: billing_service voids a PurchasePayment on Finance rejection
 router.post('/internal/void-payment', (req, res, next) =>
   purchaseController.voidPaymentInternal(req, res, next),

@@ -445,6 +445,17 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                                 {r.purchaseCostType} cost — not vendor payment
                               </span>
                             )}
+                            {/* A tax settlement is not a vendor payment: the VAT is
+                                already inside their invoice, so approving it must never
+                                be read as paying the vendor again. */}
+                            {r.taxRecordId && (
+                              <span className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                {r.taxType === 'REVERSE_CHARGE_VAT'
+                                  ? 'Reverse-charge VAT'
+                                  : 'Input VAT'}{' '}
+                                settlement — not vendor payment
+                              </span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-xs">

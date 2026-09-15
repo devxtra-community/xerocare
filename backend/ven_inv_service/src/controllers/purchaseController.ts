@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { purchaseService } from '../services/purchaseService';
 import { AppError } from '../errors/appError';
 import { Source } from '../config/db';
+import { Purchase } from '../entities/purchaseEntity';
 import { COST_TYPE_BUCKET_SQL } from '../utils/purchaseCostBuckets';
 
 export class PurchaseController {
@@ -209,6 +210,7 @@ export class PurchaseController {
           import_labour_cost: string;
           customs_duty: string;
           input_vat_amount: string;
+          unsettled_input_vat: string;
           reverse_charge_vat_amount: string;
         }[]
       >(
@@ -229,6 +231,13 @@ export class PurchaseController {
           COALESCE(SUM(p.labour_cost), 0) + COALESCE(MAX(c.import_labour), 0) AS import_labour_cost,
           COALESCE(SUM(p.customs_duty), 0) + COALESCE(MAX(c.customs_duty), 0) AS customs_duty,
           COALESCE(SUM(p.input_vat_amount) FILTER (WHERE p.vat_claimable IS NOT FALSE), 0) AS input_vat_amount,
+          -- Input VAT not yet settled through the tax-payment workflow. The reclaimable
+          -- credit above is unaffected by settlement (it stays reclaimable either way);
+          -- this is only for the Balance Sheet's matching liability, which must be
+          -- discharged once the tax has actually been paid.
+          COALESCE(SUM(p.input_vat_amount) FILTER (
+            WHERE p.vat_claimable IS NOT FALSE AND p.tax_settled_at IS NULL
+          ), 0) AS unsettled_input_vat,
           COALESCE(SUM(p.reverse_charge_vat_amount) FILTER (WHERE p.vat_claimable IS NOT FALSE), 0) AS reverse_charge_vat_amount
         FROM purchases p
         LEFT JOIN (
@@ -273,6 +282,7 @@ export class PurchaseController {
         importLabourCost: Number(r.import_labour_cost),
         customsDuty: Number(r.customs_duty),
         inputVatAmount: Number(r.input_vat_amount),
+        unsettledInputVat: Number(r.unsettled_input_vat),
         reverseChargeVatAmount: Number(r.reverse_charge_vat_amount),
       }));
 
@@ -332,6 +342,63 @@ export class PurchaseController {
    * them. This writes the itemised cost row instead, which the cost report above folds
    * into the right expense bucket.
    */
+  /**
+   * Settles the tax on a purchase after Finance approved its payment request.
+   *
+   * The third sibling of record-payment and record-cost, and the one that must touch the
+   * least: it moves tax_status to RECORDED and nothing else. It deliberately does not
+   * create a PurchasePayment — the input VAT is already inside the vendor's invoice, so
+   * reducing their outstanding by it again would settle the same liability twice and
+   * leave the vendor looking overpaid.
+   */
+  async recordTaxSettlementInternal(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (req.headers['x-internal-service'] !== 'billing') {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+      const { purchaseId, branchId, amount, taxType, settledOn, reference } = req.body;
+      if (!purchaseId || !branchId || !amount) {
+        return res
+          .status(400)
+          .json({ success: false, message: 'purchaseId, branchId, amount are required' });
+      }
+
+      const repo = Source.getRepository(Purchase);
+      const purchase = await repo.findOne({ where: { id: purchaseId, branchId } });
+      if (!purchase) {
+        return res.status(404).json({ success: false, message: 'Purchase not found' });
+      }
+
+      // Idempotent: an approval replayed for any reason must not re-settle.
+      if (purchase.taxStatus === 'RECORDED' || purchase.taxStatus === 'FILED') {
+        return res.json({ success: true, data: purchase, alreadySettled: true });
+      }
+
+      const due = Number(
+        String(taxType) === 'REVERSE_CHARGE_VAT'
+          ? (purchase.reverseChargeVatAmount ?? 0)
+          : (purchase.inputVatAmount ?? 0),
+      );
+      // Partial settlement is not marked paid — the spec is explicit that PAID means the
+      // full tax amount has been settled.
+      if (Number(amount) + 0.011 < due) {
+        return res.status(400).json({
+          success: false,
+          message: `Partial tax settlement is not supported (${amount} of ${due}).`,
+        });
+      }
+
+      purchase.taxStatus = 'RECORDED';
+      purchase.taxSettledAt = settledOn ? new Date(settledOn) : new Date();
+      purchase.taxSettlementRef = reference ?? null;
+      await repo.save(purchase);
+
+      return res.json({ success: true, data: purchase });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async recordCostInternal(req: Request, res: Response, next: NextFunction) {
     try {
       if (req.headers['x-internal-service'] !== 'billing') {

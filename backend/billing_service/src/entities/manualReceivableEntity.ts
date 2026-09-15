@@ -54,6 +54,63 @@ export class ManualReceivable {
   @Column()
   createdBy!: string;
 
+  // ── Credit Note settlement-approval gate ────────────────────────────────────
+  // Set only by the Credit Note workflow. Their presence is what makes this row
+  // un-settleable until Accounts approves — see requiresSettlementApproval().
+
+  /** The Credit Note this settlement discharges. Also the idempotency key. */
+  @Column({ type: 'uuid', nullable: true })
+  creditNoteId?: string;
+
+  /** Snapshot of the credit note's human reference, so Accounts can read the queue
+   *  without joining back. */
+  @Column({ type: 'varchar', nullable: true })
+  creditNoteNo?: string;
+
+  /** CUSTOMER_TO_COMPANY (collection) | COMPANY_TO_CUSTOMER (refund). */
+  @Column({ type: 'varchar', nullable: true })
+  paymentDirection?: string;
+
+  /** Accounts' decision: PENDING | APPROVED | REJECTED. Distinct from `status`,
+   *  which says whether the money has actually moved. */
+  @Column({ type: 'varchar', nullable: true })
+  approvalStatus?: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  approvedBy?: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  approvedByName?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  approvedAt?: Date;
+
+  @Column({ type: 'text', nullable: true })
+  rejectionReason?: string;
+
+  /** Reference of the real payment that settled this, written at settlement time. */
+  @Column({ type: 'varchar', nullable: true })
+  settlementReference?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  settledAt?: Date;
+
+  /** Amount breakdown, stored so Accounts and the Receivables/Payables pages can show
+   *  the arithmetic without recomputing it from the credit note.
+   *  netAmount + taxAmount === amount. */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  netAmount?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  taxAmount?: number;
+
+  /** The replacementDiscount already deducted in arriving at netAmount. Kept for display
+   *  and audit; it is NOT a separate posting — see the revenue treatment in
+   *  accountsShared.ts, where a discount reduces recognised revenue exactly as an
+   *  invoice-line discount does. */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  discountAmount?: number;
+
   @OneToMany(() => ReceivablePayment, (p) => p.receivable)
   payments?: ReceivablePayment[];
 

@@ -1010,6 +1010,13 @@ export default function DepreciationPage() {
   const [disposeTarget, setDisposeTarget] = useState<AssetDepreciationRegister | undefined>();
   const [disposeValue, setDisposeValue] = useState('0');
   const [postingJournal, setPostingJournal] = useState(false);
+  // Which period to close. Defaults to this month, but earlier months must be reachable:
+  // an asset registered today still owes depreciation for the months since it was bought,
+  // and that can only be recognised by closing those periods.
+  const [postPeriod, setPostPeriod] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  });
 
   const qc = useQueryClient();
   const now = new Date();
@@ -1087,16 +1094,33 @@ export default function DepreciationPage() {
   const postMut = useMutation({
     mutationFn: () =>
       postDepreciationJournal({
-        periodYear: now.getFullYear(),
-        periodMonth: now.getMonth() + 1,
+        periodYear: postPeriod.year,
+        periodMonth: postPeriod.month,
         branchId: currentUser?.branchId ?? '',
       }),
-    onSuccess: () => {
-      toast.success('Depreciation posted');
+    onSuccess: (j) => {
+      const charged = Number(j?.totalAmount ?? 0);
+      toast.success(
+        charged > 0
+          ? `Posted ${formatCurrency(charged, currency)} for ${postPeriod.year}-${String(postPeriod.month).padStart(2, '0')}`
+          : 'Period closed — no assets were depreciating in it',
+      );
+      // Posting changes accumulated depreciation, so every view of it has to refetch or
+      // the register would keep showing the pre-posting NBV.
       qc.invalidateQueries({ queryKey: ['dep-journals'] });
+      qc.invalidateQueries({ queryKey: ['asset-register'] });
+      qc.invalidateQueries({ queryKey: ['depreciation-charts'] });
+      qc.invalidateQueries({ queryKey: ['balance-sheet'] });
+      qc.invalidateQueries({ queryKey: ['chart-of-accounts'] });
       setPostingJournal(false);
     },
-    onError: () => toast.error('Failed to post — may already be posted for this period'),
+    // The server explains exactly why (already posted, future period, wrong branch) —
+    // replacing that with one guess left Finance unable to tell those apart.
+    onError: (e) =>
+      toast.error(
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'Failed to post depreciation',
+      ),
   });
 
   const totalCost = assets.reduce((s, a) => s + Number(a.purchasePrice), 0);
@@ -1118,10 +1142,15 @@ export default function DepreciationPage() {
   const brandNBVData = (() => {
     const map: Record<string, number> = {};
     assets.forEach((a) => {
-      map[a.brandId] = (map[a.brandId] ?? 0) + (Number(a.nbv) || Number(a.purchasePrice));
+      // Manual assets (furniture, vehicles) have no brand — they group under one bucket
+      // rather than being dropped from the chart or keyed by `undefined`.
+      const key = a.brand_name || a.brandId || 'Manual Assets';
+      // `|| purchasePrice` would replace a legitimately fully-depreciated 0 NBV with the
+      // asset's full cost. ?? only fills in a genuinely absent value.
+      map[key] = (map[key] ?? 0) + (Number(a.nbv) ?? Number(a.purchasePrice));
     });
     return Object.entries(map)
-      .map(([brand, nbv]) => ({ brand: brand.slice(0, 8) + '…', nbv }))
+      .map(([brand, nbv]) => ({ brand: brand.length > 9 ? brand.slice(0, 8) + '…' : brand, nbv }))
       .slice(0, 8);
   })();
 
@@ -1433,10 +1462,22 @@ export default function DepreciationPage() {
                             {formatCurrency(Number(a.monthlyDep) || 0, currency)}
                           </TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">
+                            {/* What has actually been POSTED, not a formula on elapsed time —
+                                the same figure the Balance Sheet carries. */}
                             {formatCurrency(Number(a.accumulated) || 0, currency)}
+                            {Number(a.unpostedDepreciation ?? 0) > 0.005 && (
+                              <div
+                                className="text-[10px] font-semibold text-amber-600"
+                                title="Depreciation for periods that were already closed before this asset was registered. Post those periods to recognise it."
+                              >
+                                +{formatCurrency(Number(a.unpostedDepreciation), currency)} unposted
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-bold text-slate-800">
-                            {formatCurrency(Number(a.nbv) || Number(a.purchasePrice), currency)}
+                            {/* ?? not || — a fully-depreciated asset's NBV is legitimately 0,
+                                and || would show its full cost instead. */}
+                            {formatCurrency(Number(a.nbv) ?? Number(a.purchasePrice), currency)}
                           </TableCell>
                           <TableCell>
                             <span
@@ -1609,12 +1650,13 @@ export default function DepreciationPage() {
             <div>
               <h4 className="font-bold text-slate-700">Monthly Depreciation Journal</h4>
               <p className="text-xs text-muted-foreground">
-                Post monthly depreciation as an expense entry. Each period can only be posted once
-                per branch.
+                Close a period to recognise its depreciation. Each period can only be posted once
+                per branch, and an asset is never charged before it was bought or past its salvage
+                value.
               </p>
             </div>
             <Button onClick={() => setPostingJournal(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Post This Month
+              <Plus className="h-4 w-4" /> Post Depreciation
             </Button>
           </div>
           <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
@@ -1739,14 +1781,55 @@ export default function DepreciationPage() {
       {postingJournal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-card rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 space-y-4">
-            <h2 className="font-bold text-slate-800">
-              Post Depreciation — {now.toLocaleString('default', { month: 'long' })}{' '}
-              {now.getFullYear()}
-            </h2>
+            <h2 className="font-bold text-slate-800">Post Depreciation</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Month</label>
+                <Select
+                  value={String(postPeriod.month)}
+                  onValueChange={(v) => setPostPeriod((p) => ({ ...p, month: Number(v) }))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {new Date(2000, m - 1, 1).toLocaleString('default', { month: 'long' })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Year</label>
+                <Select
+                  value={String(postPeriod.year)}
+                  onValueChange={(v) => setPostPeriod((p) => ({ ...p, year: Number(v) }))}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 8 }, (_, i) => now.getFullYear() - i).map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground">
-              This will post depreciation for your branch.
-              <br />
-              This month charge: <strong>{formatCurrency(thisMonthDep, currency)}</strong>
+              Closes this period for your branch. Each asset is charged only for the months it was
+              actually in service, and never past its salvage value.
+              {postPeriod.year === now.getFullYear() && postPeriod.month === now.getMonth() + 1 && (
+                <>
+                  <br />
+                  This month&apos;s charge:{' '}
+                  <strong>{formatCurrency(thisMonthDep, currency)}</strong>
+                </>
+              )}
             </p>
             <div className="flex gap-3">
               <Button

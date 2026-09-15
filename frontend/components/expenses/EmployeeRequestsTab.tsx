@@ -200,6 +200,53 @@ export function ViewApproveModal({
               <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">
                 Purchase Payment Details
               </p>
+              {/* Tax settlement facts. Shown above the vendor block because the approver's
+                  first question on one of these is "what tax is this and for which
+                  period", and because approving it does NOT reduce the vendor balance
+                  shown below — the VAT already sits inside their invoice. */}
+              {expense.taxRecordId && (
+                <div className="mb-3 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3">
+                  <p className="mb-1.5 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                    Tax Payment
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="font-medium text-muted-foreground">Tax Type</span>
+                      <p className="font-bold text-slate-800">
+                        {expense.taxType === 'REVERSE_CHARGE_VAT'
+                          ? 'Reverse-charge VAT'
+                          : 'Input VAT'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">Tax Amount</span>
+                      <p className="font-black text-slate-900">
+                        {expense.currency} {Number(expense.amount).toFixed(2)}
+                      </p>
+                    </div>
+                    {(expense.taxPeriodFrom || expense.taxPeriodTo) && (
+                      <div className="col-span-2">
+                        <span className="font-medium text-muted-foreground">Tax Period</span>
+                        <p className="font-semibold text-slate-700">
+                          {(expense.taxPeriodFrom ?? '—').slice(0, 10)} →{' '}
+                          {(expense.taxPeriodTo ?? '—').slice(0, 10)}
+                        </p>
+                      </div>
+                    )}
+                    <div className="col-span-2">
+                      <span className="font-medium text-muted-foreground">Tax Record</span>
+                      <p className="font-mono text-[10px] font-bold text-indigo-700">
+                        {expense.taxRecordId}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[10px] font-semibold leading-snug text-slate-500">
+                    Approving settles this tax record and pays the amount out. The vendor&apos;s own
+                    outstanding balance is not changed by it.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {expense.vendorName && (
                   <div>

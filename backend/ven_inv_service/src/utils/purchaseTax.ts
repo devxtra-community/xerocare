@@ -35,9 +35,17 @@ const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
  * @param amount       the figure as quoted by the vendor
  * @param ratePercent  the tax rate; 0 or null means no tax was declared
  * @param taxIncluded  true when `amount` already contains the tax, false when the tax
- *                     is added on top. Null/undefined is treated as inclusive, which
- *                     is the safe default: it never invents a debt that the vendor did
- *                     not quote, and never claims tax that may not have been charged.
+ *                     is added on top.
+ *
+ *                     Null/undefined is a distinct third state — "the vendor did not
+ *                     answer the Yes/No column" — and is treated as INCLUSIVE, i.e. the
+ *                     quoted price is the whole of what is owed. This is the one
+ *                     interpretation used everywhere: the RFQ comparison, the award
+ *                     screen and this splitter all agree, and the UI labels it "not
+ *                     declared" rather than claiming it is excluded. Choosing the other
+ *                     direction would silently add tax to a figure the vendor never
+ *                     quoted, inflating what we owe them; choosing this one can only
+ *                     understate the reclaimable tax, which is visible and correctable.
  */
 export function splitPurchaseTax(
   amount: number | null | undefined,
