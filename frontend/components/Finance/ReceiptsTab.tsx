@@ -153,18 +153,19 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
                 className="pl-9 pr-3 py-1.5 text-xs border border-border rounded-md bg-card w-52"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-border rounded-md px-2 py-1.5 text-xs bg-card"
-            >
-              <option value="ALL">All Status</option>
-              <option value="PENDING">Pending</option>
-              <option value="DEPOSITED">Deposited</option>
-              <option value="CLEARED">Cleared</option>
-              <option value="BOUNCED">Bounced</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 w-36 bg-card text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Status</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="DEPOSITED">Deposited</SelectItem>
+                <SelectItem value="CLEARED">Cleared</SelectItem>
+                <SelectItem value="BOUNCED">Bounced</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>

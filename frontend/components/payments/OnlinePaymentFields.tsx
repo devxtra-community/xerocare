@@ -4,6 +4,13 @@ import * as React from 'react';
 import { CreditCard, Loader2, ShieldCheck, Info } from 'lucide-react';
 
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { getUserFromToken } from '@/lib/auth';
 import {
   CardNetwork,
@@ -298,19 +305,22 @@ export default function OnlinePaymentFields({
               <label className="mb-1 block text-xs font-semibold text-slate-600">
                 Card Network *
               </label>
-              <select
+              <Select
                 disabled={disabled}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                value={value.cardNetwork}
-                onChange={(e) => set({ cardNetwork: e.target.value as CardNetwork })}
+                value={value.cardNetwork || undefined}
+                onValueChange={(v) => set({ cardNetwork: v as CardNetwork })}
               >
-                <option value="">Select network…</option>
-                {availableNetworks.map((n) => (
-                  <option key={n} value={n}>
-                    {CARD_NETWORK_LABEL[n]}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="bg-white text-sm">
+                  <SelectValue placeholder="Select network…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableNetworks.map((n) => (
+                    <SelectItem key={n} value={n}>
+                      {CARD_NETWORK_LABEL[n]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

@@ -2,6 +2,13 @@
 
 import React, { useState } from 'react';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -1918,20 +1925,24 @@ export default function UsageRecordingModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Discount Type</Label>
-                    <select
-                      className="w-full p-2 border border-slate-300 rounded-md"
+                    <Select
                       value={formData.discountType}
-                      onChange={(e) =>
+                      onValueChange={(v) =>
                         setFormData({
                           ...formData,
-                          discountType: e.target.value as 'NONE' | 'AMOUNT' | 'COPIES',
+                          discountType: v as 'NONE' | 'AMOUNT' | 'COPIES',
                         })
                       }
                     >
-                      <option value="NONE">None</option>
-                      <option value="AMOUNT">By Amount ({getActiveCurrency()})</option>
-                      <option value="COPIES">By Copies (A4 Equivalent)</option>
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">None</SelectItem>
+                        <SelectItem value="AMOUNT">By Amount ({getActiveCurrency()})</SelectItem>
+                        <SelectItem value="COPIES">By Copies (A4 Equivalent)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   {formData.discountType === 'AMOUNT' && (
                     <div className="space-y-2">

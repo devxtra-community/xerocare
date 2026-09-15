@@ -15,6 +15,13 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import api from '@/lib/api';
 import { GCC_COUNTRIES, CARD_NETWORK_LABEL, CardNetwork } from '@/lib/payments/gccCards';
 
@@ -276,24 +283,28 @@ export default function CardProcessingFeeRules() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Issuer Country *</Label>
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              <Select
                 value={form.issuerCountry}
-                onChange={(e) => {
-                  const c = GCC_COUNTRIES.find((x) => x.code === e.target.value);
+                onValueChange={(v) => {
+                  const c = GCC_COUNTRIES.find((x) => x.code === v);
                   setForm((f) => ({
                     ...f,
-                    issuerCountry: e.target.value,
+                    issuerCountry: v,
                     currency: c?.currency ?? f.currency,
                   }));
                 }}
               >
-                {GCC_COUNTRIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.name} ({c.code})
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {GCC_COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name} ({c.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs">Settlement Currency *</Label>
@@ -314,30 +325,41 @@ export default function CardProcessingFeeRules() {
             </div>
             <div>
               <Label className="text-xs">Card Type</Label>
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={form.cardType}
-                onChange={(e) => setForm((f) => ({ ...f, cardType: e.target.value }))}
+              <Select
+                value={form.cardType || 'ANY'}
+                onValueChange={(v) => setForm((f) => ({ ...f, cardType: v === 'ANY' ? '' : v }))}
               >
-                <option value="">Any</option>
-                <option value="DEBIT">Debit</option>
-                <option value="CREDIT">Credit</option>
-              </select>
+                <SelectTrigger className="mt-1 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* "" is not a legal SelectItem value (it is how Radix represents
+                      "nothing selected"), so the wildcard travels as ANY and is mapped
+                      back to the empty string the API expects. */}
+                  <SelectItem value="ANY">Any</SelectItem>
+                  <SelectItem value="DEBIT">Debit</SelectItem>
+                  <SelectItem value="CREDIT">Credit</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs">Card Network</Label>
-              <select
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={form.cardNetwork}
-                onChange={(e) => setForm((f) => ({ ...f, cardNetwork: e.target.value }))}
+              <Select
+                value={form.cardNetwork || 'ANY'}
+                onValueChange={(v) => setForm((f) => ({ ...f, cardNetwork: v === 'ANY' ? '' : v }))}
               >
-                <option value="">Any</option>
-                {(Object.keys(CARD_NETWORK_LABEL) as CardNetwork[]).map((n) => (
-                  <option key={n} value={n}>
-                    {CARD_NETWORK_LABEL[n]}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="mt-1 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ANY">Any</SelectItem>
+                  {(Object.keys(CARD_NETWORK_LABEL) as CardNetwork[]).map((n) => (
+                    <SelectItem key={n} value={n}>
+                      {CARD_NETWORK_LABEL[n]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs">Rate Percent (MDR) *</Label>

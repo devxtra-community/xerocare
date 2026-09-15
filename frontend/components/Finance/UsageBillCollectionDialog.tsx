@@ -1,6 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -201,18 +208,22 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
               <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                 Payment Mode
               </Label>
-              <select
+              <Select
                 value={paymentMode}
-                onChange={(e) => {
-                  setPaymentMode(e.target.value as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE');
+                onValueChange={(v) => {
+                  setPaymentMode(v as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE');
                   setCashAccountId('');
                 }}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-bold"
               >
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
+                <SelectTrigger className="h-9 w-full text-sm font-bold">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
+                  <SelectItem value="CHEQUE">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {paymentMode === 'CHEQUE' ? (
               <div className="grid grid-cols-2 gap-3">
@@ -266,21 +277,21 @@ export function UsageBillCollectionDialog({ target, onClose, onCollected }: Prop
                         <Label className="text-[10px] font-black uppercase tracking-wider text-slate-500">
                           Account (optional)
                         </Label>
-                        <select
-                          value={cashAccountId}
-                          onChange={(e) => setCashAccountId(e.target.value)}
-                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs font-bold"
-                        >
-                          <option value="">Select...</option>
-                          {matching.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name} — {a.currency}{' '}
-                              {Number(a.currentBalance).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                              })}
-                            </option>
-                          ))}
-                        </select>
+                        <Select value={cashAccountId || undefined} onValueChange={setCashAccountId}>
+                          <SelectTrigger className="h-9 w-full text-xs font-bold">
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {matching.map((a) => (
+                              <SelectItem key={a.id} value={a.id}>
+                                {a.name} — {a.currency}{' '}
+                                {Number(a.currentBalance).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )
                   );
