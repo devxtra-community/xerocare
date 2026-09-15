@@ -1,6 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, X } from 'lucide-react';
@@ -60,20 +67,19 @@ export default function OwnerSelect({
       </label>
       {!adding ? (
         <div className="flex gap-2">
-          <select
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            required={required}
-          >
-            <option value="">{isLoading ? 'Loading…' : '— select owner —'}</option>
-            {owners.map((o: Owner) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-                {o.ownershipPercent != null ? ` (${o.ownershipPercent}%)` : ''}
-              </option>
-            ))}
-          </select>
+          <Select value={value || undefined} onValueChange={onChange}>
+            <SelectTrigger className="flex-1 text-sm">
+              <SelectValue placeholder={isLoading ? 'Loading…' : '— select owner —'} />
+            </SelectTrigger>
+            <SelectContent>
+              {owners.map((o: Owner) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.name}
+                  {o.ownershipPercent != null ? ` (${o.ownershipPercent}%)` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <button
             type="button"
             onClick={() => setAdding(true)}
