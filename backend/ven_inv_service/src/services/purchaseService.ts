@@ -11,6 +11,7 @@ import { Purchase } from '../entities/purchaseEntity';
 import { PurchasePayment } from '../entities/purchasePaymentEntity';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
+import { vendorPayableAmount } from '../utils/purchaseTax';
 
 export class PurchaseService {
   private purchaseRepo = new PurchaseRepository();
@@ -18,19 +19,28 @@ export class PurchaseService {
   private costRepo = new PurchaseCostRepository();
 
   private enrichPurchase(purchase: Purchase) {
-    // Vendor payments settle the goods invoice (purchaseAmount) only.
-    // totalAmount = purchaseAmount + additional costs (documentation, labour,
-    // handling, transportation, shipping, groundfield) — those costs are
-    // money already spent with other parties (freight forwarders, customs
-    // brokers, ...), not a debt owed to the vendor, so they must not inflate
-    // "how much is still owed to the vendor". Paying the vendor's
-    // purchaseAmount in full is a fully-PAID purchase even if totalAmount is
-    // higher.
+    // Vendor payments settle the goods invoice only.
+    //
+    // Two things are deliberately NOT part of what the vendor is owed:
+    //
+    //  - totalAmount = purchaseAmount + additional costs (documentation, labour,
+    //    handling, transportation, shipping, groundfield). Those are money spent with
+    //    other parties (freight forwarders, customs brokers, ...), not a debt to this
+    //    vendor, so they must not inflate "how much is still owed to the vendor".
+    //
+    //  - the domestic input VAT inside the invoice, which Accounts settles separately
+    //    through the Tax Report. See vendorPayableAmount() for why keeping it here made
+    //    the same tax payable twice.
+    //
+    // Paying the vendor payable in full is a fully-PAID purchase even when totalAmount
+    // is higher.
     const paidAmount = purchase.payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-    const remainingAmount = Math.max(0, Number(purchase.purchaseAmount) - paidAmount);
+    const vendorPayable = vendorPayableAmount(purchase);
+    const remainingAmount = Math.max(0, vendorPayable - paidAmount);
 
     let status = PurchaseStatus.UNPAID;
-    if (paidAmount >= Number(purchase.purchaseAmount)) {
+    // Tolerance so a payable ending in a rounded fils still reads as fully paid.
+    if (paidAmount >= vendorPayable - 0.01) {
       status = PurchaseStatus.PAID;
     } else if (paidAmount > 0) {
       status = PurchaseStatus.PARTIAL;
@@ -39,6 +49,12 @@ export class PurchaseService {
     return {
       ...purchase,
       paidAmount,
+      /** What the vendor is owed — the invoice less any separately-settled input VAT. */
+      vendorPayableAmount: vendorPayable,
+      /** The invoice total, kept so the UI can show the split rather than just the net. */
+      grossPurchaseAmount: Number(purchase.purchaseAmount ?? 0),
+      /** The slice settled through Accounts' Tax Report, not by paying the vendor. */
+      taxSettledSeparately: Math.max(0, Number(purchase.purchaseAmount ?? 0) - vendorPayable),
       remainingAmount,
       status,
     };

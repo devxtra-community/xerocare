@@ -12,6 +12,8 @@ import {
 } from '@/lib/finance/accountsApi';
 import { fetchPurchases, agingBucket, fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getUserFromToken } from '@/lib/auth';
 import StatCard from '@/components/StatCard';
@@ -235,6 +237,9 @@ function PayableContent() {
     [combined, sourceFilter, search],
   );
 
+  // Six rows a page; resetKey returns to page 1 when a filter changes.
+  const payablePaging = useTablePagination(filtered, `${sourceFilter}|${search}`);
+
   // ── The accounting guard ────────────────────────────────────────────────────
   // Tax rows are listed here for visibility, but they are NOT a vendor liability and
   // must never be summed into one. A vendor invoice of 15,000 containing 714.29 of
@@ -449,7 +454,7 @@ function PayableContent() {
                         </td>
                       </tr>
                     ) : (
-                      filtered.map((p) => (
+                      payablePaging.pageRows.map((p) => (
                         <tr key={p.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-mono text-xs text-gray-500">
                             {p.referenceNo}
@@ -515,6 +520,15 @@ function PayableContent() {
                   </tbody>
                 </table>
               </div>
+            )}
+            {!isLoading && filtered.length > 0 && (
+              <Pagination
+                page={payablePaging.page}
+                totalPages={payablePaging.totalPages}
+                total={payablePaging.total}
+                limit={payablePaging.pageSize}
+                onPageChange={payablePaging.setPage}
+              />
             )}
           </div>
         </>

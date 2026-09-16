@@ -39,6 +39,15 @@ export interface Purchase {
   totalAmount: number; // Total cost (purchase + all fees)
   paidAmount: number; // How much money we have already sent
   remainingAmount: number; // Money we still owe the vendor
+  /** What the vendor is owed: the invoice less any domestic input VAT, which Accounts
+   *  settles separately through the Tax Report rather than by paying the vendor. Equals
+   *  purchaseAmount when no tax was declared, and on imports (reverse charge was never
+   *  inside the invoice). */
+  vendorPayableAmount?: number;
+  /** The gross invoice, so the UI can show the split rather than only the net. */
+  grossPurchaseAmount?: number;
+  /** purchaseAmount − vendorPayableAmount: the slice handled by the tax table. */
+  taxSettledSeparately?: number;
   status: 'UNPAID' | 'PARTIAL' | 'PAID';
   /** Domestic vs International — snapshot copied from the lot/RFQ at creation. */
   purchaseOrigin?: import('@/lib/purchaseOrigin').PurchaseOrigin;

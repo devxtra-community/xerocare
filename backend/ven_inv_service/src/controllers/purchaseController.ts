@@ -307,16 +307,43 @@ export class PurchaseController {
           branchClause = `AND p.branch_id IN (${ids.map((b) => `'${b}'`).join(',')})`;
       }
 
+      // What the vendor is still owed. Two corrections over the obvious query, both of
+      // which otherwise overstate Accounts Payable:
+      //
+      //  - base it on purchase_amount, not total_amount. total_amount folds in additional
+      //    costs (freight, customs, labour) that are owed to other parties entirely, and
+      //    the purchase list has always shown the vendor balance off purchase_amount — so
+      //    the Balance Sheet was reporting a bigger vendor debt than the Payables page.
+      //
+      //  - net off the domestic input VAT inside the invoice. Accounts Payable separately
+      //    adds unsettled input VAT (it is owed to the tax authority until Proceed →
+      //    settle clears it), so leaving it here counted the same tax twice: a 15,000
+      //    invoice with 714.29 of VAT reported 15,714.29 owed. Imports keep the full
+      //    amount — reverse charge is self-assessed and never sat inside the invoice.
       const rows = await Source.query<{ currency_code: string | null; outstanding: string }[]>(`
-        SELECT COALESCE(p.currency_code, 'AED') AS currency_code,
-               COALESCE(SUM(p.total_amount - COALESCE(pay.paid, 0)), 0) AS outstanding
-        FROM purchases p
-        LEFT JOIN (
-          SELECT purchase_id, SUM(amount) AS paid FROM purchase_payments GROUP BY purchase_id
-        ) pay ON pay.purchase_id = p.id
-        WHERE (p.total_amount - COALESCE(pay.paid, 0)) > 0
-          ${branchClause}
-        GROUP BY p.currency_code
+        WITH vendor_payable AS (
+          SELECT p.id,
+                 p.currency_code,
+                 CASE
+                   WHEN UPPER(COALESCE(p.purchase_origin::text, '')) = 'INTERNATIONAL'
+                     THEN COALESCE(p.purchase_amount, 0)
+                   ELSE GREATEST(
+                     COALESCE(p.purchase_amount, 0) - GREATEST(COALESCE(p.vendor_tax_amount, 0), 0),
+                     0
+                   )
+                 END AS payable,
+                 COALESCE(pay.paid, 0) AS paid
+          FROM purchases p
+          LEFT JOIN (
+            SELECT purchase_id, SUM(amount) AS paid FROM purchase_payments GROUP BY purchase_id
+          ) pay ON pay.purchase_id = p.id
+          WHERE TRUE ${branchClause}
+        )
+        SELECT COALESCE(currency_code, 'AED') AS currency_code,
+               COALESCE(SUM(payable - paid), 0) AS outstanding
+        FROM vendor_payable
+        WHERE (payable - paid) > 0
+        GROUP BY currency_code
       `);
 
       const currencyGroups = rows.map((r) => ({

@@ -431,6 +431,75 @@ export const submitExpenseRequest = async (req: Request, res: Response, next: Ne
   }
 };
 
+/**
+ * Put back cash that was deducted for an approval whose cross-service half then failed.
+ *
+ * The cash movement commits before the purchase/tax service is called, so a failure there
+ * leaves real money gone with nothing on the other side: the cashbook says the vendor was
+ * paid, their ledger says they were not, and the difference is simply missing. Logging it
+ * and moving on — the previous behaviour — meant nobody found out until the accounts were
+ * reconciled by hand, if ever.
+ *
+ * The reversal is written as its own cashbook RECEIPT rather than by deleting the payment
+ * row, so the attempt and its undo both stay on the record. The request goes back to
+ * SUBMITTED so Finance can see it still needs dealing with.
+ */
+async function reverseFailedApprovalCash(
+  request: EmployeeExpenseRequest,
+  userId: string,
+  reason: string,
+): Promise<boolean> {
+  try {
+    const accountId = request.paidFromAccount || request.paidFromAccountId;
+    if (!accountId) return false;
+    const cbYear = new Date().getFullYear();
+    const cbCount = await Source.getRepository(CashbookEntry)
+      .createQueryBuilder('c')
+      .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+      .getCount();
+    const refNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+
+    await Source.transaction(async (manager) => {
+      const account = await manager.findOne(CashBankAccount, { where: { id: accountId } });
+      if (!account) throw new Error(`Account ${accountId} not found for reversal`);
+      account.currentBalance = Number(account.currentBalance) + Number(request.amount);
+      await manager.save(CashBankAccount, account);
+
+      await manager.save(
+        manager.create(CashbookEntry, {
+          referenceNo: refNo,
+          date: new Date(),
+          accountId,
+          entryType: 'RECEIPT',
+          amount: request.amount,
+          category: 'Reversal',
+          description: `Reversed: ${request.requestNo} could not be recorded against the purchase — ${reason}`,
+          paymentMode: request.paymentMode || 'Cash',
+          createdBy: userId,
+          branchId: request.branchId,
+        }),
+      );
+
+      request.status = 'SUBMITTED';
+      request.paidAt = undefined;
+      request.notes =
+        `${request.notes ? request.notes + ' ' : ''}[auto-reversed ${new Date().toISOString().slice(0, 10)}: approval could not be completed — ${reason}]`.slice(
+          0,
+          1000,
+        );
+      await manager.save(EmployeeExpenseRequest, request);
+    });
+    logger.warn(`[approveExpenseRequest] Reversed cash for ${request.requestNo}: ${reason}`);
+    return true;
+  } catch (err) {
+    logger.error(
+      `[approveExpenseRequest] CASH REVERSAL FAILED for ${request.requestNo} — manual correction required`,
+      err,
+    );
+    return false;
+  }
+}
+
 export const approveExpenseRequest = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, role, branchId, financeJob } = req.user!;
@@ -504,6 +573,48 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
         const accountId = request.paidFromAccountId;
         if (!accountId) {
           throw new AppError('No payment account stored on this request', 400);
+        }
+
+        // Pre-flight the vendor payment against what is actually still owed, BEFORE any
+        // cash moves.
+        //
+        // The cash deduction below commits, and only then is record-payment called. If
+        // that call is rejected the money is already gone: the cashbook says the vendor
+        // was paid, the vendor's own ledger says they were not, and the difference simply
+        // disappears. Checking here turns that into an ordinary refusal with nothing
+        // written.
+        //
+        // It cannot be checked only at submission time either — two half-payments can sit
+        // in the queue together, each valid on its own, and approving both would overpay.
+        // This reads the live remaining at the moment of approval.
+        if (request.purchaseId && !request.purchaseCostType && !request.taxRecordId) {
+          const venInvUrlCheck = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+          const checkRes = await fetch(`${venInvUrlCheck}/purchases/${request.purchaseId}`, {
+            headers: { Authorization: `Bearer ${makeServiceToken()}` },
+          });
+          if (!checkRes.ok) {
+            throw new AppError(
+              'Could not confirm the vendor balance for this purchase. The approval was stopped so no money moves against a figure that could not be verified.',
+              502,
+            );
+          }
+          const checkJson = (await checkRes.json()) as {
+            data?: { vendorPayableAmount?: number; purchaseAmount?: number; paidAmount?: number };
+          };
+          const pr = checkJson?.data ?? {};
+          const payable = Number(pr.vendorPayableAmount ?? pr.purchaseAmount ?? 0);
+          const alreadyPaid = Number(pr.paidAmount ?? 0);
+          const stillOwed = payable - alreadyPaid;
+          if (Number(request.amount) > stillOwed + 0.01) {
+            throw new AppError(
+              `This request is for ${Number(request.amount).toFixed(2)} but only ${stillOwed.toFixed(2)} is still owed to the vendor` +
+                (Number(pr.purchaseAmount ?? 0) > payable
+                  ? `. The invoice totals ${Number(pr.purchaseAmount).toFixed(2)}, of which ${(Number(pr.purchaseAmount) - payable).toFixed(2)} is input VAT settled from Accounts → Tax Report rather than paid to the vendor.`
+                  : '.') +
+                ' Reject this request and raise a new one for the correct amount.',
+              400,
+            );
+          }
         }
 
         // Generate cashbook ref BEFORE transaction (pool max=1)
@@ -654,6 +765,12 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
                   errText,
                 },
               );
+              // Money already left. Put it back rather than leave it unaccounted for.
+              await reverseFailedApprovalCash(
+                request,
+                userId,
+                `the inventory service rejected it (${venInvRes.status})`,
+              );
             }
           } catch (err) {
             logger.error(
@@ -664,6 +781,11 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
                 costType: request.purchaseCostType,
                 err,
               },
+            );
+            await reverseFailedApprovalCash(
+              request,
+              userId,
+              'the inventory service was unreachable',
             );
           }
         }

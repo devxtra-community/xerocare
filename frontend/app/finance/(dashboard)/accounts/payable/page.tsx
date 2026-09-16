@@ -45,6 +45,8 @@ import {
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { Button } from '@/components/ui/button';
@@ -917,6 +919,13 @@ export default function AccountsPayablePage() {
     ],
   );
 
+  // Six rows a page. resetKey carries every filter so changing one returns the reader to
+  // page 1 instead of stranding them past the end of a shorter result.
+  const payablePaging = useTablePagination(
+    filtered,
+    `${typeFilter}|${agingFilter}|${sourceFilter}|${statusFilter}|${search}|${amountMin}|${amountMax}|${dateFrom}|${dateTo}`,
+  );
+
   // ── The accounting guard ────────────────────────────────────────────────────
   // Tax rows are shown in this table for the workflow, but they are NOT a vendor
   // liability and must never be summed into one. A vendor invoice of 15,000 that
@@ -1466,7 +1475,7 @@ export default function AccountsPayablePage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((p) => (
+                    payablePaging.pageRows.map((p) => (
                       <TableRow key={p.id} className="hover:bg-blue-50/50 transition-colors">
                         <TableCell className="pl-4 font-medium text-slate-800">
                           {p.payableTo}
@@ -1584,6 +1593,15 @@ export default function AccountsPayablePage() {
                 </TableBody>
               </Table>
             </div>
+            {filtered.length > 0 && (
+              <Pagination
+                page={payablePaging.page}
+                totalPages={payablePaging.totalPages}
+                total={payablePaging.total}
+                limit={payablePaging.pageSize}
+                onPageChange={payablePaging.setPage}
+              />
+            )}
           </div>
 
           {showAdd && (

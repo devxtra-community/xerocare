@@ -12,6 +12,8 @@ import {
 } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getUserFromToken } from '@/lib/auth';
 import StatCard from '@/components/StatCard';
@@ -200,6 +202,9 @@ function ReceivableContent() {
     [combined, sourceFilter, search],
   );
 
+  // Six rows a page; resetKey returns to page 1 when a filter changes.
+  const receivablePaging = useTablePagination(filtered, `${sourceFilter}|${search}`);
+
   const totalOutstanding = combined.reduce((s, r) => s + Number(r.outstanding), 0);
   const overdue = combined
     .filter((r) => r.aging !== 'Current')
@@ -384,7 +389,7 @@ function ReceivableContent() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((r) => (
+                    receivablePaging.pageRows.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-mono text-xs text-gray-500">
                           {r.referenceNo}
@@ -433,6 +438,15 @@ function ReceivableContent() {
                 </tbody>
               </table>
             </div>
+            {filtered.length > 0 && (
+              <Pagination
+                page={receivablePaging.page}
+                totalPages={receivablePaging.totalPages}
+                total={receivablePaging.total}
+                limit={receivablePaging.pageSize}
+                onPageChange={receivablePaging.setPage}
+              />
+            )}
           </div>
         </>
       )}

@@ -361,7 +361,8 @@ export default function PurchaseDetailsPage() {
         open={paymentModalOpen}
         onOpenChange={setPaymentModalOpen}
         purchaseId={purchase.id}
-        payableAmount={purchase.purchaseAmount}
+        payableAmount={purchase.vendorPayableAmount ?? purchase.purchaseAmount}
+        taxSettledSeparately={purchase.taxSettledSeparately ?? 0}
         paidAmount={purchase.paidAmount}
         purchaseCurrency={purchase.currencyCode}
         exchangeRate={purchase.exchangeRate}

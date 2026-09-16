@@ -34,6 +34,8 @@ import { SimpleLineChart, DonutChart, HorizontalBarChart } from '@/components/ac
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { Button } from '@/components/ui/button';
@@ -653,6 +655,13 @@ export default function AccountsReceivablePage() {
     ],
   );
 
+  // Six rows a page. resetKey carries every filter so changing one returns the reader to
+  // page 1 instead of stranding them past the end of a shorter result.
+  const receivablePaging = useTablePagination(
+    filtered,
+    `${typeFilter}|${agingFilter}|${sourceFilter}|${statusFilter}|${search}|${amountMin}|${amountMax}|${dateFrom}|${dateTo}`,
+  );
+
   const totalOutstanding = allReceivables.reduce((s, r) => s + (r.outstanding ?? 0), 0);
   const agingTotals = AGING_BUCKETS.map((b) => ({
     bucket: b,
@@ -1110,7 +1119,7 @@ export default function AccountsReceivablePage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((r) => (
+                    receivablePaging.pageRows.map((r) => (
                       <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
                         <TableCell className="pl-4 font-medium text-slate-800">
                           {r.customerName}
@@ -1214,6 +1223,15 @@ export default function AccountsReceivablePage() {
                 </TableBody>
               </Table>
             </div>
+            {filtered.length > 0 && (
+              <Pagination
+                page={receivablePaging.page}
+                totalPages={receivablePaging.totalPages}
+                total={receivablePaging.total}
+                limit={receivablePaging.pageSize}
+                onPageChange={receivablePaging.setPage}
+              />
+            )}
           </div>
 
           {showAdd && (

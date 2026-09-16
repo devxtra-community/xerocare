@@ -315,7 +315,8 @@ export default function ManagerPurchaseTable() {
             open={paymentOpen}
             onOpenChange={setPaymentOpen}
             purchaseId={selectedPurchase.id}
-            payableAmount={selectedPurchase.purchaseAmount}
+            payableAmount={selectedPurchase.vendorPayableAmount ?? selectedPurchase.purchaseAmount}
+            taxSettledSeparately={selectedPurchase.taxSettledSeparately ?? 0}
             paidAmount={selectedPurchase.paidAmount}
             purchaseCurrency={selectedPurchase.currencyCode}
             exchangeRate={selectedPurchase.exchangeRate}

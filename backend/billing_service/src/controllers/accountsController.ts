@@ -1765,24 +1765,49 @@ export const getInputVatPayableSummary = async (
     // own settlement state, so the Payables table can show a real Outstanding/Paid per
     // tax and the Proceed action has something to act on.
     // The endpoint wraps its payload in { success, data: { rows, totals } }, and
-    // paginates — ask for a high limit so a branch with many purchases still returns
-    // every settleable tax rather than just the first page.
-    const rowsRes = await internalGet<{
+    // paginates, and asking for limit=1000 does NOT get 1000: the endpoint clamps with
+    // Math.min(200, limit). It also orders newest-first. So reading only the first page
+    // returned the 200 most recent purchases and silently dropped every older one — and
+    // the oldest are precisely the taxes most likely to have been settled already, which
+    // made it look as though a tax disappeared from Payables once it was paid.
+    //
+    // Page through to the end instead, so the table shows every tax record: outstanding
+    // and fully settled alike.
+    interface TaxReportRow {
+      id: string;
+      vendorName: string;
+      inputVatAmount: number;
+      taxPercent: number;
+      taxName: string;
+      currencyCode: string;
+      invoiceDate: string;
+      taxStatus: string;
+      taxSettledAt: string | null;
+      taxSettlementRef: string | null;
+    }
+    type TaxReportPage = {
       data?: {
-        rows?: {
-          id: string;
-          vendorName: string;
-          inputVatAmount: number;
-          taxPercent: number;
-          taxName: string;
-          currencyCode: string;
-          invoiceDate: string;
-          taxStatus: string;
-          taxSettledAt: string | null;
-          taxSettlementRef: string | null;
-        }[];
+        rows?: TaxReportRow[];
+        pagination?: { page: number; limit: number; total: number; pages: number };
       };
-    }>(`${INV_URL}/purchases/tax-report/local${branchQs}${branchQs ? '&' : '?'}limit=1000`);
+    };
+
+    const PAGE_LIMIT = 200; // the endpoint's own ceiling — asking for more is pointless
+    const taxRows: TaxReportRow[] = [];
+    let pageNo = 1;
+    let pageCount = 1;
+    // Hard stop so a bad `pages` value can never spin forever.
+    while (pageNo <= pageCount && pageNo <= 50) {
+      const pageRes = await internalGet<TaxReportPage>(
+        `${INV_URL}/purchases/tax-report/local${branchQs}${branchQs ? '&' : '?'}limit=${PAGE_LIMIT}&page=${pageNo}`,
+      );
+      const rows = pageRes?.data?.rows ?? [];
+      taxRows.push(...rows);
+      pageCount = pageRes?.data?.pagination?.pages ?? 1;
+      if (rows.length === 0) break;
+      pageNo += 1;
+    }
+    const rowsRes = { data: { rows: taxRows } };
 
     // Whether each tax has a live payment request, so the UI can distinguish "not started"
     // from "waiting on approval" without a second round trip.

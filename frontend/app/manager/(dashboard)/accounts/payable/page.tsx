@@ -9,6 +9,8 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/accounts/charts';
 import * as XLSX from 'xlsx';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700',
@@ -54,6 +56,9 @@ export default function ManagerPayablePage() {
       ),
     [payables, search],
   );
+
+  // Six rows a page; resetKey returns to page 1 when the search changes.
+  const payablePaging = useTablePagination(filtered, search);
 
   const totalOutstanding = payables.reduce(
     (s, p) => s + (Number(p.amount) - Number(p.amountPaid ?? 0)),
@@ -185,7 +190,7 @@ export default function ManagerPayablePage() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((p) => {
+                  payablePaging.pageRows.map((p) => {
                     const aging = p.aging ?? 'Current';
                     return (
                       <tr key={p.id} className="hover:bg-gray-50">
@@ -224,6 +229,15 @@ export default function ManagerPayablePage() {
               </tbody>
             </table>
           </div>
+        )}
+        {filtered.length > 0 && (
+          <Pagination
+            page={payablePaging.page}
+            totalPages={payablePaging.totalPages}
+            total={payablePaging.total}
+            limit={payablePaging.pageSize}
+            onPageChange={payablePaging.setPage}
+          />
         )}
       </div>
     </div>

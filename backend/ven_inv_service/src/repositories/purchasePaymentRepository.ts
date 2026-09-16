@@ -5,6 +5,7 @@ import { Purchase } from '../entities/purchaseEntity';
 import { AppError } from '../errors/appError';
 import { AddPaymentDto } from '../types/purchaseTypes';
 import { generatePaymentReference } from '../utils/paymentReferenceGenerator';
+import { vendorPayableAmount } from '../utils/purchaseTax';
 
 export class PurchasePaymentRepository {
   private get repo() {
@@ -37,20 +38,29 @@ export class PurchasePaymentRepository {
         where: { purchaseId },
       });
 
-      // Vendor payments settle the goods invoice (purchaseAmount) only — additional
-      // costs (documentation, labour, handling, transportation, shipping,
-      // groundfield) are money spent with other parties (freight forwarders,
-      // customs brokers, ...) and are tracked separately via PurchaseCost. They
-      // are never owed to — or payable through — the vendor, so they must not
+      // Vendor payments settle the goods invoice only — additional costs
+      // (documentation, labour, handling, transportation, shipping, groundfield) are
+      // money spent with other parties (freight forwarders, customs brokers, ...) and
+      // are tracked separately via PurchaseCost, and the domestic input VAT is settled
+      // through Accounts' Tax Report. Neither is owed to the vendor, so neither may
       // inflate what a vendor payment is allowed to cover.
+      //
+      // This is the server-side half of the fix: without it the UI could stop offering
+      // the tax portion while a direct API call still paid it, which is exactly the
+      // double payment the ceiling exists to prevent.
       const alreadyPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const remaining = Number(purchase.purchaseAmount) - alreadyPaid;
+      const vendorPayable = vendorPayableAmount(purchase);
+      const remaining = vendorPayable - alreadyPaid;
 
       // 4. Validate does not exceed remaining vendor-payable amount
       if (Number(data.amount) > remaining + 0.01) {
         // 0.01 for rounding safety
+        const taxPart = Number(purchase.purchaseAmount ?? 0) - vendorPayable;
         throw new AppError(
-          `Payment amount ${data.amount} exceeds remaining vendor payable amount ${remaining}`,
+          `Payment amount ${data.amount} exceeds remaining vendor payable amount ${remaining.toFixed(2)}.` +
+            (taxPart > 0
+              ? ` The invoice total is ${Number(purchase.purchaseAmount).toFixed(2)}, of which ${taxPart.toFixed(2)} is input VAT settled from Accounts → Tax Report, not paid to the vendor.`
+              : ''),
           400,
         );
       }

@@ -42,6 +42,10 @@ interface AddPaymentModalProps {
    * included here. */
   payableAmount: number;
   paidAmount: number;
+  /** Domestic input VAT inside the invoice that Accounts settles through the Tax Report
+   *  rather than by paying the vendor. Shown so the smaller vendor figure is explained
+   *  rather than looking like the invoice was mis-entered. */
+  taxSettledSeparately?: number;
   /** Currency totalAmount/remainingAmount are recorded in (purchase.currencyCode) — may differ
    * from the branch currency the payment amount below is actually collected in. */
   purchaseCurrency?: string | null;
@@ -61,6 +65,7 @@ export default function AddPaymentModal({
   vendorName,
   payableAmount,
   paidAmount,
+  taxSettledSeparately = 0,
   purchaseCurrency,
   exchangeRate,
   existingCostLines = [],
@@ -359,6 +364,12 @@ export default function AddPaymentModal({
                     )
                   : formatCurrency(remainingAmount, currencyCode)}
               </span>
+              {taxSettledSeparately > 0 && (
+                <div className="mt-1 text-[11px] leading-relaxed text-amber-300">
+                  Excludes {formatCurrency(taxSettledSeparately, purchaseCurrency || currencyCode)}{' '}
+                  input VAT — settled from Accounts → Tax Report, not paid to the vendor.
+                </div>
+              )}
             </div>
           )}
           {isForeignPurchase && (

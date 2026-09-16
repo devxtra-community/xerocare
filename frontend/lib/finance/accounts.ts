@@ -468,7 +468,15 @@ export interface PurchaseOrder {
   vendor?: { id: string; name: string };
   vendorCountry?: string | null;
   totalAmount: number;
+  /** The gross vendor invoice, tax included. */
   purchaseAmount?: number;
+  /** What the vendor is actually owed: the invoice less any domestic input VAT, which
+   *  Accounts settles separately through the Tax Report. Equals purchaseAmount when no
+   *  tax was declared and on imports (reverse charge never sat inside the invoice). */
+  vendorPayableAmount?: number;
+  grossPurchaseAmount?: number;
+  /** purchaseAmount − vendorPayableAmount: the slice handled by the tax table. */
+  taxSettledSeparately?: number;
   documentationFee?: number;
   labourCost?: number;
   shippingCost?: number;
