@@ -22,6 +22,8 @@ import {
   Receipt,
   UserCheck,
   AlertCircle,
+  ShieldCheck,
+  Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +43,9 @@ import {
   Customer360Bill,
   SalePaymentRequest,
   AgreementSummary,
+  Customer360CreditNote,
+  Customer360GuaranteeCheque,
+  Customer360ManualReceivable,
 } from '@/lib/customer360';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { ContractAgreementModal } from '@/components/employeeComponents/ContractAgreementModal';
@@ -48,7 +53,15 @@ import { BillModal } from '@/components/Finance/BillModal';
 import CreditNoteViewModal from '@/components/returns/CreditNoteViewModal';
 import type { CreditNoteRecord } from '@/lib/invoice';
 
-type Tab = 'quotations' | 'contracts' | 'bills' | 'payments' | 'returns';
+type Tab =
+  | 'quotations'
+  | 'contracts'
+  | 'bills'
+  | 'payments'
+  | 'deposits'
+  | 'agreements'
+  | 'receivables'
+  | 'returns';
 
 const DEPARTMENT_LABELS: Record<string, string> = {
   EMPLOYEE: 'Employee',
@@ -174,7 +187,17 @@ export default function Customer360View({
   // Credit Note modal state
   const [viewingCreditNote, setViewingCreditNote] = useState<CreditNoteRecord | null>(null);
 
-  const { invoices, payments, agreements, bills, summary } = profile;
+  const {
+    invoices,
+    payments,
+    agreements,
+    bills,
+    creditNotes: creditNoteList,
+    guaranteeCheques,
+    manualReceivables,
+    securityDeposits,
+    summary,
+  } = profile;
 
   // Build a quick lookup map: invoiceId → AgreementSummary
   const agreementByInvoiceId = new Map<string, AgreementSummary>(
@@ -183,22 +206,30 @@ export default function Customer360View({
 
   const quotations = invoices.filter((i) => i.type === 'QUOTATION');
   const contracts = invoices.filter((i) => i.type !== 'QUOTATION');
-  const creditNotes = invoices.flatMap((inv) =>
-    (inv.creditNotes ?? []).map((cn) => ({
-      ...cn,
-      invoiceId: inv.id,
-      invoiceNumber: inv.invoiceNumber,
-      customerName: customer.name,
-      customerId: customer.id,
-      branchId: inv.branchId,
-    })),
-  );
+  // Credit notes now come from their own query rather than being dug out of the invoice
+  // relation — a return raised against an invoice outside this branch/creator filter was
+  // previously invisible here.
+  const invoiceNumberById = new Map(invoices.map((i) => [i.id, i.invoiceNumber]));
+  const creditNotes = creditNoteList.map((cn) => ({
+    ...cn,
+    invoiceNumber: cn.invoiceNumber ?? invoiceNumberById.get(cn.invoiceId),
+    customerName: customer.name,
+    customerId: customer.id,
+  }));
 
   const tabs: { id: Tab; label: string; count: number }[] = [
     { id: 'contracts', label: 'Contracts', count: contracts.length },
     { id: 'quotations', label: 'Quotations', count: quotations.length },
     { id: 'bills', label: 'Rent/Lease Bills', count: bills.length },
-    { id: 'payments', label: 'Payments', count: payments.length },
+    { id: 'payments', label: 'Receipts & Payments', count: payments.length },
+    {
+      id: 'deposits',
+      label: 'Security Deposits',
+      count: securityDeposits.length + guaranteeCheques.length,
+    },
+    // agreements were already being fetched and were never shown anywhere.
+    { id: 'agreements', label: 'Agreements', count: agreements.length },
+    { id: 'receivables', label: 'Other Receivables', count: manualReceivables.length },
     { id: 'returns', label: 'Returns / Credit Notes', count: creditNotes.length },
   ];
 
@@ -328,7 +359,51 @@ export default function Customer360View({
               >
                 {currency} {summary.totalOutstanding.toLocaleString()}
               </p>
+              {/* Negative means the customer has paid more than was invoiced. It used to
+                  be clamped to 0, which hid a real overpayment and disagreed with
+                  Receivables. */}
+              {summary.totalOutstanding < 0 && (
+                <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                  Overpaid by {currency} {Math.abs(summary.totalOutstanding).toLocaleString()}
+                </p>
+              )}
+              {summary.manualOutstanding > 0 && (
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  incl. {currency} {summary.manualOutstanding.toLocaleString()} non-invoice
+                </p>
+              )}
             </div>
+            {summary.totalDepositsHeld > 0 && (
+              <div className="bg-indigo-50 rounded-xl border border-indigo-100 px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-indigo-400 font-semibold">
+                  Deposits Held
+                </p>
+                <p className="text-lg font-bold text-indigo-700 mt-0.5">
+                  {currency} {summary.totalDepositsHeld.toLocaleString()}
+                </p>
+                <p className="text-[10px] text-indigo-400 mt-0.5">refundable — not income</p>
+              </div>
+            )}
+            {summary.guaranteeChequeValue > 0 && (
+              <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+                  Guarantee Cheques
+                </p>
+                <p className="text-lg font-bold text-slate-800 mt-0.5">
+                  {currency} {summary.guaranteeChequeValue.toLocaleString()}
+                </p>
+              </div>
+            )}
+            {summary.creditNoteValue > 0 && (
+              <div className="bg-slate-50 rounded-xl border border-slate-200 px-4 py-3 text-center">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
+                  Returns
+                </p>
+                <p className="text-lg font-bold text-slate-800 mt-0.5">
+                  {currency} {summary.creditNoteValue.toLocaleString()}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -406,6 +481,19 @@ export default function Customer360View({
             <BillsTab bills={bills} currency={currency} onViewBill={setViewingBillId} />
           )}
           {activeTab === 'payments' && <PaymentsTab payments={payments} />}
+          {activeTab === 'deposits' && (
+            <DepositsTab
+              deposits={securityDeposits}
+              cheques={guaranteeCheques}
+              currency={currency}
+            />
+          )}
+          {activeTab === 'agreements' && (
+            <AgreementsTab agreements={agreements} invoiceNumberById={invoiceNumberById} />
+          )}
+          {activeTab === 'receivables' && (
+            <ReceivablesTab rows={manualReceivables} currency={currency} />
+          )}
           {activeTab === 'returns' && (
             <ReturnsTab
               creditNotes={creditNotes}
@@ -835,13 +923,239 @@ function PaymentsTab({ payments }: { payments: SalePaymentRequest[] }) {
   );
 }
 
-type CreditNoteItem = NonNullable<Invoice['creditNotes']>[number];
-type CreditNoteRow = CreditNoteItem & {
-  invoiceId: string;
-  invoiceNumber: string;
+// Sourced from the profile's own creditNotes query now, so the shape is
+// Customer360CreditNote rather than the invoice relation's nested item. modelName/brand
+// are not selected by that query and are optional here.
+/**
+ * Refundable money held against a contract — cash/bank deposits and guarantee cheques.
+ *
+ * Kept apart from Receipts & Payments on purpose: a deposit is an obligation to return,
+ * not payment of the contract, and mixing the two is what made "Total Paid" overstate
+ * what a customer had actually settled.
+ */
+function DepositsTab({
+  deposits,
+  cheques,
+  currency,
+}: {
+  deposits: SalePaymentRequest[];
+  cheques: Customer360GuaranteeCheque[];
+  currency: string;
+}) {
+  if (deposits.length === 0 && cheques.length === 0)
+    return <EmptyState icon={ShieldCheck} message="No security deposits held for this customer" />;
+
+  return (
+    <div className="space-y-6">
+      {deposits.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+            Cash / Bank Deposits
+          </h4>
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Reference</TableHead>
+                <TableHead>Against</TableHead>
+                <TableHead>Mode</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Amount Held</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {deposits.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-mono text-xs text-slate-700">{d.requestNo}</TableCell>
+                  <TableCell className="font-mono text-xs text-slate-500">
+                    {d.invoiceNumber}
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600">
+                    {d.paymentMode?.replace(/_/g, ' ')}
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600">
+                    {d.paymentDate ? new Date(d.paymentDate).toLocaleDateString() : '—'}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-slate-800">
+                    {currency} {Number(d.amount).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      {cheques.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+            Guarantee Cheques
+          </h4>
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead>Cheque #</TableHead>
+                <TableHead>Bank</TableHead>
+                <TableHead>Contract</TableHead>
+                <TableHead>Received</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cheques.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-mono text-xs text-slate-700">
+                    {c.chequeNumber}
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600">{c.bankName ?? '—'}</TableCell>
+                  <TableCell className="font-mono text-xs text-slate-500">
+                    {c.contractReference ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600">
+                    {c.receivedDate ? new Date(c.receivedDate).toLocaleDateString() : '—'}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-100">
+                      {c.status ?? '—'}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-slate-800">
+                    {c.currencyCode ?? currency} {Number(c.amount).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Contract agreements and where each one is in the signing process. These were already
+ *  being fetched by the profile endpoint and had no tab to appear in. */
+function AgreementsTab({
+  agreements,
+  invoiceNumberById,
+}: {
+  agreements: AgreementSummary[];
+  invoiceNumberById: Map<string, string>;
+}) {
+  if (agreements.length === 0)
+    return <EmptyState icon={FileSignature} message="No agreements for this customer" />;
+
+  return (
+    <Table>
+      <TableHeader className="bg-slate-50">
+        <TableRow>
+          <TableHead>Agreement #</TableHead>
+          <TableHead>Contract</TableHead>
+          <TableHead>Signature Status</TableHead>
+          <TableHead>Employee Signed</TableHead>
+          <TableHead>Customer Signed</TableHead>
+          <TableHead>Prepared By</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {agreements.map((a) => (
+          <TableRow key={a.id}>
+            <TableCell className="font-mono text-xs text-slate-700">{a.agreementNumber}</TableCell>
+            <TableCell className="font-mono text-xs text-slate-500">
+              {invoiceNumberById.get(a.invoiceId) ?? '—'}
+            </TableCell>
+            <TableCell>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                  a.customerSignedAt
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                    : 'bg-amber-50 text-amber-700 border-amber-100'
+                }`}
+              >
+                {a.signatureStatus?.replace(/_/g, ' ') ?? '—'}
+              </span>
+            </TableCell>
+            <TableCell className="text-xs text-slate-600">
+              {a.employeeSignedAt ? new Date(a.employeeSignedAt).toLocaleDateString() : '—'}
+            </TableCell>
+            <TableCell className="text-xs text-slate-600">
+              {a.customerSignedAt ? new Date(a.customerSignedAt).toLocaleDateString() : '—'}
+            </TableCell>
+            <TableCell className="text-xs text-slate-600">
+              {a.createdByEmployeeName ?? '—'}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+/** Debt raised outside an invoice — a Credit Exchange difference, an advance. Real money
+ *  the customer owes that the contract tabs cannot show. */
+function ReceivablesTab({
+  rows,
+  currency,
+}: {
+  rows: Customer360ManualReceivable[];
+  currency: string;
+}) {
+  if (rows.length === 0)
+    return <EmptyState icon={Wallet} message="No other receivables for this customer" />;
+
+  return (
+    <Table>
+      <TableHeader className="bg-slate-50">
+        <TableRow>
+          <TableHead>Reference</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Description</TableHead>
+          <TableHead>Issued</TableHead>
+          <TableHead className="text-right">Amount</TableHead>
+          <TableHead className="text-right">Paid</TableHead>
+          <TableHead className="text-right">Outstanding</TableHead>
+          <TableHead>Status</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((r) => {
+          const outstanding = Number(r.outstanding ?? Number(r.amount) - Number(r.amountPaid ?? 0));
+          return (
+            <TableRow key={r.id}>
+              <TableCell className="font-mono text-xs text-slate-700">{r.referenceNo}</TableCell>
+              <TableCell className="text-xs text-slate-600">{r.type?.replace(/_/g, ' ')}</TableCell>
+              <TableCell className="text-xs text-slate-600 max-w-64 truncate" title={r.description}>
+                {r.description ?? '—'}
+              </TableCell>
+              <TableCell className="text-xs text-slate-600">
+                {r.issueDate ? new Date(r.issueDate).toLocaleDateString() : '—'}
+              </TableCell>
+              <TableCell className="text-right text-xs text-slate-700">
+                {currency} {Number(r.amount).toLocaleString()}
+              </TableCell>
+              <TableCell className="text-right text-xs text-emerald-700">
+                {currency} {Number(r.amountPaid ?? 0).toLocaleString()}
+              </TableCell>
+              <TableCell
+                className={`text-right font-bold ${outstanding > 0 ? 'text-red-700' : 'text-slate-800'}`}
+              >
+                {currency} {outstanding.toLocaleString()}
+              </TableCell>
+              <TableCell>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-100">
+                  {r.status}
+                </span>
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+type CreditNoteRow = Customer360CreditNote & {
+  invoiceNumber?: string;
   customerName: string;
   customerId: string;
-  branchId: string;
 };
 
 function ReturnsTab({
@@ -893,7 +1207,9 @@ function ReturnsTab({
             <TableCell className="font-mono text-xs text-slate-500">{cn.invoiceNumber}</TableCell>
             <TableCell className="text-xs text-slate-700">
               {cn.productName ?? '—'}
-              {cn.modelName && <span className="text-slate-400 ml-1">({cn.modelName})</span>}
+              {/* Serial identifies the exact unit returned; modelName is not selected by
+                  the credit-note query this tab now reads from. */}
+              {cn.serialNumber && <span className="text-slate-400 ml-1">({cn.serialNumber})</span>}
             </TableCell>
             <TableCell>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-100">

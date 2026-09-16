@@ -828,9 +828,31 @@ async function runPreMigrations() {
         ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "reserveType" VARCHAR NULL;
         ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "reserveSource" VARCHAR NULL;
         ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "paymentDate" DATE NULL;
+
+        -- Owners are scoped to a branch. They were created company-wide, so a contributor
+        -- entered against Branch A appeared in Branch B's Equity and Opening Balance
+        -- forms — someone in B could post a contribution against an owner who has nothing
+        -- to do with their branch.
+        ALTER TABLE owners ADD COLUMN IF NOT EXISTS "branchId" UUID NULL;
+
+        -- Backfill: an owner belongs to the branch its equity entries were posted in.
+        -- Only assigned where that is unambiguous (entries in exactly one branch), so a
+        -- guess is never written over real data.
+        UPDATE owners o
+           SET "branchId" = sub."branchId"
+          FROM (
+            SELECT "ownerId", MIN("branchId"::text)::uuid AS "branchId"
+            FROM equity_entries
+            WHERE "ownerId" IS NOT NULL
+            GROUP BY "ownerId"
+            HAVING COUNT(DISTINCT "branchId") = 1
+          ) sub
+         WHERE o.id = sub."ownerId" AND o."branchId" IS NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_owners_branch ON owners("branchId");
       `);
       logger.info(
-        'Guaranteed owners table exists, and equity_entries has its type-specific columns.',
+        'Guaranteed owners table exists (branch-scoped), and equity_entries has its type-specific columns.',
       );
     } catch (ownerErr) {
       logger.warn('Failed to ensure owners table / equity_entries columns:', ownerErr);

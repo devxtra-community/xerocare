@@ -31,6 +31,8 @@ export interface SalePaymentRequest extends CreatedByInfo {
   chequeBankName?: string;
   chequeDueDate?: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  /** True when this collection is a refundable security deposit rather than payment. */
+  isSecurityDeposit?: boolean;
   reviewedByName?: string;
   reviewedAt?: string;
   rejectionReason?: string;
@@ -56,13 +58,75 @@ export type Customer360Bill = Bill & CreatedByInfo;
 
 export type Customer360Invoice = Invoice & CreatedByInfo;
 
+/** A return/credit note as shown in the 360° profile. */
+export interface Customer360CreditNote extends CreatedByInfo {
+  id: string;
+  creditNoteNo: string;
+  invoiceId: string;
+  invoiceNumber?: string;
+  type: 'DIRECT_REFUND' | 'REPLACEMENT' | 'CREDIT_EXCHANGE';
+  status: string;
+  itemCategory?: 'PRODUCT' | 'SPARE_PART';
+  productName?: string;
+  serialNumber?: string;
+  quantity?: number;
+  productAmount: number;
+  taxAmount?: number;
+  replacementAmount?: number;
+  replacementDiscount?: number;
+  damageReason?: string;
+  notes?: string;
+  financeNote?: string;
+}
+
+/** A cheque held as security against a contract — an obligation to return, not income. */
+export interface Customer360GuaranteeCheque {
+  id: string;
+  chequeNumber: string;
+  amount: number;
+  currencyCode?: string;
+  bankName?: string;
+  receivedDate?: string;
+  chequeDate?: string | null;
+  status?: string;
+  contractReference?: string | null;
+  contractInvoiceId?: string | null;
+}
+
+/** Customer debt raised outside an invoice — e.g. a Credit Exchange difference. */
+export interface Customer360ManualReceivable {
+  id: string;
+  referenceNo: string;
+  type: string;
+  description?: string;
+  amount: number;
+  amountPaid?: number;
+  outstanding?: number;
+  currency: string;
+  status: string;
+  issueDate?: string;
+  dueDate?: string;
+  creditNoteNo?: string;
+  approvalStatus?: string;
+}
+
 export interface Customer360Summary {
   totalInvoiced: number;
+  /** Excludes security deposits — those are refundable, not payment of the contract. */
   totalPaid: number;
+  /** Not clamped at zero: a negative value is a genuine overpayment, not an error. */
   totalOutstanding: number;
+  totalDepositsHeld: number;
+  manualOutstanding: number;
+  creditNoteValue: number;
+  guaranteeChequeValue: number;
   contractCount: number;
+  quotationCount: number;
   paymentCount: number;
   billCount: number;
+  agreementCount: number;
+  creditNoteCount: number;
+  depositCount: number;
 }
 
 export interface Customer360Profile {
@@ -70,6 +134,10 @@ export interface Customer360Profile {
   payments: SalePaymentRequest[];
   agreements: AgreementSummary[];
   bills: Customer360Bill[];
+  creditNotes: Customer360CreditNote[];
+  guaranteeCheques: Customer360GuaranteeCheque[];
+  manualReceivables: Customer360ManualReceivable[];
+  securityDeposits: SalePaymentRequest[];
   summary: Customer360Summary;
 }
 

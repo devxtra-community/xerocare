@@ -64,6 +64,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { BankBranchSelector } from '@/components/shared/BankBranchSelector';
 import { getBankCodeLabel } from '@/lib/bankCodeType';
 import { currencyOptions, getDefaultCurrencyForCountry } from '@/lib/currencyList';
+import { useBranchTax } from '@/lib/hooks/useBranchCurrency';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const countryList = require('country-list');
 
@@ -798,6 +799,8 @@ export function VendorFormModal({
   const [editingBankIndex, setEditingBankIndex] = React.useState<number | null>(null);
   const [bankDraft, setBankDraft] = React.useState<BankAccount>({ ...BLANK_BANK });
   const [branches, setBranches] = React.useState<Branch[]>([]);
+  // Branch tax configuration decides whether the tax field below exists at all.
+  const { hasTax, taxName } = useBranchTax();
 
   React.useEffect(() => {
     if (open && isAdmin) {
@@ -1218,21 +1221,25 @@ export function VendorFormModal({
                 />
               </div>
 
-              {/* VAT Number — directly under Currency */}
-              <div className="col-span-2 space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                  VAT Number
-                </label>
-                <input
-                  type="text"
-                  placeholder="Tax registration / VAT No."
-                  value={form.vatNumber ?? ''}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, vatNumber: e.target.value || undefined }))
-                  }
-                  className="w-full h-11 rounded-xl bg-card shadow-sm border px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
+              {/* VAT Number — only for a branch that charges tax. A branch created with
+                  tax switched off has no registration to capture, and the field would ask
+                  staff for something their business does not have. */}
+              {hasTax && (
+                <div className="col-span-2 space-y-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    {taxName} Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder={`Tax registration / ${taxName} No.`}
+                    value={form.vatNumber ?? ''}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, vatNumber: e.target.value || undefined }))
+                    }
+                    className="w-full h-11 rounded-xl bg-card shadow-sm border px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

@@ -23,6 +23,7 @@ import { Owner } from '../entities/ownerEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { GuaranteeCheque } from '../entities/guaranteeChequeEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
@@ -2168,6 +2169,23 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
 
     const jwtBranchId = req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId;
     const userId = req.user?.userId ?? req.body.createdBy ?? SYSTEM_UUID;
+
+    // An owner from another branch cannot be contributed against. Hiding them from the
+    // selector is presentation; this is the control — the id arrives in the request body
+    // and a direct API call would otherwise bypass the dropdown entirely.
+    if (req.body.ownerId) {
+      const owner = await Source.getRepository(Owner).findOne({
+        where: { id: req.body.ownerId as string },
+      });
+      if (!owner) throw new AppError('Selected owner not found', 400);
+      // Legacy owners carry no branch and stay usable — see ownerEntity.ts.
+      if (owner.branchId && jwtBranchId && owner.branchId !== jwtBranchId) {
+        throw new AppError(
+          `${owner.name} belongs to another branch and cannot be used for an entry in this one.`,
+          403,
+        );
+      }
+    }
 
     // Cheque-mode entries have no bank account chosen yet (that happens later, at
     // Deposit/Issue in Accounts → Cheques) — never persist a linkedCashAccountId for
@@ -4953,6 +4971,41 @@ async function buildCustomer360Profile(
     ]);
   }
 
+  // ── Credit notes, guarantee cheques and standalone receivables ───────────────
+  // These were either nested inside invoices (credit notes, reachable only by digging
+  // through the invoice relation) or not fetched at all, so the profile could not answer
+  // "what has this customer returned / what deposits are we holding / what else do they
+  // owe" without leaving the page.
+  const creditNoteQb = Source.getRepository(CreditNote)
+    .createQueryBuilder('cn')
+    .where('cn.customerId = :customerId', { customerId });
+  applyBranchQB(creditNoteQb as never, 'cn', branchFilter);
+  if (employeeId) creditNoteQb.andWhere('cn.sellerEmployeeId = :employeeId', { employeeId });
+  creditNoteQb.orderBy('cn.createdAt', 'DESC');
+
+  // Cheques held as a guarantee are an obligation to return, not income — kept separate
+  // from both payments and receipts for exactly that reason.
+  const guaranteeQb = Source.getRepository(GuaranteeCheque)
+    .createQueryBuilder('gc')
+    .where('gc.customerId = :customerId', { customerId });
+  applyBranchQB(guaranteeQb as never, 'gc', branchFilter);
+  guaranteeQb.orderBy('gc.createdAt', 'DESC');
+
+  // Receivables raised outside an invoice — a Credit Exchange difference, an advance.
+  // They are real customer debt and were invisible here.
+  const manualRcvQb = Source.getRepository(ManualReceivable)
+    .createQueryBuilder('mr')
+    .where('mr.customerId = :customerId', { customerId })
+    .andWhere("mr.status <> 'WRITTEN_OFF'");
+  applyBranchQB(manualRcvQb as never, 'mr', branchFilter);
+  manualRcvQb.orderBy('mr.createdAt', 'DESC');
+
+  const [creditNotes, guaranteeCheques, manualReceivables] = await Promise.all([
+    creditNoteQb.getMany(),
+    guaranteeQb.getMany().catch(() => []),
+    manualRcvQb.getMany().catch(() => []),
+  ]);
+
   // "Created date/time + department" for every row — one batched employee lookup for
   // however many unique employees are referenced across all four entity types, then
   // attached to each row rather than re-fetched per row.
@@ -4984,22 +5037,59 @@ async function buildCustomer360Profile(
 
   const contracts = invoicesWithCreator.filter((i) => i.type !== 'QUOTATION');
   const totalInvoiced = contracts.reduce((sum, i) => sum + Number(i.totalAmount ?? 0), 0);
-  const totalPaid = paymentsWithCreator
-    .filter((p) => p.status === 'APPROVED')
+
+  const approved = paymentsWithCreator.filter((p) => p.status === 'APPROVED');
+  // A security deposit is refundable money held against the contract, not payment of it.
+  // Counting deposits here overstated what the customer had paid and understated what
+  // they still owe — the same leak that had to be fixed across the receivable queries.
+  const totalPaid = approved
+    .filter((p) => !p.isSecurityDeposit)
     .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+  const totalDepositsHeld = approved
+    .filter((p) => p.isSecurityDeposit)
+    .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+  // Debt raised outside an invoice (exchange differences, advances) is still owed.
+  const manualOutstanding = manualReceivables.reduce(
+    (sum, r) => sum + Number(r.outstanding ?? Number(r.amount) - Number(r.amountPaid ?? 0)),
+    0,
+  );
+  // NOT clamped at zero. Clamping hid a genuine overpayment behind 0.00 and made the
+  // figure disagree with Receivables, which reports the real position.
+  const totalOutstanding = totalInvoiced - totalPaid + manualOutstanding;
+
+  const creditNoteValue = creditNotes.reduce(
+    (sum, cn) => sum + Number(cn.productAmount ?? 0) + Number(cn.taxAmount ?? 0),
+    0,
+  );
+  const guaranteeChequeValue = guaranteeCheques.reduce((sum, g) => sum + Number(g.amount ?? 0), 0);
 
   return {
     invoices: invoicesWithCreator,
     payments: paymentsWithCreator,
     agreements: agreementsWithCreator,
     bills: billsWithCreator,
+    creditNotes,
+    guaranteeCheques,
+    manualReceivables,
+    // Deposits are surfaced as their own list, not mixed into payments, because they are
+    // an obligation to return rather than revenue.
+    securityDeposits: approved.filter((p) => p.isSecurityDeposit),
     summary: {
       totalInvoiced,
       totalPaid,
-      totalOutstanding: Math.max(0, totalInvoiced - totalPaid),
+      totalOutstanding,
+      totalDepositsHeld,
+      manualOutstanding,
+      creditNoteValue,
+      guaranteeChequeValue,
       contractCount: contracts.length,
+      quotationCount: invoicesWithCreator.length - contracts.length,
       paymentCount: payments.length,
       billCount: bills.length,
+      agreementCount: agreements.length,
+      creditNoteCount: creditNotes.length,
+      depositCount: approved.filter((p) => p.isSecurityDeposit).length,
     },
   };
 }

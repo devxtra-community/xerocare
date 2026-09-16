@@ -37,6 +37,7 @@ import {
 } from '@/lib/customer';
 import { ALL_COUNTRIES, isoToFlag, COUNTRY_OPTIONS } from '@/lib/countryOptions';
 import { State, City } from 'country-state-city';
+import { useBranchTax } from '@/lib/hooks/useBranchCurrency';
 
 interface CustomerFormDialogProps {
   open: boolean;
@@ -72,6 +73,8 @@ export default function CustomerFormDialog({
   customer,
   onSubmit,
 }: CustomerFormDialogProps) {
+  // Branch tax configuration decides whether the tax fields below exist at all.
+  const { hasTax, taxName } = useBranchTax();
   const [loading, setLoading] = useState(false);
   const [parsedDial, setParsedDial] = useState<string | null>(null);
   const [rawPhone, setRawPhone] = useState('');
@@ -210,8 +213,12 @@ export default function CustomerFormDialog({
       finalBankAccounts = [...existingAccounts, { ...bankDraft }];
     }
 
-    if (formData.vatStatus === 'EXEMPT' && !formData.exemptionReason) {
-      toast.error('Please select an Exemption Reason for a VAT-exempt customer');
+    // Only enforce this while the field is actually on screen. On a branch with tax
+    // switched off the exemption fields are hidden, and a customer carrying a stored
+    // EXEMPT status from before would otherwise block the form on a field nobody can see
+    // or fill in.
+    if (hasTax && formData.vatStatus === 'EXEMPT' && !formData.exemptionReason) {
+      toast.error(`Please select an Exemption Reason for a ${taxName}-exempt customer`);
       return;
     }
 
@@ -521,79 +528,88 @@ export default function CustomerFormDialog({
               </div>
             </div>
 
-            {/* Row 2: VAT Status — full width to accommodate long labels */}
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                VAT Status
-              </Label>
-              <Select
-                value={formData.vatStatus ?? 'UNREGISTERED_STANDARD'}
-                onValueChange={(val) => {
-                  const nextStatus = val as CustomerVatStatus;
-                  setFormData((prev) => ({
-                    ...prev,
-                    vatStatus: nextStatus,
-                    vatNumber: nextStatus === 'REGISTERED' ? prev.vatNumber : '',
-                    exemptionReason: nextStatus === 'EXEMPT' ? prev.exemptionReason : undefined,
-                  }));
-                }}
-              >
-                <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-none shadow-xl">
-                  {(Object.keys(CUSTOMER_VAT_STATUS_LABELS) as CustomerVatStatus[]).map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {CUSTOMER_VAT_STATUS_LABELS[s]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Tax fields only exist for a branch that actually charges tax. A branch
+                created with tax switched off (Qatar, say) has no VAT to ask about, and
+                showing the field invites staff to answer a question their business does
+                not have — any value typed there is dead data, because every tax figure is
+                driven off the branch's own rate, never off the customer record. */}
+            {hasTax && (
+              <>
+                {/* Row 2: VAT Status — full width to accommodate long labels */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                    {taxName} Status
+                  </Label>
+                  <Select
+                    value={formData.vatStatus ?? 'UNREGISTERED_STANDARD'}
+                    onValueChange={(val) => {
+                      const nextStatus = val as CustomerVatStatus;
+                      setFormData((prev) => ({
+                        ...prev,
+                        vatStatus: nextStatus,
+                        vatNumber: nextStatus === 'REGISTERED' ? prev.vatNumber : '',
+                        exemptionReason: nextStatus === 'EXEMPT' ? prev.exemptionReason : undefined,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="h-12 w-full rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-xl">
+                      {(Object.keys(CUSTOMER_VAT_STATUS_LABELS) as CustomerVatStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {CUSTOMER_VAT_STATUS_LABELS[s]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {formData.vatStatus === 'REGISTERED' && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                  VAT Number
-                </Label>
-                <Input
-                  name="vatNumber"
-                  value={formData.vatNumber ?? ''}
-                  onChange={handleChange}
-                  placeholder="Tax registration / VAT No."
-                  className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
-                />
-              </div>
-            )}
+                {formData.vatStatus === 'REGISTERED' && (
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                      {taxName} Number
+                    </Label>
+                    <Input
+                      name="vatNumber"
+                      value={formData.vatNumber ?? ''}
+                      onChange={handleChange}
+                      placeholder={`Tax registration / ${taxName} No.`}
+                      className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400"
+                    />
+                  </div>
+                )}
 
-            {formData.vatStatus === 'EXEMPT' && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
-                  Exemption Reason <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.exemptionReason ?? ''}
-                  onValueChange={(val) =>
-                    handleSelectChange('exemptionReason', val as CustomerExemptionReason)
-                  }
-                >
-                  <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
-                    <SelectValue placeholder="Select the reason for VAT exemption" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-none shadow-xl">
-                    {(
-                      Object.keys(CUSTOMER_EXEMPTION_REASON_LABELS) as CustomerExemptionReason[]
-                    ).map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {CUSTOMER_EXEMPTION_REASON_LABELS[r]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground pl-1">
-                  Internal use only — never shown on customer-facing quotations or invoices.
-                </p>
-              </div>
+                {formData.vatStatus === 'EXEMPT' && (
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider pl-1">
+                      Exemption Reason <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={formData.exemptionReason ?? ''}
+                      onValueChange={(val) =>
+                        handleSelectChange('exemptionReason', val as CustomerExemptionReason)
+                      }
+                    >
+                      <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-none shadow-sm focus:ring-2 focus:ring-blue-400">
+                        <SelectValue placeholder="Select the reason for VAT exemption" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-xl">
+                        {(
+                          Object.keys(CUSTOMER_EXEMPTION_REASON_LABELS) as CustomerExemptionReason[]
+                        ).map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {CUSTOMER_EXEMPTION_REASON_LABELS[r]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground pl-1">
+                      Internal use only — never shown on customer-facing quotations or invoices.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Bank Accounts Section */}

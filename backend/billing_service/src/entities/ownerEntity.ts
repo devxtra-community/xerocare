@@ -6,9 +6,16 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-// Owners/Shareholders/Partners are a company-wide concept (this is one legal
-// entity operating multiple branches, not separate businesses per branch) —
-// deliberately not branchId-scoped, unlike most other entities in this file.
+// Owners/Shareholders/Partners, scoped to the branch they were entered against.
+//
+// These were originally company-wide, on the reasoning that one legal entity operates
+// several branches. In practice each branch keeps its own books and its own contributors:
+// a contributor added in Branch A was appearing in Branch B's Equity and Opening Balance
+// forms, where somebody could post a contribution against an owner belonging to another
+// branch entirely.
+//
+// branchId is nullable only for rows that pre-date the change and could not be attributed
+// to a single branch from their equity history — see the backfill in dataSource.ts.
 @Entity('owners')
 export class Owner {
   @PrimaryGeneratedColumn('uuid')
@@ -16,6 +23,11 @@ export class Owner {
 
   @Column()
   name!: string;
+
+  /** Branch this owner belongs to. Null only on legacy rows that could not be attributed;
+   *  those stay visible everywhere so no existing record becomes unreachable. */
+  @Column({ type: 'uuid', nullable: true })
+  branchId?: string;
 
   @Column({ nullable: true })
   email?: string;
