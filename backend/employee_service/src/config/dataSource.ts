@@ -16,6 +16,8 @@ import { EmployeeDocument } from '../entities/employeeDocumentEntity';
 import { logger } from './logger';
 import { seedAdmin } from '../utils/seedAdmin';
 
+const EMPLOYEE_DB_POOL_MAX = Number(process.env.EMPLOYEE_DB_POOL_MAX) || 10;
+
 export const Source = new DataSource({
   type: 'postgres',
   url: process.env.EMPLOYEE_DATABASE_URL,
@@ -34,9 +36,14 @@ export const Source = new DataSource({
     LateMark,
     EmployeeDocument,
   ],
-  poolSize: 1,
+  // A pool of 1 serializes every concurrent DB-backed request onto a single
+  // connection — invoice-list enrichment alone fans out one employee lookup
+  // per unique creator per page, and those all queue up behind this one slot.
+  // billing_service hit the identical failure (see its dataSource.ts) before
+  // this was made configurable there; mirroring that fix here.
+  poolSize: EMPLOYEE_DB_POOL_MAX,
   extra: {
-    max: 1,
+    max: EMPLOYEE_DB_POOL_MAX,
     min: 0,
     connectionTimeoutMillis: 5000,
     keepAlive: true,
@@ -296,6 +303,27 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           logger.info('Guaranteed employee_documents table exists.');
         } catch (err) {
           logger.error('Failed to create employee_documents table:', err);
+        }
+
+        try {
+          await Source.query(`
+            CREATE TABLE IF NOT EXISTS trusted_devices (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id UUID NOT NULL,
+              user_type VARCHAR(10) NOT NULL DEFAULT 'EMPLOYEE',
+              device_token_hash VARCHAR(64) NOT NULL UNIQUE,
+              device_name VARCHAR(255),
+              ip_address VARCHAR(50),
+              last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              expires_at TIMESTAMPTZ NOT NULL,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_trusted_devices_user_id ON trusted_devices (user_id);
+            CREATE INDEX IF NOT EXISTS idx_trusted_devices_hash ON trusted_devices (device_token_hash);
+          `);
+          logger.info('Guaranteed trusted_devices table exists.');
+        } catch (err) {
+          logger.error('Failed to create trusted_devices table:', err);
         }
 
         await seedAdmin(Source);

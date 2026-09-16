@@ -1,13 +1,42 @@
 import nodemailer from 'nodemailer';
 import * as XLSX from 'xlsx';
 
-export const mailer = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
+/**
+ * Local dev hammers Gmail's send rate limit (every OTP is a real email).
+ * Outside production, send through Ethereal instead — a throwaway SMTP
+ * sandbox that never delivers anything real; view caught mail at
+ * https://ethereal.email using ETHEREAL_USER/ETHEREAL_PASS.
+ *
+ * If those aren't set yet (fresh dev box), fall back to `jsonTransport`
+ * rather than trying to authenticate with empty credentials — that would
+ * make every `sendMail` throw and break login locally. `jsonTransport`
+ * never sends anything; the composed message (OTP included) just logs.
+ */
+const createTransporter = () => {
+  if (process.env.NODE_ENV !== 'production') {
+    if (process.env.ETHEREAL_USER && process.env.ETHEREAL_PASS) {
+      return nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        auth: {
+          user: process.env.ETHEREAL_USER,
+          pass: process.env.ETHEREAL_PASS,
+        },
+      });
+    }
+    return nodemailer.createTransport({ jsonTransport: true });
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+  });
+};
+
+export const mailer = createTransporter();
 
 export async function sendEmployeeWelcomeMail(to: string, password: string) {
   await mailer.sendMail({

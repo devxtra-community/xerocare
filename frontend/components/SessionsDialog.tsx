@@ -10,10 +10,18 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getSessions, logoutSession, logoutOtherDevices } from '@/lib/auth';
-import { Laptop, Smartphone, Globe, LogOut, ShieldCheck, Clock } from 'lucide-react';
+import {
+  getSessions,
+  logoutSession,
+  logoutOtherDevices,
+  getTrustedDevices,
+  revokeTrustedDevice,
+  revokeAllTrustedDevices,
+} from '@/lib/auth';
+import { Laptop, Smartphone, Globe, LogOut, ShieldCheck, Clock, ShieldOff } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface Session {
   id: string;
@@ -21,6 +29,14 @@ interface Session {
   userAgent: string;
   createdAt: string;
   isCurrent: boolean;
+}
+
+interface TrustedDevice {
+  id: string;
+  device_name: string | null;
+  ip_address: string | null;
+  last_used_at: string;
+  expires_at: string;
 }
 
 interface SessionsDialogProps {
@@ -35,6 +51,8 @@ interface SessionsDialogProps {
 export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
+  const [trustedDevices, setTrustedDevices] = useState<TrustedDevice[]>([]);
+  const [trustedLoading, setTrustedLoading] = useState(false);
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -50,11 +68,50 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
     }
   };
 
+  const fetchTrustedDevices = async () => {
+    setTrustedLoading(true);
+    try {
+      const res = await getTrustedDevices();
+      if (res.success) {
+        setTrustedDevices(res.data);
+      }
+    } catch {
+      toast.error('Failed to load trusted devices');
+    } finally {
+      setTrustedLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (open) {
       fetchSessions();
+      fetchTrustedDevices();
     }
   }, [open]);
+
+  const handleRevokeTrustedDevice = async (deviceId: string) => {
+    try {
+      const res = await revokeTrustedDevice(deviceId);
+      if (res.success) {
+        toast.success('Trusted device revoked');
+        fetchTrustedDevices();
+      }
+    } catch {
+      toast.error('Failed to revoke trusted device');
+    }
+  };
+
+  const handleRevokeAllTrustedDevices = async () => {
+    try {
+      const res = await revokeAllTrustedDevices();
+      if (res.success) {
+        toast.success('All trusted devices revoked — OTP required on next login everywhere');
+        fetchTrustedDevices();
+      }
+    } catch {
+      toast.error('Failed to revoke trusted devices');
+    }
+  };
 
   const handleLogoutSession = async (sessionId: string) => {
     try {
@@ -148,106 +205,191 @@ export function SessionsDialog({ open, onOpenChange }: SessionsDialogProps) {
               <ShieldCheck className="h-5 w-5 text-primary" />
             </div>
             <div className="space-y-1">
-              <DialogTitle>Active Sessions</DialogTitle>
+              <DialogTitle>Account Security</DialogTitle>
               <DialogDescription className="m-0">
-                Manage devices where your account is currently logged in.
+                Manage where your account is logged in and which browsers skip OTP.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto py-2 pr-2 -mr-2">
-          <div className="space-y-3">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
-                <Globe className="h-8 w-8 mb-2 animate-pulse text-muted" />
-                Loading active sessions...
-              </div>
-            ) : sortedSessions.length === 0 ? (
-              <div className="text-center py-8 text-sm text-muted-foreground">
-                No active sessions found.
-              </div>
-            ) : (
-              sortedSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
-                    session.isCurrent
-                      ? 'bg-primary/5 border-primary/20 shadow-sm'
-                      : 'bg-card hover:border-border/80 hover:bg-accent/10'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
+        <Tabs defaultValue="sessions">
+          <TabsList>
+            <TabsTrigger value="sessions">Active Sessions</TabsTrigger>
+            <TabsTrigger value="trusted">Trusted Devices</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sessions">
+            <div className="max-h-[60vh] overflow-y-auto py-2 pr-2 -mr-2">
+              <div className="space-y-3">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+                    <Globe className="h-8 w-8 mb-2 animate-pulse text-muted" />
+                    Loading active sessions...
+                  </div>
+                ) : sortedSessions.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No active sessions found.
+                  </div>
+                ) : (
+                  sortedSessions.map((session) => (
                     <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                      key={session.id}
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border p-4 transition-all ${
                         session.isCurrent
-                          ? 'bg-primary/10 text-primary'
-                          : 'bg-muted text-muted-foreground'
+                          ? 'bg-primary/5 border-primary/20 shadow-sm'
+                          : 'bg-card hover:border-border/80 hover:bg-accent/10'
                       }`}
                     >
-                      {getDeviceIcon(session.userAgent)}
-                    </div>
+                      <div className="flex items-start gap-4">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                            session.isCurrent
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {getDeviceIcon(session.userAgent)}
+                        </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold tracking-tight text-foreground">
-                          {getDeviceName(session.userAgent)}
-                        </span>
-                        {session.isCurrent && (
-                          <Badge
-                            variant="secondary"
-                            className="pointer-events-none text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/10 border-primary/20"
-                          >
-                            Current Device
-                          </Badge>
-                        )}
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold tracking-tight text-foreground">
+                              {getDeviceName(session.userAgent)}
+                            </span>
+                            {session.isCurrent && (
+                              <Badge
+                                variant="secondary"
+                                className="pointer-events-none text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/10 border-primary/20"
+                              >
+                                Current Device
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:text-sm">
+                            <span className="flex items-center gap-1.5">
+                              <Globe className="h-3.5 w-3.5 opacity-70" />
+                              {session.ip || 'Unknown IP'}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5 opacity-70" />
+                              {session.isCurrent
+                                ? 'Active now'
+                                : `Last active ${formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}`}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:text-sm">
-                        <span className="flex items-center gap-1.5">
-                          <Globe className="h-3.5 w-3.5 opacity-70" />
-                          {session.ip || 'Unknown IP'}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 opacity-70" />
-                          {session.isCurrent
-                            ? 'Active now'
-                            : `Last active ${formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}`}
-                        </span>
-                      </div>
+                      {!session.isCurrent && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleLogoutSession(session.id)}
+                          className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto mt-2 sm:mt-0"
+                        >
+                          <LogOut className="mr-2 h-4 w-4 sm:mr-0" />
+                          <span className="sm:sr-only">Log out</span>
+                        </Button>
+                      )}
                     </div>
-                  </div>
+                  ))
+                )}
+              </div>
+            </div>
 
-                  {!session.isCurrent && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleLogoutSession(session.id)}
-                      className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto mt-2 sm:mt-0"
-                    >
-                      <LogOut className="mr-2 h-4 w-4 sm:mr-0" />
-                      <span className="sm:sr-only">Log out</span>
-                    </Button>
-                  )}
-                </div>
-              ))
+            {sortedSessions.length > 1 && (
+              <div className="flex justify-end pt-4 mt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogoutOtherDevices}
+                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log out all other devices
+                </Button>
+              </div>
             )}
-          </div>
-        </div>
+          </TabsContent>
 
-        {sortedSessions.length > 1 && (
-          <div className="flex justify-end pt-4 mt-2 border-t">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogoutOtherDevices}
-              className="text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Log out all other devices
-            </Button>
-          </div>
-        )}
+          <TabsContent value="trusted">
+            <div className="max-h-[60vh] overflow-y-auto py-2 pr-2 -mr-2">
+              <div className="space-y-3">
+                {trustedLoading ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-sm text-muted-foreground">
+                    <ShieldCheck className="h-8 w-8 mb-2 animate-pulse text-muted" />
+                    Loading trusted devices...
+                  </div>
+                ) : trustedDevices.length === 0 ? (
+                  <div className="text-center py-8 text-sm text-muted-foreground">
+                    No trusted devices — every login on every browser currently requires OTP.
+                  </div>
+                ) : (
+                  trustedDevices.map((device) => (
+                    <div
+                      key={device.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border p-4 bg-card hover:border-border/80 hover:bg-accent/10 transition-all"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          {getDeviceIcon(device.device_name || undefined)}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <span className="font-semibold tracking-tight text-foreground">
+                            {device.device_name
+                              ? getDeviceName(device.device_name)
+                              : 'Unknown Device'}
+                          </span>
+
+                          <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:text-sm">
+                            <span className="flex items-center gap-1.5">
+                              <Globe className="h-3.5 w-3.5 opacity-70" />
+                              {device.ip_address || 'Unknown IP'}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5 opacity-70" />
+                              Last used{' '}
+                              {formatDistanceToNow(new Date(device.last_used_at), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRevokeTrustedDevice(device.id)}
+                        className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto mt-2 sm:mt-0"
+                      >
+                        <ShieldOff className="mr-2 h-4 w-4 sm:mr-0" />
+                        <span className="sm:sr-only">Revoke</span>
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {trustedDevices.length > 0 && (
+              <div className="flex justify-end pt-4 mt-2 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRevokeAllTrustedDevices}
+                  className="text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                >
+                  <ShieldOff className="mr-2 h-4 w-4" />
+                  Revoke all devices
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

@@ -10,11 +10,18 @@ import {
   REFRESH_COOKIE_NAME,
   clearCookieOptions,
   refreshCookieOptions,
+  TRUSTED_DEVICE_COOKIE_NAME,
+  TRUSTED_DEVICE_COOKIE_MAX_AGE,
+  trustedDeviceCookieOptions,
+  clearTrustedDeviceCookieOptions,
 } from '../config/cookieOptions';
+import { TrustedDeviceRepository } from '../repositories/trustedDeviceRepository';
+import { hashDeviceToken, generateDeviceToken } from '../utils/deviceToken';
 
 const authService = new AuthService();
 const otpService = new OtpService();
 const magicLinkService = new MagicLinkService();
+const trustedDeviceRepo = new TrustedDeviceRepository();
 
 interface AuthError {
   message?: string;
@@ -30,6 +37,37 @@ interface AuthError {
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { user } = await authService.login(req.body);
+
+    // Local E2E test escape hatch only — never set SKIP_LOGIN_OTP in a deployed
+    // environment. Lets the Jest E2E suite log in without polling a mailbox for OTPs.
+    if (process.env.SKIP_LOGIN_OTP === 'true') {
+      const { accessToken } = await issueTokens(user, req, res);
+      logger.info('login successfull (OTP skipped: SKIP_LOGIN_OTP=true)');
+      return res.json({
+        message: 'Login successfull',
+        accessToken,
+        data: user,
+        success: true,
+      });
+    }
+
+    // Trusted device — same browser verified with OTP within the last 24h.
+    // Credentials are still checked above; this only skips the second factor.
+    const deviceToken = req.cookies?.[TRUSTED_DEVICE_COOKIE_NAME];
+    if (deviceToken) {
+      const trusted = await trustedDeviceRepo.findValid(hashDeviceToken(deviceToken), user.id);
+      if (trusted) {
+        await trustedDeviceRepo.touch(hashDeviceToken(deviceToken));
+        const { accessToken } = await issueTokens(user, req, res);
+        logger.info(`login successfull (trusted device, OTP skipped) for ${user.email}`);
+        return res.json({
+          message: 'Login successfull',
+          accessToken,
+          data: user,
+          success: true,
+        });
+      }
+    }
 
     otpService
       .sendOtp(user.email, OtpPurpose.LOGIN)
@@ -63,6 +101,19 @@ export const loginVerify = async (req: Request, res: Response, next: NextFunctio
     const user = await authService.findUserByEmail(email);
 
     const { accessToken } = await issueTokens(user, req, res);
+
+    const rawDeviceToken = generateDeviceToken();
+    const deviceName = (req.headers['user-agent'] as string) || 'Unknown Device';
+    const expiresAt = new Date(Date.now() + TRUSTED_DEVICE_COOKIE_MAX_AGE);
+    await trustedDeviceRepo.create(
+      user.id,
+      hashDeviceToken(rawDeviceToken),
+      deviceName,
+      req.ip,
+      expiresAt,
+    );
+    res.cookie(TRUSTED_DEVICE_COOKIE_NAME, rawDeviceToken, trustedDeviceCookieOptions);
+
     logger.info('login successfull');
 
     return res.json({
@@ -346,6 +397,58 @@ export const logoutSession = async (req: Request, res: Response, next: NextFunct
       message: 'Session logged out',
       success: true,
     });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
+  }
+};
+
+/**
+ * List trusted devices:
+ * Show every browser/device that can currently log in with just
+ * email + password (no OTP) for this account.
+ */
+export const getTrustedDevices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.userId;
+    const devices = await trustedDeviceRepo.listByUser(userId);
+    return res.json({ data: devices, success: true });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
+  }
+};
+
+/**
+ * Revoke one trusted device:
+ * That browser will need OTP again on its next login.
+ */
+export const revokeTrustedDevice = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.userId;
+    const deviceId = req.params.deviceId as string;
+    const deleted = await trustedDeviceRepo.deleteById(deviceId, userId);
+    if (!deleted) {
+      return next(new AppError('Trusted device not found', 404));
+    }
+    return res.json({ message: 'Trusted device revoked', success: true });
+  } catch (err: unknown) {
+    const error = err as AuthError;
+    next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
+  }
+};
+
+/**
+ * Revoke every trusted device:
+ * Useful if a password may be compromised — every browser, including
+ * this one, will need OTP again on its next login.
+ */
+export const revokeAllTrustedDevices = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user.userId;
+    await trustedDeviceRepo.deleteAllForUser(userId);
+    res.clearCookie(TRUSTED_DEVICE_COOKIE_NAME, clearTrustedDeviceCookieOptions);
+    return res.json({ message: 'All trusted devices revoked', success: true });
   } catch (err: unknown) {
     const error = err as AuthError;
     next(new AppError(error.message || 'Internal Server Error', error.statusCode || 500));
