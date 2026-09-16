@@ -669,7 +669,18 @@ export const getExpenseEntries = async (req: Request, res: Response, next: NextF
     const qb = repo.createQueryBuilder('e');
     applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     if (category) qb.andWhere('e.category = :category', { category });
-    if (status) qb.andWhere('e.status = :status', { status });
+    // Accepts one status or a comma-separated list ("APPROVED,PAID"). Payables needs both
+    // an unpaid expense and a settled one on the same table — a single-value match forced
+    // the page to choose, and choosing APPROVED made an expense vanish the moment it was
+    // paid. A single value still behaves exactly as before.
+    if (status) {
+      const statuses = String(status)
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (statuses.length === 1) qb.andWhere('e.status = :status', { status: statuses[0] });
+      else if (statuses.length > 1) qb.andWhere('e.status IN (:...statuses)', { statuses });
+    }
     if (fromDate) qb.andWhere('e.date >= :fromDate', { fromDate });
     if (toDate) qb.andWhere('e.date <= :toDate', { toDate });
     if (isPrepayment !== undefined) {
@@ -5282,18 +5293,23 @@ export const rejectCreditNoteSettlement = async (
     row.approvedBy = req.user?.userId;
     row.approvedByName = req.body?.reviewedByName || req.user?.email || 'Accounts';
     row.approvedAt = new Date();
-    // The balance is deliberately LEFT ON THE BOOKS.
+    // A rejected request is closed, not parked: the row is written off so it leaves the
+    // Receivables/Payables tables and the AR/AP totals together. Staff raise a fresh
+    // credit note if the customer is still owed something.
     //
-    // Rejecting the request refuses this payment, not the underlying obligation. By the
-    // time a refund reaches Accounts the credit note is already COMPLETED: the goods are
-    // back, the revenue is reversed and the stock is written off. Writing the payable off
-    // too would leave the books saying the business took the goods back and owes nothing
-    // for them — the money would simply vanish, and Assets = Liabilities + Equity would
-    // break by exactly the refund amount.
+    // Writing off has to happen on BOTH sides at once. Hiding the row from the page while
+    // leaving it in AP — or vice versa — is how the table and the Balance Sheet end up
+    // telling different stories about the same money, which is the recurring defect in
+    // this module. WRITTEN_OFF is excluded from the AR total already and is now excluded
+    // from the AP total too.
     //
-    // So the row stays outstanding and keeps showing in AR/AP. What rejection changes is
-    // that it can no longer be settled through this request (see assertSettleable);
-    // Accounts must approve it or discharge it some other, recorded way.
+    // Note the accounting consequence, which is real and is the caller's decision: for a
+    // DIRECT_REFUND the credit note is already COMPLETED, so its revenue reversal and
+    // stock write-off stand while the matching liability is removed here. If the return
+    // itself is being refused, the credit note needs voiding as well — rejecting the
+    // settlement alone does not undo it.
+    row.status = 'WRITTEN_OFF';
+    row.outstanding = 0;
 
     const repo = isReceivable
       ? Source.getRepository(ManualReceivable)

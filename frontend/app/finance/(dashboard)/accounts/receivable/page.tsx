@@ -609,6 +609,11 @@ export default function AccountsReceivablePage() {
     // credit note's id there — an id no invoice will ever match.
     const arInvoiceIds = new Set(fromInvoices.map((i) => i.id));
     const fromManual = manualRcv
+      // A written-off balance is closed — a rejected Credit Note settlement, or a manual
+      // write-off. It is excluded from AR/AP on the Balance Sheet, so showing it here
+      // would put a dead row on a table of live obligations. The rejection itself stays
+      // visible, with its reason, on the Credit Notes tab.
+      .filter((r) => r.status !== 'WRITTEN_OFF')
       .filter((r) => !r.linkedInvoiceId || !arInvoiceIds.has(r.linkedInvoiceId))
       .map((r) => ({ ...r, isInvoice: false, source: 'Manual Entry' as const }));
     return [...fromInvoices, ...fromManual];

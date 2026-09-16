@@ -318,7 +318,11 @@ export const installReplacement = (
 /** Stage 07 — 72-hour single-use customer signing link. */
 export const generateReplacementSigningToken = (id: string) =>
   api
-    .post<{ data: { token: string; expiresAt: string } }>(`${BASE}/${id}/signing-token`)
+    // `link` is built server-side from PUBLIC_APP_URL — the only address known to be
+    // reachable by a customer. The browser's own origin is the staff member's machine.
+    .post<{ data: { token: string; expiresAt: string; link?: string } }>(
+      `${BASE}/${id}/signing-token`,
+    )
     .then((r) => r.data.data);
 
 export const sendReplacementReport = (

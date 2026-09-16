@@ -46,6 +46,7 @@ import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import { getMyExpenseRequests, type ExpenseRequest } from '@/lib/employeeExpenses';
 import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
@@ -81,7 +82,15 @@ const AGING_COLORS: Record<string, string> = {
   '90+ days': 'bg-red-200 text-red-800 border-red-300',
 };
 
-const PAYABLE_STATUSES = ['PENDING', 'PARTIAL', 'UNPAID', 'PAID', 'OVERDUE', 'APPROVED'];
+const PAYABLE_STATUSES = [
+  'PENDING',
+  'PARTIAL',
+  'UNPAID',
+  'PAID',
+  'OVERDUE',
+  'APPROVED',
+  'AWAITING APPROVAL',
+];
 const PAYABLE_TYPES = [
   'VENDOR_INVOICE',
   'SALARY_PAYABLE',
@@ -92,6 +101,26 @@ const PAYABLE_TYPES = [
   'OTHER',
 ];
 const today = new Date().toISOString().slice(0, 10);
+
+/**
+ * The short label for an expense row's "Payable To" column.
+ *
+ * That column names *who* is owed, not *why*. An expense description is free text — the
+ * row that prompted this read "[Employee: RIYAS BRANCH MANAGER] manager took a flat for
+ * his family and him" — which stretched the column far past every other row and pushed
+ * the table into horizontal scroll.
+ *
+ * An employee claim is owed to the employee, so their name is the answer; anything else
+ * falls back to the expense category. The full description is unchanged in the database
+ * and still shown in the row's View modal, so nothing is lost — it just stops setting the
+ * width of the whole table.
+ */
+function expensePayeeLabel(description?: string | null, category?: string | null): string {
+  // approveExpenseRequest prefixes an employee claim's description with "[Employee: NAME]".
+  const employee = /^\[Employee:\s*([^\]]+)\]/.exec(description ?? '');
+  if (employee?.[1]) return employee[1].trim();
+  return (category || 'Expense').replace(/_/g, ' ');
+}
 
 function AddPayableModal({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -757,11 +786,33 @@ export default function AccountsPayablePage() {
     staleTime: 60_000,
   });
 
-  const { data: approvedExpenses = [] } = useQuery<ExpenseEntry[]>({
-    queryKey: ['approved-expenses-payable'],
-    queryFn: () => fetchExpenseEntries({ status: 'APPROVED' }),
+  // APPROVED *and* PAID. Fetching only APPROVED meant an expense disappeared from
+  // Payables the moment it was settled — the same complaint that was fixed for purchases
+  // and for tax rows. A paid expense stays on the table showing what it was and that it
+  // is now closed.
+  const { data: expenseEntries = [] } = useQuery<ExpenseEntry[]>({
+    queryKey: ['expenses-payable'],
+    queryFn: () => fetchExpenseEntries({ status: 'APPROVED,PAID' }),
     staleTime: 30_000,
   });
+
+  // Employee expense claims still waiting on Accounts. These have no expense_entry yet —
+  // one is only created on approval — so without this they were invisible on Payables
+  // until somebody approved them, which is exactly when a claim most needs to be seen.
+  const { data: employeeRequests = [] } = useQuery<ExpenseRequest[]>({
+    queryKey: ['employee-expense-requests-payable'],
+    queryFn: () => getMyExpenseRequests(),
+    staleTime: 30_000,
+  });
+  const pendingEmployeeExpenses = useMemo(
+    () =>
+      employeeRequests.filter(
+        (r) =>
+          r.requestSource === 'EMPLOYEE_EXPENSE' &&
+          (r.status === 'SUBMITTED' || r.status === 'PENDING'),
+      ),
+    [employeeRequests],
+  );
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['cash-bank-accounts'],
@@ -806,15 +857,21 @@ export default function AccountsPayablePage() {
       isPurchase: true,
       isExpense: false,
       isVat: false,
+      isPendingApproval: false,
       source: 'Purchase Order' as const,
     }));
     const fromManual = manualPayables
-      .filter((p) => !p.linkedPurchaseId)
+      // A written-off balance is closed — a rejected Credit Note settlement, or a manual
+      // write-off. It is excluded from AR/AP on the Balance Sheet, so showing it here
+      // would put a dead row on a table of live obligations. The rejection itself stays
+      // visible, with its reason, on the Credit Notes tab.
+      .filter((p) => !p.linkedPurchaseId && p.status !== 'WRITTEN_OFF')
       .map((p) => ({
         ...p,
         isPurchase: false,
         isExpense: false,
         isVat: false,
+        isPendingApproval: false,
         source: 'Manual Entry' as const,
       }));
     // Domestic input VAT vendors charged us.
@@ -843,36 +900,76 @@ export default function AccountsPayablePage() {
       isPurchase: false,
       isExpense: false,
       isVat: true,
+      isPendingApproval: false,
       source: 'Input VAT' as const,
       taxRecordId: t.taxRecordId,
       requestStatus: t.requestStatus,
       settlementRef: t.settlementRef,
     }));
-    const fromExpenses = approvedExpenses.map((e) => ({
-      id: e.id,
-      referenceNo: e.expenseNo,
+    const fromExpenses = expenseEntries.map((e) => {
+      const gross = Number(e.netAmount || e.amount);
+      const paid = e.status === 'PAID';
+      return {
+        id: e.id,
+        referenceNo: e.expenseNo,
+        type: 'EXPENSE_PAYABLE',
+        payableTo: expensePayeeLabel(e.description, e.category),
+        amount: gross,
+        currency: e.currency,
+        issueDate: String(e.date),
+        dueDate: String(e.date),
+        // A settled expense keeps its row and reads as fully paid, rather than dropping
+        // off the table.
+        amountPaid: paid ? gross : 0,
+        outstanding: paid ? 0 : gross,
+        status: paid ? 'PAID' : 'APPROVED',
+        branchId: e.branchId,
+        aging: e.date ? agingBucket(String(e.date)) : 'Current',
+        isPurchase: false,
+        isExpense: true,
+        isVat: false,
+        isPendingApproval: false,
+        source: 'Accrued Expense' as const,
+        _raw: e,
+      };
+    });
+    // Claims awaiting Accounts. Shown as outstanding so the money the business is being
+    // asked for is visible, but flagged so it stays OUT of the liability totals — an
+    // unapproved claim is not yet an accepted obligation, and the Balance Sheet only
+    // accrues expenses once they are APPROVED. Counting it here would put the page and
+    // the Balance Sheet at odds.
+    const fromPendingExpenses = pendingEmployeeExpenses.map((r) => ({
+      id: `req-${r.id}`,
+      referenceNo: r.requestNo,
       type: 'EXPENSE_PAYABLE',
-      payableTo: e.description ?? e.category,
-      amount: Number(e.netAmount || e.amount),
-      currency: e.currency,
-      issueDate: String(e.date),
-      dueDate: String(e.date),
+      payableTo: r.employeeName || expensePayeeLabel(null, r.category),
+      amount: Number(r.amount),
+      currency: r.currency,
+      issueDate: String(r.date),
+      dueDate: String(r.date),
       amountPaid: 0,
-      outstanding: Number(e.netAmount || e.amount),
-      status: 'APPROVED',
-      branchId: e.branchId,
-      aging: e.date ? agingBucket(String(e.date)) : 'Current',
+      outstanding: Number(r.amount),
+      status: 'AWAITING APPROVAL',
+      branchId: r.branchId,
+      aging: r.date ? agingBucket(String(r.date)) : 'Current',
       isPurchase: false,
       isExpense: true,
       isVat: false,
-      source: 'Accrued Expense' as const,
-      _raw: e,
+      isPendingApproval: true,
+      source: 'Employee Claim' as const,
     }));
-    return [...fromManual, ...fromExpenses, ...fromPurchases, ...fromInputVat];
+    return [
+      ...fromManual,
+      ...fromExpenses,
+      ...fromPendingExpenses,
+      ...fromPurchases,
+      ...fromInputVat,
+    ];
   }, [
     purchases,
     manualPayables,
-    approvedExpenses,
+    expenseEntries,
+    pendingEmployeeExpenses,
     inputVatPayable,
     currentUser?.branchId,
     currency,
@@ -933,7 +1030,17 @@ export default function AccountsPayablePage() {
   // already paid to the vendor inside that invoice, and is reclaimable from the tax
   // authority (the Balance Sheet subtracts it from VAT Payable), so adding it here
   // would book the same money as owed twice.
-  const liabilityRows = allPayables.filter((p) => !p.isVat);
+  //
+  // Employee claims awaiting Accounts are excluded for the same reason: the company has
+  // not accepted the obligation yet, and accruedExpenses on the Balance Sheet only counts
+  // expense entries once they are APPROVED. Summing an unapproved claim here would make
+  // this page disagree with the Balance Sheet by the claim amount. It is reported on its
+  // own card instead, so it is visible without being counted.
+  const liabilityRows = allPayables.filter((p) => !p.isVat && !p.isPendingApproval);
+  /** Employee claims submitted but not yet approved — visible, not yet a liability. */
+  const awaitingApproval = allPayables
+    .filter((p) => p.isPendingApproval)
+    .reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
 
   const totalPayable = liabilityRows.reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
   // Subtotals mirroring the Chart of Accounts split: PO + non-linked Manual entries
@@ -961,7 +1068,7 @@ export default function AccountsPayablePage() {
     // Charts describe the vendor liability, so they read the same filtered set the
     // totals do — a tax row in "Top vendors" would name a tax as if it were a supplier
     // we owe money to.
-    const chartRows = allPayables.filter((p) => !p.isVat);
+    const chartRows = allPayables.filter((p) => !p.isVat && !p.isPendingApproval);
     const typeMap: Record<string, number> = {};
     chartRows.forEach((p) => {
       typeMap[p.type] = (typeMap[p.type] ?? 0) + (p.outstanding ?? 0);
@@ -1169,6 +1276,11 @@ export default function AccountsPayablePage() {
                 value={formatCurrency(taxOutstanding, currency)}
                 subtitle="Not a vendor liability — excluded from Total Payable"
               />
+              <StatCard
+                title="Awaiting Approval"
+                value={formatCurrency(awaitingApproval, currency)}
+                subtitle="Employee claims — not yet a liability"
+              />
               {AGING_BUCKETS.map((b) => (
                 <StatCard
                   key={b}
@@ -1330,6 +1442,7 @@ export default function AccountsPayablePage() {
                       <SelectItem value="Purchase Order">Purchase Order</SelectItem>
                       <SelectItem value="Manual Entry">Manual Entry</SelectItem>
                       <SelectItem value="Accrued Expense">Accrued Expense</SelectItem>
+                      <SelectItem value="Employee Claim">Employee Claim</SelectItem>
                       <SelectItem value="Input VAT">Input VAT</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1477,8 +1590,16 @@ export default function AccountsPayablePage() {
                   ) : (
                     payablePaging.pageRows.map((p) => (
                       <TableRow key={p.id} className="hover:bg-blue-50/50 transition-colors">
+                        {/* Capped and truncated so one unusually long payee name can
+                            never set the width of the whole table again. `title` keeps
+                            the full value reachable on hover. */}
                         <TableCell className="pl-4 font-medium text-slate-800">
-                          {p.payableTo}
+                          <span
+                            className="block max-w-56 truncate"
+                            title={p.payableTo || undefined}
+                          >
+                            {p.payableTo}
+                          </span>
                         </TableCell>
                         <TableCell className="font-mono text-xs text-amber-600 font-bold">
                           {p.referenceNo}
@@ -1547,6 +1668,12 @@ export default function AccountsPayablePage() {
                               <span className="text-[10px] text-muted-foreground italic pl-1.5">
                                 Settled from Tax
                               </span>
+                            ) : p.isPendingApproval ? (
+                              /* No expense entry exists until Accounts approves the claim,
+                                 so there is nothing to open or to pay against yet. */
+                              <span className="text-[10px] text-muted-foreground italic pl-1.5">
+                                Awaiting Accounts approval
+                              </span>
                             ) : (
                               <button
                                 onClick={() => {
@@ -1566,25 +1693,28 @@ export default function AccountsPayablePage() {
                                 <Eye className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            {!p.isPurchase && !p.isVat && (p.outstanding ?? 0) > 0 && (
-                              <button
-                                onClick={() => {
-                                  if (p.isExpense) {
-                                    const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
-                                    setPayingForExpense({
-                                      ...raw,
-                                      outstanding: p.outstanding ?? 0,
-                                    });
-                                  } else {
-                                    setPayingFor(p as unknown as ManualPayable);
-                                  }
-                                }}
-                                className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600"
-                                title="Record Payment"
-                              >
-                                <CreditCard className="h-3.5 w-3.5" />
-                              </button>
-                            )}
+                            {!p.isPurchase &&
+                              !p.isVat &&
+                              !p.isPendingApproval &&
+                              (p.outstanding ?? 0) > 0 && (
+                                <button
+                                  onClick={() => {
+                                    if (p.isExpense) {
+                                      const raw = (p as unknown as { _raw: ExpenseEntry })._raw;
+                                      setPayingForExpense({
+                                        ...raw,
+                                        outstanding: p.outstanding ?? 0,
+                                      });
+                                    } else {
+                                      setPayingFor(p as unknown as ManualPayable);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-md hover:bg-amber-50 text-amber-600"
+                                  title="Record Payment"
+                                >
+                                  <CreditCard className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                           </div>
                         </TableCell>
                       </TableRow>

@@ -22,6 +22,7 @@ import {
   dispositionReplacementMachine,
 } from '../services/replacementRequestService';
 import { logger } from '../config/logger';
+import { publicAppLink } from '../utils/publicAppUrl';
 
 const FINANCE_ROLES = ['FINANCE', 'ADMIN', 'SUPER_ADMIN', 'MANAGER'];
 
@@ -306,7 +307,20 @@ export const startReplacementWorkCtl = async (req: Request, res: Response, next:
 export const generateSigningToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await issueReplacementSigningToken(req.params.id as string);
-    res.json({ success: true, data: result });
+    // Return the built link, like the contract/bill/installation endpoints do. Without it
+    // the modal had nothing authoritative to show and fell back to the browser's own
+    // origin — which is the staff member's localhost, not an address the customer can
+    // reach. publicAppLink refuses rather than inventing a localhost URL.
+    const link = publicAppLink(`/public/replacement/sign/${result.token}`);
+    if (!link) {
+      throw new AppError(
+        'Customer links are not configured on the server: PUBLIC_APP_URL is unset, so any link ' +
+          'generated here would point at localhost and fail for the customer. Set PUBLIC_APP_URL ' +
+          'to the public application address and restart the service.',
+        500,
+      );
+    }
+    res.json({ success: true, data: { ...result, link } });
   } catch (err) {
     next(err);
   }
@@ -395,8 +409,16 @@ export const sendReplacementReport = async (req: Request, res: Response, next: N
     }
 
     const { token } = await issueReplacementSigningToken(id);
-    const base = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
-    const link = `${base}/public/replacement/sign/${token}`;
+    // Shared resolver — this used to carry its own `|| 'http://localhost:3000'`, which
+    // emailed customers a link only this machine could open.
+    const link = publicAppLink(`/public/replacement/sign/${token}`);
+    if (!link) {
+      throw new AppError(
+        'Customer links are not configured on the server: PUBLIC_APP_URL is unset. Set it to ' +
+          'the public application address and restart the service before sending this link.',
+        500,
+      );
+    }
 
     const body =
       `Dear ${request.customerName},\n\n` +

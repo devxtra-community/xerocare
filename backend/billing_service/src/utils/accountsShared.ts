@@ -1415,7 +1415,11 @@ export async function computeBalanceSheet(
     db.query<{ amount: string }[]>(`
       SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
       FROM manual_payables
-      WHERE status NOT IN ('PAID')
+      -- WRITTEN_OFF excluded for the same reason it always has been on the receivable
+      -- side: a written-off balance is not owed. It matters because rejecting a Credit
+      -- Note settlement writes the row off, and a rejected refund must stop counting as a
+      -- liability at the same moment it leaves the Payables table.
+      WHERE status NOT IN ('PAID', 'WRITTEN_OFF')
         AND "linkedPurchaseId" IS NULL
         ${bSql('manual_payables')}
     `),

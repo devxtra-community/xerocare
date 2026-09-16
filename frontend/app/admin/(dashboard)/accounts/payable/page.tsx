@@ -191,7 +191,11 @@ function PayableContent() {
         isVat: false,
       }));
     const fromManual = manualPayables
-      .filter((p) => !p.linkedPurchaseId)
+      // A written-off balance is closed — a rejected Credit Note settlement, or a manual
+      // write-off. It is excluded from AR/AP on the Balance Sheet, so showing it here
+      // would put a dead row on a table of live obligations. The rejection itself stays
+      // visible, with its reason, on the Credit Notes tab.
+      .filter((p) => !p.linkedPurchaseId && p.status !== 'WRITTEN_OFF')
       .map((p) => ({
         id: p.id,
         referenceNo: p.referenceNo,

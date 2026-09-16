@@ -85,13 +85,21 @@ const EMPLOYEE_SERVICE_URL = process.env.EMPLOYEE_SERVICE_URL || 'http://localho
  * reachable from the server itself, so warn loudly when PUBLIC_APP_URL is unset.
  */
 function publicAppUrl(): string {
-  const base = process.env.PUBLIC_APP_URL;
+  const base = process.env.PUBLIC_APP_URL?.trim();
   if (!base) {
-    logger.warn(
-      'PUBLIC_APP_URL is not set — customer-facing estimate links are falling back to ' +
-        'http://localhost:3000, which is unreachable from anywhere but this machine.',
+    // Refuse rather than fall back to localhost. Returning a localhost URL "so something
+    // is shown" produced a link that looked correct everywhere except the customer's
+    // browser, and nothing upstream could tell a good link from a dead one.
+    logger.error(
+      'PUBLIC_APP_URL is not set — customer-facing estimate links cannot be generated. Set ' +
+        'PUBLIC_APP_URL to the public application address and restart the service.',
     );
-    return 'http://localhost:3000';
+    throw new AppError(
+      'Customer links are not configured on the server: PUBLIC_APP_URL is unset, so any link ' +
+        'generated here would point at localhost and fail for the customer. Set PUBLIC_APP_URL ' +
+        'to the public application address and restart the service.',
+      500,
+    );
   }
   return base.replace(/\/+$/, '');
 }

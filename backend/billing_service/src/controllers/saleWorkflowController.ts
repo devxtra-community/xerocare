@@ -46,6 +46,7 @@ import {
 import { requireCashAccount, postCashbookEntry } from '../services/cashbookService';
 
 import { logger } from '../config/logger';
+import { publicAppUrl, isPublicAppUrlConfigured } from '../utils/publicAppUrl';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
@@ -335,27 +336,30 @@ async function issueSigningToken(agreement: ContractAgreement): Promise<{ token:
   return { token };
 }
 
-// Single source of truth for the base URL every customer-facing remote link (Contract
-// Agreement signing, Bill approval — Receipt already uses R2_PUBLIC_URL directly and
-// doesn't go through here) is built from. Previously each link builder had its own
-// `process.env.FRONTEND_URL || 'http://localhost:3000'` fallback, and FRONTEND_URL was
-// never actually set in any environment — every emailed link silently pointed at
-// localhost:3000, unreachable from a customer's phone (ERR_CONNECTION_REFUSED) with no
-// warning anywhere. Falling back to localhost now logs loudly on every use so this can
-// never again ship silently broken.
-function publicAppUrl(): string {
-  const base = process.env.PUBLIC_APP_URL;
-  if (base) return base.replace(/\/$/, '');
-  logger.error(
-    'PUBLIC_APP_URL is not set — customer-facing links are falling back to localhost:3000, ' +
-      'which is unreachable from anywhere but this machine. Set PUBLIC_APP_URL to the real, ' +
-      'publicly-reachable application URL.',
-  );
-  return 'http://localhost:3000';
+// Base URL for every customer-facing remote link now lives in utils/publicAppUrl.ts —
+// there were three copies of this resolver across two services, each with its own
+// fallback, and one of them being wrong was enough to email a dead link.
+/**
+ * Refuses instead of returning a link nobody outside this machine can open.
+ *
+ * The previous behaviour — fall back to localhost and log — meant staff generated a link,
+ * copied it, emailed it, and only the customer discovered it was dead. Failing here turns
+ * a silent bad link into an obvious configuration error at the moment it is generated.
+ */
+function requirePublicBase(): string {
+  if (!isPublicAppUrlConfigured()) {
+    throw new AppError(
+      'Customer links are not configured on the server: PUBLIC_APP_URL is unset, so any link ' +
+        'generated here would point at localhost and fail for the customer. Set PUBLIC_APP_URL ' +
+        'to the public application address and restart the service.',
+      500,
+    );
+  }
+  return publicAppUrl();
 }
 
 function signingLinkUrl(token: string): string {
-  return `${publicAppUrl()}/public/contract/sign/${token}`;
+  return `${requirePublicBase()}/public/contract/sign/${token}`;
 }
 
 export const generateSigningToken = async (req: Request, res: Response, next: NextFunction) => {
@@ -619,7 +623,7 @@ export const getContractForSigning = async (req: Request, res: Response, next: N
 // period's Bill) rather than a dedicated agreement entity.
 
 function billSigningLinkUrl(token: string): string {
-  return `${publicAppUrl()}/public/bill/sign/${token}`;
+  return `${requirePublicBase()}/public/bill/sign/${token}`;
 }
 
 async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: string }> {
@@ -3769,7 +3773,7 @@ export const getInstallationReport = async (req: Request, res: Response, next: N
 };
 
 function installationSigningLinkUrl(token: string): string {
-  return `${publicAppUrl()}/public/installation/sign/${token}`;
+  return `${requirePublicBase()}/public/installation/sign/${token}`;
 }
 
 /** POST /installation-requests/:id/signing-token */
