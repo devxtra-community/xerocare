@@ -20,7 +20,7 @@ import {
   Repeat,
 } from 'lucide-react';
 import { useNavCounts } from '@/hooks/useNavCounts';
-import { navCountFor } from '@/lib/navCounts';
+import { navCountFor, EMPLOYEE_BADGE_OVERRIDES, TECHNICIAN_BADGE_OVERRIDES } from '@/lib/navCounts';
 import { NavBadge } from '@/components/ui/NavBadge';
 
 import {
@@ -208,6 +208,21 @@ export default function EmployeeSidebar({
     });
   }, [employeeJob, isManager]);
 
+  /**
+   * Which queue each sidebar dot watches for THIS employee.
+   *
+   * The sales titles always take the employee's reading. The Service entry is the one that
+   * genuinely differs inside this single sidebar: the help desk triages tickets nobody has
+   * claimed, while a technician only cares about the ones assigned to them — so the same
+   * menu item has to watch a different queue depending on who is signed in.
+   */
+  const badgeOverrides = useMemo(() => {
+    if (employeeJob === 'SERVICE_TECHNICIAN') {
+      return { ...EMPLOYEE_BADGE_OVERRIDES, ...TECHNICIAN_BADGE_OVERRIDES };
+    }
+    return EMPLOYEE_BADGE_OVERRIDES;
+  }, [employeeJob]);
+
   const handleLogout = async () => {
     try {
       const res = await logout();
@@ -264,7 +279,7 @@ export default function EmployeeSidebar({
                     <a href={item.href} className="flex items-center gap-3 px-3">
                       <item.icon className="h-4 w-4" />
                       <span className="font-medium flex-1">{item.title}</span>
-                      <NavBadge count={navCountFor(item.title, navCounts)} />
+                      <NavBadge count={navCountFor(item.title, navCounts, badgeOverrides)} />
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -19,7 +19,7 @@ router.get('/nav-counts', authMiddleware, async (req: Request, res: Response) =>
     if (!branchId && role !== 'ADMIN') {
       return res.json({ success: true, data: {} });
     }
-    const data = await getInventoryNavCounts(branchId, role);
+    const data = await getInventoryNavCounts(branchId, role, req.user?.userId);
     return res.json({ success: true, data });
   } catch (err) {
     logger.error('nav-counts error', err);

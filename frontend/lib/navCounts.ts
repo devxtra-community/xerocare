@@ -73,6 +73,38 @@ export const NAV_BADGE_KEYS: Record<string, string | string[]> = {
 };
 
 /**
+ * The employee sidebar's own reading of the shared sales titles.
+ *
+ * Rent / Lease / Sale / Quotations name the same pages for everyone, but the queue behind
+ * them differs by who is looking: Finance is waiting on deals the employee has approved and
+ * passed up, while the employee is waiting on deals the customer has accepted or Finance has
+ * sent back. Without this the employee's dots tracked Finance's inbox — lighting up for work
+ * they had already finished and staying dark for work that was theirs.
+ *
+ * Passed to `navCountFor` as `overrides`; every other title falls through to NAV_BADGE_KEYS.
+ */
+export const EMPLOYEE_BADGE_OVERRIDES: Record<string, string | string[]> = {
+  Quotations: 'QUOTATIONS_EMPLOYEE',
+  Rent: 'RENT_EMPLOYEE',
+  Lease: 'LEASE_EMPLOYEE',
+  Sales: 'SALE_EMPLOYEE',
+  Sale: 'SALE_EMPLOYEE',
+  Orders: ['RENT_EMPLOYEE', 'LEASE_EMPLOYEE', 'SALE_EMPLOYEE'],
+};
+
+/**
+ * What the Service entry means to a technician.
+ *
+ * The default SERVICE_TICKETS key counts OPEN (unclaimed) tickets, which is the service
+ * desk's queue — a technician's sidebar went dark the moment a ticket was assigned to them.
+ * Theirs counts the tickets actually on their name and awaiting their move.
+ */
+export const TECHNICIAN_BADGE_OVERRIDES: Record<string, string | string[]> = {
+  Service: 'SERVICE_TICKETS_TECHNICIAN',
+  Tickets: 'SERVICE_TICKETS_TECHNICIAN',
+};
+
+/**
  * The count for a menu item, or 0 when it watches no queue.
  *
  * `overrides` lets one sidebar re-point a shared title at a different queue, for a title
@@ -90,20 +122,31 @@ export function navCountFor(
 }
 
 /**
- * Combined count for several menu titles at once.
+ * The override map a menu entry should use, chosen from where it links.
  *
- * Used to roll a collapsible group's children up onto its parent, so a collapsed
- * "Sales Desk" still shows a dot when one of the entries hidden inside it has work
- * waiting — otherwise the badge would only ever be visible to someone who had already
- * opened the group and so had no need of it.
+ * Sidebars that span more than one desk (the Manager's, which lists the employee pages
+ * under "Sales Desk" and the Finance pages under "Finance Desk") carry two entries with the
+ * same title but opposite meanings — there is an "Orders" in each. Title alone cannot tell
+ * them apart, so the destination decides: an entry pointing into /employee is the employee's
+ * queue, anything else keeps the default.
  */
-export function navCountForTitles(
-  titles: Array<string | undefined>,
+export function badgeOverridesForHref(
+  href?: string,
+): Record<string, string | string[]> | undefined {
+  return href?.startsWith('/employee') ? EMPLOYEE_BADGE_OVERRIDES : undefined;
+}
+
+/**
+ * Roll a group's children up onto its parent, resolving each child's overrides from its own
+ * href. Used where one collapsible group mixes desks, so the collapsed parent's dot counts
+ * each child against the queue that child actually watches.
+ */
+export function navCountForEntries(
+  entries: Array<{ title?: string; href?: string }>,
   counts: NavCounts,
-  overrides?: Record<string, string | string[]>,
 ): number {
-  return titles.reduce<number>(
-    (sum, title) => sum + (title ? navCountFor(title, counts, overrides) : 0),
+  return entries.reduce<number>(
+    (sum, e) => sum + (e.title ? navCountFor(e.title, counts, badgeOverridesForHref(e.href)) : 0),
     0,
   );
 }

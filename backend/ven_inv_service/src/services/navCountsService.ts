@@ -15,6 +15,7 @@ import { logger } from '../config/logger';
 export async function getInventoryNavCounts(
   branchId: string,
   role: string,
+  userId?: string,
 ): Promise<Record<string, number>> {
   const ticketRepo = Source.getRepository(ServiceTicket);
   const estimateRepo = Source.getRepository(ServiceEstimate);
@@ -40,7 +41,36 @@ export async function getInventoryNavCounts(
     );
   }
 
-  const [tickets, estimates, rfqs, transfers] = await Promise.all([
+  /**
+   * A technician's own workload.
+   *
+   * SERVICE_TICKETS counts OPEN tickets — ones nobody has claimed — which is the service
+   * desk's queue, not a technician's. The moment a ticket is assigned it leaves that count,
+   * so a technician's sidebar went dark at exactly the point they acquired work. These are
+   * the states where the ticket is assigned to them AND the next move is theirs; the
+   * waiting-on-Finance and waiting-on-customer states are excluded because nothing the
+   * technician does there advances it.
+   */
+  const myTickets =
+    userId && /^[0-9a-f-]{36}$/i.test(userId)
+      ? ticketRepo
+          .createQueryBuilder('t')
+          .where('t.branchId = :branchId', { branchId })
+          .andWhere('t.assignedTechnicianId = :userId', { userId })
+          .andWhere('t.status IN (:...statuses)', {
+            statuses: [
+              ServiceTicketStatus.ASSIGNED,
+              ServiceTicketStatus.IN_PROGRESS,
+              ServiceTicketStatus.FINANCE_APPROVED,
+              ServiceTicketStatus.FINANCE_APPROVED_2,
+              ServiceTicketStatus.CUSTOMER_APPROVED,
+              ServiceTicketStatus.FREE_SERVICE,
+            ],
+          })
+          .getCount()
+      : Promise.resolve(0);
+
+  const [tickets, estimates, rfqs, transfers, technicianTickets] = await Promise.all([
     // Raised but not yet picked up by anyone.
     ticketRepo
       .createQueryBuilder('t')
@@ -72,10 +102,12 @@ export async function getInventoryNavCounts(
       .getCount(),
 
     transferQb.getCount(),
+    myTickets,
   ]);
 
   const counts = {
     SERVICE_TICKETS: tickets,
+    SERVICE_TICKETS_TECHNICIAN: technicianTickets,
     SERVICE_ESTIMATES: estimates,
     RFQS: rfqs,
     STOCK_TRANSFERS: transfers,

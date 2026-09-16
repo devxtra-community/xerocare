@@ -24,6 +24,28 @@ import { logger } from '../config/logger';
  */
 export type NavCounts = Record<string, number>;
 
+/**
+ * Quotation/contract statuses waiting on FINANCE — the employee has approved the deal and
+ * handed it over.
+ */
+const FINANCE_INBOX = [InvoiceStatus.EMPLOYEE_APPROVED] as const;
+
+/**
+ * The same records when they are waiting on the EMPLOYEE instead.
+ *
+ * Both statuses mean somebody else has acted and the ball is back in the employee's court:
+ * CUSTOMER_ACCEPTED is a deal the customer has said yes to and which nobody has converted
+ * into a contract yet, and FINANCE_REJECTED is one Finance sent back to be corrected and
+ * resubmitted. Neither is visible in the Finance-facing counts, which is why the employee
+ * sidebar's Rent/Lease/Sale dots could only ever light up for work the employee had
+ * already finished.
+ *
+ * DRAFT and SENT are deliberately excluded. A draft is the employee's own unfinished
+ * writing rather than news, and a sent quotation is waiting on the customer — badging
+ * either would leave the dot permanently lit and so tell nobody anything.
+ */
+const EMPLOYEE_INBOX = [InvoiceStatus.CUSTOMER_ACCEPTED, InvoiceStatus.FINANCE_REJECTED] as const;
+
 /** Statuses a replacement can sit in while it waits for each desk. */
 const REPLACEMENT_QUEUES = {
   /** Raised by an employee, or swapped and now awaiting the stock/GWR audit. */
@@ -66,12 +88,21 @@ export async function getBillingNavCounts(branchId: string): Promise<NavCounts> 
         .createQueryBuilder('invoice')
         .select('invoice.saleType', 'saleType')
         .addSelect('invoice.type', 'type')
+        .addSelect('invoice.status', 'status')
         .addSelect('COUNT(invoice.id)', 'count')
-        .where('invoice.status = :status', { status: InvoiceStatus.EMPLOYEE_APPROVED })
+        .where('invoice.status IN (:...statuses)', {
+          statuses: [...FINANCE_INBOX, ...EMPLOYEE_INBOX],
+        })
         .andWhere('invoice.branchId = :branchId', { branchId })
         .groupBy('invoice.saleType')
         .addGroupBy('invoice.type')
-        .getRawMany<{ saleType: string | null; type: string | null; count: string }>(),
+        .addGroupBy('invoice.status')
+        .getRawMany<{
+          saleType: string | null;
+          type: string | null;
+          status: string;
+          count: string;
+        }>(),
 
       // Bills raised but not yet signed off by the customer — nothing can be collected
       // against them until they are, so they are genuinely blocking work.
@@ -104,6 +135,11 @@ export async function getBillingNavCounts(branchId: string): Promise<NavCounts> 
     RENT: 0,
     LEASE: 0,
     SALE: 0,
+    // Same four queues as seen from the employee's desk — see EMPLOYEE_INBOX.
+    QUOTATIONS_EMPLOYEE: 0,
+    RENT_EMPLOYEE: 0,
+    LEASE_EMPLOYEE: 0,
+    SALE_EMPLOYEE: 0,
     BILLS: bills,
     INSTALLATION_REQUESTS: installations,
     MACHINE_REPLACEMENTS_FINANCE: replFinance,
@@ -114,18 +150,23 @@ export async function getBillingNavCounts(branchId: string): Promise<NavCounts> 
 
   for (const row of invoiceRows) {
     const n = Number(row.count);
+    // One suffix decides which desk this row belongs to, so a record is never counted for
+    // both — a quotation Finance is waiting on is not also the employee's to chase.
+    const forEmployee = (EMPLOYEE_INBOX as readonly string[]).includes(row.status);
+    const suffix = forEmployee ? '_EMPLOYEE' : '';
+
     if (row.type === InvoiceType.QUOTATION) {
-      counts.QUOTATIONS += n;
+      counts[`QUOTATIONS${suffix}`] += n;
       continue;
     }
-    if (row.saleType === 'RENT') counts.RENT += n;
-    else if (row.saleType === 'LEASE') counts.LEASE += n;
+    if (row.saleType === 'RENT') counts[`RENT${suffix}`] += n;
+    else if (row.saleType === 'LEASE') counts[`LEASE${suffix}`] += n;
     else if (
       row.saleType === 'SALE' ||
       row.saleType === 'PRODUCT_SALE' ||
       row.saleType === 'SPAREPART_SALE'
     )
-      counts.SALE += n;
+      counts[`SALE${suffix}`] += n;
   }
 
   logger.debug('navCounts(billing)', { branchId, counts });
