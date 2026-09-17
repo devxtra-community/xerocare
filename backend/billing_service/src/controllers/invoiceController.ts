@@ -303,6 +303,71 @@ export const financeApproveQuotation = async (req: Request, res: Response, next:
 /**
  * Employee converts an approved quotation into an active Sale/Rent/Lease transaction.
  */
+/**
+ * POST /invoices/:id/confirm-service-to-accounts
+ *
+ * Accounts taking a customer-accepted service estimate into the books.
+ */
+export const confirmServiceEstimateToAccounts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    if (!req.user?.userId) throw new AppError('User context missing', 401);
+    const invoice = await billingService.confirmServiceEstimateToAccounts(id, req.user.userId);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Service estimate taken into accounts — receivable raised.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /invoices/:id/service-completion-payment
+ *
+ * Internal: called by ven_inv when a technician closes a job having taken payment.
+ */
+export const recordServiceCompletionPayment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const {
+      amount,
+      paymentMode,
+      accountId,
+      chequeNumber,
+      chequeBankName,
+      chequeDate,
+      remarks,
+      branchId,
+      collectedBy,
+    } = req.body;
+    const result = await billingService.recordServiceCompletionPayment({
+      invoiceId: id,
+      userId: collectedBy || req.user?.userId || 'SYSTEM',
+      amount: Number(amount) || 0,
+      paymentMode,
+      accountId,
+      chequeNumber,
+      chequeBankName,
+      chequeDate,
+      remarks,
+      branchId,
+    });
+    return res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const convertToTransaction = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -496,9 +561,24 @@ export const getAllInvoices = async (req: Request, res: Response, next: NextFunc
   try {
     const branchId = req.user?.role === 'ADMIN' ? undefined : req.user?.branchId;
     const invoices = await billingService.getAllInvoices(branchId);
+
+    // `?billType=` and `?status=` were accepted and then silently ignored: this handler
+    // never looked at req.query, so a caller asking for "service estimates awaiting
+    // finance approval" was handed every invoice in the branch — paid sales, refunds and
+    // all. The Finance estimates page only looked right because it re-filtered the same
+    // list again in the browser; anything trusting the URL got the wrong rows.
+    const billType = (req.query.billType as string | undefined)?.trim();
+    const status = (req.query.status as string | undefined)?.trim();
+
+    const filtered = invoices.filter((inv) => {
+      if (billType && inv.billType !== billType) return false;
+      if (status && inv.status !== status) return false;
+      return true;
+    });
+
     return res.status(200).json({
       success: true,
-      data: invoices,
+      data: filtered,
     });
   } catch (error) {
     next(error);
@@ -1689,6 +1769,11 @@ export const recordServiceVisitCharge = async (req: Request, res: Response, next
       paymentMode,
       accountId,
       remarks,
+      collectedByName,
+      collectedByRole,
+      chequeNumber,
+      chequeBankName,
+      chequeDate,
     } = req.body;
     if (!serviceTicketId || !branchId) {
       return res.status(400).json({
@@ -1696,7 +1781,7 @@ export const recordServiceVisitCharge = async (req: Request, res: Response, next
         message: 'serviceTicketId and branchId are required',
       });
     }
-    const invoice = await billingService.recordServiceVisitCharge({
+    const { invoice, paymentRequestId } = await billingService.recordServiceVisitCharge({
       serviceTicketId,
       ticketNumber,
       customerId,
@@ -1706,8 +1791,15 @@ export const recordServiceVisitCharge = async (req: Request, res: Response, next
       paymentMode,
       accountId,
       remarks,
+      collectedByName,
+      collectedByRole,
+      chequeNumber,
+      chequeBankName,
+      chequeDate,
     });
-    return res.status(201).json({ success: true, data: invoice });
+    // paymentRequestId is what the caller stores on the ticket so it can follow the
+    // approval; the invoice alone no longer tells you whether the money has moved.
+    return res.status(201).json({ success: true, data: { ...invoice, paymentRequestId } });
   } catch (error) {
     next(error);
   }

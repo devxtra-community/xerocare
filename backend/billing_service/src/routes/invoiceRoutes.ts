@@ -15,6 +15,8 @@ import {
   financeReject,
   financeApproveQuotation,
   convertToTransaction,
+  recordServiceCompletionPayment,
+  confirmServiceEstimateToAccounts,
   generateFinalInvoice,
   getAllInvoices,
   getInvoiceById,
@@ -287,6 +289,20 @@ router.post(
  * Employee converts a finance-approved quotation to a transaction.
  */
 router.post('/:id/convert-to-transaction', authMiddleware, convertToTransaction);
+
+/** Internal: payment a technician collected at job completion. */
+router.post('/:id/service-completion-payment', authMiddleware, recordServiceCompletionPayment);
+
+/**
+ * Accounts confirming a customer-accepted service estimate into the books. Finance only —
+ * this raises a real receivable, which is a bookkeeping act, not a service-desk one.
+ */
+router.post(
+  '/:id/confirm-service-to-accounts',
+  authMiddleware,
+  requireRole(EmployeeRole.ADMIN, EmployeeRole.FINANCE),
+  confirmServiceEstimateToAccounts,
+);
 
 /**
  * Record a deposit or initial payment from the customer.

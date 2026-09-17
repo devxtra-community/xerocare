@@ -1239,6 +1239,22 @@ export const getPendingServiceEstimates = async (): Promise<Invoice[]> => {
   return response.data.data;
 };
 
+/**
+ * Service estimates the customer has accepted, waiting for Accounts to take them into the
+ * books. Until that happens the job lives on a QUOTATION, and the accounting queries only
+ * count FINAL/PROFORMA — so the money is invisible to the ledger however much work is done.
+ */
+export const getCustomerAcceptedServiceEstimates = async (): Promise<Invoice[]> => {
+  const response = await api.get('/b/invoices?billType=SERVICE&status=CUSTOMER_ACCEPTED');
+  return response.data.data;
+};
+
+/** Accounts confirming one: QUOTATION/CUSTOMER_ACCEPTED → PROFORMA/INVOICED (QTN → INV). */
+export const confirmServiceEstimateToAccounts = async (id: string): Promise<Invoice> => {
+  const response = await api.post(`/b/invoices/${id}/confirm-service-to-accounts`);
+  return response.data.data;
+};
+
 /** Finance-approved service estimates — ready to be sent to the customer. */
 export const getApprovedServiceEstimates = async (): Promise<Invoice[]> => {
   const response = await api.get('/b/invoices?billType=SERVICE&status=FINANCE_APPROVED');

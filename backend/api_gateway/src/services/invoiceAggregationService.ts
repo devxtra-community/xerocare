@@ -247,12 +247,28 @@ export class InvoiceAggregationService {
   async getAllInvoices(
     user: { role: string; branchId?: string },
     token: string,
+    /**
+     * The caller's own filters (billType, status, …).
+     *
+     * These used to stop here: the gateway read none of req.query, so billing was always
+     * asked for every invoice and the "service estimates awaiting approval" request came
+     * back with paid sales and refunds in it. Forwarding them is what makes the filter
+     * billing already applies actually reachable from the browser.
+     */
+    query?: Record<string, unknown>,
   ): Promise<AggregatedInvoice[]> {
     try {
+      const forwarded: Record<string, string> = {};
+      for (const key of ['billType', 'status', 'saleType', 'customerId'] as const) {
+        const v = query?.[key];
+        if (typeof v === 'string' && v.trim()) forwarded[key] = v.trim();
+      }
+
       const billingResponse = await axios.get<{ data: Invoice[] }>(
         `${BILLING_SERVICE_URL}/invoices`,
         {
           headers: { Authorization: `Bearer ${token}` },
+          params: forwarded,
         },
       );
       let invoices = billingResponse.data.data;
@@ -833,6 +849,34 @@ export class InvoiceAggregationService {
   /**
    * Employee converts an approved quotation into a transaction.
    */
+  /** Accounts taking a customer-accepted service estimate into the books. */
+  async confirmServiceEstimateToAccounts(id: string, token: string) {
+    try {
+      const response = await axios.post<{ data: Invoice }>(
+        `${BILLING_SERVICE_URL}/invoices/${id}/confirm-service-to-accounts`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return response.data.data;
+    } catch (error: unknown) {
+      // Pass billing's own status and message through. Without this the gateway turned a
+      // precise 400 ("this one is FINANCE_APPROVED, not customer-accepted") into a bare
+      // 500, which tells the person clicking nothing about why it was refused.
+      if (axios.isAxiosError(error)) {
+        logger.error('Axios error confirming service estimate to accounts', {
+          message: error.message,
+          responseStatus: error.response?.status,
+          responseData: error.response?.data,
+        });
+        throw new AppError(
+          error.response?.data?.message || 'Failed to take the estimate into accounts',
+          error.response?.status || 500,
+        );
+      }
+      throw new AppError('Internal Gateway Error confirming service estimate', 500);
+    }
+  }
+
   async convertToTransaction(id: string, token: string) {
     try {
       const response = await axios.post<{ data: Invoice }>(

@@ -97,7 +97,7 @@ export function RecordCustomerApprovalDialog({
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} maxWidth="sm" title="Record the customer's approval">
+    <Modal isOpen={open} onClose={onClose} maxWidth="3xl" title="Record the customer's approval">
       <div className="space-y-4">
         <div className="flex gap-3 rounded-xl bg-amber-50 border border-amber-100 p-3">
           <ShieldCheck className="size-5 shrink-0 text-amber-600" />
@@ -109,165 +109,180 @@ export function RecordCustomerApprovalDialog({
           </p>
         </div>
 
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Who approved it? <span className="text-red-500">*</span>
-          </label>
-          <input
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Customer / contact person's full name"
-            className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-slate-600">
-            How did they confirm? <span className="text-red-500">*</span>
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {CHANNELS.map((c) => (
-              <label
-                key={c.value}
-                className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
-                  confirmedVia === c.value
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-slate-50 text-slate-600'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="confirmedVia"
-                  value={c.value}
-                  checked={confirmedVia === c.value}
-                  onChange={() => setConfirmedVia(c.value)}
-                />
-                {c.label}
+        {/* Two columns: who/how/why on the left, the signature on the right. Stacked in one
+            column this form was taller than any laptop screen — the signature pad alone is a
+            third of it — so the two halves sit side by side and it fits without scrolling. */}
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">
+                Who approved it? <span className="text-red-500">*</span>
               </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-slate-600">Note (optional)</label>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            placeholder="e.g. Confirmed with Mr. Rahul over the phone at 3:15 PM"
-            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
-            Customer signature <span className="text-red-500">*</span>
-          </label>
-
-          <div className="flex rounded-xl border border-slate-200 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setSignMethod('CAPTURE')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
-                signMethod === 'CAPTURE'
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-white text-slate-400 hover:bg-slate-50'
-              }`}
-            >
-              <PenLine size={12} />
-              Capture Signature
-            </button>
-            <button
-              type="button"
-              onClick={() => setSignMethod('UPLOAD')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
-                signMethod === 'UPLOAD'
-                  ? 'bg-slate-800 text-white'
-                  : 'bg-white text-slate-400 hover:bg-slate-50'
-              }`}
-            >
-              <Upload size={12} />
-              Upload Signed Doc
-            </button>
-          </div>
-
-          {signMethod === 'CAPTURE' ? (
-            <div className="mt-2.5">
-              <p className="mb-1.5 text-[11px] font-bold text-slate-500">
-                Hand the device to the customer to sign below
-              </p>
-              <ESignatureCanvas
-                label=""
-                width={360}
-                height={130}
-                onSave={setSigData}
-                onClear={() => setSigData(null)}
-              />
-            </div>
-          ) : (
-            <div className="mt-2.5 space-y-2.5">
-              <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-[11px] font-bold leading-relaxed text-amber-700">
-                Upload a photo or scan of the physically-signed estimate. This is recorded as the
-                customer&apos;s consent proof.
-              </div>
-
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                className="cursor-pointer rounded-xl border-2 border-dashed border-slate-200 p-3 text-center transition-all hover:border-slate-400 hover:bg-slate-50"
-              >
-                {uploadFile ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <FileText size={14} className="text-slate-500" />
-                    <span className="max-w-[180px] truncate text-xs font-bold text-slate-700">
-                      {uploadFile.name}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      ({(uploadFile.size / 1024 / 1024).toFixed(1)} MB)
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <Upload size={18} className="mx-auto mb-1 text-slate-300" />
-                    <p className="text-xs font-bold text-slate-400">Click to select file</p>
-                    <p className="mt-0.5 text-[10px] text-slate-300">JPG, PNG, PDF · max 15 MB</p>
-                  </>
-                )}
-              </div>
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  if (f && f.size > 15 * 1024 * 1024) {
-                    toast.error('File too large', { description: 'Maximum file size is 15 MB.' });
-                    return;
-                  }
-                  setUploadFile(f);
-                }}
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Customer / contact person's full name"
+                className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs"
               />
+            </div>
 
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold text-slate-600">
-                  How was the signed copy obtained? <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={attestationNote}
-                  onChange={(e) => setAttestationNote(e.target.value)}
-                  rows={2}
-                  placeholder="e.g. Signed copy received via WhatsApp from customer on 2026-09-13"
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
-                />
-                <p className="mt-1 text-[10px] text-slate-400">
-                  This note is required and stored as an audit record.
-                </p>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">
+                How did they confirm? <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {CHANNELS.map((c) => (
+                  <label
+                    key={c.value}
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium ${
+                      confirmedVia === c.value
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="confirmedVia"
+                      value={c.value}
+                      checked={confirmedVia === c.value}
+                      onChange={() => setConfirmedVia(c.value)}
+                    />
+                    {c.label}
+                  </label>
+                ))}
               </div>
             </div>
-          )}
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">
+                Note (optional)
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="e.g. Confirmed with Mr. Rahul over the phone at 3:15 PM"
+                className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                Customer signature <span className="text-red-500">*</span>
+              </label>
+
+              <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setSignMethod('CAPTURE')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    signMethod === 'CAPTURE'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-white text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <PenLine size={12} />
+                  Capture Signature
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSignMethod('UPLOAD')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                    signMethod === 'UPLOAD'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-white text-slate-400 hover:bg-slate-50'
+                  }`}
+                >
+                  <Upload size={12} />
+                  Upload Signed Doc
+                </button>
+              </div>
+
+              {signMethod === 'CAPTURE' ? (
+                <div className="mt-2.5">
+                  <p className="mb-1.5 text-[11px] font-bold text-slate-500">
+                    Hand the device to the customer to sign below
+                  </p>
+                  <ESignatureCanvas
+                    label=""
+                    width={360}
+                    height={130}
+                    onSave={setSigData}
+                    onClear={() => setSigData(null)}
+                  />
+                </div>
+              ) : (
+                <div className="mt-2.5 space-y-2.5">
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-2.5 text-[11px] font-bold leading-relaxed text-amber-700">
+                    Upload a photo or scan of the physically-signed estimate. This is recorded as
+                    the customer&apos;s consent proof.
+                  </div>
+
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="cursor-pointer rounded-xl border-2 border-dashed border-slate-200 p-3 text-center transition-all hover:border-slate-400 hover:bg-slate-50"
+                  >
+                    {uploadFile ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <FileText size={14} className="text-slate-500" />
+                        <span className="max-w-[180px] truncate text-xs font-bold text-slate-700">
+                          {uploadFile.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          ({(uploadFile.size / 1024 / 1024).toFixed(1)} MB)
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload size={18} className="mx-auto mb-1 text-slate-300" />
+                        <p className="text-xs font-bold text-slate-400">Click to select file</p>
+                        <p className="mt-0.5 text-[10px] text-slate-300">
+                          JPG, PNG, PDF · max 15 MB
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      if (f && f.size > 15 * 1024 * 1024) {
+                        toast.error('File too large', {
+                          description: 'Maximum file size is 15 MB.',
+                        });
+                        return;
+                      }
+                      setUploadFile(f);
+                    }}
+                  />
+
+                  <div>
+                    <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                      How was the signed copy obtained? <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={attestationNote}
+                      onChange={(e) => setAttestationNote(e.target.value)}
+                      rows={2}
+                      placeholder="e.g. Signed copy received via WhatsApp from customer on 2026-09-13"
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
+                    />
+                    <p className="mt-1 text-[10px] text-slate-400">
+                      This note is required and stored as an audit record.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
           <input
             type="checkbox"
             checked={ack}
@@ -280,7 +295,10 @@ export function RecordCustomerApprovalDialog({
           </span>
         </label>
 
-        <div className="flex justify-end gap-2 pt-1">
+        {/* Sticky, because this form is long: the confirmation checkbox and the action it
+            gates were the two things furthest from each other, and staff had to scroll
+            back down to a button they had already passed. */}
+        <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-3">
           <Button variant="outline" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>

@@ -74,6 +74,11 @@ export interface ServiceTicket {
   visitChargeAmount?: number;
   visitChargeMethod?: string | null;
   visitChargeCollected?: boolean;
+  /** NONE | PENDING_APPROVAL | COLLECTED | REJECTED — see the ticket entity. */
+  visitChargeStatus?: 'NONE' | 'PENDING_APPROVAL' | 'COLLECTED' | 'REJECTED';
+  visitChargeCollectedByName?: string | null;
+  visitChargeCollectedByRole?: string | null;
+  visitChargeRejectionReason?: string | null;
   transportChargeAmount?: number;
   discountAmount?: number;
   technicianNoteToFinance?: string | null;
@@ -110,10 +115,12 @@ export const collectVisitCharge = async (
   id: string,
   paymentMode: string,
   accountId?: string,
+  cheque?: { chequeNumber?: string; chequeBankName?: string; chequeDate?: string },
 ): Promise<ServiceTicket> => {
   const response = await api.post(`/i/service/tickets/${id}/collect-visit-charge`, {
     paymentMode,
     accountId,
+    ...(paymentMode === 'CHEQUE' ? cheque : {}),
   });
   return response.data.data;
 };
@@ -144,6 +151,7 @@ export const diagnoseServiceTicket = async (
     visitChargeCollected?: boolean;
     visitChargePaymentMode?: string;
     visitChargeAccountId?: string;
+    visitChargeChequeNumber?: string;
     transportChargeAmount?: number;
     discountAmount?: number;
     technicianNoteToFinance?: string | null;
@@ -231,6 +239,13 @@ export const completeServiceTicket = async (
     technicianRemarks?: string;
     customerSignature?: string;
     technicianSignature?: string;
+    /** Payment the technician took at the door. Raised as a PENDING request for Accounts. */
+    collectedAmount?: number;
+    paymentMode?: string;
+    paymentAccountId?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDate?: string;
   },
 ): Promise<ServiceTicket> => {
   const response = await api.post(`/i/service/tickets/${id}/complete`, payload);
