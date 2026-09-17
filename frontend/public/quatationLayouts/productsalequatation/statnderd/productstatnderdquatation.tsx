@@ -1,4 +1,5 @@
 import React from 'react';
+import { WarrantyDetailsBlock, type WarrantyInfo } from '@/components/shared/WarrantyDetailsBlock';
 import { numberToWords } from '@/lib/numberToWords';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -31,6 +32,8 @@ export interface StandardQuotationLineItem {
 }
 
 export interface ProductStandardQuotationProps {
+  /** Warranty coverage, printed inside the document. */
+  warranty?: WarrantyInfo;
   isInvoice?: boolean;
   /** Subject line – product name */
   productName?: string;
@@ -79,6 +82,7 @@ const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
+  warranty,
   productName = 'TONER CHIP SET',
   modelName = 'ALTALink C8130',
   billTo = {
@@ -1022,6 +1026,9 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
             ))}
         </div>
       )}
+
+      {/* ─── WARRANTY DETAILS ─── */}
+      <WarrantyDetailsBlock {...(warranty ?? {})} accent={TEAL} />
 
       {/* ─── TERMS AND CONDITIONS (BOTTOM) ─── */}
       <div style={{ padding: '0 48px', marginTop: '40px' }}>

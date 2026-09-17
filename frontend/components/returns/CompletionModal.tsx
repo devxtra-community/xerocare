@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,14 @@ import { toast } from 'sonner';
 import { getProductById, getAllProducts, Product, ProductStatus } from '@/lib/product';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { CreditNoteRecord } from '@/lib/invoice';
-import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle2, Search, PackageSearch } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 
@@ -56,6 +63,14 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
   const [availableSpareParts, setAvailableSpareParts] = useState<SparePart[]>([]);
   const [replacementQty, setReplacementQty] = useState<number>(1);
 
+  // ── Stock list filters ──
+  // A branch with real stock puts dozens of units behind this picker, and the list was a
+  // bare scroll: the only way to reach a specific machine was to drag a 140px-tall box
+  // past everything else. Searching by serial is how staff actually look — the serial is
+  // what is printed on the unit in front of them.
+  const [stockQuery, setStockQuery] = useState('');
+  const [modelFilter, setModelFilter] = useState<string>('ALL');
+
   // ── Shared ──
   const [discount, setDiscount] = useState<number>(0);
   const [loadingStock, setLoadingStock] = useState(false);
@@ -69,6 +84,8 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
       setAvailableProducts([]);
       setAvailableSpareParts([]);
       setDiscount(0);
+      setStockQuery('');
+      setModelFilter('ALL');
       setStockChecked(false);
       setReplacementQty(record?.quantity || 1);
       return;
@@ -115,6 +132,42 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
     fetchStock();
   }, [open, record, isSpare, isExchange]);
 
+  /** Models present in the available stock, for the filter dropdown. */
+  const modelOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const p of availableProducts) {
+      const id = p.model?.id;
+      const name = p.model?.model_name || p.name;
+      if (id && !seen.has(id)) seen.set(id, name);
+    }
+    return Array.from(seen, ([id, name]) => ({ id, name })).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [availableProducts]);
+
+  const filteredProducts = useMemo(() => {
+    const q = stockQuery.trim().toLowerCase();
+    return availableProducts.filter((p) => {
+      if (modelFilter !== 'ALL' && p.model?.id !== modelFilter) return false;
+      if (!q) return true;
+      // Serial first — it is the thing staff read off the machine — then the names, so a
+      // search for "canon" still narrows the list to that make.
+      return [p.serial_no, p.name, p.model?.model_name, p.brand]
+        .filter(Boolean)
+        .some((f) => String(f).toLowerCase().includes(q));
+    });
+  }, [availableProducts, stockQuery, modelFilter]);
+
+  const filteredSpareParts = useMemo(() => {
+    const q = stockQuery.trim().toLowerCase();
+    if (!q) return availableSpareParts;
+    return availableSpareParts.filter((p) =>
+      [p.part_name, p.sku, p.brand]
+        .filter(Boolean)
+        .some((f) => String(f).toLowerCase().includes(q)),
+    );
+  }, [availableSpareParts, stockQuery]);
+
   const handleSelectProduct = (product: Product) => {
     setSelectedProduct(product);
     setNewSerial(product.serial_no);
@@ -159,6 +212,17 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
         toast.error('Please select or enter a new Serial Number');
         return;
       }
+      // An exchange settles money against the incoming unit's price, and that price comes
+      // only from a unit matched in stock. Confirming on an unmatched serial submitted a
+      // replacement value of 0, which Accounts would have settled as a refund of the full
+      // original amount. A replacement is unaffected — it moves no money — so it is not
+      // gated here.
+      if (isExchange && !selectedProduct) {
+        toast.error(
+          'Pick the incoming unit from the stock list. A hand-typed serial has no price, so the exchange difference cannot be calculated.',
+        );
+        return;
+      }
       onConfirm({
         replacementSerialNumber: serial,
         replacementProductId: selectedProduct?.id,
@@ -184,6 +248,17 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
   const exchangeVat = Math.abs(variation) * (exchangeTaxPercent / 100);
   const exchangeTotal = Math.abs(variation) + exchangeVat;
 
+  /**
+   * Whether the incoming item's price is actually known yet.
+   *
+   * Until a unit is chosen `newValue` is 0, which made the panel state a confident
+   * "Refund to Customer: <the whole original amount>" before anything had been picked —
+   * a figure that is wrong, is the one staff read out to the customer, and silently
+   * becomes the real settlement if they confirm on a hand-typed serial that matches no
+   * unit in stock. The panel now withholds the numbers until there is a price behind them.
+   */
+  const hasPricedReplacement = isSpare ? !!selectedSparePart : !!selectedProduct;
+
   const isOutOfStock =
     stockChecked &&
     !loadingStock &&
@@ -191,15 +266,19 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      {/* The body grows with stock, the adjustment panel and any warnings, and had no
+          height budget — on a laptop the Confirm button was pushed off the bottom of the
+          screen with no way to reach it. The dialog now claims at most 90vh and scrolls
+          its middle, so the title and the actions stay put however long the contents. */}
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
           <DialogTitle>
             Complete Physical {record?.type === 'REPLACEMENT' ? 'Replacement' : 'Exchange'}
             {isSpare ? ' — Spare Part' : ''}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4 text-sm">
+        <div className="grid gap-4 px-6 py-4 text-sm flex-1 overflow-y-auto min-h-0">
           {/* Original Item Info */}
           <div className="rounded-md bg-orange-50 p-3">
             <p className="font-semibold text-orange-800">
@@ -242,10 +321,31 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                 <span>
                   {availableSpareParts.length} SKU{availableSpareParts.length > 1 ? 's' : ''} in
                   Stock
+                  {filteredSpareParts.length !== availableSpareParts.length && (
+                    <span className="text-slate-400 font-normal">
+                      {' '}
+                      — showing {filteredSpareParts.length}
+                    </span>
+                  )}
                 </span>
               </Label>
-              <div className="max-h-36 overflow-y-auto rounded-md border divide-y">
-                {availableSpareParts.map((p) => (
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <Input
+                  value={stockQuery}
+                  onChange={(e) => setStockQuery(e.target.value)}
+                  placeholder="Search part name, SKU or brand…"
+                  className="h-9 pl-8 text-xs"
+                />
+              </div>
+              <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
+                {filteredSpareParts.length === 0 ? (
+                  <div className="flex flex-col items-center gap-1 py-6 text-center">
+                    <PackageSearch className="h-5 w-5 text-slate-300" />
+                    <p className="text-xs text-slate-400">No spare part matches that search.</p>
+                  </div>
+                ) : null}
+                {filteredSpareParts.map((p) => (
                   <button
                     key={p.id}
                     type="button"
@@ -303,10 +403,59 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                     <span>
                       {availableProducts.length} Unit{availableProducts.length > 1 ? 's' : ''}{' '}
                       Available
+                      {filteredProducts.length !== availableProducts.length && (
+                        <span className="text-slate-400 font-normal">
+                          {' '}
+                          — showing {filteredProducts.length}
+                        </span>
+                      )}
                     </span>
                   </Label>
-                  <div className="max-h-36 overflow-y-auto rounded-md border divide-y">
-                    {availableProducts.map((p) => (
+                  {/* Search + model filter. Two controls rather than one because they
+                      answer different questions: the search finds a unit you already know
+                      ("is SN 12347889 still here?"), the dropdown narrows to a make when
+                      the customer only said what they want, not which one. */}
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                      <Input
+                        value={stockQuery}
+                        onChange={(e) => setStockQuery(e.target.value)}
+                        placeholder="Search serial, product or brand…"
+                        className="h-9 pl-8 text-xs"
+                      />
+                    </div>
+                    {modelOptions.length > 1 && (
+                      <Select value={modelFilter} onValueChange={setModelFilter}>
+                        <SelectTrigger className="h-9 w-[40%] text-xs">
+                          <SelectValue placeholder="All models" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL" className="text-xs">
+                            All models ({availableProducts.length})
+                          </SelectItem>
+                          {modelOptions.map((m) => (
+                            <SelectItem key={m.id} value={m.id} className="text-xs">
+                              {m.name} (
+                              {availableProducts.filter((p) => p.model?.id === m.id).length})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto rounded-md border divide-y">
+                    {filteredProducts.length === 0 ? (
+                      <div className="flex flex-col items-center gap-1 py-6 text-center">
+                        <PackageSearch className="h-5 w-5 text-slate-300" />
+                        <p className="text-xs text-slate-400">
+                          No unit matches that search
+                          {modelFilter !== 'ALL' ? ' in this model' : ''}.
+                        </p>
+                      </div>
+                    ) : null}
+                    {filteredProducts.map((p) => (
                       <button
                         key={p.id}
                         type="button"
@@ -341,10 +490,16 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                   }
                   value={newSerial}
                   onChange={(e) => {
-                    setNewSerial(e.target.value);
-                    if (selectedProduct && e.target.value !== selectedProduct.serial_no) {
-                      setSelectedProduct(null);
-                    }
+                    const typed = e.target.value;
+                    setNewSerial(typed);
+                    // Scanning a barcode fills this box rather than clicking the list, so a
+                    // scanned unit used to stay "unselected" and its price never reached the
+                    // adjustment below. Matching the typed serial back to stock makes the
+                    // scanner and the list behave identically.
+                    const match = availableProducts.find(
+                      (p) => p.serial_no.toLowerCase() === typed.trim().toLowerCase(),
+                    );
+                    setSelectedProduct(match ?? null);
                   }}
                 />
                 {selectedProduct && (
@@ -380,49 +535,69 @@ export default function CompletionModal({ open, onClose, onConfirm, record }: Pr
                 <h4 className="font-bold text-blue-800 text-xs uppercase tracking-wider">
                   Account Adjustment
                 </h4>
-                <div className="flex justify-between text-xs text-blue-700">
-                  <span>{isSpare ? 'New Spare Part(s) Price:' : 'New Product Price:'}</span>
-                  <span className="font-semibold">{formatCurrency(newValue, currency)}</span>
-                </div>
-                <div className="flex justify-between text-xs text-blue-700">
-                  <span>Returned Credit:</span>
-                  <span className="font-semibold">- {formatCurrency(originalValue, currency)}</span>
-                </div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-xs text-green-600">
-                    <span>Extra Discount:</span>
-                    <span className="font-semibold">- {formatCurrency(discount, currency)}</span>
+                {!hasPricedReplacement ? (
+                  <div className="flex items-start gap-2 py-1">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      {isSpare
+                        ? 'Select a spare part above to work out the difference.'
+                        : 'Select a unit from stock above to work out the difference. A serial typed by hand carries no price, so the settlement cannot be calculated from it.'}
+                    </p>
                   </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-xs text-blue-700">
+                      <span>{isSpare ? 'New Spare Part(s) Price:' : 'New Product Price:'}</span>
+                      <span className="font-semibold">{formatCurrency(newValue, currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-blue-700">
+                      <span>Returned Credit:</span>
+                      <span className="font-semibold">
+                        - {formatCurrency(originalValue, currency)}
+                      </span>
+                    </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between text-xs text-green-600">
+                        <span>Extra Discount:</span>
+                        <span className="font-semibold">
+                          - {formatCurrency(discount, currency)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-blue-200 flex justify-between text-xs text-blue-700">
+                      <span>Net Difference:</span>
+                      <span className="font-semibold">
+                        {formatCurrency(Math.abs(variation), currency)}
+                      </span>
+                    </div>
+                    {exchangeTaxPercent > 0 && (
+                      <div className="flex justify-between text-xs text-blue-700">
+                        <span>VAT ({exchangeTaxPercent}%):</span>
+                        <span className="font-semibold">
+                          {formatCurrency(exchangeVat, currency)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-blue-200 flex justify-between font-bold text-sm">
+                      <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                        {variation >= 0 ? 'Customer Pays:' : 'Refund to Customer:'}
+                      </span>
+                      <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
+                        {formatCurrency(exchangeTotal, currency)}
+                      </span>
+                    </div>
+                    <p className="pt-1 text-[10px] text-blue-600">
+                      Goes to Accounts for approval — no money moves until it is approved and
+                      settled.
+                    </p>
+                  </>
                 )}
-                <div className="pt-2 border-t border-blue-200 flex justify-between text-xs text-blue-700">
-                  <span>Net Difference:</span>
-                  <span className="font-semibold">
-                    {formatCurrency(Math.abs(variation), currency)}
-                  </span>
-                </div>
-                {exchangeTaxPercent > 0 && (
-                  <div className="flex justify-between text-xs text-blue-700">
-                    <span>VAT ({exchangeTaxPercent}%):</span>
-                    <span className="font-semibold">{formatCurrency(exchangeVat, currency)}</span>
-                  </div>
-                )}
-                <div className="pt-2 border-t border-blue-200 flex justify-between font-bold text-sm">
-                  <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
-                    {variation >= 0 ? 'Customer Pays:' : 'Refund to Customer:'}
-                  </span>
-                  <span className={variation >= 0 ? 'text-blue-900' : 'text-green-700'}>
-                    {formatCurrency(exchangeTotal, currency)}
-                  </span>
-                </div>
-                <p className="pt-1 text-[10px] text-blue-600">
-                  Goes to Accounts for approval — no money moves until it is approved and settled.
-                </p>
               </div>
             </div>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="px-6 py-4 border-t bg-slate-50 shrink-0">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

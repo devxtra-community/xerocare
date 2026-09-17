@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { getCustomers } from '@/lib/customer';
 import { getCustomerById } from '@/lib/customer';
 import { getInvoicesByCustomerId, getInvoiceById } from '@/services/invoiceService';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
+import { getActiveCurrency } from '@/lib/currency';
 import { getProductById, Product } from '@/lib/product';
 import { getSparePartById, SparePart } from '@/lib/spare-part';
 import { toast } from 'sonner';
@@ -186,6 +188,46 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     setReturnQuantity(1);
   };
 
+  /**
+   * Options for the two searchable pickers.
+   *
+   * Both were plain Selects, which is fine for a handful of rows and unusable once a
+   * branch has a few hundred customers or a customer has a year of invoices — the only
+   * way to find a row was to scroll. `searchText` carries the fields people actually type
+   * (a phone number, a quotation number) even though they are not all shown in the label.
+   */
+  const customerOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      customers.map((c) => ({
+        value: c.id,
+        label: c.name,
+        description: [c.phone, c.email].filter(Boolean).join('  ·  ') || undefined,
+        searchText: [c.name, c.phone, c.email, c.vatNumber].filter(Boolean).join(' '),
+      })),
+    [customers],
+  );
+
+  const invoiceOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      invoices.map((i) => {
+        const no = getDisplayInvoiceNumber(i);
+        const total = i.totalAmount != null ? Number(i.totalAmount).toLocaleString() : '';
+        return {
+          value: i.id,
+          label: no,
+          // The status and value are what tells two otherwise identical numbers apart when
+          // a customer has several invoices open.
+          description: [i.status, total && `${getActiveCurrency()} ${total}`]
+            .filter(Boolean)
+            .join('  ·  '),
+          // Staff quote the quotation number as often as the invoice number, because that
+          // is what the customer has on their copy.
+          searchText: [no, i.invoiceNumber, i.quotationNumber, i.status].filter(Boolean).join(' '),
+        };
+      }),
+    [invoices],
+  );
+
   /* ── fetchers ── */
   const fetchCustomers = async () => {
     try {
@@ -207,6 +249,18 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     }
   }, []);
 
+  /**
+   * Whether the invoice list has already been hydrated from an existing record.
+   *
+   * A ref rather than state on purpose. This used to be `!selectedInvoice` inside
+   * fetchInvoices, which put `selectedInvoice` in the callback's dependency list — so
+   * picking an invoice changed the callback's identity, which re-ran the effect that calls
+   * it, which cleared the very selection that had just been made. The dropdown snapped
+   * back to its placeholder the instant you chose anything, making the field impossible
+   * to set. A ref carries the same guard without feeding the dependency graph.
+   */
+  const hydratedFromRecord = useRef(false);
+
   const fetchInvoices = useCallback(
     async (customerId: string) => {
       setLoadingInvoices(true);
@@ -221,7 +275,8 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
           const fetchedInvoices = res.data.data || [];
           setInvoices(fetchedInvoices);
 
-          if (record && !selectedInvoice) {
+          if (record && !hydratedFromRecord.current) {
+            hydratedFromRecord.current = true;
             const inv = fetchedInvoices.find((i: Invoice) => i.id === record.invoiceId);
             if (inv) {
               setSelectedInvoice(inv);
@@ -246,7 +301,9 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
         setLoadingInvoices(false);
       }
     },
-    [record, selectedInvoice],
+    // Deliberately only `record`: see hydratedFromRecord above. Adding selectedInvoice
+    // here is what broke invoice selection.
+    [record],
   );
 
   const handleInvoiceChange = useCallback(async (invoiceId: string) => {
@@ -285,7 +342,10 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
   }, [open, record, handleInvoiceChange]);
 
   useEffect(() => {
-    if (!open) resetForm();
+    if (!open) {
+      resetForm();
+      hydratedFromRecord.current = false;
+    }
   }, [open]);
 
   useEffect(() => {
@@ -563,18 +623,14 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                       </span>
                       Customer
                     </label>
-                    <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                      <SelectTrigger className="h-9 rounded-lg border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary/20">
-                        <SelectValue placeholder="Select a customer…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {customers.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={customerOptions}
+                      value={selectedCustomer}
+                      onValueChange={setSelectedCustomer}
+                      placeholder="Select a customer…"
+                      emptyText="No customer matches that search."
+                      className="h-9 rounded-lg border-slate-200 bg-white text-sm"
+                    />
 
                     {selectedCustomer && (
                       <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5">
@@ -614,29 +670,22 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
                       </span>
                       Invoice Reference
                     </label>
-                    <Select
+                    <SearchableSelect
+                      options={invoiceOptions}
                       value={selectedInvoiceId}
                       onValueChange={handleInvoiceChange}
+                      loading={loadingInvoices}
                       disabled={!selectedCustomer || loadingInvoices}
-                    >
-                      <SelectTrigger className="h-9 rounded-lg border-slate-200 bg-white text-sm focus:ring-2 focus:ring-primary/20">
-                        {loadingInvoices ? (
-                          <span className="flex items-center gap-2 text-slate-400 text-xs">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Loading invoices…
-                          </span>
-                        ) : (
-                          <SelectValue placeholder="Select an invoice…" />
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        {invoices.map((i) => (
-                          <SelectItem key={i.id} value={i.id}>
-                            {getDisplayInvoiceNumber(i)} — {i.status}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder={
+                        selectedCustomer ? 'Select an invoice…' : 'Choose a customer first…'
+                      }
+                      emptyText={
+                        loadingInvoices
+                          ? 'Loading invoices…'
+                          : 'This customer has no invoices to return against.'
+                      }
+                      className="h-9 rounded-lg border-slate-200 bg-white text-sm"
+                    />
 
                     {selectedInvoice && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">

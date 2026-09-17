@@ -1,4 +1,5 @@
 import React from 'react';
+import { WarrantyDetailsBlock, type WarrantyInfo } from '@/components/shared/WarrantyDetailsBlock';
 import { LetterheadTop, LetterheadBottom } from '@/components/shared/documentTemplate';
 import { numberToWords } from '@/lib/numberToWords';
 
@@ -24,6 +25,8 @@ export interface QuotationLineItem {
 }
 
 export interface SparePartsNormalQuotationProps {
+  /** Warranty coverage, printed inside the document. */
+  warranty?: WarrantyInfo;
   isInvoice?: boolean;
   /** Subject line – product name */
   productName?: string;
@@ -91,6 +94,7 @@ const tdStyleHelper = (align: 'left' | 'center' | 'right' = 'center'): React.CSS
 });
 
 const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
+  warranty,
   modelName = '',
   billTo = {
     name: 'XEROCARE W. L. L',
@@ -511,6 +515,9 @@ const SparePartsNormalQuotation: React.FC<SparePartsNormalQuotationProps> = ({
           ))}
         </div>
       </div>
+
+      {/* ─── WARRANTY DETAILS ─── */}
+      <WarrantyDetailsBlock {...(warranty ?? {})} accent={ACCENT} />
 
       {/* ─── TERMS AND CONDITIONS ─── */}
       <div style={{ marginBottom: '32px' }}>

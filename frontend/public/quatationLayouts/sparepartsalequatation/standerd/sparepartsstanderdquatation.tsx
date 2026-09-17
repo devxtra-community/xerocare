@@ -1,4 +1,5 @@
 import React from 'react';
+import { WarrantyDetailsBlock, type WarrantyInfo } from '@/components/shared/WarrantyDetailsBlock';
 
 import { getActiveCurrency } from '@/lib/currency';
 import { numberToWords } from '@/lib/numberToWords';
@@ -23,6 +24,8 @@ export interface QuotationLineItem {
 }
 
 export interface SparePartsStandardQuotationProps {
+  /** Warranty coverage, printed inside the document. */
+  warranty?: WarrantyInfo;
   /** Subject line – product name */
   productName?: string;
   /** Subject line – model name */
@@ -72,6 +75,7 @@ const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = ({
+  warranty,
   modelName = '',
   billTo = {
     name: 'XEROCARE W. L. L',
@@ -507,6 +511,14 @@ const SparePartsStandardQuotation: React.FC<SparePartsStandardQuotationProps> = 
             ))}
         </tbody>
       </table>
+
+      {/* ─── WARRANTY DETAILS ─── */}
+      <WarrantyDetailsBlock
+        {...(warranty ?? {})}
+        accent={purpleColor}
+        muted={mutedText}
+        text={textColor}
+      />
 
       {/* ─── TOTALS & FOOTER ─── */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '40px' }}>
