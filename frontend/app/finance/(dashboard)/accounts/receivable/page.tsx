@@ -4,7 +4,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ReceiptsTab from '@/components/Finance/ReceiptsTab';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Plus,
   Search,
@@ -30,7 +29,12 @@ import {
   type CashBankAccount,
 } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
-import { SimpleLineChart, DonutChart, HorizontalBarChart } from '@/components/accounts/charts';
+import {
+  SimpleLineChart,
+  SimpleBarChart,
+  DonutChart,
+  HorizontalBarChart,
+} from '@/components/accounts/charts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
@@ -837,37 +841,13 @@ export default function AccountsReceivablePage() {
                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
                       AR Aging Analysis
                     </h4>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={agingTotals} barSize={44}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis
-                          dataKey="bucket"
-                          tick={{ fontSize: 12 }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 11 }}
-                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <Tooltip
-                          formatter={(v: number) => formatCurrency(v, currency)}
-                          contentStyle={{
-                            borderRadius: '10px',
-                            fontSize: '12px',
-                            border: '1px solid #e2e8f0',
-                          }}
-                        />
-                        <Bar
-                          dataKey="total"
-                          name="Outstanding"
-                          fill="#3b82f6"
-                          radius={[6, 6, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart
+                      data={agingTotals}
+                      xKey="bucket"
+                      bars={[{ key: 'total', color: '#3b82f6', label: 'Outstanding' }]}
+                      height={220}
+                      currency={currency}
+                    />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="md:col-span-2">
@@ -899,7 +879,7 @@ export default function AccountsReceivablePage() {
                     <HorizontalBarChart
                       data={rcvCharts?.topCustomers ?? []}
                       height={240}
-                      color="#8b5cf6"
+                      color="#3b82f6"
                       currency={currency}
                     />
                   </div>

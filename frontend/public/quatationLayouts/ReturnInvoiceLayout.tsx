@@ -8,6 +8,7 @@ import { Mail, Phone, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { LetterheadTop, LetterheadBottom } from '@/components/shared/documentTemplate';
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /** Converts CN-2026-00001 → RTN-INV-0001 */
@@ -237,10 +238,6 @@ export default function ReturnInvoiceLayout({
     }
   };
 
-  // ── Logo path same as normal quotation ────────────────────────────────────
-  const logoPath =
-    '/quatationLayouts/productsalequatation/normal/normallogo/xerocarelogo-removebg-preview.png';
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
       {/* ════════════════════════════════════════════════════════════════
@@ -255,12 +252,23 @@ export default function ReturnInvoiceLayout({
             minHeight: '1122px',
             margin: '0 auto',
             padding: '50px 40px',
+            backgroundImage: `url('/branding/letterhead-watermark.png')`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            backgroundSize: '78%',
             color: '#1a1a1a',
             display: 'flex',
             flexDirection: 'column',
             boxSizing: 'border-box',
           }}
         >
+          {/* ── COMPANY LETTERHEAD ────────────────────────────────────── */}
+          {/* Negative margins cancel the sheet's 50px/40px padding so the artwork runs
+              edge to edge, exactly as it does on the quotations. */}
+          <div style={{ marginLeft: -40, marginRight: -40, marginTop: -50, marginBottom: 20 }}>
+            <LetterheadTop />
+          </div>
+
           {/* ── TITLE ─────────────────────────────────────────────────── */}
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <div
@@ -288,7 +296,9 @@ export default function ReturnInvoiceLayout({
             </div>
           </div>
 
-          {/* ── HEADER: Company Info + Logo ────────────────────────────── */}
+          {/* ── HEADER: Company Info ──────────────────────────────────── */}
+          {/* No logo image here any more — it sat beside a letterhead band that already
+              carries the wordmark, so the mark appeared twice on one sheet. */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '32px' }}>
             <div>
               <div
@@ -301,21 +311,6 @@ export default function ReturnInvoiceLayout({
                 <div>Mobile: +974 7071 7282</div>
                 <div>Email: mail@xerocare.com</div>
               </div>
-            </div>
-            <div
-              style={{
-                width: '160px',
-                height: '75px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <img
-                src={logoPath}
-                alt="Xerocare"
-                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              />
             </div>
           </div>
 
@@ -405,7 +400,7 @@ export default function ReturnInvoiceLayout({
                 letterSpacing: '1px',
               }}
             >
-              Sub: {isDirectRefund ? 'Credit Note for' : 'Return &amp; Replacement — '}
+              Sub: {isDirectRefund ? 'Credit Note for' : 'Return & Replacement — '}
               {creditNote.productName}
             </div>
           </div>
@@ -934,28 +929,20 @@ export default function ReturnInvoiceLayout({
             ))}
           </div>
 
-          {/* ── FOOTER DIVIDER ────────────────────────────────────────── */}
+          {/* ── COMPANY FOOTER ────────────────────────────────────────── */}
+          {/* The artwork's own contact strip carries the address, phones and website that
+              the hand-drawn rule used to spell out, so nothing is lost by replacing it.
+              marginTop:auto pins it to the foot of the sheet however short the body is. */}
           <div
             style={{
-              borderTop: '2px solid #000',
-              marginTop: '40px',
-              paddingTop: '16px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              marginTop: 'auto',
+              marginLeft: -40,
+              marginRight: -40,
+              marginBottom: -50,
+              paddingTop: '32px',
             }}
           >
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '300', textTransform: 'uppercase' }}>
-                Xerocare Trading &amp; Services W.L.L
-              </div>
-              <div style={{ fontSize: '11px', color: '#777', marginTop: '2px' }}>Doha, Qatar</div>
-            </div>
-            <div style={{ fontSize: '11px', color: '#777', textAlign: 'right', lineHeight: '1.6' }}>
-              <div>mail@xerocare.com</div>
-              <div>+974 7071 7282</div>
-              <div>www.xerocare.com</div>
-            </div>
+            <LetterheadBottom />
           </div>
         </div>
       </div>

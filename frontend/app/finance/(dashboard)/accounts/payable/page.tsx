@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PaymentsTab from '@/components/Finance/PaymentsTab';
 import ExpensesTab from '@/components/Finance/ExpensesTab';
 import CreditNoteSettlementsTab from '@/components/finance/CreditNoteSettlementsTab';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Plus,
   Search,
@@ -1316,28 +1315,13 @@ export default function AccountsPayablePage() {
                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
                       AP Aging Analysis
                     </h4>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={agingTotals} barSize={40}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis
-                          dataKey="bucket"
-                          tick={{ fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 11 }}
-                          tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <Tooltip
-                          formatter={(v: number) => formatCurrency(v, currency)}
-                          contentStyle={{ borderRadius: '10px', fontSize: '12px' }}
-                        />
-                        <Bar dataKey="total" name="Payable" fill="#f59e0b" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart
+                      data={agingTotals}
+                      xKey="bucket"
+                      bars={[{ key: 'total', color: '#f59e0b', label: 'Payable' }]}
+                      height={200}
+                      currency={currency}
+                    />
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
