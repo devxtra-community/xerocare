@@ -224,7 +224,7 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     const user = await authService.findUserByEmail(email);
     if (!user) {
       return res.json({
-        message: 'If account exists, magic link sent',
+        message: 'If account exists, an OTP has been sent to your email',
         success: true,
       });
     }
@@ -232,7 +232,7 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     await otpService.sendOtp(email, OtpPurpose.FORGOT_PASSWORD);
 
     return res.json({
-      message: 'If account exists, magic link sent',
+      message: 'If account exists, an OTP has been sent to your email',
       success: true,
     });
   } catch (err: unknown) {
@@ -262,6 +262,13 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     if (currentRefreshToken) {
       await authService.logoutOtherDevices(user.id, currentRefreshToken);
     }
+
+    // Verifying an OTP here confirms email access for a password reset, not
+    // a login — it must not leave (or count as re-establishing) a trusted
+    // device. Revoke every trusted device so the very next login asks for
+    // OTP again, regardless of any still-valid cookie from before the reset.
+    await trustedDeviceRepo.deleteAllForUser(user.id);
+    res.clearCookie(TRUSTED_DEVICE_COOKIE_NAME, clearTrustedDeviceCookieOptions);
 
     return res.json({
       message: 'Password reset successfully',
