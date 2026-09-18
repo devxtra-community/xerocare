@@ -70,6 +70,8 @@ import {
   type CustomerDecisionChannel,
 } from '@/lib/serviceTicket';
 import { ServiceContract, getServiceContracts } from '@/lib/serviceContract';
+import { getInvoiceById } from '@/lib/invoice';
+import { getSalePaymentsForInvoice } from '@/lib/saleWorkflow';
 import {
   getStatusColor,
   ServiceTicketHistoryPanel,
@@ -578,6 +580,22 @@ export default function ServiceDashboardPage() {
    * it while the technician still knows; otherwise the cash is invisible until somebody in
    * Accounts keys it in from memory.
    */
+  /**
+   * What the customer actually owes at completion.
+   *
+   * NOT the estimate total. Approving within validity waives the labour line, so a job
+   * quoted at 550 can be a 150 bill — prefilling the estimate figure would have the
+   * technician collect 400 too much. The invoice carries the post-waiver amount, and any
+   * payment already taken (an up-front visit charge, a part payment) comes off it too.
+   */
+  const [amountDue, setAmountDue] = useState<{
+    total: number;
+    paid: number;
+    outstanding: number;
+    invoiceNumber?: string;
+  } | null>(null);
+  const [loadingDue, setLoadingDue] = useState(false);
+
   const [collectAmount, setCollectAmount] = useState('');
   const [collectMode, setCollectMode] = useState('');
   const [collectAccountId, setCollectAccountId] = useState('');
@@ -1151,6 +1169,41 @@ export default function ServiceDashboardPage() {
   //   });
   //   setConfirmOpen(true);
   // };
+
+  /**
+   * Loads the outstanding balance when the completion form opens, and prefills the amount
+   * so the technician confirms a figure rather than inventing one.
+   */
+  const loadAmountDue = useCallback(async (ticket: ServiceTicket | null) => {
+    if (!ticket?.serviceQuotationId) {
+      setAmountDue(null);
+      return;
+    }
+    setLoadingDue(true);
+    try {
+      const [inv, payments] = await Promise.all([
+        getInvoiceById(ticket.serviceQuotationId),
+        getSalePaymentsForInvoice(ticket.serviceQuotationId).catch(() => []),
+      ]);
+      const total = Number(inv?.totalAmount) || 0;
+      // Pending counts as paid for this purpose: that money is already with Accounts
+      // awaiting approval, and collecting it twice is the failure to avoid.
+      const paid = (payments || [])
+        .filter((p) => p.status === 'APPROVED' || p.status === 'PENDING')
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const outstanding = Math.max(0, total - paid);
+      setAmountDue({ total, paid, outstanding, invoiceNumber: inv?.invoiceNumber });
+      setCollectAmount(outstanding > 0 ? String(outstanding) : '');
+    } catch {
+      setAmountDue(null);
+    } finally {
+      setLoadingDue(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showCompleteModal) loadAmountDue(selectedTicket);
+  }, [showCompleteModal, selectedTicket, loadAmountDue]);
 
   const handleCompleteService = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4834,9 +4887,40 @@ export default function ServiceDashboardPage() {
                     this page, and gated behind choosing a mode so a technician who took
                     nothing is not asked to fill anything in. */}
                 <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-3 space-y-3">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
-                    Payment collected on site (optional)
-                  </p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                      Payment collected on site (optional)
+                    </p>
+                    {loadingDue ? (
+                      <span className="text-[10px] font-bold text-orange-500">
+                        Loading balance…
+                      </span>
+                    ) : amountDue ? (
+                      <span className="text-[11px] font-black text-orange-800">
+                        Due now: {getActiveCurrency()} {amountDue.outstanding.toFixed(2)}
+                        {amountDue.invoiceNumber ? (
+                          <span className="ml-1 font-bold text-orange-500">
+                            ({amountDue.invoiceNumber})
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* The estimate and the bill can differ — labour is waived when the
+                      customer approves within validity — so the figure is spelled out
+                      rather than left for the technician to reconcile in their head. */}
+                  {amountDue && amountDue.paid > 0 && (
+                    <p className="text-[10px] text-orange-600">
+                      Invoice {getActiveCurrency()} {amountDue.total.toFixed(2)} · already collected{' '}
+                      {getActiveCurrency()} {amountDue.paid.toFixed(2)}
+                    </p>
+                  )}
+                  {amountDue && amountDue.outstanding === 0 && (
+                    <p className="text-[10px] font-bold text-emerald-700">
+                      Nothing outstanding — this invoice is already settled.
+                    </p>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
@@ -4875,9 +4959,15 @@ export default function ServiceDashboardPage() {
                           min="0"
                           value={collectAmount}
                           onChange={(e) => setCollectAmount(e.target.value)}
-                          placeholder="0.00"
+                          placeholder={amountDue ? amountDue.outstanding.toFixed(2) : '0.00'}
                           className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
                         />
+                        {amountDue && Number(collectAmount) > amountDue.outstanding + 0.01 && (
+                          <p className="text-[10px] font-bold text-red-600">
+                            More than the {getActiveCurrency()} {amountDue.outstanding.toFixed(2)}{' '}
+                            outstanding.
+                          </p>
+                        )}
                       </div>
                     )}
 

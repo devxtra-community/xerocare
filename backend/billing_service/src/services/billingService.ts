@@ -4794,13 +4794,33 @@ export class BillingService {
     const finalTotal =
       itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
 
+    /**
+     * The customer's name, copied onto the invoice.
+     *
+     * Accounts Receivable reads `invoices.customer_name` — a denormalised column, not a
+     * join to CRM — so an invoice created without it shows as "Unknown Customer" on the
+     * AR page no matter how valid its customerId is. Every service estimate was landing
+     * there nameless.
+     */
+    const customer = payload.customerId
+      ? await this.getCustomerDetails(payload.customerId).catch(() => null)
+      : null;
+    const customerName =
+      (customer as { name?: string } | null)?.name ??
+      (customer as { customerName?: string } | null)?.customerName ??
+      null;
+
     const invoice = invoiceRepo.create({
       invoiceNumber,
       customerId: payload.customerId || undefined,
+      customerName: customerName || undefined,
       branchId: payload.branchId,
       createdBy: payload.createdBy,
       serviceTicketId: payload.serviceTicketId,
-      saleType: payload.saleType as SaleType,
+      // A service job is a SERVICE sale, whatever the caller passed. ven_inv hard-coded
+      // 'PRODUCT_SALE' here, so every repair showed up in Accounts typed as a product
+      // sale — wrong in the AR list, and wrong in anything that segments revenue by type.
+      saleType: SaleType.SERVICE,
       status: payload.status as InvoiceStatus,
       billType: BillType.SERVICE,
       visitChargeAmount: visitCharge,
@@ -4855,9 +4875,24 @@ export class BillingService {
     const labourAmount = labour ? Number(labour.unitPrice || 0) * (labour.quantity || 1) : 0;
     if (!labour || labourAmount <= 0) return invoice;
 
+    const waivedDescription = 'Labor Cost / Service Charge (waived — approved within validity)';
     labour.unitPrice = 0;
-    labour.description = 'Labor Cost / Service Charge (waived — approved within validity)';
+    labour.description = waivedDescription;
     await itemRepo.save(labour);
+
+    // The same row, in the invoice's own loaded graph.
+    //
+    // Invoice.items is declared `cascade: true`, and `invoice` was loaded WITH its items.
+    // Saving the invoice below therefore re-writes every item from the in-memory array —
+    // which still held the original price. The item update above was being applied and
+    // then immediately overwritten, leaving an invoice whose total said 150 while its
+    // own lines still added up to 550. Zeroing it here too means the cascade writes the
+    // waiver instead of undoing it.
+    const labourInGraph = (invoice.items || []).find((it) => it.id === labour.id);
+    if (labourInGraph) {
+      labourInGraph.unitPrice = 0;
+      labourInGraph.description = waivedDescription;
+    }
 
     invoice.totalAmount = Math.max(0, Number(invoice.totalAmount) - labourAmount);
     const saved = await this.invoiceRepo.save(invoice);

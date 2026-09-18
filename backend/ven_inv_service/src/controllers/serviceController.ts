@@ -4346,8 +4346,28 @@ Xerocare Technical Services`;
       );
     }
 
-    if (invoiceFetched && !approvalTravelCovered) {
-      // Timely approval — waive the labour line on the billing estimate.
+    /**
+     * Labour is waived because the customer ALREADY PAID a visit charge.
+     *
+     * That is the deal the system itself offers them, verbatim: "Paying the visit charge
+     * also covers the labour cost of the repair for one month." The waiver is the other
+     * half of a transaction — it is not a discount handed out for approving on time.
+     *
+     * It used to fire on every chargeable approval regardless, including tickets where
+     * the visit charge was ADDED_TO_ESTIMATE and so had never been collected. A job
+     * quoted at 550 became a 150 bill the instant the customer signed: the company
+     * forgave 400 of labour in exchange for a visit charge it never received, and the
+     * figure the customer had signed for was one the system never intended to charge.
+     *
+     * Now it reciprocates only a payment that actually happened. When the visit charge is
+     * folded into the estimate the customer is paying it as part of this same bill, so
+     * there is no prepayment to return the favour for and the quote stands as quoted.
+     */
+    const visitChargeWasPaid =
+      ticket.visitChargeCollected === true || ticket.visitChargeStatus === 'COLLECTED';
+
+    if (invoiceFetched && !approvalTravelCovered && visitChargeWasPaid) {
+      // Timely approval on a ticket whose visit charge is already paid — waive labour.
       try {
         await axios.post(
           `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
@@ -4357,7 +4377,7 @@ Xerocare Technical Services`;
         await this.logActivity(
           ticket.id,
           'LABOUR_WAIVED',
-          'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
+          'Labour waived — covered by the visit charge the customer already paid.',
           actorId,
         );
       } catch (err) {
