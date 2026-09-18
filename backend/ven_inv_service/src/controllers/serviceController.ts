@@ -104,6 +104,27 @@ function publicAppUrl(): string {
   return base.replace(/\/+$/, '');
 }
 
+/**
+ * A delivery failure in words the person reading it can act on.
+ *
+ * nodemailer's `Missing credentials for "PLAIN"` is accurate and useless to the staff
+ * member looking at it — it means the service has no mail account configured, which is an
+ * operations fix, not something they did wrong. The raw message is still logged.
+ */
+function describeSendFailure(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/Missing credentials|Invalid login|EAUTH/i.test(msg)) {
+    return 'the mail account for this service is not configured — ask IT to set MAIL_USER / MAIL_PASS.';
+  }
+  if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ETIMEDOUT|Connection timeout/i.test(msg)) {
+    return 'the mail server could not be reached. Check the connection and try again.';
+  }
+  if (/quota|rate limit|550|too many/i.test(msg)) {
+    return 'the mail provider refused the message (quota or rate limit). Try again later.';
+  }
+  return msg;
+}
+
 function estimateSigningLinkUrl(token: string): string {
   return `${publicAppUrl()}/public/service-estimate/sign/${token}`;
 }
@@ -1252,6 +1273,7 @@ Xerocare Technical Services`;
         visitChargeCollected,
         visitChargePaymentMode,
         visitChargeAccountId,
+        visitChargeChequeNumber,
         transportChargeAmount,
         discountAmount,
         technicianNoteToFinance,
@@ -1333,10 +1355,12 @@ Xerocare Technical Services`;
         effectiveVisitCharge > 0 &&
         visitChargeCollected &&
         !ticket.visitChargeCollected &&
-        (!visitChargePaymentMode || (visitChargePaymentMode !== 'CHEQUE' && !visitChargeAccountId))
+        (!visitChargePaymentMode ||
+          (visitChargePaymentMode !== 'CHEQUE' && !visitChargeAccountId) ||
+          (visitChargePaymentMode === 'CHEQUE' && !visitChargeChequeNumber))
       ) {
         throw new AppError(
-          'Payment mode (and account, unless paying by cheque) are required to post the visit charge.',
+          'Payment mode is required to post the visit charge — plus an account, or a cheque number when paying by cheque.',
           400,
         );
       }
@@ -1704,41 +1728,23 @@ Xerocare Technical Services`;
         visitChargeMethod === 'SEPARATE' &&
         effectiveVisitCharge > 0 &&
         visitChargeCollected &&
-        !ticket.visitChargeCollected
+        // Covers the case the desk already took it: pending approval counts as taken, so
+        // the technician cannot collect the same charge a second time.
+        !this.isVisitChargeSettledOrPending(ticket)
       ) {
         try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-          await axios.post(
-            `${BILLING_SERVICE_URL}/invoices/service-visit-charge`,
-            {
-              serviceTicketId: ticket.id,
-              ticketNumber: ticket.ticketNumber,
-              customerId: ticket.customerId,
-              branchId: ticket.branchId,
-              amount: effectiveVisitCharge,
-              collectedBy: req.user?.userId || 'SYSTEM',
-              paymentMode: visitChargePaymentMode,
-              accountId: visitChargeAccountId,
-            },
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-          ticket.visitChargeCollected = true;
-          ticket.visitChargeCollectedAt = new Date();
-          await ticketRepo.save(ticket);
-          await this.logActivity(
-            ticket.id,
-            'VISIT_CHARGE_COLLECTED',
-            `Visit charge of ${effectiveVisitCharge} collected in cash on-site and posted to accounts.`,
-            req.user?.userId,
-          );
+          await this.requestVisitChargeApproval(ticket, {
+            paymentMode: visitChargePaymentMode,
+            accountId: visitChargeAccountId,
+            chequeNumber: visitChargeChequeNumber,
+            userId: req.user?.userId,
+            userName: await this.resolveCollectorName(req),
+            userRole: req.user?.employeeJob || req.user?.role,
+            remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected on-site by technician at diagnosis`,
+            activityNote: `Visit charge of ${effectiveVisitCharge} collected on-site by the technician — sent to Accounts for approval.`,
+          });
         } catch (err) {
-          logger.error('Failed to post on-site visit charge receipt to billing:', err);
+          logger.error('Failed to raise on-site visit charge approval request:', err);
         }
       }
 
@@ -2464,6 +2470,8 @@ Xerocare Technical Services`;
             ticket,
             { collectVisitCharge, paymentMode, accountId },
             req.user?.userId,
+            await this.resolveCollectorName(req),
+            req.user?.employeeJob || req.user?.role,
           );
         } catch (err) {
           logger.error('Failed to collect visit charge at estimate rejection:', err);
@@ -2866,6 +2874,14 @@ Xerocare Technical Services`;
         technicianRemarks,
         customerSignature,
         technicianSignature,
+        // Payment the technician took on the spot. Optional — a customer who pays later
+        // still closes the job, the invoice just stays outstanding for Accounts to chase.
+        collectedAmount,
+        paymentMode,
+        paymentAccountId,
+        chequeNumber,
+        chequeBankName,
+        chequeDate,
       } = req.body;
 
       const id = req.params.id as string;
@@ -2943,6 +2959,49 @@ Xerocare Technical Services`;
         technicianSignature,
       });
       await reportRepo.save(report);
+
+      // Payment taken at the door, if any. Best-effort: the job IS finished, and failing
+      // the completion because the collection could not be raised would leave the
+      // technician unable to close a ticket for work that is demonstrably done. The
+      // failure is logged and the invoice simply stays outstanding.
+      if (paymentMode && Number(collectedAmount) > 0 && ticket.serviceQuotationId) {
+        try {
+          const payToken = sign(
+            { userId: 'ven_inv_service', role: 'ADMIN' },
+            ACCESS_SECRET as string,
+            { expiresIn: '1m' },
+          );
+          const payRes = await axios.post(
+            `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/service-completion-payment`,
+            {
+              amount: Number(collectedAmount),
+              paymentMode,
+              accountId: paymentAccountId,
+              chequeNumber,
+              chequeBankName,
+              chequeDate,
+              branchId: ticket.branchId,
+              collectedBy: req.user?.userId,
+              remarks: `Service completion payment — Ticket ${ticket.ticketNumber} — collected by technician`,
+            },
+            { headers: { Authorization: `Bearer ${payToken}` } },
+          );
+          await this.logActivity(
+            ticket.id,
+            'COMPLETION_PAYMENT_COLLECTED',
+            `Technician collected ${collectedAmount} by ${paymentMode} — sent to Accounts for approval (${payRes.data?.data?.requestNo ?? 'request raised'}).`,
+            req.user?.userId,
+          );
+        } catch (err) {
+          logger.error('Failed to raise completion payment request:', err);
+          await this.logActivity(
+            ticket.id,
+            'COMPLETION_PAYMENT_FAILED',
+            `Could not record the ${collectedAmount} collected at completion. The invoice remains outstanding — record it from Accounts.`,
+            req.user?.userId,
+          );
+        }
+      }
 
       // Consume Reserved Parts
       await this.consumeReservations(ticket.id);
@@ -3975,7 +4034,21 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      ticket.status = ServiceTicketStatus.QUOTED;
+      // FINANCE_APPROVED, not QUOTED.
+      //
+      // This is the cross-service half of Finance approving an estimate — billing calls it
+      // the moment the approval commits — and it used to leave the ticket on QUOTED while
+      // its sibling approveEstimateFinance (the in-service path) set FINANCE_APPROVED. The
+      // send-to-customer guard reads the TICKET and demands FINANCE_APPROVED, so an
+      // estimate approved through Accounts could never be sent: the customer share refused
+      // with "The estimate must be approved by Finance" about an estimate Finance had
+      // just approved. The estimate row said FINANCE_APPROVED; only the ticket disagreed.
+      //
+      // A re-estimate lands on the _2 state, mirroring approveRevisionFinance.
+      ticket.status =
+        ticket.status === ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2
+          ? ServiceTicketStatus.FINANCE_APPROVED_2
+          : ServiceTicketStatus.FINANCE_APPROVED;
       await ticketRepo.save(ticket);
 
       const estimateRepo = Source.getRepository(ServiceEstimate);
@@ -4273,8 +4346,28 @@ Xerocare Technical Services`;
       );
     }
 
-    if (invoiceFetched && !approvalTravelCovered) {
-      // Timely approval — waive the labour line on the billing estimate.
+    /**
+     * Labour is waived because the customer ALREADY PAID a visit charge.
+     *
+     * That is the deal the system itself offers them, verbatim: "Paying the visit charge
+     * also covers the labour cost of the repair for one month." The waiver is the other
+     * half of a transaction — it is not a discount handed out for approving on time.
+     *
+     * It used to fire on every chargeable approval regardless, including tickets where
+     * the visit charge was ADDED_TO_ESTIMATE and so had never been collected. A job
+     * quoted at 550 became a 150 bill the instant the customer signed: the company
+     * forgave 400 of labour in exchange for a visit charge it never received, and the
+     * figure the customer had signed for was one the system never intended to charge.
+     *
+     * Now it reciprocates only a payment that actually happened. When the visit charge is
+     * folded into the estimate the customer is paying it as part of this same bill, so
+     * there is no prepayment to return the favour for and the quote stands as quoted.
+     */
+    const visitChargeWasPaid =
+      ticket.visitChargeCollected === true || ticket.visitChargeStatus === 'COLLECTED';
+
+    if (invoiceFetched && !approvalTravelCovered && visitChargeWasPaid) {
+      // Timely approval on a ticket whose visit charge is already paid — waive labour.
       try {
         await axios.post(
           `${BILLING_SERVICE_URL}/invoices/${ticket.serviceQuotationId}/waive-labour`,
@@ -4284,7 +4377,7 @@ Xerocare Technical Services`;
         await this.logActivity(
           ticket.id,
           'LABOUR_WAIVED',
-          'Customer approved within estimate validity — labour cost waived (covered by the up-front visit/estimate charge).',
+          'Labour waived — covered by the visit charge the customer already paid.',
           actorId,
         );
       } catch (err) {
@@ -4469,7 +4562,7 @@ Xerocare Technical Services`;
       ticket.serviceContext === ServiceContext.CHARGEABLE &&
       Number(ticket.visitChargeAmount) > 0 &&
       ticket.visitChargeMethod === 'ADDED_TO_ESTIMATE' &&
-      !ticket.visitChargeCollected
+      !this.isVisitChargeSettledOrPending(ticket)
     );
   }
 
@@ -4490,12 +4583,49 @@ Xerocare Technical Services`;
     ticket: ServiceTicket,
     body: { collectVisitCharge?: boolean; paymentMode?: string; accountId?: string },
     userId?: string,
+    collectorName?: string,
+    collectorRole?: string,
   ): Promise<void> {
     if (!body.collectVisitCharge || !this.isVisitChargeCollectionEligible(ticket)) return;
+    await this.requestVisitChargeApproval(ticket, {
+      paymentMode: body.paymentMode,
+      accountId: body.accountId,
+      userId,
+      userName: collectorName,
+      userRole: collectorRole,
+      remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected at estimate rejection`,
+      activityNote: `Visit charge of ${ticket.visitChargeAmount} collected at estimate rejection — sent to Accounts for approval.`,
+    });
+  }
+
+  /**
+   * Sends a collected visit charge to Accounts for approval and marks the ticket pending.
+   *
+   * Every collection point funnels through here — the desk's up-front button, the
+   * technician's on-site collection at diagnosis, and collection at estimate rejection —
+   * so all three obey the same rule: the person takes the money, Accounts decide whether
+   * it posts. Previously each one called billing directly and the cash landed in the
+   * cashbook on the collector's own authority.
+   */
+  private async requestVisitChargeApproval(
+    ticket: ServiceTicket,
+    opts: {
+      paymentMode?: string;
+      accountId?: string;
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDate?: string;
+      userId?: string;
+      userName?: string;
+      userRole?: string;
+      remarks?: string;
+      activityNote?: string;
+    },
+  ): Promise<void> {
     const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
       expiresIn: '1m',
     });
-    await axios.post(
+    const response = await axios.post(
       `${BILLING_SERVICE_URL}/invoices/service-visit-charge`,
       {
         serviceTicketId: ticket.id,
@@ -4503,23 +4633,132 @@ Xerocare Technical Services`;
         customerId: ticket.customerId,
         branchId: ticket.branchId,
         amount: Number(ticket.visitChargeAmount),
-        collectedBy: userId || 'SYSTEM',
-        paymentMode: body.paymentMode,
-        accountId: body.accountId,
-        remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected at estimate rejection`,
+        collectedBy: opts.userId || 'SYSTEM',
+        collectedByName: opts.userName || null,
+        collectedByRole: opts.userRole || null,
+        paymentMode: opts.paymentMode,
+        accountId: opts.accountId,
+        chequeNumber: opts.chequeNumber,
+        chequeBankName: opts.chequeBankName,
+        chequeDate: opts.chequeDate,
+        remarks: opts.remarks,
       },
       { headers: { Authorization: `Bearer ${token}` } },
     );
-    ticket.visitChargeCollected = true;
-    ticket.visitChargeCollectedAt = new Date();
+
+    ticket.visitChargeStatus = 'PENDING_APPROVAL';
+    ticket.visitChargeRequestId = response.data?.data?.paymentRequestId ?? null;
+    ticket.visitChargeCollectedBy = opts.userId || null;
+    ticket.visitChargeCollectedByName = opts.userName || null;
+    ticket.visitChargeCollectedByRole = opts.userRole || null;
+    ticket.visitChargeRejectionReason = null;
+    // visitChargeCollected stays FALSE until Accounts approve — see the entity note.
+    if (!ticket.visitChargeMethod) ticket.visitChargeMethod = 'SEPARATE';
     await Source.getRepository(ServiceTicket).save(ticket);
+
     await this.logActivity(
       ticket.id,
-      'VISIT_CHARGE_COLLECTED',
-      `Visit charge of ${ticket.visitChargeAmount} collected at estimate rejection and posted to accounts.`,
-      userId,
+      'VISIT_CHARGE_REQUESTED',
+      opts.activityNote ||
+        `Visit charge of ${ticket.visitChargeAmount} collected by ${opts.userName || 'staff'} — sent to Accounts for approval.`,
+      opts.userId,
     );
   }
+
+  /**
+   * The collector's display name for the Accounts queue and the ticket.
+   *
+   * Falls back to the email, then the role, then "Staff" — Accounts must always see a
+   * person against money that has been taken, and a blank name in that column is the
+   * thing that makes a collection impossible to chase later.
+   */
+  private async resolveCollectorName(req: Request): Promise<string> {
+    const userId = req.user?.userId;
+    if (userId) {
+      try {
+        const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
+          expiresIn: '1m',
+        });
+        const url = `${process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002'}/employee/${userId}`;
+        const res = await axios.get(url, { headers: { Authorization: `Bearer ${token}` } });
+        const emp = res.data?.data ?? res.data;
+        // The employee record stores the name split in two snake_case columns; there is no
+        // single `name` field, so reading one silently yielded undefined and every
+        // collection was attributed to an email address instead of a person.
+        const full =
+          `${emp?.first_name || emp?.firstName || ''} ${emp?.last_name || emp?.lastName || ''}`.trim();
+        if (full) return full;
+        if (emp?.email) return String(emp.email);
+      } catch {
+        // Name lookup is a convenience; never block a collection on it.
+      }
+    }
+    return req.user?.email || req.user?.employeeJob || req.user?.role || 'Staff';
+  }
+
+  /** True while the charge is taken or awaiting sign-off: no one may collect it again. */
+  private isVisitChargeSettledOrPending(ticket: ServiceTicket): boolean {
+    return (
+      ticket.visitChargeCollected ||
+      ticket.visitChargeStatus === 'COLLECTED' ||
+      ticket.visitChargeStatus === 'PENDING_APPROVAL'
+    );
+  }
+
+  /**
+   * PATCH /service/tickets/:id/visit-charge-decision
+   *
+   * Called by billing when Accounts approve or reject the charge. Internal only.
+   */
+  applyVisitChargeDecision = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { status, paymentRequestId, rejectionReason } = req.body || {};
+      if (status !== 'COLLECTED' && status !== 'REJECTED') {
+        throw new AppError('status must be COLLECTED or REJECTED', 400);
+      }
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: String(req.params.id) } });
+      if (!ticket) throw new AppError('Ticket not found', 404);
+
+      // Ignore a decision for a superseded request: a charge rejected once and collected
+      // again has a newer request, and a late callback for the old one must not undo it.
+      if (
+        paymentRequestId &&
+        ticket.visitChargeRequestId &&
+        ticket.visitChargeRequestId !== paymentRequestId
+      ) {
+        return res.status(200).json({ success: true, data: ticket, ignored: 'stale request' });
+      }
+
+      if (status === 'COLLECTED') {
+        ticket.visitChargeStatus = 'COLLECTED';
+        ticket.visitChargeCollected = true;
+        ticket.visitChargeCollectedAt = new Date();
+        ticket.visitChargeRejectionReason = null;
+      } else {
+        // The charge is owed again, so the ticket goes back to collectable and the
+        // boolean every other reader trusts stays false.
+        ticket.visitChargeStatus = 'REJECTED';
+        ticket.visitChargeCollected = false;
+        ticket.visitChargeCollectedAt = null;
+        ticket.visitChargeRejectionReason = rejectionReason || null;
+      }
+      await ticketRepo.save(ticket);
+
+      await this.logActivity(
+        ticket.id,
+        status === 'COLLECTED' ? 'VISIT_CHARGE_APPROVED' : 'VISIT_CHARGE_REJECTED',
+        status === 'COLLECTED'
+          ? `Accounts approved the visit charge of ${ticket.visitChargeAmount}.`
+          : `Accounts rejected the visit charge${rejectionReason ? `: ${rejectionReason}` : ''}. It may be collected again.`,
+        undefined,
+      );
+
+      res.status(200).json({ success: true, data: ticket });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   /**
    * POST /service/tickets/:id/collect-visit-charge
@@ -4543,7 +4782,7 @@ Xerocare Technical Services`;
         throw new AppError('Not authorized to collect payment for this ticket', 403);
       }
 
-      const { paymentMode, accountId } = req.body;
+      const { paymentMode, accountId, chequeNumber, chequeBankName, chequeDate } = req.body;
       const id = req.params.id as string;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
@@ -4564,8 +4803,13 @@ Xerocare Technical Services`;
       if (Number(ticket.visitChargeAmount) <= 0) {
         throw new AppError('No visit charge has been quoted on this ticket yet', 400);
       }
-      if (ticket.visitChargeCollected) {
-        throw new AppError('Visit charge already collected', 400);
+      if (this.isVisitChargeSettledOrPending(ticket)) {
+        throw new AppError(
+          ticket.visitChargeStatus === 'PENDING_APPROVAL'
+            ? 'This visit charge has already been collected and is awaiting Accounts approval.'
+            : 'Visit charge already collected',
+          400,
+        );
       }
       if (!paymentMode || (paymentMode !== 'CHEQUE' && !accountId)) {
         throw new AppError(
@@ -4573,42 +4817,31 @@ Xerocare Technical Services`;
           400,
         );
       }
-
-      const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
-        expiresIn: '1m',
-      });
-      await axios.post(
-        `${BILLING_SERVICE_URL}/invoices/service-visit-charge`,
-        {
-          serviceTicketId: ticket.id,
-          ticketNumber: ticket.ticketNumber,
-          customerId: ticket.customerId,
-          branchId: ticket.branchId,
-          amount: Number(ticket.visitChargeAmount),
-          collectedBy: req.user?.userId || 'SYSTEM',
-          paymentMode,
-          accountId,
-          remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected before assignment/diagnosis`,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      ticket.visitChargeCollected = true;
-      ticket.visitChargeCollectedAt = new Date();
-      // Mark it the same way the on-site "pay now" path does — a stand-alone
-      // collected charge, not deferred onto the estimate — so anything that
-      // keys off visitChargeMethod (finance reporting, the diagnosis-time
-      // "already collected" guard) treats it consistently either way.
-      if (!ticket.visitChargeMethod) {
-        ticket.visitChargeMethod = 'SEPARATE';
+      // Rejected up front rather than 500ing deep inside billing. The approval queue takes
+      // these four modes only; CREDIT_CARD is a legacy stored value, not something new
+      // payments may use.
+      const ACCEPTED_MODES = ['CASH', 'BANK_TRANSFER', 'CHEQUE'];
+      if (!ACCEPTED_MODES.includes(paymentMode)) {
+        throw new AppError(
+          `Unsupported payment mode "${paymentMode}". Use Cash, Bank Transfer or Cheque.`,
+          400,
+        );
       }
-      await ticketRepo.save(ticket);
-      await this.logActivity(
-        ticket.id,
-        'VISIT_CHARGE_COLLECTED',
-        `Visit charge of ${ticket.visitChargeAmount} collected up front and posted to accounts.`,
-        req.user?.userId,
-      );
+      if (paymentMode === 'CHEQUE' && !chequeNumber) {
+        throw new AppError('A cheque number is required to record a cheque payment.', 400);
+      }
+
+      await this.requestVisitChargeApproval(ticket, {
+        paymentMode,
+        accountId,
+        chequeNumber,
+        chequeBankName,
+        chequeDate,
+        userId: req.user?.userId,
+        userName: await this.resolveCollectorName(req),
+        userRole: callerJob || callerRole,
+        remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected before assignment/diagnosis`,
+      });
 
       res.status(200).json({ success: true, data: ticket });
     } catch (error) {
@@ -4699,6 +4932,8 @@ Xerocare Technical Services`;
           ticket,
           { collectVisitCharge, paymentMode, accountId },
           req.user?.userId,
+          await this.resolveCollectorName(req),
+          req.user?.employeeJob || req.user?.role,
         );
       } catch (err) {
         logger.error('Failed to collect visit charge at customer rejection:', err);
@@ -5997,6 +6232,8 @@ Xerocare Technical Services`;
 
       let emailSent = false;
       let whatsappSent = false;
+      let emailError: string | null = null;
+      let whatsappError: string | null = null;
 
       if (emailToUse) {
         const subject = `Service Quotation - ${ticket.ticketNumber}`;
@@ -6017,14 +6254,23 @@ ${approvalLink}
 Best regards,
 Xerocare Technical Services`;
 
-        await sendServicePdfEmail(
-          emailToUse,
-          subject,
-          bodyText,
-          pdfBuffer,
-          `Quotation_${ticket.ticketNumber}.pdf`,
-        );
-        emailSent = true;
+        // A channel that fails must not sink the whole send. Before this, an SMTP
+        // problem threw past everything and the caller got a bare "Internal server
+        // error" — no way to tell whether the WhatsApp had gone out, whether the customer
+        // had been contacted at all, or what to fix.
+        try {
+          await sendServicePdfEmail(
+            emailToUse,
+            subject,
+            bodyText,
+            pdfBuffer,
+            `Quotation_${ticket.ticketNumber}.pdf`,
+          );
+          emailSent = true;
+        } catch (err) {
+          emailError = describeSendFailure(err);
+          logger.error(`Quotation email failed for ticket ${ticket.ticketNumber}:`, err);
+        }
       }
 
       if (phoneToUse) {
@@ -6046,8 +6292,25 @@ Review & approve your quotation (link valid 72 hours): ${approvalLink}
 
 For queries contact us at +974 4455 6677`;
 
-        await sendWhatsappMessage(phoneToUse, message);
-        whatsappSent = true;
+        try {
+          await sendWhatsappMessage(phoneToUse, message);
+          whatsappSent = true;
+        } catch (err) {
+          whatsappError = describeSendFailure(err);
+          logger.error(`Quotation WhatsApp failed for ticket ${ticket.ticketNumber}:`, err);
+        }
+      }
+
+      // Nothing reached the customer: that is a failure, and the reason is the useful
+      // part of it. 502, not 500 — the request was fine, the mail/WhatsApp provider was not.
+      if (!emailSent && !whatsappSent) {
+        return res.status(502).json({
+          success: false,
+          message: `The quotation could not be delivered. ${[emailError, whatsappError]
+            .filter(Boolean)
+            .join(' ')}`.trim(),
+          data: { emailSent, whatsappSent, emailError, whatsappError },
+        });
       }
 
       await this.logActivity(

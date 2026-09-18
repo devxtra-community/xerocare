@@ -54,7 +54,15 @@ export function Modal({
               }
             }}
             className={cn(
+              // A height budget and a scrolling body.
+              //
+              // This was `overflow-hidden` with no max-height, so a dialog taller than the
+              // screen simply grew past it: the title ran off the top, the confirm buttons
+              // off the bottom, and `overflow-hidden` clipped them rather than letting
+              // anyone scroll to them — the form became impossible to submit. Short
+              // dialogs never reach the cap and are unaffected.
               'relative w-full bg-white rounded-xl shadow-xl p-6 overflow-hidden outline-none',
+              'max-h-[calc(100vh-2rem)] flex flex-col',
               'transition-all duration-150 ease-out',
               'data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:scale-100 data-[state=open]:duration-150',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:scale-95 data-[state=closed]:duration-150',
@@ -63,7 +71,7 @@ export function Modal({
             )}
           >
             {title ? (
-              <div className="mb-4">
+              <div className="mb-4 shrink-0 pr-10">
                 <DialogPrimitive.Title className="text-xl font-bold text-gray-900">
                   {title}
                 </DialogPrimitive.Title>
@@ -82,7 +90,10 @@ export function Modal({
               </DialogPrimitive.Close>
             )}
 
-            <div>{children}</div>
+            {/* min-h-0 is what lets this shrink inside the flex column; without it a flex
+                child refuses to go below its content height and the scrollbar never
+                appears. */}
+            <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
           </DialogPrimitive.Content>
         </div>
       </DialogPrimitive.Portal>

@@ -44,6 +44,7 @@ import { BillType } from '../entities/enums/billType';
 import { PaymentTiming } from '../entities/enums/paymentTiming';
 import { getBranchCurrencyInfo, generatePaymentReference } from './billingHelpers';
 import { createSalePaymentRequest } from './salePaymentRequestService';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 const appendOpenEndedSlab = <T extends { from: number; to: number; rate: number }>(
   ranges: T[] | undefined,
   excessRate: number | undefined,
@@ -1820,6 +1821,120 @@ export class BillingService {
   /**
    * Employee converts a finance-approved quotation into a transaction (Proforma).
    */
+  /**
+   * Accounts confirming a service estimate the customer has accepted.
+   *
+   * Up to this point the whole service job lives on a QUOTATION, and the accounting
+   * queries only ever count `type = 'FINAL'` or a PROFORMA that is ACTIVE_CONTRACT /
+   * INVOICED / PAID. So a customer could accept a 1,290 job, the technician could do the
+   * work, and the 1,290 would never appear as a receivable anywhere — the books simply
+   * never learned about it. Converting is what makes the money real:
+   *
+   *   QUOTATION / CUSTOMER_ACCEPTED   →   PROFORMA / INVOICED   (QTN-… renumbered to INV-…)
+   *
+   * Deliberately a separate, explicit act by Accounts rather than something that fires on
+   * the customer's signature: raising a receivable is a bookkeeping decision, and the
+   * person who owns the ledger should be the one who makes it.
+   */
+  async confirmServiceEstimateToAccounts(id: string, userId: string) {
+    const invoice = await this.invoiceRepo.findById(id);
+    if (!invoice) throw new AppError('Service estimate not found', 404);
+    if (invoice.billType !== BillType.SERVICE) {
+      throw new AppError('This endpoint only confirms service estimates', 400);
+    }
+    if (invoice.status !== InvoiceStatus.CUSTOMER_ACCEPTED) {
+      throw new AppError(
+        `Only a customer-accepted estimate can be taken into accounts (this one is ${invoice.status}).`,
+        400,
+      );
+    }
+
+    // Reuse the existing conversion so the QTN→INV renumber and its audit entry stay in
+    // one place; it lands on DRAFT, which is still not a receivable, so finish the job.
+    const converted = await this.convertToTransaction(id, userId);
+
+    const repo = Source.getRepository(Invoice);
+    const row = await repo.findOne({ where: { id: converted.id } });
+    if (!row) throw new AppError('Invoice vanished during conversion', 500);
+    row.status = InvoiceStatus.INVOICED;
+    await repo.save(row);
+
+    await logAudit(
+      row.id,
+      'STATUS_CHANGE',
+      userId,
+      'Service estimate confirmed into accounts — receivable raised.',
+      InvoiceStatus.CUSTOMER_ACCEPTED,
+      InvoiceStatus.INVOICED,
+    );
+
+    return this.invoiceRepo.findById(row.id);
+  }
+
+  /**
+   * Money the technician collected when they finished the job.
+   *
+   * Completion used to collect nothing: the technician closed the ticket, the customer paid
+   * them on the spot, and the system had no idea — the invoice sat as an open receivable
+   * until somebody in Accounts noticed and keyed the payment in by hand. The cash in the
+   * technician's pocket was invisible until then.
+   *
+   * Two things have to happen together here. The estimate is still a QUOTATION at this
+   * point, and a quotation is not a receivable, so there is nothing for a payment to settle
+   * against — it is taken into accounts first. Then the collection is raised as a PENDING
+   * request like every other one: the technician took the money, Accounts decide whether it
+   * posts, and it lands in whichever cash/bank account they chose on the form.
+   */
+  async recordServiceCompletionPayment(payload: {
+    invoiceId: string;
+    userId: string;
+    amount: number;
+    paymentMode: string;
+    accountId?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDate?: string;
+    remarks?: string;
+    branchId: string;
+  }) {
+    const amount = Number(payload.amount) || 0;
+    if (amount <= 0) throw new AppError('Collected amount must be greater than zero', 400);
+
+    const repo = Source.getRepository(Invoice);
+    let invoice = await repo.findOne({ where: { id: payload.invoiceId } });
+    if (!invoice) throw new AppError('Service invoice not found', 404);
+
+    if (invoice.type === InvoiceType.QUOTATION) {
+      if (invoice.status !== InvoiceStatus.CUSTOMER_ACCEPTED) {
+        throw new AppError(
+          `The customer must accept the estimate before payment can be collected (this one is ${invoice.status}).`,
+          400,
+        );
+      }
+      await this.confirmServiceEstimateToAccounts(invoice.id, payload.userId);
+      invoice = await repo.findOne({ where: { id: payload.invoiceId } });
+      if (!invoice) throw new AppError('Invoice vanished during conversion', 500);
+    }
+
+    const request = await createSalePaymentRequest({
+      invoiceId: invoice.id,
+      branchId: payload.branchId,
+      userId: payload.userId,
+      amount,
+      paymentMode: payload.paymentMode,
+      paymentDate: new Date(),
+      cashAccountId: payload.accountId,
+      chequeNumber: payload.chequeNumber,
+      chequeBankName: payload.chequeBankName,
+      chequeDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+      chequeDueDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+      remarks: payload.remarks || `Service completion payment — ${invoice.invoiceNumber}`,
+      paymentContext: 'SERVICE_COMPLETION',
+    });
+
+    return { invoice, paymentRequestId: request.id, requestNo: request.requestNo };
+  }
+
   async convertToTransaction(id: string, userId: string) {
     const invoice = await this.invoiceRepo.findById(id);
     if (!invoice) throw new AppError('Quotation not found', 404);
@@ -4679,13 +4794,33 @@ export class BillingService {
     const finalTotal =
       itemsTotal + (payload.visitChargeMethod === 'ADDED_TO_ESTIMATE' ? visitCharge : 0) - discount;
 
+    /**
+     * The customer's name, copied onto the invoice.
+     *
+     * Accounts Receivable reads `invoices.customer_name` — a denormalised column, not a
+     * join to CRM — so an invoice created without it shows as "Unknown Customer" on the
+     * AR page no matter how valid its customerId is. Every service estimate was landing
+     * there nameless.
+     */
+    const customer = payload.customerId
+      ? await this.getCustomerDetails(payload.customerId).catch(() => null)
+      : null;
+    const customerName =
+      (customer as { name?: string } | null)?.name ??
+      (customer as { customerName?: string } | null)?.customerName ??
+      null;
+
     const invoice = invoiceRepo.create({
       invoiceNumber,
       customerId: payload.customerId || undefined,
+      customerName: customerName || undefined,
       branchId: payload.branchId,
       createdBy: payload.createdBy,
       serviceTicketId: payload.serviceTicketId,
-      saleType: payload.saleType as SaleType,
+      // A service job is a SERVICE sale, whatever the caller passed. ven_inv hard-coded
+      // 'PRODUCT_SALE' here, so every repair showed up in Accounts typed as a product
+      // sale — wrong in the AR list, and wrong in anything that segments revenue by type.
+      saleType: SaleType.SERVICE,
       status: payload.status as InvoiceStatus,
       billType: BillType.SERVICE,
       visitChargeAmount: visitCharge,
@@ -4740,9 +4875,24 @@ export class BillingService {
     const labourAmount = labour ? Number(labour.unitPrice || 0) * (labour.quantity || 1) : 0;
     if (!labour || labourAmount <= 0) return invoice;
 
+    const waivedDescription = 'Labor Cost / Service Charge (waived — approved within validity)';
     labour.unitPrice = 0;
-    labour.description = 'Labor Cost / Service Charge (waived — approved within validity)';
+    labour.description = waivedDescription;
     await itemRepo.save(labour);
+
+    // The same row, in the invoice's own loaded graph.
+    //
+    // Invoice.items is declared `cascade: true`, and `invoice` was loaded WITH its items.
+    // Saving the invoice below therefore re-writes every item from the in-memory array —
+    // which still held the original price. The item update above was being applied and
+    // then immediately overwritten, leaving an invoice whose total said 150 while its
+    // own lines still added up to 550. Zeroing it here too means the cascade writes the
+    // waiver instead of undoing it.
+    const labourInGraph = (invoice.items || []).find((it) => it.id === labour.id);
+    if (labourInGraph) {
+      labourInGraph.unitPrice = 0;
+      labourInGraph.description = waivedDescription;
+    }
 
     invoice.totalAmount = Math.max(0, Number(invoice.totalAmount) - labourAmount);
     const saved = await this.invoiceRepo.save(invoice);
@@ -4776,17 +4926,57 @@ export class BillingService {
     accountId?: string;
     /** Overrides the default "collected on-site by technician" audit text. */
     remarks?: string;
-  }): Promise<Invoice> {
+    /** Cheque details, required by the approval queue when paymentMode is CHEQUE. */
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDate?: string;
+    /** Name of the person who physically took the money, for the Accounts queue. */
+    collectedByName?: string;
+    /** SERVICE_HELP_DESK | SERVICE_TECHNICIAN — which desk took it. */
+    collectedByRole?: string;
+  }): Promise<{ invoice: Invoice; paymentRequestId: string }> {
     const amount = Number(payload.amount) || 0;
     if (amount <= 0) throw new AppError('Visit charge amount must be greater than zero', 400);
 
     const invoiceRepo = Source.getRepository(Invoice);
     const marker = `VISIT_CHARGE_ONSITE:${payload.serviceTicketId}`;
 
+    // Idempotent on the ticket: a retried call must not raise a SECOND charge, so the
+    // invoice is reused. The request is a different matter — a charge Accounts rejected is
+    // still owed, and collecting it again has to produce a new PENDING request. Returning
+    // the old rejected one would leave the desk showing "awaiting approval" against a
+    // request nobody will ever act on, and the money would never post.
+    const requestRepo = Source.getRepository(SalePaymentRequest);
     const existing = await invoiceRepo.findOne({
       where: { serviceTicketId: payload.serviceTicketId, notes: marker },
     });
-    if (existing) return existing;
+    if (existing) {
+      const live = await requestRepo.findOne({
+        where: [
+          { invoiceId: existing.id, status: 'PENDING' },
+          { invoiceId: existing.id, status: 'APPROVED' },
+        ],
+        order: { createdAt: 'DESC' },
+      });
+      if (live) return { invoice: existing, paymentRequestId: live.id };
+
+      const retry = await createSalePaymentRequest({
+        invoiceId: existing.id,
+        branchId: payload.branchId,
+        userId: payload.collectedBy,
+        amount,
+        paymentMode: payload.paymentMode || 'CASH',
+        paymentDate: new Date(),
+        cashAccountId: payload.accountId,
+        remarks: payload.remarks || `Service Visit Charge — Ticket ${payload.ticketNumber ?? ''}`,
+        paymentContext: 'SERVICE_VISIT_CHARGE',
+        chequeNumber: payload.chequeNumber,
+        chequeBankName: payload.chequeBankName,
+        chequeDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+        chequeDueDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+      });
+      return { invoice: existing, paymentRequestId: retry.id };
+    }
 
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
     const label = `Service Visit Charge — Ticket ${payload.ticketNumber || payload.serviceTicketId}`;
@@ -4816,20 +5006,28 @@ export class BillingService {
     delete (invoiceItem as { invoice?: unknown }).invoice;
     savedInvoice.items = [invoiceItem];
 
-    await this.recordPayment(
-      savedInvoice.id,
-      {
-        paymentMode: payload.paymentMode || 'CASH',
-        accountId: payload.accountId,
-        amount,
-        remarks: payload.remarks || `${label} — collected on-site by technician`,
-        bypassStatusCheck: true,
-      },
-      payload.collectedBy,
-    );
+    // The money is NOT posted here. It goes to the Accounts queue as a pending request,
+    // exactly like a sale collection, and only reaches the cashbook when Accounts approve
+    // it. Before this, whoever clicked "Collect" moved real cash on their own authority —
+    // the one control the rest of this system applies to every other collection was the
+    // only one missing from the visit charge.
+    const request = await createSalePaymentRequest({
+      invoiceId: savedInvoice.id,
+      branchId: payload.branchId,
+      userId: payload.collectedBy,
+      amount,
+      paymentMode: payload.paymentMode || 'CASH',
+      paymentDate: new Date(),
+      cashAccountId: payload.accountId,
+      remarks: payload.remarks || label,
+      paymentContext: 'SERVICE_VISIT_CHARGE',
+      chequeNumber: payload.chequeNumber,
+      chequeBankName: payload.chequeBankName,
+      chequeDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+      chequeDueDate: payload.chequeDate ? new Date(payload.chequeDate) : undefined,
+    });
 
-    const withPayment = await this.invoiceRepo.findById(savedInvoice.id);
-    return withPayment || savedInvoice;
+    return { invoice: savedInvoice, paymentRequestId: request.id };
   }
 
   /**

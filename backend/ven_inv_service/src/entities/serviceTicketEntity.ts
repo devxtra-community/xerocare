@@ -225,6 +225,53 @@ export class ServiceTicket {
   @Column({ name: 'technician_note_to_finance', type: 'text', nullable: true, default: null })
   technicianNoteToFinance!: string | null;
 
+  /**
+   * Where the visit charge has got to.
+   *
+   *   NONE             nobody has taken it yet — the collect action is offered
+   *   PENDING_APPROVAL someone took the money; Accounts has not signed it off
+   *   COLLECTED        Accounts approved and the money is posted
+   *   REJECTED         Accounts refused it; the charge is owed again
+   *
+   * `visitChargeCollected` stays as the single boolean every existing reader already
+   * keys off (billing reports, the diagnosis-time "already collected" guard) and is true
+   * only for COLLECTED. Money that is merely awaiting approval must not read as collected
+   * anywhere, or the charge silently disappears from what is still owed.
+   */
+  @Column({ name: 'visit_charge_status', type: 'varchar', length: 20, default: 'NONE' })
+  visitChargeStatus!: 'NONE' | 'PENDING_APPROVAL' | 'COLLECTED' | 'REJECTED';
+
+  /** The SalePaymentRequest in billing that Accounts acts on. */
+  @Column({ name: 'visit_charge_request_id', type: 'uuid', nullable: true, default: null })
+  visitChargeRequestId!: string | null;
+
+  // Who physically took the money, kept on the ticket so the desk can see it without a
+  // round trip to billing — and so a rejected charge names the person to go back to.
+  @Column({ name: 'visit_charge_collected_by', type: 'uuid', nullable: true, default: null })
+  visitChargeCollectedBy!: string | null;
+
+  @Column({
+    name: 'visit_charge_collected_by_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    default: null,
+  })
+  visitChargeCollectedByName!: string | null;
+
+  /** SERVICE_HELP_DESK or SERVICE_TECHNICIAN — which desk took it. */
+  @Column({
+    name: 'visit_charge_collected_by_role',
+    type: 'varchar',
+    length: 40,
+    nullable: true,
+    default: null,
+  })
+  visitChargeCollectedByRole!: string | null;
+
+  @Column({ name: 'visit_charge_rejection_reason', type: 'text', nullable: true, default: null })
+  visitChargeRejectionReason!: string | null;
+
   @Column({ name: 'visit_charge_collected', type: 'boolean', default: false })
   visitChargeCollected!: boolean;
 

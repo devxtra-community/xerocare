@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { syncVisitChargeDecision } from '../utils/serviceTicketSync';
 import {
   renderReceipt,
   PAGE as RECEIPT_PAGE,
@@ -2043,6 +2044,7 @@ function receiptContextLabel(request: SalePaymentRequest): string | undefined {
     LEASE_ADVANCE: 'Lease — Advance',
     LEASE_PERIODIC: 'Lease — Periodic Collection',
     LEASE_SECURITY_DEPOSIT: 'Lease — Security Deposit',
+    SERVICE_VISIT_CHARGE: 'Service — Visit Charge',
   };
   return map[ctx] ?? ctx.replace(/_/g, ' ');
 }
@@ -2578,6 +2580,23 @@ export const approveSalePayment = async (req: Request, res: Response, next: Next
       }
 
       await queryRunner.commitTransaction();
+
+      // Mirror the decision onto the service ticket so the desk stops showing "awaiting
+      // approval". After the commit on purpose: the money is posted either way, and this
+      // must never be able to roll the approval back.
+      if (request.paymentContext === 'SERVICE_VISIT_CHARGE') {
+        const inv = await Source.getRepository(Invoice).findOne({
+          where: { id: request.invoiceId },
+        });
+        if (inv?.serviceTicketId) {
+          await syncVisitChargeDecision({
+            serviceTicketId: inv.serviceTicketId,
+            status: 'COLLECTED',
+            paymentRequestId: request.id,
+          });
+        }
+      }
+
       res.json({ success: true, data: { ...request, paymentTransactionId: savedTxn.id } });
     } catch (err) {
       await queryRunner.rollbackTransaction();
@@ -2614,6 +2633,22 @@ export const rejectSalePayment = async (req: Request, res: Response, next: NextF
     request.reviewedAt = new Date();
     request.rejectionReason = rejectionReason;
     await repo.save(request);
+
+    // A rejected visit charge is still owed — the ticket returns to "collect" so the desk
+    // or the technician can take it again, rather than the charge quietly vanishing.
+    if (request.paymentContext === 'SERVICE_VISIT_CHARGE') {
+      const inv = await Source.getRepository(Invoice).findOne({
+        where: { id: request.invoiceId },
+      });
+      if (inv?.serviceTicketId) {
+        await syncVisitChargeDecision({
+          serviceTicketId: inv.serviceTicketId,
+          status: 'REJECTED',
+          paymentRequestId: request.id,
+          rejectionReason: rejectionReason ?? null,
+        });
+      }
+    }
 
     res.json({ success: true, data: request });
   } catch (err) {

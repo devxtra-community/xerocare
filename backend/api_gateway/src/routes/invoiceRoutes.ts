@@ -38,6 +38,7 @@ import {
   processReturn,
   financeApproveQuotation,
   convertToTransaction,
+  confirmServiceEstimateToAccounts,
   createDirectSale,
   createQuotationTemplate,
   getQuotationTemplates,
@@ -267,6 +268,16 @@ router.post(
   '/:id/convert-to-transaction',
   requireRole(UserRole.EMPLOYEE, UserRole.MANAGER),
   convertToTransaction,
+);
+
+/**
+ * Accounts confirms a customer-accepted service estimate into the books, raising the
+ * receivable. Finance/Admin only — it is a bookkeeping act, not a service-desk one.
+ */
+router.post(
+  '/:id/confirm-service-to-accounts',
+  requireRole(UserRole.ADMIN, UserRole.FINANCE),
+  confirmServiceEstimateToAccounts,
 );
 
 /**
