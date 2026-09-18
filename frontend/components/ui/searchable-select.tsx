@@ -88,14 +88,20 @@ export function SearchableSelect({
             className,
           )}
         >
+          {/* min-w-0 is what makes the truncate below actually bite: a flex child's
+              default min-width is auto, so it refuses to shrink under its content and
+              instead pushes its container wider — which is how one long option could
+              stretch a fixed-width dialog and spill its buttons off the edge. */}
           {selectedOption ? (
-            <div className="flex flex-col items-start truncate overflow-hidden">
-              <span className="font-bold truncate text-sm text-slate-700">
+            <div className="flex min-w-0 flex-col items-start overflow-hidden">
+              <span className="w-full truncate text-left font-bold text-sm text-slate-700">
                 {selectedOption.label}
               </span>
             </div>
           ) : (
-            <span className="text-muted-foreground font-normal text-sm">{placeholder}</span>
+            <span className="min-w-0 truncate text-muted-foreground font-normal text-sm">
+              {placeholder}
+            </span>
           )}
           {loading ? (
             <Loader2 className="ml-2 h-4 w-4 shrink-0 opacity-50 animate-spin" />

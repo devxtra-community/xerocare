@@ -431,6 +431,75 @@ export const submitExpenseRequest = async (req: Request, res: Response, next: Ne
   }
 };
 
+/**
+ * Put back cash that was deducted for an approval whose cross-service half then failed.
+ *
+ * The cash movement commits before the purchase/tax service is called, so a failure there
+ * leaves real money gone with nothing on the other side: the cashbook says the vendor was
+ * paid, their ledger says they were not, and the difference is simply missing. Logging it
+ * and moving on — the previous behaviour — meant nobody found out until the accounts were
+ * reconciled by hand, if ever.
+ *
+ * The reversal is written as its own cashbook RECEIPT rather than by deleting the payment
+ * row, so the attempt and its undo both stay on the record. The request goes back to
+ * SUBMITTED so Finance can see it still needs dealing with.
+ */
+async function reverseFailedApprovalCash(
+  request: EmployeeExpenseRequest,
+  userId: string,
+  reason: string,
+): Promise<boolean> {
+  try {
+    const accountId = request.paidFromAccount || request.paidFromAccountId;
+    if (!accountId) return false;
+    const cbYear = new Date().getFullYear();
+    const cbCount = await Source.getRepository(CashbookEntry)
+      .createQueryBuilder('c')
+      .where(`EXTRACT(YEAR FROM c."createdAt") = :year`, { year: cbYear })
+      .getCount();
+    const refNo = `CBK-${cbYear}-${String(cbCount + 1).padStart(5, '0')}`;
+
+    await Source.transaction(async (manager) => {
+      const account = await manager.findOne(CashBankAccount, { where: { id: accountId } });
+      if (!account) throw new Error(`Account ${accountId} not found for reversal`);
+      account.currentBalance = Number(account.currentBalance) + Number(request.amount);
+      await manager.save(CashBankAccount, account);
+
+      await manager.save(
+        manager.create(CashbookEntry, {
+          referenceNo: refNo,
+          date: new Date(),
+          accountId,
+          entryType: 'RECEIPT',
+          amount: request.amount,
+          category: 'Reversal',
+          description: `Reversed: ${request.requestNo} could not be recorded against the purchase — ${reason}`,
+          paymentMode: request.paymentMode || 'Cash',
+          createdBy: userId,
+          branchId: request.branchId,
+        }),
+      );
+
+      request.status = 'SUBMITTED';
+      request.paidAt = undefined;
+      request.notes =
+        `${request.notes ? request.notes + ' ' : ''}[auto-reversed ${new Date().toISOString().slice(0, 10)}: approval could not be completed — ${reason}]`.slice(
+          0,
+          1000,
+        );
+      await manager.save(EmployeeExpenseRequest, request);
+    });
+    logger.warn(`[approveExpenseRequest] Reversed cash for ${request.requestNo}: ${reason}`);
+    return true;
+  } catch (err) {
+    logger.error(
+      `[approveExpenseRequest] CASH REVERSAL FAILED for ${request.requestNo} — manual correction required`,
+      err,
+    );
+    return false;
+  }
+}
+
 export const approveExpenseRequest = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, role, branchId, financeJob } = req.user!;
@@ -506,6 +575,48 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
           throw new AppError('No payment account stored on this request', 400);
         }
 
+        // Pre-flight the vendor payment against what is actually still owed, BEFORE any
+        // cash moves.
+        //
+        // The cash deduction below commits, and only then is record-payment called. If
+        // that call is rejected the money is already gone: the cashbook says the vendor
+        // was paid, the vendor's own ledger says they were not, and the difference simply
+        // disappears. Checking here turns that into an ordinary refusal with nothing
+        // written.
+        //
+        // It cannot be checked only at submission time either — two half-payments can sit
+        // in the queue together, each valid on its own, and approving both would overpay.
+        // This reads the live remaining at the moment of approval.
+        if (request.purchaseId && !request.purchaseCostType && !request.taxRecordId) {
+          const venInvUrlCheck = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+          const checkRes = await fetch(`${venInvUrlCheck}/purchases/${request.purchaseId}`, {
+            headers: { Authorization: `Bearer ${makeServiceToken()}` },
+          });
+          if (!checkRes.ok) {
+            throw new AppError(
+              'Could not confirm the vendor balance for this purchase. The approval was stopped so no money moves against a figure that could not be verified.',
+              502,
+            );
+          }
+          const checkJson = (await checkRes.json()) as {
+            data?: { vendorPayableAmount?: number; purchaseAmount?: number; paidAmount?: number };
+          };
+          const pr = checkJson?.data ?? {};
+          const payable = Number(pr.vendorPayableAmount ?? pr.purchaseAmount ?? 0);
+          const alreadyPaid = Number(pr.paidAmount ?? 0);
+          const stillOwed = payable - alreadyPaid;
+          if (Number(request.amount) > stillOwed + 0.01) {
+            throw new AppError(
+              `This request is for ${Number(request.amount).toFixed(2)} but only ${stillOwed.toFixed(2)} is still owed to the vendor` +
+                (Number(pr.purchaseAmount ?? 0) > payable
+                  ? `. The invoice totals ${Number(pr.purchaseAmount).toFixed(2)}, of which ${(Number(pr.purchaseAmount) - payable).toFixed(2)} is input VAT settled from Accounts → Tax Report rather than paid to the vendor.`
+                  : '.') +
+                ' Reject this request and raise a new one for the correct amount.',
+              400,
+            );
+          }
+        }
+
         // Generate cashbook ref BEFORE transaction (pool max=1)
         const cbYear = new Date().getFullYear();
         const cbCount = await Source.getRepository(CashbookEntry)
@@ -540,10 +651,16 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
             accountId,
             entryType: 'PAYMENT',
             amount: request.amount,
-            category: request.purchaseCostType ? 'Purchase Additional Cost' : 'Vendor Purchase',
-            description: request.purchaseCostType
-              ? `${request.purchaseCostType} cost: ${request.purchaseRef || request.requestNo} (${request.vendorName || 'vendor'} lot)`
-              : `Vendor payment: ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
+            category: request.taxRecordId
+              ? 'Tax Payment'
+              : request.purchaseCostType
+                ? 'Purchase Additional Cost'
+                : 'Vendor Purchase',
+            description: request.taxRecordId
+              ? `${request.taxType === 'REVERSE_CHARGE_VAT' ? 'Reverse-charge VAT' : 'Input VAT'} settlement: ${request.purchaseRef || request.requestNo}`
+              : request.purchaseCostType
+                ? `${request.purchaseCostType} cost: ${request.purchaseRef || request.requestNo} (${request.vendorName || 'vendor'} lot)`
+                : `Vendor payment: ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
             paymentMode: request.paymentMode || 'Cash',
             notes: notes || request.notes,
             createdBy: userId,
@@ -558,40 +675,60 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
         // must not roll back over a cross-service call; a failure here is logged and
         // leaves the purchase's own ledger correctable via ven_inv_service directly,
         // rather than silently under-recording what Finance just paid.
-        if (request.purchaseId) {
+        // A tax settlement carries taxRecordId, not purchaseId — gating on purchaseId
+        // alone silently skipped the settlement call entirely, so cash left the account
+        // while the tax stayed PENDING.
+        if (request.purchaseId || request.taxRecordId) {
           try {
             const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
             const serviceToken = makeServiceToken();
             // An additional cost is money paid to a third party, so it is recorded as a
             // cost line on the lot and must NOT reduce what the vendor is still owed.
             // Only a genuine vendor payment settles the vendor's invoice.
-            const isCostPayment = !!request.purchaseCostType;
-            const endpoint = isCostPayment
-              ? `${venInvUrl}/purchases/internal/record-cost`
-              : `${venInvUrl}/purchases/internal/record-payment`;
-            const payload = isCostPayment
+            // Three distinct outcomes, and mixing them up moves real money to the wrong
+            // place. A tax settlement must NOT touch the vendor's outstanding: the VAT is
+            // already inside their invoice, and paying it down again would settle one
+            // liability twice.
+            const isTaxPayment = !!request.taxRecordId;
+            const isCostPayment = !isTaxPayment && !!request.purchaseCostType;
+            const endpoint = isTaxPayment
+              ? `${venInvUrl}/purchases/internal/record-tax-settlement`
+              : isCostPayment
+                ? `${venInvUrl}/purchases/internal/record-cost`
+                : `${venInvUrl}/purchases/internal/record-payment`;
+            const payload = isTaxPayment
               ? {
-                  purchaseId: request.purchaseId,
+                  purchaseId: request.taxRecordId,
                   branchId: request.branchId,
                   amount: Number(request.amount),
-                  costType: request.purchaseCostType,
-                  description:
-                    request.description ||
-                    `${request.purchaseCostType} — ${request.purchaseRef || request.requestNo}`,
-                  costDate: new Date().toISOString().split('T')[0],
-                  createdBy: userId,
-                  attachmentUrl: request.receiptUrl,
+                  taxType: request.taxType,
+                  settledOn: new Date().toISOString().split('T')[0],
+                  reference: request.requestNo,
+                  settledBy: userId,
                 }
-              : {
-                  purchaseId: request.purchaseId,
-                  branchId: request.branchId,
-                  amount: Number(request.amount),
-                  paymentMethod: request.paymentMode,
-                  description: `Vendor payment — ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
-                  paymentDate: new Date().toISOString().split('T')[0],
-                  createdBy: userId,
-                  attachmentUrl: request.receiptUrl,
-                };
+              : isCostPayment
+                ? {
+                    purchaseId: request.purchaseId,
+                    branchId: request.branchId,
+                    amount: Number(request.amount),
+                    costType: request.purchaseCostType,
+                    description:
+                      request.description ||
+                      `${request.purchaseCostType} — ${request.purchaseRef || request.requestNo}`,
+                    costDate: new Date().toISOString().split('T')[0],
+                    createdBy: userId,
+                    attachmentUrl: request.receiptUrl,
+                  }
+                : {
+                    purchaseId: request.purchaseId,
+                    branchId: request.branchId,
+                    amount: Number(request.amount),
+                    paymentMethod: request.paymentMode,
+                    description: `Vendor payment — ${request.vendorName || 'vendor'} (${request.purchaseRef || request.requestNo})`,
+                    paymentDate: new Date().toISOString().split('T')[0],
+                    createdBy: userId,
+                    attachmentUrl: request.receiptUrl,
+                  };
             const venInvRes = await fetch(endpoint, {
               method: 'POST',
               headers: {
@@ -605,16 +742,21 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
               const venInvData = await venInvRes.json();
               // Only a vendor payment yields a PurchasePayment; a cost yields a cost
               // line, which has no bearing on what the vendor is owed.
-              if (!isCostPayment) {
+              // Only a vendor payment yields a PurchasePayment. A cost yields a cost
+              // line and a tax settlement yields neither — recording either as a vendor
+              // payment id would misreport what the vendor was paid.
+              if (!isCostPayment && !isTaxPayment) {
                 request.purchasePaymentId = venInvData.data?.id;
                 await Source.getRepository(EmployeeExpenseRequest).save(request);
               }
             } else {
               const errText = await venInvRes.text();
               logger.error(
-                isCostPayment
-                  ? '[approveExpenseRequest] Failed to record purchase cost after approval — cash was deducted but the cost was not added to the lot'
-                  : '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
+                isTaxPayment
+                  ? '[approveExpenseRequest] Failed to settle the tax after approval — cash was deducted but the tax record still shows outstanding'
+                  : isCostPayment
+                    ? '[approveExpenseRequest] Failed to record purchase cost after approval — cash was deducted but the cost was not added to the lot'
+                    : '[approveExpenseRequest] Failed to record PurchasePayment after approval — cash was deducted but the purchase Outstanding was not reduced',
                 {
                   requestId: request.id,
                   purchaseId: request.purchaseId,
@@ -622,6 +764,12 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
                   status: venInvRes.status,
                   errText,
                 },
+              );
+              // Money already left. Put it back rather than leave it unaccounted for.
+              await reverseFailedApprovalCash(
+                request,
+                userId,
+                `the inventory service rejected it (${venInvRes.status})`,
               );
             }
           } catch (err) {
@@ -634,14 +782,21 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
                 err,
               },
             );
+            await reverseFailedApprovalCash(
+              request,
+              userId,
+              'the inventory service was unreachable',
+            );
           }
         }
       }
 
       // Notify the Manager
-      const payeeLabel = request.purchaseCostType
-        ? `${request.purchaseCostType} cost on ${request.purchaseRef || 'the purchase'}`
-        : `payment to ${request.vendorName || 'vendor'}`;
+      const payeeLabel = request.taxRecordId
+        ? `${request.taxType === 'REVERSE_CHARGE_VAT' ? 'reverse-charge VAT' : 'input VAT'} settlement on ${request.purchaseRef || 'the purchase'}`
+        : request.purchaseCostType
+          ? `${request.purchaseCostType} cost on ${request.purchaseRef || 'the purchase'}`
+          : `payment to ${request.vendorName || 'vendor'}`;
       await sendNotification(
         request.employeeId,
         request.purchaseCostType ? 'Purchase Cost Approved ✅' : 'Purchase Payment Approved ✅',
@@ -881,6 +1036,155 @@ export const rejectExpenseRequest = async (req: Request, res: Response, next: Ne
 // Called directly by the Manager's AddPaymentModal (JWT-authenticated).
 // Records the PurchasePayment in ven_inv immediately (outstanding reduces) but
 // holds the cash movement until Finance approves.
+
+/**
+ * Proceed a tax record: raise a payment-approval request against it.
+ *
+ * Deliberately built on the same EmployeeExpenseRequest queue the Payments tab already
+ * reads, rather than a parallel approval system — Finance approves tax the same way they
+ * approve everything else, and the audit trail is the one they already know.
+ *
+ * What it must never do is create the payment itself. Nothing is settled, no cash moves
+ * and no ledger entry is written here; approval is what does that. A request sitting in
+ * the queue leaves the tax exactly as outstanding as it was.
+ */
+export const createTaxPaymentRequest = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId, branchId, role } = req.user!;
+    const {
+      taxRecordId,
+      taxType,
+      amount,
+      paymentMethod,
+      paidFromAccountId,
+      taxPeriodFrom,
+      taxPeriodTo,
+      vendorName,
+      purchaseRef,
+      description,
+      paymentDate,
+      currency,
+    } = req.body;
+
+    if (!taxRecordId || !taxType) throw new AppError('taxRecordId and taxType are required', 400);
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new AppError('Enter the tax amount being settled', 400);
+    }
+    if (!paymentMethod) throw new AppError('Select a payment method', 400);
+
+    const repo = Source.getRepository(EmployeeExpenseRequest);
+
+    // Idempotency. A second Proceed on the same tax record must not raise a second
+    // request — two approvals would settle one liability twice and double the cash out.
+    // A REJECTED request is not a blocker: the spec allows re-proceeding after one.
+    const existing = await repo.findOne({
+      where: { taxRecordId: String(taxRecordId) },
+      order: { createdAt: 'DESC' },
+    });
+    if (existing && existing.status !== 'REJECTED') {
+      return res.status(200).json({
+        success: true,
+        alreadyExists: true,
+        data: existing,
+        message: `This tax already has a ${existing.status} payment request (${existing.requestNo}).`,
+      });
+    }
+
+    // Confirm the tax is real and still unsettled, read from the owning service rather
+    // than trusted from the client — the amount decides how much cash leaves on approval.
+    const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
+    const serviceToken = makeServiceToken();
+    const purchaseRes = await fetch(`${venInvUrl}/purchases/${taxRecordId}`, {
+      headers: { Authorization: `Bearer ${serviceToken}`, 'x-internal-service': 'billing' },
+    });
+    if (!purchaseRes.ok) throw new AppError('Tax record not found', 404);
+    const purchaseBody = await purchaseRes.json();
+    const purchase = (purchaseBody?.data ?? purchaseBody) as {
+      taxStatus?: string;
+      inputVatAmount?: number | string | null;
+      reverseChargeVatAmount?: number | string | null;
+      currencyCode?: string | null;
+      branchId?: string;
+    };
+
+    if (purchase.taxStatus === 'RECORDED' || purchase.taxStatus === 'FILED') {
+      throw new AppError('This tax has already been settled', 400);
+    }
+
+    const onRecord = Number(
+      taxType === 'REVERSE_CHARGE_VAT'
+        ? (purchase.reverseChargeVatAmount ?? 0)
+        : (purchase.inputVatAmount ?? 0),
+    );
+    if (!(onRecord > 0)) throw new AppError('This record carries no tax to settle', 400);
+    // Guard against a tampered or stale amount: settle what the record says, not what the
+    // form claimed. A tolerance covers the display rounding only.
+    if (Math.abs(onRecord - value) > 0.011) {
+      throw new AppError(
+        `Tax amount does not match the record (${onRecord.toFixed(2)}). Reload and try again.`,
+        400,
+      );
+    }
+
+    const empInfo = await fetchEmployeeInfo(userId);
+    const empBranchId = purchase.branchId || empInfo?.branchId || branchId || '';
+
+    // Same pre-flight the vendor path uses — fail before queuing rather than at approval.
+    if (String(paymentMethod).trim().toUpperCase() !== 'CHEQUE') {
+      await requireCashAccount(Source, {
+        branchId: empBranchId,
+        paymentMode: paymentMethod,
+        explicitAccountId: paidFromAccountId,
+        amountToDeduct: onRecord,
+      });
+    }
+
+    const requestNo = await generateRequestNo();
+    const label = taxType === 'REVERSE_CHARGE_VAT' ? 'Reverse-charge VAT' : 'Input VAT';
+
+    const request = repo.create({
+      requestNo,
+      employeeId: userId,
+      employeeName: empInfo?.name || 'Accounts',
+      employeeRole: role,
+      branchId: empBranchId,
+      branchName: empInfo?.branchName || 'Unknown Branch',
+      date: paymentDate ? new Date(paymentDate) : new Date(),
+      category: 'Tax Payment',
+      subCategory: `${label} · ${paymentMethod}`,
+      description:
+        description ||
+        `${label} settlement — ${purchaseRef || 'purchase'} (${vendorName || 'vendor'})`,
+      amount: onRecord,
+      currency: currency || purchase.currencyCode || 'AED',
+      status: 'SUBMITTED',
+      submittedAt: new Date(),
+      requestSource: 'MANAGER_PURCHASE',
+      taxRecordId: String(taxRecordId),
+      taxType: String(taxType),
+      taxPeriodFrom: taxPeriodFrom ? new Date(taxPeriodFrom) : undefined,
+      taxPeriodTo: taxPeriodTo ? new Date(taxPeriodTo) : undefined,
+      purchaseRef: purchaseRef || undefined,
+      vendorName: vendorName || undefined,
+      paymentMode: paymentMethod,
+      paidFromAccountId: paidFromAccountId || undefined,
+      notes:
+        'Tax settlement. No cash has moved and the tax is still outstanding — both change only when Finance approves this request.',
+    });
+
+    const saved = await repo.save(request);
+    logger.info('[TaxPayment] Request raised', {
+      requestNo,
+      taxRecordId,
+      taxType,
+      amount: onRecord,
+    });
+    return res.status(201).json({ success: true, data: saved });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const createManagerPurchasePaymentRequest = async (
   req: Request,

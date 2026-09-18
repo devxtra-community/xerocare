@@ -5,7 +5,6 @@
  */
 
 import { DataSource } from 'typeorm';
-import { calculateDepreciation } from './depreciation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -224,7 +223,7 @@ function aggByCurrency(
 
 // ─── Internal service fetch ───────────────────────────────────────────────────
 
-async function internalGet<T>(url: string): Promise<T | null> {
+export async function internalGet<T>(url: string): Promise<T | null> {
   try {
     const { sign } = await import('jsonwebtoken');
     const token = sign(
@@ -258,6 +257,9 @@ export interface VatCreditBreakdown {
   // VAT the vendor charged us on a domestic purchase — part of that vendor's
   // invoice, so it belongs in Accounts Payable until we pay it off.
   domesticInputVat: number;
+  /** The slice of domesticInputVat not yet settled through the tax-payment workflow.
+   *  Only this part still has a matching liability on the Balance Sheet. */
+  unsettledDomesticInputVat: number;
   // VAT we self-assess on an import — raises an output-VAT liability of the
   // same size as the input credit claimed for it, netting to zero.
   reverseChargeVatSelfAssessed: number;
@@ -278,12 +280,14 @@ export async function getVatCreditBreakdown(
     currencyGroups: {
       currencyCode: string;
       inputVatAmount: number;
+      unsettledInputVat?: number;
       reverseChargeVatAmount: number;
     }[];
   }>(`${invUrl}/purchases/internal/cost-report${branchQs}`);
 
   let inputVatReclaimable = 0;
   let domesticInputVat = 0;
+  let unsettledDomesticInputVat = 0;
   let reverseChargeVatSelfAssessed = 0;
   const currencyWarnings: string[] = [];
   let dataWarning: string | null = null;
@@ -305,6 +309,14 @@ export async function getVatCreditBreakdown(
       } else {
         inputVatReclaimable += ivResult.value;
         domesticInputVat += ivResult.value;
+        // Unsettled portion, converted on the same rate as the total it came from.
+        const unsettled = convertAmt(
+          grp.unsettledInputVat ?? grp.inputVatAmount,
+          grp.currencyCode,
+          baseCurrency,
+          rates,
+        );
+        if (!unsettled.warning) unsettledDomesticInputVat += unsettled.value;
       }
       if (rcResult.warning) {
         if (!currencyWarnings.includes(rcResult.warning)) currencyWarnings.push(rcResult.warning);
@@ -317,6 +329,7 @@ export async function getVatCreditBreakdown(
 
   return {
     domesticInputVat,
+    unsettledDomesticInputVat,
     reverseChargeVatSelfAssessed,
     inputVatReclaimable,
     dataWarning,
@@ -650,8 +663,21 @@ export async function computeProfitAndLoss(
         ${bSqlAllDep}
     `),
     // Credit note adjustments against sales revenue, for the period.
-    //  - CREDIT_EXCHANGE (PRODUCT_REPLACED): net replacementAmount - productAmount
-    //    (positive = upsell, negative = downgrade/return).
+    //  - CREDIT_EXCHANGE (PRODUCT_REPLACED): replacementAmount - productAmount, LESS any
+    //    replacementDiscount given on the swap.
+    //
+    //    The discount has to come off here. Revenue moved by the full
+    //    replacement - original spread while the receivable raised against the customer
+    //    was net of the discount, so a discounted exchange recognised revenue nobody
+    //    would ever pay — 500 of revenue against a 300 receivable left 200 unaccounted
+    //    for anywhere, and the Balance Sheet out by exactly that much.
+    //
+    //    Netting it off — rather than posting it to a contra-revenue account — is the
+    //    convention this system already uses for every other sales discount: an invoice
+    //    line's discountAmount never gets its own posting either, it simply reduces
+    //    totalAmount, and salesRevenue above is computed from totalAmount. There is no
+    //    discount account in the chart of accounts to post to, and inventing one would
+    //    make exchange discounts the only discounts in the business reported separately.
     //  - DIRECT_REFUND (COMPLETED): reverse the sale entirely. This used to be missing,
     //    so a refunded sale kept its revenue forever: approving the refund raised a
     //    payable to the customer and pulled the unit out of inventory, but profit never
@@ -665,6 +691,7 @@ export async function computeProfitAndLoss(
         CASE
           WHEN cn.type = 'CREDIT_EXCHANGE' AND cn.status = 'PRODUCT_REPLACED'
             THEN COALESCE(cn."replacementAmount", 0) - cn."productAmount"
+                 - COALESCE(cn."replacementDiscount", 0)
           WHEN cn.type = 'DIRECT_REFUND' AND cn.status = 'COMPLETED'
             THEN -cn."productAmount"
           ELSE 0
@@ -1316,14 +1343,38 @@ export async function computeBalanceSheet(
         ${bSql('i')}
       GROUP BY i."currency_code"
     `),
-    // 1003 Manual AR — non-security-deposit, without linked invoice
+    // 1003 Manual AR — non-security-deposit receivables not already represented by an
+    // invoice.
+    //
+    // The exclusion exists to stop double counting: if a manual receivable mirrors an
+    // invoice that Invoice AR above already sums, counting both books the same money
+    // twice. But the test used to be "linkedInvoiceId IS NOT NULL", which assumes any
+    // value in that column is a real invoice carrying the balance. A Credit Exchange
+    // wrote the CREDIT NOTE's id there — not an invoice at all — so the difference the
+    // customer owed was skipped by Invoice AR (no such invoice) AND by Manual AR (column
+    // not null), and disappeared from the Balance Sheet while still listed on the
+    // Receivables page.
+    //
+    // So test the thing the exclusion actually cares about: does an invoice exist that
+    // this receivable is represented by? A dangling id — a credit note, a deleted
+    // invoice, one excluded from AR — means nothing else is carrying this balance, so it
+    // belongs here. That also self-heals rows written before this fix, without weakening
+    // the genuine double-count guard.
     db.query<{ amount: string }[]>(`
-      SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
-      FROM manual_receivables
-      WHERE status IN ('PENDING', 'PARTIAL', 'OVERDUE')
-        AND type != 'SECURITY_DEPOSIT'
-        AND "linkedInvoiceId" IS NULL
-        ${bSql('manual_receivables')}
+      SELECT COALESCE(SUM(COALESCE(mr.outstanding, mr.amount - COALESCE(mr."amountPaid", 0))), 0) AS amount
+      FROM manual_receivables mr
+      WHERE mr.status IN ('PENDING', 'PARTIAL', 'OVERDUE')
+        AND mr.type != 'SECURITY_DEPOSIT'
+        AND (
+          mr."linkedInvoiceId" IS NULL
+          OR NOT EXISTS (
+            SELECT 1 FROM invoices inv
+            WHERE inv.id = mr."linkedInvoiceId"
+              AND inv."deletedAt" IS NULL
+              AND inv.status NOT IN ('DRAFT','CANCELLED','EXPIRED','RETAKEN','SUPERSEDED')
+          )
+        )
+        ${bSql('mr')}
     `),
     // 1004 Security Deposits Receivable (paid TO others, held as asset)
     db.query<{ amount: string }[]>(`
@@ -1343,14 +1394,18 @@ export async function computeBalanceSheet(
         method: string;
         purchase_date: string;
         gross_cost: string;
+        posted_accumulated: string;
       }[]
     >(`
-      SELECT "purchasePrice" AS purchase_price, "salvageValue" AS salvage_value,
-             "usefulLifeMonths" AS useful_life_months, "annualDepreciationPct" AS annual_depreciation_pct,
-             method, "purchaseDate" AS purchase_date,
-             "purchasePrice" AS gross_cost
-      FROM asset_depreciation_register
-      WHERE status != 'DISPOSED' ${bSql('asset_depreciation_register')}
+      SELECT a."purchasePrice" AS purchase_price, a."salvageValue" AS salvage_value,
+             a."usefulLifeMonths" AS useful_life_months, a."annualDepreciationPct" AS annual_depreciation_pct,
+             a.method, a."purchaseDate" AS purchase_date,
+             a."purchasePrice" AS gross_cost,
+             COALESCE((
+               SELECT SUM(l.amount) FROM depreciation_journal_lines l WHERE l."assetId" = a.id
+             ), 0) AS posted_accumulated
+      FROM asset_depreciation_register a
+      WHERE a.status != 'DISPOSED' ${bSql('a')}
     `),
     // 2001 Accounts Payable — outstanding manual payables
     // Use COALESCE(outstanding, amount - amountPaid) so that records created without
@@ -1360,7 +1415,11 @@ export async function computeBalanceSheet(
     db.query<{ amount: string }[]>(`
       SELECT COALESCE(SUM(COALESCE(outstanding, amount - COALESCE("amountPaid", 0))), 0) AS amount
       FROM manual_payables
-      WHERE status NOT IN ('PAID')
+      -- WRITTEN_OFF excluded for the same reason it always has been on the receivable
+      -- side: a written-off balance is not owed. It matters because rejecting a Credit
+      -- Note settlement writes the row off, and a rejected refund must stop counting as a
+      -- liability at the same moment it leaves the Payables table.
+      WHERE status NOT IN ('PAID', 'WRITTEN_OFF')
         AND "linkedPurchaseId" IS NULL
         ${bSql('manual_payables')}
     `),
@@ -1521,19 +1580,31 @@ export async function computeBalanceSheet(
   let equipmentGrossCost = 0,
     accumulatedDepreciation = 0,
     equipmentNBV = 0;
+  // Accumulated depreciation is whatever has actually been POSTED, not a formula on
+  // elapsed time.
+  //
+  // This is the fix for a genuine double count. The asset side used to re-derive
+  // depreciation from the purchase date every time the Balance Sheet was opened, so it
+  // wrote assets down whether or not a journal had ever been posted — while the P&L and
+  // retained earnings only ever counted posted journals. The two sides were measuring the
+  // same thing independently and could not agree: with nothing posted, assets fell and
+  // equity did not; and posting a period then took equity down again by a charge the
+  // asset side had already applied, so every close pushed
+  // Assets = Liabilities + Equity further apart by exactly that month's depreciation.
+  //
+  // Reading the posted lines makes one posting move both sides by one figure: expense
+  // (equity down) and accumulated depreciation (assets down). An asset with no journals
+  // posted against it correctly stands at cost — depreciation is recognised when the
+  // period is closed, which is what the Post Depreciation action is for.
   for (const a of equipAssets) {
     const gross = Number(a.gross_cost);
+    const posted = Number(a.posted_accumulated ?? 0);
+    // Never write an asset below salvage even if its journals were mis-posted.
+    const depreciable = Math.max(0, gross - Number(a.salvage_value));
+    const accumulated = Math.min(posted, depreciable);
     equipmentGrossCost += gross;
-    const dep = calculateDepreciation({
-      purchasePrice: Number(a.purchase_price),
-      salvageValue: Number(a.salvage_value),
-      usefulLifeMonths: Number(a.useful_life_months),
-      annualDepreciationPct: Number(a.annual_depreciation_pct),
-      method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-      purchaseDate: new Date(a.purchase_date),
-    });
-    accumulatedDepreciation += dep.accumulated;
-    equipmentNBV += dep.nbv;
+    accumulatedDepreciation += accumulated;
+    equipmentNBV += gross - accumulated;
   }
 
   // ── Inventory value (1006/1009) — cross-service ──────────────────────────────
@@ -1646,7 +1717,6 @@ export async function computeBalanceSheet(
   //    owe that vendor and belongs in Accounts Payable.
   //  - reverseChargeVatSelfAssessed is VAT we charge ourselves on an import; it must
   //    raise an output-VAT liability as well as the input credit, netting to zero.
-  const domesticInputVat = vatCredit.domesticInputVat;
   const reverseChargeVatSelfAssessed = vatCredit.reverseChargeVatSelfAssessed;
   if (vatCredit.dataWarning) dataWarnings.push(vatCredit.dataWarning);
   for (const w of vatCredit.currencyWarnings) {
@@ -1664,9 +1734,14 @@ export async function computeBalanceSheet(
   // position), not that anything is broken — the headline and the drill-down must agree,
   // and the drill-down was the one telling the truth.
   // The vendor's own VAT charge is part of their invoice — we hold a reclaimable asset
-  // for it, and we owe the vendor the same amount. Booking only the credit left an asset
-  // with no matching liability.
-  accountsPayable += domesticInputVat;
+  // for it, and we owe the same amount until it is settled. Booking only the credit left
+  // an asset with no matching liability.
+  //
+  // Only the UNSETTLED portion still has that liability. Once the tax-payment workflow
+  // has actually settled a tax, the obligation is discharged and leaving it here would
+  // report a payable that no longer exists — the reclaimable credit itself is unchanged
+  // either way, which is why inputVatReclaimable above still uses the full figure.
+  accountsPayable += vatCredit.unsettledDomesticInputVat;
 
   // Cheques Payable — ISSUED cheques not yet cleared. Mirrors "1011 Cheques in Hand"
   // above for the opposite direction: issuing a vendor cheque (Manager/Employee
@@ -1704,9 +1779,38 @@ export async function computeBalanceSheet(
   `);
   const creditNoteVatReversed = Number(creditNoteVatRows[0]?.amount ?? 0);
 
+  // Output VAT on a Credit Exchange difference.
+  //
+  // An exchange changes the consideration: swapping a 2,000 machine for a 2,500 one is
+  // another 500 of taxable supply, and swapping the other way relieves 500 of it. VAT
+  // follows in both directions, at the rate the originating invoice was written at — so
+  // an exchange on a VAT-exempt customer's invoice correctly yields zero, because that
+  // invoice carried a zero rate for the credit note to inherit.
+  //
+  // Nothing declared this before: the customer was billed the bare difference with no
+  // tax, and the authority was never told about the extra supply. Signed deliberately —
+  // a downgrade is negative and must REDUCE what is owed, exactly as the upgrade
+  // increases it.
+  //
+  // The base is net of replacementDiscount, matching both the revenue line above and the
+  // receivable actually raised, because VAT is due on the consideration actually charged
+  // (the same rule billingService applies to a discounted invoice line).
+  const exchangeVatRows = await db.query<{ amount: string }[]>(`
+    SELECT COALESCE(SUM(
+      (COALESCE(cn."replacementAmount", 0) - cn."productAmount" - COALESCE(cn."replacementDiscount", 0))
+      * COALESCE(cn.tax_percent, 0) / 100
+    ), 0) AS amount
+    FROM credit_notes cn
+    WHERE cn.type = 'CREDIT_EXCHANGE'
+      AND cn.status = 'PRODUCT_REPLACED'
+      ${bSql('cn')}
+  `);
+  const creditExchangeVatCharged = Number(exchangeVatRows[0]?.amount ?? 0);
+
   const vatPayable =
     vatCollected +
-    reverseChargeVatSelfAssessed -
+    reverseChargeVatSelfAssessed +
+    creditExchangeVatCharged -
     inputVatReclaimable -
     vatRemitted -
     creditNoteVatReversed;

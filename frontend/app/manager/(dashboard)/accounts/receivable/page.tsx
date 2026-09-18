@@ -13,6 +13,8 @@ import * as XLSX from 'xlsx';
 import { InvoiceDetailsDialog } from '@/components/invoice/InvoiceDetailsDialog';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import { toast } from 'sonner';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 
 const AGING_COLORS: Record<string, string> = {
   Current: 'bg-emerald-100 text-emerald-700',
@@ -83,6 +85,9 @@ export default function ManagerReceivablePage() {
       ),
     [all, search],
   );
+
+  // Six rows a page; resetKey returns to page 1 when the search changes.
+  const receivablePaging = useTablePagination(filtered, search);
 
   const totalOutstanding = all.reduce((s, r) => s + (r.outstanding ?? 0), 0);
   const overdue = all
@@ -206,7 +211,7 @@ export default function ManagerReceivablePage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
+                receivablePaging.pageRows.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">
                       {r.isInvoice ? (
@@ -258,6 +263,15 @@ export default function ManagerReceivablePage() {
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <Pagination
+            page={receivablePaging.page}
+            totalPages={receivablePaging.totalPages}
+            total={receivablePaging.total}
+            limit={receivablePaging.pageSize}
+            onPageChange={receivablePaging.setPage}
+          />
+        )}
       </div>
       {viewingInvoice && (
         <InvoiceDetailsDialog

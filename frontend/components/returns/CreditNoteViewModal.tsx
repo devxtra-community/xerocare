@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import CreditNoteDocumentBody from './CreditNoteDocumentBody';
 import { Button } from '@/components/ui/button';
 import {
   FileText,
@@ -23,6 +25,7 @@ import {
   Wrench,
   Hash,
   Percent,
+  Printer,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/format';
@@ -96,6 +99,9 @@ function InfoRow({
 
 export default function CreditNoteViewModal({ record, open, onClose }: Props) {
   const currency = useBranchCurrency();
+  // The printable document is a separate view of the same record: the summary below is
+  // for staff, the document is what the customer receives.
+  const [showDocument, setShowDocument] = useState(false);
   if (!record) return null;
 
   const status = STATUS_CONFIG[record.status] ?? {
@@ -124,329 +130,367 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
         className="p-0 overflow-hidden rounded-2xl border-0 shadow-2xl sm:max-w-none"
-        style={{ maxWidth: 580, width: '95vw' }}
+        style={{ maxWidth: showDocument ? 900 : 580, width: '95vw' }}
       >
         <DialogTitle className="sr-only">Credit Note Details</DialogTitle>
 
-        {/* ── Header ── */}
-        <div
-          className="relative px-6 pt-5 pb-4"
-          style={{ background: 'linear-gradient(135deg,#f0f4ff 0%,#e8edff 100%)' }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
-                <RotateCcw className="h-4.5 w-4.5 text-white" />
+        {showDocument ? (
+          <div className="flex max-h-[90vh] flex-col">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-3 print:hidden">
+              <p className="text-sm font-black tracking-tight text-slate-800">
+                Credit Note Document
+              </p>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowDocument(false)}>
+                  Back to Summary
+                </Button>
+                <Button size="sm" onClick={() => window.print()}>
+                  <Printer className="mr-1 h-3.5 w-3.5" /> Print / Save PDF
+                </Button>
               </div>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-slate-100 p-4 print:overflow-visible print:bg-white print:p-0">
+              <div className="mx-auto max-w-[800px] bg-white shadow-sm print:max-w-none print:shadow-none">
+                <CreditNoteDocumentBody record={record} currency={currency} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* ── Header ── */}
+            <div
+              className="relative px-6 pt-5 pb-4"
+              style={{ background: 'linear-gradient(135deg,#f0f4ff 0%,#e8edff 100%)' }}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
+                    <RotateCcw className="h-4.5 w-4.5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                      Credit Note
+                    </p>
+                    <h2 className="text-lg font-bold text-slate-800 leading-tight">
+                      {record.creditNoteNo}
+                    </h2>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors mt-0.5"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Status + Type pills */}
+              <div className="flex items-center gap-2 mt-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${status.color}`}
+                >
+                  <StatusIcon className="h-3 w-3" />
+                  {status.label}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold ${type.color}`}
+                >
+                  <TypeIcon className="h-3 w-3" />
+                  {type.label}
+                </span>
+              </div>
+            </div>
+
+            {/* ── Body ── */}
+            <div className="p-6 space-y-5 overflow-y-auto" style={{ maxHeight: '65vh' }}>
+              {/* Item Info */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Credit Note
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  {record.itemCategory === 'SPARE_PART' ? (
+                    <>
+                      <Wrench className="h-3 w-3" /> Spare Part Details
+                    </>
+                  ) : (
+                    <>
+                      <Package className="h-3 w-3" /> Product Details
+                    </>
+                  )}
                 </p>
-                <h2 className="text-lg font-bold text-slate-800 leading-tight">
-                  {record.creditNoteNo}
-                </h2>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors mt-0.5"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Status + Type pills */}
-          <div className="flex items-center gap-2 mt-3">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${status.color}`}
-            >
-              <StatusIcon className="h-3 w-3" />
-              {status.label}
-            </span>
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-bold ${type.color}`}
-            >
-              <TypeIcon className="h-3 w-3" />
-              {type.label}
-            </span>
-          </div>
-        </div>
-
-        {/* ── Body ── */}
-        <div className="p-6 space-y-5 overflow-y-auto" style={{ maxHeight: '65vh' }}>
-          {/* Item Info */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-              {record.itemCategory === 'SPARE_PART' ? (
-                <>
-                  <Wrench className="h-3 w-3" /> Spare Part Details
-                </>
-              ) : (
-                <>
-                  <Package className="h-3 w-3" /> Product Details
-                </>
-              )}
-            </p>
-            {/* Category badge */}
-            <div className="mb-2">
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                  record.itemCategory === 'SPARE_PART'
-                    ? 'bg-orange-50 text-orange-700 border-orange-200'
-                    : 'bg-blue-50 text-blue-700 border-blue-200'
-                }`}
-              >
-                {record.itemCategory === 'SPARE_PART' ? (
-                  <>
-                    <Wrench className="h-3 w-3" /> Spare Part
-                  </>
-                ) : (
-                  <>
-                    <Package className="h-3 w-3" /> Product
-                  </>
-                )}
-              </span>
-            </div>
-            <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
-              <InfoRow
-                icon={Package}
-                label={record.itemCategory === 'SPARE_PART' ? 'Part Name' : 'Product'}
-                value={record.productName}
-              />
-              {record.itemCategory === 'SPARE_PART' ? (
-                <>
-                  <InfoRow icon={Building2} label="SKU" value={record.sku} mono />
+                {/* Category badge */}
+                <div className="mb-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                      record.itemCategory === 'SPARE_PART'
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                    }`}
+                  >
+                    {record.itemCategory === 'SPARE_PART' ? (
+                      <>
+                        <Wrench className="h-3 w-3" /> Spare Part
+                      </>
+                    ) : (
+                      <>
+                        <Package className="h-3 w-3" /> Product
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
                   <InfoRow
-                    icon={Hash}
-                    label="Return Qty"
-                    value={record.quantity != null ? String(record.quantity) : undefined}
+                    icon={Package}
+                    label={record.itemCategory === 'SPARE_PART' ? 'Part Name' : 'Product'}
+                    value={record.productName}
                   />
-                </>
-              ) : (
-                <>
-                  <InfoRow icon={Tag} label="Model" value={record.modelName} />
-                  <InfoRow icon={Building2} label="Brand" value={record.brand} />
-                  <InfoRow icon={Building2} label="Serial No" value={record.serialNumber} mono />
-                </>
-              )}
-              <InfoRow
-                icon={DollarSign}
-                label="Amount"
-                value={formatCurrency(record.productAmount, currency)}
-                accent
-              />
-              {/* Tax breakdown */}
-              {record.taxName && (
-                <>
-                  <InfoRow
-                    icon={Percent}
-                    label={`Tax (${record.taxName})`}
-                    value={record.taxPercent != null ? `${record.taxPercent}%` : undefined}
-                  />
+                  {record.itemCategory === 'SPARE_PART' ? (
+                    <>
+                      <InfoRow icon={Building2} label="SKU" value={record.sku} mono />
+                      <InfoRow
+                        icon={Hash}
+                        label="Return Qty"
+                        value={record.quantity != null ? String(record.quantity) : undefined}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <InfoRow icon={Tag} label="Model" value={record.modelName} />
+                      <InfoRow icon={Building2} label="Brand" value={record.brand} />
+                      <InfoRow
+                        icon={Building2}
+                        label="Serial No"
+                        value={record.serialNumber}
+                        mono
+                      />
+                    </>
+                  )}
                   <InfoRow
                     icon={DollarSign}
-                    label="Tax Amount"
-                    value={
-                      record.taxAmount != null
-                        ? formatCurrency(record.taxAmount, currency)
-                        : undefined
-                    }
+                    label="Amount"
+                    value={formatCurrency(record.productAmount, currency)}
+                    accent
                   />
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Customer & Invoice */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <User className="h-3 w-3" /> Customer
-              </p>
-              <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3">
-                <p className="text-xs font-bold text-slate-700">{record.customerName || '—'}</p>
+                  {/* Tax breakdown */}
+                  {record.taxName && (
+                    <>
+                      <InfoRow
+                        icon={Percent}
+                        label={`Tax (${record.taxName})`}
+                        value={record.taxPercent != null ? `${record.taxPercent}%` : undefined}
+                      />
+                      <InfoRow
+                        icon={DollarSign}
+                        label="Tax Amount"
+                        value={
+                          record.taxAmount != null
+                            ? formatCurrency(record.taxAmount, currency)
+                            : undefined
+                        }
+                      />
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <FileText className="h-3 w-3" /> Invoice
-              </p>
-              <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3">
-                <p className="text-xs font-bold text-slate-700">{record.invoiceNumber || '—'}</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Timeline */}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" /> Timeline
-            </p>
-            <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
-              <InfoRow icon={Calendar} label="Created" value={createdDate} />
-              {updatedDate && <InfoRow icon={Calendar} label="Last Updated" value={updatedDate} />}
-            </div>
-          </div>
-
-          {/* Notes */}
-          {record.notes && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <StickyNote className="h-3 w-3" /> Notes
-              </p>
-              <div className="rounded-xl bg-amber-50/60 border border-amber-100 px-4 py-3">
-                <p className="text-xs text-slate-600 leading-relaxed">{record.notes}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Finance Note (if approved) */}
-          {record.financeNote && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Finance Note
-              </p>
-              <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
-                <p className="text-xs text-emerald-700 leading-relaxed">{record.financeNote}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Damage Reason (if approved) */}
-          {record.damageReason && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <StickyNote className="h-3 w-3" /> Damage Reason
-              </p>
-              <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3">
-                <p className="text-xs text-orange-700 leading-relaxed">{record.damageReason}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Payment Mode (if selected) */}
-          {record.paymentMode && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <Banknote className="h-3 w-3" /> Settlement Method
-              </p>
-              <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
-                <p className="text-xs font-bold text-indigo-700 leading-relaxed uppercase tracking-wider">
-                  {record.paymentMode.replace('_', ' ')}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Rejection Reason */}
-          {record.rejectionReason && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                <XCircle className="h-3 w-3 text-red-500" /> Rejection Reason
-              </p>
-              <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3">
-                <p className="text-xs text-red-600 leading-relaxed">{record.rejectionReason}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Replacement/Exchange Details */}
-          {(record.status === 'PRODUCT_REPLACED' || record.status === 'COMPLETED') &&
-            (record.replacementSerialNumber || record.replacementSparePartId) && (
-              <div className="space-y-4 pt-4 border-t border-dashed">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                  <RefreshCw className="h-3 w-3 text-blue-500" />{' '}
-                  {record.type === 'REPLACEMENT' ? 'Replacement' : 'Exchange'} Finalization
-                </p>
-
-                <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
-                    <div className="bg-white p-1.5 rounded-lg border border-blue-100">
-                      {record.itemCategory === 'SPARE_PART' ? (
-                        <Wrench className="h-4 w-4 text-blue-600" />
-                      ) : (
-                        <Package className="h-4 w-4 text-blue-600" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase font-bold text-blue-400">
-                        {record.itemCategory === 'SPARE_PART'
-                          ? 'Replacement Spare Part'
-                          : 'New Unit Assigned'}
-                      </p>
-                      {record.itemCategory === 'SPARE_PART' ? (
-                        <p className="text-xs font-bold text-blue-900">
-                          {record.replacementSparePartName} ({record.replacementSparePartSku})
-                          {record.replacementQuantity != null
-                            ? ` × ${record.replacementQuantity}`
-                            : ''}
-                        </p>
-                      ) : (
-                        <p className="text-xs font-bold text-blue-900">
-                          Serial No: {record.replacementSerialNumber}
-                        </p>
-                      )}
-                    </div>
+              {/* Customer & Invoice */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <User className="h-3 w-3" /> Customer
+                  </p>
+                  <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3">
+                    <p className="text-xs font-bold text-slate-700">{record.customerName || '—'}</p>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <p className="text-blue-500 font-medium">New Item Price</p>
-                      <p className="font-bold text-blue-900">
-                        {formatCurrency(record.replacementAmount || 0, currency)}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-blue-500 font-medium">Returned Credit</p>
-                      <p className="font-bold text-blue-900">
-                        - {formatCurrency(record.productAmount, currency)}
-                      </p>
-                    </div>
-                    {record.replacementDiscount !== undefined && record.replacementDiscount > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-emerald-600 font-medium">Extra Discount</p>
-                        <p className="font-bold text-emerald-700">
-                          - {formatCurrency(record.replacementDiscount || 0, currency)}
-                        </p>
-                      </div>
-                    )}
-                    <div className="col-span-2 pt-2 border-t border-blue-200 flex justify-between items-center mt-1">
-                      <p className="font-bold text-blue-900">
-                        {(record.replacementAmount || 0) -
-                          record.productAmount -
-                          (record.replacementDiscount || 0) >=
-                        0
-                          ? 'Payable Gap'
-                          : 'Refundable Balance'}
-                      </p>
-                      <p className="text-sm font-black text-blue-900">
-                        {formatCurrency(
-                          Math.abs(
-                            (record.replacementAmount || 0) -
-                              record.productAmount -
-                              (record.replacementDiscount || 0),
-                          ),
-                          currency,
-                        )}
-                      </p>
-                    </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <FileText className="h-3 w-3" /> Invoice
+                  </p>
+                  <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3">
+                    <p className="text-xs font-bold text-slate-700">
+                      {record.invoiceNumber || '—'}
+                    </p>
                   </div>
                 </div>
               </div>
-            )}
-        </div>
 
-        {/* ── Footer ── */}
-        <div className="flex justify-end px-6 py-4 border-t border-slate-100 bg-white">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            className="rounded-lg px-5 border-slate-200 text-slate-600 hover:bg-slate-50"
-          >
-            Close
-          </Button>
-        </div>
+              {/* Timeline */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                  <Calendar className="h-3 w-3" /> Timeline
+                </p>
+                <div className="rounded-xl bg-slate-50 border border-slate-100 px-4">
+                  <InfoRow icon={Calendar} label="Created" value={createdDate} />
+                  {updatedDate && (
+                    <InfoRow icon={Calendar} label="Last Updated" value={updatedDate} />
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              {record.notes && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <StickyNote className="h-3 w-3" /> Notes
+                  </p>
+                  <div className="rounded-xl bg-amber-50/60 border border-amber-100 px-4 py-3">
+                    <p className="text-xs text-slate-600 leading-relaxed">{record.notes}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Finance Note (if approved) */}
+              {record.financeNote && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Finance Note
+                  </p>
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+                    <p className="text-xs text-emerald-700 leading-relaxed">{record.financeNote}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Damage Reason (if approved) */}
+              {record.damageReason && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <StickyNote className="h-3 w-3" /> Damage Reason
+                  </p>
+                  <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3">
+                    <p className="text-xs text-orange-700 leading-relaxed">{record.damageReason}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment Mode (if selected) */}
+              {record.paymentMode && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <Banknote className="h-3 w-3" /> Settlement Method
+                  </p>
+                  <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">
+                    <p className="text-xs font-bold text-indigo-700 leading-relaxed uppercase tracking-wider">
+                      {record.paymentMode.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Rejection Reason */}
+              {record.rejectionReason && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <XCircle className="h-3 w-3 text-red-500" /> Rejection Reason
+                  </p>
+                  <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3">
+                    <p className="text-xs text-red-600 leading-relaxed">{record.rejectionReason}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Replacement/Exchange Details */}
+              {(record.status === 'PRODUCT_REPLACED' || record.status === 'COMPLETED') &&
+                (record.replacementSerialNumber || record.replacementSparePartId) && (
+                  <div className="space-y-4 pt-4 border-t border-dashed">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                      <RefreshCw className="h-3 w-3 text-blue-500" />{' '}
+                      {record.type === 'REPLACEMENT' ? 'Replacement' : 'Exchange'} Finalization
+                    </p>
+
+                    <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 space-y-3">
+                      <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
+                        <div className="bg-white p-1.5 rounded-lg border border-blue-100">
+                          {record.itemCategory === 'SPARE_PART' ? (
+                            <Wrench className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <Package className="h-4 w-4 text-blue-600" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-blue-400">
+                            {record.itemCategory === 'SPARE_PART'
+                              ? 'Replacement Spare Part'
+                              : 'New Unit Assigned'}
+                          </p>
+                          {record.itemCategory === 'SPARE_PART' ? (
+                            <p className="text-xs font-bold text-blue-900">
+                              {record.replacementSparePartName} ({record.replacementSparePartSku})
+                              {record.replacementQuantity != null
+                                ? ` × ${record.replacementQuantity}`
+                                : ''}
+                            </p>
+                          ) : (
+                            <p className="text-xs font-bold text-blue-900">
+                              Serial No: {record.replacementSerialNumber}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="space-y-1">
+                          <p className="text-blue-500 font-medium">New Item Price</p>
+                          <p className="font-bold text-blue-900">
+                            {formatCurrency(record.replacementAmount || 0, currency)}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-blue-500 font-medium">Returned Credit</p>
+                          <p className="font-bold text-blue-900">
+                            - {formatCurrency(record.productAmount, currency)}
+                          </p>
+                        </div>
+                        {record.replacementDiscount !== undefined &&
+                          record.replacementDiscount > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-emerald-600 font-medium">Extra Discount</p>
+                              <p className="font-bold text-emerald-700">
+                                - {formatCurrency(record.replacementDiscount || 0, currency)}
+                              </p>
+                            </div>
+                          )}
+                        <div className="col-span-2 pt-2 border-t border-blue-200 flex justify-between items-center mt-1">
+                          <p className="font-bold text-blue-900">
+                            {(record.replacementAmount || 0) -
+                              record.productAmount -
+                              (record.replacementDiscount || 0) >=
+                            0
+                              ? 'Payable Gap'
+                              : 'Refundable Balance'}
+                          </p>
+                          <p className="text-sm font-black text-blue-900">
+                            {formatCurrency(
+                              Math.abs(
+                                (record.replacementAmount || 0) -
+                                  record.productAmount -
+                                  (record.replacementDiscount || 0),
+                              ),
+                              currency,
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            {/* ── Footer ── */}
+            <div className="flex justify-between gap-2 px-6 py-4 border-t border-slate-100 bg-white">
+              <Button size="sm" onClick={() => setShowDocument(true)} className="rounded-lg px-5">
+                <FileText className="mr-1 h-3.5 w-3.5" /> View Credit Note Document
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                className="rounded-lg px-5 border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Close
+              </Button>
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

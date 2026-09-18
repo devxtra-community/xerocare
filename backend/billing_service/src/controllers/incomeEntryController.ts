@@ -20,7 +20,9 @@ export const getIncomeEntries = async (req: Request, res: Response, next: NextFu
     if (status) qb.andWhere('i.status = :status', { status });
     if (fromDate) qb.andWhere('i.date >= :fromDate', { fromDate });
     if (toDate) qb.andWhere('i.date <= :toDate', { toDate });
-    qb.orderBy('i.date', 'DESC');
+    // See accountsController.getExpenseEntries: `date` is day-precision and needs a
+    // timestamp tie-break, or same-day income rows render in a shifting order.
+    qb.orderBy('i.date', 'DESC').addOrderBy('i.createdAt', 'DESC');
     const entries = await qb.getMany();
     res.json({ success: true, data: entries });
   } catch (err) {

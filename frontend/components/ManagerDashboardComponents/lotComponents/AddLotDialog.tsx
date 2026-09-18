@@ -441,9 +441,14 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                             <SearchableSelect
                               value={field.value}
                               onValueChange={field.onChange}
+                              // Same reasoning as the RFQ warehouse picker: a raw uuid in
+                              // the label reads as noise and is long enough to stretch the
+                              // control past its container. It stays searchable, so pasting
+                              // one still finds the vendor.
                               options={vendors.map((v) => ({
                                 value: v.id,
-                                label: `${v.name} (${v.id})`,
+                                label: v.name,
+                                searchText: `${v.name} ${v.id}`,
                               }))}
                               placeholder="Select Vendor"
                               emptyText="No vendors found."
@@ -468,7 +473,13 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                               onValueChange={field.onChange}
                               options={warehouses.map((w) => ({
                                 value: w.id,
-                                label: `${w.warehouseName} (${w.id})`,
+                                label: w.warehouseName,
+                                description: [w.warehouseCode, w.location]
+                                  .filter(Boolean)
+                                  .join(' · '),
+                                searchText: [w.warehouseName, w.warehouseCode, w.location, w.id]
+                                  .filter(Boolean)
+                                  .join(' '),
                               }))}
                               placeholder="Select Warehouse"
                               emptyText="No warehouses found."

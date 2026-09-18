@@ -189,6 +189,15 @@ export class Purchase {
   })
   taxStatus!: 'PENDING' | 'RECORDED' | 'FILED';
 
+  /** When the tax was actually settled through the approval workflow. Null while
+   *  outstanding — this, not the vendor payment, is what makes the tax row PAID. */
+  @Column({ name: 'tax_settled_at', type: 'timestamp', nullable: true })
+  taxSettledAt?: Date | null;
+
+  /** The approved request that settled it — the audit link back to the approval. */
+  @Column({ name: 'tax_settlement_ref', type: 'varchar', length: 100, nullable: true })
+  taxSettlementRef?: string | null;
+
   // ─── ─────────────────────────────────────────────────────────────────────
   @Column({ name: 'created_by', type: 'uuid', nullable: true })
   createdBy?: string;

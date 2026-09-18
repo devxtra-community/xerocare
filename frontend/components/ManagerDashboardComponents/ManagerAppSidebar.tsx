@@ -43,7 +43,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { useNavCounts } from '@/hooks/useNavCounts';
-import { navCountFor, navCountForTitles } from '@/lib/navCounts';
+import { navCountFor, navCountForEntries, badgeOverridesForHref } from '@/lib/navCounts';
 import { NavBadge } from '@/components/ui/NavBadge';
 
 import { useState, useEffect } from 'react';
@@ -459,8 +459,14 @@ export default function ManagerSidebar() {
                             <item.icon className="h-4 w-4" />
                             <span className="font-medium">{item.title}</span>
                             <NavBadge
-                              count={navCountForTitles(
-                                [item.title, ...(item.subItems?.map((s) => s.title) ?? [])],
+                              count={navCountForEntries(
+                                [
+                                  { title: item.title, href: item.href },
+                                  ...(item.subItems?.map((s) => ({
+                                    title: s.title,
+                                    href: s.href,
+                                  })) ?? []),
+                                ],
                                 navCounts,
                               )}
                             />
@@ -498,7 +504,13 @@ export default function ManagerSidebar() {
                                     <div className="flex items-center gap-3">
                                       <sub.icon className="h-3.5 w-3.5" />
                                       <span>{sub.title}</span>
-                                      <NavBadge count={navCountFor(sub.title, navCounts)} />
+                                      <NavBadge
+                                        count={navCountFor(
+                                          sub.title,
+                                          navCounts,
+                                          badgeOverridesForHref(sub.href),
+                                        )}
+                                      />
                                     </div>
                                     {sub.title === 'Overview' && expiryCount > 0 && (
                                       <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
@@ -526,7 +538,13 @@ export default function ManagerSidebar() {
                         <a href={item.href} className="flex items-center gap-3 px-3">
                           <item.icon className="h-4 w-4" />
                           <span className="font-medium flex-1">{item.title}</span>
-                          <NavBadge count={navCountFor(item.title, navCounts)} />
+                          <NavBadge
+                            count={navCountFor(
+                              item.title,
+                              navCounts,
+                              badgeOverridesForHref(item.href),
+                            )}
+                          />
                         </a>
                       </SidebarMenuButton>
                     )}
@@ -566,7 +584,13 @@ export default function ManagerSidebar() {
                         <a href={item.href} className="flex items-center gap-2.5 px-3 w-full">
                           <item.icon className="h-3.5 w-3.5 shrink-0" />
                           <span className="font-medium leading-tight flex-1">{item.title}</span>
-                          <NavBadge count={navCountFor(item.title, navCounts)} />
+                          <NavBadge
+                            count={navCountFor(
+                              item.title,
+                              navCounts,
+                              badgeOverridesForHref(item.href),
+                            )}
+                          />
                         </a>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

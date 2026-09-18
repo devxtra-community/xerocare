@@ -190,6 +190,27 @@ export function QuotationConversionFlow({
     new Date().toISOString().split('T')[0],
   );
 
+  /**
+   * WHEN the deposit is collected — not a new money path, only which of the two that
+   * already exist this conversion takes.
+   *
+   * Deferring was always possible: a cautionAmount of 0 deliberately skips creating the
+   * SalePaymentRequest so the deposit stays outstanding for the Technician's own "Collect
+   * Deposit" step at installation (see the note on prefilledCaution above). But it was
+   * reachable only by knowing to clear a pre-filled field, which reads like correcting a
+   * mistake rather than choosing a plan — so the common case of "the technician will take
+   * it on site" was routinely recorded as money already in hand. Stating the choice up
+   * front drives the same amount, so nothing downstream changes.
+   */
+  const [depositTiming, setDepositTiming] = useState<'NOW' | 'ON_INSTALLATION'>('NOW');
+
+  const handleDepositTimingChange = (val: 'NOW' | 'ON_INSTALLATION') => {
+    setDepositTiming(val);
+    // Restoring the quotation figure on the way back keeps the choice reversible — the
+    // employee can flip to installation and back without retyping what the quotation said.
+    setCautionAmount(val === 'NOW' ? String(prefilledCaution) : '');
+  };
+
   // Accessories (stand, tray, stapler unit, etc.) added alongside the machine on the
   // quotation — real priced items, never metered, collected once together with the first
   // month advance rather than through a separate payment.
@@ -691,73 +712,104 @@ export function QuotationConversionFlow({
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
                     Security deposit required according to quotation. This amount is refundable.
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                        Amount Collected Now ({currency})
-                      </Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={cautionAmount}
-                        onChange={(e) => setCautionAmount(e.target.value)}
-                        className="h-10 font-black text-blue-600 text-sm border-slate-200"
-                      />
-                      <p className="text-[10px] text-blue-500 font-bold mt-1">
-                        Pre-filled from the quotation (QAR {prefilledCaution.toFixed(2)}) — adjust
-                        or clear to 0 if the deposit hasn&apos;t actually been collected yet. Left
-                        at 0, it stays outstanding for the Technician or Finance to collect later.
+
+                  <div>
+                    <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                      Collection Timing
+                    </Label>
+                    <Select value={depositTiming} onValueChange={handleDepositTimingChange}>
+                      <SelectTrigger className="h-10 border-slate-200 font-bold text-xs bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NOW" className="text-xs font-bold">
+                          Collect Now
+                        </SelectItem>
+                        <SelectItem value="ON_INSTALLATION" className="text-xs font-bold">
+                          Collect on Installation
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {depositTiming === 'ON_INSTALLATION' && (
+                    <div className="p-3 bg-white/70 border border-dashed border-blue-200 rounded-xl">
+                      <p className="text-[11px] font-bold text-blue-600 leading-relaxed">
+                        {currency} {prefilledCaution.toFixed(2)} will be collected by the Technician
+                        at installation. Nothing is recorded now — the deposit stays outstanding
+                        against this contract until it is collected.
                       </p>
                     </div>
-                    {cautionAmount && Number(cautionAmount) > 0 && (
-                      <>
-                        <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                            Payment Mode
-                          </Label>
-                          <Select
-                            value={cautionMode}
-                            onValueChange={(
-                              val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
-                            ) => setCautionMode(val)}
-                          >
-                            <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="CASH" className="text-xs font-bold">
-                                Cash
-                              </SelectItem>
-                              <SelectItem value="BANK_TRANSFER" className="text-xs font-bold">
-                                Bank Transfer
-                              </SelectItem>
-                              <SelectItem value="CHEQUE" className="text-xs font-bold">
-                                Cheque
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
-                            {cautionMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference'}
-                          </Label>
-                          {cautionMode === 'CHEQUE' ? (
-                            <Input
-                              value={cautionChequeNumber}
-                              onChange={(e) => setCautionChequeNumber(e.target.value)}
-                              placeholder="e.g., CHQ-005678"
-                              required
-                              className="h-10 border-slate-200 font-bold text-xs"
-                            />
-                          ) : (
-                            <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-400 italic">
-                              Auto-generated — {autoReferencePreview(cautionMode)}
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  )}
+
+                  {depositTiming === 'NOW' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                          Amount Collected Now ({currency})
+                        </Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={cautionAmount}
+                          onChange={(e) => setCautionAmount(e.target.value)}
+                          className="h-10 font-black text-blue-600 text-sm border-slate-200"
+                        />
+                        <p className="text-[10px] text-blue-500 font-bold mt-1">
+                          Pre-filled from the quotation ({currency} {prefilledCaution.toFixed(2)}) —
+                          adjust if a different amount was actually handed over.
+                        </p>
+                      </div>
+                      {cautionAmount && Number(cautionAmount) > 0 && (
+                        <>
+                          <div>
+                            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                              Payment Mode
+                            </Label>
+                            <Select
+                              value={cautionMode}
+                              onValueChange={(
+                                val: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'CREDIT_CARD',
+                              ) => setCautionMode(val)}
+                            >
+                              <SelectTrigger className="h-10 border-slate-200 font-bold text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="CASH" className="text-xs font-bold">
+                                  Cash
+                                </SelectItem>
+                                <SelectItem value="BANK_TRANSFER" className="text-xs font-bold">
+                                  Bank Transfer
+                                </SelectItem>
+                                <SelectItem value="CHEQUE" className="text-xs font-bold">
+                                  Cheque
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">
+                              {cautionMode === 'CHEQUE' ? 'Cheque Number *' : 'Reference'}
+                            </Label>
+                            {cautionMode === 'CHEQUE' ? (
+                              <Input
+                                value={cautionChequeNumber}
+                                onChange={(e) => setCautionChequeNumber(e.target.value)}
+                                placeholder="e.g., CHQ-005678"
+                                required
+                                className="h-10 border-slate-200 font-bold text-xs"
+                              />
+                            ) : (
+                              <div className="h-10 flex items-center px-3 rounded-md border border-dashed border-slate-200 bg-slate-50 text-[11px] text-slate-400 italic">
+                                Auto-generated — {autoReferencePreview(cautionMode)}
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {/* Cheque-specific fields for Security Deposit */}
                   {cautionAmount && Number(cautionAmount) > 0 && cautionMode === 'CHEQUE' && (
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
@@ -857,7 +909,10 @@ export function QuotationConversionFlow({
                     <div className="flex justify-between text-[11px] font-bold">
                       <span className="text-amber-600">Security Deposit</span>
                       <span className="text-amber-600">
-                        {currency} {prefilledCaution.toFixed(2)} — Not collected now
+                        {currency} {prefilledCaution.toFixed(2)} —{' '}
+                        {depositTiming === 'ON_INSTALLATION'
+                          ? 'Technician collects at installation'
+                          : 'Not collected now'}
                       </span>
                     </div>
                   )}
@@ -950,7 +1005,8 @@ export function QuotationConversionFlow({
                       Security Deposit
                     </span>
                     <span className="text-amber-600 font-black">
-                      {currency} {prefilledCaution.toFixed(2)} — Deferred
+                      {currency} {prefilledCaution.toFixed(2)} —{' '}
+                      {depositTiming === 'ON_INSTALLATION' ? 'At installation' : 'Deferred'}
                     </span>
                   </div>
                 )}

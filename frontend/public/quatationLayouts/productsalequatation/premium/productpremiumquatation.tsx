@@ -1,4 +1,5 @@
 import React from 'react';
+import { WarrantyDetailsBlock, type WarrantyInfo } from '@/components/shared/WarrantyDetailsBlock';
 import { numberToWords } from '@/lib/numberToWords';
 
 import { getActiveCurrency } from '@/lib/currency';
@@ -31,6 +32,8 @@ export interface PremiumQuotationLineItem {
 }
 
 export interface ProductPremiumQuotationProps {
+  /** Warranty coverage, printed inside the document. */
+  warranty?: WarrantyInfo;
   productName?: string;
   modelName?: string;
   billTo?: {
@@ -74,6 +77,7 @@ const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
+  warranty,
   productName = 'TONER CHIP SET',
   billTo = {
     name: 'XEROCARE W. L. L',
@@ -812,6 +816,9 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
             )}
           </div>
         </div>
+
+        {/* ─── WARRANTY DETAILS ─── */}
+        <WarrantyDetailsBlock {...(warranty ?? {})} accent={ACCENT} />
 
         {/* ─── SIGNATURE & SEAL ─── */}
         <div style={{ padding: '20px 50px', display: 'flex', justifyContent: 'flex-end' }}>

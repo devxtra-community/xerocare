@@ -7,7 +7,14 @@ import { DepreciationBrandRule } from '../entities/depreciationBrandRuleEntity';
 import { DepreciationModelRule } from '../entities/depreciationModelRuleEntity';
 import { AssetDepreciationRegister } from '../entities/assetDepreciationRegisterEntity';
 import { DepreciationJournalEntry } from '../entities/depreciationJournalEntryEntity';
+import { DepreciationJournalLine } from '../entities/depreciationJournalLineEntity';
 import { ManualReceivable } from '../entities/manualReceivableEntity';
+import { assertSettleable } from '../utils/settlementGuard';
+import {
+  PaymentDirection,
+  SettlementApprovalStatus,
+  requiresSettlementApproval,
+} from '../entities/settlementApproval';
 import { ReceivablePayment } from '../entities/receivablePaymentEntity';
 import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
@@ -16,19 +23,22 @@ import { Owner } from '../entities/ownerEntity';
 import { Invoice } from '../entities/invoiceEntity';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
+import { GuaranteeCheque } from '../entities/guaranteeChequeEntity';
 import { PaymentLedger } from '../entities/paymentLedgerEntity';
 import { ExchangeRate } from '../entities/exchangeRateEntity';
 import { AccountReconciliation } from '../entities/accountReconciliationEntity';
 import { AppError } from '../errors/appError';
-import { calculateDepreciation, generateDepreciationSchedule } from '../utils/depreciation';
+import { generateDepreciationSchedule, depreciationForPeriod } from '../utils/depreciation';
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { CountryTaxRule } from '../entities/countryTaxRuleEntity';
 import { VatRemittance } from '../entities/vatRemittanceEntity';
+import { EmployeeExpenseRequest } from '../entities/employeeExpenseRequestEntity';
 import {
   computeProfitAndLoss,
   computeBalanceSheet,
   ALL_TIME_START,
   getVatCreditBreakdown,
+  internalGet,
   loadExchangeRates,
 } from '../utils/accountsShared';
 import { Cheque } from '../entities/chequeEntity';
@@ -660,13 +670,26 @@ export const getExpenseEntries = async (req: Request, res: Response, next: NextF
     const qb = repo.createQueryBuilder('e');
     applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
     if (category) qb.andWhere('e.category = :category', { category });
-    if (status) qb.andWhere('e.status = :status', { status });
+    // Accepts one status or a comma-separated list ("APPROVED,PAID"). Payables needs both
+    // an unpaid expense and a settled one on the same table — a single-value match forced
+    // the page to choose, and choosing APPROVED made an expense vanish the moment it was
+    // paid. A single value still behaves exactly as before.
+    if (status) {
+      const statuses = String(status)
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (statuses.length === 1) qb.andWhere('e.status = :status', { status: statuses[0] });
+      else if (statuses.length > 1) qb.andWhere('e.status IN (:...statuses)', { statuses });
+    }
     if (fromDate) qb.andWhere('e.date >= :fromDate', { fromDate });
     if (toDate) qb.andWhere('e.date <= :toDate', { toDate });
     if (isPrepayment !== undefined) {
       qb.andWhere('e.isPrepayment = :isPrepayment', { isPrepayment: isPrepayment === 'true' });
     }
-    qb.orderBy('e.date', 'DESC');
+    // Tie-broken on createdAt: `date` is day-precision, so same-day expenses would
+    // otherwise come back in an arbitrary order that changes as rows are edited.
+    qb.orderBy('e.date', 'DESC').addOrderBy('e.createdAt', 'DESC');
     const entries = await qb.getMany();
     res.json({ success: true, data: entries });
   } catch (err) {
@@ -1028,6 +1051,38 @@ export const deleteDepreciationModelRule = async (
 
 // ─── ASSET DEPRECIATION REGISTER ──────────────────────────────────────────────
 
+/**
+ * Accumulated depreciation actually POSTED against each asset, keyed by asset id.
+ *
+ * Every reader of NBV goes through this so the Balance Sheet, the asset register and the
+ * depreciation charts cannot report different values for the same machine. Recomputing
+ * it from the purchase date in each place is what let them drift apart.
+ */
+async function postedAccumulatedByAsset(assetIds: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (assetIds.length === 0) return map;
+  const rows = await Source.getRepository(DepreciationJournalLine)
+    .createQueryBuilder('l')
+    .select('l.assetId', 'assetId')
+    .addSelect('COALESCE(SUM(l.amount), 0)', 'total')
+    .where('l.assetId IN (:...ids)', { ids: assetIds })
+    .groupBy('l.assetId')
+    .getRawMany<{ assetId: string; total: string }>();
+  for (const r of rows) map.set(r.assetId, Number(r.total));
+  return map;
+}
+
+/** NBV from what has been posted, floored at salvage. */
+function postedNbv(
+  asset: { purchasePrice: number | string; salvageValue: number | string; id: string },
+  posted: Map<string, number>,
+): { accumulated: number; nbv: number } {
+  const gross = Number(asset.purchasePrice);
+  const depreciable = Math.max(0, gross - Number(asset.salvageValue));
+  const accumulated = Math.min(posted.get(asset.id) ?? 0, depreciable);
+  return { accumulated, nbv: gross - accumulated };
+}
+
 export const getAssetRegister = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const repo = Source.getRepository(AssetDepreciationRegister);
@@ -1039,16 +1094,67 @@ export const getAssetRegister = async (req: Request, res: Response, next: NextFu
     qb.orderBy('a.purchaseDate', 'DESC');
     const assets = await qb.getMany();
 
+    // Accumulated depreciation comes from the posted journal lines, the same source the
+    // Balance Sheet reads, so the register and the accounts can never tell different
+    // stories about the same asset.
+    const postedByAsset = await postedAccumulatedByAsset(assets.map((a) => a.id));
+
+    const today = new Date();
     const withDepreciation = assets.map((a) => {
-      const result = calculateDepreciation({
+      const { accumulated, nbv } = postedNbv(a, postedByAsset);
+      // What the NEXT close will charge, so the register shows what is still to come
+      // rather than a flat instalment that never stops.
+      const monthlyDep = depreciationForPeriod(
+        {
+          purchasePrice: Number(a.purchasePrice),
+          salvageValue: Number(a.salvageValue),
+          usefulLifeMonths: a.usefulLifeMonths,
+          annualDepreciationPct: Number(a.annualDepreciationPct),
+          method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
+          purchaseDate: new Date(a.purchaseDate),
+        },
+        new Date().getFullYear(),
+        new Date().getMonth() + 1,
+        accumulated,
+      );
+      // What SHOULD have been posted by now, walked period by period with exactly the
+      // same rule the monthly close uses. Deriving it any other way — from elapsed whole
+      // months, say — puts it a month out of step with the postings it is being compared
+      // against, and the "unposted" figure then misreports by one instalment.
+      const spec = {
         purchasePrice: Number(a.purchasePrice),
         salvageValue: Number(a.salvageValue),
         usefulLifeMonths: a.usefulLifeMonths,
         annualDepreciationPct: Number(a.annualDepreciationPct),
         method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
         purchaseDate: new Date(a.purchaseDate),
-      });
-      return { ...a, ...result };
+      };
+      const pd = new Date(a.purchaseDate);
+      const periodsToDate =
+        (today.getFullYear() - pd.getFullYear()) * 12 + (today.getMonth() - pd.getMonth()) + 1;
+      let accruedToDate = 0;
+      for (let k = 0; k < Math.min(Math.max(periodsToDate, 0), a.usefulLifeMonths); k++) {
+        const d = new Date(pd.getFullYear(), pd.getMonth() + k, 1);
+        accruedToDate += depreciationForPeriod(
+          spec,
+          d.getFullYear(),
+          d.getMonth() + 1,
+          accruedToDate,
+        );
+      }
+      accruedToDate = Math.round(accruedToDate * 100) / 100;
+      return {
+        ...a,
+        accumulated,
+        nbv,
+        monthlyDep,
+        monthsElapsed: Math.max(0, Math.min(periodsToDate, a.usefulLifeMonths)),
+        /** What the schedule says should have been posted by now. The gap below is
+         *  depreciation for periods that were closed before this asset was registered —
+         *  it can never be posted to those periods, so it is surfaced rather than hidden. */
+        accruedToDate,
+        unpostedDepreciation: Math.round(Math.max(0, accruedToDate - accumulated) * 100) / 100,
+      };
     });
 
     // Enrich printer assets with product details (serial number, brand name, model name)
@@ -1132,21 +1238,26 @@ export const addAssetToRegister = async (req: Request, res: Response, next: Next
       if (existing) throw new AppError('Product already registered for depreciation', 400);
     }
 
-    const salvageValue = (Number(purchasePrice) * Number(salvageValuePct || 10)) / 100;
+    // ?? not || — a deliberate 0% salvage is a real choice, and `|| 10` silently turned
+    // it into 10%, leaving every such asset depreciating to 90% of cost and no further.
+    const salvagePct = salvageValuePct ?? 10;
+    const salvageValue = (Number(purchasePrice) * Number(salvagePct)) / 100;
 
     const asset = repo.create({
       productId: productId || null,
       assetType,
       assetCategory,
       assetName: assetName || null,
-      brandId: brandId || 'MANUAL',
-      modelId: modelId || 'MANUAL',
+      // Null, not the string 'MANUAL': both columns are uuid, so 'MANUAL' made every
+      // manual (non-printer) asset fail with "invalid input syntax for type uuid".
+      brandId: brandId || null,
+      modelId: modelId || null,
       branchId: req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId,
       purchaseDate,
       purchasePrice: Number(purchasePrice),
-      annualDepreciationPct: Number(annualDepreciationPct || 20),
+      annualDepreciationPct: Number(annualDepreciationPct ?? 20),
       usefulLifeMonths: Number(usefulLifeMonths),
-      salvageValuePct: Number(salvageValuePct || 10),
+      salvageValuePct: Number(salvagePct),
       salvageValue,
       method: method || 'STRAIGHT_LINE',
       status: 'ACTIVE',
@@ -1240,15 +1351,37 @@ export const getDepreciationJournals = async (req: Request, res: Response, next:
 
 export const postDepreciationJournal = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { periodYear, periodMonth, branchId } = req.body as {
+    const { periodYear, periodMonth } = req.body as {
       periodYear: number;
       periodMonth: number;
-      branchId: string;
     };
+    if (!periodYear || !periodMonth || periodMonth < 1 || periodMonth > 12) {
+      throw new AppError('A valid period year and month are required', 400);
+    }
+
+    // The branch is taken from the caller's own scope, never from the body. It used to be
+    // read straight off req.body with no check, so anyone who could reach this endpoint
+    // could post a depreciation journal into a branch they have no access to.
+    const branchFilter: string[] = req.branchFilter ?? [];
+    const requestedBranch = (req.body.branchId as string) || req.user?.branchId;
+    if (!requestedBranch) throw new AppError('Branch could not be determined', 400);
+    if (branchFilter.length > 0 && !branchFilter.includes(requestedBranch)) {
+      throw new AppError('You do not have permission to post depreciation for this branch', 403);
+    }
+    const branchId = requestedBranch;
+
+    // Posting a period that has not happened yet would recognise an expense before it is
+    // incurred, and there is no reason to do it.
+    const now = new Date();
+    if (periodYear * 12 + periodMonth > now.getFullYear() * 12 + (now.getMonth() + 1)) {
+      throw new AppError('Cannot post depreciation for a future period', 400);
+    }
 
     let saved!: DepreciationJournalEntry;
+    let lineCount = 0;
     await Source.transaction(async (em) => {
       const journalRepo = em.getRepository(DepreciationJournalEntry);
+      const lineRepo = em.getRepository(DepreciationJournalLine);
       const expenseRepo = em.getRepository(ExpenseEntry);
       const assetRepo = em.getRepository(AssetDepreciationRegister);
 
@@ -1257,11 +1390,7 @@ export const postDepreciationJournal = async (req: Request, res: Response, next:
         .createQueryBuilder('j')
         .where(
           'j.periodYear = :periodYear AND j.periodMonth = :periodMonth AND j.branchId = :branchId',
-          {
-            periodYear,
-            periodMonth,
-            branchId,
-          },
+          { periodYear, periodMonth, branchId },
         )
         .setLock('pessimistic_write')
         .getOne();
@@ -1270,47 +1399,114 @@ export const postDepreciationJournal = async (req: Request, res: Response, next:
       }
 
       const assets = await assetRepo.find({ where: { branchId, status: 'ACTIVE' } });
-      let totalAmount = 0;
-      for (const a of assets) {
-        const result = calculateDepreciation({
-          purchasePrice: Number(a.purchasePrice),
-          salvageValue: Number(a.salvageValue),
-          usefulLifeMonths: a.usefulLifeMonths,
-          annualDepreciationPct: Number(a.annualDepreciationPct),
-          method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-          purchaseDate: new Date(a.purchaseDate),
-        });
-        totalAmount += result.monthlyDep;
-      }
 
-      const expCount = await expenseRepo.count();
-      const expense = expenseRepo.create({
-        expenseNo: `EXP-DEP-${periodYear}-${String(periodMonth).padStart(2, '0')}-${String(expCount + 1).padStart(4, '0')}`,
-        date: new Date(`${periodYear}-${String(periodMonth).padStart(2, '0')}-28`),
-        category: 'DEPRECIATION',
-        description: `Depreciation for ${periodYear}-${String(periodMonth).padStart(2, '0')}`,
-        branchId,
-        amount: totalAmount,
-        vatAmount: 0,
-        netAmount: totalAmount,
-        currency: 'AED',
-        status: 'PAID',
-        createdBy: req.user?.userId ?? (req.body.createdBy as string),
-      }) as unknown as ExpenseEntry;
-      const savedExpense = await expenseRepo.save(expense);
+      // What each asset has ALREADY had posted against it, from the journal lines
+      // themselves. Deriving it here is what stops an asset being depreciated past its
+      // depreciable base no matter which order periods are posted in.
+      const accumulatedByAsset = new Map<string, number>();
+      if (assets.length > 0) {
+        const rows = await lineRepo
+          .createQueryBuilder('l')
+          .select('l.assetId', 'assetId')
+          .addSelect('COALESCE(SUM(l.amount), 0)', 'total')
+          .where('l.assetId IN (:...ids)', { ids: assets.map((a) => a.id) })
+          .groupBy('l.assetId')
+          .getRawMany<{ assetId: string; total: string }>();
+        for (const r of rows) accumulatedByAsset.set(r.assetId, Number(r.total));
+      }
 
       const journal: DepreciationJournalEntry =
         existing ??
         (journalRepo.create({ periodYear, periodMonth, branchId }) as DepreciationJournalEntry);
-      journal.totalAmount = totalAmount;
       journal.status = 'POSTED';
       journal.postedBy = req.user?.userId;
       journal.postedAt = new Date();
-      journal.expenseEntryId = savedExpense.id;
+      journal.totalAmount = 0;
       saved = await journalRepo.save(journal);
+
+      let totalAmount = 0;
+      const fullyDepreciated: AssetDepreciationRegister[] = [];
+      for (const a of assets) {
+        const opening = accumulatedByAsset.get(a.id) ?? 0;
+        const amount = depreciationForPeriod(
+          {
+            purchasePrice: Number(a.purchasePrice),
+            salvageValue: Number(a.salvageValue),
+            usefulLifeMonths: a.usefulLifeMonths,
+            annualDepreciationPct: Number(a.annualDepreciationPct),
+            method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
+            purchaseDate: new Date(a.purchaseDate),
+          },
+          periodYear,
+          periodMonth,
+          opening,
+        );
+        // An asset bought after this period, or already written down to salvage, simply
+        // has no line — rather than the flat monthly instalment it used to be charged.
+        if (amount <= 0) continue;
+
+        const closing = opening + amount;
+        await lineRepo.save(
+          lineRepo.create({
+            journalId: saved.id,
+            assetId: a.id,
+            branchId,
+            periodYear,
+            periodMonth,
+            amount,
+            openingAccumulated: opening,
+            closingAccumulated: closing,
+          }),
+        );
+        totalAmount += amount;
+        lineCount += 1;
+
+        // Retire the asset once it reaches salvage. The status existed but nothing ever
+        // set it, so assets stayed ACTIVE for ever and kept being picked up here.
+        if (Number(a.purchasePrice) - Number(a.salvageValue) - closing <= 0.005) {
+          a.status = 'FULLY_DEPRECIATED';
+          fullyDepreciated.push(a);
+        }
+      }
+      if (fullyDepreciated.length > 0) await assetRepo.save(fullyDepreciated);
+
+      totalAmount = Math.round(totalAmount * 100) / 100;
+
+      // Mirror row in the expense list for audit visibility. accountsShared deliberately
+      // excludes category = 'DEPRECIATION' from the expense totals so this cannot double
+      // count — depreciation_journal_entries is the figure the P&L uses.
+      if (totalAmount > 0) {
+        const { getBranchCurrencyInfo } = await import('../services/billingHelpers');
+        const branchInfo = await getBranchCurrencyInfo(branchId);
+        // Month end, not a hardcoded 28th, so February and 30-day months date correctly.
+        const periodEnd = new Date(periodYear, periodMonth, 0);
+        const expense = expenseRepo.create({
+          // Suffixed with the branch so two branches closing the same period cannot
+          // collide — the old count()-based number could produce the same string twice.
+          expenseNo: `EXP-DEP-${periodYear}-${String(periodMonth).padStart(2, '0')}-${branchId.slice(0, 8)}`,
+          date: periodEnd,
+          category: 'DEPRECIATION',
+          description: `Depreciation for ${periodYear}-${String(periodMonth).padStart(2, '0')}`,
+          branchId,
+          amount: totalAmount,
+          vatAmount: 0,
+          netAmount: totalAmount,
+          // Was hardcoded 'AED', which mislabelled every non-AED branch's depreciation.
+          currency: branchInfo?.currencyCode ?? 'AED',
+          // Depreciation is non-cash: PAID keeps it out of Accrued Expenses (which counts
+          // APPROVED) without ever moving money.
+          status: 'PAID',
+          createdBy: req.user?.userId ?? (req.body.createdBy as string),
+        }) as unknown as ExpenseEntry;
+        const savedExpense = await expenseRepo.save(expense);
+        saved.expenseEntryId = savedExpense.id;
+      }
+
+      saved.totalAmount = totalAmount;
+      saved = await journalRepo.save(saved);
     });
 
-    res.json({ success: true, data: saved });
+    res.json({ success: true, data: saved, assetsCharged: lineCount });
   } catch (err) {
     next(err);
   }
@@ -1399,6 +1595,11 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
       throw new AppError('You do not have permission to record payment for this receivable', 403);
     }
 
+    // A Credit Exchange collection may not be taken until Accounts approved it, and the
+    // amount is validated against the stored outstanding rather than whatever the client
+    // sent. Throws before anything is written.
+    const settleAmount = assertSettleable(receivable, req.body.amount, 'payment');
+
     // Fail before writing anything — same reasoning as recordPayablePayment: the
     // account's type/branch must be valid for a Cash/Bank-mode receipt before the
     // receivable is marked PAID/PARTIAL below.
@@ -1419,15 +1620,24 @@ export const recordReceivablePayment = async (req: Request, res: Response, next:
 
       const payment = paymentRepo.create({
         ...req.body,
+        amount: settleAmount,
         receivableId: receivable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as ReceivablePayment;
       savedPayment = await paymentRepo.save(payment);
 
-      receivable.amountPaid = Number(receivable.amountPaid) + Number(req.body.amount);
+      receivable.amountPaid = Number(receivable.amountPaid) + settleAmount;
       receivable.outstanding = Number(receivable.amount) - Number(receivable.amountPaid);
       if (receivable.outstanding <= 0) receivable.status = 'PAID';
       else if (Number(receivable.amountPaid) > 0) receivable.status = 'PARTIAL';
+      // Settlement trail for the Credit Note workflow — written inside the same
+      // transaction as the balance change, so a row can never read "settled" without the
+      // payment that settled it.
+      if (requiresSettlementApproval(receivable) && receivable.status === 'PAID') {
+        receivable.settledAt = new Date();
+        receivable.settlementReference =
+          req.body.referenceNo || req.body.paymentReference || savedPayment.id;
+      }
       saved = await receivableRepo.save(receivable);
     });
 
@@ -1561,12 +1771,98 @@ export const getInputVatPayableSummary = async (
     const rates = await loadExchangeRates(Source, baseCurrency);
     const vatCredit = await getVatCreditBreakdown(INV_URL, branchQs, baseCurrency, rates);
 
+    // Per-record rows, not just the aggregate. The aggregate had no link back to any
+    // purchase, so it could never be proceeded, never settled, and sat unpaid forever —
+    // which is exactly what it did. Each row now carries its own tax record id and its
+    // own settlement state, so the Payables table can show a real Outstanding/Paid per
+    // tax and the Proceed action has something to act on.
+    // The endpoint wraps its payload in { success, data: { rows, totals } }, and
+    // paginates, and asking for limit=1000 does NOT get 1000: the endpoint clamps with
+    // Math.min(200, limit). It also orders newest-first. So reading only the first page
+    // returned the 200 most recent purchases and silently dropped every older one — and
+    // the oldest are precisely the taxes most likely to have been settled already, which
+    // made it look as though a tax disappeared from Payables once it was paid.
+    //
+    // Page through to the end instead, so the table shows every tax record: outstanding
+    // and fully settled alike.
+    interface TaxReportRow {
+      id: string;
+      vendorName: string;
+      inputVatAmount: number;
+      taxPercent: number;
+      taxName: string;
+      currencyCode: string;
+      invoiceDate: string;
+      taxStatus: string;
+      taxSettledAt: string | null;
+      taxSettlementRef: string | null;
+    }
+    type TaxReportPage = {
+      data?: {
+        rows?: TaxReportRow[];
+        pagination?: { page: number; limit: number; total: number; pages: number };
+      };
+    };
+
+    const PAGE_LIMIT = 200; // the endpoint's own ceiling — asking for more is pointless
+    const taxRows: TaxReportRow[] = [];
+    let pageNo = 1;
+    let pageCount = 1;
+    // Hard stop so a bad `pages` value can never spin forever.
+    while (pageNo <= pageCount && pageNo <= 50) {
+      const pageRes = await internalGet<TaxReportPage>(
+        `${INV_URL}/purchases/tax-report/local${branchQs}${branchQs ? '&' : '?'}limit=${PAGE_LIMIT}&page=${pageNo}`,
+      );
+      const rows = pageRes?.data?.rows ?? [];
+      taxRows.push(...rows);
+      pageCount = pageRes?.data?.pagination?.pages ?? 1;
+      if (rows.length === 0) break;
+      pageNo += 1;
+    }
+    const rowsRes = { data: { rows: taxRows } };
+
+    // Whether each tax has a live payment request, so the UI can distinguish "not started"
+    // from "waiting on approval" without a second round trip.
+    const reqRepo = Source.getRepository(EmployeeExpenseRequest);
+    const taxRequests = await reqRepo.find({
+      where: { requestSource: 'MANAGER_PURCHASE' },
+      order: { createdAt: 'DESC' },
+    });
+    const latestByTax = new Map<string, EmployeeExpenseRequest>();
+    for (const r of taxRequests) {
+      if (!r.taxRecordId) continue;
+      if (!latestByTax.has(r.taxRecordId)) latestByTax.set(r.taxRecordId, r);
+    }
+
+    const items = (rowsRes?.data?.rows ?? [])
+      .filter((r) => Number(r.inputVatAmount) > 0)
+      .map((r) => {
+        const req = latestByTax.get(r.id);
+        const settled = !!r.taxSettledAt || r.taxStatus === 'RECORDED' || r.taxStatus === 'FILED';
+        return {
+          taxRecordId: r.id,
+          taxType: 'INPUT_VAT' as const,
+          taxName: r.taxName ?? 'Input VAT',
+          taxPercent: r.taxPercent ?? null,
+          vendorName: r.vendorName,
+          invoiceDate: r.invoiceDate,
+          amount: Number(r.inputVatAmount),
+          currency: r.currencyCode ?? baseCurrency,
+          settled,
+          settledAt: r.taxSettledAt ?? null,
+          settlementRef: r.taxSettlementRef ?? null,
+          requestNo: req?.requestNo ?? null,
+          requestStatus: req?.status ?? null,
+        };
+      });
+
     res.json({
       success: true,
       data: {
         amount: vatCredit.domesticInputVat,
         currency: baseCurrency,
         dataWarning: vatCredit.dataWarning,
+        items,
       },
     });
   } catch (err) {
@@ -1629,13 +1925,17 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
     // be checked inside a "best-effort" try/catch AFTER the payable was already marked
     // PAID/PARTIAL below — a mismatched account or insufficient balance was logged and
     // swallowed, leaving the payable showing settled with no real cash movement.
+    // A customer refund may not be paid out until Accounts approved it, and the amount is
+    // validated against the stored outstanding rather than whatever the client sent.
+    const settleAmount = assertSettleable(payable, req.body.amount, 'refund');
+
     const isChequePayUpfront = (req.body.paymentMode ?? '').trim().toLowerCase() === 'cheque';
     if (!isChequePayUpfront) {
       await requireCashAccount(Source, {
         branchId: payable.branchId,
         paymentMode: req.body.paymentMode,
         explicitAccountId: req.body.paidFromAccount,
-        amountToDeduct: Number(req.body.amount),
+        amountToDeduct: settleAmount,
       });
     }
 
@@ -1647,15 +1947,21 @@ export const recordPayablePayment = async (req: Request, res: Response, next: Ne
 
       const payment = paymentRepo.create({
         ...req.body,
+        amount: settleAmount,
         payableId: payable.id,
         createdBy: req.user?.userId ?? req.body.createdBy,
       }) as unknown as PayablePayment;
       savedPayment = await paymentRepo.save(payment);
 
-      payable.amountPaid = Number(payable.amountPaid) + Number(req.body.amount);
+      payable.amountPaid = Number(payable.amountPaid) + settleAmount;
       payable.outstanding = Number(payable.amount) - Number(payable.amountPaid);
       if (payable.outstanding <= 0) payable.status = 'PAID';
       else if (Number(payable.amountPaid) > 0) payable.status = 'PARTIAL';
+      if (requiresSettlementApproval(payable) && payable.status === 'PAID') {
+        payable.settledAt = new Date();
+        payable.settlementReference =
+          req.body.referenceNo || req.body.paymentReference || savedPayment.id;
+      }
       saved = await payableRepo.save(payable);
     });
 
@@ -1864,6 +2170,23 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
     const jwtBranchId = req.user?.branchId ?? req.branchFilter?.[0] ?? req.body.branchId;
     const userId = req.user?.userId ?? req.body.createdBy ?? SYSTEM_UUID;
 
+    // An owner from another branch cannot be contributed against. Hiding them from the
+    // selector is presentation; this is the control — the id arrives in the request body
+    // and a direct API call would otherwise bypass the dropdown entirely.
+    if (req.body.ownerId) {
+      const owner = await Source.getRepository(Owner).findOne({
+        where: { id: req.body.ownerId as string },
+      });
+      if (!owner) throw new AppError('Selected owner not found', 400);
+      // Legacy owners carry no branch and stay usable — see ownerEntity.ts.
+      if (owner.branchId && jwtBranchId && owner.branchId !== jwtBranchId) {
+        throw new AppError(
+          `${owner.name} belongs to another branch and cannot be used for an entry in this one.`,
+          403,
+        );
+      }
+    }
+
     // Cheque-mode entries have no bank account chosen yet (that happens later, at
     // Deposit/Issue in Accounts → Cheques) — never persist a linkedCashAccountId for
     // them, so the Equity list/drilldown never implies an immediate account movement
@@ -2038,16 +2361,9 @@ export const getEquitySummary = async (req: Request, res: Response, next: NextFu
     applyBranchQB(assetQb as never, 'a', req.branchFilter ?? []);
     const assets = await assetQb.getMany();
     let fixedNBV = 0;
+    const postedForSummary = await postedAccumulatedByAsset(assets.map((a) => a.id));
     for (const a of assets) {
-      const dep = calculateDepreciation({
-        purchasePrice: Number(a.purchasePrice),
-        salvageValue: Number(a.salvageValue),
-        usefulLifeMonths: a.usefulLifeMonths,
-        annualDepreciationPct: Number(a.annualDepreciationPct),
-        method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(a.purchaseDate),
-      });
-      fixedNBV += dep.nbv;
+      fixedNBV += postedNbv(a, postedForSummary).nbv;
     }
     const cbRepo2 = Source.getRepository(CashBankAccount);
     const cbQbEq = cbRepo2.createQueryBuilder('a').where('a.isActive = :active', { active: true });
@@ -2105,7 +2421,9 @@ export const getEquityStatement = async (req: Request, res: Response, next: Next
     const prevYear = String(Number(targetYear) - 1);
     const qb = repo.createQueryBuilder('e');
     applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
-    qb.orderBy('e.date', 'ASC');
+    // ASC tie-break too: this drives a running balance, so two entries on the same
+    // day must accumulate in a fixed order or the closing figures wobble.
+    qb.orderBy('e.date', 'ASC').addOrderBy('e.createdAt', 'ASC');
     const all = await qb.getMany();
 
     const opening = { shareCapital: 0, retainedEarnings: 0, reserves: 0, total: 0 };
@@ -2542,19 +2860,12 @@ export const getDepreciationCharts = async (req: Request, res: Response, next: N
     const brandMap: Record<string, { cost: number; nbv: number }> = {};
     const statusMap: Record<string, number> = {};
 
+    const postedForCharts = await postedAccumulatedByAsset(assets.map((a) => a.id));
     for (const a of assets) {
-      const dep = calculateDepreciation({
-        purchasePrice: Number(a.purchasePrice),
-        salvageValue: Number(a.salvageValue),
-        usefulLifeMonths: a.usefulLifeMonths,
-        annualDepreciationPct: Number(a.annualDepreciationPct),
-        method: a.method as 'STRAIGHT_LINE' | 'DECLINING_BALANCE',
-        purchaseDate: new Date(a.purchaseDate),
-      });
       const bid = a.brandId ?? 'Unknown';
       if (!brandMap[bid]) brandMap[bid] = { cost: 0, nbv: 0 };
       brandMap[bid].cost += Number(a.purchasePrice);
-      brandMap[bid].nbv += dep.nbv;
+      brandMap[bid].nbv += postedNbv(a, postedForCharts).nbv;
       statusMap[a.status] = (statusMap[a.status] ?? 0) + 1;
     }
 
@@ -2586,7 +2897,9 @@ export const getEquityCharts = async (req: Request, res: Response, next: NextFun
     const repo = Source.getRepository(EquityEntry);
     const qb = repo.createQueryBuilder('e');
     applyBranchQB(qb as never, 'e', req.branchFilter ?? []);
-    qb.orderBy('e.date', 'ASC');
+    // ASC tie-break too: this drives a running balance, so two entries on the same
+    // day must accumulate in a fixed order or the closing figures wobble.
+    qb.orderBy('e.date', 'ASC').addOrderBy('e.createdAt', 'ASC');
     const rows = await qb.getMany();
 
     const typeMap: Record<string, number> = {};
@@ -4154,19 +4467,28 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
     // was invoiced in (which the REFUNDED status above deliberately no longer excludes).
     // Dated by updatedAt: the only timestamp available for when approve() flipped the
     // credit note to COMPLETED, since there's no dedicated completedAt/approvedAt column.
+    //
+    // CREDIT_EXCHANGE rows are included alongside them because an exchange changes the
+    // taxable consideration: trading up is extra supply that owes VAT, trading down
+    // relieves it. VAT Payable now accounts for that, so this report has to show the same
+    // movement or the headline and the report it drills into would disagree.
     const cnQb = Source.getRepository(CreditNote)
       .createQueryBuilder('cn')
       .leftJoin(Invoice, 'inv', 'inv.id = cn.invoiceId')
-      .where('cn.type = :type', { type: 'DIRECT_REFUND' })
-      .andWhere('cn.status = :status', { status: 'COMPLETED' })
-      .andWhere('cn.taxAmount > 0')
+      .where(
+        `((cn.type = 'DIRECT_REFUND' AND cn.status = 'COMPLETED' AND cn.taxAmount > 0)
+          OR (cn.type = 'CREDIT_EXCHANGE' AND cn.status = 'PRODUCT_REPLACED'))`,
+      )
       .select([
         'cn.creditNoteNo AS "creditNoteNo"',
+        'cn.type AS "creditNoteType"',
         'cn.updatedAt AS "reversalDate"',
         'cn.branchId AS "branchId"',
         'cn.customerId AS "customerId"',
         'cn.customerName AS "customerName"',
         'cn.productAmount AS "productAmount"',
+        'cn.replacementAmount AS "replacementAmount"',
+        'cn.replacementDiscount AS "replacementDiscount"',
         'cn.taxPercent AS "taxPercent"',
         'cn.taxName AS "taxName"',
         'cn.taxAmount AS "taxAmount"',
@@ -4196,11 +4518,14 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
 
     const reversalsRaw = await cnQb.getRawMany<{
       creditNoteNo: string;
+      creditNoteType: string;
       reversalDate: Date;
       branchId: string;
       customerId: string;
       customerName: string | null;
       productAmount: string;
+      replacementAmount: string | null;
+      replacementDiscount: string | null;
       taxPercent: string | null;
       taxName: string | null;
       taxAmount: string;
@@ -4212,26 +4537,45 @@ export const getOutputTax = async (req: Request, res: Response, next: NextFuncti
       customerVatStatus: string | null;
     }>();
 
-    const reversalRows = reversalsRaw.map((r) => ({
-      invoiceNumber: `Reversal — ${r.creditNoteNo}`,
-      invoiceDate: r.reversalDate,
-      branchId: r.branchId,
-      customerId: r.customerId,
-      customerName: r.customerName,
-      customerVatNumber: r.customerVatNumber,
-      customerCountry: r.customerCountry,
-      customerStateProvince: r.customerStateProvince,
-      customerCity: r.customerCity,
-      taxableAmount: -Number(r.productAmount ?? 0),
-      taxPercent: r.taxPercent != null ? Number(r.taxPercent) : null,
-      taxName: r.taxName,
-      outputVat: -Number(r.taxAmount ?? 0),
-      isExempt: r.customerVatStatus === 'EXEMPT',
-      totalInvoice: -(Number(r.productAmount ?? 0) + Number(r.taxAmount ?? 0)),
-      currencyCode: r.currencyCode,
-      status: 'CREDIT_NOTE_REVERSAL',
-      isReversal: true,
-    }));
+    const reversalRows = reversalsRaw
+      .map((r) => {
+        const isExchange = r.creditNoteType === 'CREDIT_EXCHANGE';
+        // A refund reverses the whole line. An exchange adjusts only the difference —
+        // net of the discount, because VAT is due on what the customer is actually
+        // charged. Signed, so a downgrade reduces output VAT instead of adding to it.
+        const taxableAmount = isExchange
+          ? Number(r.replacementAmount ?? 0) -
+            Number(r.productAmount ?? 0) -
+            Number(r.replacementDiscount ?? 0)
+          : -Number(r.productAmount ?? 0);
+        const pct = r.taxPercent != null ? Number(r.taxPercent) : null;
+        const outputVat = isExchange
+          ? taxableAmount * ((pct ?? 0) / 100)
+          : -Number(r.taxAmount ?? 0);
+        return {
+          invoiceNumber: `${isExchange ? 'Exchange' : 'Reversal'} — ${r.creditNoteNo}`,
+          invoiceDate: r.reversalDate,
+          branchId: r.branchId,
+          customerId: r.customerId,
+          customerName: r.customerName,
+          customerVatNumber: r.customerVatNumber,
+          customerCountry: r.customerCountry,
+          customerStateProvince: r.customerStateProvince,
+          customerCity: r.customerCity,
+          taxableAmount,
+          taxPercent: pct,
+          taxName: r.taxName,
+          outputVat,
+          isExempt: r.customerVatStatus === 'EXEMPT',
+          totalInvoice: taxableAmount + outputVat,
+          currencyCode: r.currencyCode,
+          status: isExchange ? 'CREDIT_NOTE_EXCHANGE' : 'CREDIT_NOTE_REVERSAL',
+          isReversal: true,
+        };
+      })
+      // An even exchange moves no consideration and owes no tax — showing a 0.00 row
+      // would just be noise in the return.
+      .filter((r) => Math.abs(r.taxableAmount) > 0.005 || Math.abs(r.outputVat) > 0.005);
 
     // Reversal rows aren't paginated by the invoice query above (their volume is small
     // relative to invoices), so they're only attached to page 1 — otherwise they'd
@@ -4627,6 +4971,41 @@ async function buildCustomer360Profile(
     ]);
   }
 
+  // ── Credit notes, guarantee cheques and standalone receivables ───────────────
+  // These were either nested inside invoices (credit notes, reachable only by digging
+  // through the invoice relation) or not fetched at all, so the profile could not answer
+  // "what has this customer returned / what deposits are we holding / what else do they
+  // owe" without leaving the page.
+  const creditNoteQb = Source.getRepository(CreditNote)
+    .createQueryBuilder('cn')
+    .where('cn.customerId = :customerId', { customerId });
+  applyBranchQB(creditNoteQb as never, 'cn', branchFilter);
+  if (employeeId) creditNoteQb.andWhere('cn.sellerEmployeeId = :employeeId', { employeeId });
+  creditNoteQb.orderBy('cn.createdAt', 'DESC');
+
+  // Cheques held as a guarantee are an obligation to return, not income — kept separate
+  // from both payments and receipts for exactly that reason.
+  const guaranteeQb = Source.getRepository(GuaranteeCheque)
+    .createQueryBuilder('gc')
+    .where('gc.customerId = :customerId', { customerId });
+  applyBranchQB(guaranteeQb as never, 'gc', branchFilter);
+  guaranteeQb.orderBy('gc.createdAt', 'DESC');
+
+  // Receivables raised outside an invoice — a Credit Exchange difference, an advance.
+  // They are real customer debt and were invisible here.
+  const manualRcvQb = Source.getRepository(ManualReceivable)
+    .createQueryBuilder('mr')
+    .where('mr.customerId = :customerId', { customerId })
+    .andWhere("mr.status <> 'WRITTEN_OFF'");
+  applyBranchQB(manualRcvQb as never, 'mr', branchFilter);
+  manualRcvQb.orderBy('mr.createdAt', 'DESC');
+
+  const [creditNotes, guaranteeCheques, manualReceivables] = await Promise.all([
+    creditNoteQb.getMany(),
+    guaranteeQb.getMany().catch(() => []),
+    manualRcvQb.getMany().catch(() => []),
+  ]);
+
   // "Created date/time + department" for every row — one batched employee lookup for
   // however many unique employees are referenced across all four entity types, then
   // attached to each row rather than re-fetched per row.
@@ -4658,22 +5037,59 @@ async function buildCustomer360Profile(
 
   const contracts = invoicesWithCreator.filter((i) => i.type !== 'QUOTATION');
   const totalInvoiced = contracts.reduce((sum, i) => sum + Number(i.totalAmount ?? 0), 0);
-  const totalPaid = paymentsWithCreator
-    .filter((p) => p.status === 'APPROVED')
+
+  const approved = paymentsWithCreator.filter((p) => p.status === 'APPROVED');
+  // A security deposit is refundable money held against the contract, not payment of it.
+  // Counting deposits here overstated what the customer had paid and understated what
+  // they still owe — the same leak that had to be fixed across the receivable queries.
+  const totalPaid = approved
+    .filter((p) => !p.isSecurityDeposit)
     .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+  const totalDepositsHeld = approved
+    .filter((p) => p.isSecurityDeposit)
+    .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+  // Debt raised outside an invoice (exchange differences, advances) is still owed.
+  const manualOutstanding = manualReceivables.reduce(
+    (sum, r) => sum + Number(r.outstanding ?? Number(r.amount) - Number(r.amountPaid ?? 0)),
+    0,
+  );
+  // NOT clamped at zero. Clamping hid a genuine overpayment behind 0.00 and made the
+  // figure disagree with Receivables, which reports the real position.
+  const totalOutstanding = totalInvoiced - totalPaid + manualOutstanding;
+
+  const creditNoteValue = creditNotes.reduce(
+    (sum, cn) => sum + Number(cn.productAmount ?? 0) + Number(cn.taxAmount ?? 0),
+    0,
+  );
+  const guaranteeChequeValue = guaranteeCheques.reduce((sum, g) => sum + Number(g.amount ?? 0), 0);
 
   return {
     invoices: invoicesWithCreator,
     payments: paymentsWithCreator,
     agreements: agreementsWithCreator,
     bills: billsWithCreator,
+    creditNotes,
+    guaranteeCheques,
+    manualReceivables,
+    // Deposits are surfaced as their own list, not mixed into payments, because they are
+    // an obligation to return rather than revenue.
+    securityDeposits: approved.filter((p) => p.isSecurityDeposit),
     summary: {
       totalInvoiced,
       totalPaid,
-      totalOutstanding: Math.max(0, totalInvoiced - totalPaid),
+      totalOutstanding,
+      totalDepositsHeld,
+      manualOutstanding,
+      creditNoteValue,
+      guaranteeChequeValue,
       contractCount: contracts.length,
+      quotationCount: invoicesWithCreator.length - contracts.length,
       paymentCount: payments.length,
       billCount: bills.length,
+      agreementCount: agreements.length,
+      creditNoteCount: creditNotes.length,
+      depositCount: approved.filter((p) => p.isSecurityDeposit).length,
     },
   };
 }
@@ -4731,6 +5147,267 @@ export const sendTaxDocumentEmail = async (req: Request, res: Response, next: Ne
     });
 
     res.json({ success: true, message: 'Tax document email queued' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── CREDIT NOTE SETTLEMENT APPROVAL QUEUE ────────────────────────────────────
+// The Accounts gate between a Credit Note being agreed and real money moving.
+//
+// The queue is assembled from the receivable and payable rows the Credit Note workflow
+// already created, rather than from an approval table of its own. Those rows ARE the
+// money — they are what Receivables/Payables list and what the Balance Sheet sums — so
+// approving them in place keeps one source of truth. A parallel approval table would
+// have meant reconciling two records of the same amount.
+
+interface SettlementQueueRow {
+  id: string;
+  ledger: 'RECEIVABLE' | 'PAYABLE';
+  referenceNo: string;
+  creditNoteId?: string;
+  creditNoteNo?: string;
+  type: string;
+  paymentDirection?: string;
+  customerName?: string;
+  customerId?: string;
+  branchId: string;
+  currency: string;
+  netAmount: number;
+  taxAmount: number;
+  discountAmount: number;
+  amount: number;
+  amountPaid: number;
+  outstanding: number;
+  reason?: string;
+  approvalStatus: string;
+  approvedByName?: string;
+  approvedAt?: Date | null;
+  rejectionReason?: string;
+  settlementStatus: string;
+  settledAt?: Date | null;
+  settlementReference?: string;
+  createdBy: string;
+  createdAt: Date;
+}
+
+/**
+ * List every Credit Note settlement request — collections and refunds together, so
+ * Accounts sees one queue rather than having to check Receivables and Payables
+ * separately for work that arrived from the same workflow.
+ */
+export const getCreditNoteSettlements = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const branchFilter: string[] = req.branchFilter ?? [];
+    const { approvalStatus, direction } = req.query as Record<string, string>;
+
+    const recQb = Source.getRepository(ManualReceivable)
+      .createQueryBuilder('r')
+      .where('r."creditNoteId" IS NOT NULL');
+    const payQb = Source.getRepository(ManualPayable)
+      .createQueryBuilder('p')
+      .where('p."creditNoteId" IS NOT NULL');
+    if (branchFilter.length > 0) {
+      recQb.andWhere('r."branchId" IN (:...bf)', { bf: branchFilter });
+      payQb.andWhere('p."branchId" IN (:...bf)', { bf: branchFilter });
+    }
+    const [receivables, payables] = await Promise.all([recQb.getMany(), payQb.getMany()]);
+
+    const settlementStatus = (row: { status?: string; amountPaid?: number }) =>
+      row.status === 'PAID' ? 'SETTLED' : Number(row.amountPaid) > 0 ? 'PARTIAL' : 'UNSETTLED';
+
+    const rows: SettlementQueueRow[] = [
+      ...receivables.map((r) => ({
+        id: r.id,
+        ledger: 'RECEIVABLE' as const,
+        referenceNo: r.referenceNo,
+        creditNoteId: r.creditNoteId,
+        creditNoteNo: r.creditNoteNo,
+        type: r.type,
+        paymentDirection: r.paymentDirection ?? PaymentDirection.CUSTOMER_TO_COMPANY,
+        customerName: r.customerName,
+        customerId: r.customerId,
+        branchId: r.branchId,
+        currency: r.currency,
+        netAmount: Number(r.netAmount ?? r.amount),
+        taxAmount: Number(r.taxAmount ?? 0),
+        discountAmount: Number(r.discountAmount ?? 0),
+        amount: Number(r.amount),
+        amountPaid: Number(r.amountPaid ?? 0),
+        outstanding: Number(r.outstanding ?? r.amount),
+        reason: r.description,
+        approvalStatus: r.approvalStatus ?? SettlementApprovalStatus.PENDING,
+        approvedByName: r.approvedByName,
+        approvedAt: r.approvedAt ?? null,
+        rejectionReason: r.rejectionReason,
+        settlementStatus: settlementStatus(r),
+        settledAt: r.settledAt ?? null,
+        settlementReference: r.settlementReference,
+        createdBy: r.createdBy,
+        createdAt: r.createdAt,
+      })),
+      ...payables.map((p) => ({
+        id: p.id,
+        ledger: 'PAYABLE' as const,
+        referenceNo: p.referenceNo,
+        creditNoteId: p.creditNoteId,
+        creditNoteNo: p.creditNoteNo,
+        type: p.type,
+        paymentDirection: p.paymentDirection ?? PaymentDirection.COMPANY_TO_CUSTOMER,
+        customerName: p.payableTo,
+        customerId: undefined,
+        branchId: p.branchId,
+        currency: p.currency,
+        netAmount: Number(p.netAmount ?? p.amount),
+        taxAmount: Number(p.taxAmount ?? 0),
+        discountAmount: Number(p.discountAmount ?? 0),
+        amount: Number(p.amount),
+        amountPaid: Number(p.amountPaid ?? 0),
+        outstanding: Number(p.outstanding ?? p.amount),
+        reason: p.description,
+        approvalStatus: p.approvalStatus ?? SettlementApprovalStatus.PENDING,
+        approvedByName: p.approvedByName,
+        approvedAt: p.approvedAt ?? null,
+        rejectionReason: p.rejectionReason,
+        settlementStatus: settlementStatus(p),
+        settledAt: p.settledAt ?? null,
+        settlementReference: p.settlementReference,
+        createdBy: p.createdBy,
+        createdAt: p.createdAt,
+      })),
+    ]
+      .filter((r) => !approvalStatus || r.approvalStatus === approvalStatus)
+      .filter((r) => !direction || r.paymentDirection === direction)
+      // Newest first, with a stable id tie-break so rows never shuffle between reloads
+      // when two were created in the same transaction.
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() ||
+          a.id.localeCompare(b.id),
+      );
+
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/** Load a settlement row from whichever ledger holds it, with branch enforcement. */
+async function loadSettlementRow(req: Request) {
+  const id = req.params.id as string;
+  const receivable = await Source.getRepository(ManualReceivable).findOne({ where: { id } });
+  const payable = receivable
+    ? null
+    : await Source.getRepository(ManualPayable).findOne({ where: { id } });
+  const row = receivable ?? payable;
+  if (!row) throw new AppError('Settlement request not found', 404);
+  if (!row.creditNoteId) {
+    throw new AppError('This record is not a Credit Note settlement request', 400);
+  }
+  const branchFilter: string[] = req.branchFilter ?? [];
+  if (branchFilter.length > 0 && !branchFilter.includes(row.branchId)) {
+    throw new AppError('You do not have permission to act on this settlement request', 403);
+  }
+  return { row, isReceivable: !!receivable };
+}
+
+/**
+ * Accounts authorises the settlement. This does NOT move money — it only records that
+ * the transaction may proceed. The actual payment still has to be recorded against the
+ * receivable/payable, which is where cash and the cashbook change.
+ */
+export const approveCreditNoteSettlement = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { row, isReceivable } = await loadSettlementRow(req);
+
+    // Idempotent: approving twice returns the existing approval rather than re-stamping
+    // it, so a double-click cannot rewrite who approved it or when.
+    if (row.approvalStatus === SettlementApprovalStatus.APPROVED) {
+      return res.json({ success: true, data: row, alreadyApproved: true });
+    }
+    if (row.approvalStatus === SettlementApprovalStatus.REJECTED) {
+      throw new AppError(
+        'This request was rejected. Rejected requests cannot be approved — raise a new credit note instead.',
+        400,
+      );
+    }
+
+    row.approvalStatus = SettlementApprovalStatus.APPROVED;
+    row.approvedBy = req.user?.userId;
+    row.approvedByName = req.body?.approvedByName || req.user?.email || 'Accounts';
+    row.approvedAt = new Date();
+    row.rejectionReason = undefined;
+
+    const repo = isReceivable
+      ? Source.getRepository(ManualReceivable)
+      : Source.getRepository(ManualPayable);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saved = await (repo as any).save(row);
+    logger.info(`Credit Note settlement ${row.referenceNo} approved by ${row.approvedByName}`);
+    return res.json({ success: true, data: saved });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Accounts declines the settlement. The receivable/payable stays on the books as a
+ * record of what was asked for, but can never be settled — see assertSettleable.
+ */
+export const rejectCreditNoteSettlement = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { row, isReceivable } = await loadSettlementRow(req);
+    const reason = (req.body?.rejectionReason ?? '').trim();
+    if (!reason) throw new AppError('A rejection reason is required', 400);
+
+    if (Number(row.amountPaid) > 0) {
+      throw new AppError(
+        'This request has already been partly settled and can no longer be rejected.',
+        400,
+      );
+    }
+    if (row.approvalStatus === SettlementApprovalStatus.REJECTED) {
+      return res.json({ success: true, data: row, alreadyRejected: true });
+    }
+
+    row.approvalStatus = SettlementApprovalStatus.REJECTED;
+    row.rejectionReason = reason;
+    row.approvedBy = req.user?.userId;
+    row.approvedByName = req.body?.reviewedByName || req.user?.email || 'Accounts';
+    row.approvedAt = new Date();
+    // A rejected request is closed, not parked: the row is written off so it leaves the
+    // Receivables/Payables tables and the AR/AP totals together. Staff raise a fresh
+    // credit note if the customer is still owed something.
+    //
+    // Writing off has to happen on BOTH sides at once. Hiding the row from the page while
+    // leaving it in AP — or vice versa — is how the table and the Balance Sheet end up
+    // telling different stories about the same money, which is the recurring defect in
+    // this module. WRITTEN_OFF is excluded from the AR total already and is now excluded
+    // from the AP total too.
+    //
+    // Note the accounting consequence, which is real and is the caller's decision: for a
+    // DIRECT_REFUND the credit note is already COMPLETED, so its revenue reversal and
+    // stock write-off stand while the matching liability is removed here. If the return
+    // itself is being refused, the credit note needs voiding as well — rejecting the
+    // settlement alone does not undo it.
+    row.status = 'WRITTEN_OFF';
+    row.outstanding = 0;
+
+    const repo = isReceivable
+      ? Source.getRepository(ManualReceivable)
+      : Source.getRepository(ManualPayable);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const saved = await (repo as any).save(row);
+    logger.info(`Credit Note settlement ${row.referenceNo} rejected: ${reason}`);
+    return res.json({ success: true, data: saved });
   } catch (err) {
     next(err);
   }

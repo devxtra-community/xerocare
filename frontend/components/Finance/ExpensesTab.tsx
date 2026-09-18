@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, CheckCircle2, XCircle, X, Search, FileText } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, X, Search, FileText, Plus, Wallet } from 'lucide-react';
 import {
   getMyExpenseRequests,
   rejectExpenseRequest,
@@ -15,8 +15,16 @@ import {
   EXPENSE_CATEGORIES_LIST,
   getExpenseCategoryLabel,
 } from '@/components/expenses/EmployeeRequestsTab';
-import { fetchCashBankAccounts } from '@/lib/finance/accountsApi';
+import {
+  fetchCashBankAccounts,
+  fetchExpenseEntries,
+  fetchChartOfAccountsStructure,
+  type ExpenseEntry,
+} from '@/lib/finance/accountsApi';
+import AddExpenseModal from '@/components/Finance/AddExpenseModal';
+import { expenseCategoryLabel, expenseCategoryOptions } from '@/lib/finance/expenseCategories';
 import { formatCurrency } from '@/lib/format';
+import StatCard from '@/components/StatCard';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,6 +148,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
   const [dateTo, setDateTo] = useState('');
 
   // Modal state
+  const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<ExpenseRequest | null>(null);
   const [paying, setPaying] = useState<ExpenseRequest | null>(null);
   const [rejecting, setRejecting] = useState<ExpenseRequest | null>(null);
@@ -156,6 +165,23 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
     queryFn: () => fetchCashBankAccounts(),
     staleTime: 60_000,
   });
+
+  // Expenses Accounts booked directly, which are ExpenseEntry rows rather than employee
+  // requests. They are a separate store with no approval step, so they need their own
+  // list — without one, an expense recorded here would post to the P&L and the cashbook
+  // and then be invisible on the very page that created it.
+  const { data: ownExpenses = [], isLoading: loadingOwn } = useQuery<ExpenseEntry[]>({
+    queryKey: ['accounts-expense-entries', branchIds ?? ''],
+    queryFn: () => fetchExpenseEntries(),
+    staleTime: 30_000,
+  });
+
+  const { data: coaRows = [] } = useQuery({
+    queryKey: ['coa-structure'],
+    queryFn: () => fetchChartOfAccountsStructure(),
+    staleTime: 5 * 60_000,
+  });
+  const categoryOptions = useMemo(() => expenseCategoryOptions(coaRows), [coaRows]);
   const accounts = accountsRaw as {
     id: string;
     name: string;
@@ -222,40 +248,34 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
 
   return (
     <div className="space-y-6">
+      {/* Accounts can book an expense directly — this page previously only reviewed what
+          employees submitted, so a rent or utility bill Accounts paid themselves had
+          nowhere to be entered. */}
+      <div className="flex justify-end">
+        <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+          <Plus size={15} /> Add Expense
+        </Button>
+      </div>
+
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl border p-3 bg-blue-50 border-blue-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Awaiting Approval
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-blue-700">{stats.submitted.count}</p>
-          <p className="text-xs font-semibold text-blue-600">
-            {formatCurrency(stats.submitted.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-emerald-50 border-emerald-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Approved / Pending Payment
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-emerald-700">{stats.approved.count}</p>
-          <p className="text-xs font-semibold text-emerald-600">
-            {formatCurrency(stats.approved.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-purple-50 border-purple-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Paid</p>
-          <p className="text-xl font-bold mt-0.5 text-purple-700">{stats.paid.count}</p>
-          <p className="text-xs font-semibold text-purple-600">
-            {formatCurrency(stats.paid.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-red-50 border-red-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Rejected</p>
-          <p className="text-xl font-bold mt-0.5 text-red-700">{stats.rejected.count}</p>
-          <p className="text-xs font-semibold text-red-600">
-            {formatCurrency(stats.rejected.total, currency)}
-          </p>
-        </div>
+      {/* Shared StatCard, matching the Receipts tab — see PaymentsTab for why these
+          stopped being hand-rolled colour blocks. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+        {(
+          [
+            { label: 'Awaiting Approval', ...stats.submitted },
+            { label: 'Approved / Pending Payment', ...stats.approved },
+            { label: 'Paid', ...stats.paid },
+            { label: 'Rejected', ...stats.rejected },
+          ] as { label: string; count: number; total: number }[]
+        ).map(({ label, count, total }) => (
+          <StatCard
+            key={label}
+            title={label}
+            value={String(count)}
+            subtitle={formatCurrency(total, currency)}
+          />
+        ))}
       </div>
 
       {/* Filters */}
@@ -345,6 +365,99 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
             </button>
           )}
         </div>
+      </div>
+
+      {/* Expenses booked by Accounts. Kept as its own table rather than merged into the
+          requests list below: these never had a submitter and never go through approval,
+          so the columns that matter (which account it posted to, whether it is paid) are
+          different ones. */}
+      <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+            <Wallet size={14} className="text-emerald-600" />
+            Expenses Recorded by Accounts
+          </h3>
+          <span className="text-xs text-muted-foreground">{ownExpenses.length} records</span>
+        </div>
+        {loadingOwn ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="h-7 w-7 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : ownExpenses.length === 0 ? (
+          <div className="py-10 text-center">
+            <p className="text-sm font-semibold text-slate-500">No expenses recorded yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use Add Expense to book one directly — rent, utilities, salaries and the like.
+            </p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead className="pl-4">Date</TableHead>
+                <TableHead>Expense #</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Tax</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ownExpenses.map((e) => (
+                <TableRow key={e.id}>
+                  <TableCell className="pl-4 text-xs font-semibold text-slate-600">
+                    {new Date(e.date).toLocaleDateString('en-GB')}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs font-bold text-blue-600">
+                    {e.expenseNo}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <span className="font-semibold text-slate-700">
+                      {expenseCategoryLabel(e.category, categoryOptions)}
+                    </span>
+                    {e.subCategory && (
+                      <span className="block text-[10px] text-slate-400">{e.subCategory}</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-[260px] truncate text-xs text-slate-600">
+                    {e.description}
+                    {e.isPrepayment && (
+                      <span className="ml-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700">
+                        PREPAID
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatCurrency(Number(e.amount), e.currency || currency)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-slate-500">
+                    {Number(e.vatAmount) > 0
+                      ? formatCurrency(Number(e.vatAmount), e.currency || currency)
+                      : '—'}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs font-black text-slate-800">
+                    {formatCurrency(Number(e.netAmount), e.currency || currency)}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        e.status === 'PAID'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : e.status === 'REJECTED'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
+                      {e.status}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
 
       {/* Table */}
@@ -516,6 +629,8 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
         />
       )}
       {rejecting && <QuickRejectModal expense={rejecting} onClose={() => setRejecting(null)} />}
+
+      <AddExpenseModal open={addOpen} onOpenChange={setAddOpen} onSuccess={invalidateAll} />
     </div>
   );
 }

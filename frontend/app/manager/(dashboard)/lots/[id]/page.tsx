@@ -1454,7 +1454,10 @@ export default function LotDetailPage() {
                       variant="default"
                       className="w-full gap-2 shadow-md bg-primary hover:bg-primary/90"
                       onClick={() => setShowPaymentModal(true)}
-                      disabled={purchaseRecord.paidAmount >= purchaseRecord.purchaseAmount}
+                      disabled={
+                        purchaseRecord.paidAmount >=
+                        (purchaseRecord.vendorPayableAmount ?? purchaseRecord.purchaseAmount) - 0.01
+                      }
                     >
                       <Plus size={16} /> Add Payment
                     </Button>
@@ -1495,7 +1498,8 @@ export default function LotDetailPage() {
           purchaseRef={lot?.lotNumber}
           vendorName={lot?.vendor?.name}
           purchaseCurrency={purchaseRecord.currencyCode}
-          payableAmount={purchaseRecord.purchaseAmount}
+          payableAmount={purchaseRecord.vendorPayableAmount ?? purchaseRecord.purchaseAmount}
+          taxSettledSeparately={purchaseRecord.taxSettledSeparately ?? 0}
           paidAmount={purchaseRecord.paidAmount}
           // So the Additional Cost mode can show what this lot already carries for the
           // chosen cost type instead of asking blind.

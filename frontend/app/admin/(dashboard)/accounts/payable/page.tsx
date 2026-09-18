@@ -7,10 +7,13 @@ import { Search, Eye, FileText } from 'lucide-react';
 import {
   fetchManualPayables,
   fetchPayableCharts,
+  fetchInputVatPayable,
   fetchVendorStatement,
 } from '@/lib/finance/accountsApi';
 import { fetchPurchases, agingBucket, fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getUserFromToken } from '@/lib/auth';
 import StatCard from '@/components/StatCard';
@@ -18,6 +21,7 @@ import { DonutChart, HorizontalBarChart, SimpleBarChart } from '@/components/acc
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import PaymentsTab from '@/components/Finance/PaymentsTab';
 import ExpensesTab from '@/components/Finance/ExpensesTab';
+import CreditNoteSettlementsTab from '@/components/finance/CreditNoteSettlementsTab';
 import { PayableDetailModal } from '@/components/accounts/ReceivablePayableDetail';
 import { Button } from '@/components/ui/button';
 import {
@@ -96,8 +100,12 @@ function PayableContent() {
   const router = useRouter();
   const branchIds = searchParams.get('branchIds') ?? '';
   // Same ?tab= contract as the Finance page, so deep links behave identically on both sides.
-  const activeTab = (searchParams.get('tab') ?? 'payable') as 'payable' | 'payments' | 'expenses';
-  const switchTab = (t: 'payable' | 'payments' | 'expenses') => {
+  const activeTab = (searchParams.get('tab') ?? 'payable') as
+    | 'payable'
+    | 'payments'
+    | 'expenses'
+    | 'credit-notes';
+  const switchTab = (t: 'payable' | 'payments' | 'expenses' | 'credit-notes') => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', t);
     router.replace(`?${params.toString()}`);
@@ -154,12 +162,21 @@ function PayableContent() {
       }>,
   });
 
+  const { data: inputVatPayable } = useQuery({
+    queryKey: ['admin-input-vat-payable'],
+    queryFn: () => fetchInputVatPayable(),
+    staleTime: 30_000,
+  });
+
   // Manual payables linked to a PO are excluded — that PO's own outstanding
   // balance already covers it (mirrors the Finance page's guard).
   const combined = useMemo(() => {
+    // Settled purchases stay on the list, exactly as on the Finance page and on
+    // Receivables. Dropping them hid the payment history the moment a vendor was
+    // paid off. No total moves: everything below sums `outstanding`, which is 0 on
+    // a settled row.
     const fromPurchases = purchases
       .filter((p) => branchIdList.length === 0 || branchIdList.includes(p.branchId))
-      .filter((p) => (p.remainingAmount ?? p.totalAmount ?? 0) > 0)
       .map((p) => ({
         id: p.id,
         referenceNo: `PO-${p.id?.slice(0, 8)}`,
@@ -171,9 +188,14 @@ function PayableContent() {
         status: p.status ?? 'PENDING',
         source: 'Purchase Order' as const,
         isPurchase: true,
+        isVat: false,
       }));
     const fromManual = manualPayables
-      .filter((p) => !p.linkedPurchaseId)
+      // A written-off balance is closed — a rejected Credit Note settlement, or a manual
+      // write-off. It is excluded from AR/AP on the Balance Sheet, so showing it here
+      // would put a dead row on a table of live obligations. The rejection itself stays
+      // visible, with its reason, on the Credit Notes tab.
+      .filter((p) => !p.linkedPurchaseId && p.status !== 'WRITTEN_OFF')
       .map((p) => ({
         id: p.id,
         referenceNo: p.referenceNo,
@@ -185,9 +207,26 @@ function PayableContent() {
         status: p.status,
         source: 'Manual Entry' as const,
         isPurchase: false,
+        isVat: false,
       }));
-    return [...fromPurchases, ...fromManual];
-  }, [purchases, manualPayables, branchIdList]);
+    // One row per domestic input-VAT record, mirroring Finance. Paid is driven by the
+    // settlement, never by the vendor's own payment: the VAT sits inside the vendor's
+    // invoice, so paying them says nothing about whether the tax has been settled.
+    const fromInputVat = (inputVatPayable?.items ?? []).map((t) => ({
+      id: `tax-${t.taxRecordId}`,
+      referenceNo: t.requestNo ?? `VAT-${t.taxRecordId.slice(0, 8).toUpperCase()}`,
+      payableTo: `${t.taxName}${t.taxPercent != null ? ` ${Number(t.taxPercent)}%` : ''} — ${t.vendorName}`,
+      type: 'TAX_PAYABLE',
+      amount: t.amount,
+      outstanding: t.settled ? 0 : t.amount,
+      aging: t.invoiceDate ? agingBucket(t.invoiceDate) : 'Current',
+      status: t.settled ? 'PAID' : (t.requestStatus ?? 'PENDING'),
+      source: 'Input VAT' as const,
+      isPurchase: false,
+      isVat: true,
+    }));
+    return [...fromPurchases, ...fromManual, ...fromInputVat];
+  }, [purchases, manualPayables, inputVatPayable, branchIdList]);
 
   const filtered = useMemo(
     () =>
@@ -202,13 +241,32 @@ function PayableContent() {
     [combined, sourceFilter, search],
   );
 
-  const totalOutstanding = combined.reduce((s, p) => s + Number(p.outstanding), 0);
-  const overdue = combined
+  // Six rows a page; resetKey returns to page 1 when a filter changes.
+  const payablePaging = useTablePagination(filtered, `${sourceFilter}|${search}`);
+
+  // ── The accounting guard ────────────────────────────────────────────────────
+  // Tax rows are listed here for visibility, but they are NOT a vendor liability and
+  // must never be summed into one. A vendor invoice of 15,000 containing 714.29 of
+  // input VAT is a 15,000 liability — not 15,714.29. That VAT was already paid to the
+  // vendor inside the invoice and is reclaimable from the tax authority, so counting
+  // it here would book the same money as owed twice.
+  const liabilityRows = combined.filter((p) => !p.isVat);
+
+  const totalOutstanding = liabilityRows.reduce((s, p) => s + Number(p.outstanding), 0);
+  // Aging measures how overdue a debt is; a tax row is not a debt to anyone here.
+  const overdue = liabilityRows
     .filter((p) => p.aging && p.aging !== 'Current')
+    .reduce((s, p) => s + Number(p.outstanding), 0);
+  /** Outstanding tax, reported separately so it is visible without being a liability. */
+  const taxOutstanding = combined
+    .filter((p) => p.isVat)
     .reduce((s, p) => s + Number(p.outstanding), 0);
 
   const vendorNames = useMemo(
-    () => [...new Set(combined.map((p) => p.payableTo))].filter(Boolean).sort() as string[],
+    () =>
+      [...new Set(combined.filter((p) => !p.isVat).map((p) => p.payableTo))]
+        .filter(Boolean)
+        .sort() as string[],
     [combined],
   );
 
@@ -237,7 +295,9 @@ function PayableContent() {
   };
 
   const handleGenerateStatementClick = () => {
-    const uniqueVisible = [...new Set(filtered.map((p) => p.payableTo))].filter(Boolean);
+    const uniqueVisible = [
+      ...new Set(filtered.filter((p) => !p.isVat).map((p) => p.payableTo)),
+    ].filter(Boolean);
     if (uniqueVisible.length === 1) {
       generateVendorStatement(uniqueVisible[0] as string);
       return;
@@ -256,7 +316,7 @@ function PayableContent() {
           </p>
         </div>
         <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl shadow-sm">
-          {(['payable', 'payments', 'expenses'] as const).map((t) => (
+          {(['payable', 'payments', 'expenses', 'credit-notes'] as const).map((t) => (
             <button
               key={t}
               onClick={() => switchTab(t)}
@@ -266,7 +326,13 @@ function PayableContent() {
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              {t === 'payable' ? 'Payable' : t === 'payments' ? 'Payments' : 'Expenses'}
+              {t === 'payable'
+                ? 'Payable'
+                : t === 'payments'
+                  ? 'Payments'
+                  : t === 'expenses'
+                    ? 'Expenses'
+                    : 'Credit Notes'}
             </button>
           ))}
         </div>
@@ -285,6 +351,9 @@ function PayableContent() {
       {/* Payments / Expenses — the same shared components Finance renders, scoped cross-branch. */}
       {activeTab === 'payments' && <PaymentsTab branchIds={branchIds || undefined} />}
       {activeTab === 'expenses' && <ExpensesTab branchIds={branchIds || undefined} />}
+      {activeTab === 'credit-notes' && (
+        <CreditNoteSettlementsTab branchIds={branchIds || undefined} />
+      )}
 
       {activeTab === 'payable' && (
         <>
@@ -292,14 +361,18 @@ function PayableContent() {
             <StatCard
               title="Total Outstanding"
               value={formatCurrency(totalOutstanding, currency)}
-              subtitle="All branches"
+              subtitle="Vendor liability only"
             />
             <StatCard
               title="Overdue"
               value={formatCurrency(overdue, currency)}
               subtitle="Past due"
             />
-            <StatCard title="Total Entries" value={combined.length.toString()} subtitle="Records" />
+            <StatCard
+              title="Tax To Settle"
+              value={formatCurrency(taxOutstanding, currency)}
+              subtitle="Input VAT — not a vendor debt"
+            />
             <StatCard title="Shown" value={filtered.length.toString()} subtitle="Filtered" />
           </div>
 
@@ -349,6 +422,7 @@ function PayableContent() {
                   <SelectItem value="ALL">All Sources</SelectItem>
                   <SelectItem value="Purchase Order">Purchase Order</SelectItem>
                   <SelectItem value="Manual Entry">Manual Entry</SelectItem>
+                  <SelectItem value="Input VAT">Input VAT</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -384,7 +458,7 @@ function PayableContent() {
                         </td>
                       </tr>
                     ) : (
-                      filtered.map((p) => (
+                      payablePaging.pageRows.map((p) => (
                         <tr key={p.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 font-mono text-xs text-gray-500">
                             {p.referenceNo}
@@ -395,7 +469,9 @@ function PayableContent() {
                               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 p.source === 'Purchase Order'
                                   ? 'bg-indigo-100 text-indigo-700'
-                                  : 'bg-gray-100 text-gray-700'
+                                  : p.source === 'Input VAT'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-gray-100 text-gray-700'
                               }`}
                             >
                               {p.source}
@@ -409,23 +485,38 @@ function PayableContent() {
                             {formatCurrency(p.outstanding, currency)}
                           </td>
                           <td className="px-4 py-3">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${AGING_COLORS[p.aging ?? 'Current'] ?? 'bg-gray-100 text-gray-700'}`}
-                            >
-                              {p.aging}
-                            </span>
+                            {/* A settled row has no age — it is not waiting on anything.
+                                Showing its original bucket read as though the money were
+                                still owed and the payee overdue. */}
+                            {Number(p.outstanding ?? 0) <= 0.001 ? (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                                Paid
+                              </span>
+                            ) : (
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-xs font-medium ${AGING_COLORS[p.aging ?? 'Current'] ?? 'bg-gray-100 text-gray-700'}`}
+                              >
+                                {p.aging}
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-500">{p.status}</td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() =>
-                                setViewingRow({ type: p.isPurchase ? 'PO' : 'MANUAL', id: p.id })
-                              }
-                              className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
-                              title="View full details"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
+                            {p.isVat ? (
+                              <span className="text-[10px] text-gray-400 italic pl-1.5">
+                                Settled from Tax
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setViewingRow({ type: p.isPurchase ? 'PO' : 'MANUAL', id: p.id })
+                                }
+                                className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600"
+                                title="View full details"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -433,6 +524,15 @@ function PayableContent() {
                   </tbody>
                 </table>
               </div>
+            )}
+            {!isLoading && filtered.length > 0 && (
+              <Pagination
+                page={payablePaging.page}
+                totalPages={payablePaging.totalPages}
+                total={payablePaging.total}
+                limit={payablePaging.pageSize}
+                onPageChange={payablePaging.setPage}
+              />
             )}
           </div>
         </>

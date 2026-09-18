@@ -25,6 +25,7 @@ import {
 } from '@/components/accounts/ChequeDetailModal';
 import { ViewApproveModal } from '@/components/expenses/EmployeeRequestsTab';
 import { formatCurrency } from '@/lib/format';
+import StatCard from '@/components/StatCard';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -264,70 +265,28 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="rounded-xl border p-3 bg-blue-50 border-blue-200 col-span-1">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Awaiting Approval
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-blue-700">{reqStats.submitted.count}</p>
-          <p className="text-xs font-semibold text-blue-600">
-            {formatCurrency(reqStats.submitted.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-emerald-50 border-emerald-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Requests Approved
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-emerald-700">{reqStats.approved.count}</p>
-          <p className="text-xs font-semibold text-emerald-600">
-            {formatCurrency(reqStats.approved.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-teal-50 border-teal-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Requests Paid
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-teal-700">{reqStats.paid.count}</p>
-          <p className="text-xs font-semibold text-teal-600">
-            {formatCurrency(reqStats.paid.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-red-50 border-red-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Requests Rejected
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-red-700">{reqStats.rejected.count}</p>
-          <p className="text-xs font-semibold text-red-600">
-            {formatCurrency(reqStats.rejected.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-yellow-50 border-yellow-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Cheques Pending
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-yellow-700">{chequeStats.pending.count}</p>
-          <p className="text-xs font-semibold text-yellow-600">
-            {formatCurrency(chequeStats.pending.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-purple-50 border-purple-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Cheques Issued
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-purple-700">{chequeStats.issued.count}</p>
-          <p className="text-xs font-semibold text-purple-600">
-            {formatCurrency(chequeStats.issued.total, currency)}
-          </p>
-        </div>
-        <div className="rounded-xl border p-3 bg-gray-50 border-gray-200">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
-            Cheques Cleared
-          </p>
-          <p className="text-xl font-bold mt-0.5 text-gray-700">{chequeStats.cleared.count}</p>
-          <p className="text-xs font-semibold text-gray-600">
-            {formatCurrency(chequeStats.cleared.total, currency)}
-          </p>
-        </div>
+      {/* The shared StatCard, same as the Receipts tab and the Rent/Installation pages.
+          These were hand-rolled divs in seven different colours, which made the same
+          figures read as a different kind of thing depending on which tab you were on. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 md:gap-4">
+        {(
+          [
+            { label: 'Awaiting Approval', ...reqStats.submitted },
+            { label: 'Requests Approved', ...reqStats.approved },
+            { label: 'Requests Paid', ...reqStats.paid },
+            { label: 'Requests Rejected', ...reqStats.rejected },
+            { label: 'Cheques Pending', ...chequeStats.pending },
+            { label: 'Cheques Issued', ...chequeStats.issued },
+            { label: 'Cheques Cleared', ...chequeStats.cleared },
+          ] as { label: string; count: number; total: number }[]
+        ).map(({ label, count, total }) => (
+          <StatCard
+            key={label}
+            title={label}
+            value={String(count)}
+            subtitle={formatCurrency(total, currency)}
+          />
+        ))}
       </div>
 
       {/* Filters */}
@@ -484,6 +443,17 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                             {r.purchaseCostType && (
                               <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                                 {r.purchaseCostType} cost — not vendor payment
+                              </span>
+                            )}
+                            {/* A tax settlement is not a vendor payment: the VAT is
+                                already inside their invoice, so approving it must never
+                                be read as paying the vendor again. */}
+                            {r.taxRecordId && (
+                              <span className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                {r.taxType === 'REVERSE_CHARGE_VAT'
+                                  ? 'Reverse-charge VAT'
+                                  : 'Input VAT'}{' '}
+                                settlement — not vendor payment
                               </span>
                             )}
                           </div>

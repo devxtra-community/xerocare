@@ -3,8 +3,16 @@
 import React, { Suspense, useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import ProceedTaxModal, { type ProceedTaxTarget } from '@/components/finance/ProceedTaxModal';
 import { useSearchParams } from 'next/navigation';
-import { RefreshCw, FileText, ChevronDown } from 'lucide-react';
+import { RefreshCw, FileText } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   getOutputTax,
   getInputTaxLocal,
@@ -397,26 +405,29 @@ function TaxStatusControl({
   // the same thing twice and squeezed both into one narrow column; colouring the select
   // itself keeps the status just as scannable while leaving room to actually read and
   // click it.
+  // The trigger keeps the status colour so it still reads as a badge; the menu itself is
+  // the app's styled Select, so the options highlight in the theme accent rather than the
+  // browser's own blue — a native <option> cannot be told to do that.
   return (
-    <div className="relative inline-block">
-      <select
+    <Select
+      disabled={saving}
+      value={status}
+      onValueChange={(v) => change(v as 'PENDING' | 'RECORDED' | 'FILED')}
+    >
+      <SelectTrigger
         aria-label="Tax status"
-        disabled={saving}
-        value={status}
-        onChange={(e) => change(e.target.value as 'PENDING' | 'RECORDED' | 'FILED')}
-        className={`h-8 w-[120px] cursor-pointer appearance-none rounded-lg border-0 pl-3 pr-7 text-xs font-semibold ring-1 ring-inset ring-black/5 transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-wait disabled:opacity-60 ${
+        className={`h-8 w-[120px] border-0 text-xs font-semibold ring-1 ring-inset ring-black/5 transition hover:brightness-95 disabled:cursor-wait disabled:opacity-60 ${
           TAX_STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-600'
         }`}
       >
-        <option value="PENDING">Pending</option>
-        <option value="RECORDED">Recorded</option>
-        <option value="FILED">Filed</option>
-      </select>
-      <ChevronDown
-        size={13}
-        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60"
-      />
-    </div>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="PENDING">Pending</SelectItem>
+        <SelectItem value="RECORDED">Recorded</SelectItem>
+        <SelectItem value="FILED">Filed</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -434,6 +445,7 @@ function InputTaxLocalTab({
   const currency = useBranchCurrency();
   const [page, setPage] = useState(1);
   const [showStatement, setShowStatement] = useState(false);
+  const [proceedTarget, setProceedTarget] = useState<ProceedTaxTarget | null>(null);
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['admin-tax-input-local', filters, page],
@@ -589,6 +601,30 @@ function InputTaxLocalTab({
                         />
                       </TableCell>
                       <TableCell className="pr-4">
+                        {/* Proceed raises the payment request. Hidden once the tax is
+                            settled — there is nothing left to pay — and while a request
+                            is already standing, which is also enforced server-side. */}
+                        {r.taxStatus === 'PENDING' && Number(r.inputVatAmount ?? 0) > 0 && (
+                          <button
+                            onClick={() =>
+                              setProceedTarget({
+                                taxRecordId: r.id,
+                                taxType: 'INPUT_VAT',
+                                taxName: r.taxName ?? 'Input VAT',
+                                amount: Number(r.inputVatAmount ?? 0),
+                                currency: r.currencyCode ?? currency,
+                                vendorName: r.vendorName,
+                                reference: r.id.slice(0, 8).toUpperCase(),
+                                taxPercent: r.taxPercent,
+                                periodFrom: filters.dateFrom,
+                                periodTo: filters.dateTo,
+                              })
+                            }
+                            className="mr-2 whitespace-nowrap rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                          >
+                            Proceed
+                          </button>
+                        )}
                         <button
                           onClick={() => onGenerate('local', r)}
                           className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors whitespace-nowrap"
@@ -612,6 +648,7 @@ function InputTaxLocalTab({
           </>
         )}
       </div>
+      <ProceedTaxModal target={proceedTarget} onClose={() => setProceedTarget(null)} />
       {showStatement && (
         <StatementDialog
           open

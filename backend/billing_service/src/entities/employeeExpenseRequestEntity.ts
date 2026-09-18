@@ -118,6 +118,28 @@ export class EmployeeExpenseRequest {
   @Column({ type: 'varchar', nullable: true })
   purchaseCostType?: string;
 
+  /**
+   * Set when this request settles a tax liability rather than paying a vendor.
+   *
+   * Input VAT is not money owed to the vendor — it is already inside their invoice and
+   * is reclaimable from the tax authority. So a tax request must never take the vendor
+   * payment path: approving it settles the tax record and leaves the vendor's own
+   * outstanding untouched. `taxRecordId` is the discriminator and the audit link back to
+   * the source row, which is what makes Tax → Request → Approval → Payables traceable.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  taxRecordId?: string;
+
+  /** INPUT_VAT | REVERSE_CHARGE_VAT — which tax on that record is being settled. */
+  @Column({ type: 'varchar', nullable: true })
+  taxType?: string;
+
+  @Column({ type: 'date', nullable: true })
+  taxPeriodFrom?: Date;
+
+  @Column({ type: 'date', nullable: true })
+  taxPeriodTo?: Date;
+
   // paymentMode selected by Manager (Cash / Bank Transfer / Cheque)
   @Column({ type: 'varchar', nullable: true })
   paymentMode?: string;

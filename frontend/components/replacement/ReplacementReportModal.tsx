@@ -84,12 +84,13 @@ export function ReplacementReportModal({
   const makeLink = async () => {
     setGeneratingLink(true);
     try {
-      const { token } = await generateReplacementSigningToken(requestId);
-      // window.location.origin is whatever THIS browser is on — localhost in dev, an
-      // internal host on the LAN — which is unreachable for the customer the link is
-      // being sent to. The other three signing modals were moved off it; this one was
-      // missed.
-      setLink(publicAppLink(`/public/replacement/sign/${token}`));
+      const { token, link: serverLink } = await generateReplacementSigningToken(requestId);
+      // Prefer the link the server built from PUBLIC_APP_URL, exactly as the contract,
+      // bill and installation modals do. This one was still deriving the URL from
+      // window.location.origin — whatever THIS browser is on, i.e. the staff member's
+      // localhost — so every replacement link it produced was unreachable for the
+      // customer it was sent to.
+      setLink(serverLink || publicAppLink(`/public/replacement/sign/${token}`));
     } catch (err) {
       toast.error('Could not generate a link', { description: getApiErrorMessage(err) });
     } finally {

@@ -133,6 +133,10 @@ export async function getInputTaxLocal(req: Request, res: Response, next: NextFu
         currencyCode: p.currencyCode ?? p.lot?.currencyCode ?? p.branch?.currency_code ?? 'AED',
         taxStatus: p.taxStatus,
         vatClaimable: p.vatClaimable,
+        // Settlement audit, so the Tax table can show whether this tax has actually been
+        // paid and the Proceed action can be hidden once it has.
+        taxSettledAt: p.taxSettledAt ?? null,
+        taxSettlementRef: p.taxSettlementRef ?? null,
       };
     });
 

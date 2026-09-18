@@ -1,4 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import {
+  renderReceipt,
+  PAGE as RECEIPT_PAGE,
+  type ReceiptDocumentInput,
+  type ReceiptField,
+} from '../utils/receiptDocument';
 import { randomBytes } from 'crypto';
 import { sign } from 'jsonwebtoken';
 import { FindOptionsWhere, In, LessThan } from 'typeorm';
@@ -46,6 +52,7 @@ import {
 import { requireCashAccount, postCashbookEntry } from '../services/cashbookService';
 
 import { logger } from '../config/logger';
+import { publicAppUrl, isPublicAppUrlConfigured } from '../utils/publicAppUrl';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
@@ -335,27 +342,30 @@ async function issueSigningToken(agreement: ContractAgreement): Promise<{ token:
   return { token };
 }
 
-// Single source of truth for the base URL every customer-facing remote link (Contract
-// Agreement signing, Bill approval — Receipt already uses R2_PUBLIC_URL directly and
-// doesn't go through here) is built from. Previously each link builder had its own
-// `process.env.FRONTEND_URL || 'http://localhost:3000'` fallback, and FRONTEND_URL was
-// never actually set in any environment — every emailed link silently pointed at
-// localhost:3000, unreachable from a customer's phone (ERR_CONNECTION_REFUSED) with no
-// warning anywhere. Falling back to localhost now logs loudly on every use so this can
-// never again ship silently broken.
-function publicAppUrl(): string {
-  const base = process.env.PUBLIC_APP_URL;
-  if (base) return base.replace(/\/$/, '');
-  logger.error(
-    'PUBLIC_APP_URL is not set — customer-facing links are falling back to localhost:3000, ' +
-      'which is unreachable from anywhere but this machine. Set PUBLIC_APP_URL to the real, ' +
-      'publicly-reachable application URL.',
-  );
-  return 'http://localhost:3000';
+// Base URL for every customer-facing remote link now lives in utils/publicAppUrl.ts —
+// there were three copies of this resolver across two services, each with its own
+// fallback, and one of them being wrong was enough to email a dead link.
+/**
+ * Refuses instead of returning a link nobody outside this machine can open.
+ *
+ * The previous behaviour — fall back to localhost and log — meant staff generated a link,
+ * copied it, emailed it, and only the customer discovered it was dead. Failing here turns
+ * a silent bad link into an obvious configuration error at the moment it is generated.
+ */
+function requirePublicBase(): string {
+  if (!isPublicAppUrlConfigured()) {
+    throw new AppError(
+      'Customer links are not configured on the server: PUBLIC_APP_URL is unset, so any link ' +
+        'generated here would point at localhost and fail for the customer. Set PUBLIC_APP_URL ' +
+        'to the public application address and restart the service.',
+      500,
+    );
+  }
+  return publicAppUrl();
 }
 
 function signingLinkUrl(token: string): string {
-  return `${publicAppUrl()}/public/contract/sign/${token}`;
+  return `${requirePublicBase()}/public/contract/sign/${token}`;
 }
 
 export const generateSigningToken = async (req: Request, res: Response, next: NextFunction) => {
@@ -619,7 +629,7 @@ export const getContractForSigning = async (req: Request, res: Response, next: N
 // period's Bill) rather than a dedicated agreement entity.
 
 function billSigningLinkUrl(token: string): string {
-  return `${publicAppUrl()}/public/bill/sign/${token}`;
+  return `${requirePublicBase()}/public/bill/sign/${token}`;
 }
 
 async function issueBillSigningToken(usage: UsageRecord): Promise<{ token: string }> {
@@ -2020,6 +2030,101 @@ function receiptCardLine(request: {
   return `${parts.join(' ')} •••• ${request.cardLast4}`.trim();
 }
 
+/** Human label for the collection this receipt covers — Sale, Rent or Lease. */
+function receiptContextLabel(request: SalePaymentRequest): string | undefined {
+  if (request.isSecurityDeposit) return 'Refundable Security Deposit';
+  const ctx = request.paymentContext;
+  if (!ctx) return undefined;
+  const map: Record<string, string> = {
+    SALE: 'Sale Payment',
+    RENT_ADVANCE: 'Rent — Advance',
+    RENT_PERIODIC: 'Rent — Periodic Collection',
+    RENT_SECURITY_DEPOSIT: 'Rent — Security Deposit',
+    LEASE_ADVANCE: 'Lease — Advance',
+    LEASE_PERIODIC: 'Lease — Periodic Collection',
+    LEASE_SECURITY_DEPOSIT: 'Lease — Security Deposit',
+  };
+  return map[ctx] ?? ctx.replace(/_/g, ' ');
+}
+
+const ukDate = (d: Date | string) =>
+  new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+/**
+ * Everything the printed receipt shows, assembled once.
+ *
+ * Both generators (the on-demand download and the one behind a customer notification
+ * link) used to build their own field list, and they had drifted: the notification copy
+ * silently dropped the cheque dates, the card holder and the remarks, so the same payment
+ * produced two different documents depending on how the customer reached it.
+ */
+function buildSaleReceiptInput(request: SalePaymentRequest): ReceiptDocumentInput {
+  const fields: ReceiptField[] = [
+    {
+      label: 'Amount Received',
+      value: `${request.currency} ${Number(request.amount).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+      })}`,
+      emphasis: true,
+    },
+    { label: 'Invoice No.', value: request.invoiceNumber },
+    { label: 'Payment Mode', value: receiptModeLabel(request.paymentMode) },
+    { label: 'Payment Date', value: ukDate(request.paymentDate) },
+  ];
+
+  if (request.paymentMode === 'CHEQUE' && request.chequeNumber) {
+    fields.push({ label: 'Cheque No.', value: request.chequeNumber });
+    if (request.chequeBankName) fields.push({ label: 'Bank', value: request.chequeBankName });
+    if (request.chequeDate)
+      fields.push({ label: 'Cheque Date', value: ukDate(request.chequeDate) });
+    if (request.chequeDueDate)
+      fields.push({ label: 'Due Date', value: ukDate(request.chequeDueDate) });
+  } else if (request.paymentMode === 'ONLINE_PAYMENT') {
+    // The processing fee stays off the receipt: it is the merchant's cost, not a charge
+    // to the customer, and printing it would imply they were billed it.
+    const cardLine = receiptCardLine(request);
+    if (cardLine) fields.push({ label: 'Card', value: cardLine });
+    if (request.cardHolderName)
+      fields.push({ label: 'Card Holder', value: request.cardHolderName });
+    if (request.transactionReference)
+      fields.push({ label: 'Approval Ref', value: request.transactionReference });
+    if (request.referenceNumber)
+      fields.push({ label: 'Reference No.', value: request.referenceNumber });
+  } else if (request.referenceNumber) {
+    fields.push({ label: 'Reference No.', value: request.referenceNumber });
+  }
+
+  // Rent/Lease advances carry their own VAT split. Showing it turns the receipt into a
+  // valid tax document for the customer instead of a bare acknowledgement of cash.
+  if (request.taxAmount && Number(request.taxAmount) > 0) {
+    const money = (n: number) =>
+      `${request.currency} ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    if (request.taxableAmount)
+      fields.push({ label: 'Taxable Amount', value: money(request.taxableAmount) });
+    fields.push({ label: 'Tax', value: money(request.taxAmount) });
+  }
+
+  if (request.remarks) fields.push({ label: 'Remarks', value: request.remarks });
+
+  return {
+    title: request.isSecurityDeposit ? 'Security Deposit Receipt' : 'Payment Receipt',
+    receiptNo: request.requestNo,
+    contextLabel: receiptContextLabel(request),
+    customerName: request.customerName,
+    fields,
+    collectedByName: request.recordedByEmployeeName,
+    collectedOn: request.paymentDate ? ukDate(request.paymentDate) : undefined,
+    // Left blank while pending rather than defaulted to "Finance": the receipt is issued
+    // the moment the money changes hands, and naming an approver who has not yet acted
+    // would put a false sign-off on a customer-facing document.
+    approvedByName: request.reviewedByName || undefined,
+    approvedOn: request.reviewedAt ? ukDate(request.reviewedAt) : undefined,
+    note: request.isSecurityDeposit
+      ? 'This deposit is refundable in accordance with the terms of the agreement.'
+      : 'This is a computer-generated receipt and is valid without a manual signature.',
+  };
+}
+
 export const approveSalePayment = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string; // salePaymentRequestId
@@ -3329,7 +3434,7 @@ export const generateSalePaymentReceipt = async (
 
     // Generate PDF receipt with pdfkit
     const { default: PDFDocument } = await import('pdfkit');
-    const doc = new PDFDocument({ margin: 50, size: 'A5' });
+    const doc = new PDFDocument({ margin: 0, size: [RECEIPT_PAGE.width, RECEIPT_PAGE.height] });
     const chunks: Buffer[] = [];
 
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -3337,87 +3442,7 @@ export const generateSalePaymentReceipt = async (
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Header
-      doc.fontSize(18).font('Helvetica-Bold').text('PAYMENT RECEIPT', { align: 'center' });
-      doc.moveDown(0.5);
-      doc
-        .fontSize(9)
-        .font('Helvetica')
-        .fillColor('#666666')
-        .text(request.requestNo, { align: 'center' });
-      doc.moveDown(1);
-      doc
-        .moveTo(50, doc.y)
-        .lineTo(doc.page.width - 50, doc.y)
-        .strokeColor('#cccccc')
-        .stroke();
-      doc.moveDown(1);
-
-      // Body
-      doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
-
-      const row = (label: string, value: string) => {
-        doc.font('Helvetica-Bold').text(label, 50, doc.y, { continued: true, width: 160 });
-        doc.font('Helvetica').text(value);
-        doc.moveDown(0.4);
-      };
-
-      row('Received from:', request.customerName);
-      row('Invoice No.:', request.invoiceNumber);
-      row(
-        'Amount:',
-        `${request.currency} ${Number(request.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-      );
-      row('Payment Mode:', receiptModeLabel(request.paymentMode));
-      row(
-        'Payment Date:',
-        new Date(request.paymentDate).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'long',
-          year: 'numeric',
-        }),
-      );
-
-      // Mode-specific details
-      if (request.paymentMode === 'CHEQUE' && request.chequeNumber) {
-        row('Cheque No.:', request.chequeNumber);
-        if (request.chequeBankName) row('Bank:', request.chequeBankName);
-        if (request.chequeDate)
-          row('Cheque Date:', new Date(request.chequeDate).toLocaleDateString('en-GB'));
-        if (request.chequeDueDate)
-          row('Due Date:', new Date(request.chequeDueDate).toLocaleDateString('en-GB'));
-      } else if (request.paymentMode === 'ONLINE_PAYMENT') {
-        // The card, masked, and the approval code. The processing fee is deliberately
-        // absent: it is the merchant's cost, not a charge to the customer, and printing
-        // it on their receipt would imply they were billed it.
-        const cardLine = receiptCardLine(request);
-        if (cardLine) row('Card:', cardLine);
-        if (request.cardHolderName) row('Card Holder:', request.cardHolderName);
-        if (request.transactionReference) row('Approval Ref:', request.transactionReference);
-        if (request.referenceNumber) row('Reference No.:', request.referenceNumber);
-      } else if (request.referenceNumber) {
-        row('Reference No.:', request.referenceNumber);
-      }
-
-      if (request.paymentContext) row('Payment Type:', request.paymentContext.replace(/_/g, ' '));
-      if (request.remarks) row('Remarks:', request.remarks);
-      row('Approved by:', request.reviewedByName || 'Finance');
-      row(
-        'Approved on:',
-        request.reviewedAt ? new Date(request.reviewedAt).toLocaleDateString('en-GB') : '—',
-      );
-
-      doc.moveDown(1.5);
-      doc
-        .moveTo(50, doc.y)
-        .lineTo(doc.page.width - 50, doc.y)
-        .strokeColor('#cccccc')
-        .stroke();
-      doc.moveDown(1);
-      doc
-        .fontSize(8)
-        .fillColor('#888888')
-        .text('This is a system-generated receipt.', { align: 'center' });
+      renderReceipt(doc, buildSaleReceiptInput(request));
 
       doc.end();
     });
@@ -3457,7 +3482,7 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
     return (await r2SignedGetUrl(request.receiptUrl, CUSTOMER_LINK_TTL)) ?? request.receiptUrl;
 
   const { default: PDFDocument } = await import('pdfkit');
-  const doc = new PDFDocument({ margin: 50, size: 'A5' });
+  const doc = new PDFDocument({ margin: 0, size: [RECEIPT_PAGE.width, RECEIPT_PAGE.height] });
   const chunks: Buffer[] = [];
 
   doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -3465,69 +3490,8 @@ async function ensureReceiptUrl(request: SalePaymentRequest): Promise<string> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    doc.fontSize(18).font('Helvetica-Bold').text('PAYMENT RECEIPT', { align: 'center' });
-    doc.moveDown(0.5);
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor('#666666')
-      .text(request.requestNo, { align: 'center' });
-    doc.moveDown(1);
-    doc
-      .moveTo(50, doc.y)
-      .lineTo(doc.page.width - 50, doc.y)
-      .strokeColor('#cccccc')
-      .stroke();
-    doc.moveDown(1);
-    doc.fillColor('#000000').fontSize(10).font('Helvetica-Bold');
+    renderReceipt(doc, buildSaleReceiptInput(request));
 
-    const row = (label: string, value: string) => {
-      doc.font('Helvetica-Bold').text(label, 50, doc.y, { continued: true, width: 160 });
-      doc.font('Helvetica').text(value);
-      doc.moveDown(0.4);
-    };
-
-    row('Received from:', request.customerName);
-    row('Invoice No.:', request.invoiceNumber);
-    row(
-      'Amount:',
-      `${request.currency} ${Number(request.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-    );
-    row('Payment Mode:', receiptModeLabel(request.paymentMode));
-    row(
-      'Payment Date:',
-      new Date(request.paymentDate).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }),
-    );
-
-    if (request.paymentMode === 'CHEQUE' && request.chequeNumber) {
-      row('Cheque No.:', request.chequeNumber);
-      if (request.chequeBankName) row('Bank:', request.chequeBankName);
-    } else if (request.paymentMode === 'ONLINE_PAYMENT') {
-      const cardLine = receiptCardLine(request);
-      if (cardLine) row('Card:', cardLine);
-      if (request.transactionReference) row('Approval Ref:', request.transactionReference);
-    } else if (request.referenceNumber) {
-      row('Reference No.:', request.referenceNumber);
-    }
-
-    if (request.paymentContext) row('Payment Type:', request.paymentContext.replace(/_/g, ' '));
-    row('Approved by:', request.reviewedByName || 'Finance');
-
-    doc.moveDown(1.5);
-    doc
-      .moveTo(50, doc.y)
-      .lineTo(doc.page.width - 50, doc.y)
-      .strokeColor('#cccccc')
-      .stroke();
-    doc.moveDown(1);
-    doc
-      .fontSize(8)
-      .fillColor('#888888')
-      .text('This is a system-generated receipt.', { align: 'center' });
     doc.end();
   });
 
@@ -3769,7 +3733,7 @@ export const getInstallationReport = async (req: Request, res: Response, next: N
 };
 
 function installationSigningLinkUrl(token: string): string {
-  return `${publicAppUrl()}/public/installation/sign/${token}`;
+  return `${requirePublicBase()}/public/installation/sign/${token}`;
 }
 
 /** POST /installation-requests/:id/signing-token */

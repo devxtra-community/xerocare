@@ -34,6 +34,8 @@ import { SimpleLineChart, DonutChart, HorizontalBarChart } from '@/components/ac
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { Button } from '@/components/ui/button';
@@ -86,6 +88,7 @@ const RECEIVABLE_TYPES = [
   'SECURITY_DEPOSIT',
   'ADVANCE_PAYMENT',
   'CREDIT_EXCHANGE_DIFF',
+  'CREDIT_EXCHANGE_RECEIPT',
   'OTHER',
 ];
 const RECEIVABLE_STATUSES = ['OUTSTANDING', 'PENDING', 'PARTIAL', 'OVERDUE', 'PAID', 'WRITTEN_OFF'];
@@ -600,8 +603,18 @@ export default function AccountsReceivablePage() {
       isInvoice: true,
       source: (inv.isOpeningEntry ? 'Opening Balance' : 'Invoice') as 'Invoice' | 'Opening Balance',
     }));
+    // Same rule the Balance Sheet's Manual AR uses: exclude a manual receivable only when
+    // an invoice in this very list is already carrying the balance. Excluding every row
+    // with a non-null linkedInvoiceId hid Credit Exchange differences, which wrote the
+    // credit note's id there — an id no invoice will ever match.
+    const arInvoiceIds = new Set(fromInvoices.map((i) => i.id));
     const fromManual = manualRcv
-      .filter((r) => !r.linkedInvoiceId)
+      // A written-off balance is closed — a rejected Credit Note settlement, or a manual
+      // write-off. It is excluded from AR/AP on the Balance Sheet, so showing it here
+      // would put a dead row on a table of live obligations. The rejection itself stays
+      // visible, with its reason, on the Credit Notes tab.
+      .filter((r) => r.status !== 'WRITTEN_OFF')
+      .filter((r) => !r.linkedInvoiceId || !arInvoiceIds.has(r.linkedInvoiceId))
       .map((r) => ({ ...r, isInvoice: false, source: 'Manual Entry' as const }));
     return [...fromInvoices, ...fromManual];
   }, [arInvoices, manualRcv]);
@@ -645,6 +658,13 @@ export default function AccountsReceivablePage() {
       dateFrom,
       dateTo,
     ],
+  );
+
+  // Six rows a page. resetKey carries every filter so changing one returns the reader to
+  // page 1 instead of stranding them past the end of a shorter result.
+  const receivablePaging = useTablePagination(
+    filtered,
+    `${typeFilter}|${agingFilter}|${sourceFilter}|${statusFilter}|${search}|${amountMin}|${amountMax}|${dateFrom}|${dateTo}`,
   );
 
   const totalOutstanding = allReceivables.reduce((s, r) => s + (r.outstanding ?? 0), 0);
@@ -1104,7 +1124,7 @@ export default function AccountsReceivablePage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((r) => (
+                    receivablePaging.pageRows.map((r) => (
                       <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
                         <TableCell className="pl-4 font-medium text-slate-800">
                           {r.customerName}
@@ -1208,6 +1228,15 @@ export default function AccountsReceivablePage() {
                 </TableBody>
               </Table>
             </div>
+            {filtered.length > 0 && (
+              <Pagination
+                page={receivablePaging.page}
+                totalPages={receivablePaging.totalPages}
+                total={receivablePaging.total}
+                limit={receivablePaging.pageSize}
+                onPageChange={receivablePaging.setPage}
+              />
+            )}
           </div>
 
           {showAdd && (

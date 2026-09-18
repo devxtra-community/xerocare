@@ -12,6 +12,8 @@ import {
 } from '@/lib/finance/accountsApi';
 import { fetchBranches } from '@/lib/finance/accounts';
 import { formatCurrency } from '@/lib/format';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getUserFromToken } from '@/lib/auth';
 import StatCard from '@/components/StatCard';
@@ -171,7 +173,11 @@ function ReceivableContent() {
       isInvoice: true,
     }));
     const fromManual = manual
-      .filter((r) => !r.linkedInvoiceId)
+      // A written-off balance is closed — a rejected Credit Note settlement, or a manual
+      // write-off. It is excluded from AR/AP on the Balance Sheet, so showing it here
+      // would put a dead row on a table of live obligations. The rejection itself stays
+      // visible, with its reason, on the Credit Notes tab.
+      .filter((r) => !r.linkedInvoiceId && r.status !== 'WRITTEN_OFF')
       .map((r) => ({
         id: r.id,
         referenceNo: r.referenceNo,
@@ -199,6 +205,9 @@ function ReceivableContent() {
       }),
     [combined, sourceFilter, search],
   );
+
+  // Six rows a page; resetKey returns to page 1 when a filter changes.
+  const receivablePaging = useTablePagination(filtered, `${sourceFilter}|${search}`);
 
   const totalOutstanding = combined.reduce((s, r) => s + Number(r.outstanding), 0);
   const overdue = combined
@@ -384,7 +393,7 @@ function ReceivableContent() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((r) => (
+                    receivablePaging.pageRows.map((r) => (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 font-mono text-xs text-gray-500">
                           {r.referenceNo}
@@ -433,6 +442,15 @@ function ReceivableContent() {
                 </tbody>
               </table>
             </div>
+            {filtered.length > 0 && (
+              <Pagination
+                page={receivablePaging.page}
+                totalPages={receivablePaging.totalPages}
+                total={receivablePaging.total}
+                limit={receivablePaging.pageSize}
+                onPageChange={receivablePaging.setPage}
+              />
+            )}
           </div>
         </>
       )}

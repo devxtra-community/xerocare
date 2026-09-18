@@ -38,6 +38,9 @@ import {
   createManualPayable,
   updateManualPayable,
   recordPayablePayment,
+  getCreditNoteSettlements,
+  approveCreditNoteSettlement,
+  rejectCreditNoteSettlement,
   getInputVatPayableSummary,
   getEquityEntries,
   createEquityEntry,
@@ -230,6 +233,22 @@ router.get('/payables', getManualPayables);
 router.post('/payables', createManualPayable);
 router.put('/payables/:id', updateManualPayable);
 router.post('/payables/:id/payment', recordPayablePayment);
+
+// ─── Credit Note settlement approvals ─────────────────────────────────────────
+// Approve/reject are Accounts decisions, so they carry the same ADMIN/FINANCE gate as
+// every other structural accounts action. Reading the queue is open to anyone who can
+// already see Receivables/Payables, since it shows them nothing new.
+router.get('/credit-note-settlements', getCreditNoteSettlements);
+router.post(
+  '/credit-note-settlements/:id/approve',
+  requireAccountsAdmin,
+  approveCreditNoteSettlement,
+);
+router.post(
+  '/credit-note-settlements/:id/reject',
+  requireAccountsAdmin,
+  rejectCreditNoteSettlement,
+);
 router.get('/payables/charts', getPayableCharts);
 router.get('/payables/input-vat-summary', getInputVatPayableSummary);
 

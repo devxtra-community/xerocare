@@ -35,9 +35,17 @@ const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
  * @param amount       the figure as quoted by the vendor
  * @param ratePercent  the tax rate; 0 or null means no tax was declared
  * @param taxIncluded  true when `amount` already contains the tax, false when the tax
- *                     is added on top. Null/undefined is treated as inclusive, which
- *                     is the safe default: it never invents a debt that the vendor did
- *                     not quote, and never claims tax that may not have been charged.
+ *                     is added on top.
+ *
+ *                     Null/undefined is a distinct third state — "the vendor did not
+ *                     answer the Yes/No column" — and is treated as INCLUSIVE, i.e. the
+ *                     quoted price is the whole of what is owed. This is the one
+ *                     interpretation used everywhere: the RFQ comparison, the award
+ *                     screen and this splitter all agree, and the UI labels it "not
+ *                     declared" rather than claiming it is excluded. Choosing the other
+ *                     direction would silently add tax to a figure the vendor never
+ *                     quoted, inflating what we owe them; choosing this one can only
+ *                     understate the reclaimable tax, which is visible and correctable.
  */
 export function splitPurchaseTax(
   amount: number | null | undefined,
@@ -115,4 +123,45 @@ export function computePurchaseTaxFields(params: {
     inputVatAmount: isImport ? null : totalTax,
     reverseChargeVatAmount: isImport ? totalTax : null,
   };
+}
+
+/**
+ * What the vendor is actually owed on a purchase.
+ *
+ * On a DOMESTIC purchase the input VAT inside the vendor's invoice is not settled by
+ * paying the vendor — it is settled separately through Accounts' Tax Report (the Proceed
+ * → approve → settle workflow). Leaving it in the vendor's outstanding balance meant the
+ * same tax was owed twice: once as part of the vendor's remaining balance, and again as
+ * the unsettled input VAT that Accounts Payable adds on top. A 15,000 invoice carrying
+ * 714.29 of VAT reported 15,714.29 owed, and paying both really did move 15,714.29 of
+ * cash for a 15,000 invoice.
+ *
+ * So the vendor's payable is the goods value, and the tax rides in the tax table. The two
+ * together still come to the invoice total — the liability is represented once, in two
+ * places that do not overlap.
+ *
+ * INTERNATIONAL purchases are deliberately untouched: an import is self-assessed under
+ * reverse charge, so the foreign vendor never billed local VAT and is owed the whole
+ * invoice. Their tax never reaches the local tax table (it filters on DOMESTIC), so there
+ * is nothing settled elsewhere to net off.
+ *
+ * `vendorTaxAmount` is used rather than `inputVatAmount` on purpose: input VAT also
+ * covers tax assessed on additional costs (freight, customs, labour), which are supplies
+ * from other parties and were never part of what the vendor invoiced.
+ */
+export function vendorPayableAmount(p: {
+  purchaseAmount?: number | string | null;
+  vendorTaxAmount?: number | string | null;
+  purchaseOrigin?: string | null;
+}): number {
+  const gross = Number(p.purchaseAmount ?? 0);
+  if (!Number.isFinite(gross) || gross <= 0) return 0;
+
+  if (String(p.purchaseOrigin ?? '').toUpperCase() === 'INTERNATIONAL') return r2(gross);
+
+  const vendorTax = Number(p.vendorTaxAmount ?? 0);
+  if (!Number.isFinite(vendorTax) || vendorTax <= 0) return r2(gross);
+
+  // Guard against a malformed row claiming more tax than the invoice.
+  return r2(Math.max(0, gross - vendorTax));
 }

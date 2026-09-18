@@ -15,38 +15,77 @@ import { CreditNoteType } from '../entities/enums/creditNoteType';
 import { ManualPayable } from '../entities/manualPayableEntity';
 import { ManualReceivable } from '../entities/manualReceivableEntity';
 import { CashBankAccount } from '../entities/cashBankAccountEntity';
+import {
+  PaymentDirection,
+  SettlementApprovalStatus,
+  SETTLEMENT_TYPES,
+} from '../entities/settlementApproval';
+import { computeExchangeSettlement, computeRefundSettlement } from '../utils/creditNoteSettlement';
 
 export class CreditNoteController {
   private repository = Source.getRepository(CreditNote);
   private returnCreditRepo = new ReturnCreditRepository();
 
-  // ── Shared helper: has the full quantity sold on this invoice line now been
-  // returned, counting this credit note plus any earlier completed DIRECT_REFUNDs
-  // against the same invoice+spare part? Only then should the invoice itself be
-  // marked REFUNDED — a partial return must leave it as-is (the enum has no
-  // PARTIALLY_REFUNDED state; better to under-signal than to falsely mark a
-  // still-mostly-valid sale as fully refunded).
+  /**
+   * Has this invoice now been returned in full?
+   *
+   * An invoice may only be stamped REFUNDED when every refundable line has come back.
+   * Two different units of measure are in play, so each category is measured on its own
+   * terms and the invoice is only fully covered when BOTH are:
+   *
+   *  - SPARE_PART lines are quantity-based: 2 of 5 returned leaves 3 validly sold.
+   *  - PRODUCT lines are serialized: one credit note per machine, so the measure is how
+   *    many of the invoice's machines have been returned.
+   *
+   * Counting only the category of the credit note in hand would let a 3-machine invoice
+   * be closed by returning one machine — which is exactly the bug this replaces.
+   */
   private async isFullyReturned(manager: EntityManager, creditNote: CreditNote): Promise<boolean> {
-    const items = await manager.find(InvoiceItem, {
-      where: { invoice: { id: creditNote.invoiceId }, sparePartId: creditNote.sparePartId },
+    const allItems = await manager.find(InvoiceItem, {
+      where: { invoice: { id: creditNote.invoiceId } },
     });
-    const totalSoldQty = items.reduce((sum, i) => sum + (i.quantity ?? 0), 0);
-    if (totalSoldQty <= 0) return true; // no line-item data to compare against — don't block the refund
+    if (allItems.length === 0) return true; // no line-item data to compare against — don't block the refund
 
+    // Every completed DIRECT_REFUND against this invoice, including the one being
+    // approved right now (which is not yet persisted as COMPLETED).
     const priorReturns = await manager.find(CreditNote, {
       where: {
         invoiceId: creditNote.invoiceId,
-        sparePartId: creditNote.sparePartId,
         type: CreditNoteType.DIRECT_REFUND,
         status: CreditNoteStatus.COMPLETED,
       },
     });
-    const priorReturnedQty = priorReturns
-      .filter((cn) => cn.id !== creditNote.id)
-      .reduce((sum, cn) => sum + (cn.quantity ?? 0), 0);
-    const totalReturnedQty = priorReturnedQty + (creditNote.quantity ?? 1);
+    const returns = [...priorReturns.filter((cn) => cn.id !== creditNote.id), creditNote];
 
-    return totalReturnedQty >= totalSoldQty;
+    // ── Serialized products: count distinct machines sold vs returned ──
+    const soldProductIds = new Set(
+      allItems.filter((i) => i.productId).map((i) => String(i.productId)),
+    );
+    const returnedProductIds = new Set(
+      returns
+        .filter((cn) => cn.itemCategory === 'PRODUCT' && cn.productId)
+        .map((cn) => String(cn.productId)),
+    );
+    const productsCovered = [...soldProductIds].every((id) => returnedProductIds.has(id));
+
+    // ── Spare parts: compare quantities per spare part ──
+    const soldQtyByPart = new Map<string, number>();
+    for (const i of allItems) {
+      if (!i.sparePartId) continue;
+      const key = String(i.sparePartId);
+      soldQtyByPart.set(key, (soldQtyByPart.get(key) ?? 0) + (i.quantity ?? 0));
+    }
+    const returnedQtyByPart = new Map<string, number>();
+    for (const cn of returns) {
+      if (cn.itemCategory !== 'SPARE_PART' || !cn.sparePartId) continue;
+      const key = String(cn.sparePartId);
+      returnedQtyByPart.set(key, (returnedQtyByPart.get(key) ?? 0) + (cn.quantity ?? 1));
+    }
+    const partsCovered = [...soldQtyByPart.entries()].every(
+      ([partId, soldQty]) => soldQty <= 0 || (returnedQtyByPart.get(partId) ?? 0) >= soldQty,
+    );
+
+    return productsCovered && partsCovered;
   }
 
   // ── Shared helper: call inventory service with admin JWT ──────────────────
@@ -392,54 +431,77 @@ export class CreditNoteController {
         );
 
         // Close originating invoice — but only if this (plus any earlier completed
-        // DIRECT_REFUNDs against the same line) covers the FULL quantity sold.
-        // A partial spare-part return (e.g. 2 of 5 units) must not mark the whole
-        // invoice REFUNDED — the other 3 units are still validly sold to the
-        // customer. PRODUCT credit notes are always for the single serialized
-        // unit the invoice covers, so they always fully close the invoice.
-        const invoiceFullyCovered =
-          creditNote.itemCategory === 'PRODUCT'
-            ? true
-            : await this.isFullyReturned(queryRunner.manager, creditNote);
+        // DIRECT_REFUNDs against the same invoice) covers EVERY refundable line.
+        //
+        // This used to hardcode `true` for PRODUCT, on the reasoning that a product
+        // credit note is always for "the single serialized unit the invoice covers".
+        // That stopped being true when Direct Sale gained multi-product support: a
+        // 3-machine invoice had one machine returned and the whole invoice — all three
+        // machines, the other two still validly sold — was stamped REFUNDED.
+        // Both categories now go through the same coverage check.
+        const invoiceFullyCovered = await this.isFullyReturned(queryRunner.manager, creditNote);
         if (invoiceFullyCovered) {
           await queryRunner.manager.update(Invoice, creditNote.invoiceId, {
             status: InvoiceStatus.REFUNDED,
           });
         }
-        // Create ManualPayable so the refund owed to the customer appears on the Payable Payments tab.
-        // This is atomic with the credit note save — if either fails, both roll back.
-        const refundAmount = Number(creditNote.productAmount) + Number(creditNote.taxAmount || 0);
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const branchCurrency = await this.getBranchCurrency(
-          creditNote.branchId,
-          queryRunner.manager,
-        );
-        const payable = queryRunner.manager.create(ManualPayable, {
-          referenceNo: `REFUND-${creditNote.creditNoteNo}`,
-          type: 'CUSTOMER_REFUND',
-          payableTo: creditNote.customerName,
-          amount: refundAmount,
-          currency: branchCurrency,
-          issueDate: new Date(todayStr),
-          dueDate: new Date(todayStr),
-          outstanding: refundAmount,
-          amountPaid: 0,
-          status: 'PENDING',
-          branchId: creditNote.branchId,
-          createdBy: req.user?.userId || 'FINANCE',
-          description: `Refund for Credit Note ${creditNote.creditNoteNo}`,
-          // NOTE: linkedPurchaseId must stay null here. It means "this payable is a
-          // vendor Purchase Order already tracked by the PO's own outstanding balance",
-          // and every reader treats a non-null value as a reason to SKIP the row —
-          // the Balance Sheet's Accounts Payable, the vendor statement drill-down and
-          // the payables aggregation all filter on `linkedPurchaseId IS NULL`. Stuffing
-          // the credit note's own id in here made customer refunds invisible as
-          // liabilities: the money owed back to the customer never appeared in AP, so
-          // Assets = Liabilities + Equity broke by the refund amount. The link back to
-          // the credit note is already carried by referenceNo and description.
-          notes: financeNote,
+        // Raise the refund the customer is owed as a ManualPayable — a real liability,
+        // visible on the Payable Payments tab and counted in Accounts Payable.
+        //
+        // Creating it does NOT move money. It carries approvalStatus = PENDING, and
+        // recordPayablePayment refuses to settle a credit-note row until Accounts has
+        // approved it. Approving the credit note establishes that the refund is owed;
+        // Accounts separately authorises paying it out.
+        //
+        // Idempotent on creditNoteId (unique partial index backs this up), so a second
+        // approve can never raise a second refund.
+        const existingRefund = await queryRunner.manager.findOne(ManualPayable, {
+          where: { creditNoteId: creditNote.id },
         });
-        await queryRunner.manager.save(ManualPayable, payable);
+        if (!existingRefund) {
+          const refund = computeRefundSettlement({
+            productAmount: creditNote.productAmount,
+            taxAmount: creditNote.taxAmount,
+          });
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const branchCurrency = await this.getBranchCurrency(
+            creditNote.branchId,
+            queryRunner.manager,
+          );
+          const payable = queryRunner.manager.create(ManualPayable, {
+            referenceNo: `REFUND-${creditNote.creditNoteNo}`,
+            type: SETTLEMENT_TYPES.CUSTOMER_REFUND,
+            payableTo: creditNote.customerName,
+            amount: refund.grossAmount,
+            currency: branchCurrency,
+            issueDate: new Date(todayStr),
+            dueDate: new Date(todayStr),
+            outstanding: refund.grossAmount,
+            amountPaid: 0,
+            status: 'PENDING',
+            branchId: creditNote.branchId,
+            createdBy: req.user?.userId || 'FINANCE',
+            description: `Refund for Credit Note ${creditNote.creditNoteNo}`,
+            // NOTE: linkedPurchaseId must stay null here. It means "this payable is a
+            // vendor Purchase Order already tracked by the PO's own outstanding balance",
+            // and every reader treats a non-null value as a reason to SKIP the row —
+            // the Balance Sheet's Accounts Payable, the vendor statement drill-down and
+            // the payables aggregation all filter on `linkedPurchaseId IS NULL`. Stuffing
+            // the credit note's own id in here made customer refunds invisible as
+            // liabilities: the money owed back to the customer never appeared in AP, so
+            // Assets = Liabilities + Equity broke by the refund amount. The link back to
+            // the credit note is carried by creditNoteId below.
+            creditNoteId: creditNote.id,
+            creditNoteNo: creditNote.creditNoteNo,
+            paymentDirection: PaymentDirection.COMPANY_TO_CUSTOMER,
+            approvalStatus: SettlementApprovalStatus.PENDING,
+            netAmount: refund.netAmount,
+            taxAmount: refund.taxAmount,
+            discountAmount: 0,
+            notes: financeNote,
+          });
+          await queryRunner.manager.save(ManualPayable, payable);
+        }
       } else {
         // REPLACEMENT or CREDIT_EXCHANGE: Finance approval only — inventory updated later in complete()
         creditNote.status = CreditNoteStatus.APPROVED;
@@ -459,19 +521,20 @@ export class CreditNoteController {
         }
       }
 
-      // Notify the employee who created this credit note. DIRECT_REFUND is
-      // already fully complete at this point; REPLACEMENT/CREDIT_EXCHANGE is
-      // only APPROVED — it needs the employee to call complete() next, so the
-      // message says so explicitly.
+      // Notify the employee who created this credit note. A DIRECT_REFUND's credit note
+      // is COMPLETED here, but the money is NOT paid — the refund it raised still has to
+      // clear the Accounts approval gate and then actually be paid out, so the message
+      // must not imply the customer has their money. REPLACEMENT/CREDIT_EXCHANGE is only
+      // APPROVED and needs the employee to call complete() next.
       const isDirectRefund = creditNote.type === 'DIRECT_REFUND';
       try {
         await NotificationPublisher.publishInAppRequest({
           recipientId: creditNote.sellerEmployeeId,
           title: isDirectRefund
-            ? 'Credit Note Approved — Refund Completed'
+            ? 'Credit Note Approved — Refund Pending Payout'
             : 'Credit Note Approved',
           message: isDirectRefund
-            ? `Your credit note ${creditNote.creditNoteNo} was approved and the refund has been completed.`
+            ? `Your credit note ${creditNote.creditNoteNo} was approved. The refund is now with Accounts for payment approval — the customer has not been paid yet.`
             : `Your credit note ${creditNote.creditNoteNo} was approved by Finance — it's ready for you to complete the ${creditNote.type === 'REPLACEMENT' ? 'replacement' : 'exchange'}.`,
           type: 'CREDIT_NOTE_APPROVED',
           referenceId: creditNote.id,
@@ -510,7 +573,10 @@ export class CreditNoteController {
       return res.status(200).json({
         success: true,
         data: creditNote,
-        message: creditNote.type === 'DIRECT_REFUND' ? 'Refund Completed' : 'Credit Note Approved',
+        message:
+          creditNote.type === 'DIRECT_REFUND'
+            ? 'Refund approved — awaiting Accounts approval before payout'
+            : 'Credit Note Approved',
       });
     } catch (error) {
       // Guard against rolling back a transaction that already committed — e.g. if
@@ -684,60 +750,89 @@ export class CreditNoteController {
       logger.info(`Completing Return: ${creditNote.creditNoteNo}, Status: ${creditNote.status}`);
       await this.repository.save(creditNote);
 
-      // For CREDIT_EXCHANGE, wire the variance into the Payable/Receivable approval-gate system.
-      // REPLACEMENT intentionally creates no financial record.
+      // For CREDIT_EXCHANGE, raise the difference as a real receivable or payable that
+      // must clear the Accounts approval gate before any money moves.
+      // REPLACEMENT intentionally creates no financial record — a like-for-like swap
+      // changes no consideration, so there is nothing to collect or refund.
       if (creditNote.type === 'CREDIT_EXCHANGE') {
-        const variance =
-          Number(creditNote.replacementAmount || 0) -
-          Number(creditNote.productAmount || 0) -
-          Number(creditNote.replacementDiscount || 0);
+        // Net of discount, plus VAT at the credit note's own rate — the same convention
+        // the original sale line used. See computeExchangeSettlement for why the rate is
+        // taken from the credit note rather than looked up again.
+        const settlement = computeExchangeSettlement({
+          originalAmount: creditNote.productAmount,
+          replacementAmount: creditNote.replacementAmount ?? 0,
+          replacementDiscount: creditNote.replacementDiscount ?? 0,
+          taxPercent: creditNote.taxPercent,
+        });
         const todayStr = new Date().toISOString().slice(0, 10);
         const branchCurrency = await this.getBranchCurrency(creditNote.branchId);
+        const common = {
+          referenceNo: `EXCH-${creditNote.creditNoteNo}`,
+          currency: branchCurrency,
+          issueDate: new Date(todayStr),
+          dueDate: new Date(todayStr),
+          amount: settlement.grossAmount,
+          outstanding: settlement.grossAmount,
+          amountPaid: 0,
+          status: 'PENDING',
+          branchId: creditNote.branchId,
+          createdBy: req.user?.userId || 'SYSTEM',
+          description: `Credit Exchange difference for ${creditNote.creditNoteNo}`,
+          creditNoteId: creditNote.id,
+          creditNoteNo: creditNote.creditNoteNo,
+          paymentDirection: settlement.direction,
+          approvalStatus: SettlementApprovalStatus.PENDING,
+          netAmount: Math.abs(settlement.netAmount),
+          taxAmount: settlement.taxAmount,
+          discountAmount: settlement.discountAmount,
+        };
 
-        if (variance > 0) {
-          // Customer owes the difference → ManualReceivable (company receives)
-          const rec = Source.getRepository(ManualReceivable).create({
-            referenceNo: `EXCH-${creditNote.creditNoteNo}`,
-            type: 'CREDIT_EXCHANGE_DIFF',
-            customerId: creditNote.customerId,
-            customerName: creditNote.customerName,
-            amount: variance,
-            currency: branchCurrency,
-            issueDate: new Date(todayStr),
-            dueDate: new Date(todayStr),
-            outstanding: variance,
-            amountPaid: 0,
-            status: 'PENDING',
-            branchId: creditNote.branchId,
-            createdBy: req.user?.userId || 'SYSTEM',
-            description: `Credit Exchange difference for ${creditNote.creditNoteNo}`,
-            linkedInvoiceId: creditNote.id,
-          });
-          await Source.getRepository(ManualReceivable).save(rec);
-          logger.info(`Created ManualReceivable EXCH-${creditNote.creditNoteNo} for ${variance}`);
-        } else if (variance < 0) {
-          // Company owes the difference → ManualPayable (company pays customer)
-          const absVariance = Math.abs(variance);
-          const pay = Source.getRepository(ManualPayable).create({
-            referenceNo: `EXCH-${creditNote.creditNoteNo}`,
-            type: 'CUSTOMER_REFUND',
-            payableTo: creditNote.customerName,
-            amount: absVariance,
-            currency: branchCurrency,
-            issueDate: new Date(todayStr),
-            dueDate: new Date(todayStr),
-            outstanding: absVariance,
-            amountPaid: 0,
-            status: 'PENDING',
-            branchId: creditNote.branchId,
-            createdBy: req.user?.userId || 'SYSTEM',
-            description: `Credit Exchange difference for ${creditNote.creditNoteNo}`,
-            // Same reason as the DIRECT_REFUND payable above — leave linkedPurchaseId null.
-          });
-          await Source.getRepository(ManualPayable).save(pay);
-          logger.info(`Created ManualPayable EXCH-${creditNote.creditNoteNo} for ${absVariance}`);
+        if (settlement.isZero) {
+          // An even swap (or one the discount exactly cancels) settles nothing. Raising a
+          // zero-value receivable would put a row in Accounts' queue with nothing to do.
+          logger.info(`Credit Exchange ${creditNote.creditNoteNo}: no difference to settle`);
+        } else if (settlement.direction === PaymentDirection.CUSTOMER_TO_COMPANY) {
+          // Customer owes us. Idempotent on creditNoteId so a repeated complete() cannot
+          // raise the difference twice.
+          const recRepo = Source.getRepository(ManualReceivable);
+          const existing = await recRepo.findOne({ where: { creditNoteId: creditNote.id } });
+          if (!existing) {
+            await recRepo.save(
+              recRepo.create({
+                ...common,
+                type: SETTLEMENT_TYPES.CREDIT_EXCHANGE_RECEIPT,
+                customerId: creditNote.customerId,
+                customerName: creditNote.customerName,
+                // linkedInvoiceId stays NULL. It means "this amount is already
+                // represented by that invoice's outstanding balance", and the Balance
+                // Sheet's Manual AR skips any row where that holds. Writing the credit
+                // note's own id here — which is not an invoice at all — made the money
+                // the customer owes vanish from Accounts Receivable while still showing
+                // on the Receivables page. The link is carried by creditNoteId.
+              }),
+            );
+            logger.info(
+              `Credit Exchange ${creditNote.creditNoteNo}: receivable ${settlement.grossAmount} (net ${settlement.netAmount} + tax ${settlement.taxAmount}) awaiting Accounts approval`,
+            );
+          }
+        } else {
+          // We owe the customer.
+          const payRepo = Source.getRepository(ManualPayable);
+          const existing = await payRepo.findOne({ where: { creditNoteId: creditNote.id } });
+          if (!existing) {
+            await payRepo.save(
+              payRepo.create({
+                ...common,
+                type: SETTLEMENT_TYPES.CREDIT_EXCHANGE_REFUND,
+                payableTo: creditNote.customerName,
+                // Same reason as the DIRECT_REFUND payable — leave linkedPurchaseId null.
+              }),
+            );
+            logger.info(
+              `Credit Exchange ${creditNote.creditNoteNo}: refund ${settlement.grossAmount} (net ${Math.abs(settlement.netAmount)} + tax ${settlement.taxAmount}) awaiting Accounts approval`,
+            );
+          }
         }
-        // zero variance: no record needed
       }
 
       return res.status(200).json({

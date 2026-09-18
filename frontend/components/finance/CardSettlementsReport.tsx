@@ -6,6 +6,13 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import api from '@/lib/api';
 import { GCC_COUNTRIES, CARD_NETWORK_LABEL, CardNetwork } from '@/lib/payments/gccCards';
 import StatCard from '@/components/StatCard';
@@ -137,45 +144,59 @@ export default function CardSettlementsReport() {
         </div>
         <div>
           <Label className="text-[10px] font-black uppercase text-slate-400">Card Type</Label>
-          <select
-            className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-            value={cardType}
-            onChange={(e) => setCardType(e.target.value)}
+          <Select
+            value={cardType || 'ALL'}
+            onValueChange={(v) => setCardType(v === 'ALL' ? '' : v)}
           >
-            <option value="">All</option>
-            <option value="DEBIT">Debit</option>
-            <option value="CREDIT">Credit</option>
-          </select>
+            <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {/* "" is how Radix represents "nothing selected" and is rejected as an
+                  item value, so the all-filter travels as ALL and maps back to "". */}
+              <SelectItem value="ALL">All</SelectItem>
+              <SelectItem value="DEBIT">Debit</SelectItem>
+              <SelectItem value="CREDIT">Credit</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label className="text-[10px] font-black uppercase text-slate-400">Network</Label>
-          <select
-            className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-            value={cardNetwork}
-            onChange={(e) => setCardNetwork(e.target.value)}
+          <Select
+            value={cardNetwork || 'ALL'}
+            onValueChange={(v) => setCardNetwork(v === 'ALL' ? '' : v)}
           >
-            <option value="">All</option>
-            {(Object.keys(CARD_NETWORK_LABEL) as CardNetwork[]).map((n) => (
-              <option key={n} value={n}>
-                {CARD_NETWORK_LABEL[n]}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All</SelectItem>
+              {(Object.keys(CARD_NETWORK_LABEL) as CardNetwork[]).map((n) => (
+                <SelectItem key={n} value={n}>
+                  {CARD_NETWORK_LABEL[n]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label className="text-[10px] font-black uppercase text-slate-400">Country</Label>
-          <select
-            className="mt-1 h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
-            value={issuerCountry}
-            onChange={(e) => setIssuerCountry(e.target.value)}
+          <Select
+            value={issuerCountry || 'ALL'}
+            onValueChange={(v) => setIssuerCountry(v === 'ALL' ? '' : v)}
           >
-            <option value="">All</option>
-            {GCC_COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="mt-1 h-9 bg-white text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All</SelectItem>
+              {GCC_COUNTRIES.map((c) => (
+                <SelectItem key={c.code} value={c.code}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div>
           <Label className="text-[10px] font-black uppercase text-slate-400">Search</Label>

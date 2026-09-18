@@ -27,6 +27,7 @@ import { DepreciationBrandRule } from '../entities/depreciationBrandRuleEntity';
 import { DepreciationModelRule } from '../entities/depreciationModelRuleEntity';
 import { AssetDepreciationRegister } from '../entities/assetDepreciationRegisterEntity';
 import { DepreciationJournalEntry } from '../entities/depreciationJournalEntryEntity';
+import { DepreciationJournalLine } from '../entities/depreciationJournalLineEntity';
 import { ManualReceivable } from '../entities/manualReceivableEntity';
 import { ReceivablePayment } from '../entities/receivablePaymentEntity';
 import { ManualPayable } from '../entities/manualPayableEntity';
@@ -86,6 +87,7 @@ export const Source = new DataSource({
     DepreciationModelRule,
     AssetDepreciationRegister,
     DepreciationJournalEntry,
+    DepreciationJournalLine,
     ManualReceivable,
     ReceivablePayment,
     ManualPayable,
@@ -826,9 +828,31 @@ async function runPreMigrations() {
         ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "reserveType" VARCHAR NULL;
         ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "reserveSource" VARCHAR NULL;
         ALTER TABLE equity_entries ADD COLUMN IF NOT EXISTS "paymentDate" DATE NULL;
+
+        -- Owners are scoped to a branch. They were created company-wide, so a contributor
+        -- entered against Branch A appeared in Branch B's Equity and Opening Balance
+        -- forms — someone in B could post a contribution against an owner who has nothing
+        -- to do with their branch.
+        ALTER TABLE owners ADD COLUMN IF NOT EXISTS "branchId" UUID NULL;
+
+        -- Backfill: an owner belongs to the branch its equity entries were posted in.
+        -- Only assigned where that is unambiguous (entries in exactly one branch), so a
+        -- guess is never written over real data.
+        UPDATE owners o
+           SET "branchId" = sub."branchId"
+          FROM (
+            SELECT "ownerId", MIN("branchId"::text)::uuid AS "branchId"
+            FROM equity_entries
+            WHERE "ownerId" IS NOT NULL
+            GROUP BY "ownerId"
+            HAVING COUNT(DISTINCT "branchId") = 1
+          ) sub
+         WHERE o.id = sub."ownerId" AND o."branchId" IS NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_owners_branch ON owners("branchId");
       `);
       logger.info(
-        'Guaranteed owners table exists, and equity_entries has its type-specific columns.',
+        'Guaranteed owners table exists (branch-scoped), and equity_entries has its type-specific columns.',
       );
     } catch (ownerErr) {
       logger.warn('Failed to ensure owners table / equity_entries columns:', ownerErr);
@@ -1015,9 +1039,60 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "chequeBankName" VARCHAR NULL,
         ADD COLUMN IF NOT EXISTS "chequeDueDate" DATE NULL,
         ADD COLUMN IF NOT EXISTS "purchaseOrigin" VARCHAR NULL,
-        ADD COLUMN IF NOT EXISTS "purchaseCostType" VARCHAR NULL;
+        ADD COLUMN IF NOT EXISTS "purchaseCostType" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "taxRecordId" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "taxType" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "taxPeriodFrom" DATE NULL,
+        ADD COLUMN IF NOT EXISTS "taxPeriodTo" DATE NULL;
     `);
     logger.info('Manager purchase payment request columns on expense_requests ensured.');
+
+    // ─── Credit Note settlement-approval gate ──────────────────────────────────
+    // The Accounts approval that must clear before a Credit Note refund is paid out or
+    // an exchange difference is collected. These live on the existing receivable/payable
+    // rows because those rows are already the ledger for this money — a separate
+    // approval table would have been a second source of truth for the same amount.
+    // All nullable: existing rows keep their previous, un-gated behaviour.
+    await client.query(`
+      ALTER TABLE manual_receivables
+        ADD COLUMN IF NOT EXISTS "creditNoteId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "creditNoteNo" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "paymentDirection" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "approvalStatus" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "approvedBy" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "approvedByName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT NULL,
+        ADD COLUMN IF NOT EXISTS "settlementReference" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "settledAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "netAmount" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "taxAmount" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "discountAmount" DECIMAL(12,2) NULL;
+
+      ALTER TABLE manual_payables
+        ADD COLUMN IF NOT EXISTS "creditNoteId" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "creditNoteNo" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "paymentDirection" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "approvalStatus" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "approvedBy" UUID NULL,
+        ADD COLUMN IF NOT EXISTS "approvedByName" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT NULL,
+        ADD COLUMN IF NOT EXISTS "settlementReference" VARCHAR NULL,
+        ADD COLUMN IF NOT EXISTS "settledAt" TIMESTAMP NULL,
+        ADD COLUMN IF NOT EXISTS "netAmount" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "taxAmount" DECIMAL(12,2) NULL,
+        ADD COLUMN IF NOT EXISTS "discountAmount" DECIMAL(12,2) NULL;
+
+      -- One settlement row per credit note, per direction. This is the database-level
+      -- backstop for idempotency: even if two approve/complete calls race past the
+      -- application check, only one row can exist.
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_manual_receivable_credit_note
+        ON manual_receivables("creditNoteId") WHERE "creditNoteId" IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_manual_payable_credit_note
+        ON manual_payables("creditNoteId") WHERE "creditNoteId" IS NOT NULL;
+    `);
+    logger.info('Credit Note settlement-approval columns ensured.');
     // ─── Cash & Bank extended columns + reconciliation table ─────────────────
     await client.query(`
       ALTER TABLE cash_bank_accounts
@@ -1062,6 +1137,40 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "assetName" VARCHAR NULL;
     `);
     logger.info('Asset depreciation register extended columns applied.');
+
+    // ─── Depreciation: per-asset journal lines + manual-asset support ──────────
+    // brandId/modelId were created UUID NOT NULL for the printer-only design. When
+    // manual assets (furniture, vehicles, office equipment) were added, productId was
+    // relaxed but these two were not, and the controller filled them with the literal
+    // string 'MANUAL' — which is not a uuid, so every manual asset failed with a 500.
+    await client.query(`
+      ALTER TABLE asset_depreciation_register
+        ALTER COLUMN "brandId" DROP NOT NULL,
+        ALTER COLUMN "modelId" DROP NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS depreciation_journal_lines (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        "journalId" UUID NOT NULL REFERENCES depreciation_journal_entries(id) ON DELETE CASCADE,
+        "assetId" UUID NOT NULL REFERENCES asset_depreciation_register(id) ON DELETE CASCADE,
+        "branchId" UUID NOT NULL,
+        "periodYear" INTEGER NOT NULL,
+        "periodMonth" INTEGER NOT NULL,
+        amount DECIMAL(12,2) NOT NULL,
+        "openingAccumulated" DECIMAL(12,2) NOT NULL DEFAULT 0,
+        "closingAccumulated" DECIMAL(12,2) NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dep_line_asset ON depreciation_journal_lines("assetId");
+      CREATE INDEX IF NOT EXISTS idx_dep_line_journal ON depreciation_journal_lines("journalId");
+      CREATE INDEX IF NOT EXISTS idx_dep_line_branch ON depreciation_journal_lines("branchId");
+
+      -- One line per asset per period: the database backstop against a period being
+      -- posted twice and doubling an asset's accumulated depreciation.
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_dep_line_asset_period
+        ON depreciation_journal_lines("assetId", "periodYear", "periodMonth");
+    `);
+    logger.info('Depreciation journal lines + manual-asset columns ensured.');
 
     // ─── Cheque Management Tables ──────────────────────────────────────────────
     await client.query(`
