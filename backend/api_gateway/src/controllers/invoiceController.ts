@@ -29,7 +29,11 @@ export const getAllInvoices = async (
       throw new Error('User not authenticated');
     }
     const token = req.headers.authorization?.split(' ')[1] || '';
-    const invoices = await invoiceAggregationService.getAllInvoices(user, token);
+    const invoices = await invoiceAggregationService.getAllInvoices(
+      user,
+      token,
+      req.query as Record<string, unknown>,
+    );
     return res.status(200).json({
       success: true,
       data: invoices,
@@ -185,6 +189,25 @@ export const financeApproveQuotation = async (req: Request, res: Response, next:
 /**
  * Employee converts an approved quotation into an active Sale/Rent/Lease transaction.
  */
+export const confirmServiceEstimateToAccounts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = req.params.id as string;
+    const token = req.headers.authorization?.split(' ')[1] || '';
+    const invoice = await invoiceAggregationService.confirmServiceEstimateToAccounts(id, token);
+    return res.status(200).json({
+      success: true,
+      data: invoice,
+      message: 'Service estimate taken into accounts — receivable raised.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const convertToTransaction = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;

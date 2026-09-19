@@ -43,9 +43,42 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
   const [error, setError] = useState<string | null>(null);
 
   /**
+   * Finish logging in: save the Digital ID Card (AccessToken) and send
+   * the staff member to the right department based on their job role.
+   * Shared by the OTP-verify path and the trusted-device (OTP-skipped) path.
+   */
+  const completeLogin = (accessToken: string) => {
+    localStorage.setItem('accessToken', accessToken);
+    document.cookie = `accessToken=${accessToken}; path=/; max-age=86400; SameSite=Strict`;
+
+    try {
+      const decoded = jwtDecode<{ role: string }>(accessToken);
+      const role = decoded.role;
+
+      if (role === 'ADMIN') {
+        window.location.href = '/admin/dashboard';
+      } else if (role === 'HR') {
+        window.location.href = '/hr/dashboard';
+      } else if (role === 'MANAGER') {
+        window.location.href = '/manager/dashboard';
+      } else if (role === 'FINANCE') {
+        window.location.href = '/finance/dashboard';
+      } else if (role === 'EMPLOYEE') {
+        window.location.href = '/employee/dashboard';
+      } else {
+        window.location.href = '/dashboard';
+      }
+    } catch {
+      window.location.href = '/dashboard';
+    }
+  };
+
+  /**
    * STEP 1: Check Password
    * When the user clicks "Next" after entering their password, we send
-   * a verification code to their email for extra security.
+   * a verification code to their email for extra security — unless this
+   * browser was already verified within the last day, in which case the
+   * server logs them straight in with no OTP step at all.
    */
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +87,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
 
     try {
       const res = await requestLoginOtp(email, password);
-      if (res.success) {
+      if (res.accessToken) {
+        // Trusted device — server skipped OTP and logged us in directly.
+        toast.success(res.message);
+        completeLogin(res.accessToken);
+      } else if (res.success) {
         toast.success(res.message);
         setStep('otp'); // Move to the "Enter Code" screen
       } else {
@@ -93,33 +130,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
       const res = await verifyLoginOtp(email, otp);
       if (res.success) {
         toast.success(res.message);
-        // Save the Digital ID Card (AccessToken) in the browser
-        // so they stay signed in even if they refresh the page.
-        localStorage.setItem('accessToken', res.accessToken);
-        document.cookie = `accessToken=${res.accessToken}; path=/; max-age=86400; SameSite=Strict`;
-
-        // Check the user's Job Role to decide where to send them.
-        try {
-          const decoded = jwtDecode<{ role: string }>(res.accessToken);
-          const role = decoded.role;
-
-          // Redirecting to the right department:
-          if (role === 'ADMIN') {
-            window.location.href = '/admin/dashboard';
-          } else if (role === 'HR') {
-            window.location.href = '/hr/dashboard';
-          } else if (role === 'MANAGER') {
-            window.location.href = '/manager/dashboard';
-          } else if (role === 'FINANCE') {
-            window.location.href = '/finance/dashboard';
-          } else if (role === 'EMPLOYEE') {
-            window.location.href = '/employee/dashboard';
-          } else {
-            window.location.href = '/dashboard';
-          }
-        } catch {
-          window.location.href = '/dashboard';
-        }
+        completeLogin(res.accessToken);
       } else {
         toast.error(res.message);
         setError(res.message);

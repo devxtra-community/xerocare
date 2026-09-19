@@ -751,11 +751,50 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             finance_decision_at TIMESTAMP DEFAULT NULL,
             valid_until TIMESTAMP DEFAULT NULL,
             submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            "estimateId" UUID NULL REFERENCES service_estimates(id) ON DELETE CASCADE,
+            version INTEGER NOT NULL DEFAULT 1,
+            status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+            reason TEXT DEFAULT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMP NOT NULL DEFAULT NOW()
           );
         `);
+
+        // Four columns the entity maps that the original CREATE above never had. Because
+        // that statement is CREATE TABLE IF NOT EXISTS, an existing database could never
+        // pick them up — so every read through the repository selected "estimateId" and
+        // failed with `column does not exist`, 500ing the whole revision history page.
+        // Adding them here is what actually repairs a database already in the field.
+        await Source.query(`
+          ALTER TABLE service_estimate_revisions
+            ADD COLUMN IF NOT EXISTS "estimateId" UUID NULL,
+            ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
+            ADD COLUMN IF NOT EXISTS status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+            ADD COLUMN IF NOT EXISTS reason TEXT DEFAULT NULL;
+        `);
+        // Backfill version from the revision number the rows already carry, so existing
+        // history keeps its ordering instead of every row claiming to be version 1.
+        await Source.query(`
+          UPDATE service_estimate_revisions
+             SET version = revision_number
+           WHERE version = 1 AND revision_number IS NOT NULL AND revision_number <> 1;
+        `);
         logger.info('Guaranteed service_estimate_revisions table exists.');
+
+        // Repair tickets stranded by the QUOTED/FINANCE_APPROVED mismatch described in
+        // serviceController.financeApproved. Their estimate row already says
+        // FINANCE_APPROVED — only the ticket was left on QUOTED, which made the customer
+        // share refuse them forever. Scoped to tickets whose own estimate proves the
+        // approval happened, so nothing is promoted that Finance never approved.
+        await Source.query(`
+          UPDATE service_tickets t
+             SET status = 'FINANCE_APPROVED'
+           WHERE t.status = 'QUOTED'
+             AND EXISTS (
+               SELECT 1 FROM service_estimates e
+                WHERE e."ticketId" = t.id AND e.status = 'FINANCE_APPROVED'
+             );
+        `);
 
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_estimate_items (
@@ -837,12 +876,27 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected BOOLEAN DEFAULT FALSE;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected_at TIMESTAMP DEFAULT NULL;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_informed BOOLEAN DEFAULT FALSE;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_status VARCHAR(20) DEFAULT 'NONE';
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_request_id UUID DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected_by UUID DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected_by_name VARCHAR(255) DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_collected_by_role VARCHAR(40) DEFAULT NULL;
+          ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS visit_charge_rejection_reason TEXT DEFAULT NULL;
+          -- Charges already collected under the old direct-posting flow are settled facts,
+          -- not pending requests: backfill them to COLLECTED so they are never re-offered
+          -- for collection now that the status column drives the button.
+          UPDATE service_tickets SET visit_charge_status = 'COLLECTED'
+            WHERE visit_charge_collected = TRUE AND visit_charge_status = 'NONE';
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS discount_amount DECIMAL(10,2) DEFAULT 0;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS technician_note_to_finance TEXT DEFAULT NULL;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS transport_charge_amount DECIMAL(10,2) DEFAULT 0;
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS service_location VARCHAR(500);
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "partBrand" VARCHAR(255) NULL;
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS mpn VARCHAR(255) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
@@ -874,6 +928,26 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           );
         `);
         logger.info('Guaranteed machine_service_history table exists (new redesign).');
+
+        // External machines (never purchased from us — no matching Product row)
+        // still need a lifetime-spend history row, keyed by serialNumber alone.
+        // Postgres allows multiple NULLs under a UNIQUE constraint, so relaxing
+        // productId to nullable doesn't break its existing uniqueness among
+        // real products.
+        await Source.query(`
+          ALTER TABLE machine_service_history ALTER COLUMN "productId" DROP NOT NULL;
+        `);
+        try {
+          await Source.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS machine_service_history_serial_number_key
+              ON machine_service_history ("serialNumber");
+          `);
+        } catch (err) {
+          logger.warn(
+            'Could not add unique index on machine_service_history.serialNumber (likely pre-existing duplicate serials) — external-machine history lookups will still work by best match, just without the uniqueness guarantee:',
+            err,
+          );
+        }
 
         // 4. Create service_part_usage_logs table
         await Source.query(`

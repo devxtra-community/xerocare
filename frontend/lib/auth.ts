@@ -192,3 +192,28 @@ export async function getProfile() {
   const res = await api.get('/e/auth/me');
   return res.data;
 }
+
+/**
+ * Lists browsers/devices that can currently log in without OTP.
+ */
+export async function getTrustedDevices() {
+  const res = await api.get('/e/auth/trusted-devices');
+  return res.data;
+}
+
+/**
+ * Revokes a single trusted device — it will need OTP again on its next login.
+ * @param deviceId The ID of the trusted device to revoke
+ */
+export async function revokeTrustedDevice(deviceId: string) {
+  const res = await api.delete(`/e/auth/trusted-devices/${deviceId}`);
+  return res.data;
+}
+
+/**
+ * Revokes every trusted device for the current user (e.g. password compromised).
+ */
+export async function revokeAllTrustedDevices() {
+  const res = await api.post('/e/auth/revoke-trusted-devices');
+  return res.data;
+}

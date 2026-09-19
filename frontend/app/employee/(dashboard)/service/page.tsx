@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getUserFromToken } from '@/lib/auth';
 import { getBranches, Branch } from '@/lib/branch';
 import { getCustomers, Customer, createCustomer, CreateCustomerData } from '@/lib/customer';
@@ -70,6 +70,8 @@ import {
   type CustomerDecisionChannel,
 } from '@/lib/serviceTicket';
 import { ServiceContract, getServiceContracts } from '@/lib/serviceContract';
+import { getInvoiceById } from '@/lib/invoice';
+import { getSalePaymentsForInvoice } from '@/lib/saleWorkflow';
 import {
   getStatusColor,
   ServiceTicketHistoryPanel,
@@ -111,6 +113,7 @@ import {
   Laptop,
   FileText,
   Activity,
+  Clock,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -310,11 +313,23 @@ export default function ServiceDashboardPage() {
     | { kind: 'estimate'; estimateId: string; ticketNumber?: string; total?: number }
     | null
   >(null);
+  /**
+   * A charge that is taken, or taken and waiting on Accounts, is not collectable again.
+   *
+   * PENDING_APPROVAL has to count as taken everywhere: the customer has already handed
+   * the money over, and offering "Collect" again is how the same charge gets taken twice
+   * — once by the desk and once by the technician on site.
+   */
+  const visitChargeTakenOrPending = (t: ServiceTicket) =>
+    !!t.visitChargeCollected ||
+    t.visitChargeStatus === 'COLLECTED' ||
+    t.visitChargeStatus === 'PENDING_APPROVAL';
+
   const isVisitChargeCollectionEligible = (t: ServiceTicket) =>
     t.serviceContext === 'CHARGEABLE' &&
     Number(t.visitChargeAmount || 0) > 0 &&
     t.visitChargeMethod === 'ADDED_TO_ESTIMATE' &&
-    !t.visitChargeCollected;
+    !visitChargeTakenOrPending(t);
 
   // Collect-visit-charge-up-front modal — available any time before COMPLETED/
   // CANCELLED, independent of diagnosis/assignment. Never gates either.
@@ -322,7 +337,7 @@ export default function ServiceDashboardPage() {
   const canCollectVisitChargeNow = (t: ServiceTicket) =>
     CHARGEABLE_VISIT_CONTEXTS.includes(t.serviceContext) &&
     Number(t.visitChargeAmount || 0) > 0 &&
-    !t.visitChargeCollected &&
+    !visitChargeTakenOrPending(t) &&
     !['COMPLETED', 'CANCELLED'].includes(t.status);
   const [collectVCModal, setCollectVCModal] = useState<{
     ticketId: string;
@@ -456,6 +471,47 @@ export default function ServiceDashboardPage() {
     }
   };
 
+  const [collectVCChequeNumber, setCollectVCChequeNumber] = useState('');
+  const [collectVCChequeBank, setCollectVCChequeBank] = useState('');
+  const [collectVCChequeDate, setCollectVCChequeDate] = useState('');
+
+  /**
+   * The accounts that can actually receive this payment.
+   *
+   * The picker listed every cash AND bank account whatever mode was chosen, so a cash
+   * collection could be posted to a bank account — the money would sit in the wrong place
+   * on the balance sheet with nothing to flag it. The mode decides the account type, so
+   * the list follows it.
+   */
+  const accountsForMode = useCallback(
+    (mode: string) => {
+      if (mode === 'CASH') return cashBankAccounts.filter((a) => a.type === 'CASH');
+      if (mode === 'BANK_TRANSFER') return cashBankAccounts.filter((a) => a.type === 'BANK');
+      return [];
+    },
+    [cashBankAccounts],
+  );
+
+  const collectVCEligibleAccounts = useMemo(
+    () => accountsForMode(collectVCPaymentMode),
+    [accountsForMode, collectVCPaymentMode],
+  );
+
+  /**
+   * Choosing a mode picks the account when there is only one it could be.
+   *
+   * Most branches run a single cash drawer and a single bank account, so the second
+   * dropdown was a mandatory click with exactly one option behind it.
+   */
+  const handleCollectVCModeChange = (mode: string) => {
+    setCollectVCPaymentMode(mode);
+    setCollectVCChequeNumber('');
+    setCollectVCChequeBank('');
+    setCollectVCChequeDate('');
+    const eligible = accountsForMode(mode);
+    setCollectVCAccountId(eligible.length === 1 ? eligible[0].id : '');
+  };
+
   const [assignForm, setAssignForm] = useState({
     technicianId: '',
   });
@@ -471,6 +527,7 @@ export default function ServiceDashboardPage() {
     visitChargeCollected: boolean;
     visitChargePaymentMode: string;
     visitChargeAccountId: string;
+    visitChargeChequeNumber?: string;
     transportChargeAmount: number;
     discountAmount: number;
     technicianNoteToFinance: string;
@@ -480,6 +537,7 @@ export default function ServiceDashboardPage() {
       customPartName: string;
       customPartBrand: string;
       customPartDescription: string;
+      customPartCost: number;
       mpn: string;
       partName: string;
       quantity: number;
@@ -497,6 +555,7 @@ export default function ServiceDashboardPage() {
     visitChargeCollected: true,
     visitChargePaymentMode: '',
     visitChargeAccountId: '',
+    visitChargeChequeNumber: '',
     transportChargeAmount: 0,
     discountAmount: 0,
     technicianNoteToFinance: '',
@@ -512,6 +571,38 @@ export default function ServiceDashboardPage() {
   });
 
   const [completionNotes, setCompletionNotes] = useState('');
+
+  /**
+   * Payment the technician takes at the door when they close the job.
+   *
+   * Optional on purpose — a customer who pays later still closes the ticket, the invoice
+   * just stays outstanding for Accounts to chase. But when the money IS handed over on
+   * site, capturing the mode and the destination account here is the only chance to record
+   * it while the technician still knows; otherwise the cash is invisible until somebody in
+   * Accounts keys it in from memory.
+   */
+  /**
+   * What the customer actually owes at completion.
+   *
+   * NOT the estimate total. Approving within validity waives the labour line, so a job
+   * quoted at 550 can be a 150 bill — prefilling the estimate figure would have the
+   * technician collect 400 too much. The invoice carries the post-waiver amount, and any
+   * payment already taken (an up-front visit charge, a part payment) comes off it too.
+   */
+  const [amountDue, setAmountDue] = useState<{
+    total: number;
+    paid: number;
+    outstanding: number;
+    invoiceNumber?: string;
+  } | null>(null);
+  const [loadingDue, setLoadingDue] = useState(false);
+
+  const [collectAmount, setCollectAmount] = useState('');
+  const [collectMode, setCollectMode] = useState('');
+  const [collectAccountId, setCollectAccountId] = useState('');
+  const [collectChequeNo, setCollectChequeNo] = useState('');
+  const [collectChequeBank, setCollectChequeBank] = useState('');
+  const [collectChequeDate, setCollectChequeDate] = useState('');
 
   // Intel view states
   const [selectedIntelCustomer, setSelectedIntelCustomer] = useState<string>('');
@@ -857,11 +948,18 @@ export default function ServiceDashboardPage() {
     }
     try {
       setCollectVCSubmitting(true);
-      await collectVisitCharge(collectVCModal.ticketId, collectVCPaymentMode, collectVCAccountId);
-      toastSuccess('Visit charge collected.');
+      await collectVisitCharge(collectVCModal.ticketId, collectVCPaymentMode, collectVCAccountId, {
+        chequeNumber: collectVCChequeNumber.trim() || undefined,
+        chequeBankName: collectVCChequeBank.trim() || undefined,
+        chequeDate: collectVCChequeDate || undefined,
+      });
+      toastSuccess('Visit charge sent to Accounts for approval.');
       setCollectVCModal(null);
       setCollectVCPaymentMode('');
       setCollectVCAccountId('');
+      setCollectVCChequeNumber('');
+      setCollectVCChequeBank('');
+      setCollectVCChequeDate('');
       await fetchInitialData();
     } catch (error) {
       console.error('Failed to collect visit charge:', error);
@@ -943,6 +1041,7 @@ export default function ServiceDashboardPage() {
             customPartName: it.customPartName || undefined,
             customPartBrand: it.customPartBrand || undefined,
             customPartDescription: it.customPartDescription || undefined,
+            customPartCost: it.itemSource === 'CUSTOM' ? Number(it.customPartCost) || 0 : undefined,
             mpn: it.mpn || undefined,
             partName: it.partName,
             quantity: Number(it.quantity) || 1,
@@ -978,6 +1077,10 @@ export default function ServiceDashboardPage() {
           visitChargeAccountId: isSeparateVisitChargeCollection
             ? diagnosisForm.visitChargeAccountId
             : undefined,
+          visitChargeChequeNumber:
+            isSeparateVisitChargeCollection && diagnosisForm.visitChargePaymentMode === 'CHEQUE'
+              ? diagnosisForm.visitChargeChequeNumber
+              : undefined,
           transportChargeAmount: Number(diagnosisForm.transportChargeAmount) || 0,
           discountAmount: Number(diagnosisForm.discountAmount) || 0,
           technicianNoteToFinance: diagnosisForm.technicianNoteToFinance || null,
@@ -987,6 +1090,7 @@ export default function ServiceDashboardPage() {
             customPartName: it.customPartName || undefined,
             customPartBrand: it.customPartBrand || undefined,
             customPartDescription: it.customPartDescription || undefined,
+            customPartCost: it.itemSource === 'CUSTOM' ? Number(it.customPartCost) || 0 : undefined,
             mpn: it.mpn || undefined,
             partName: it.partName,
             quantity: Number(it.quantity) || 1,
@@ -1069,6 +1173,41 @@ export default function ServiceDashboardPage() {
   //   setConfirmOpen(true);
   // };
 
+  /**
+   * Loads the outstanding balance when the completion form opens, and prefills the amount
+   * so the technician confirms a figure rather than inventing one.
+   */
+  const loadAmountDue = useCallback(async (ticket: ServiceTicket | null) => {
+    if (!ticket?.serviceQuotationId) {
+      setAmountDue(null);
+      return;
+    }
+    setLoadingDue(true);
+    try {
+      const [inv, payments] = await Promise.all([
+        getInvoiceById(ticket.serviceQuotationId),
+        getSalePaymentsForInvoice(ticket.serviceQuotationId).catch(() => []),
+      ]);
+      const total = Number(inv?.totalAmount) || 0;
+      // Pending counts as paid for this purpose: that money is already with Accounts
+      // awaiting approval, and collecting it twice is the failure to avoid.
+      const paid = (payments || [])
+        .filter((p) => p.status === 'APPROVED' || p.status === 'PENDING')
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const outstanding = Math.max(0, total - paid);
+      setAmountDue({ total, paid, outstanding, invoiceNumber: inv?.invoiceNumber });
+      setCollectAmount(outstanding > 0 ? String(outstanding) : '');
+    } catch {
+      setAmountDue(null);
+    } finally {
+      setLoadingDue(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showCompleteModal) loadAmountDue(selectedTicket);
+  }, [showCompleteModal, selectedTicket, loadAmountDue]);
+
   const handleCompleteService = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
@@ -1085,6 +1224,12 @@ export default function ServiceDashboardPage() {
         technicianRemarks: completeForm.technicianRemarks || undefined,
         customerSignature: completeForm.customerSignature || 'Customer Signed',
         technicianSignature: completeForm.technicianSignature || 'Technician Signed',
+        collectedAmount: collectMode && collectAmount ? Number(collectAmount) : undefined,
+        paymentMode: collectMode || undefined,
+        paymentAccountId: collectMode && collectMode !== 'CHEQUE' ? collectAccountId : undefined,
+        chequeNumber: collectMode === 'CHEQUE' ? collectChequeNo : undefined,
+        chequeBankName: collectMode === 'CHEQUE' ? collectChequeBank : undefined,
+        chequeDate: collectMode === 'CHEQUE' ? collectChequeDate : undefined,
       });
       setShowCompleteModal(false);
       setCompleteForm({
@@ -1097,8 +1242,18 @@ export default function ServiceDashboardPage() {
         technicianSignature: 'Technician Signed',
       });
       setCompletionNotes('');
+      setCollectAmount('');
+      setCollectMode('');
+      setCollectAccountId('');
+      setCollectChequeNo('');
+      setCollectChequeBank('');
+      setCollectChequeDate('');
       await fetchInitialData();
-      toastSuccess('Service job completed successfully!');
+      toastSuccess(
+        collectMode && collectAmount
+          ? `Job completed. ${getActiveCurrency()} ${collectAmount} sent to Accounts for approval.`
+          : 'Service job completed successfully!',
+      );
     } catch (error) {
       console.error('Failed to complete ticket:', error);
       toastError('Failed to complete service job.');
@@ -1700,6 +1855,7 @@ export default function ServiceDashboardPage() {
           customPartName: '',
           customPartBrand: '',
           customPartDescription: '',
+          customPartCost: 0,
           mpn: '',
           partName: '',
           quantity: 1,
@@ -2027,7 +2183,13 @@ export default function ServiceDashboardPage() {
                             <Send className="size-3.5" />
                           </button>
                         )}
-                        {(ticket.status === 'QUOTED' || ticket.status === 'CUSTOMER_APPROVED') && (
+                        {/* FINANCE_APPROVED is the state a Finance approval now leaves the
+                            ticket in; QUOTED is kept so tickets approved before that fix
+                            still offer the share. */}
+                        {(ticket.status === 'FINANCE_APPROVED' ||
+                          ticket.status === 'FINANCE_APPROVED_2' ||
+                          ticket.status === 'QUOTED' ||
+                          ticket.status === 'CUSTOMER_APPROVED') && (
                           <button
                             title="Share Service Quotation"
                             className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0"
@@ -2108,8 +2270,52 @@ export default function ServiceDashboardPage() {
                                 }}
                               >
                                 <DollarSign className="size-3.5" />
-                                Collect Visit Charge
+                                {ticket.visitChargeStatus === 'REJECTED'
+                                  ? 'Collect Visit Charge Again'
+                                  : 'Collect Visit Charge'}
                               </Button>
+                            )}
+
+                          {/* What happened to the charge, once someone has taken it. The
+                              desk used to get no feedback at all after clicking Collect —
+                              the button simply vanished, which is indistinguishable from
+                              the action having failed. */}
+                          {ticket.visitChargeStatus === 'PENDING_APPROVAL' && (
+                            <span
+                              title={
+                                ticket.visitChargeCollectedByName
+                                  ? `Collected by ${ticket.visitChargeCollectedByName}`
+                                  : undefined
+                              }
+                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200"
+                            >
+                              <Clock className="size-3.5" />
+                              Awaiting Accounts Approval
+                            </span>
+                          )}
+                          {(ticket.visitChargeStatus === 'COLLECTED' ||
+                            (!ticket.visitChargeStatus && ticket.visitChargeCollected)) && (
+                            <span
+                              title={
+                                ticket.visitChargeCollectedByName
+                                  ? `Collected by ${ticket.visitChargeCollectedByName}`
+                                  : undefined
+                              }
+                              className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                              Visit Charge Collected
+                            </span>
+                          )}
+                          {ticket.visitChargeStatus === 'REJECTED' &&
+                            ticket.visitChargeRejectionReason && (
+                              <span
+                                title={ticket.visitChargeRejectionReason}
+                                className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium bg-red-50 text-red-700 border border-red-200"
+                              >
+                                <AlertTriangle className="size-3.5" />
+                                Accounts Rejected
+                              </span>
                             )}
 
                           {/* Recording that the customer accepted is limited to the assigned
@@ -2220,7 +2426,7 @@ export default function ServiceDashboardPage() {
                                       rootCause: '',
                                       meterReading: 0,
                                       labourCost: 0,
-                                      visitChargeAmount: ticket.visitChargeAmount || 0,
+                                      visitChargeAmount: Number(ticket.visitChargeAmount) || 0,
                                       visitChargeMethod: 'ADDED_TO_ESTIMATE',
                                       visitChargeCollected: true,
                                       visitChargePaymentMode: '',
@@ -2280,7 +2486,7 @@ export default function ServiceDashboardPage() {
                                     rootCause: ticket.rootCause || '',
                                     meterReading: ticket.meterReadingAtService || 0,
                                     labourCost: laborItem ? Number(laborItem.unitPrice) : 0,
-                                    visitChargeAmount: ticket.visitChargeAmount || 0,
+                                    visitChargeAmount: Number(ticket.visitChargeAmount) || 0,
                                     visitChargeMethod:
                                       (ticket.visitChargeMethod as
                                         | 'ADDED_TO_ESTIMATE'
@@ -2297,6 +2503,7 @@ export default function ServiceDashboardPage() {
                                       customPartName: it.customPartName || '',
                                       customPartBrand: it.customPartBrand || '',
                                       customPartDescription: it.customPartDescription || '',
+                                      customPartCost: it.unitCost || 0,
                                       mpn: it.mpn || '',
                                       partName: it.partName || '',
                                       quantity: it.quantity || 1,
@@ -4087,7 +4294,7 @@ export default function ServiceDashboardPage() {
 
                       {item.itemSource === 'CUSTOM' && (
                         <div className="space-y-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
                               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
                                 Brand
@@ -4125,11 +4332,33 @@ export default function ServiceDashboardPage() {
                                 className="h-9 text-xs bg-white border-slate-200 rounded-lg"
                               />
                             </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                                Internal Cost (what we paid)
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                placeholder="0.00"
+                                value={item.customPartCost || ''}
+                                onChange={(e) =>
+                                  updateDiagnosisItem(
+                                    idx,
+                                    'customPartCost',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                              />
+                            </div>
                           </div>
                           <p className="text-[10px] text-slate-400 flex items-center gap-1">
                             <Info className="size-3 shrink-0" />
                             Brand and Model Name are pre-filled from the machine on this ticket —
-                            edit if the part differs.
+                            edit if the part differs. Internal cost is never shown to the customer —
+                            it&apos;s tracked so we know what off-catalog parts actually cost us,
+                            and flags the branch manager to consider stocking it via RFQ.
                           </p>
                         </div>
                       )}
@@ -4257,9 +4486,30 @@ export default function ServiceDashboardPage() {
                             </div>
                           </div>
 
+                          {/* Already taken by the service desk (approved, or sitting with
+                              Accounts): the technician must not be offered the same charge
+                              again on site, or the customer pays it twice. */}
                           {!travelCovered &&
                             diagnosisForm.visitChargeMethod === 'SEPARATE' &&
-                            (diagnosisForm.visitChargeAmount || 0) > 0 && (
+                            (diagnosisForm.visitChargeAmount || 0) > 0 &&
+                            visitChargeTakenOrPending(selectedTicket) && (
+                              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                                <p className="text-[11px] font-bold text-slate-600">
+                                  {selectedTicket.visitChargeStatus === 'PENDING_APPROVAL'
+                                    ? 'Visit charge already collected by the service desk — awaiting Accounts approval. Do not collect it again.'
+                                    : 'Visit charge already collected. Do not collect it again.'}
+                                  {selectedTicket.visitChargeCollectedByName
+                                    ? ` Collected by ${selectedTicket.visitChargeCollectedByName}.`
+                                    : ''}
+                                </p>
+                              </div>
+                            )}
+
+                          {!travelCovered &&
+                            diagnosisForm.visitChargeMethod === 'SEPARATE' &&
+                            (diagnosisForm.visitChargeAmount || 0) > 0 &&
+                            !visitChargeTakenOrPending(selectedTicket) && (
                               <>
                                 <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
                                   <input
@@ -4278,9 +4528,9 @@ export default function ServiceDashboardPage() {
                                     htmlFor="visit-charge-collected"
                                     className="text-[11px] font-bold text-amber-800"
                                   >
-                                    Cash collected on-site — post {getActiveCurrency()}{' '}
+                                    Cash collected on-site — send {getActiveCurrency()}{' '}
                                     {Number(diagnosisForm.visitChargeAmount || 0).toFixed(2)} to
-                                    accounts now
+                                    Accounts for approval
                                   </label>
                                 </div>
 
@@ -4299,15 +4549,32 @@ export default function ServiceDashboardPage() {
                                             visitChargeAccountId: '',
                                           })
                                         }
-                                        className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                                        className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                                       >
                                         <option value="">Select mode...</option>
                                         <option value="CASH">Cash</option>
                                         <option value="BANK_TRANSFER">Bank Transfer</option>
                                         <option value="CHEQUE">Cheque</option>
-                                        <option value="CREDIT_CARD">Credit Card</option>
                                       </select>
                                     </div>
+                                    {diagnosisForm.visitChargePaymentMode === 'CHEQUE' && (
+                                      <div>
+                                        <label className="text-[11px] font-bold text-orange-700 uppercase tracking-wider block mb-1">
+                                          Cheque No. *
+                                        </label>
+                                        <input
+                                          value={diagnosisForm.visitChargeChequeNumber || ''}
+                                          onChange={(e) =>
+                                            setDiagnosisForm({
+                                              ...diagnosisForm,
+                                              visitChargeChequeNumber: e.target.value,
+                                            })
+                                          }
+                                          placeholder="e.g. CHQ-004512"
+                                          className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                        />
+                                      </div>
+                                    )}
                                     {diagnosisForm.visitChargePaymentMode &&
                                       diagnosisForm.visitChargePaymentMode !== 'CHEQUE' && (
                                         <div>
@@ -4322,12 +4589,14 @@ export default function ServiceDashboardPage() {
                                                 visitChargeAccountId: e.target.value,
                                               })
                                             }
-                                            className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary"
+                                            className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                                           >
                                             <option value="">Select account...</option>
-                                            {cashBankAccounts.map((a) => (
+                                            {accountsForMode(
+                                              diagnosisForm.visitChargePaymentMode,
+                                            ).map((a) => (
                                               <option key={a.id} value={a.id}>
-                                                {a.name} ({a.type})
+                                                {a.name}
                                               </option>
                                             ))}
                                           </select>
@@ -4403,19 +4672,28 @@ export default function ServiceDashboardPage() {
                               <span>{getActiveCurrency()}</span>
                               <span>
                                 {(() => {
+                                  // Every term is coerced before it is added. These fields are
+                                  // TYPED as number but arrive as strings: the ticket comes from
+                                  // the API, where a Postgres numeric column serialises as
+                                  // "150.00", and prefilling the form put that string straight
+                                  // into state. `+` then concatenated instead of adding, so
+                                  // labour 100 and a 150.00 visit charge displayed as 100150.00 —
+                                  // a number the technician would read out to the customer.
+                                  const num = (v: unknown) => Number(v) || 0;
                                   const partsTotal = diagnosisForm.items.reduce(
                                     (sum, item) =>
-                                      sum + (item.isFree ? 0 : item.quantity * item.unitPrice),
+                                      sum +
+                                      (item.isFree ? 0 : num(item.quantity) * num(item.unitPrice)),
                                     0,
                                   );
-                                  const laborTotal = diagnosisForm.labourCost || 0;
+                                  const laborTotal = num(diagnosisForm.labourCost);
                                   const transportTotal = travelCovered
                                     ? 0
-                                    : diagnosisForm.transportChargeAmount || 0;
+                                    : num(diagnosisForm.transportChargeAmount);
                                   const visitChargeToAdd =
                                     !travelCovered &&
                                     diagnosisForm.visitChargeMethod === 'ADDED_TO_ESTIMATE'
-                                      ? diagnosisForm.visitChargeAmount || 0
+                                      ? num(diagnosisForm.visitChargeAmount)
                                       : 0;
                                   const totalEstimate = Math.max(
                                     0,
@@ -4423,7 +4701,7 @@ export default function ServiceDashboardPage() {
                                       laborTotal +
                                       transportTotal +
                                       visitChargeToAdd -
-                                      (diagnosisForm.discountAmount || 0),
+                                      num(diagnosisForm.discountAmount),
                                   );
                                   return totalEstimate.toFixed(2);
                                 })()}
@@ -4630,6 +4908,146 @@ export default function ServiceDashboardPage() {
                     }
                     className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
                   />
+                </div>
+
+                {/* Payment taken at the door. Orange, matching the other money sections on
+                    this page, and gated behind choosing a mode so a technician who took
+                    nothing is not asked to fill anything in. */}
+                <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-3 space-y-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                      Payment collected on site (optional)
+                    </p>
+                    {loadingDue ? (
+                      <span className="text-[10px] font-bold text-orange-500">
+                        Loading balance…
+                      </span>
+                    ) : amountDue ? (
+                      <span className="text-[11px] font-black text-orange-800">
+                        Due now: {getActiveCurrency()} {amountDue.outstanding.toFixed(2)}
+                        {amountDue.invoiceNumber ? (
+                          <span className="ml-1 font-bold text-orange-500">
+                            ({amountDue.invoiceNumber})
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* The estimate and the bill can differ — labour is waived when the
+                      customer approves within validity — so the figure is spelled out
+                      rather than left for the technician to reconcile in their head. */}
+                  {amountDue && amountDue.paid > 0 && (
+                    <p className="text-[10px] text-orange-600">
+                      Invoice {getActiveCurrency()} {amountDue.total.toFixed(2)} · already collected{' '}
+                      {getActiveCurrency()} {amountDue.paid.toFixed(2)}
+                    </p>
+                  )}
+                  {amountDue && amountDue.outstanding === 0 && (
+                    <p className="text-[10px] font-bold text-emerald-700">
+                      Nothing outstanding — this invoice is already settled.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                        Payment Mode
+                      </label>
+                      <select
+                        value={collectMode}
+                        onChange={(e) => {
+                          const mode = e.target.value;
+                          setCollectMode(mode);
+                          setCollectChequeNo('');
+                          setCollectChequeBank('');
+                          setCollectChequeDate('');
+                          const eligible = accountsForMode(mode);
+                          setCollectAccountId(eligible.length === 1 ? eligible[0].id : '');
+                          if (mode && selectedTicket?.branchId) {
+                            loadCashBankAccounts(selectedTicket.branchId);
+                          }
+                        }}
+                        className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      >
+                        <option value="">Not collected</option>
+                        <option value="CASH">Cash</option>
+                        <option value="BANK_TRANSFER">Bank Transfer</option>
+                        <option value="CHEQUE">Cheque</option>
+                      </select>
+                    </div>
+
+                    {collectMode && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                          Amount ({getActiveCurrency()})
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={collectAmount}
+                          onChange={(e) => setCollectAmount(e.target.value)}
+                          placeholder={amountDue ? amountDue.outstanding.toFixed(2) : '0.00'}
+                          className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        />
+                        {amountDue && Number(collectAmount) > amountDue.outstanding + 0.01 && (
+                          <p className="text-[10px] font-bold text-red-600">
+                            More than the {getActiveCurrency()} {amountDue.outstanding.toFixed(2)}{' '}
+                            outstanding.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {collectMode && collectMode !== 'CHEQUE' && (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                          {collectMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
+                        </label>
+                        <select
+                          value={collectAccountId}
+                          onChange={(e) => setCollectAccountId(e.target.value)}
+                          className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        >
+                          <option value="">Select account...</option>
+                          {accountsForMode(collectMode).map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {collectMode === 'CHEQUE' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <input
+                        value={collectChequeNo}
+                        onChange={(e) => setCollectChequeNo(e.target.value)}
+                        placeholder="Cheque No. *"
+                        className="h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                      <input
+                        value={collectChequeBank}
+                        onChange={(e) => setCollectChequeBank(e.target.value)}
+                        placeholder="Bank"
+                        className="h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                      <input
+                        type="date"
+                        value={collectChequeDate}
+                        onChange={(e) => setCollectChequeDate(e.target.value)}
+                        className="h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                    </div>
+                  )}
+
+                  {collectMode && (
+                    <p className="text-[10px] text-orange-700">
+                      Goes to Accounts for approval. The money posts to the account selected here
+                      once they approve it — nothing reaches the cashbook before that.
+                    </p>
+                  )}
                 </div>
               </CardContent>
               <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center justify-end gap-2">
@@ -4975,6 +5393,9 @@ export default function ServiceDashboardPage() {
                                 <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
                                   Total
                                 </TableHead>
+                                <TableHead className="h-8 text-[10px] font-bold text-amber-600 py-1 text-right px-2">
+                                  Internal Cost
+                                </TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -5001,11 +5422,21 @@ export default function ServiceDashboardPage() {
                                       `${getActiveCurrency()} ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                     )}
                                   </TableCell>
+                                  <TableCell className="py-1 px-2 text-xs font-semibold text-amber-700 text-right">
+                                    {getActiveCurrency()}{' '}
+                                    {Number(item.totalCost || 0).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
                           </Table>
                         </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Internal Cost is what we actually spent — staff view only, never shown to
+                          the customer.
+                        </p>
                       </div>
                     )}
 
@@ -6575,36 +7006,94 @@ export default function ServiceDashboardPage() {
               for later (on-site or on the completion bill) — collecting it here does not affect
               technician assignment or diagnosis.
             </p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Recording this sends the collection to Accounts for approval. Nothing is posted to the
+              cashbook until they approve it, and the technician will no longer be offered this
+              charge on site.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <select
-                value={collectVCPaymentMode}
-                onChange={(e) => {
-                  setCollectVCPaymentMode(e.target.value);
-                  setCollectVCAccountId('');
-                }}
-                className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
-              >
-                <option value="">Select mode...</option>
-                <option value="CASH">Cash</option>
-                <option value="BANK_TRANSFER">Bank Transfer</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="CREDIT_CARD">Credit Card</option>
-              </select>
-              {collectVCPaymentMode && collectVCPaymentMode !== 'CHEQUE' && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  Payment Mode
+                </label>
                 <select
-                  value={collectVCAccountId}
-                  onChange={(e) => setCollectVCAccountId(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  value={collectVCPaymentMode}
+                  onChange={(e) => handleCollectVCModeChange(e.target.value)}
+                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
                 >
-                  <option value="">Select account...</option>
-                  {cashBankAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.type})
-                    </option>
-                  ))}
+                  <option value="">Select mode...</option>
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
                 </select>
+              </div>
+              {collectVCPaymentMode && collectVCPaymentMode !== 'CHEQUE' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    {collectVCPaymentMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
+                  </label>
+                  <select
+                    value={collectVCAccountId}
+                    onChange={(e) => setCollectVCAccountId(e.target.value)}
+                    disabled={collectVCEligibleAccounts.length === 0}
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400 disabled:opacity-60"
+                  >
+                    {collectVCEligibleAccounts.length === 0 ? (
+                      <option value="">
+                        No {collectVCPaymentMode === 'CASH' ? 'cash' : 'bank'} account configured
+                      </option>
+                    ) : (
+                      <>
+                        <option value="">Select account...</option>
+                        {collectVCEligibleAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
               )}
             </div>
+
+            {collectVCPaymentMode === 'CHEQUE' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    Cheque No. *
+                  </label>
+                  <input
+                    value={collectVCChequeNumber}
+                    onChange={(e) => setCollectVCChequeNumber(e.target.value)}
+                    placeholder="e.g. CHQ-004512"
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    Bank
+                  </label>
+                  <input
+                    value={collectVCChequeBank}
+                    onChange={(e) => setCollectVCChequeBank(e.target.value)}
+                    placeholder="e.g. FAB"
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    Cheque Date
+                  </label>
+                  <input
+                    type="date"
+                    value={collectVCChequeDate}
+                    onChange={(e) => setCollectVCChequeDate(e.target.value)}
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setCollectVCModal(null)}>
                 Cancel
@@ -6613,11 +7102,12 @@ export default function ServiceDashboardPage() {
                 disabled={
                   collectVCSubmitting ||
                   !collectVCPaymentMode ||
-                  (collectVCPaymentMode !== 'CHEQUE' && !collectVCAccountId)
+                  (collectVCPaymentMode !== 'CHEQUE' && !collectVCAccountId) ||
+                  (collectVCPaymentMode === 'CHEQUE' && !collectVCChequeNumber.trim())
                 }
                 onClick={handleCollectVisitChargeNow}
               >
-                {collectVCSubmitting ? 'Collecting...' : 'Confirm Payment'}
+                {collectVCSubmitting ? 'Sending...' : 'Send to Accounts for Approval'}
               </Button>
             </div>
           </div>

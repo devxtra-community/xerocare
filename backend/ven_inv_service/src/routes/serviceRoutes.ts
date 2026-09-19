@@ -37,6 +37,8 @@ router.get('/contracts/:id/bills', controller.getContractBills);
 router.post('/external-machines', controller.registerExternalMachine);
 router.post('/tickets/:id/assign', controller.assignTechnician);
 router.post('/tickets/:id/collect-visit-charge', controller.collectVisitCharge);
+// Internal: billing reports what Accounts decided about a collected visit charge.
+router.patch('/tickets/:id/visit-charge-decision', controller.applyVisitChargeDecision);
 router.post(
   '/tickets/:id/start-diagnosis',
   requireServiceRole(['SERVICE_TECHNICIAN']),
@@ -159,6 +161,7 @@ router.get('/customers/:customerId/history', controller.getCustomerHistory);
 router.get('/machines/:serialNumber/lifetime-cost', controller.getMachineLifetimeCost);
 router.get('/machines/:serialNumber/context', controller.getMachineContext);
 router.get('/machines/:serialNumber/yield-history', controller.getMachineYieldHistory);
+router.get('/machines/:serialNumber/analytics', controller.getMachineAnalytics);
 router.get('/finance/dashboard', controller.getFinanceDashboard);
 router.post('/spare-parts/:id/mark-damaged', controller.markSparePartDamaged);
 

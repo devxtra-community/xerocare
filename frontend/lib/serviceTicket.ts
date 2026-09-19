@@ -26,6 +26,8 @@ export interface ServiceTicketItem {
   customPartName?: string;
   customPartBrand?: string;
   customPartDescription?: string;
+  /** CUSTOM (off-catalog) items only — technician-entered internal cost, since there's no catalog price to pull from. */
+  customPartCost?: number;
   /** Brand of the part (from spare part record, or technician-entered for custom parts). */
   partBrand?: string | null;
   /** Manufacturer part number. */
@@ -35,6 +37,9 @@ export interface ServiceTicketItem {
   unitPrice: number;
   totalPrice: number;
   isFree: boolean;
+  /** Real internal cost, even when unitPrice/totalPrice are 0 (FOC). Internal-only — never shown to the customer. */
+  unitCost?: number | null;
+  totalCost?: number | null;
 }
 
 export interface ServiceTicket {
@@ -74,6 +79,11 @@ export interface ServiceTicket {
   visitChargeAmount?: number;
   visitChargeMethod?: string | null;
   visitChargeCollected?: boolean;
+  /** NONE | PENDING_APPROVAL | COLLECTED | REJECTED — see the ticket entity. */
+  visitChargeStatus?: 'NONE' | 'PENDING_APPROVAL' | 'COLLECTED' | 'REJECTED';
+  visitChargeCollectedByName?: string | null;
+  visitChargeCollectedByRole?: string | null;
+  visitChargeRejectionReason?: string | null;
   transportChargeAmount?: number;
   discountAmount?: number;
   technicianNoteToFinance?: string | null;
@@ -110,10 +120,12 @@ export const collectVisitCharge = async (
   id: string,
   paymentMode: string,
   accountId?: string,
+  cheque?: { chequeNumber?: string; chequeBankName?: string; chequeDate?: string },
 ): Promise<ServiceTicket> => {
   const response = await api.post(`/i/service/tickets/${id}/collect-visit-charge`, {
     paymentMode,
     accountId,
+    ...(paymentMode === 'CHEQUE' ? cheque : {}),
   });
   return response.data.data;
 };
@@ -144,6 +156,7 @@ export const diagnoseServiceTicket = async (
     visitChargeCollected?: boolean;
     visitChargePaymentMode?: string;
     visitChargeAccountId?: string;
+    visitChargeChequeNumber?: string;
     transportChargeAmount?: number;
     discountAmount?: number;
     technicianNoteToFinance?: string | null;
@@ -231,6 +244,13 @@ export const completeServiceTicket = async (
     technicianRemarks?: string;
     customerSignature?: string;
     technicianSignature?: string;
+    /** Payment the technician took at the door. Raised as a PENDING request for Accounts. */
+    collectedAmount?: number;
+    paymentMode?: string;
+    paymentAccountId?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDate?: string;
   },
 ): Promise<ServiceTicket> => {
   const response = await api.post(`/i/service/tickets/${id}/complete`, payload);
@@ -525,6 +545,44 @@ export const getMachineYieldHistory = async (
   serialNumber: string,
 ): Promise<ConsumableYieldHistory[]> => {
   const response = await api.get(`/i/service/machines/${serialNumber}/yield-history`);
+  return response.data.data;
+};
+
+export interface MachineAnalyticsTicket {
+  ticketId: string;
+  ticketNumber: string;
+  date: string | null;
+  serviceContext: string;
+  partsUsed: Array<{
+    partName: string;
+    sku: string | null;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    isConsumable: boolean;
+  }>;
+  partsCostInternal: number;
+  labourCost: number;
+  totalSpend: number;
+}
+
+export interface MachineAnalytics {
+  serialNumber: string;
+  serviceVisitCount: number;
+  tickets: MachineAnalyticsTicket[];
+  toner: {
+    totalTonerReplacements: number;
+    replacementHistory: ConsumableYieldHistory[];
+    yieldHistory: ConsumableYieldHistory[];
+  };
+  lifetimePartsCost: number;
+  lifetimeLabourCost: number;
+  lifetimeSpend: number;
+}
+
+/** Real internal spend on a machine — works for company-owned AND external machines (keyed by serial, not productId). Internal-only, never shown to the customer. */
+export const getMachineAnalytics = async (serialNumber: string): Promise<MachineAnalytics> => {
+  const response = await api.get(`/i/service/machines/${serialNumber}/analytics`);
   return response.data.data;
 };
 

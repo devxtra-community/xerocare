@@ -35,7 +35,15 @@ import {
   type ActionType as ChequeActionType,
 } from '@/components/accounts/ChequeDetailModal';
 import { useQuery } from '@tanstack/react-query';
-import { getInvoiceById, Invoice } from '@/lib/invoice';
+import {
+  getInvoiceById,
+  getPendingServiceEstimates,
+  getCustomerAcceptedServiceEstimates,
+  confirmServiceEstimateToAccounts,
+  financeApproveQuotation,
+  financeRejectInvoice,
+  Invoice,
+} from '@/lib/invoice';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { getActiveCurrency } from '@/lib/currency';
 import { toast } from 'sonner';
@@ -63,6 +71,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogHeader,
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
@@ -470,6 +479,103 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     setDirectCardQuoteError(null);
   };
 
+  /**
+   * Service estimates a technician has sent up for Finance sign-off.
+   *
+   * They are Invoices, not SalePaymentRequests, so they can never arrive in `payments`
+   * above — nothing has been collected yet, which is why Accounts saw "No payments in this
+   * category" while a 270 estimate sat waiting. They are rendered as rows of THIS table
+   * rather than a panel of their own: Accounts work one approval queue, and a second list
+   * under the first is a second place to forget to look.
+   *
+   * Only shown on PENDING, because that is the only tab whose meaning they share.
+   */
+  const [viewEstimate, setViewEstimate] = useState<Invoice | null>(null);
+  const [estimateBusyId, setEstimateBusyId] = useState<string | null>(null);
+  const [rejectEstimate, setRejectEstimate] = useState<Invoice | null>(null);
+  const [rejectEstimateReason, setRejectEstimateReason] = useState('');
+
+  const { data: pendingEstimates = [], refetch: refetchEstimates } = useQuery<Invoice[]>({
+    queryKey: ['pending-service-estimates'],
+    queryFn: getPendingServiceEstimates,
+    staleTime: 30_000,
+  });
+
+  /**
+   * Estimates the customer has already accepted, waiting for Accounts to raise the
+   * receivable. A second, later queue than the one above: Finance prices the job, the
+   * customer accepts it, and only then is there money to put in the books.
+   */
+  const { data: acceptedEstimates = [], refetch: refetchAccepted } = useQuery<Invoice[]>({
+    queryKey: ['customer-accepted-service-estimates'],
+    queryFn: getCustomerAcceptedServiceEstimates,
+    staleTime: 30_000,
+  });
+
+  const takeIntoAccounts = async (inv: Invoice) => {
+    setEstimateBusyId(inv.id);
+    try {
+      const updated = await confirmServiceEstimateToAccounts(inv.id);
+      toast.success(`Receivable raised for ${updated.invoiceNumber ?? inv.invoiceNumber}`, {
+        description: 'The estimate is now an invoice and shows in Accounts Receivable.',
+      });
+      await Promise.all([refetchAccepted(), loadData()]);
+    } catch (err) {
+      toast.error('Could not take this into accounts', { description: getApiErrorMessage(err) });
+    } finally {
+      setEstimateBusyId(null);
+    }
+  };
+
+  /**
+   * What the estimate is worth.
+   *
+   * `totalAmount` is the figure Finance approves against, so it wins. It is only
+   * recomputed from the parts when it is missing or zero but the estimate plainly has
+   * value — a sync gap between the ticket and its invoice should not show Accounts a
+   * blank cheque to approve.
+   */
+  const estimateAmount = (inv: Invoice): number => {
+    const stored = Number(inv.totalAmount) || 0;
+    if (stored > 0) return stored;
+    const items = (inv.items || []).reduce(
+      (sum, it) => sum + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+      0,
+    );
+    const rebuilt =
+      items + (Number(inv.visitChargeAmount) || 0) - (Number(inv.discountAmount) || 0);
+    return rebuilt > 0 ? rebuilt : stored;
+  };
+
+  const approveEstimate = async (inv: Invoice) => {
+    setEstimateBusyId(inv.id);
+    try {
+      await financeApproveQuotation(inv.id);
+      toast.success(`Service estimate ${inv.invoiceNumber} approved`);
+      await refetchEstimates();
+    } catch (err) {
+      toast.error('Failed to approve estimate', { description: getApiErrorMessage(err) });
+    } finally {
+      setEstimateBusyId(null);
+    }
+  };
+
+  const submitEstimateRejection = async () => {
+    if (!rejectEstimate || rejectEstimateReason.trim().length < 5) return;
+    setEstimateBusyId(rejectEstimate.id);
+    try {
+      await financeRejectInvoice(rejectEstimate.id, rejectEstimateReason.trim());
+      toast.success(`Service estimate ${rejectEstimate.invoiceNumber} rejected`);
+      setRejectEstimate(null);
+      setRejectEstimateReason('');
+      await refetchEstimates();
+    } catch (err) {
+      toast.error('Failed to reject estimate', { description: getApiErrorMessage(err) });
+    } finally {
+      setEstimateBusyId(null);
+    }
+  };
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -830,8 +936,16 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const sumAmount = (list: SalePaymentRequest[]) =>
     list.reduce((s, p) => s + Number(p.amount || 0), 0);
 
+  const showEstimateRows = tab === 'PENDING' && pendingEstimates.length > 0;
+  const showAcceptedRows = tab === 'PENDING' && acceptedEstimates.length > 0;
+
   const counts = {
-    PENDING: filteredBase.filter((p) => p.status === 'PENDING').length,
+    // Estimates count toward Pending too — the headline must agree with the rows below it,
+    // or "0 Awaiting approval" sits above a list of things plainly awaiting approval.
+    PENDING:
+      filteredBase.filter((p) => p.status === 'PENDING').length +
+      pendingEstimates.length +
+      acceptedEstimates.length,
     APPROVED: filteredBase.filter((p) => p.status === 'APPROVED').length,
     REJECTED: filteredBase.filter((p) => p.status === 'REJECTED').length,
     ALL: filteredBase.length,
@@ -1320,7 +1434,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               <div className="flex items-center justify-center py-12">
                 <Loader2 size={24} className="animate-spin text-slate-400" />
               </div>
-            ) : filtered.length === 0 ? (
+            ) : filtered.length === 0 && !showEstimateRows && !showAcceptedRows ? (
               <div className="text-center py-12">
                 <DollarSign size={32} className="mx-auto mb-3 text-slate-300" />
                 <p className="text-sm font-bold text-slate-500">No payments in this category</p>
@@ -1342,6 +1456,149 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {showEstimateRows &&
+                    pendingEstimates.map((inv) => (
+                      <TableRow
+                        key={`est-${inv.id}`}
+                        className="hover:bg-amber-50/40 bg-amber-50/20 [&>td]:py-4"
+                      >
+                        <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
+                          {inv.invoiceNumber}
+                        </TableCell>
+                        <TableCell className="font-bold text-slate-400 text-sm whitespace-nowrap">
+                          —
+                        </TableCell>
+                        <TableCell className="font-bold text-slate-600 text-sm">
+                          {inv.customerName || '—'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                            Service Estimate
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {/* An estimate has no payment mode because no money has moved.
+                              Saying so beats a bare dash, which reads as missing data. */}
+                          <span className="text-[11px] font-black text-slate-400 uppercase whitespace-nowrap">
+                            Not Collected
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-black text-slate-800 text-[15px] whitespace-nowrap">
+                          {formatCurrency(estimateAmount(inv), currency)}
+                        </TableCell>
+                        <TableCell className="text-[12px] font-bold text-slate-500 whitespace-nowrap">
+                          {inv.createdAt
+                            ? new Date(inv.createdAt).toLocaleDateString('en-GB')
+                            : '—'}
+                        </TableCell>
+                        <TableCell className="text-[12px] font-bold text-slate-500">
+                          {inv.employeeName || '—'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                            Awaiting Approval
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-slate-500 hover:bg-slate-100"
+                              title="View estimate breakdown"
+                              onClick={() => setViewEstimate(inv)}
+                            >
+                              <Eye size={14} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] font-bold text-green-700 hover:bg-green-50"
+                              disabled={estimateBusyId === inv.id}
+                              onClick={() => approveEstimate(inv)}
+                            >
+                              Approve
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] font-bold text-red-600 hover:bg-red-50"
+                              disabled={estimateBusyId === inv.id}
+                              onClick={() => {
+                                setRejectEstimate(inv);
+                                setRejectEstimateReason('');
+                              }}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {showAcceptedRows &&
+                    acceptedEstimates.map((inv) => (
+                      <TableRow
+                        key={`acc-${inv.id}`}
+                        className="hover:bg-emerald-50/40 bg-emerald-50/20 [&>td]:py-4"
+                      >
+                        <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
+                          {inv.invoiceNumber}
+                        </TableCell>
+                        <TableCell className="font-bold text-slate-400 text-sm whitespace-nowrap">
+                          —
+                        </TableCell>
+                        <TableCell className="font-bold text-slate-600 text-sm">
+                          {inv.customerName || '—'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                            Customer Accepted
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-[11px] font-black text-slate-400 uppercase whitespace-nowrap">
+                            Not Collected
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-black text-slate-800 text-[15px] whitespace-nowrap">
+                          {formatCurrency(estimateAmount(inv), currency)}
+                        </TableCell>
+                        <TableCell className="text-[12px] font-bold text-slate-500 whitespace-nowrap">
+                          {inv.createdAt
+                            ? new Date(inv.createdAt).toLocaleDateString('en-GB')
+                            : '—'}
+                        </TableCell>
+                        <TableCell className="text-[12px] font-bold text-slate-500">
+                          {inv.employeeName || '—'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
+                            Raise Receivable
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-slate-500 hover:bg-slate-100"
+                              title="View estimate breakdown"
+                              onClick={() => setViewEstimate(inv)}
+                            >
+                              <Eye size={14} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 px-2 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                              disabled={estimateBusyId === inv.id}
+                              onClick={() => takeIntoAccounts(inv)}
+                            >
+                              Take into Accounts
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   {filtered.map((pmt) => (
                     <TableRow key={pmt.id} className="hover:bg-slate-50/50 [&>td]:py-4">
                       <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
@@ -1508,6 +1765,186 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* What Finance is actually approving: the technician's costing, broken out.
+          Approving a bare total means approving a number nobody has checked. */}
+      {viewEstimate && (
+        <Dialog open onOpenChange={() => setViewEstimate(null)}>
+          <DialogContent className="sm:max-w-lg rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2">
+                Service Estimate {viewEstimate.invoiceNumber}
+                <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-black uppercase">
+                  Awaiting Approval
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    Customer
+                  </p>
+                  <p className="font-bold text-slate-700">{viewEstimate.customerName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    Raised By
+                  </p>
+                  <p className="font-bold text-slate-700">{viewEstimate.employeeName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    Date
+                  </p>
+                  <p className="font-bold text-slate-700">
+                    {viewEstimate.createdAt
+                      ? new Date(viewEstimate.createdAt).toLocaleDateString('en-GB')
+                      : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                    Service Ticket
+                  </p>
+                  <p className="font-bold text-slate-700">
+                    {viewEstimate.serviceTicketId
+                      ? viewEstimate.serviceTicketId.slice(0, 8).toUpperCase()
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-3 py-2 bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Costing
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {(viewEstimate.items || []).length === 0 && (
+                    <div className="px-3 py-3 text-[11px] text-slate-400">
+                      No line items recorded on this estimate.
+                    </div>
+                  )}
+                  {(viewEstimate.items || []).map((it, i) => (
+                    <div key={i} className="px-3 py-2 flex items-center justify-between text-xs">
+                      <span className="text-slate-600">
+                        {it.description}
+                        {Number(it.quantity) > 1 ? ` × ${it.quantity}` : ''}
+                      </span>
+                      <span className="font-bold text-slate-800">
+                        {formatCurrency(
+                          (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0),
+                          currency,
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                  {Number(viewEstimate.visitChargeAmount) > 0 && (
+                    <div className="px-3 py-2 flex items-center justify-between text-xs">
+                      <span className="text-slate-600">Visit Charge</span>
+                      <span className="font-bold text-slate-800">
+                        {formatCurrency(Number(viewEstimate.visitChargeAmount), currency)}
+                      </span>
+                    </div>
+                  )}
+                  {Number(viewEstimate.discountAmount) > 0 && (
+                    <div className="px-3 py-2 flex items-center justify-between text-xs">
+                      <span className="text-emerald-700">Discount</span>
+                      <span className="font-bold text-emerald-700">
+                        − {formatCurrency(Number(viewEstimate.discountAmount), currency)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="px-3 py-2.5 flex items-center justify-between bg-slate-50">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-600">
+                      Total
+                    </span>
+                    <span className="text-sm font-black text-slate-900">
+                      {formatCurrency(estimateAmount(viewEstimate), currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {viewEstimate.technicianNoteToFinance && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider text-amber-700 font-bold mb-0.5">
+                    Technician Note to Finance
+                  </p>
+                  <p className="text-[11px] text-amber-900">
+                    {viewEstimate.technicianNoteToFinance}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewEstimate(null)}>
+                Close
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700"
+                onClick={() => {
+                  setRejectEstimate(viewEstimate);
+                  setRejectEstimateReason('');
+                  setViewEstimate(null);
+                }}
+              >
+                Reject
+              </Button>
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                disabled={estimateBusyId === viewEstimate.id}
+                onClick={() => {
+                  approveEstimate(viewEstimate);
+                  setViewEstimate(null);
+                }}
+              >
+                Approve
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Reject dialog for a service estimate — the reason goes back to the technician,
+          who can then revise and resubmit. */}
+      {rejectEstimate && (
+        <Dialog open onOpenChange={() => setRejectEstimate(null)}>
+          <DialogContent className="sm:max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base">Reject {rejectEstimate.invoiceNumber}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                The technician sees this reason and can revise the estimate.
+              </p>
+              <textarea
+                value={rejectEstimateReason}
+                onChange={(e) => setRejectEstimateReason(e.target.value)}
+                rows={3}
+                placeholder="Why is this estimate being rejected?"
+                className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-red-300"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRejectEstimate(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700"
+                disabled={
+                  rejectEstimateReason.trim().length < 5 || estimateBusyId === rejectEstimate.id
+                }
+                onClick={submitEstimateRejection}
+              >
+                Reject Estimate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Customer Cheques (Received) */}
