@@ -537,6 +537,7 @@ export default function ServiceDashboardPage() {
       customPartName: string;
       customPartBrand: string;
       customPartDescription: string;
+      customPartCost: number;
       mpn: string;
       partName: string;
       quantity: number;
@@ -1040,6 +1041,7 @@ export default function ServiceDashboardPage() {
             customPartName: it.customPartName || undefined,
             customPartBrand: it.customPartBrand || undefined,
             customPartDescription: it.customPartDescription || undefined,
+            customPartCost: it.itemSource === 'CUSTOM' ? Number(it.customPartCost) || 0 : undefined,
             mpn: it.mpn || undefined,
             partName: it.partName,
             quantity: Number(it.quantity) || 1,
@@ -1088,6 +1090,7 @@ export default function ServiceDashboardPage() {
             customPartName: it.customPartName || undefined,
             customPartBrand: it.customPartBrand || undefined,
             customPartDescription: it.customPartDescription || undefined,
+            customPartCost: it.itemSource === 'CUSTOM' ? Number(it.customPartCost) || 0 : undefined,
             mpn: it.mpn || undefined,
             partName: it.partName,
             quantity: Number(it.quantity) || 1,
@@ -1852,6 +1855,7 @@ export default function ServiceDashboardPage() {
           customPartName: '',
           customPartBrand: '',
           customPartDescription: '',
+          customPartCost: 0,
           mpn: '',
           partName: '',
           quantity: 1,
@@ -2499,6 +2503,7 @@ export default function ServiceDashboardPage() {
                                       customPartName: it.customPartName || '',
                                       customPartBrand: it.customPartBrand || '',
                                       customPartDescription: it.customPartDescription || '',
+                                      customPartCost: it.unitCost || 0,
                                       mpn: it.mpn || '',
                                       partName: it.partName || '',
                                       quantity: it.quantity || 1,
@@ -4289,7 +4294,7 @@ export default function ServiceDashboardPage() {
 
                       {item.itemSource === 'CUSTOM' && (
                         <div className="space-y-2">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
                               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
                                 Brand
@@ -4327,11 +4332,33 @@ export default function ServiceDashboardPage() {
                                 className="h-9 text-xs bg-white border-slate-200 rounded-lg"
                               />
                             </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
+                                Internal Cost (what we paid)
+                              </label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                placeholder="0.00"
+                                value={item.customPartCost || ''}
+                                onChange={(e) =>
+                                  updateDiagnosisItem(
+                                    idx,
+                                    'customPartCost',
+                                    parseFloat(e.target.value) || 0,
+                                  )
+                                }
+                                className="h-9 text-xs bg-white border-slate-200 rounded-lg"
+                              />
+                            </div>
                           </div>
                           <p className="text-[10px] text-slate-400 flex items-center gap-1">
                             <Info className="size-3 shrink-0" />
                             Brand and Model Name are pre-filled from the machine on this ticket —
-                            edit if the part differs.
+                            edit if the part differs. Internal cost is never shown to the customer —
+                            it&apos;s tracked so we know what off-catalog parts actually cost us,
+                            and flags the branch manager to consider stocking it via RFQ.
                           </p>
                         </div>
                       )}
@@ -5366,6 +5393,9 @@ export default function ServiceDashboardPage() {
                                 <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
                                   Total
                                 </TableHead>
+                                <TableHead className="h-8 text-[10px] font-bold text-amber-600 py-1 text-right px-2">
+                                  Internal Cost
+                                </TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -5392,11 +5422,21 @@ export default function ServiceDashboardPage() {
                                       `${getActiveCurrency()} ${item.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                                     )}
                                   </TableCell>
+                                  <TableCell className="py-1 px-2 text-xs font-semibold text-amber-700 text-right">
+                                    {getActiveCurrency()}{' '}
+                                    {Number(item.totalCost || 0).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
                           </Table>
                         </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Internal Cost is what we actually spent — staff view only, never shown to
+                          the customer.
+                        </p>
                       </div>
                     )}
 

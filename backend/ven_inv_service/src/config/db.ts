@@ -893,6 +893,10 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS service_location VARCHAR(500);
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "partBrand" VARCHAR(255) NULL;
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS mpn VARCHAR(255) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
@@ -924,6 +928,26 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           );
         `);
         logger.info('Guaranteed machine_service_history table exists (new redesign).');
+
+        // External machines (never purchased from us — no matching Product row)
+        // still need a lifetime-spend history row, keyed by serialNumber alone.
+        // Postgres allows multiple NULLs under a UNIQUE constraint, so relaxing
+        // productId to nullable doesn't break its existing uniqueness among
+        // real products.
+        await Source.query(`
+          ALTER TABLE machine_service_history ALTER COLUMN "productId" DROP NOT NULL;
+        `);
+        try {
+          await Source.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS machine_service_history_serial_number_key
+              ON machine_service_history ("serialNumber");
+          `);
+        } catch (err) {
+          logger.warn(
+            'Could not add unique index on machine_service_history.serialNumber (likely pre-existing duplicate serials) — external-machine history lookups will still work by best match, just without the uniqueness guarantee:',
+            err,
+          );
+        }
 
         // 4. Create service_part_usage_logs table
         await Source.query(`

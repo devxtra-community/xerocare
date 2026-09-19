@@ -161,6 +161,7 @@ router.get('/customers/:customerId/history', controller.getCustomerHistory);
 router.get('/machines/:serialNumber/lifetime-cost', controller.getMachineLifetimeCost);
 router.get('/machines/:serialNumber/context', controller.getMachineContext);
 router.get('/machines/:serialNumber/yield-history', controller.getMachineYieldHistory);
+router.get('/machines/:serialNumber/analytics', controller.getMachineAnalytics);
 router.get('/finance/dashboard', controller.getFinanceDashboard);
 router.post('/spare-parts/:id/mark-damaged', controller.markSparePartDamaged);
 

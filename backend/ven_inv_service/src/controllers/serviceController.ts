@@ -178,6 +178,7 @@ interface ReviseEstimateItem {
   partName?: string;
   description?: string;
   customPartBrand?: string;
+  customPartCost?: number;
   mpn?: string;
   quantity: number;
   unitPrice: number;
@@ -220,7 +221,8 @@ export class ServiceController {
         | 'SERVICE'
         | 'SERVICE_TICKET'
         | 'SERVICE_CONTRACT'
-        | 'STOCK_TRANSFER';
+        | 'STOCK_TRANSFER'
+        | 'CUSTOM_PART_REQUEST';
     },
   ): Promise<void> {
     try {
@@ -617,6 +619,53 @@ export class ServiceController {
     );
   }
 
+  /**
+   * Single source of truth for "what's covered on this ticket" — replaces the
+   * 3 previously-divergent per-site variants (a real contract's coverage always
+   * wins; otherwise RENT/LEASE_CPC/FSMA are fully free, WARRANTY/
+   * LEASE_UNDER_WARRANTY/SMA are free except toner, everything else pays for
+   * everything). Used regardless of "track" — coverage and finance-routing are
+   * separate concerns now.
+   */
+  private async resolveItemCoverage(ticket: {
+    contractReferenceId?: string | null;
+    serviceContext: ServiceContext;
+  }): Promise<ContractCoverage> {
+    const contractCoverage = await this.getTicketContractCoverage(ticket.contractReferenceId);
+    if (contractCoverage) return contractCoverage;
+    if (
+      ticket.serviceContext === ServiceContext.RENT ||
+      ticket.serviceContext === ServiceContext.LEASE_CPC ||
+      ticket.serviceContext === ServiceContext.FSMA
+    ) {
+      return { ...FULL_COVERAGE };
+    }
+    if (
+      ticket.serviceContext === ServiceContext.WARRANTY ||
+      ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
+      ticket.serviceContext === ServiceContext.SMA
+    ) {
+      return { ...WARRANTY_COVERAGE };
+    }
+    return { ...NO_COVERAGE };
+  }
+
+  /**
+   * An item is free when its category is covered by contract/warranty rules,
+   * OR when staff explicitly flagged it free (a one-way override — this can
+   * only ever add extra free items on top of coverage, never take coverage
+   * away from an item the rules say should be covered).
+   */
+  private resolveItemIsFree(
+    coverage: ContractCoverage,
+    item: { partCategory?: string | null; partName?: string | null; isFree?: boolean },
+  ): boolean {
+    return (
+      coverageAllowsItem(coverage, { partCategory: item.partCategory, partName: item.partName }) ||
+      !!item.isFree
+    );
+  }
+
   /** Maps sparePartId → part_category for coverage checks over item lists. */
   private async getPartCategories(
     sparePartIds: Array<string | null | undefined>,
@@ -944,7 +993,11 @@ export class ServiceController {
       const count = await ticketRepo.count();
       const ticketNumber = `ST-${year}${month}-${String(count + 1).padStart(4, '0')}`;
 
-      const status = track === 'A' ? ServiceTicketStatus.FREE_SERVICE : ServiceTicketStatus.OPEN;
+      // Every ticket starts OPEN and goes through the same diagnose →
+      // finance-approval → customer-approval → complete pipeline, regardless
+      // of whether it turns out to be free/covered — `track` only affects the
+      // WARRANTY_ONSITE jobType lock above, not the ticket lifecycle.
+      const status = ServiceTicketStatus.OPEN;
 
       const branchId = req.user.branchId || req.body.branchId;
       if (!branchId) throw new Error('Branch ID is required');
@@ -992,7 +1045,7 @@ export class ServiceController {
       await this.logActivity(
         ticket.id,
         'CREATION',
-        `Ticket ${ticket.ticketNumber} created under context ${ticket.serviceContext} (${track === 'A' ? 'Free Track A' : 'Chargeable Track B'})`,
+        `Ticket ${ticket.ticketNumber} created under context ${ticket.serviceContext}${track === 'A' ? ' (covered/warranty-onsite)' : ''}`,
         req.user.userId,
       );
 
@@ -1322,8 +1375,6 @@ Xerocare Technical Services`;
         }
       }
 
-      const isFreeContext = ticket.track === 'A';
-
       // Visit + transportation are free whenever the machine is covered by a
       // service contract (AMC/SMA/FSMA — all include travel), by warranty, or is
       // a company-owned RENT machine. Only uncovered machines pay these charges.
@@ -1350,7 +1401,6 @@ Xerocare Technical Services`;
       // transactional, so a validation error thrown after ticket/estimate
       // writes have already landed would leave a half-committed state.
       if (
-        !isFreeContext &&
         visitChargeMethod === 'SEPARATE' &&
         effectiveVisitCharge > 0 &&
         visitChargeCollected &&
@@ -1380,15 +1430,14 @@ Xerocare Technical Services`;
         ticket.meterReadingAtService = meterReading || 0;
       }
 
-      if (isFreeContext) {
-        ticket.status = ServiceTicketStatus.FREE_SERVICE;
-      } else {
-        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
-        ticket.visitChargeAmount = effectiveVisitCharge;
-        ticket.visitChargeMethod = visitChargeMethod || null;
-        ticket.transportChargeAmount = effectiveTransportCharge;
-        ticket.discountAmount = Number(discountAmount) || 0;
-      }
+      // Every context now goes through the same finance-approval pipeline —
+      // covered items still price at 0, finance just reviews/marks them FOC
+      // instead of the ticket silently bypassing finance entirely.
+      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+      ticket.visitChargeAmount = effectiveVisitCharge;
+      ticket.visitChargeMethod = visitChargeMethod || null;
+      ticket.transportChargeAmount = effectiveTransportCharge;
+      ticket.discountAmount = Number(discountAmount) || 0;
 
       await ticketRepo.save(ticket);
 
@@ -1414,16 +1463,12 @@ Xerocare Technical Services`;
 
       const itemRepo = Source.getRepository(ServiceTicketItem);
       const ticketItems: ServiceTicketItem[] = [];
+      let hasCustomItem = false;
 
-      // Under a contract, "free" is per item category (e.g. SMA covers spare
-      // parts but charges toner). Warranty mirrors SMA (toner chargeable);
-      // RENT + no-contract track A stay fully free.
-      const contractCoverage =
-        (await this.getTicketContractCoverage(ticket.contractReferenceId)) ??
-        (ticket.serviceContext === ServiceContext.WARRANTY ||
-        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
-          ? { ...WARRANTY_COVERAGE }
-          : null);
+      // Single source of truth for what's covered — real contract rules win,
+      // else RENT/LEASE_CPC/FSMA are fully free, WARRANTY/LEASE_UNDER_WARRANTY/
+      // SMA are free except toner, everything else pays for everything.
+      const contractCoverage = await this.resolveItemCoverage(ticket);
 
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
@@ -1435,6 +1480,7 @@ Xerocare Technical Services`;
           let partCategory: string | null = null;
           let partBrand = itemData.customPartBrand || null;
           let mpn = itemData.mpn || null;
+          let unitCost = 0;
 
           if (itemData.itemSource === ServiceItemSource.SPARE_PART && itemData.sparePartId) {
             const part = await sparePartRepo.findOne({
@@ -1448,6 +1494,7 @@ Xerocare Technical Services`;
               partCategory = part.part_category || null;
               partBrand = part.brand || null;
               mpn = part.mpn || null;
+              unitCost = Number(part.purchase_price) || 0;
 
               // Check stock warnings
               if (part.quantity <= 5) {
@@ -1460,13 +1507,18 @@ Xerocare Technical Services`;
                 });
               }
             }
+          } else if (itemData.itemSource === ServiceItemSource.CUSTOM) {
+            unitCost = Number(itemData.customPartCost) || 0;
+            hasCustomItem = true;
           }
 
-          const coveredByContract = contractCoverage
-            ? coverageAllowsItem(contractCoverage, { partCategory, partName })
-            : true;
-          const isItemFree = isFreeContext ? coveredByContract : !!itemData.isFree;
+          const isItemFree = this.resolveItemIsFree(contractCoverage, {
+            partCategory,
+            partName,
+            isFree: itemData.isFree,
+          });
           const finalPrice = isItemFree ? 0 : unitPrice;
+          const quantity = itemData.quantity || 1;
 
           const serviceItem = itemRepo.create({
             ticketId: ticket.id,
@@ -1480,85 +1532,37 @@ Xerocare Technical Services`;
             partBrand,
             mpn,
             partName,
-            quantity: itemData.quantity || 1,
+            quantity,
             unitPrice: finalPrice,
-            totalPrice: finalPrice * (itemData.quantity || 1),
+            totalPrice: finalPrice * quantity,
             isFree: isItemFree,
+            unitCost,
+            totalCost: unitCost * quantity,
           });
           ticketItems.push(serviceItem);
-
-          // Reserve Parts Immediately for Free Workflows
-          if (
-            isFreeContext &&
-            itemData.itemSource === ServiceItemSource.SPARE_PART &&
-            itemData.sparePartId
-          ) {
-            await this.reserveSparePart(ticket.id, itemData.sparePartId, itemData.quantity || 1);
-          }
         }
       }
 
       ticket.items = ticketItems;
       await ticketRepo.save(ticket);
 
-      // For Track A, automatically generate/send FOC Estimate to billing service.
-      // Items excluded by the contract (e.g. toner under SMA) keep their price.
-      if (isFreeContext) {
-        const billingItems = ticketItems.map((item) => ({
-          itemSource: item.itemSource,
-          productId: item.sparePartId || null,
-          sparePartId: item.sparePartId || null,
-          partName: item.partName,
-          sku: item.sku,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice) || 0,
-          totalPrice: Number(item.totalPrice) || 0,
-          isFree: item.isFree,
-        }));
-        try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-
-          const response = await axios.post(
-            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
-            {
-              customerId: ticket.customerId,
-              branchId: ticket.branchId,
-              createdBy: req.user?.userId || 'SYSTEM',
-              serviceTicketId: ticket.id,
-              items: billingItems,
-              saleType: 'SERVICE',
-              status: 'APPROVED',
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          );
-          if (response.data?.success) {
-            ticket.linkedInvoiceId = response.data.data.id;
-            ticket.estimateSentToFinance = true;
-            await ticketRepo.save(ticket);
-          }
-        } catch (billingErr) {
-          logger.error('Failed to post FOC estimate to billing service:', billingErr);
-        }
-
-        await this.logActivity(
-          ticket.id,
-          'ESTIMATE_RECORDED',
-          `FOC estimate automatically created and sent to billing service.`,
-          req.user?.userId,
-        );
+      if (hasCustomItem) {
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: 'Spare Part Procurement Needed',
+          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
+          type: 'ACTION_REQUIRED',
+          referenceId: ticket.id,
+          referenceType: 'CUSTOM_PART_REQUEST',
+        });
       }
 
-      // If Track B workflow with parts or labor, automatically generate a WAITING_FINANCE_APPROVAL Estimate
+      // Parts are reserved once the customer (or finance, for FOC-only
+      // estimates) actually approves the estimate — not here — so a rejected
+      // estimate never leaves stock wrongly held.
+
+      // Automatically generate a WAITING_FINANCE_APPROVAL Estimate whenever
+      // there's anything to estimate. Covered items are already priced at 0
+      // above — finance reviews and approves the FOC estimate like any other.
       const inputLabour = Number(labourCost) || 0;
       const finalLabourCost =
         ticket.serviceContext === ServiceContext.AMC ||
@@ -1572,11 +1576,10 @@ Xerocare Technical Services`;
           : inputLabour;
 
       if (
-        !isFreeContext &&
-        ((ticketItems && ticketItems.length > 0) ||
-          finalLabourCost > 0 ||
-          effectiveVisitCharge > 0 ||
-          effectiveTransportCharge > 0)
+        (ticketItems && ticketItems.length > 0) ||
+        finalLabourCost > 0 ||
+        effectiveVisitCharge > 0 ||
+        effectiveTransportCharge > 0
       ) {
         // Discount applies to the whole estimate (parts + labour + transport +
         // visit charge when added to the estimate) — cap it there.
@@ -1632,6 +1635,8 @@ Xerocare Technical Services`;
             totalPrice: ticketItem.totalPrice,
             isFree: ticketItem.isFree,
             isApproved: true,
+            unitCost: ticketItem.unitCost,
+            totalCost: ticketItem.totalCost,
           });
           estItemsToSave.push(estItem);
         }
@@ -1724,7 +1729,6 @@ Xerocare Technical Services`;
       // billing immediately so it shows up in the cashbook / day book and earnings
       // without waiting for the estimate to be paid.
       if (
-        !isFreeContext &&
         visitChargeMethod === 'SEPARATE' &&
         effectiveVisitCharge > 0 &&
         visitChargeCollected &&
@@ -1815,6 +1819,8 @@ Xerocare Technical Services`;
 
       let calculatedTotal = Number(estimate.labourCost);
       const savedItems: ServiceEstimateItem[] = [];
+      let hasCustomItem = false;
+      const coverage = await this.resolveItemCoverage(ticket);
 
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
@@ -1823,6 +1829,7 @@ Xerocare Technical Services`;
           let sku = it.sku || '';
           let basePrice = Number(it.unitPrice) || 0;
           let partCategory: string | null = null;
+          let unitCost = 0;
 
           if (it.sparePartId) {
             const part = await sparePartRepo.findOne({ where: { id: String(it.sparePartId) } });
@@ -1833,28 +1840,22 @@ Xerocare Technical Services`;
               if (basePrice === 0) {
                 basePrice = Number(part.base_price) || 0;
               }
+              unitCost = Number(part.purchase_price) || 0;
             }
+          } else {
+            unitCost = Number(it.customPartCost) || 0;
+            hasCustomItem = true;
           }
 
-          let isItemFree = !!it.isFree;
-          if (
-            ticket.serviceContext === ServiceContext.RENT ||
-            ticket.serviceContext === ServiceContext.LEASE_CPC ||
-            ticket.serviceContext === ServiceContext.FSMA
-          ) {
-            isItemFree = true;
-          } else if (
-            ticket.serviceContext === ServiceContext.WARRANTY ||
-            ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
-          ) {
-            // Warranty mirrors SMA: parts free, toner chargeable
-            isItemFree = coverageAllowsItem(WARRANTY_COVERAGE, { partCategory, partName });
-          } else if (ticket.serviceContext === ServiceContext.AMC) {
-            isItemFree = false;
-          }
+          const isItemFree = this.resolveItemIsFree(coverage, {
+            partCategory,
+            partName,
+            isFree: it.isFree,
+          });
 
           const finalPrice = isItemFree ? 0 : basePrice;
-          const itemTotal = finalPrice * (it.quantity || 1);
+          const quantity = it.quantity || 1;
+          const itemTotal = finalPrice * quantity;
           calculatedTotal += itemTotal;
 
           const estItem = estItemRepo.create({
@@ -1865,14 +1866,26 @@ Xerocare Technical Services`;
             sparePartId: it.sparePartId || null,
             sku,
             partName,
-            quantity: it.quantity || 1,
+            quantity,
             unitPrice: finalPrice,
             totalPrice: itemTotal,
             isFree: isItemFree,
             isApproved: true,
+            unitCost,
+            totalCost: unitCost * quantity,
           });
           savedItems.push(estItem);
         }
+      }
+
+      if (hasCustomItem) {
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: 'Spare Part Procurement Needed',
+          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
+          type: 'ACTION_REQUIRED',
+          referenceId: ticket.id,
+          referenceType: 'CUSTOM_PART_REQUEST',
+        });
       }
 
       estimate.totalCost = calculatedTotal;
@@ -2551,21 +2564,15 @@ Xerocare Technical Services`;
       await revisionRepo.save(revision);
 
       const sparePartRepo = Source.getRepository(SparePart);
-      // Contract decides what stays free per item category: SMA/FSMA cover
-      // parts, AMC does not, and toner is only covered under FSMA. Warranty
-      // mirrors SMA (toner chargeable).
-      const revisionCoverage =
-        (await this.getTicketContractCoverage(ticket.contractReferenceId)) ??
-        (ticket.serviceContext === ServiceContext.WARRANTY ||
-        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
-          ? { ...WARRANTY_COVERAGE }
-          : null);
+      const revisionCoverage = await this.resolveItemCoverage(ticket);
+      let hasCustomItem = false;
       if (items && Array.isArray(items)) {
         for (const it of items) {
           let partName = it.partName || '';
           let sku = it.sku || '';
           let basePrice = Number(it.unitPrice) || 0;
           let partCategory: string | null = null;
+          let unitCost = 0;
 
           if (it.sparePartId) {
             const part = await sparePartRepo.findOne({ where: { id: String(it.sparePartId) } });
@@ -2576,16 +2583,21 @@ Xerocare Technical Services`;
               if (basePrice === 0) {
                 basePrice = Number(part.base_price) || 0;
               }
+              unitCost = Number(part.purchase_price) || 0;
             }
+          } else {
+            unitCost = Number(it.customPartCost) || 0;
+            hasCustomItem = true;
           }
 
-          const isItemFree = revisionCoverage
-            ? coverageAllowsItem(revisionCoverage, { partCategory, partName })
-            : ticket.track === 'A'
-              ? true
-              : !!it.isFree;
+          const isItemFree = this.resolveItemIsFree(revisionCoverage, {
+            partCategory,
+            partName,
+            isFree: it.isFree,
+          });
           const finalPrice = isItemFree ? 0 : basePrice;
-          const itemTotal = finalPrice * (it.quantity || 1);
+          const quantity = it.quantity || 1;
+          const itemTotal = finalPrice * quantity;
           revisionTotal += itemTotal;
 
           const revItem = estItemRepo.create({
@@ -2596,14 +2608,26 @@ Xerocare Technical Services`;
             sparePartId: it.sparePartId || null,
             sku,
             partName,
-            quantity: it.quantity || 1,
+            quantity,
             unitPrice: finalPrice,
             totalPrice: itemTotal,
             isFree: isItemFree,
             isApproved: false,
+            unitCost,
+            totalCost: unitCost * quantity,
           });
           revisionItems.push(revItem);
         }
+      }
+
+      if (hasCustomItem) {
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: 'Spare Part Procurement Needed',
+          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
+          type: 'ACTION_REQUIRED',
+          referenceId: ticket.id,
+          referenceType: 'CUSTOM_PART_REQUEST',
+        });
       }
 
       revision.totalCost = revisionTotal;
@@ -3014,89 +3038,97 @@ Xerocare Technical Services`;
         relations: ['items'],
       });
 
-      // What the customer was actually billed for parts/consumables (used for the
-      // customer/UI-facing Machine History stat) — distinct from purchaseCost below,
-      // which is the internal cost basis used only for ServicePartUsageLog/margin tracking.
-      let totalPartsBilled = 0;
+      // Real internal spend, regardless of what the customer was billed — this
+      // is what MachineServiceHistory.totalPartsSpend reflects (see below).
+      let totalPartsCostInternal = 0;
 
       const itemsToInspect = estimate ? estimate.items : ticket.items;
       const usageLogRepo = Source.getRepository(ServicePartUsageLog);
 
       for (const item of itemsToInspect) {
-        totalPartsBilled +=
-          Number(item.totalPrice) || (Number(item.unitPrice) || 0) * (item.quantity || 1);
+        // Prefer the cost captured at diagnosis/estimate time (covers CUSTOM
+        // items, which have no catalog price to re-derive here) — only fall
+        // back to a fresh SparePart lookup for items that predate that column.
+        let purchaseCost = item.unitCost != null ? Number(item.unitCost) || 0 : 0;
+        let partNameForLog = item.partName || '';
+        let skuForLog = item.sku || '';
+        let isConsumableItem = this.isConsumable(partNameForLog, skuForLog);
 
-        let purchaseCost = 0;
-        if (item.sparePartId) {
+        if (item.unitCost == null && item.sparePartId) {
           const partDetails = await sparePartRepo.findOne({
             where: { id: String(item.sparePartId) },
           });
           if (partDetails) {
             purchaseCost = Number(partDetails.purchase_price) || 0;
-            const itemCost = purchaseCost * item.quantity;
-
-            // Yield page calculation for consumables if replaced
-            let yieldPages = 0;
-            if (this.isConsumable(partDetails.part_name, partDetails.sku)) {
-              const yieldRepo = Source.getRepository(ConsumableYieldHistory);
-              const activeYield = await yieldRepo.findOne({
-                where: {
-                  serialNumber: ticket.serialNumber,
-                  tonerSku: item.sku || '',
-                  replacedMeterReading: IsNull(),
-                },
-                order: { installedDate: 'DESC' },
-              });
-
-              if (activeYield) {
-                activeYield.replacedDate = new Date();
-                activeYield.replacedMeterReading = meterReading || 0;
-                activeYield.yieldPages = Math.max(
-                  0,
-                  (meterReading || 0) - activeYield.installedMeterReading,
-                );
-                await yieldRepo.save(activeYield);
-                yieldPages = activeYield.yieldPages;
-              }
-
-              const newYield = yieldRepo.create({
-                productId: ticket.productId || undefined,
-                serialNumber: ticket.serialNumber,
-                tonerSku: item.sku || '',
-                installedDate: new Date(),
-                installedMeterReading: meterReading || 0,
-                ticketId: ticket.id,
-              });
-              await yieldRepo.save(newYield);
-            }
-
-            // Save Part Usage Log — productId is NOT NULL here (it's a per-machine
-            // usage record), so this is skipped entirely for a ticket with no
-            // matched Product (e.g. a serial number not yet in the catalog).
-            // Previously this passed '' as a fallback, which isn't a valid uuid
-            // and crashed the whole completion request with a 500 — after the
-            // ticket's status had already been committed as COMPLETED, silently
-            // skipping the rest of the function including the Manager notification.
-            if (ticket.productId) {
-              const usageLog = usageLogRepo.create({
-                ticketId: ticket.id,
-                productId: ticket.productId,
-                sparePartId: item.sparePartId,
-                sku: item.sku || '',
-                partName: item.partName || '',
-                quantityUsed: item.quantity,
-                unitCost: purchaseCost,
-                totalCost: itemCost,
-                replacedAt: new Date(),
-                calculatedYield: yieldPages || null,
-                isFree: item.isFree,
-                isConsumable: this.isConsumable(partDetails.part_name, partDetails.sku),
-                meterReadingAtReplacement: meterReading || null,
-                linkedInvoiceId: ticket.linkedInvoiceId || null,
-              });
-              await usageLogRepo.save(usageLog);
-            }
+            partNameForLog = partDetails.part_name;
+            skuForLog = partDetails.sku;
+            isConsumableItem = this.isConsumable(partDetails.part_name, partDetails.sku);
           }
+        }
+
+        const itemCost = purchaseCost * item.quantity;
+        totalPartsCostInternal += itemCost;
+
+        // Yield page calculation for consumables if replaced
+        let yieldPages = 0;
+        if (isConsumableItem) {
+          const yieldRepo = Source.getRepository(ConsumableYieldHistory);
+          const activeYield = await yieldRepo.findOne({
+            where: {
+              serialNumber: ticket.serialNumber,
+              tonerSku: skuForLog || '',
+              replacedMeterReading: IsNull(),
+            },
+            order: { installedDate: 'DESC' },
+          });
+
+          if (activeYield) {
+            activeYield.replacedDate = new Date();
+            activeYield.replacedMeterReading = meterReading || 0;
+            activeYield.yieldPages = Math.max(
+              0,
+              (meterReading || 0) - activeYield.installedMeterReading,
+            );
+            await yieldRepo.save(activeYield);
+            yieldPages = activeYield.yieldPages;
+          }
+
+          const newYield = yieldRepo.create({
+            productId: ticket.productId || undefined,
+            serialNumber: ticket.serialNumber,
+            tonerSku: skuForLog || '',
+            installedDate: new Date(),
+            installedMeterReading: meterReading || 0,
+            ticketId: ticket.id,
+          });
+          await yieldRepo.save(newYield);
+        }
+
+        // Save Part Usage Log — productId is NOT NULL here (it's a per-machine
+        // usage record), so this is skipped entirely for a ticket with no
+        // matched Product (e.g. a serial number not yet in the catalog).
+        // Previously this passed '' as a fallback, which isn't a valid uuid
+        // and crashed the whole completion request with a 500 — after the
+        // ticket's status had already been committed as COMPLETED, silently
+        // skipping the rest of the function including the Manager notification.
+        if (ticket.productId) {
+          const usageLog = usageLogRepo.create({
+            ticketId: ticket.id,
+            productId: ticket.productId,
+            sparePartId: item.sparePartId || null,
+            sku: skuForLog,
+            partName: partNameForLog,
+            quantityUsed: item.quantity,
+            unitCost: purchaseCost,
+            totalCost: itemCost,
+            replacedAt: new Date(),
+            calculatedYield: yieldPages || null,
+            isFree: item.isFree,
+            isConsumable: isConsumableItem,
+            meterReadingAtReplacement: meterReading || null,
+            linkedInvoiceId: ticket.linkedInvoiceId || null,
+          });
+          await usageLogRepo.save(usageLog);
         }
       }
 
@@ -3110,10 +3142,14 @@ Xerocare Technical Services`;
       // come back first; the fallback create() path then crashed on `''` not
       // being a valid uuid. Skipping entirely is correct: there's no real
       // machine to attribute lifetime history to.
-      if (ticket.productId) {
+      //
+      // Keyed by serialNumber (not productId) so external machines — never
+      // purchased from us, no matching Product row — still get a lifetime
+      // spend/service-count record; productId is attached when we have it.
+      if (ticket.serialNumber) {
         const historyRepo = Source.getRepository(MachineServiceHistory);
         let historyRecord = await historyRepo.findOne({
-          where: { productId: ticket.productId },
+          where: { serialNumber: ticket.serialNumber },
         });
 
         let nextScheduledMaintenanceDate: Date | null = null;
@@ -3132,21 +3168,27 @@ Xerocare Technical Services`;
           }
           historyRecord.lastServiceDate = new Date();
           historyRecord.nextScheduledMaintenanceDate = nextScheduledMaintenanceDate;
-          historyRecord.totalPartsSpend = Number(historyRecord.totalPartsSpend) + totalPartsBilled;
+          historyRecord.totalPartsSpend =
+            Number(historyRecord.totalPartsSpend) + totalPartsCostInternal;
           historyRecord.totalLabourSpend = Number(historyRecord.totalLabourSpend) + labourCost;
           historyRecord.totalLifetimeCost =
             Number(historyRecord.totalPartsSpend) + Number(historyRecord.totalLabourSpend);
+          // Backfill productId if this machine was matched to the catalog
+          // after its history row was first created as an external machine.
+          if (!historyRecord.productId && ticket.productId) {
+            historyRecord.productId = ticket.productId;
+          }
         } else {
           historyRecord = historyRepo.create({
-            productId: ticket.productId,
+            productId: ticket.productId || null,
             serialNumber: ticket.serialNumber,
             totalServiceVisits: 1,
             totalPreventativeVisits: ticket.ticketType === 'PREVENTATIVE_MAINTENANCE' ? 1 : 0,
             lastServiceDate: new Date(),
             nextScheduledMaintenanceDate,
-            totalPartsSpend: totalPartsBilled,
+            totalPartsSpend: totalPartsCostInternal,
             totalLabourSpend: labourCost,
-            totalLifetimeCost: totalPartsBilled + labourCost,
+            totalLifetimeCost: totalPartsCostInternal + labourCost,
           });
         }
         await historyRepo.save(historyRecord);
@@ -3517,31 +3559,12 @@ Xerocare Technical Services`;
       );
 
       let activeContract = null;
-      let coverage: ContractCoverage = { ...NO_COVERAGE };
-
       if (details.contractReferenceId) {
         activeContract = await Source.getRepository(ServiceContract).findOne({
           where: { id: details.contractReferenceId as string },
         });
-        if (activeContract) {
-          // Coverage rules are fixed per contract type; normalize legacy rows
-          coverage = normalizeCoverage(
-            activeContract.coverageRules || coverageForContractType(activeContract.contractType),
-          );
-        }
-      } else if (
-        details.serviceContext === ServiceContext.RENT ||
-        details.serviceContext === ServiceContext.LEASE_CPC
-      ) {
-        // RENT and CPC leases are full-service — spare parts AND toner free.
-        coverage = { ...FULL_COVERAGE };
-      } else if (
-        details.serviceContext === ServiceContext.WARRANTY ||
-        details.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY
-      ) {
-        // Warranty mirrors SMA: toner chargeable
-        coverage = { ...WARRANTY_COVERAGE };
       }
+      const coverage = await this.resolveItemCoverage(details);
 
       res.status(200).json({
         success: true,
@@ -3613,6 +3636,90 @@ Xerocare Technical Services`;
       });
 
       res.status(200).json({ success: true, data: yields });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * GET /service/machines/:serialNumber/analytics
+   *
+   * Consolidated per-machine lifetime stats — keyed by serialNumber alone so
+   * it works for RENT/LEASE/SALE machines AND external machines never
+   * purchased from us (no matching Product row). Additive alongside
+   * getMachineLifetimeCost, which existing callers keep using; new frontend
+   * surfaces should call this one instead.
+   */
+  getMachineAnalytics = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const serialNumber = String(req.params.serialNumber);
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const tickets = await ticketRepo.find({
+        where: { serialNumber, status: ServiceTicketStatus.COMPLETED },
+        order: { completedAt: 'ASC' },
+      });
+
+      const usageLogRepo = Source.getRepository(ServicePartUsageLog);
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+
+      let lifetimePartsCost = 0;
+      let lifetimeLabourCost = 0;
+      const ticketBreakdown = [];
+
+      for (const t of tickets) {
+        const usageLogs = await usageLogRepo.find({ where: { ticketId: t.id } });
+        const partsCostInternal = usageLogs.reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0);
+
+        const estimate = await estimateRepo.findOne({
+          where: { ticketId: t.id, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
+        });
+        const labourCost = estimate ? Number(estimate.labourCost) || 0 : 0;
+
+        lifetimePartsCost += partsCostInternal;
+        lifetimeLabourCost += labourCost;
+
+        ticketBreakdown.push({
+          ticketId: t.id,
+          ticketNumber: t.ticketNumber,
+          date: t.completedAt,
+          serviceContext: t.serviceContext,
+          partsUsed: usageLogs.map((l) => ({
+            partName: l.partName,
+            sku: l.sku,
+            quantity: l.quantityUsed,
+            unitCost: Number(l.unitCost) || 0,
+            totalCost: Number(l.totalCost) || 0,
+            isConsumable: l.isConsumable,
+          })),
+          partsCostInternal,
+          labourCost,
+          totalSpend: partsCostInternal + labourCost,
+        });
+      }
+
+      const yieldRepo = Source.getRepository(ConsumableYieldHistory);
+      const yieldHistory = await yieldRepo.find({
+        where: { serialNumber },
+        order: { installedDate: 'DESC' },
+      });
+      const replacementHistory = yieldHistory.filter((y) => y.replacedDate != null);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          serialNumber,
+          serviceVisitCount: tickets.length,
+          tickets: ticketBreakdown,
+          toner: {
+            totalTonerReplacements: replacementHistory.length,
+            replacementHistory,
+            yieldHistory,
+          },
+          lifetimePartsCost,
+          lifetimeLabourCost,
+          lifetimeSpend: lifetimePartsCost + lifetimeLabourCost,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -3896,35 +4003,15 @@ Xerocare Technical Services`;
         );
       }
 
-      // RENT and CPC leases cover everything; warranty mirrors SMA (toner
-      // chargeable); contract contexts cover per item category (SMA/AMC charge
-      // toner, AMC charges parts too). Labour is free under all three contract types.
-      const baseFreeContext =
-        ticket.serviceContext === ServiceContext.RENT ||
-        ticket.serviceContext === ServiceContext.LEASE_CPC;
-      const warrantyContext = [
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-      ].includes(ticket.serviceContext);
-      const quoteCoverage: ContractCoverage = baseFreeContext
-        ? { ...FULL_COVERAGE }
-        : warrantyContext
-          ? { ...WARRANTY_COVERAGE }
-          : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
-              ...NO_COVERAGE,
-            });
+      const quoteCoverage = await this.resolveItemCoverage(ticket);
       const partCategories = await this.getPartCategories(ticket.items.map((it) => it.sparePartId));
 
-      const hasContractContext = baseFreeContext || warrantyContext || !!ticket.contractReferenceId;
-
       const items = ticket.items.map((it) => {
-        const itemCovered = hasContractContext
-          ? coverageAllowsItem(quoteCoverage, {
-              partCategory: it.sparePartId ? partCategories.get(it.sparePartId) : null,
-              partName: it.partName,
-            })
-          : false;
-        const isFree = itemCovered || !!it.isFree;
+        const isFree = this.resolveItemIsFree(quoteCoverage, {
+          partCategory: it.sparePartId ? partCategories.get(it.sparePartId) : null,
+          partName: it.partName,
+          isFree: it.isFree,
+        });
         return {
           description: it.partName,
           quantity: it.quantity,
@@ -3933,7 +4020,7 @@ Xerocare Technical Services`;
         };
       });
 
-      const labourFree = hasContractContext && quoteCoverage.labour;
+      const labourFree = quoteCoverage.labour;
       items.push({
         description: 'Labor Cost / Service Charge',
         quantity: 1,
@@ -3941,11 +4028,10 @@ Xerocare Technical Services`;
         isFree: labourFree,
       });
 
-      const effectiveVisitCharge =
-        hasContractContext && quoteCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
+      const effectiveVisitCharge = quoteCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
 
-      const allFree = items.every((it) => it.isFree) && effectiveVisitCharge === 0;
-
+      // Every ticket goes to finance for review — covered/free items already
+      // price at 0 above, finance just approves the FOC estimate like any other.
       const billingPayload = {
         customerId: ticket.customerId,
         branchId: ticket.branchId,
@@ -3957,7 +4043,7 @@ Xerocare Technical Services`;
         discountAmount: Number(discountAmount) || 0,
         technicianNoteToFinance: technicianNoteToFinance || null,
         saleType: 'PRODUCT_SALE',
-        status: allFree ? 'CUSTOMER_ACCEPTED' : 'WAITING_FINANCE_APPROVAL',
+        status: 'WAITING_FINANCE_APPROVAL',
       };
 
       const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
@@ -3975,12 +4061,7 @@ Xerocare Technical Services`;
       );
       const quotation = quoteRes.data.data;
 
-      if (allFree) {
-        ticket.status = ServiceTicketStatus.CUSTOMER_APPROVED;
-      } else {
-        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
-      }
-
+      ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
       ticket.serviceQuotationId = quotation.id;
       ticket.visitChargeAmount = effectiveVisitCharge;
       ticket.visitChargeMethod = visitChargeMethod || null;
@@ -6521,24 +6602,8 @@ For queries contact us at +974 4455 6677`;
       });
       await revisionRepo.save(newRevision);
 
-      // Coverage is per item category under contracts (SMA/AMC charge toner,
-      // AMC charges parts). Warranty mirrors SMA (toner chargeable); RENT and
-      // CPC leases stay fully covered. Computed BEFORE any mutation so validation can reject early.
-      const baseFreeContext =
-        ticket.serviceContext === ServiceContext.RENT ||
-        ticket.serviceContext === ServiceContext.LEASE_CPC;
-      const warrantyContext = [
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-      ].includes(ticket.serviceContext);
-      const reviseCoverage: ContractCoverage = baseFreeContext
-        ? { ...FULL_COVERAGE }
-        : warrantyContext
-          ? { ...WARRANTY_COVERAGE }
-          : ((await this.getTicketContractCoverage(ticket.contractReferenceId)) ?? {
-              ...NO_COVERAGE,
-            });
-      const hasContractContext = baseFreeContext || warrantyContext || !!ticket.contractReferenceId;
+      // Computed BEFORE any mutation so validation can reject early.
+      const reviseCoverage = await this.resolveItemCoverage(ticket);
       const revisePartCategories = await this.getPartCategories(
         items.map((it: ReviseEstimateItem) => it.sparePartId),
       );
@@ -6556,13 +6621,11 @@ For queries contact us at +974 4455 6677`;
       }
 
       const billingItems = items.map((it: ReviseEstimateItem) => {
-        const covered = hasContractContext
-          ? coverageAllowsItem(reviseCoverage, {
-              partCategory: it.sparePartId ? revisePartCategories.get(it.sparePartId) : null,
-              partName: it.partName || it.description,
-            })
-          : false;
-        const isFree = covered || !!it.isFree;
+        const isFree = this.resolveItemIsFree(reviseCoverage, {
+          partCategory: it.sparePartId ? revisePartCategories.get(it.sparePartId) : null,
+          partName: it.partName || it.description,
+          isFree: it.isFree,
+        });
         const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
         const brand = part?.brand || it.customPartBrand || null;
         const mpn = part?.mpn || it.mpn || null;
@@ -6578,8 +6641,7 @@ For queries contact us at +974 4455 6677`;
       });
 
       // Travel-covered contexts never pay a visit charge, revisions included.
-      const reviseEffectiveVisitCharge =
-        hasContractContext && reviseCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
+      const reviseEffectiveVisitCharge = reviseCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
 
       // Discount is capped by the whole estimate total, not per-part limits.
       const reviseItemsTotal = billingItems.reduce(
@@ -6600,8 +6662,15 @@ For queries contact us at +974 4455 6677`;
       const ticketItemRepo = Source.getRepository(ServiceTicketItem);
       await ticketItemRepo.delete({ ticketId: ticket.id });
 
+      let reviseHasCustomItem = false;
       const newTicketItems = items.map((it: ReviseEstimateItem) => {
         const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
+        const quantity = Number(it.quantity) || 1;
+        let unitCost = part ? Number(part.purchase_price) || 0 : 0;
+        if (!part) {
+          unitCost = Number(it.customPartCost) || 0;
+          reviseHasCustomItem = true;
+        }
         return ticketItemRepo.create({
           ticketId: ticket.id,
           itemSource: it.itemSource || ServiceItemSource.SPARE_PART,
@@ -6610,13 +6679,25 @@ For queries contact us at +974 4455 6677`;
           partName: it.partName || it.description || 'Spare Part',
           partBrand: part?.brand || it.customPartBrand || null,
           mpn: part?.mpn || it.mpn || null,
-          quantity: it.quantity,
+          quantity,
           unitPrice: Number(it.unitPrice) || 0,
-          totalPrice: (Number(it.quantity) || 1) * (Number(it.unitPrice) || 0),
+          totalPrice: quantity * (Number(it.unitPrice) || 0),
           isFree: !!it.isFree,
+          unitCost,
+          totalCost: unitCost * quantity,
         });
       });
       await ticketItemRepo.save(newTicketItems);
+
+      if (reviseHasCustomItem) {
+        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+          title: 'Spare Part Procurement Needed',
+          message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
+          type: 'ACTION_REQUIRED',
+          referenceId: ticket.id,
+          referenceType: 'CUSTOM_PART_REQUEST',
+        });
+      }
 
       // Update ticket fields
       ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
