@@ -29,6 +29,10 @@ export interface PaymentSummary {
   totalAmount: number;
   totalPaid: number;
   pendingBalance: number;
+  /** Payment(s) already collected but sitting in the Accounts Receipts queue,
+   *  awaiting Finance approval — not yet reflected in totalPaid/pendingBalance. */
+  pendingApprovalCount: number;
+  pendingApprovalAmount: number;
   payments: PaymentLedger[];
   status: string;
   currencyWarnings?: string[];

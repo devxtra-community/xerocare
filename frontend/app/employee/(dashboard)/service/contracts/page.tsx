@@ -4,8 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { getCustomers, createCustomer, Customer, CreateCustomerData } from '@/lib/customer';
 import CustomerFormDialog from '@/components/employeeComponents/CustomerFormDialog';
 import { getAllProducts, Product } from '@/lib/product';
-import { getBrands, createBrand, Brand } from '@/lib/brand';
-import { getAllModels, addModel, Model } from '@/lib/model';
+import { getBrands, Brand } from '@/lib/brand';
+import { getAllModels, Model } from '@/lib/model';
+import { AddBrandDialog } from '@/components/ManagerDashboardComponents/BrandComponents/AddBrandDialog';
+import { AddModelDialog } from '@/components/ManagerDashboardComponents/productComponents/AddModelDialog';
 import { CustomerServiceHistory, WarrantyInfo } from '@/lib/serviceTicket';
 import {
   getServiceContracts,
@@ -26,7 +28,7 @@ import { getAccountSummary, PaymentSummary } from '@/lib/payment';
 import { recordSalePayment } from '@/lib/saleWorkflow';
 import { getInvoiceById, Invoice } from '@/lib/invoice';
 import { InvoiceViewDialog } from '@/components/employeeComponents/InvoiceViewDialog';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -62,13 +64,14 @@ import {
   Check,
   X,
   Eye,
-  Loader2,
   Package,
+  Clock,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { getUserFromToken } from '@/lib/auth';
 interface CustomerMachine {
   id: string;
   modelName: string;
@@ -194,6 +197,20 @@ export default function ServiceContractsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('ALL');
 
+  // Creating/editing/deleting a contract is restricted server-side to SERVICE_HELP_DESK
+  // (see api_gateway requireServiceRole on POST/PUT/DELETE /i/service/contracts) —
+  // a technician can view this page but gets a 403 on any of those actions. Hide the
+  // buttons for them instead of letting them hit a permission error.
+  const [canManageContracts, setCanManageContracts] = useState(true);
+  useEffect(() => {
+    const user = getUserFromToken();
+    setCanManageContracts(
+      user?.role === 'ADMIN' ||
+        user?.role === 'MANAGER' ||
+        user?.employeeJob !== 'SERVICE_TECHNICIAN',
+    );
+  }, []);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<ServiceContract | null>(null);
@@ -264,24 +281,14 @@ export default function ServiceContractsPage() {
     meterReading: '',
     printColour: 'BLACK_WHITE' as 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
     description: '',
+    machineType: 'PRINTER' as 'PRINTER' | 'COMPUTER' | 'OTHER',
   });
 
   // Brand/model catalog — same "Other Machine" pattern as service ticket raising
   const [brands, setBrands] = useState<Brand[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [showCreateBrandModal, setShowCreateBrandModal] = useState(false);
-  const [brandForm, setBrandForm] = useState({ name: '', description: '' });
-  const [creatingBrandState, setCreatingBrandState] = useState(false);
-  const [brandError, setBrandError] = useState<string | null>(null);
-  const [showCreateModelModal, setShowCreateModelModal] = useState(false);
-  const [modelForm, setModelForm] = useState({
-    model_no: '',
-    model_name: '',
-    brand_id: '',
-    description: '',
-  });
-  const [creatingModelState, setCreatingModelState] = useState(false);
-  const [modelError, setModelError] = useState<string | null>(null);
+  const [showAddBrandDialog, setShowAddBrandDialog] = useState(false);
+  const [showAddModelDialog, setShowAddModelDialog] = useState(false);
 
   const [customerIntel, setCustomerIntel] = useState<CustomerServiceHistory | null>(null);
   const [loadingIntel, setLoadingIntel] = useState(false);
@@ -463,6 +470,15 @@ export default function ServiceContractsPage() {
         toast.error('Enter the machine current meter reading — SMA usage is counted from it.');
         return;
       }
+      if (
+        machineCurrentMeter != null &&
+        Number(formState.startMeterReading) < machineCurrentMeter
+      ) {
+        toast.error(
+          `Starting meter cannot be less than the machine's current meter reading (${machineCurrentMeter.toLocaleString()}).`,
+        );
+        return;
+      }
     }
     if (type === 'FSMA') {
       if (formState.fsmaBillingMode === 'INDIVIDUAL') {
@@ -474,6 +490,13 @@ export default function ServiceContractsPage() {
           toast.error('Enter the starting B&W and colour meter readings.');
           return;
         }
+        const startTotal = Number(formState.startMeterBW) + Number(formState.startMeterColor);
+        if (machineCurrentMeter != null && startTotal < machineCurrentMeter) {
+          toast.error(
+            `Starting meter (B&W + colour = ${startTotal.toLocaleString()}) cannot be less than the machine's current meter reading (${machineCurrentMeter.toLocaleString()}).`,
+          );
+          return;
+        }
       } else {
         if (formState.ratePerClickCombined === '') {
           toast.error('Enter the combined per-click rate.');
@@ -481,6 +504,15 @@ export default function ServiceContractsPage() {
         }
         if (formState.startMeterReading === '') {
           toast.error('Enter the starting total meter reading.');
+          return;
+        }
+        if (
+          machineCurrentMeter != null &&
+          Number(formState.startMeterReading) < machineCurrentMeter
+        ) {
+          toast.error(
+            `Starting meter cannot be less than the machine's current meter reading (${machineCurrentMeter.toLocaleString()}).`,
+          );
           return;
         }
       }
@@ -570,6 +602,7 @@ export default function ServiceContractsPage() {
         paymentDate: payingForm.paymentDate,
         referenceNumber: payingForm.referenceNumber || undefined,
         remarks: payingForm.remarks || undefined,
+        paymentContext: 'SERVICE_CONTRACT_INSTALLMENT',
       });
       toast.success('Payment submitted for Finance approval.');
       setPayingContract(null);
@@ -704,88 +737,24 @@ export default function ServiceContractsPage() {
       meterReading: '',
       printColour: 'BLACK_WHITE',
       description: '',
+      machineType: 'PRINTER',
     });
     setExternalDialogOpen(true);
   };
 
-  const handleCreateBrand = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!brandForm.name.trim()) return;
-    try {
-      setCreatingBrandState(true);
-      setBrandError(null);
-      const res = await createBrand({
-        name: brandForm.name.trim(),
-        description: brandForm.description.trim() || undefined,
-      });
-      const resBrands = await getBrands().catch(() => ({ success: false, data: [] }));
-      setBrands(resBrands.data || []);
-
-      const createdBrand = res.data || res;
-      setExternalForm((prev) => ({
-        ...prev,
-        brand: createdBrand.name || brandForm.name.trim(),
-      }));
-
-      setShowCreateBrandModal(false);
-      setBrandForm({ name: '', description: '' });
-      toast.success('Brand created successfully!');
-    } catch (error) {
-      console.error('Failed to create brand:', error);
-      const msg =
-        getApiErrorMessage(error) || 'Failed to create brand. Please check if it already exists.';
-      setBrandError(msg);
-      toast.error(msg);
-    } finally {
-      setCreatingBrandState(false);
+  const handleBrandCreated = async (created?: Brand) => {
+    const resBrands = await getBrands().catch(() => ({ success: false, data: [] }));
+    setBrands(resBrands.data || []);
+    if (created) {
+      setExternalForm((prev) => ({ ...prev, brand: created.name, modelName: '' }));
     }
   };
 
-  const handleOpenCreateModel = () => {
-    const defaultBrand = brands.find((b) => b.name === externalForm.brand);
-    setModelForm({
-      model_no: '',
-      model_name: '',
-      brand_id: defaultBrand ? defaultBrand.id : '',
-      description: '',
-    });
-    setModelError(null);
-    setShowCreateModelModal(true);
-  };
-
-  const handleCreateModel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modelForm.model_name.trim() || !modelForm.model_no.trim() || !modelForm.brand_id) {
-      setModelError('Model Name, Model Number, and Brand are required.');
-      return;
-    }
-    try {
-      setCreatingModelState(true);
-      setModelError(null);
-      const created = await addModel({
-        model_name: modelForm.model_name.trim(),
-        model_no: modelForm.model_no.trim(),
-        brand_id: modelForm.brand_id,
-        description: modelForm.description.trim() || modelForm.model_name.trim(),
-      });
-      const resModels = await getAllModels({ limit: 1000 }).catch(() => ({ data: [] }));
-      setModels(resModels.data || []);
-
-      setExternalForm((prev) => ({
-        ...prev,
-        modelName: created.model_name || modelForm.model_name.trim(),
-      }));
-
-      setShowCreateModelModal(false);
-      setModelForm({ model_no: '', model_name: '', brand_id: '', description: '' });
-      toast.success('Model created successfully!');
-    } catch (error) {
-      console.error('Failed to create model:', error);
-      const msg = getApiErrorMessage(error) || 'Failed to create model. Please try again.';
-      setModelError(msg);
-      toast.error(msg);
-    } finally {
-      setCreatingModelState(false);
+  const handleModelCreated = async (created?: { model_name: string }) => {
+    const resModels = await getAllModels({ limit: 1000 }).catch(() => ({ data: [] }));
+    setModels(resModels.data || []);
+    if (created) {
+      setExternalForm((prev) => ({ ...prev, modelName: created.model_name }));
     }
   };
 
@@ -803,7 +772,8 @@ export default function ServiceContractsPage() {
       toast.error('Serial number is required.');
       return;
     }
-    if (externalForm.meterReading === '' || Number(externalForm.meterReading) < 0) {
+    const isMetered = externalForm.machineType === 'PRINTER';
+    if (isMetered && (externalForm.meterReading === '' || Number(externalForm.meterReading) < 0)) {
       toast.error('Enter the machine current meter reading.');
       return;
     }
@@ -815,9 +785,10 @@ export default function ServiceContractsPage() {
         brand: externalForm.brand.trim(),
         modelName: externalForm.modelName.trim(),
         serialNumber: externalForm.serialNumber.trim(),
-        meterReading: Number(externalForm.meterReading),
+        meterReading: isMetered ? Number(externalForm.meterReading) : 0,
         printColour: externalForm.printColour,
         description: externalForm.description.trim() || undefined,
+        machineType: externalForm.machineType,
       });
       toast.success(`External machine ${machine.serial_no} registered.`);
       setExternalDialogOpen(false);
@@ -972,6 +943,11 @@ export default function ServiceContractsPage() {
               ? new Date(prod.warranty_end_date).toLocaleDateString()
               : 'N/A',
             activeContract: 'None',
+            // Assigned products come from a branch-unfiltered lookup, unlike the
+            // global `products` list step 6 overlays from below (which excludes
+            // external machines — they have no warehouse/branch). Set it here so
+            // an external machine's meter still shows even when step 6 can't find it.
+            meterReading: prod.meter_reading ?? undefined,
           });
         }
       });
@@ -1039,6 +1015,27 @@ export default function ServiceContractsPage() {
     }));
   }, [formState.productId, products, editingContract]);
 
+  // A computer (or anything else non-metered) has no page count to bill by, so
+  // SMA/FSMA — both priced per click — don't apply. Only AMC's flat fee does.
+  const selectedMachineType: 'PRINTER' | 'COMPUTER' | 'OTHER' =
+    editingContract?.machine?.machineType ||
+    products.find((p) => p.id === formState.productId)?.machine_type ||
+    'PRINTER';
+  const isMeteredMachineSelected = selectedMachineType === 'PRINTER';
+
+  useEffect(() => {
+    if (!isMeteredMachineSelected && formState.contractType !== 'AMC') {
+      setFormState((prev) => ({ ...prev, contractType: 'AMC' }));
+    }
+  }, [isMeteredMachineSelected, formState.contractType]);
+
+  // The machine's own last-known meter reading — a new SMA/FSMA contract's starting
+  // meter can never be entered lower than this (only checked at creation; once a
+  // contract exists this same number is partly made up of its own readings).
+  const machineCurrentMeter = !editingContract
+    ? (products.find((p) => p.id === formState.productId)?.meter_reading ?? null)
+    : null;
+
   const selectedSerial = selectedRegistryMachine?.serialNumber;
   useEffect(() => {
     if (
@@ -1084,13 +1081,15 @@ export default function ServiceContractsPage() {
             Manage Service Agreements (FSMA, SMA, AMC) for customer and external machines.
           </p>
         </div>
-        <Button
-          onClick={handleOpenCreateModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Service Contract
-        </Button>
+        {canManageContracts && (
+          <Button
+            onClick={handleOpenCreateModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Service Contract
+          </Button>
+        )}
       </div>
 
       {/* Analytics Summary */}
@@ -1225,12 +1224,17 @@ export default function ServiceContractsPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-xs text-slate-800 truncate">
+                        <span className="font-bold text-xs text-slate-800 truncate flex items-center gap-1.5">
                           {c.machine
                             ? `${c.machine.brand} ${c.machine.modelName}`
                             : product
                               ? `${product.brand} ${product.name}`
                               : 'Unknown Product'}
+                          {c.machine?.machineType === 'COMPUTER' && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-50 text-violet-700 border border-violet-100">
+                              COMPUTER
+                            </span>
+                          )}
                         </span>
                       </div>
                     </TableCell>
@@ -1285,12 +1289,25 @@ export default function ServiceContractsPage() {
                                   ? 'bg-amber-50 text-amber-700 border-amber-200'
                                   : 'bg-rose-50 text-rose-700 border-rose-200';
                             return (
-                              <span
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${cls}`}
-                                title={`Paid ${getActiveCurrency()} ${summary.totalPaid.toFixed(2)} of ${getActiveCurrency()} ${summary.totalAmount.toFixed(2)}`}
-                              >
-                                {paid}
-                              </span>
+                              <>
+                                <span
+                                  className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border ${cls}`}
+                                  title={`Paid ${getActiveCurrency()} ${summary.totalPaid.toFixed(2)} of ${getActiveCurrency()} ${summary.totalAmount.toFixed(2)}`}
+                                >
+                                  {paid}
+                                </span>
+                                {summary.pendingApprovalCount > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border bg-amber-50 text-amber-700 border-amber-200"
+                                    title={`${getActiveCurrency()} ${summary.pendingApprovalAmount.toFixed(2)} awaiting Finance approval`}
+                                  >
+                                    <Clock className="h-2.5 w-2.5" />
+                                    {summary.pendingApprovalCount === 1
+                                      ? '1 pending approval'
+                                      : `${summary.pendingApprovalCount} pending approval`}
+                                  </span>
+                                )}
+                              </>
                             );
                           })()
                         ) : (
@@ -1343,15 +1360,18 @@ export default function ServiceContractsPage() {
                             <FileText className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openBillingDialog(c)}
-                          title="Meter readings & monthly billing"
-                          className="h-7 w-7 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/50"
-                        >
-                          <Gauge className="h-3.5 w-3.5" />
-                        </Button>
+                        {c.machine?.machineType !== 'COMPUTER' &&
+                          c.machine?.machineType !== 'OTHER' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openBillingDialog(c)}
+                              title="Meter readings & monthly billing"
+                              className="h-7 w-7 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50/50"
+                            >
+                              <Gauge className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         {c.invoiceId &&
                           (contractPaymentSummaries[c.invoiceId]?.pendingBalance ?? 1) > 0 && (
                             <Button
@@ -1364,15 +1384,17 @@ export default function ServiceContractsPage() {
                               <DollarSign className="h-3.5 w-3.5" />
                             </Button>
                           )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenEditModal(c)}
-                          className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </Button>
-                        {!c.invoiceId && (
+                        {canManageContracts && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEditModal(c)}
+                            className="h-7 w-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {canManageContracts && !c.invoiceId && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1395,7 +1417,10 @@ export default function ServiceContractsPage() {
 
       {/* Create / Edit Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-xl w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent
+          className="max-w-xl w-full p-0 bg-white rounded-xl shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col overflow-hidden"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader className="px-6 pt-6 pb-3 border-b border-slate-100">
             <DialogTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <FileText className="h-5 w-5 text-blue-600" />
@@ -1637,18 +1662,30 @@ export default function ServiceContractsPage() {
                 <label className="text-xs font-bold text-slate-600">Contract Type</label>
                 <select
                   value={formState.contractType}
+                  disabled={!isMeteredMachineSelected}
                   onChange={(e) =>
                     setFormState((prev) => ({
                       ...prev,
                       contractType: e.target.value as ServiceContractType,
                     }))
                   }
-                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
                 >
-                  <option value="FSMA">FSMA (Full Service — per click)</option>
-                  <option value="SMA">SMA (Service Maintenance — copy limit)</option>
+                  {isMeteredMachineSelected && (
+                    <option value="FSMA">FSMA (Full Service — per click)</option>
+                  )}
+                  {isMeteredMachineSelected && (
+                    <option value="SMA">SMA (Service Maintenance — copy limit)</option>
+                  )}
                   <option value="AMC">AMC (Annual Maintenance — monthly fee)</option>
                 </select>
+                {!isMeteredMachineSelected && (
+                  <p className="text-[10px] text-slate-400">
+                    {selectedMachineType === 'COMPUTER' ? 'Computers' : 'This machine type'} have no
+                    usage meter — only AMC (flat annual fee) applies. No meter readings will be
+                    tracked for this contract.
+                  </p>
+                )}
               </div>
 
               {/* Contract Value — FSMA has no upfront value, it's pure pay-per-click */}
@@ -1822,6 +1859,16 @@ export default function ServiceContractsPage() {
                     />
                     <p className="text-[10px] text-slate-400">
                       Contract copies are counted from this baseline.
+                      {machineCurrentMeter != null && (
+                        <>
+                          {' '}
+                          Machine&apos;s current meter:{' '}
+                          <span className="font-mono font-semibold text-slate-600">
+                            {machineCurrentMeter.toLocaleString()}
+                          </span>{' '}
+                          — cannot enter less than this.
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-col space-y-1">
@@ -1988,6 +2035,15 @@ export default function ServiceContractsPage() {
                           ).toLocaleString()}
                         </span>{' '}
                         (B&W + colour)
+                        {machineCurrentMeter != null && (
+                          <>
+                            {' · '}machine&apos;s current meter:{' '}
+                            <span className="font-mono font-semibold text-slate-700">
+                              {machineCurrentMeter.toLocaleString()}
+                            </span>{' '}
+                            — total cannot be less than this
+                          </>
+                        )}
                       </div>
                     </>
                   ) : (
@@ -2026,6 +2082,15 @@ export default function ServiceContractsPage() {
                           className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
                           placeholder="e.g. 85000"
                         />
+                        {machineCurrentMeter != null && (
+                          <p className="text-[10px] text-slate-400">
+                            Machine&apos;s current meter:{' '}
+                            <span className="font-mono font-semibold text-slate-600">
+                              {machineCurrentMeter.toLocaleString()}
+                            </span>{' '}
+                            — cannot enter less than this
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
@@ -2445,10 +2510,7 @@ export default function ServiceContractsPage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => {
-                      setBrandError(null);
-                      setShowCreateBrandModal(true);
-                    }}
+                    onClick={() => setShowAddBrandDialog(true)}
                     className="h-10 w-10 shrink-0 border-slate-200 rounded-lg bg-card hover:bg-slate-50 text-slate-500"
                   >
                     <Plus size={16} />
@@ -2483,7 +2545,7 @@ export default function ServiceContractsPage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={handleOpenCreateModel}
+                    onClick={() => setShowAddModelDialog(true)}
                     className="h-10 w-10 shrink-0 border-slate-200 rounded-lg bg-card hover:bg-slate-50 text-slate-500"
                   >
                     <Plus size={16} />
@@ -2502,38 +2564,65 @@ export default function ServiceContractsPage() {
                 />
               </div>
               <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                  <Gauge className="h-3 w-3" />
-                  Current Meter Reading *
-                </label>
-                <Input
-                  type="number"
-                  min={0}
-                  value={externalForm.meterReading}
-                  onChange={(e) =>
-                    setExternalForm((prev) => ({ ...prev, meterReading: e.target.value }))
-                  }
-                  className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
-                  placeholder="e.g. 85000"
-                />
-              </div>
-              <div className="flex flex-col space-y-1">
-                <label className="text-xs font-bold text-slate-600">Print Type</label>
+                <label className="text-xs font-bold text-slate-600">Machine Type</label>
                 <select
-                  value={externalForm.printColour}
+                  value={externalForm.machineType}
                   onChange={(e) =>
                     setExternalForm((prev) => ({
                       ...prev,
-                      printColour: e.target.value as 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
+                      machineType: e.target.value as 'PRINTER' | 'COMPUTER' | 'OTHER',
                     }))
                   }
                   className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="BLACK_WHITE">Black & White</option>
-                  <option value="COLOUR">Colour</option>
-                  <option value="BOTH">Both</option>
+                  <option value="PRINTER">Printer / Copier</option>
+                  <option value="COMPUTER">Computer</option>
+                  <option value="OTHER">Other</option>
                 </select>
+                {externalForm.machineType !== 'PRINTER' && (
+                  <p className="text-[10px] text-slate-400">
+                    No usage meter — this machine can only be enrolled in an AMC contract, no meter
+                    readings.
+                  </p>
+                )}
               </div>
+              {externalForm.machineType === 'PRINTER' && (
+                <>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                      <Gauge className="h-3 w-3" />
+                      Current Meter Reading *
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={externalForm.meterReading}
+                      onChange={(e) =>
+                        setExternalForm((prev) => ({ ...prev, meterReading: e.target.value }))
+                      }
+                      className="h-10 border-slate-200 focus-visible:ring-blue-500 font-mono"
+                      placeholder="e.g. 85000"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-600">Print Type</label>
+                    <select
+                      value={externalForm.printColour}
+                      onChange={(e) =>
+                        setExternalForm((prev) => ({
+                          ...prev,
+                          printColour: e.target.value as 'BLACK_WHITE' | 'COLOUR' | 'BOTH',
+                        }))
+                      }
+                      className="h-10 px-3 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="BLACK_WHITE">Black & White</option>
+                      <option value="COLOUR">Colour</option>
+                      <option value="BOTH">Both</option>
+                    </select>
+                  </div>
+                </>
+              )}
               <div className="flex flex-col space-y-1">
                 <label className="text-xs font-bold text-slate-600">Notes</label>
                 <Input
@@ -2568,172 +2657,18 @@ export default function ServiceContractsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* CREATE BRAND MODAL */}
-      {showCreateBrandModal && (
-        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-sm bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
-              <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Plus className="text-blue-600" size={16} /> Create Brand
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Add a new hardware brand to the repository list.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleCreateBrand}>
-              <CardContent className="p-5 space-y-3.5">
-                {brandError && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-xl flex items-start gap-2">
-                    <span className="font-medium">{brandError}</span>
-                  </div>
-                )}
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Brand Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. Xerox, HP, Canon"
-                    value={brandForm.name}
-                    onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Description
-                  </label>
-                  <Input
-                    placeholder="Short description of the brand"
-                    value={brandForm.description}
-                    onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
-                  />
-                </div>
-              </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-3.5 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowCreateBrandModal(false);
-                    setBrandForm({ name: '', description: '' });
-                    setBrandError(null);
-                  }}
-                  className="rounded-xl h-8 text-xs font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={creatingBrandState}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-8 text-xs px-4"
-                >
-                  {creatingBrandState && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Create
-                  Brand
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+      <AddBrandDialog
+        open={showAddBrandDialog}
+        onOpenChange={setShowAddBrandDialog}
+        onSuccess={handleBrandCreated}
+      />
 
-      {/* CREATE MODEL MODAL */}
-      {showCreateModelModal && (
-        <div className="fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-sm bg-white border-none shadow-2xl rounded-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 p-5">
-              <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Plus className="text-blue-600" size={16} /> Create Model
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Add a new model to the list and link it to a brand.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleCreateModel}>
-              <CardContent className="p-5 space-y-3.5">
-                {modelError && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 text-xs p-3 rounded-xl flex items-start gap-2">
-                    <span className="font-medium">{modelError}</span>
-                  </div>
-                )}
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Brand <span className="text-red-500">*</span>
-                  </label>
-                  <SearchableSelect
-                    options={brands.map((b) => ({ value: b.id, label: b.name }))}
-                    value={modelForm.brand_id}
-                    onValueChange={(val) => setModelForm({ ...modelForm, brand_id: val })}
-                    placeholder="Select brand..."
-                    className="h-9 w-full rounded-xl border-slate-200 bg-slate-50 text-xs font-medium text-slate-700"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Model Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. VersaLink C405"
-                    value={modelForm.model_name}
-                    onChange={(e) => setModelForm({ ...modelForm, model_name: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Model Number / Code <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    required
-                    placeholder="e.g. C405-DX"
-                    value={modelForm.model_no}
-                    onChange={(e) => setModelForm({ ...modelForm, model_no: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                    Description
-                  </label>
-                  <Input
-                    placeholder="Short description of the model features"
-                    value={modelForm.description}
-                    onChange={(e) => setModelForm({ ...modelForm, description: e.target.value })}
-                    className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500"
-                  />
-                </div>
-              </CardContent>
-              <div className="bg-slate-50 border-t border-slate-100 p-3.5 flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowCreateModelModal(false);
-                    setModelForm({ model_no: '', model_name: '', brand_id: '', description: '' });
-                    setModelError(null);
-                  }}
-                  className="rounded-xl h-8 text-xs font-bold"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={creatingModelState}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-8 text-xs px-4"
-                >
-                  {creatingModelState && <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />} Create
-                  Model
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+      <AddModelDialog
+        open={showAddModelDialog}
+        onOpenChange={setShowAddModelDialog}
+        initialBrandId={brands.find((b) => b.name === externalForm.brand)?.id}
+        onSuccess={handleModelCreated}
+      />
 
       {/* AMC INSTALLMENT PAYMENT DIALOG */}
       <Dialog open={!!payingContract} onOpenChange={(open) => !open && setPayingContract(null)}>
@@ -2750,17 +2685,34 @@ export default function ServiceContractsPage() {
           </DialogHeader>
 
           {payingContract?.invoiceId && contractPaymentSummaries[payingContract.invoiceId] && (
-            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex items-center justify-between">
-              <span className="text-slate-500">
-                Paid {getActiveCurrency()}{' '}
-                {contractPaymentSummaries[payingContract.invoiceId].totalPaid.toFixed(2)} of{' '}
-                {getActiveCurrency()}{' '}
-                {contractPaymentSummaries[payingContract.invoiceId].totalAmount.toFixed(2)}
-              </span>
-              <span className="font-bold text-slate-700">
-                Balance {getActiveCurrency()}{' '}
-                {contractPaymentSummaries[payingContract.invoiceId].pendingBalance.toFixed(2)}
-              </span>
+            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">
+                  Paid {getActiveCurrency()}{' '}
+                  {contractPaymentSummaries[payingContract.invoiceId].totalPaid.toFixed(2)} of{' '}
+                  {getActiveCurrency()}{' '}
+                  {contractPaymentSummaries[payingContract.invoiceId].totalAmount.toFixed(2)}
+                </span>
+                <span className="font-bold text-slate-700">
+                  Balance {getActiveCurrency()}{' '}
+                  {contractPaymentSummaries[payingContract.invoiceId].pendingBalance.toFixed(2)}
+                </span>
+              </div>
+              {contractPaymentSummaries[payingContract.invoiceId].pendingApprovalCount > 0 && (
+                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  <span className="font-semibold">
+                    {contractPaymentSummaries[payingContract.invoiceId].pendingApprovalCount === 1
+                      ? '1 payment'
+                      : `${contractPaymentSummaries[payingContract.invoiceId].pendingApprovalCount} payments`}{' '}
+                    ({getActiveCurrency()}{' '}
+                    {contractPaymentSummaries[
+                      payingContract.invoiceId
+                    ].pendingApprovalAmount.toFixed(2)}
+                    ) awaiting Finance approval — not yet reflected in the balance above.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

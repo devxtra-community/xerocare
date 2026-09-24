@@ -37,6 +37,7 @@ router.get('/contracts/:id/bills', controller.getContractBills);
 router.post('/external-machines', controller.registerExternalMachine);
 router.post('/tickets/:id/assign', controller.assignTechnician);
 router.post('/tickets/:id/collect-visit-charge', controller.collectVisitCharge);
+router.post('/tickets/:id/collect-completion-payment', controller.collectCompletionPayment);
 // Internal: billing reports what Accounts decided about a collected visit charge.
 router.patch('/tickets/:id/visit-charge-decision', controller.applyVisitChargeDecision);
 router.post(

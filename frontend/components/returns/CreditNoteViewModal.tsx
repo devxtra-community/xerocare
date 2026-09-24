@@ -129,6 +129,7 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
+        showCloseButton={false}
         className="p-0 overflow-hidden rounded-2xl border-0 shadow-2xl sm:max-w-none"
         style={{ maxWidth: showDocument ? 900 : 580, width: '95vw' }}
       >
@@ -147,6 +148,12 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                 <Button size="sm" onClick={() => window.print()}>
                   <Printer className="mr-1 h-3.5 w-3.5" /> Print / Save PDF
                 </Button>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors print:hidden"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto bg-slate-100 p-4 print:overflow-visible print:bg-white print:p-0">

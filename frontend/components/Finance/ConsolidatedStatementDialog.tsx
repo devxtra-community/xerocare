@@ -116,7 +116,10 @@ export default function ConsolidatedStatementDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0"
+      >
         <DialogHeader className="p-6 border-b flex flex-row items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 rounded-lg text-blue-600">

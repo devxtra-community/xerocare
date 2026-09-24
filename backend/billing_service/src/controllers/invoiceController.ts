@@ -1691,6 +1691,7 @@ export const createServiceContractInvoice = async (
               paymentDate: initialPayment.paymentDate,
               referenceNumber: initialPayment.referenceNumber,
               remarks: initialPayment.remarks,
+              cashAccountId: initialPayment.cashAccountId,
             }
           : undefined,
     });

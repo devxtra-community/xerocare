@@ -35,6 +35,9 @@ export interface Product {
   ownership?: 'RENT' | 'LEASE' | 'SALE' | 'EXTERNAL';
   meter_reading?: number;
   customer_id?: string | null;
+  /** PRINTER (default, meter-based service) | COMPUTER | OTHER — only PRINTER
+   *  uses meter readings and can take SMA/FSMA contracts. */
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
   warranty_start_date?: string;
   warranty_end_date?: string;
   warranty_max_pages?: number;

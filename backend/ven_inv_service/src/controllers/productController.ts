@@ -320,11 +320,11 @@ export const getproductbyid = async (req: Request, res: Response, next: NextFunc
       throw new AppError('Product not found', 404);
     }
 
-    // Branch isolation
-    const isAdmin = req.user?.role === 'ADMIN';
-    if (!isAdmin && product.warehouse?.branchId !== req.user?.branchId) {
-      throw new AppError('Access denied: Product belongs to another branch', 403);
-    }
+    // Read-only lookup, deliberately not branch-gated: a customer's machine may
+    // have been purchased at a different branch than the one now servicing it
+    // (service contracts, sale-contracts, installation requests all open this
+    // for machines outside the viewing employee's own branch). Branch isolation
+    // still applies to every write path (update/delete) below.
 
     return res.status(200).json({
       success: true,

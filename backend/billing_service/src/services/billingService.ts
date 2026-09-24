@@ -5032,10 +5032,12 @@ export class BillingService {
 
   /**
    * Creates the lump-sum invoice for an AMC service contract at signing time, and — if an
-   * initial payment was collected on the spot — records it against that same invoice via the
-   * normal payment path so status (INVOICED/PARTIAL via ledger/PAID) and cashbook posting stay
-   * consistent with every other payment in the system. Later installments reuse this invoiceId
-   * through the existing /invoices/:id/payments or /payments/record endpoints.
+   * initial payment was collected on the spot — raises it as a PENDING SalePaymentRequest
+   * against that same invoice, exactly like every other collection in the system (sale,
+   * rent, visit charge). It does NOT touch the cashbook or InvoiceLedger here: whoever took
+   * the money at signing has no authority to post it themselves, so the contract stays
+   * INVOICED/unpaid until Finance approves the request. Later installments reuse this same
+   * invoiceId through the existing sale-payments (recordSalePayment) path.
    */
   async createContractInvoice(payload: {
     customerId: string;
@@ -5051,6 +5053,7 @@ export class BillingService {
       paymentDate?: string;
       referenceNumber?: string;
       remarks?: string;
+      cashAccountId?: string;
     };
   }): Promise<Invoice> {
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
@@ -5093,20 +5096,20 @@ export class BillingService {
     savedInvoice.items = [invoiceItem];
 
     if (payload.initialPayment && payload.initialPayment.amount > 0) {
-      await this.recordPayment(
-        savedInvoice.id,
-        {
-          paymentMode: payload.initialPayment.paymentMode,
-          amount: payload.initialPayment.amount,
-          transactionDate: payload.initialPayment.paymentDate,
-          referenceNumber: payload.initialPayment.referenceNumber,
-          remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
-          bypassStatusCheck: true,
-        },
-        payload.createdBy,
-      );
-      const withPayment = await this.invoiceRepo.findById(savedInvoice.id);
-      if (withPayment) return withPayment;
+      await createSalePaymentRequest({
+        invoiceId: savedInvoice.id,
+        branchId: payload.branchId,
+        userId: payload.createdBy,
+        amount: payload.initialPayment.amount,
+        paymentMode: payload.initialPayment.paymentMode,
+        paymentDate: payload.initialPayment.paymentDate
+          ? new Date(payload.initialPayment.paymentDate)
+          : new Date(),
+        referenceNumber: payload.initialPayment.referenceNumber,
+        remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
+        cashAccountId: payload.initialPayment.cashAccountId,
+        paymentContext: 'SERVICE_CONTRACT_SIGNING',
+      });
     }
 
     return savedInvoice;

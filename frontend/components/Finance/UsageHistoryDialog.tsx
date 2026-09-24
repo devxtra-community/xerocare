@@ -707,7 +707,10 @@ export default function UsageHistoryDialog({
 
       {/* Image Preview Dialog */}
       <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
-        <DialogContent className="max-w-5xl p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center">
+        <DialogContent
+          showCloseButton={false}
+          className="max-w-5xl p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center"
+        >
           <DialogTitle className="sr-only">Meter Reading Image Preview</DialogTitle>
           <DialogDescription className="sr-only">
             Visual confirmation of the meter reading for this billing period.

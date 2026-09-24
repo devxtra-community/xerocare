@@ -427,22 +427,22 @@ export default function FinanceServiceEstimatesPage() {
         <Dialog open onOpenChange={(v) => !v && setDetailTarget(null)}>
           <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden rounded-2xl max-h-[92vh] flex flex-col">
             {/* Header band */}
-            <DialogHeader className="shrink-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 space-y-2">
+            <DialogHeader className="shrink-0 bg-blue-50/60 border-b border-slate-100 px-6 py-5 space-y-2">
               <div className="flex items-start justify-between gap-3 pr-8">
                 <div>
-                  <DialogTitle className="text-white text-lg font-bold tracking-tight">
+                  <DialogTitle className="text-slate-900 text-lg font-bold tracking-tight">
                     Service Estimate Review
                   </DialogTitle>
-                  <DialogDescription className="text-slate-400 text-xs mt-0.5">
+                  <DialogDescription className="text-slate-500 text-xs mt-0.5">
                     Items, charges and technician context for this estimate.
                   </DialogDescription>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <span className="font-mono text-xs font-bold text-sky-300 bg-sky-500/10 border border-sky-400/20 px-2.5 py-1 rounded-lg">
+                  <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
                     {detailTarget.invoiceNumber}
                   </span>
                   {(detailTarget.revisionCount || 0) > 0 && (
-                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
                       Revision {detailTarget.revisionCount}
                     </span>
                   )}
@@ -473,13 +473,13 @@ export default function FinanceServiceEstimatesPage() {
                 ].map((f) => (
                   <div
                     key={f.label}
-                    className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5"
+                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
                   >
                     <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">
                       {f.label}
                     </span>
                     <span
-                      className={`block text-[11px] font-semibold text-slate-100 truncate ${
+                      className={`block text-[11px] font-semibold text-slate-700 truncate ${
                         f.mono ? 'font-mono' : ''
                       }`}
                       title={f.value}

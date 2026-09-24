@@ -471,7 +471,14 @@ export const recordSalePayment = async (
     chequeDueDate?: string;
     chequeDate?: string;
     collectLater?: boolean;
-    paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
+    paymentContext?:
+      | 'SALE'
+      | 'RENT_ADVANCE'
+      | 'RENT_PERIODIC'
+      | 'LEASE_ADVANCE'
+      | 'LEASE_PERIODIC'
+      | 'SERVICE_CONTRACT_SIGNING'
+      | 'SERVICE_CONTRACT_INSTALLMENT';
     isSecurityDeposit?: boolean;
 
     // ONLINE_PAYMENT only. Card facts, never the PAN or the CVV — and deliberately no

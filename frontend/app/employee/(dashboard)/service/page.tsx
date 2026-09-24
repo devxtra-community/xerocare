@@ -19,7 +19,7 @@ import SendDocumentModal from '@/components/SendDocumentModal';
 import { RecordCustomerApprovalDialog } from '@/components/service/RecordCustomerApprovalDialog';
 import { AddBrandDialog } from '@/components/ManagerDashboardComponents/BrandComponents/AddBrandDialog';
 import { ModelFormModal } from '@/components/ManagerDashboardComponents/productComponents/ModelFormModal';
-import { Play, UserPlus, Send } from 'lucide-react';
+import { Play, UserPlus, Send, AlertCircle } from 'lucide-react';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import {
   getServiceTickets,
@@ -66,6 +66,7 @@ import {
   WarrantyInfo,
   fetchServiceCashBankAccounts,
   collectVisitCharge,
+  collectCompletionPayment,
   type RecordCustomerDecisionMeta,
   type CustomerDecisionChannel,
 } from '@/lib/serviceTicket';
@@ -128,6 +129,7 @@ import {
 } from 'lucide-react';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { getApiErrorMessage } from '@/lib/apiError';
 interface AuthUser {
   userId: string;
   role: string;
@@ -227,6 +229,7 @@ export default function ServiceDashboardPage() {
 
   // Modals & States
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createTicketError, setCreateTicketError] = useState('');
   const [selectedTicket, setSelectedTicket] = useState<ServiceTicket | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDiagnoseModal, setShowDiagnoseModal] = useState(false);
@@ -347,6 +350,29 @@ export default function ServiceDashboardPage() {
   const [collectVCPaymentMode, setCollectVCPaymentMode] = useState('');
   const [collectVCAccountId, setCollectVCAccountId] = useState('');
   const [collectVCSubmitting, setCollectVCSubmitting] = useState(false);
+
+  // Collect-completion-payment modal — "Not collected" at completion isn't
+  // final; this lets staff record the customer's payment later against an
+  // already-COMPLETED ticket. Amount due is fetched lazily on open, not per
+  // row, to avoid an invoice+payments fetch for every completed ticket.
+  const [collectCPModal, setCollectCPModal] = useState<{
+    ticketId: string;
+    ticketNumber: string;
+  } | null>(null);
+  const [collectCPAmountDue, setCollectCPAmountDue] = useState<{
+    total: number;
+    paid: number;
+    outstanding: number;
+    invoiceNumber?: string;
+  } | null>(null);
+  const [collectCPLoadingDue, setCollectCPLoadingDue] = useState(false);
+  const [collectCPAmount, setCollectCPAmount] = useState('');
+  const [collectCPPaymentMode, setCollectCPPaymentMode] = useState('');
+  const [collectCPAccountId, setCollectCPAccountId] = useState('');
+  const [collectCPChequeNumber, setCollectCPChequeNumber] = useState('');
+  const [collectCPChequeBank, setCollectCPChequeBank] = useState('');
+  const [collectCPChequeDate, setCollectCPChequeDate] = useState('');
+  const [collectCPSubmitting, setCollectCPSubmitting] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [associatedLeadName, setAssociatedLeadName] = useState('');
   const [leadForm, setLeadForm] = useState({
@@ -495,6 +521,10 @@ export default function ServiceDashboardPage() {
   const collectVCEligibleAccounts = useMemo(
     () => accountsForMode(collectVCPaymentMode),
     [accountsForMode, collectVCPaymentMode],
+  );
+  const collectCPEligibleAccounts = useMemo(
+    () => accountsForMode(collectCPPaymentMode),
+    [accountsForMode, collectCPPaymentMode],
   );
 
   /**
@@ -759,21 +789,29 @@ export default function ServiceDashboardPage() {
               : undefined,
           issueDescription: newTicket.issueDescription.trim(),
           meterReadingAtCreation:
-            !isOtherMachine && newTicket.machineType === 'PRINTER' && meterReadingInput !== ''
+            newTicket.machineType === 'PRINTER' && meterReadingInput !== ''
               ? Number(meterReadingInput)
               : undefined,
           visitChargeAmount:
             newTicket.visitChargeAmount !== '' ? Number(newTicket.visitChargeAmount) : undefined,
         };
 
+        setCreateTicketError('');
         await createServiceTicket(payload);
         toast.success('Service ticket created — confirmation email sent to the customer.');
         setShowCreateModal(false);
         resetTicketForm();
         await fetchInitialData();
       } catch (error) {
-        console.error('Failed to create ticket:', error);
-        toast.error('Error creating service ticket. Please verify inputs and connection.');
+        // Expected, user-facing validation failure (e.g. duplicate open ticket) —
+        // shown via the inline banner below, not console.error: that flags a real
+        // bug to Next's dev overlay, which this is not.
+        setCreateTicketError(
+          getApiErrorMessage(
+            error,
+            'Error creating service ticket. Please verify inputs and connection.',
+          ),
+        );
       } finally {
         setSubmitting(false);
       }
@@ -969,26 +1007,83 @@ export default function ServiceDashboardPage() {
     }
   };
 
+  const openCollectCompletionPayment = async (ticket: ServiceTicket) => {
+    setCollectCPModal({
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+    });
+    setCollectCPPaymentMode('');
+    setCollectCPAccountId('');
+    setCollectCPChequeNumber('');
+    setCollectCPChequeBank('');
+    setCollectCPChequeDate('');
+    setCollectCPAmountDue(null);
+    setCollectCPAmount('');
+    loadCashBankAccounts(ticket.branchId);
+    if (!ticket.serviceQuotationId) return;
+    setCollectCPLoadingDue(true);
+    try {
+      const [inv, payments] = await Promise.all([
+        getInvoiceById(ticket.serviceQuotationId),
+        getSalePaymentsForInvoice(ticket.serviceQuotationId).catch(() => []),
+      ]);
+      const total = Number(inv?.totalAmount) || 0;
+      // Pending counts as paid: that money is already with Accounts awaiting
+      // approval, and collecting it twice is the failure to avoid.
+      const paid = (payments || [])
+        .filter((p) => p.status === 'APPROVED' || p.status === 'PENDING')
+        .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const outstanding = Math.max(0, total - paid);
+      setCollectCPAmountDue({ total, paid, outstanding, invoiceNumber: inv?.invoiceNumber });
+      setCollectCPAmount(outstanding > 0 ? String(outstanding) : '');
+    } catch {
+      setCollectCPAmountDue(null);
+    } finally {
+      setCollectCPLoadingDue(false);
+    }
+  };
+
+  const handleCollectCompletionPayment = async () => {
+    if (!collectCPModal) return;
+    if (!collectCPPaymentMode || (collectCPPaymentMode !== 'CHEQUE' && !collectCPAccountId)) {
+      toast.error('Select a payment mode (and account, unless paying by cheque).');
+      return;
+    }
+    if (!(Number(collectCPAmount) > 0)) {
+      toast.error('Enter an amount greater than 0.');
+      return;
+    }
+    try {
+      setCollectCPSubmitting(true);
+      await collectCompletionPayment(collectCPModal.ticketId, {
+        amount: Number(collectCPAmount),
+        paymentMode: collectCPPaymentMode,
+        accountId: collectCPAccountId || undefined,
+        chequeNumber: collectCPChequeNumber.trim() || undefined,
+        chequeBankName: collectCPChequeBank.trim() || undefined,
+        chequeDate: collectCPChequeDate || undefined,
+      });
+      toastSuccess('Payment sent to Accounts for approval.');
+      setCollectCPModal(null);
+      await fetchInitialData();
+    } catch (error) {
+      console.error('Failed to collect completion payment:', error);
+      toastError('Failed to collect payment.');
+    } finally {
+      setCollectCPSubmitting(false);
+    }
+  };
+
   const handleDiagnose = async (e?: React.FormEvent, confirmed = false) => {
     e?.preventDefault();
     if (!selectedTicket) return;
 
-    // Discount applies to the whole estimate: parts + labour + transport +
-    // visit charge (when added to the estimate). It cannot exceed that total.
-    const partsTotal = diagnosisForm.items.reduce(
-      (sum, item) => sum + (item.isFree ? 0 : (item.quantity || 1) * (item.unitPrice || 0)),
-      0,
-    );
-    const estimateTotalBeforeDiscount =
-      partsTotal +
-      (Number(diagnosisForm.labourCost) || 0) +
-      (Number(diagnosisForm.transportChargeAmount) || 0) +
-      (diagnosisForm.visitChargeMethod === 'ADDED_TO_ESTIMATE'
-        ? Number(diagnosisForm.visitChargeAmount) || 0
-        : 0);
-    if (Number(diagnosisForm.discountAmount || 0) > estimateTotalBeforeDiscount) {
+    // Discount is a discount on labour/service charge only — it cannot
+    // exceed the labour cost, regardless of parts/transport/visit charge.
+    const labourCost = Number(diagnosisForm.labourCost) || 0;
+    if (Number(diagnosisForm.discountAmount || 0) > labourCost) {
       toast.error(
-        `Discount of ${getActiveCurrency()} ${diagnosisForm.discountAmount} exceeds the total estimate amount of ${getActiveCurrency()} ${estimateTotalBeforeDiscount.toFixed(2)}.`,
+        `Discount of ${getActiveCurrency()} ${diagnosisForm.discountAmount} exceeds the labour cost of ${getActiveCurrency()} ${labourCost.toFixed(2)}.`,
       );
       return;
     }
@@ -1309,20 +1404,27 @@ export default function ServiceDashboardPage() {
         totalLabourCost: Number(data.history?.totalLabourSpend) || 0,
         totalLifetimeCost: Number(data.history?.totalLifetimeCost) || 0,
         currentMeterReading: data.currentMeterReading ?? null,
-        visitLogs: (data.tickets || []).map((t: ServiceTicket) => {
-          let ticketCost = 0;
-          t.items?.forEach((item: ServiceTicketItem) => {
-            ticketCost += Number(item.totalPrice) || 0;
-          });
-          return {
-            ticketNumber: t.ticketNumber,
-            serviceContext: t.serviceContext,
-            status: t.status,
-            date: t.completedAt || t.created_at,
-            meterReading: t.meterReadingAtService || t.meterReadingAtCreation || 0,
-            cost: ticketCost,
-          };
-        }),
+        visitLogs: (data.tickets || []).map(
+          (t: ServiceTicket & { estimateTotalCost?: number | null }) => {
+            // The latest estimate's total already covers parts + labour +
+            // visit/transport charge - discount. Fall back to summing billed
+            // items only for older tickets that predate estimates.
+            let cost = t.estimateTotalCost ?? 0;
+            if (t.estimateTotalCost == null) {
+              t.items?.forEach((item: ServiceTicketItem) => {
+                cost += Number(item.totalPrice) || 0;
+              });
+            }
+            return {
+              ticketNumber: t.ticketNumber,
+              serviceContext: t.serviceContext,
+              status: t.status,
+              date: t.completedAt || t.created_at,
+              meterReading: t.meterReadingAtService || t.meterReadingAtCreation || 0,
+              cost,
+            };
+          },
+        ),
       };
 
       const mappedYields: ConsumableYieldUI[] = (data.yields || []).map(
@@ -1801,6 +1903,7 @@ export default function ServiceDashboardPage() {
   };
 
   const resetTicketForm = () => {
+    setCreateTicketError('');
     setNewTicket({
       customerId: '',
       leadId: '',
@@ -1973,7 +2076,10 @@ export default function ServiceDashboardPage() {
           {/* Action buttons based on jobs — manager has full authority in the branch */}
           {(isHelpDesk || isManagerOrAdmin) && (
             <Button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => {
+                setCreateTicketError('');
+                setShowCreateModal(true);
+              }}
               className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl shadow-sm gap-2"
             >
               <Plus size={16} /> Create Service Ticket
@@ -2273,6 +2379,24 @@ export default function ServiceDashboardPage() {
                                 {ticket.visitChargeStatus === 'REJECTED'
                                   ? 'Collect Visit Charge Again'
                                   : 'Collect Visit Charge'}
+                              </Button>
+                            )}
+
+                          {/* "Not collected" at completion isn't final — the customer can
+                              still pay later. Amount due is fetched lazily when this opens,
+                              not per row, so a completed-tickets list doesn't fire an
+                              invoice+payments lookup for every row. */}
+                          {(isHelpDesk || isManagerOrAdmin || isTechnician) &&
+                            ticket.status === 'COMPLETED' &&
+                            ticket.serviceQuotationId && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-7 px-2 rounded-md text-[11px] font-medium gap-1"
+                                onClick={() => openCollectCompletionPayment(ticket)}
+                              >
+                                <DollarSign className="size-3.5" />
+                                Collect Payment
                               </Button>
                             )}
 
@@ -2649,6 +2773,12 @@ export default function ServiceDashboardPage() {
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleCreateTicket}>
+              {createTicketError && (
+                <div className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-5 py-3 text-xs font-semibold text-red-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <span>{createTicketError}</span>
+                </div>
+              )}
               <CardContent className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
                 {/* PATH 1: EXISTING CUSTOMER FLOW */}
                 {creationPath === 'existing' && (
@@ -2866,6 +2996,14 @@ export default function ServiceDashboardPage() {
                                               {machine.effectiveFrom} → {machine.effectiveTo}
                                             </span>
                                           </div>
+                                          {machine.meterReading != null && (
+                                            <div className="col-span-2">
+                                              Last Reading:{' '}
+                                              <span className="font-semibold text-slate-700">
+                                                {machine.meterReading.toLocaleString()}
+                                              </span>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     ))
@@ -2954,6 +3092,14 @@ export default function ServiceDashboardPage() {
                                               Expired First:{' '}
                                               <span className="text-red-700 font-bold">
                                                 {machine.expiredFirst}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {machine.meterReading != null && (
+                                            <div className="col-span-2">
+                                              Last Reading:{' '}
+                                              <span className="font-semibold text-slate-700">
+                                                {machine.meterReading.toLocaleString()}
                                               </span>
                                             </div>
                                           )}
@@ -3049,6 +3195,14 @@ export default function ServiceDashboardPage() {
                                                 </span>
                                               </div>
                                             )
+                                          )}
+                                          {machine.meterReading != null && (
+                                            <div className="col-span-2">
+                                              Last Reading:{' '}
+                                              <span className="font-semibold text-slate-700">
+                                                {machine.meterReading.toLocaleString()}
+                                              </span>
+                                            </div>
                                           )}
                                         </div>
                                       </div>
@@ -3418,68 +3572,68 @@ export default function ServiceDashboardPage() {
                             </div>
 
                             {/* METER READING — copies can expire a warranty before time does.
-                                Printer machines only; computer / other have no meter. */}
-                            {newTicket.machineType === 'PRINTER' &&
-                              (selectedMachine.type === 'SALE' ||
-                                selectedMachine.type === 'LEASE') && (
-                                <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
-                                  <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
-                                    Current Meter Reading (Total Copies)
-                                    {machineContextData?.warrantyInfo?.copyLimit != null && ' *'}
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    placeholder="Ask the customer for the machine's current meter reading..."
-                                    value={meterReadingInput}
-                                    onChange={(e) => setMeterReadingInput(e.target.value)}
-                                    // Re-check warranty/coverage only once the full number is
-                                    // entered — on blur, or on Enter — not per digit.
-                                    onBlur={() => {
-                                      if (selectedMachine?.serialNumber) {
-                                        fetchMachineContext(
-                                          selectedMachine.serialNumber,
-                                          meterReadingInput !== ''
-                                            ? Number(meterReadingInput)
-                                            : undefined,
-                                        );
-                                      }
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        (e.target as HTMLInputElement).blur();
-                                      }
-                                    }}
-                                    className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
-                                  />
-                                  {machineContextData?.warrantyInfo && (
-                                    <p
-                                      className={`text-[11px] font-semibold ${
-                                        machineContextData.warrantyInfo.isUnderWarranty
-                                          ? 'text-emerald-700'
-                                          : 'text-red-700'
-                                      }`}
-                                    >
-                                      {machineContextData.warrantyInfo.isUnderWarranty
-                                        ? `Under warranty${
-                                            machineContextData.warrantyInfo.copiesRemaining != null
-                                              ? ` — ${machineContextData.warrantyInfo.copiesRemaining.toLocaleString()} copies remaining`
-                                              : ''
-                                          }${
-                                            machineContextData.warrantyInfo.warrantyEndDate
-                                              ? ` (until ${new Date(machineContextData.warrantyInfo.warrantyEndDate).toLocaleDateString()})`
-                                              : ''
-                                          }`
-                                        : `Warranty expired${
-                                            machineContextData.warrantyInfo.expiredBy
-                                              ? ` — limit hit: ${machineContextData.warrantyInfo.expiredBy}`
-                                              : ''
-                                          }. Service will be chargeable.`}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
+                                Printer machines only; computer / other have no meter.
+                                Asked regardless of ownership (SALE/LEASE/RENT/EXTERNAL) so
+                                meterReadingAtCreation is always captured for the ticket. */}
+                            {newTicket.machineType === 'PRINTER' && (
+                              <div className="p-3 bg-amber-50/50 border border-amber-100 rounded-xl space-y-2">
+                                <label className="text-[10px] uppercase font-bold tracking-wider text-amber-700 block">
+                                  Current Meter Reading (Total Copies)
+                                  {machineContextData?.warrantyInfo?.copyLimit != null && ' *'}
+                                </label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  placeholder="Ask the customer for the machine's current meter reading..."
+                                  value={meterReadingInput}
+                                  onChange={(e) => setMeterReadingInput(e.target.value)}
+                                  // Re-check warranty/coverage only once the full number is
+                                  // entered — on blur, or on Enter — not per digit.
+                                  onBlur={() => {
+                                    if (selectedMachine?.serialNumber) {
+                                      fetchMachineContext(
+                                        selectedMachine.serialNumber,
+                                        meterReadingInput !== ''
+                                          ? Number(meterReadingInput)
+                                          : undefined,
+                                      );
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      (e.target as HTMLInputElement).blur();
+                                    }
+                                  }}
+                                  className="h-9 text-xs bg-white border-amber-200 rounded-xl focus-visible:ring-amber-500 font-mono"
+                                />
+                                {machineContextData?.warrantyInfo && (
+                                  <p
+                                    className={`text-[11px] font-semibold ${
+                                      machineContextData.warrantyInfo.isUnderWarranty
+                                        ? 'text-emerald-700'
+                                        : 'text-red-700'
+                                    }`}
+                                  >
+                                    {machineContextData.warrantyInfo.isUnderWarranty
+                                      ? `Under warranty${
+                                          machineContextData.warrantyInfo.copiesRemaining != null
+                                            ? ` — ${machineContextData.warrantyInfo.copiesRemaining.toLocaleString()} copies remaining`
+                                            : ''
+                                        }${
+                                          machineContextData.warrantyInfo.warrantyEndDate
+                                            ? ` (until ${new Date(machineContextData.warrantyInfo.warrantyEndDate).toLocaleDateString()})`
+                                            : ''
+                                        }`
+                                      : `Warranty expired${
+                                          machineContextData.warrantyInfo.expiredBy
+                                            ? ` — limit hit: ${machineContextData.warrantyInfo.expiredBy}`
+                                            : ''
+                                        }. Service will be chargeable.`}
+                                  </p>
+                                )}
+                              </div>
+                            )}
 
                             {machineContextData?.contract && (
                               <div className="p-2.5 bg-blue-50/50 border border-blue-100/50 rounded-xl space-y-1">
@@ -3615,6 +3769,25 @@ export default function ServiceDashboardPage() {
                         </p>
                       )}
                     </div>
+
+                    {/* METER READING — for an external/new-lead machine there's no catalogue
+                        record to pull a prior reading from, so ask for it directly. */}
+                    {(creationPath === 'new' || isOtherMachine) &&
+                      newTicket.machineType === 'PRINTER' && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                            Current Meter Reading (Total Copies)
+                          </label>
+                          <Input
+                            type="number"
+                            min={0}
+                            placeholder="Ask the customer for the machine's current meter reading..."
+                            value={meterReadingInput}
+                            onChange={(e) => setMeterReadingInput(e.target.value)}
+                            className="h-9 text-xs bg-white border-slate-200 rounded-xl focus-visible:ring-primary font-mono"
+                          />
+                        </div>
+                      )}
 
                     {/* Information Banner */}
                     {(() => {
@@ -4648,17 +4821,21 @@ export default function ServiceDashboardPage() {
                               <Input
                                 type="number"
                                 min={0}
+                                max={Number(diagnosisForm.labourCost) || 0}
                                 value={diagnosisForm.discountAmount || ''}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const labourCost = Number(diagnosisForm.labourCost) || 0;
+                                  const entered = parseFloat(e.target.value) || 0;
                                   setDiagnosisForm({
                                     ...diagnosisForm,
-                                    discountAmount: parseFloat(e.target.value) || 0,
-                                  })
-                                }
+                                    discountAmount: Math.min(entered, labourCost),
+                                  });
+                                }}
                                 className="h-9 text-xs bg-slate-50 border-slate-200 rounded-xl"
                               />
                               <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                                Applied on the total estimate amount.
+                                Cannot exceed the labour cost ({getActiveCurrency()}{' '}
+                                {(Number(diagnosisForm.labourCost) || 0).toFixed(2)}).
                               </p>
                             </div>
                           </div>
@@ -5003,18 +5180,16 @@ export default function ServiceDashboardPage() {
                         <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
                           {collectMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
                         </label>
-                        <select
+                        <SearchableSelect
+                          options={accountsForMode(collectMode).map((a) => ({
+                            value: a.id,
+                            label: a.name,
+                          }))}
                           value={collectAccountId}
-                          onChange={(e) => setCollectAccountId(e.target.value)}
-                          className="w-full h-9 px-3 text-xs bg-white border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
-                        >
-                          <option value="">Select account...</option>
-                          {accountsForMode(collectMode).map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
+                          onValueChange={(val) => setCollectAccountId(val)}
+                          placeholder="Select account..."
+                          className="w-full h-9 px-3 text-xs bg-white border-orange-200 rounded-xl text-orange-900 font-semibold"
+                        />
                       </div>
                     )}
                   </div>
@@ -7108,6 +7283,161 @@ export default function ServiceDashboardPage() {
                 onClick={handleCollectVisitChargeNow}
               >
                 {collectVCSubmitting ? 'Sending...' : 'Send to Accounts for Approval'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={!!collectCPModal}
+        onClose={() => setCollectCPModal(null)}
+        maxWidth="sm"
+        title="Collect Payment"
+      >
+        {collectCPModal && (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600">
+              Ticket {collectCPModal.ticketNumber} — record a payment the customer made after the
+              job was completed.
+            </p>
+            {collectCPLoadingDue ? (
+              <p className="text-xs text-slate-400">Loading outstanding balance…</p>
+            ) : collectCPAmountDue ? (
+              collectCPAmountDue.outstanding > 0 ? (
+                <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  Invoice {collectCPAmountDue.invoiceNumber || ''}: {getActiveCurrency()}{' '}
+                  {collectCPAmountDue.total.toFixed(2)} total, {getActiveCurrency()}{' '}
+                  {collectCPAmountDue.paid.toFixed(2)} already collected/pending —{' '}
+                  <span className="font-bold">
+                    {getActiveCurrency()} {collectCPAmountDue.outstanding.toFixed(2)} outstanding
+                  </span>
+                  .
+                </p>
+              ) : (
+                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                  Nothing outstanding — this invoice is already fully collected or pending approval.
+                </p>
+              )
+            ) : (
+              <p className="text-xs text-red-500">Could not load the invoice balance.</p>
+            )}
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Recording this sends the collection to Accounts for approval. Nothing is posted to the
+              cashbook until they approve it, into whichever account is selected here.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  Amount ({getActiveCurrency()})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={collectCPAmount}
+                  onChange={(e) => setCollectCPAmount(e.target.value)}
+                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                />
+                {collectCPAmountDue &&
+                  Number(collectCPAmount) > collectCPAmountDue.outstanding + 0.01 && (
+                    <p className="text-[10px] font-bold text-red-600">
+                      More than the {getActiveCurrency()}{' '}
+                      {collectCPAmountDue.outstanding.toFixed(2)} outstanding.
+                    </p>
+                  )}
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  Payment Mode
+                </label>
+                <select
+                  value={collectCPPaymentMode}
+                  onChange={(e) => {
+                    setCollectCPPaymentMode(e.target.value);
+                    setCollectCPAccountId('');
+                  }}
+                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
+                >
+                  <option value="">Select mode...</option>
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+            </div>
+
+            {collectCPPaymentMode && collectCPPaymentMode !== 'CHEQUE' && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                  {collectCPPaymentMode === 'CASH' ? 'Cash Account' : 'Bank Account'}
+                </label>
+                <SearchableSelect
+                  options={collectCPEligibleAccounts.map((a) => ({ value: a.id, label: a.name }))}
+                  value={collectCPAccountId}
+                  onValueChange={(val) => setCollectCPAccountId(val)}
+                  placeholder={
+                    collectCPEligibleAccounts.length === 0
+                      ? `No ${collectCPPaymentMode === 'CASH' ? 'cash' : 'bank'} account configured`
+                      : 'Select account...'
+                  }
+                  disabled={collectCPEligibleAccounts.length === 0}
+                  className="w-full h-9 px-3 text-xs bg-orange-50/60 border-orange-200 rounded-xl text-orange-900 font-semibold"
+                />
+              </div>
+            )}
+
+            {collectCPPaymentMode === 'CHEQUE' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    Cheque No. *
+                  </label>
+                  <input
+                    value={collectCPChequeNumber}
+                    onChange={(e) => setCollectCPChequeNumber(e.target.value)}
+                    placeholder="e.g. CHQ-004512"
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    Bank
+                  </label>
+                  <input
+                    value={collectCPChequeBank}
+                    onChange={(e) => setCollectCPChequeBank(e.target.value)}
+                    placeholder="e.g. FAB"
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-orange-700">
+                    Cheque Date
+                  </label>
+                  <input
+                    type="date"
+                    value={collectCPChequeDate}
+                    onChange={(e) => setCollectCPChequeDate(e.target.value)}
+                    className="w-full h-9 px-3 text-xs bg-orange-50/60 border border-orange-200 rounded-xl text-orange-900 font-semibold focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCollectCPModal(null)}>
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  collectCPSubmitting ||
+                  !(Number(collectCPAmount) > 0) ||
+                  !collectCPPaymentMode ||
+                  (collectCPPaymentMode !== 'CHEQUE' && !collectCPAccountId) ||
+                  (collectCPPaymentMode === 'CHEQUE' && !collectCPChequeNumber.trim())
+                }
+                onClick={handleCollectCompletionPayment}
+              >
+                {collectCPSubmitting ? 'Sending...' : 'Send to Accounts for Approval'}
               </Button>
             </div>
           </div>

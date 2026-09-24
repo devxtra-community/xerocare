@@ -110,7 +110,9 @@ export const getServiceTicketById = async (id: string): Promise<ServiceTicket> =
 };
 
 export const createServiceTicket = async (data: Partial<ServiceTicket>): Promise<ServiceTicket> => {
-  const response = await api.post('/i/service/tickets', data);
+  // The create dialog shows validation failures (e.g. "machine already has an
+  // open ticket") inline itself, so the global toast would just duplicate it.
+  const response = await api.post('/i/service/tickets', data, { skipErrorToast: true });
   return response.data.data;
 };
 
@@ -127,6 +129,25 @@ export const collectVisitCharge = async (
     accountId,
     ...(paymentMode === 'CHEQUE' ? cheque : {}),
   });
+  return response.data.data;
+};
+
+/** Collect a service ticket's completion balance any time after it's marked
+ *  COMPLETED — "Not collected" at completion isn't final, the customer can
+ *  still pay later. Goes to Accounts as a pending approval, same as every
+ *  other collection path. */
+export const collectCompletionPayment = async (
+  id: string,
+  payload: {
+    amount: number;
+    paymentMode: string;
+    accountId?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDate?: string;
+  },
+): Promise<{ paymentRequestId: string; requestNo: string }> => {
+  const response = await api.post(`/i/service/tickets/${id}/collect-completion-payment`, payload);
   return response.data.data;
 };
 

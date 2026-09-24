@@ -697,7 +697,10 @@ export default function InstallationRequestsPage() {
 
       {/* Contract View Dialog */}
       <Dialog open={!!viewContract} onOpenChange={(v) => !v && setViewContract(null)}>
-        <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl"
+        >
           <DialogTitle className="sr-only">Contract Agreement</DialogTitle>
           {viewContract && (
             <>
@@ -814,7 +817,10 @@ export default function InstallationRequestsPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl">
+        <DialogContent
+          showCloseButton={false}
+          className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-0 shadow-2xl"
+        >
           <DialogTitle className="sr-only">Initial Meter Readings</DialogTitle>
 
           {/* Header */}

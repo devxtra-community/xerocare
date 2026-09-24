@@ -311,10 +311,11 @@ function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
 }
 
 // paymentContext → contract type label
-const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | null => {
+const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | 'SERVICE' | null => {
   if (!ctx || ctx === 'SALE') return 'SALE';
   if (ctx.startsWith('RENT')) return 'RENT';
   if (ctx.startsWith('LEASE')) return 'LEASE';
+  if (ctx.startsWith('SERVICE_CONTRACT')) return 'SERVICE';
   return null;
 };
 
@@ -382,7 +383,9 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
   const [tab, setTab] = useState<FilterTab>('PENDING');
 
   // Secondary filters
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'SALE' | 'RENT' | 'LEASE'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'SALE' | 'RENT' | 'LEASE' | 'SERVICE'>(
+    'ALL',
+  );
   const [modeFilter, setModeFilter] = useState<
     'ALL' | 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'ONLINE_PAYMENT'
   >('ALL');
@@ -1170,6 +1173,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   <SelectItem value="SALE">Sale</SelectItem>
                   <SelectItem value="RENT">Rent</SelectItem>
                   <SelectItem value="LEASE">Lease</SelectItem>
+                  <SelectItem value="SERVICE">Service Contract</SelectItem>
                 </SelectContent>
               </Select>
             </div>

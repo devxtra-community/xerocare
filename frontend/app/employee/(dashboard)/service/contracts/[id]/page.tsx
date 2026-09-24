@@ -55,6 +55,7 @@ import {
   DollarSign,
   Send,
   Eye,
+  Clock,
 } from 'lucide-react';
 
 const COVERAGE_LABELS: Array<{ key: keyof ContractCoverage; label: string }> = [
@@ -201,6 +202,7 @@ export default function ServiceContractDetailPage() {
         paymentDate: payForm.paymentDate,
         referenceNumber: payForm.referenceNumber || undefined,
         remarks: payForm.remarks || undefined,
+        paymentContext: 'SERVICE_CONTRACT_INSTALLMENT',
         // Card facts only — the processing fee is priced server-side from the
         // configured merchant agreement, never sent from here.
         ...(payForm.paymentMode === 'ONLINE_PAYMENT'
@@ -448,6 +450,15 @@ export default function ServiceContractDetailPage() {
                   Paid {currency} {paymentSummary.totalPaid.toFixed(2)} · Balance {currency}{' '}
                   {paymentSummary.pendingBalance.toFixed(2)}
                 </span>
+                {paymentSummary.pendingApprovalCount > 0 && (
+                  <span className="block text-[10px] font-semibold text-amber-700 mt-0.5">
+                    {paymentSummary.pendingApprovalCount === 1
+                      ? '1 payment'
+                      : `${paymentSummary.pendingApprovalCount} payments`}{' '}
+                    ({currency} {paymentSummary.pendingApprovalAmount.toFixed(2)}) awaiting Finance
+                    approval
+                  </span>
+                )}
               </>
             )}
           </CardContent>
@@ -637,67 +648,75 @@ export default function ServiceContractDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Meter readings */}
-      <Card className="shadow-sm border-slate-200/80">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
-            <Gauge className="h-3.5 w-3.5 text-emerald-600" /> Meter Readings (
-            {contract.readings.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {contract.readings.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">No readings recorded yet.</p>
-          ) : (
-            <div className="border border-slate-100 rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/80">
-                  <TableRow>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Date</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Meter</TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
-                      Clicks
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500 text-right">
-                      Charged
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold text-slate-500">Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contract.readings.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs text-slate-500 py-2">
-                        {fmtDate(r.readingDate)}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono py-2">
-                        {r.totalReading != null
-                          ? Number(r.totalReading).toLocaleString()
-                          : r.bwReading != null || r.colorReading != null
-                            ? `BW ${Number(r.bwReading ?? 0).toLocaleString()} · Col ${Number(r.colorReading ?? 0).toLocaleString()}`
-                            : '—'}
-                      </TableCell>
-                      <TableCell className="text-xs text-right font-mono py-2">
-                        {Number(r.clicksTotal || 0).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-xs text-right font-mono py-2">
-                        {contract.contractType === 'AMC' ? (
-                          <span className="text-slate-400">tracking only</span>
-                        ) : (
-                          `${currency} ${Number(r.amountCharged || 0).toFixed(2)}`
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-400 py-2 max-w-[200px] truncate">
-                        {r.notes || '—'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Meter readings — not applicable to a computer/non-metered machine, which has
+          no page count to track at all. */}
+      {contract.machine?.machineType !== 'COMPUTER' &&
+        contract.machine?.machineType !== 'OTHER' && (
+          <Card className="shadow-sm border-slate-200/80">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5 text-emerald-600" /> Meter Readings (
+                {contract.readings.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {contract.readings.length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 text-center">No readings recorded yet.</p>
+              ) : (
+                <div className="border border-slate-100 rounded-lg overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50/80">
+                      <TableRow>
+                        <TableHead className="text-[10px] font-bold text-slate-500">Date</TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500">
+                          Meter
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                          Clicks
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500 text-right">
+                          Charged
+                        </TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500">
+                          Notes
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contract.readings.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs text-slate-500 py-2">
+                            {fmtDate(r.readingDate)}
+                          </TableCell>
+                          <TableCell className="text-xs font-mono py-2">
+                            {r.totalReading != null
+                              ? Number(r.totalReading).toLocaleString()
+                              : r.bwReading != null || r.colorReading != null
+                                ? `BW ${Number(r.bwReading ?? 0).toLocaleString()} · Col ${Number(r.colorReading ?? 0).toLocaleString()}`
+                                : '—'}
+                          </TableCell>
+                          <TableCell className="text-xs text-right font-mono py-2">
+                            {Number(r.clicksTotal || 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-xs text-right font-mono py-2">
+                            {contract.contractType === 'AMC' ? (
+                              <span className="text-slate-400">tracking only</span>
+                            ) : (
+                              `${currency} ${Number(r.amountCharged || 0).toFixed(2)}`
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-400 py-2 max-w-[200px] truncate">
+                            {r.notes || '—'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
       {/* Monthly bills — FSMA only. Generated automatically once a month by
           the billing sweep; casual readings in between accrue unbilled. */}
@@ -864,14 +883,28 @@ export default function ServiceContractDetailPage() {
           </DialogHeader>
 
           {paymentSummary && (
-            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex items-center justify-between">
-              <span className="text-slate-500">
-                Paid {currency} {paymentSummary.totalPaid.toFixed(2)} of {currency}{' '}
-                {paymentSummary.totalAmount.toFixed(2)}
-              </span>
-              <span className="font-bold text-slate-700">
-                Balance {currency} {paymentSummary.pendingBalance.toFixed(2)}
-              </span>
+            <div className="mx-6 mt-4 p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">
+                  Paid {currency} {paymentSummary.totalPaid.toFixed(2)} of {currency}{' '}
+                  {paymentSummary.totalAmount.toFixed(2)}
+                </span>
+                <span className="font-bold text-slate-700">
+                  Balance {currency} {paymentSummary.pendingBalance.toFixed(2)}
+                </span>
+              </div>
+              {paymentSummary.pendingApprovalCount > 0 && (
+                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  <span className="font-semibold">
+                    {paymentSummary.pendingApprovalCount === 1
+                      ? '1 payment'
+                      : `${paymentSummary.pendingApprovalCount} payments`}{' '}
+                    ({currency} {paymentSummary.pendingApprovalAmount.toFixed(2)}) awaiting Finance
+                    approval — not yet reflected in the balance above.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

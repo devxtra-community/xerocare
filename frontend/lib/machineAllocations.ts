@@ -20,6 +20,7 @@ export interface HistoryAllocation {
   currentColorA4?: number;
   currentColorA3?: number;
   warrantyInfo?: WarrantyInfo;
+  currentMeterReading?: number;
 }
 
 export interface HistoryInvoice {
@@ -133,6 +134,7 @@ export function getRentedMachines(
           contractStatus: deriveContractStatus(inv.effectiveTo, inv.contractStatus),
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
+          meterReading: alloc.currentMeterReading,
           type: 'RENT',
         });
       });
@@ -189,6 +191,7 @@ export function getLeasedMachines(
           warrantyInfo: alloc.warrantyInfo,
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
+          meterReading: alloc.currentMeterReading,
           type: 'LEASE',
         });
       });
@@ -261,6 +264,7 @@ export function getPurchasedMachines(
           expiredFirst: w.expiredFirst,
           effectiveTo: w.effectiveTo,
           warrantyInfo: alloc.warrantyInfo,
+          meterReading: alloc.currentMeterReading,
           type: 'SALE',
         });
       });

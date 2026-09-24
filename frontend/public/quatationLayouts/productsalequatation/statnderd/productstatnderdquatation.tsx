@@ -72,6 +72,8 @@ export interface ProductStandardQuotationProps {
     payment: number;
     balanceDue: number;
     paid: boolean;
+    /** Collected but sitting in the Accounts approval queue — not yet in `payment`. */
+    pendingApprovalAmount?: number;
   };
 }
 
@@ -82,6 +84,7 @@ const fmt = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
+  isInvoice,
   warranty,
   productName = 'TONER CHIP SET',
   modelName = 'ALTALink C8130',
@@ -776,19 +779,50 @@ const ProductStandardQuotation: React.FC<ProductStandardQuotationProps> = ({
 
           {/* Grand Total */}
 
-          {totals.paid && (
-            <div
-              style={{
-                textAlign: 'right',
-                color: '#16a34a',
-                fontWeight: '800',
-                fontSize: '14px',
-                letterSpacing: '0.08em',
-                marginTop: '4px',
-              }}
-            >
-              PAID
+          {isInvoice && totals.payment !== totals.total ? (
+            <div style={{ marginTop: '8px', borderTop: '1px solid #e5e7eb', paddingTop: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#047857' }}>
+                  Amount Paid
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: '#047857' }}>
+                  {getActiveCurrency()} {fmt(totals.payment)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#b91c1c' }}>
+                  Balance Due
+                </span>
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#b91c1c' }}>
+                  {getActiveCurrency()} {fmt(totals.balanceDue)}
+                </span>
+              </div>
+              {!!totals.pendingApprovalAmount && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                  <span style={{ fontSize: '9px', textTransform: 'uppercase', color: '#b45309' }}>
+                    Awaiting Finance Approval
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: '#b45309' }}>
+                    {getActiveCurrency()} {fmt(totals.pendingApprovalAmount)}
+                  </span>
+                </div>
+              )}
             </div>
+          ) : (
+            totals.paid && (
+              <div
+                style={{
+                  textAlign: 'right',
+                  color: '#16a34a',
+                  fontWeight: '800',
+                  fontSize: '14px',
+                  letterSpacing: '0.08em',
+                  marginTop: '4px',
+                }}
+              >
+                PAID
+              </div>
+            )
           )}
         </div>
       </div>

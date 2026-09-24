@@ -6,6 +6,7 @@ import { AppError } from '../errors/appError';
 import { BillingService } from './billingService';
 import { loadExchangeRates, convertAmt } from '../utils/accountsShared';
 import { r2SignedGetUrl } from '../utils/r2Url';
+import { SalePaymentRequest } from '../entities/salePaymentRequestEntity';
 
 /**
  * Normalized payment record served to the frontend. Merges the current
@@ -187,6 +188,16 @@ export class PaymentService {
     const totalAmount = Number(invoice.totalAmount || 0);
     const pendingBalance = Math.max(0, Math.round((totalAmount - totalPaid) * 100) / 100);
 
+    // Money collected but sitting in the Accounts Receipts queue, not yet approved —
+    // never counted in totalPaid/pendingBalance above (those only reflect posted
+    // PaymentTransactions). Surfaced separately so a contract/invoice can show
+    // "N payment(s) awaiting Finance approval" instead of looking simply unpaid.
+    const pendingRequests = await Source.getRepository(SalePaymentRequest).find({
+      where: { invoiceId, status: 'PENDING' },
+    });
+    const pendingApprovalCount = pendingRequests.length;
+    const pendingApprovalAmount = pendingRequests.reduce((sum, r) => sum + Number(r.amount), 0);
+
     return {
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
@@ -196,6 +207,8 @@ export class PaymentService {
       totalAmount,
       totalPaid,
       pendingBalance,
+      pendingApprovalCount,
+      pendingApprovalAmount,
       payments,
       status: invoice.status,
       currencyWarnings,

@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
+import { getAccountSummary, PaymentSummary } from '@/lib/payment';
 
 interface InternalConsumable {
   name?: string;
@@ -108,6 +109,31 @@ export function InvoiceViewDialog({
 
   const [ticketDetails, setTicketDetails] = useState<ServiceTicket | null>(null);
   const [loadingTicket, setLoadingTicket] = useState(false);
+
+  // Service Contract (AMC/SMA/FSMA) invoices are raised in full at signing and can carry
+  // partial payments approved over time — the generic product/sale quotation layout below
+  // has no notion of that, so the contract value / paid / balance is surfaced separately
+  // here rather than by teaching every shared quotation template about it.
+  const isServiceContractInvoice = (invoice.saleType || '').toUpperCase() === 'SERVICE';
+  const [contractPaymentSummary, setContractPaymentSummary] = useState<PaymentSummary | null>(null);
+
+  useEffect(() => {
+    if (!isServiceContractInvoice) {
+      setContractPaymentSummary(null);
+      return;
+    }
+    let cancelled = false;
+    getAccountSummary(invoice.id)
+      .then((summary) => {
+        if (!cancelled) setContractPaymentSummary(summary);
+      })
+      .catch(() => {
+        if (!cancelled) setContractPaymentSummary(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invoice.id, isServiceContractInvoice]);
 
   useEffect(() => {
     if (invoice.serviceTicketId) {
@@ -567,9 +593,15 @@ export function InvoiceViewDialog({
     vatPercent: resolvedTaxPercent,
     vatName: vatLabel,
     total: finalTotalAmount,
-    payment: finalTotalAmount,
-    balanceDue: finalTotalAmount,
-    paid: ['PAID', 'TRANSACTION_COMPLETED'].includes(invoice.status),
+    // A service contract can be invoiced in full at signing and paid off over several
+    // Finance-approved installments — payment/balanceDue reflect that real progress
+    // instead of assuming the whole invoice is either fully paid or fully outstanding.
+    payment: contractPaymentSummary ? contractPaymentSummary.totalPaid : finalTotalAmount,
+    balanceDue: contractPaymentSummary ? contractPaymentSummary.pendingBalance : finalTotalAmount,
+    pendingApprovalAmount: contractPaymentSummary?.pendingApprovalAmount || 0,
+    paid: contractPaymentSummary
+      ? contractPaymentSummary.pendingBalance <= 0
+      : ['PAID', 'TRANSACTION_COMPLETED'].includes(invoice.status),
   };
 
   const templateBillTo = {
