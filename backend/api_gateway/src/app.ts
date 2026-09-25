@@ -120,14 +120,26 @@ app.get(
  * We limit how many times someone can try to login or request a password reset
  * in a short period. This prevents hackers from trying thousands of passwords
  * automatically.
+ *
+ * otpSendLimiter/otpVerifyLimiter key by IP+email (authKeyGenerator, rateLimitter.ts) so
+ * the budget is per-target, not shared across everyone behind one IP/NAT — but that
+ * requires req.body.email, and there is no global express.json() in this app (see
+ * fixRequestBody's own comment below for why: a global parser would drain the body stream
+ * for every proxied request too). Without a parser in front of these specific routes,
+ * req.body was always undefined here and the limiter silently fell back to IP-only keying.
+ * `jsonParser` below parses the body just for these limiter-guarded routes; the eventual
+ * proxy fallthrough to employee_service re-serializes it via fixRequestBody exactly like
+ * /bank-reference and /b/invoices already do for their own locally-mounted express.json().
  */
-app.post('/e/auth/login', loginLimiter);
-app.post('/e/admin/login', loginLimiter);
+const jsonParser = express.json();
+app.post('/e/auth/login', jsonParser, loginLimiter);
+app.post('/e/admin/login', jsonParser, loginLimiter);
 app.post(
   ['/e/auth/login/verify', '/e/auth/forgot-password/verify', '/e/auth/magic-link/verify'],
+  jsonParser,
   otpVerifyLimiter,
 );
-app.post(['/e/auth/forgot-password', '/e/auth/magic-link'], otpSendLimiter);
+app.post(['/e/auth/forgot-password', '/e/auth/magic-link'], jsonParser, otpSendLimiter);
 
 /**
  * Traffic Director: Sending requests to the right service.
@@ -542,8 +554,17 @@ async function startServer(): Promise<void> {
   });
 }
 
-// Fire up the server!
-startServer().catch((err: Error) => {
-  logger.error('Fatal error during API Gateway startup', { error: err.message, stack: err.stack });
-  process.exit(1);
-});
+// Only auto-start when this file is the process entrypoint (`node dist/app.js` / `ts-node src/app.ts`).
+// Tests import `app` directly and drive it via supertest without opening a real port or
+// connecting RabbitMQ.
+if (require.main === module) {
+  startServer().catch((err: Error) => {
+    logger.error('Fatal error during API Gateway startup', {
+      error: err.message,
+      stack: err.stack,
+    });
+    process.exit(1);
+  });
+}
+
+export { app };

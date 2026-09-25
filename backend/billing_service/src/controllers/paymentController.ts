@@ -57,6 +57,17 @@ export const recordPayment = async (req: Request, res: Response, next: NextFunct
       data: payment,
     });
   } catch (error) {
+    // Postgres unique_violation on uq_payment_idempotency (dataSource.ts) — an exact
+    // duplicate of invoice_id/amount/payment_mode/transaction_date. TypeORM's
+    // QueryFailedError carries the driver's own `code` through onto itself.
+    const pgCode = (error as { code?: string })?.code;
+    if (pgCode === '23505') {
+      res.status(409).json({
+        success: false,
+        message: 'This payment has already been recorded. Please refresh the page.',
+      });
+      return;
+    }
     next(error);
   }
 };

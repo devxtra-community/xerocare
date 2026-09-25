@@ -115,4 +115,10 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Only auto-start when this file is the process entrypoint (`node dist/app.js` / `ts-node src/app.ts`).
+// Tests import `app` directly and drive it via supertest without opening a real port or DB/MQ connections.
+if (require.main === module) {
+  startServer();
+}
+
+export { app };

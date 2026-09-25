@@ -1496,6 +1496,34 @@ async function runPreMigrations() {
     `);
     logger.info('Employee targets and achievements tables ensured.');
 
+    // Dedup guard: on a fresh DB, Source.synchronize() (above) creates employee_targets
+    // straight from the EmployeeTarget entity BEFORE this raw-SQL block runs — so the
+    // UNIQUE(employeeId, targetMonth) declared in the CREATE TABLE IF NOT EXISTS just above
+    // is a no-op (the table already exists by the time this statement runs). The entity now
+    // carries @Unique(['employeeId','targetMonth']) so synchronize() creates the constraint
+    // correctly on a truly fresh DB; this ALTER TABLE is what backfills it onto any database
+    // that already has the table without the constraint (including this same "fresh" DB,
+    // since employeeId/targetMonth are camelCase columns here, not the snake_case shown in
+    // the CREATE TABLE literal above — see column names below).
+    try {
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'uniq_employee_month'
+          ) THEN
+            ALTER TABLE employee_targets
+            ADD CONSTRAINT uniq_employee_month UNIQUE ("employeeId", "targetMonth");
+          END IF;
+        END $$;
+      `);
+      logger.info('Guaranteed uniq_employee_month constraint on employee_targets.');
+    } catch (err) {
+      // A pre-existing duplicate (employeeId, targetMonth) pair from before this fix would
+      // make the ALTER TABLE itself fail — log and keep booting rather than block the whole
+      // service; cleaning up any such existing duplicates is a manual follow-up.
+      logger.warn('Failed to add uniq_employee_month constraint on employee_targets:', err);
+    }
+
     logger.info('Pre-migration enum values and tables added successfully');
 
     // Run legacy status updates
@@ -1539,6 +1567,33 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS is_reversed BOOLEAN NOT NULL DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS reversed_by_id UUID NULL;
     `);
+
+    // Idempotency guard: reject an exact duplicate payment submission (same invoice,
+    // amount, mode, and transaction date) at the database level. Before this, a
+    // double-click on "Record Payment", a resubmit after a dropped response, or any
+    // other exact-duplicate POST /payments/record was accepted twice with nothing to
+    // stop it — see recordPayment()'s own comment for the transactional half of this fix.
+    try {
+      await client.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'uq_payment_idempotency'
+          ) THEN
+            ALTER TABLE payment_transactions
+            ADD CONSTRAINT uq_payment_idempotency
+            UNIQUE (invoice_id, amount, payment_mode, transaction_date);
+          END IF;
+        END $$;
+      `);
+      logger.info('Guaranteed uq_payment_idempotency unique constraint on payment_transactions.');
+    } catch (err) {
+      // A pre-existing exact-duplicate row from before this fix shipped would make the
+      // ALTER TABLE itself fail (Postgres refuses to add a UNIQUE constraint over data
+      // that already violates it) — log and keep booting rather than block the whole
+      // service; cleaning up any such existing duplicates is a manual follow-up, not
+      // something this migration attempts automatically.
+      logger.warn('Failed to add uq_payment_idempotency constraint on payment_transactions:', err);
+    }
 
     // payment_ledgers predates the receiptUrl column in its CREATE TABLE DDL —
     // CREATE TABLE IF NOT EXISTS never adds columns to an existing table, so the

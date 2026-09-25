@@ -29,9 +29,11 @@ export async function startBranchConsumer() {
           status: 'ACTIVE',
         });
       } else if (routingKey === 'branch.updated') {
-        // branch.updated carries only { branchId, updatedFields[], updatedAt } — no field values.
-        // Blindly saving would write undefined into name/location, corrupting the mirror row.
-        // Only update fields that are actually present in the payload.
+        // ven_inv_service's publishBranchUpdated now sends real name/location values
+        // alongside updatedFields/updatedAt (previously it sent only field NAMES, which
+        // this handler had nothing to apply — see BranchUpdatedEvent's own comment).
+        // Still guard on undefined rather than blindly saving the whole event: a partial
+        // update (only one of name/location changed) must not null out the other.
         const branchId = event.branchId || event.id;
         if (!branchId) {
           logger.warn('branch.updated event missing branchId — skipping', event);

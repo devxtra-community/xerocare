@@ -152,7 +152,13 @@ router.post('/tickets/:id/send-quotation', controller.sendQuotation);
 router.post('/tickets/:id/send-completion-bill', controller.sendCompletionBill);
 router.post(
   '/tickets/:id/cancel',
-  requireServiceRole([], false), // Only ADMIN and MANAGER
+  // Only ADMIN and MANAGER. requireServiceRole's ADMIN/MANAGER bypass is itself gated on
+  // its second param (allowManagerAdmin, default true) — this was `false`, which disabled
+  // that exact bypass and left an empty allowedJobs list matching no one, so the route
+  // rejected every caller including ADMIN. `true` (the default) restores the bypass; an
+  // empty allowedJobs still means no EMPLOYEE/FINANCE job qualifies, so it stays
+  // ADMIN/MANAGER-only as intended.
+  requireServiceRole([], true),
   controller.cancelTicket,
 );
 router.get('/technicians', controller.getTechnicians);

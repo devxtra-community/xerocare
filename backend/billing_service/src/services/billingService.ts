@@ -5569,249 +5569,288 @@ export class BillingService {
     },
     userId?: string,
   ): Promise<PaymentTransaction> {
-    const invoice = await this.invoiceRepo.findById(invoiceId);
-    if (!invoice) {
-      throw new AppError('Invoice not found', 404);
-    }
-
-    const isActiveOrInvoiced =
-      invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
-      invoice.status === InvoiceStatus.INVOICED ||
-      invoice.status === InvoiceStatus.PAID;
-
-    const isSecurityDeposit =
-      data.isSecurityDeposit === true || data.remarks?.toLowerCase() === 'security deposit';
-
-    if (
-      !isActiveOrInvoiced &&
-      !isSecurityDeposit &&
-      !invoice.isDirectSale &&
-      !data.bypassStatusCheck
-    ) {
-      throw new AppError(
-        'Payment is only allowed for active contracts/invoiced sales, unless it is a Security Deposit',
-        400,
-      );
-    }
-
-    if (Number(data.amount) <= 0) {
-      throw new AppError('Payment amount must be greater than zero', 400);
-    }
-
-    // Block the whole payment before recording anything: a CASH/BANK payment with no
-    // matching account behind it used to still succeed — the PaymentTransaction, the
-    // ledger, and the invoice's PAID status all get written below regardless of
-    // whether the cashbook posting further down succeeds (that posting is wrapped in
-    // its own best-effort try/catch, and none of these writes share one transaction).
-    // Checking here, before any of that runs, is what actually stops it — a failure
-    // once we're already mid-way through would leave the invoice showing paid with no
-    // real cash movement behind it. CHEQUE payments don't touch cash until cleared
-    // (Accounts → Cheques), so they're validated there instead, not here.
-    const isChequePaymentPreflight = (data.paymentMode ?? '').toUpperCase() === 'CHEQUE';
-    if (invoice.branchId && !isChequePaymentPreflight) {
-      await requireCashAccount(Source, {
-        branchId: invoice.branchId,
-        paymentMode: data.paymentMode,
-      });
-    }
-
-    // Paid-so-far must count both payment tables: payment_transactions (current path)
-    // and payment_ledgers (legacy /payments/record path), so the ledger and the
-    // overpayment guard stay correct for invoices with history in either table.
-    const transactionRepoForSum = Source.getRepository(PaymentTransaction);
-    const { PaymentLedger } = await import('../entities/paymentLedgerEntity');
-    const legacyRepo = Source.getRepository(PaymentLedger);
-    const [priorTxns, legacyRows] = await Promise.all([
-      transactionRepoForSum.find({ where: { invoiceId } }),
-      legacyRepo.find({ where: { invoiceId } }),
-    ]);
-    // Security deposits sit outside the invoice total (refundable caution money),
-    // so they must never count toward invoice settlement.
+    // The paidSoFar read → overpayment guard → PaymentTransaction insert → ledger update
+    // below all run inside one transaction, with the invoice row locked (SELECT ... FOR
+    // UPDATE) for its duration. Without the lock, two concurrent calls for the same
+    // invoice can both read the same pre-payment paidSoFar before either commits, and
+    // both pass the guard — the exact race this comment used to describe before this fix
+    // ("none of these writes share one transaction"). A unique constraint on
+    // payment_transactions(invoice_id, amount, payment_mode, transaction_date) (see
+    // dataSource.ts) is the other half of this fix, rejecting an exact duplicate
+    // submission at the DB level regardless of timing.
     //
-    // The remarks string is a legacy signal: only deposits recorded through the direct
-    // path ever carried it. Deposits approved through the sale-payment workflow get
-    // "Sale payment approved — SPAY-…" instead, so this test missed every one of them
-    // and let them count as settlement. PaymentTransaction now states the fact outright.
-    const isDepositByRemarks = (remarks?: string) =>
-      (remarks ?? '').trim().toLowerCase() === 'security deposit';
-    const isDepositTxn = (t: { remarks?: string; isSecurityDeposit?: boolean }) =>
-      t.isSecurityDeposit === true || isDepositByRemarks(t.remarks);
+    // The cashbook posting/notification further below stay OUTSIDE this transaction on
+    // purpose, unchanged from before — that was already this function's documented
+    // best-effort behavior (a posting failure must never undo a successful payment).
+    const { transaction, invoice, newPaymentInInvoiceCurrency } = await Source.transaction(
+      async (manager) => {
+        const invoice = await manager
+          .getRepository(Invoice)
+          .createQueryBuilder('invoice')
+          .setLock('pessimistic_write')
+          .where('invoice.id = :id', { id: invoiceId })
+          .getOne();
+        if (!invoice) {
+          throw new AppError('Invoice not found', 404);
+        }
 
-    // A prior payment may have been recorded in a currency other than the
-    // invoice's own (paid from a foreign-currency customer bank account) —
-    // convert each to the invoice's currency using its own snapshotted rate
-    // before summing, rather than adding mismatched currencies raw.
-    const invoiceCurrency = invoice.currencyCode || 'AED';
-    const liveRatesForGuard =
-      priorTxns.some((t) => t.currencyCode && t.currencyCode !== invoiceCurrency) ||
-      (data.currencyCode && data.currencyCode !== invoiceCurrency)
-        ? await loadExchangeRates(Source, invoiceCurrency)
-        : null;
-    const toInvoiceCurrencyForGuard = (amount: number, currencyCode?: string, rate?: number) => {
-      if (!currencyCode || currencyCode === invoiceCurrency) return amount;
-      const rates = rate
-        ? new Map([[currencyCode, rate]])
-        : (liveRatesForGuard as Map<string, number>);
-      return convertAmt(amount, currencyCode, invoiceCurrency, rates).value;
-    };
+        const isActiveOrInvoiced =
+          invoice.status === InvoiceStatus.ACTIVE_CONTRACT ||
+          invoice.status === InvoiceStatus.INVOICED ||
+          invoice.status === InvoiceStatus.PAID;
 
-    const paidSoFar =
-      priorTxns
-        .filter((t) => !isDepositTxn(t))
-        .reduce(
-          (sum, t) =>
-            sum +
-            toInvoiceCurrencyForGuard(Number(t.amount), t.currencyCode, t.exchangeRateSnapshot),
-          0,
-        ) +
-      legacyRows
-        .filter((p) => !isDepositByRemarks(p.remarks))
-        .reduce((sum, p) => sum + Number(p.amountPaid), 0);
+        const isSecurityDeposit =
+          data.isSecurityDeposit === true || data.remarks?.toLowerCase() === 'security deposit';
 
-    // This new payment may also be in a foreign currency — convert before comparing.
-    const newPaymentInInvoiceCurrency = toInvoiceCurrencyForGuard(
-      Number(data.amount),
-      data.currencyCode,
-      data.exchangeRate,
-    );
-
-    // Overpayment guard (skipped for security deposits, which sit outside the invoice total).
-    if (!isSecurityDeposit && Number(invoice.totalAmount) > 0) {
-      const pendingBalance = Number(invoice.totalAmount) - paidSoFar;
-      if (newPaymentInInvoiceCurrency > pendingBalance + 0.01) {
-        throw new AppError(
-          `Payment amount (${newPaymentInInvoiceCurrency.toFixed(2)} ${invoiceCurrency}) exceeds pending balance (${pendingBalance.toFixed(2)} ${invoiceCurrency})`,
-          400,
-        );
-      }
-    }
-
-    // Save transaction
-    const transactionRepo = Source.getRepository(PaymentTransaction);
-    const transaction = new PaymentTransaction();
-    transaction.invoiceId = invoiceId;
-    transaction.paymentMode = data.paymentMode;
-    transaction.amount = Number(data.amount);
-    transaction.transactionDate = data.transactionDate
-      ? new Date(data.transactionDate)
-      : new Date();
-    // Auto-generated for Cash/Bank/Card (CASH-20260828-014 style) — always wins over
-    // whatever the caller passed, per the "no manual override" decision; see
-    // generatePaymentReference's own comment. Cheque is untouched (falls back to
-    // whatever the caller sent, normally nothing — its Cheque Number field is its
-    // reference instead).
-    transaction.referenceNumber =
-      (await generatePaymentReference(data.paymentMode, transaction.transactionDate)) ??
-      data.referenceNumber;
-    transaction.recordedBy = userId;
-    transaction.remarks = data.remarks || (isSecurityDeposit ? 'Security Deposit' : undefined);
-    const paymentCurrency = data.currencyCode || invoice.currencyCode || undefined;
-    transaction.currencyCode = paymentCurrency;
-    // Only store a rate when the payment currency genuinely differs from the
-    // invoice's own — otherwise there's nothing to convert and no rate applies.
-    transaction.exchangeRateSnapshot =
-      paymentCurrency && paymentCurrency !== invoice.currencyCode ? data.exchangeRate : undefined;
-    transaction.receiptUrl = data.receiptUrl;
-
-    await transactionRepo.save(transaction);
-
-    // Capture this contract's stable default payment mode from the first real payment
-    // ever recorded (typically the advance) — never overwritten afterward, so later
-    // per-period overrides (e.g. a usage bill paid by Bank instead) don't change what
-    // subsequent periods default back to. Security deposits are excluded (tracked
-    // separately via securityDepositMode) since they aren't the recurring-billing mode.
-    const isFirstRealPayment =
-      !isSecurityDeposit &&
-      priorTxns.filter((t) => !isDepositTxn(t)).length === 0 &&
-      legacyRows.filter((p) => !isDepositByRemarks(p.remarks)).length === 0;
-    if (isFirstRealPayment && !invoice.preferredPaymentMode) {
-      invoice.preferredPaymentMode = data.paymentMode;
-      if ((data.paymentMode ?? '').toUpperCase() === 'CHEQUE' && data.chequeBankName) {
-        invoice.preferredChequeBankName = data.chequeBankName;
-      }
-      await this.invoiceRepo.saveInvoice(invoice);
-    }
-
-    // If active or invoiced or security deposit, we can maintain the ledger.
-    const ledgerRepo = Source.getRepository(InvoiceLedger);
-    let ledger = await ledgerRepo.findOne({ where: { invoiceId } });
-
-    if (!ledger && (isActiveOrInvoiced || isSecurityDeposit)) {
-      ledger = new InvoiceLedger();
-      ledger.invoiceId = invoiceId;
-      ledger.totalAmount = Number(invoice.totalAmount || 0);
-      ledger.paidAmount = 0;
-      ledger.balanceAmount = Number(invoice.totalAmount || 0);
-    }
-
-    if (ledger) {
-      // Re-sync totalAmount from the live invoice every time, not just on first
-      // creation above: a Rent/Lease invoice's totalAmount keeps growing as each new
-      // periodic usage bill accrues (usageService.ts), but an existing ledger row
-      // only ever mirrored it once. Left stale, the invoice could get marked PAID
-      // below (balanceAmount hits 0) while genuinely still owing later periods'
-      // charges the ledger never learned about.
-      ledger.totalAmount = Number(invoice.totalAmount || 0);
-
-      // Recompute from the full payment history (both tables) rather than
-      // incrementing, so ledgers stay correct even for invoices whose earlier
-      // payments went through the legacy path. Security deposits are excluded —
-      // they are refundable money held aside, not settlement of the invoice.
-      // paidSoFar and newPaymentInInvoiceCurrency (computed above, for the
-      // overpayment guard) are both already converted to the invoice's own
-      // currency — using the raw transaction.amount here instead would silently
-      // mix currencies whenever this payment's currency differs from the
-      // invoice's, corrupting paidAmount/balanceAmount and potentially marking
-      // the invoice PAID after only a fraction of its value was received.
-      const round2 = (n: number) => Math.round(n * 100) / 100;
-      ledger.paidAmount = round2(paidSoFar + (isSecurityDeposit ? 0 : newPaymentInInvoiceCurrency));
-      ledger.balanceAmount = Math.max(
-        0,
-        round2(Number(ledger.totalAmount) - Number(ledger.paidAmount)),
-      );
-      await ledgerRepo.save(ledger);
-
-      // Check if invoice is an opening balance entry
-      if (invoice.isOpeningEntry || invoice.type === 'OPENING') {
-        const { OpeningBalanceEntry } = await import('../entities/openingBalanceEntryEntity');
-        const openingBalanceRepo = Source.getRepository(OpeningBalanceEntry);
-        const entry = await openingBalanceRepo.findOne({ where: { invoiceId: invoice.id } });
-        if (entry) {
-          entry.remainingBalance = ledger.balanceAmount;
-          entry.isFullySettled = ledger.balanceAmount === 0;
-          await openingBalanceRepo.save(entry);
-
-          await logAudit(
-            entry.id,
-            'UPDATE',
-            userId || 'SYSTEM',
-            `Updated opening balance entry ${entry.entryNumber}: remaining balance is now QAR ${entry.remainingBalance}.`,
+        if (
+          !isActiveOrInvoiced &&
+          !isSecurityDeposit &&
+          !invoice.isDirectSale &&
+          !data.bypassStatusCheck
+        ) {
+          throw new AppError(
+            'Payment is only allowed for active contracts/invoiced sales, unless it is a Security Deposit',
+            400,
           );
         }
-      }
 
-      // Check if invoice is fully paid (never triggered by a security deposit alone —
-      // deposits are excluded from paidAmount, and zero-total invoices are skipped)
-      if (
-        Number(ledger.totalAmount) > 0 &&
-        ledger.balanceAmount === 0 &&
-        invoice.status !== InvoiceStatus.PAID
-      ) {
-        const oldStatus = invoice.status;
-        invoice.status = InvoiceStatus.PAID;
-        await this.invoiceRepo.save(invoice);
+        if (Number(data.amount) <= 0) {
+          throw new AppError('Payment amount must be greater than zero', 400);
+        }
 
-        // Audit log status change
-        await logAudit(
-          invoice.id,
-          'STATUS_CHANGE',
-          userId || 'SYSTEM',
-          `Invoice fully paid via payment transaction. Status updated to PAID.`,
-          oldStatus,
-          InvoiceStatus.PAID,
+        // Block the whole payment before recording anything: a CASH/BANK payment with no
+        // matching account behind it used to still succeed — the PaymentTransaction, the
+        // ledger, and the invoice's PAID status all get written below regardless of
+        // whether the cashbook posting further down succeeds (that posting is wrapped in
+        // its own best-effort try/catch, and none of these writes share one transaction).
+        // Checking here, before any of that runs, is what actually stops it — a failure
+        // once we're already mid-way through would leave the invoice showing paid with no
+        // real cash movement behind it. CHEQUE payments don't touch cash until cleared
+        // (Accounts → Cheques), so they're validated there instead, not here.
+        const isChequePaymentPreflight = (data.paymentMode ?? '').toUpperCase() === 'CHEQUE';
+        if (invoice.branchId && !isChequePaymentPreflight) {
+          await requireCashAccount(manager, {
+            branchId: invoice.branchId,
+            paymentMode: data.paymentMode,
+          });
+        }
+
+        // Paid-so-far must count both payment tables: payment_transactions (current path)
+        // and payment_ledgers (legacy /payments/record path), so the ledger and the
+        // overpayment guard stay correct for invoices with history in either table.
+        const transactionRepoForSum = manager.getRepository(PaymentTransaction);
+        const { PaymentLedger } = await import('../entities/paymentLedgerEntity');
+        const legacyRepo = manager.getRepository(PaymentLedger);
+        const [priorTxns, legacyRows] = await Promise.all([
+          transactionRepoForSum.find({ where: { invoiceId } }),
+          legacyRepo.find({ where: { invoiceId } }),
+        ]);
+        // Security deposits sit outside the invoice total (refundable caution money),
+        // so they must never count toward invoice settlement.
+        //
+        // The remarks string is a legacy signal: only deposits recorded through the direct
+        // path ever carried it. Deposits approved through the sale-payment workflow get
+        // "Sale payment approved — SPAY-…" instead, so this test missed every one of them
+        // and let them count as settlement. PaymentTransaction now states the fact outright.
+        const isDepositByRemarks = (remarks?: string) =>
+          (remarks ?? '').trim().toLowerCase() === 'security deposit';
+        const isDepositTxn = (t: { remarks?: string; isSecurityDeposit?: boolean }) =>
+          t.isSecurityDeposit === true || isDepositByRemarks(t.remarks);
+
+        // A prior payment may have been recorded in a currency other than the
+        // invoice's own (paid from a foreign-currency customer bank account) —
+        // convert each to the invoice's currency using its own snapshotted rate
+        // before summing, rather than adding mismatched currencies raw.
+        const invoiceCurrency = invoice.currencyCode || 'AED';
+        const liveRatesForGuard =
+          priorTxns.some((t) => t.currencyCode && t.currencyCode !== invoiceCurrency) ||
+          (data.currencyCode && data.currencyCode !== invoiceCurrency)
+            ? await loadExchangeRates(Source, invoiceCurrency)
+            : null;
+        const toInvoiceCurrencyForGuard = (
+          amount: number,
+          currencyCode?: string,
+          rate?: number,
+        ) => {
+          if (!currencyCode || currencyCode === invoiceCurrency) return amount;
+          const rates = rate
+            ? new Map([[currencyCode, rate]])
+            : (liveRatesForGuard as Map<string, number>);
+          return convertAmt(amount, currencyCode, invoiceCurrency, rates).value;
+        };
+
+        const paidSoFar =
+          priorTxns
+            .filter((t) => !isDepositTxn(t))
+            .reduce(
+              (sum, t) =>
+                sum +
+                toInvoiceCurrencyForGuard(Number(t.amount), t.currencyCode, t.exchangeRateSnapshot),
+              0,
+            ) +
+          legacyRows
+            .filter((p) => !isDepositByRemarks(p.remarks))
+            .reduce((sum, p) => sum + Number(p.amountPaid), 0);
+
+        // This new payment may also be in a foreign currency — convert before comparing.
+        const newPaymentInInvoiceCurrency = toInvoiceCurrencyForGuard(
+          Number(data.amount),
+          data.currencyCode,
+          data.exchangeRate,
         );
-      }
-    }
+
+        // Overpayment guard (skipped for security deposits, which sit outside the invoice total).
+        if (!isSecurityDeposit && Number(invoice.totalAmount) > 0) {
+          const pendingBalance = Number(invoice.totalAmount) - paidSoFar;
+          if (newPaymentInInvoiceCurrency > pendingBalance + 0.01) {
+            throw new AppError(
+              `Payment amount (${newPaymentInInvoiceCurrency.toFixed(2)} ${invoiceCurrency}) exceeds pending balance (${pendingBalance.toFixed(2)} ${invoiceCurrency})`,
+              400,
+            );
+          }
+        }
+
+        // Save transaction
+        const transactionRepo = manager.getRepository(PaymentTransaction);
+        const transaction = new PaymentTransaction();
+        transaction.invoiceId = invoiceId;
+        transaction.paymentMode = data.paymentMode;
+        transaction.amount = Number(data.amount);
+        transaction.transactionDate = data.transactionDate
+          ? new Date(data.transactionDate)
+          : new Date();
+        // Auto-generated for Cash/Bank/Card (CASH-20260828-014 style) — always wins over
+        // whatever the caller passed, per the "no manual override" decision; see
+        // generatePaymentReference's own comment. Cheque is untouched (falls back to
+        // whatever the caller sent, normally nothing — its Cheque Number field is its
+        // reference instead).
+        transaction.referenceNumber =
+          (await generatePaymentReference(data.paymentMode, transaction.transactionDate)) ??
+          data.referenceNumber;
+        transaction.recordedBy = userId;
+        transaction.remarks = data.remarks || (isSecurityDeposit ? 'Security Deposit' : undefined);
+        const paymentCurrency = data.currencyCode || invoice.currencyCode || undefined;
+        transaction.currencyCode = paymentCurrency;
+        // Only store a rate when the payment currency genuinely differs from the
+        // invoice's own — otherwise there's nothing to convert and no rate applies.
+        transaction.exchangeRateSnapshot =
+          paymentCurrency && paymentCurrency !== invoice.currencyCode
+            ? data.exchangeRate
+            : undefined;
+        transaction.receiptUrl = data.receiptUrl;
+
+        await transactionRepo.save(transaction);
+
+        // Capture this contract's stable default payment mode from the first real payment
+        // ever recorded (typically the advance) — never overwritten afterward, so later
+        // per-period overrides (e.g. a usage bill paid by Bank instead) don't change what
+        // subsequent periods default back to. Security deposits are excluded (tracked
+        // separately via securityDepositMode) since they aren't the recurring-billing mode.
+        const isFirstRealPayment =
+          !isSecurityDeposit &&
+          priorTxns.filter((t) => !isDepositTxn(t)).length === 0 &&
+          legacyRows.filter((p) => !isDepositByRemarks(p.remarks)).length === 0;
+        if (isFirstRealPayment && !invoice.preferredPaymentMode) {
+          invoice.preferredPaymentMode = data.paymentMode;
+          if ((data.paymentMode ?? '').toUpperCase() === 'CHEQUE' && data.chequeBankName) {
+            invoice.preferredChequeBankName = data.chequeBankName;
+          }
+          // Not this.invoiceRepo.saveInvoice() — that repo isn't manager-aware, and writing
+          // to this same row from a separate connection while our FOR UPDATE lock above is
+          // still held would deadlock against ourselves. Its Proforma effectiveFrom/effectiveTo
+          // preservation is a no-op here anyway: `invoice` is the row this transaction just
+          // locked and read, and we never touch those two fields.
+          await manager.getRepository(Invoice).save(invoice);
+        }
+
+        // If active or invoiced or security deposit, we can maintain the ledger.
+        const ledgerRepo = manager.getRepository(InvoiceLedger);
+        let ledger = await ledgerRepo.findOne({ where: { invoiceId } });
+
+        if (!ledger && (isActiveOrInvoiced || isSecurityDeposit)) {
+          ledger = new InvoiceLedger();
+          ledger.invoiceId = invoiceId;
+          ledger.totalAmount = Number(invoice.totalAmount || 0);
+          ledger.paidAmount = 0;
+          ledger.balanceAmount = Number(invoice.totalAmount || 0);
+        }
+
+        if (ledger) {
+          // Re-sync totalAmount from the live invoice every time, not just on first
+          // creation above: a Rent/Lease invoice's totalAmount keeps growing as each new
+          // periodic usage bill accrues (usageService.ts), but an existing ledger row
+          // only ever mirrored it once. Left stale, the invoice could get marked PAID
+          // below (balanceAmount hits 0) while genuinely still owing later periods'
+          // charges the ledger never learned about.
+          ledger.totalAmount = Number(invoice.totalAmount || 0);
+
+          // Recompute from the full payment history (both tables) rather than
+          // incrementing, so ledgers stay correct even for invoices whose earlier
+          // payments went through the legacy path. Security deposits are excluded —
+          // they are refundable money held aside, not settlement of the invoice.
+          // paidSoFar and newPaymentInInvoiceCurrency (computed above, for the
+          // overpayment guard) are both already converted to the invoice's own
+          // currency — using the raw transaction.amount here instead would silently
+          // mix currencies whenever this payment's currency differs from the
+          // invoice's, corrupting paidAmount/balanceAmount and potentially marking
+          // the invoice PAID after only a fraction of its value was received.
+          const round2 = (n: number) => Math.round(n * 100) / 100;
+          ledger.paidAmount = round2(
+            paidSoFar + (isSecurityDeposit ? 0 : newPaymentInInvoiceCurrency),
+          );
+          ledger.balanceAmount = Math.max(
+            0,
+            round2(Number(ledger.totalAmount) - Number(ledger.paidAmount)),
+          );
+          await ledgerRepo.save(ledger);
+
+          // Check if invoice is an opening balance entry
+          if (invoice.isOpeningEntry || invoice.type === 'OPENING') {
+            const { OpeningBalanceEntry } = await import('../entities/openingBalanceEntryEntity');
+            const openingBalanceRepo = manager.getRepository(OpeningBalanceEntry);
+            const entry = await openingBalanceRepo.findOne({ where: { invoiceId: invoice.id } });
+            if (entry) {
+              entry.remainingBalance = ledger.balanceAmount;
+              entry.isFullySettled = ledger.balanceAmount === 0;
+              await openingBalanceRepo.save(entry);
+
+              await logAudit(
+                entry.id,
+                'UPDATE',
+                userId || 'SYSTEM',
+                `Updated opening balance entry ${entry.entryNumber}: remaining balance is now QAR ${entry.remainingBalance}.`,
+              );
+            }
+          }
+
+          // Check if invoice is fully paid (never triggered by a security deposit alone —
+          // deposits are excluded from paidAmount, and zero-total invoices are skipped)
+          if (
+            Number(ledger.totalAmount) > 0 &&
+            ledger.balanceAmount === 0 &&
+            invoice.status !== InvoiceStatus.PAID
+          ) {
+            const oldStatus = invoice.status;
+            invoice.status = InvoiceStatus.PAID;
+            // Same reason as the preferredPaymentMode save above: manager-scoped, not
+            // this.invoiceRepo, to avoid deadlocking against our own row lock.
+            await manager.getRepository(Invoice).save(invoice);
+
+            // Audit log status change
+            await logAudit(
+              invoice.id,
+              'STATUS_CHANGE',
+              userId || 'SYSTEM',
+              `Invoice fully paid via payment transaction. Status updated to PAID.`,
+              oldStatus,
+              InvoiceStatus.PAID,
+            );
+          }
+        }
+
+        return { transaction, invoice, newPaymentInInvoiceCurrency };
+      },
+    );
 
     // Mirror the receipt into the cashbook / day book and move the cash/bank balance.
     // Best-effort: a posting failure must never break payment recording.

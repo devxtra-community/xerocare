@@ -170,6 +170,11 @@ export class BranchService {
 
     await publishBranchUpdated({
       branchId: id,
+      // Real values, not just field names — branchConsumer.ts (employee_service) applies
+      // these to branches_mirror; previously this only sent `updatedFields` (names), which
+      // the consumer's own patch logic never actually had anything to apply.
+      name: typeof updatePayload.name === 'string' ? updatePayload.name : undefined,
+      location: typeof updatePayload.location === 'string' ? updatePayload.location : undefined,
       updatedFields: Object.keys(updatePayload),
       updatedAt: new Date().toISOString(),
     });
