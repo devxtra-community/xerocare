@@ -2,6 +2,9 @@ node_modules
 dist
 build
 .env
+.env.test
+e2e/.env.test
+reports/
 
 
 # Database dumps — these carry the admin password hash and customer data,
