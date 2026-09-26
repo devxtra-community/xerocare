@@ -2,7 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { getProductById, getAllProducts } from '@/lib/product';
+import {
+  getProductById,
+  getAllProducts,
+  getProductMeterReadings,
+  type MeterReadingEntry,
+} from '@/lib/product';
+import { meterSourceLabel } from '@/lib/machineAllocations';
 import { getServiceContracts, ServiceContract } from '@/lib/serviceContract';
 import { resolveImageUrl } from '@/lib/imageUrl';
 import { getActiveCurrency } from '@/lib/currency';
@@ -17,6 +23,7 @@ import {
   Hash,
   CheckCircle2,
   FileText,
+  Gauge,
 } from 'lucide-react';
 
 interface ProductDetail {
@@ -37,6 +44,8 @@ interface ProductDetail {
   barcode_id?: string;
   hs_code?: string;
   meter_reading?: number;
+  meter_reading_at?: string | null;
+  meter_reading_source?: string | null;
   ownership?: string;
   model?: {
     id: string;
@@ -127,6 +136,7 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
   const [availableQty, setAvailableQty] = useState<number | null>(null);
   const [contracts, setContracts] = useState<ServiceContract[]>([]);
   const [contractsLoading, setContractsLoading] = useState(false);
+  const [meterReadings, setMeterReadings] = useState<MeterReadingEntry[]>([]);
 
   useEffect(() => {
     if (!open || !productId) return;
@@ -177,6 +187,16 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
       })
       .finally(() => {
         if (!cancelled) setContractsLoading(false);
+      });
+
+    // Every reading of this machine, whichever flow took it.
+    setMeterReadings([]);
+    getProductMeterReadings(productId)
+      .then((rows) => {
+        if (!cancelled) setMeterReadings(rows.slice(0, 10));
+      })
+      .catch(() => {
+        if (!cancelled) setMeterReadings([]);
       });
 
     return () => {
@@ -302,7 +322,25 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                   <Field label="Serial No." value={product.serial_no} />
                   <Field label="Barcode ID" value={product.barcode_id} />
                   <Field label="Print Colour" value={product.print_colour?.replace(/_/g, ' ')} />
-                  <Field label="Meter Reading" value={product.meter_reading ?? null} />
+                  <Field
+                    label="Meter Reading"
+                    value={
+                      product.meter_reading != null
+                        ? Number(product.meter_reading).toLocaleString()
+                        : null
+                    }
+                  />
+                  <Field
+                    label="Reading Taken"
+                    value={
+                      [
+                        meterSourceLabel(product.meter_reading_source),
+                        fmtDate(product.meter_reading_at),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || null
+                    }
+                  />
                 </div>
               </div>
 
@@ -359,6 +397,33 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
               )}
 
               {/* ── Service Agreement History ── */}
+              {/* ── Meter Reading History ── one shared reading per machine, fed by
+                  service tickets/contracts and Rent/Lease installation, usage and
+                  replacement alike. */}
+              {meterReadings.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                  <SectionLabel icon={Gauge} label="Meter Reading History" />
+                  <div className="divide-y divide-slate-100">
+                    {meterReadings.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between py-1.5 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-700">
+                            {meterSourceLabel(r.source) ?? r.source}
+                            {r.referenceNo && (
+                              <span className="font-normal text-slate-400"> · {r.referenceNo}</span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-slate-400">{fmtDate(r.readingDate)}</p>
+                        </div>
+                        <span className="shrink-0 font-bold tabular-nums text-slate-800">
+                          {Number(r.totalReading).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(contractsLoading || contracts.length > 0) && (
                 <div className="bg-white rounded-xl border border-slate-100 p-4">
                   <SectionLabel icon={FileText} label="Service Agreement History" />

@@ -132,6 +132,35 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed processed_invoice_items table exists.');
 
+        // Machine meter readings from every side of the system — service tickets, service
+        // contracts, and (pushed from billing_service) Rent/Lease installation, monthly
+        // usage and replacement. products.meter_reading stays the single current value;
+        // this log says which flow took each reading and when. See
+        // helpers/meterReadingHelper.ts.
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS product_meter_readings (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            product_id UUID NULL,
+            serial_no VARCHAR(255) NOT NULL,
+            total_reading INTEGER NOT NULL,
+            bw_a4 INTEGER NULL,
+            bw_a3 INTEGER NULL,
+            color_a4 INTEGER NULL,
+            color_a3 INTEGER NULL,
+            source VARCHAR(40) NOT NULL,
+            reference_id VARCHAR(64) NULL,
+            reference_no VARCHAR(100) NULL,
+            reading_date TIMESTAMP NOT NULL DEFAULT NOW(),
+            recorded_by VARCHAR(64) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_pmr_product ON product_meter_readings(product_id, reading_date DESC);
+          CREATE INDEX IF NOT EXISTS idx_pmr_serial ON product_meter_readings(serial_no);
+          ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS meter_reading_at TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS meter_reading_source VARCHAR(40) NULL;
+        `);
+
         // --- Multi-Currency & Tax: new branch columns ---
         await Source.query(`
           ALTER TABLE branches

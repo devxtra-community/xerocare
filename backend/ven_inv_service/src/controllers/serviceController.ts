@@ -70,6 +70,7 @@ import {
 } from '../helpers/warrantyHelper';
 import { deleteCached } from '../utils/cacheUtil';
 import { randomBytes } from 'crypto';
+import { recordMeterReading, totalFromCounters } from '../helpers/meterReadingHelper';
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET;
 if (!ACCESS_SECRET) {
@@ -981,8 +982,15 @@ export class ServiceController {
               400,
             );
           }
-          product.meter_reading = reportedMeterReading;
-          await productRepo.save(product);
+          // Already validated above — record it as given, with its source.
+          await recordMeterReading({
+            product,
+            total: reportedMeterReading,
+            source: 'SERVICE_TICKET',
+            referenceNo: 'Ticket creation',
+            recordedBy: req.user?.userId ?? null,
+            monotonic: false,
+          });
         }
       }
 
@@ -1471,8 +1479,15 @@ Xerocare Technical Services`;
       // customer later decide about the estimate, so it's never gated on
       // approval status.
       if (diagnosisProduct && meterReading !== undefined && meterReading !== null) {
-        diagnosisProduct.meter_reading = Number(meterReading);
-        await Source.getRepository(Product).save(diagnosisProduct);
+        await recordMeterReading({
+          product: diagnosisProduct,
+          total: Number(meterReading),
+          source: 'SERVICE_DIAGNOSIS',
+          referenceId: ticket.id,
+          referenceNo: ticket.ticketNumber,
+          recordedBy: req.user?.userId ?? null,
+          monotonic: false,
+        });
       }
 
       // Save Diagnosis Report
@@ -2967,8 +2982,15 @@ Xerocare Technical Services`;
             where: { id: ticket.productId },
           });
           if (completionProduct) {
-            completionProduct.meter_reading = Number(meterReading);
-            await Source.getRepository(Product).save(completionProduct);
+            await recordMeterReading({
+              product: completionProduct,
+              total: Number(meterReading),
+              source: 'SERVICE_COMPLETION',
+              referenceId: ticket.id,
+              referenceNo: ticket.ticketNumber,
+              recordedBy: req.user?.userId ?? null,
+              monotonic: false,
+            });
           }
         }
       }
@@ -3489,6 +3511,8 @@ Xerocare Technical Services`;
           currentColorA3?: number;
           warrantyInfo?: unknown;
           currentMeterReading?: number;
+          currentMeterReadingAt?: Date | null;
+          currentMeterReadingSource?: string | null;
         }>;
       }>
     >,
@@ -3514,6 +3538,22 @@ Xerocare Technical Services`;
         for (const alloc of inv.productAllocations || []) {
           const product = alloc.productId ? productById.get(alloc.productId) : undefined;
           alloc.currentMeterReading = product?.meter_reading ?? undefined;
+          alloc.currentMeterReadingAt = product?.meter_reading_at ?? null;
+          alloc.currentMeterReadingSource = product?.meter_reading_source ?? null;
+          // The allocation's own counters are the Rent/Lease side's latest reading. Until
+          // billing has pushed it here (machines read before readings were shared), show
+          // whichever is further along rather than a stale product value.
+          const fromCounters = totalFromCounters({
+            bwA4: alloc.currentBwA4,
+            bwA3: alloc.currentBwA3,
+            colorA4: alloc.currentColorA4,
+            colorA3: alloc.currentColorA3,
+          });
+          if (fromCounters > (Number(alloc.currentMeterReading) || 0)) {
+            alloc.currentMeterReading = fromCounters;
+            alloc.currentMeterReadingAt = null;
+            alloc.currentMeterReadingSource = billType === 'LEASE' ? 'LEASE_USAGE' : 'RENT_USAGE';
+          }
 
           if (billType === 'RENT') {
             alloc.warrantyInfo = { isUnderWarranty: true, fullCoverage: true };
@@ -5291,6 +5331,15 @@ Xerocare Technical Services`;
         description: description ? String(description) : undefined,
       });
       await productRepo.save(product);
+      if (meter) {
+        await recordMeterReading({
+          product,
+          total: Number(meter),
+          source: 'EXTERNAL_REGISTRATION',
+          recordedBy: req.user?.userId ?? null,
+          monotonic: false,
+        });
+      }
 
       res.status(201).json({ success: true, data: product });
     } catch (error) {
@@ -6013,12 +6062,15 @@ Xerocare Technical Services`;
       // Keep the machine's lifetime meter in sync so service tickets validate
       // against the freshest value.
       if (newTotal !== null) {
-        const productRepo = Source.getRepository(Product);
-        const product = await productRepo.findOne({ where: { id: contract.productId } });
-        if (product && (!product.meter_reading || newTotal > product.meter_reading)) {
-          product.meter_reading = newTotal;
-          await productRepo.save(product);
-        }
+        await recordMeterReading({
+          productId: contract.productId,
+          total: newTotal,
+          source: 'SERVICE_CONTRACT',
+          referenceId: contract.id,
+          referenceNo: `${contract.contractType} contract`,
+          readingDate: readingDate ? new Date(readingDate) : new Date(),
+          recordedBy: req.user?.userId ?? null,
+        });
       }
 
       res.status(201).json({ success: true, data: reading });

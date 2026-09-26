@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { syncVisitChargeDecision } from '../utils/serviceTicketSync';
+import { pushMeterReadings, type MeterReadingPush } from '../utils/meterReadingSync';
 import {
   renderReceipt,
   PAGE as RECEIPT_PAGE,
@@ -1718,6 +1719,8 @@ export const stopInstallation = async (req: Request, res: Response, next: NextFu
 
     const isRentLease = request.saleType === 'RENT' || request.saleType === 'LEASE';
     const hasReadings = isRentLease && (bwCount != null || colorCount != null);
+    // Readings taken on site, mirrored to each machine's shared reading once saved.
+    const installReadings: MeterReadingPush[] = [];
 
     if (hasReadings) {
       // Apply initial readings to all InvoiceItems that belong to this invoice
@@ -1764,6 +1767,23 @@ export const stopInstallation = async (req: Request, res: Response, next: NextFu
           alloc.initialColorA3 = alloc.currentColorA3 = Number(colorA3Count);
       }
       if (untouchedAllocations.length > 0) await allocRepo.save(untouchedAllocations);
+      for (const alloc of untouchedAllocations) {
+        installReadings.push({
+          productId: alloc.productId,
+          serialNo: alloc.serialNumber,
+          counters: {
+            bwA4: alloc.currentBwA4,
+            bwA3: alloc.currentBwA3,
+            colorA4: alloc.currentColorA4,
+            colorA3: alloc.currentColorA3,
+          },
+          source: 'INSTALLATION',
+          referenceId: request.invoiceId,
+          referenceNo: request.invoiceNumber ?? null,
+          readingDate: readingTakenDate || new Date(),
+          recordedBy: userId,
+        });
+      }
       if (untouchedAllocations.length < allocations.length) {
         logger.warn(
           'stopInstallation: skipped syncing initial reading onto allocation(s) already advanced by billing',
@@ -1788,6 +1808,7 @@ export const stopInstallation = async (req: Request, res: Response, next: NextFu
     );
     request.status = 'COMPLETED';
     await repo.save(request);
+    await pushMeterReadings(installReadings);
 
     res.json({ success: true, data: request });
   } catch (err) {

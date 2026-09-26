@@ -18,6 +18,11 @@ import { roleMiddleware } from '../middlewares/roleMiddleware';
 import { uploadProductImage } from '../middlewares/uploadProductImage';
 import { r2ViewUrl } from '../utils/r2Url';
 import { Source } from '../config/db';
+import {
+  recordMeterReading,
+  getMeterReadingHistory,
+  METER_READING_SOURCES,
+} from '../helpers/meterReadingHelper';
 
 /**
  * This file handles the Catalog of items we sell and use.
@@ -29,6 +34,64 @@ const productRoute = Router();
 productRoute.get('/inventory-value', getProductInventoryValue);
 productRoute.get('/written-off-value', getWrittenOffProductValue);
 productRoute.get('/deployed-value', getDeployedProductValue);
+
+// --- Meter readings (shared by every side of the system) ---
+
+/**
+ * billing_service pushes Rent/Lease readings here (contract start, installation, monthly
+ * usage, machine replacement) so the machine's one current reading — the one the service
+ * ticket form shows and validates against — moves with them. Batched: a usage record or
+ * a replacement produces several readings at once. Monotonic, so a late or repeated
+ * push can never lower a machine's reading.
+ */
+productRoute.post(
+  '/internal/meter-readings',
+  authMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.headers['x-internal-service'] !== 'billing') {
+        return res.status(401).json({ success: false, message: 'Unauthorized' });
+      }
+      const readings = Array.isArray(req.body?.readings) ? req.body.readings : [];
+      const results = [];
+      for (const r of readings) {
+        if (!METER_READING_SOURCES.includes(r?.source)) continue;
+        if (!r?.productId && !r?.serialNo) continue;
+        results.push(
+          await recordMeterReading({
+            productId: r.productId ?? null,
+            serialNo: r.serialNo ?? null,
+            total: r.total ?? null,
+            counters: r.counters,
+            source: r.source,
+            referenceId: r.referenceId ?? null,
+            referenceNo: r.referenceNo ?? null,
+            readingDate: r.readingDate ?? null,
+            recordedBy: r.recordedBy ?? null,
+            logOnlyIfApplied: !!r.logOnlyIfApplied,
+          }),
+        );
+      }
+      return res.json({ success: true, data: results });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** A machine's reading history across every flow, newest first. */
+productRoute.get(
+  '/:idOrSerial/meter-readings',
+  authMiddleware,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rows = await getMeterReadingHistory(String(req.params.idOrSerial));
+      res.json({ success: true, data: rows });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // --- 1. Basic Product Management ---
 

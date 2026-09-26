@@ -86,6 +86,7 @@ import {
   getExternalMachines as getExternalMachinesShared,
   getContractMachines as getContractMachinesShared,
 } from '@/lib/machineAllocations';
+import { MachineMeterLine } from '@/components/service/MachineMeterLine';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -2996,14 +2997,7 @@ export default function ServiceDashboardPage() {
                                               {machine.effectiveFrom} → {machine.effectiveTo}
                                             </span>
                                           </div>
-                                          {machine.meterReading != null && (
-                                            <div className="col-span-2">
-                                              Last Reading:{' '}
-                                              <span className="font-semibold text-slate-700">
-                                                {machine.meterReading.toLocaleString()}
-                                              </span>
-                                            </div>
-                                          )}
+                                          <MachineMeterLine machine={machine} />
                                         </div>
                                       </div>
                                     ))
@@ -3095,14 +3089,7 @@ export default function ServiceDashboardPage() {
                                               </span>
                                             </div>
                                           )}
-                                          {machine.meterReading != null && (
-                                            <div className="col-span-2">
-                                              Last Reading:{' '}
-                                              <span className="font-semibold text-slate-700">
-                                                {machine.meterReading.toLocaleString()}
-                                              </span>
-                                            </div>
-                                          )}
+                                          <MachineMeterLine machine={machine} />
                                         </div>
                                       </div>
                                     ))
@@ -3196,14 +3183,7 @@ export default function ServiceDashboardPage() {
                                               </div>
                                             )
                                           )}
-                                          {machine.meterReading != null && (
-                                            <div className="col-span-2">
-                                              Last Reading:{' '}
-                                              <span className="font-semibold text-slate-700">
-                                                {machine.meterReading.toLocaleString()}
-                                              </span>
-                                            </div>
-                                          )}
+                                          <MachineMeterLine machine={machine} />
                                         </div>
                                       </div>
                                     ))
@@ -3321,12 +3301,10 @@ export default function ServiceDashboardPage() {
                                               {machine.serialNumber}
                                             </span>
                                           </div>
-                                          <div>
-                                            Current Meter:{' '}
-                                            <span className="font-semibold text-slate-700">
-                                              {machine.meterReading}
-                                            </span>
-                                          </div>
+                                          <MachineMeterLine
+                                            machine={machine}
+                                            label="Current Meter"
+                                          />
                                           {machine.contractType && (
                                             <div className="col-span-2">
                                               Active Contract:{' '}

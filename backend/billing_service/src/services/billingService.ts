@@ -1,5 +1,6 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { In, Raw } from 'typeorm';
+import { pushMeterReadings, type MeterReadingPush } from '../utils/meterReadingSync';
 import { Source } from '../config/dataSource';
 import { resolveBillingCycle } from '../utils/billingPeriod';
 import { logAudit } from './auditLogService';
@@ -2278,6 +2279,8 @@ export class BillingService {
       }
 
       // 2. Process Initial Readings
+      // Mirrored to each machine's shared reading after commit (utils/meterReadingSync).
+      const startReadings: MeterReadingPush[] = [];
       if (itemUpdates && itemUpdates.length > 0) {
         const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
         for (const update of itemUpdates) {
@@ -2346,6 +2349,18 @@ export class BillingService {
                 currentColorA3: item.initialColorA3Count || 0,
               },
             );
+            startReadings.push({
+              productId: item.productId,
+              counters: {
+                bwA4: item.initialBwCount || 0,
+                bwA3: item.initialBwA3Count || 0,
+                colorA4: item.initialColorCount || 0,
+                colorA3: item.initialColorA3Count || 0,
+              },
+              source: 'CONTRACT_START',
+              referenceId: invoice.id,
+              recordedBy: userId,
+            });
           }
         }
       }
@@ -2376,6 +2391,9 @@ export class BillingService {
       const promotedNumber = await promoteQuotationToInvoice(queryRunner.manager, savedInvoice.id);
       if (promotedNumber) savedInvoice.invoiceNumber = promotedNumber;
       await queryRunner.commitTransaction();
+      await pushMeterReadings(
+        startReadings.map((r) => ({ ...r, referenceNo: savedInvoice.invoiceNumber ?? null })),
+      );
 
       // Record Security Deposit — goes through the approval gate, NOT directly to cashbook.
       // Cash/Bank: PENDING SalePaymentRequest (Accounts approval required)
@@ -3578,6 +3596,40 @@ export class BillingService {
           customerId: invoice?.customerId || null,
         }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
       }
+
+      // Both halves of the swap are real readings of real machines: the outgoing unit's
+      // closing count and the incoming unit's opening count. Mirror both to each
+      // machine's shared reading so the service side sees them too.
+      await pushMeterReadings([
+        {
+          productId: oldAllocation.productId,
+          serialNo: oldAllocation.serialNumber,
+          counters: {
+            bwA4: oldAllocation.currentBwA4,
+            bwA3: oldAllocation.currentBwA3,
+            colorA4: oldAllocation.currentColorA4,
+            colorA3: oldAllocation.currentColorA3,
+          },
+          source: 'REPLACEMENT_REMOVED',
+          referenceId: oldAllocation.contractId,
+          referenceNo: invoice?.invoiceNumber ?? null,
+          readingDate: ts,
+        },
+        {
+          productId: newAllocation.productId,
+          serialNo: newAllocation.serialNumber,
+          counters: {
+            bwA4: newAllocation.currentBwA4,
+            bwA3: newAllocation.currentBwA3,
+            colorA4: newAllocation.currentColorA4,
+            colorA3: newAllocation.currentColorA3,
+          },
+          source: 'REPLACEMENT_INSTALLED',
+          referenceId: newAllocation.contractId,
+          referenceNo: invoice?.invoiceNumber ?? null,
+          readingDate: ts,
+        },
+      ]);
 
       return newAllocation;
     } catch (error) {

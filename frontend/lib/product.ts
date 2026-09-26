@@ -34,6 +34,8 @@ export interface Product {
   warranty?: string;
   ownership?: 'RENT' | 'LEASE' | 'SALE' | 'EXTERNAL';
   meter_reading?: number;
+  meter_reading_at?: string | null;
+  meter_reading_source?: string | null;
   customer_id?: string | null;
   /** PRINTER (default, meter-based service) | COMPUTER | OTHER — only PRINTER
    *  uses meter readings and can take SMA/FSMA contracts. */
@@ -206,4 +208,32 @@ export const bulkCreateProducts = async (
     ApiResponse<{ successCount: number; failedRows: { row: number; error: string }[] }>
   >('/i/products/bulk', { rows });
   return response.data.data || { successCount: 0, failedRows: [] };
+};
+
+export interface MeterReadingEntry {
+  id: string;
+  totalReading: number;
+  bwA4: number | null;
+  bwA3: number | null;
+  colorA4: number | null;
+  colorA3: number | null;
+  source: string;
+  referenceId: string | null;
+  referenceNo: string | null;
+  readingDate: string;
+}
+
+/**
+ * A machine's meter readings from every flow (service tickets and contracts, Rent/Lease
+ * installation, usage and replacement), newest first. Silent: the history is an extra on
+ * the product view, never a reason for an error toast.
+ */
+export const getProductMeterReadings = async (
+  productIdOrSerial: string,
+): Promise<MeterReadingEntry[]> => {
+  const response = await api.get<ApiResponse<MeterReadingEntry[]>>(
+    `/i/products/${productIdOrSerial}/meter-readings`,
+    { skipErrorToast: true },
+  );
+  return response.data.data ?? [];
 };

@@ -300,6 +300,8 @@ export interface AssignedProduct {
   warranty_end_date?: string;
   brand?: string;
   meter_reading?: number;
+  meter_reading_at?: string | null;
+  meter_reading_source?: string | null;
 }
 
 export interface CustomerServiceHistory {
