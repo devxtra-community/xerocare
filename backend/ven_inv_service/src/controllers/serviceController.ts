@@ -709,8 +709,14 @@ export class ServiceController {
       limitExceeded: boolean;
       overagePerCopyRate: number;
     } | null;
+    /** True when billing could not be asked whether this machine is on Rent/Lease/Sale. */
+    coverageUnverified: boolean;
   }> {
     let serviceContext = ServiceContext.CHARGEABLE;
+    // Whether the Rent/Lease/Sale lookup actually answered. It used to fail silently and
+    // leave the machine CHARGEABLE — so a billing outage (or a broken query) quoted a
+    // rented machine to the customer with no sign anything had gone wrong.
+    let coverageUnverified = false;
     let contractReferenceId: string | null = null;
     let productId: string | null = null;
     let jobType = JobType.ONSITE;
@@ -756,8 +762,11 @@ export class ServiceController {
           saleInvoice = billingData.saleInvoice;
           leaseInvoice = billingData.leaseInvoice;
           latestAllocation = billingData.latestAllocation;
+        } else {
+          coverageUnverified = true;
         }
       } catch (err) {
+        coverageUnverified = true;
         logger.error('Failed to fetch machine billing context from billing service:', err);
       }
 
@@ -914,6 +923,7 @@ export class ServiceController {
       warrantyInfo,
       machineType,
       contractUsage,
+      coverageUnverified,
     };
   }
 
@@ -962,11 +972,21 @@ export class ServiceController {
         track,
         linkedInvoiceId,
         machineType,
+        coverageUnverified,
       } = await this.determineServiceContextAndJobType(
         serialNumber,
         reportedMeterReading,
         machineTypeInput,
       );
+
+      // Never open a ticket on a guess: a machine we could not check might be on Rent or a
+      // covered Lease, and recording it CHARGEABLE would bill the customer for it.
+      if (coverageUnverified) {
+        throw new AppError(
+          'Could not confirm whether this machine is on a Rent, Lease or Sale contract (billing service did not respond). Please try again in a moment.',
+          503,
+        );
+      }
 
       // Meter readings are printer-only.
       const metered = isMeteredMachine(machineType);
@@ -3680,6 +3700,7 @@ Xerocare Technical Services`;
           warrantyInfo: details.warrantyInfo,
           machineType: details.machineType,
           contractUsage: details.contractUsage,
+          coverageUnverified: details.coverageUnverified,
         },
       });
     } catch (error) {

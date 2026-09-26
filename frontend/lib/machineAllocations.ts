@@ -15,6 +15,8 @@ export interface HistoryAllocation {
   productId?: string;
   modelId?: string;
   serialNumber?: string;
+  /** ALLOCATED while the machine is on the contract; REPLACED / RETURNED once it left. */
+  status?: string;
   currentBwA4?: number;
   currentBwA3?: number;
   currentColorA4?: number;
@@ -141,6 +143,17 @@ export function warrantyDisplayFields(w?: WarrantyInfo) {
  * real state from `effectiveTo` so the picker never labels a lapsed rental
  * "ACTIVE".
  */
+/**
+ * A machine taken off the contract by a replacement (REPLACED) or at contract end
+ * (RETURNED) is back in stock, not rented — it must not read ACTIVE in the picker. Only
+ * the machine still ALLOCATED carries the contract, which is also the only one the
+ * service ticket treats as Rent/Lease-covered.
+ */
+function allocationContractStatus(alloc: HistoryAllocation, inv: HistoryInvoice): string {
+  if (alloc.status && alloc.status !== 'ALLOCATED') return alloc.status;
+  return deriveContractStatus(inv.effectiveTo, inv.contractStatus);
+}
+
 function deriveContractStatus(effectiveTo?: string, rawStatus?: string): string {
   if (effectiveTo) {
     const end = new Date(effectiveTo);
@@ -172,7 +185,7 @@ export function getRentedMachines(
           effectiveFrom: inv.effectiveFrom,
           effectiveTo: inv.effectiveTo,
           monthlyRent: inv.monthlyRent || 0,
-          contractStatus: deriveContractStatus(inv.effectiveTo, inv.contractStatus),
+          contractStatus: allocationContractStatus(alloc, inv),
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
           meterReading: alloc.currentMeterReading,
@@ -232,6 +245,8 @@ export function getLeasedMachines(
           remainingCopies: w.remainingCopies,
           expiredFirst: w.expiredFirst,
           warrantyInfo: alloc.warrantyInfo,
+          // Set only once the machine has left the lease (replaced / returned).
+          contractStatus: alloc.status && alloc.status !== 'ALLOCATED' ? alloc.status : undefined,
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
           meterReading: alloc.currentMeterReading,

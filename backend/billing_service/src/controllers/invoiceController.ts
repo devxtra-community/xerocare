@@ -1219,7 +1219,12 @@ export const getActiveRentAllocations = async (req: Request, res: Response, next
       .createQueryBuilder('pa')
       .innerJoin(Invoice, 'i', 'pa."contractId" = i.id')
       .where('i.type = :type', { type: InvoiceType.PROFORMA })
-      .andWhere('i."billType" = :billType', { billType: BillType.RENT })
+      // saleType identifies a Rent contract; billType is only set on opening-balance
+      // imports, so filtering on it alone returned no rent fleet at all.
+      .andWhere(
+        '(i."billType" = :billType OR (i."billType" IS NULL AND i."saleType" = :saleType))',
+        { billType: BillType.RENT, saleType: 'RENT' },
+      )
       .andWhere('i."contractStatus" = :contractStatus', { contractStatus: ContractStatus.ACTIVE })
       .andWhere('pa.status = :allocStatus', { allocStatus: AllocationStatus.ALLOCATED })
       .select('pa."productId"', 'productId')
@@ -2082,14 +2087,21 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
     const productId = req.params.productId as string;
     const serialNumber = req.query.serialNumber as string;
 
+    // A Rent/Lease contract is identified by saleType. billType is NULL on every contract
+    // created through the normal flow (only opening-balance imports set it), so matching
+    // on billType alone never found a rented or leased machine — every one of them was
+    // quoted as CHARGEABLE on a service ticket. Accept either, as the sale lookup does.
+    //
+    // Only the machine currently ALLOCATED counts: after a replacement the removed unit is
+    // REPLACED and back in stock, and the new unit carries the contract.
     const rentInvoice = await Source.query(
       `
       SELECT i.id, i.type, i."billType", i."contractStatus"
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
-      WHERE i.type = 'PROFORMA' 
-        AND i."billType" = 'RENT' 
-        AND i."contractStatus" = 'ACTIVE' 
+      WHERE i.type = 'PROFORMA'
+        AND (i."billType" = 'RENT' OR (i."billType" IS NULL AND i."saleType" = 'RENT'))
+        AND i."contractStatus" = 'ACTIVE'
         AND pa.status = 'ALLOCATED'
         AND (pa."productId" = $1 OR pa."serialNumber" = $2)
       LIMIT 1;
@@ -2120,12 +2132,13 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
       WHERE i.type = 'PROFORMA'
-        AND i."billType" = 'LEASE'
+        AND (i."billType" = 'LEASE' OR (i."billType" IS NULL AND i."saleType" = 'LEASE'))
         AND i."contractStatus" = 'ACTIVE'
-        AND pa."productId" = $1
+        AND pa.status = 'ALLOCATED'
+        AND (pa."productId" = $1 OR pa."serialNumber" = $2)
       LIMIT 1;
     `,
-      [productId],
+      [productId, serialNumber],
     );
 
     const latestAllocation = await Source.query(

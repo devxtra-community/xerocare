@@ -675,6 +675,8 @@ export const getMachineContext = async (
     limitExceeded: boolean;
     overagePerCopyRate: number;
   } | null;
+  /** Billing could not be asked about Rent/Lease/Sale — the context is not trustworthy. */
+  coverageUnverified?: boolean;
 }> => {
   const params: Record<string, string | number> = {};
   if (meterReading !== undefined && meterReading > 0) params.meterReading = meterReading;

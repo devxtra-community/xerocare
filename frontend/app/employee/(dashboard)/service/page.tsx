@@ -436,6 +436,7 @@ export default function ServiceDashboardPage() {
       limitExceeded: boolean;
       overagePerCopyRate: number;
     } | null;
+    coverageUnverified?: boolean;
   } | null>(null);
 
   const fetchMachineContext = useCallback((serial: string, reading?: number) => {
@@ -3493,12 +3494,26 @@ export default function ServiceDashboardPage() {
                             <span className="text-[10px] text-slate-400 font-normal animate-pulse">
                               Checking coverage...
                             </span>
+                          ) : !machineContextData || machineContextData.coverageUnverified ? (
+                            // Never show CHARGEABLE as a fallback: a machine whose contract
+                            // could not be checked may well be on Rent or a covered Lease.
+                            <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase">
+                              Coverage unknown
+                            </span>
                           ) : (
                             <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full uppercase">
-                              {machineContextData?.serviceContext || 'CHARGEABLE'}
+                              {machineContextData.serviceContext}
                             </span>
                           )}
                         </h4>
+                        {!machineContextLoading &&
+                          (!machineContextData || machineContextData.coverageUnverified) && (
+                            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+                              Could not confirm whether this machine is on a Rent, Lease or Sale
+                              contract. Re-select the machine to try again — the ticket cannot be
+                              created until coverage is confirmed.
+                            </p>
+                          )}
 
                         {machineContextLoading ? (
                           <div className="py-4 text-center text-xs text-slate-400">
