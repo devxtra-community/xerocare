@@ -50,6 +50,7 @@ import {
   FileText,
   X,
   Warehouse as WarehouseIcon,
+  ShieldCheck,
 } from 'lucide-react';
 import { ProductDetailModal } from '@/components/shared/ProductDetailModal';
 import { ChangeMachineModal } from '@/components/employeeComponents/ChangeMachineModal';
@@ -560,24 +561,45 @@ export default function InstallationRequestsPage() {
                                         },
                                       ]
                                     : []),
-                                  // Sometimes the Employee doesn't collect the deposit at
-                                  // conversion — this is the fallback so it's never left
-                                  // uncollected indefinitely.
-                                  ...(isRentLease &&
-                                  (req.securityDepositAmount ?? 0) > 0 &&
-                                  !req.securityDepositCollected
-                                    ? [
-                                        {
-                                          key: 'deposit',
-                                          icon: <SecurityBillMark />,
-                                          label: 'Collect Security Deposit',
-                                          description: 'Record the refundable deposit',
-                                          onClick: () => setDepositTarget(req),
-                                        },
-                                      ]
-                                    : []),
                                 ]}
                               />
+                              {/* Security deposit, always visible on a Rent/Lease job that
+                                  requires one. It used to be a menu entry that simply
+                                  vanished once the Employee had recorded the deposit at
+                                  conversion, so the row gave no sign either way and the
+                                  action read as missing. Now: "Collect Now" when nobody
+                                  has taken it (the fallback so it is never left
+                                  uncollected), and "Collected" once someone has. */}
+                              {isRentLease &&
+                                (req.securityDepositAmount ?? 0) > 0 &&
+                                (req.securityDepositCollected ? (
+                                  <span
+                                    title={
+                                      req.securityDepositStatus === 'APPROVED'
+                                        ? 'Security deposit collected and approved by Finance'
+                                        : 'Security deposit collected — awaiting Finance approval'
+                                    }
+                                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-3 text-[9px] font-black uppercase tracking-widest text-emerald-700 ring-1 ring-emerald-200"
+                                  >
+                                    <ShieldCheck size={12} />
+                                    Deposit Collected
+                                    {req.securityDepositStatus !== 'APPROVED' && (
+                                      <span className="font-bold normal-case tracking-normal text-emerald-600/80">
+                                        (awaiting approval)
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDepositTarget(req)}
+                                    title={`Collect the ${Number(req.securityDepositAmount).toFixed(2)} refundable security deposit`}
+                                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full border-2 border-slate-800 bg-amber-400 px-3 text-[9px] font-black uppercase tracking-widest text-slate-900 transition-colors hover:bg-amber-500 active:translate-y-px"
+                                  >
+                                    <SecurityBillMark size={16} />
+                                    Collect Deposit Now
+                                  </button>
+                                ))}
                               {req.status === 'ASSIGNED' && (
                                 <button
                                   type="button"

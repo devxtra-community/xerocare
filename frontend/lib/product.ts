@@ -166,8 +166,11 @@ export const deleteProduct = async (id: string): Promise<void> => {
  * @param id The ID of the product to retrieve
  * @returns The Product object
  */
-export const getProductById = async (id: string): Promise<Product> => {
-  const response = await api.get<ApiResponse<Product>>(`/i/products/${id}`);
+/** `silent` suppresses the global error toast for callers that handle a miss themselves. */
+export const getProductById = async (id: string, opts?: { silent?: boolean }): Promise<Product> => {
+  const response = await api.get<ApiResponse<Product>>(`/i/products/${id}`, {
+    skipErrorToast: opts?.silent,
+  });
   if (!response.data.data) {
     throw new Error('Product not found');
   }

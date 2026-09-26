@@ -142,6 +142,11 @@ export function QuotationConversionFlow({
   // here. handleConfirm already forced the rent portion to 0 for Arrears, so a figure
   // typed into that card was silently discarded: the field looked collectable and wasn't.
   const isArrearsBilling = quotation.paymentTiming === 'ARREARS';
+  // This step is shared by every conversion. "First month advance" only means something
+  // for a Rent/Lease contract; on a product Sale the same amount is an advance payment
+  // against the sale invoice, so the wording must follow the sale type.
+  const isRentalContract = quotation.saleType === 'RENT' || quotation.saleType === 'LEASE';
+  const advanceLabel = isRentalContract ? 'First Month Advance' : 'Advance Payment';
   const prefilledAdvance = isArrearsBilling ? 0 : Number(quotation.advanceAmount || 0);
   const [advanceAmount, setAdvanceAmount] = useState(
     prefilledAdvance > 0 ? String(prefilledAdvance) : '',
@@ -355,12 +360,12 @@ export function QuotationConversionFlow({
       const hasAdvance = advanceBase > 0;
       const hasCaution = cautionAmount && Number(cautionAmount) > 0;
       if (hasAdvance && hasCaution) {
-        successMsg += ` ${accessoryTotal > 0 ? 'Advance + Accessories' : 'First Month Advance'} ${currency} ${advanceInclTax.toFixed(2)} and Security Deposit ${currency} ${Number(cautionAmount).toFixed(2)} recorded as separate transactions pending Finance approval.`;
+        successMsg += ` ${accessoryTotal > 0 ? 'Advance + Accessories' : advanceLabel} ${currency} ${advanceInclTax.toFixed(2)} and Security Deposit ${currency} ${Number(cautionAmount).toFixed(2)} recorded as separate transactions pending Finance approval.`;
       } else if (hasAdvance) {
         successMsg +=
           paymentMode === 'CHEQUE'
             ? ` Cheque recorded (PENDING) — go to Accounts → Cheques to deposit when cleared.`
-            : ` ${accessoryTotal > 0 ? 'Advance + Accessories' : 'First Month Advance'} ${currency} ${advanceInclTax.toFixed(2)} recorded.`;
+            : ` ${accessoryTotal > 0 ? 'Advance + Accessories' : advanceLabel} ${currency} ${advanceInclTax.toFixed(2)} recorded.`;
       } else if (hasCaution) {
         successMsg += ` Security Deposit ${currency} ${Number(cautionAmount).toFixed(2)} recorded as a separate transaction pending Finance approval.`;
       }
@@ -428,7 +433,7 @@ export function QuotationConversionFlow({
               Serial Numbers
             </span>
             <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
-              Advance & Deposit
+              {isRentalContract ? 'Advance & Deposit' : 'Payment'}
             </span>
             <span className="text-[9px] font-black uppercase tracking-widest opacity-70">
               Confirm
@@ -556,13 +561,15 @@ export function QuotationConversionFlow({
                       <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
                       {isArrearsBilling
                         ? 'Accessories Collection'
-                        : 'First Month Advance Payment (Optional)'}
+                        : `${isRentalContract ? 'First Month Advance Payment' : 'Advance Payment'} (Optional)`}
                     </h4>
                   </div>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide leading-relaxed">
                     {isArrearsBilling
                       ? 'This contract bills in arrears — no first month advance is collected. Only the accessories supplied with the machine are charged now.'
-                      : 'Record first month advance payment to initialize the ledger and activate the contract.'}
+                      : isRentalContract
+                        ? 'Record first month advance payment to initialize the ledger and activate the contract.'
+                        : 'Record any amount the customer pays now towards this sale. Leave it at 0 if nothing is collected yet — the balance stays outstanding on the invoice.'}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
@@ -869,7 +876,7 @@ export function QuotationConversionFlow({
                   </h4>
                   {rentAdvancePortion > 0 && (
                     <div className="flex justify-between text-[11px] font-bold">
-                      <span className="text-slate-500">First Month Advance</span>
+                      <span className="text-slate-500">{advanceLabel}</span>
                       <span className="text-slate-800">
                         {currency} {rentAdvancePortion.toFixed(2)}
                       </span>
@@ -963,9 +970,7 @@ export function QuotationConversionFlow({
                 </div>
                 {rentAdvancePortion > 0 && (
                   <div className="flex justify-between text-[11px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-widest">
-                      First Month Advance
-                    </span>
+                    <span className="text-slate-400 uppercase tracking-widest">{advanceLabel}</span>
                     <span className="text-emerald-600 font-black">
                       {currency} {rentAdvancePortion.toFixed(2)}
                     </span>

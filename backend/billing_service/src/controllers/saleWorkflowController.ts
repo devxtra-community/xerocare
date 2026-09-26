@@ -1540,6 +1540,10 @@ export const getInstallationRequestsForBranch = async (
       .filter(Boolean);
     const depositAmountMap = new Map<string, number>();
     const depositCollectedSet = new Set<string>();
+    // PENDING while Finance has not yet approved the recorded deposit, APPROVED after.
+    // Lets the technician's row say "Collected — awaiting Finance approval" rather than
+    // showing nothing at all, which read as though the Collect action were missing.
+    const depositStatusMap = new Map<string, 'PENDING' | 'APPROVED'>();
     if (rentLeaseIds.length > 0) {
       const [invoices, depositPayments] = await Promise.all([
         Source.getRepository(Invoice).find({
@@ -1561,6 +1565,9 @@ export const getInstallationRequestsForBranch = async (
       }
       for (const p of depositPayments) {
         depositCollectedSet.add(p.invoiceId);
+        if (p.status === 'APPROVED' || !depositStatusMap.has(p.invoiceId)) {
+          depositStatusMap.set(p.invoiceId, p.status === 'APPROVED' ? 'APPROVED' : 'PENDING');
+        }
       }
     }
 
@@ -1574,6 +1581,7 @@ export const getInstallationRequestsForBranch = async (
         currentModelId: alloc?.modelId ?? null,
         securityDepositAmount: requiredDeposit,
         securityDepositCollected: depositCollectedSet.has(r.invoiceId),
+        securityDepositStatus: depositStatusMap.get(r.invoiceId) ?? null,
       };
     });
     res.json({ success: true, data: enriched });

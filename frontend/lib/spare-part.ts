@@ -85,9 +85,17 @@ export const getAvailableSparePartsByModel = async (modelId: string): Promise<Sp
 
 /**
  * Retrieves a single spare part by its ID.
+ *
+ * `silent` suppresses the global error toast — for callers that probe an id which may
+ * legitimately belong to a product instead, and handle the miss themselves.
  */
-export const getSparePartById = async (id: string): Promise<SparePart> => {
-  const response = await api.get<ApiResponse<SparePart>>(`/i/spare-parts/${id}`);
+export const getSparePartById = async (
+  id: string,
+  opts?: { silent?: boolean },
+): Promise<SparePart> => {
+  const response = await api.get<ApiResponse<SparePart>>(`/i/spare-parts/${id}`, {
+    skipErrorToast: opts?.silent,
+  });
   if (!response.data.data) {
     throw new Error('Spare part not found');
   }

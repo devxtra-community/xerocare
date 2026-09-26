@@ -77,6 +77,8 @@ export interface InstallationRequest {
    *  SalePaymentRequest exists for this contract — gates the "Collect Security Deposit"
    *  action so it only shows when one is actually needed and missing. */
   securityDepositCollected?: boolean;
+  /** PENDING = recorded, awaiting Finance approval; APPROVED = approved; null = none. */
+  securityDepositStatus?: 'PENDING' | 'APPROVED' | null;
 }
 
 export interface SalePaymentRequest {
