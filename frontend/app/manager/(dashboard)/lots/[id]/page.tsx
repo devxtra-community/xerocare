@@ -1529,6 +1529,8 @@ export default function LotDetailPage() {
           open={showCostModal}
           onOpenChange={(open) => setShowCostModal(open)}
           purchaseId={purchaseRecord.id}
+          purchaseRef={lot?.lotNumber}
+          vendorName={lot?.vendor?.name}
           onSuccess={() => {
             fetchPurchase();
             setShowCostModal(false);

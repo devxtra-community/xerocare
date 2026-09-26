@@ -405,7 +405,13 @@ export default function AddPaymentModal({
                   <button
                     key={o.key}
                     type="button"
-                    onClick={() => setPayFor(o.key)}
+                    onClick={() => {
+                      setPayFor(o.key);
+                      // Cheque is not offered for a cost (see the method list below).
+                      if (o.key === 'COST' && formData.paymentMethod === 'Cheque') {
+                        setFormData({ ...formData, paymentMethod: 'Bank Transfer' });
+                      }
+                    }}
                     className={`rounded-xl border px-3 py-2 text-left transition ${
                       payFor === o.key
                         ? 'border-blue-600 bg-blue-50 ring-1 ring-blue-600'
@@ -559,11 +565,16 @@ export default function AddPaymentModal({
                   <SelectValue placeholder="Select method" />
                 </SelectTrigger>
                 <SelectContent>
-                  {['Bank Transfer', 'Cash', 'Credit Card', 'Cheque', 'Online Payment'].map((m) => (
-                    <SelectItem key={m} value={m} className="text-xs">
-                      {m}
-                    </SelectItem>
-                  ))}
+                  {/* No Cheque for an additional cost: a Manager's cheque skips the Finance
+                      approval queue, and a cleared purchase cheque settles the vendor's
+                      invoice rather than recording a cost line. */}
+                  {['Bank Transfer', 'Cash', 'Credit Card', 'Cheque', 'Online Payment']
+                    .filter((m) => !(payFor === 'COST' && m === 'Cheque'))
+                    .map((m) => (
+                      <SelectItem key={m} value={m} className="text-xs">
+                        {m}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

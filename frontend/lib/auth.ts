@@ -1,4 +1,5 @@
 import api from './api';
+import { clearQueryCache } from './queryCache';
 import { jwtDecode } from 'jwt-decode';
 import { EmployeeJob } from './employeeJob';
 import { FinanceJob } from './financeJob';
@@ -60,6 +61,8 @@ export async function verifyLoginOtp(email: string, otp: string) {
     email,
     otp,
   });
+  // A different identity may be signing in — never serve the previous one's cache.
+  clearQueryCache();
   localStorage.setItem('accessToken', res.data.accessToken);
   setAccessTokenCookie(res.data.accessToken);
   await initBranchCurrency();
@@ -82,6 +85,8 @@ export async function requestMagicLink(email: string) {
  */
 export async function verifyMagicLink(token: string) {
   const res = await api.post('/e/auth/magic-link/verify', { token });
+  // A different identity may be signing in — never serve the previous one's cache.
+  clearQueryCache();
   localStorage.setItem('accessToken', res.data.accessToken);
   setAccessTokenCookie(res.data.accessToken);
   await initBranchCurrency();
@@ -121,6 +126,7 @@ export async function logout() {
     const res = await api.post('/e/auth/logout');
     if (res.data.success) {
       localStorage.clear();
+      clearQueryCache();
       clearAccessTokenCookie();
       clearActiveCurrency();
       clearBranchTaxPercent();
@@ -142,6 +148,8 @@ export async function adminLogin(email: string, password: string) {
     email,
     password,
   });
+  // A different identity may be signing in — never serve the previous one's cache.
+  clearQueryCache();
   localStorage.setItem('accessToken', res.data.accessToken);
   setAccessTokenCookie(res.data.accessToken);
   return res.data;

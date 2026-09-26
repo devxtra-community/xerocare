@@ -814,6 +814,20 @@ export default function AccountsPayablePage() {
     [employeeRequests],
   );
 
+  // A Branch Manager's additional cost on a purchase lot (Shipping, Labour, Customs…).
+  // Raised into the approval queue rather than written to the lot, so this is the only
+  // place it exists until Finance acts on it. Rejected requests never happened.
+  const purchaseCostRequests = useMemo(
+    () =>
+      employeeRequests.filter(
+        (r) =>
+          r.requestSource === 'MANAGER_PURCHASE' &&
+          !!r.purchaseCostType &&
+          (r.status === 'SUBMITTED' || r.status === 'PENDING' || r.status === 'PAID'),
+      ),
+    [employeeRequests],
+  );
+
   const { data: accounts = [] } = useQuery({
     queryKey: ['cash-bank-accounts'],
     queryFn: () => fetchCashBankAccounts(),
@@ -958,10 +972,40 @@ export default function AccountsPayablePage() {
       isPendingApproval: true,
       source: 'Employee Claim' as const,
     }));
+    // Additional purchase costs, labelled with what Finance needs to judge them: the cost
+    // type, the vendor whose lot it belongs to, and the lot number as the reference.
+    // Awaiting approval → shown but kept out of the totals (same guard as employee
+    // claims). Once approved the cash was paid at approval, so it reads as settled
+    // (outstanding 0); the cost itself now sits inside the purchase order's amount, which
+    // is why the approved row is also kept out of the charts (see chartRows).
+    const fromPurchaseCosts = purchaseCostRequests.map((r) => {
+      const paid = r.status === 'PAID';
+      return {
+        id: `cost-${r.id}`,
+        referenceNo: r.purchaseRef || r.requestNo,
+        type: 'EXPENSE_PAYABLE',
+        payableTo: `${r.purchaseCostType} — ${r.vendorName || 'Vendor'}`,
+        amount: Number(r.amount),
+        currency: r.currency,
+        issueDate: String(r.date),
+        dueDate: String(r.date),
+        amountPaid: paid ? Number(r.amount) : 0,
+        outstanding: paid ? 0 : Number(r.amount),
+        status: paid ? 'PAID' : 'AWAITING APPROVAL',
+        branchId: r.branchId,
+        aging: r.date ? agingBucket(String(r.date)) : 'Current',
+        isPurchase: false,
+        isExpense: true,
+        isVat: false,
+        isPendingApproval: !paid,
+        source: 'Purchase Cost' as const,
+      };
+    });
     return [
       ...fromManual,
       ...fromExpenses,
       ...fromPendingExpenses,
+      ...fromPurchaseCosts,
       ...fromPurchases,
       ...fromInputVat,
     ];
@@ -970,6 +1014,7 @@ export default function AccountsPayablePage() {
     manualPayables,
     expenseEntries,
     pendingEmployeeExpenses,
+    purchaseCostRequests,
     inputVatPayable,
     currentUser?.branchId,
     currency,
@@ -1068,7 +1113,11 @@ export default function AccountsPayablePage() {
     // Charts describe the vendor liability, so they read the same filtered set the
     // totals do — a tax row in "Top vendors" would name a tax as if it were a supplier
     // we owe money to.
-    const chartRows = allPayables.filter((p) => !p.isVat && !p.isPendingApproval);
+    // An approved purchase cost is already inside its purchase order's amount, so
+    // charting it again would count that spend twice.
+    const chartRows = allPayables.filter(
+      (p) => !p.isVat && !p.isPendingApproval && p.source !== 'Purchase Cost',
+    );
     const typeMap: Record<string, number> = {};
     chartRows.forEach((p) => {
       typeMap[p.type] = (typeMap[p.type] ?? 0) + (p.outstanding ?? 0);
@@ -1114,7 +1163,9 @@ export default function AccountsPayablePage() {
       [
         ...new Set(
           allPayables
-            .filter((p) => p.source !== 'Accrued Expense' && !p.isVat)
+            .filter(
+              (p) => p.source !== 'Accrued Expense' && p.source !== 'Purchase Cost' && !p.isVat,
+            )
             .map((p) => p.payableTo),
         ),
       ]
@@ -1279,7 +1330,7 @@ export default function AccountsPayablePage() {
               <StatCard
                 title="Awaiting Approval"
                 value={formatCurrency(awaitingApproval, currency)}
-                subtitle="Employee claims — not yet a liability"
+                subtitle="Employee claims & purchase costs — not yet a liability"
               />
               {AGING_BUCKETS.map((b) => (
                 <StatCard
@@ -1443,6 +1494,7 @@ export default function AccountsPayablePage() {
                       <SelectItem value="Manual Entry">Manual Entry</SelectItem>
                       <SelectItem value="Accrued Expense">Accrued Expense</SelectItem>
                       <SelectItem value="Employee Claim">Employee Claim</SelectItem>
+                      <SelectItem value="Purchase Cost">Purchase Cost</SelectItem>
                       <SelectItem value="Input VAT">Input VAT</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1613,7 +1665,9 @@ export default function AccountsPayablePage() {
                                   ? 'bg-slate-100 text-slate-700 border-slate-200'
                                   : p.source === 'Input VAT'
                                     ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
-                                    : 'bg-purple-50 text-purple-700 border-purple-200'
+                                    : p.source === 'Purchase Cost'
+                                      ? 'bg-orange-50 text-orange-700 border-orange-200'
+                                      : 'bg-purple-50 text-purple-700 border-purple-200'
                             }`}
                           >
                             {p.source}
@@ -1668,6 +1722,15 @@ export default function AccountsPayablePage() {
                               <span className="text-[10px] text-muted-foreground italic pl-1.5">
                                 Settled from Tax
                               </span>
+                            ) : p.source === 'Purchase Cost' ? (
+                              /* Approved and rejected on Payments, where the request's
+                                 lot, vendor, account and proof are shown. */
+                              <button
+                                onClick={() => switchTab('payments')}
+                                className="text-[10px] font-semibold text-blue-600 hover:underline pl-1.5"
+                              >
+                                {p.isPendingApproval ? 'Review in Payments' : 'View in Payments'}
+                              </button>
                             ) : p.isPendingApproval ? (
                               /* No expense entry exists until Accounts approves the claim,
                                  so there is nothing to open or to pay against yet. */
@@ -1696,6 +1759,7 @@ export default function AccountsPayablePage() {
                             {!p.isPurchase &&
                               !p.isVat &&
                               !p.isPendingApproval &&
+                              p.source !== 'Purchase Cost' &&
                               (p.outstanding ?? 0) > 0 && (
                                 <button
                                   onClick={() => {

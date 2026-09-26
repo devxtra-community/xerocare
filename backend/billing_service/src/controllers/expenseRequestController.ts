@@ -715,7 +715,8 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
                     description:
                       request.description ||
                       `${request.purchaseCostType} — ${request.purchaseRef || request.requestNo}`,
-                    costDate: new Date().toISOString().split('T')[0],
+                    // The date the Manager incurred the cost, not the approval date.
+                    costDate: new Date(request.date ?? new Date()).toISOString().split('T')[0],
                     createdBy: userId,
                     attachmentUrl: request.receiptUrl,
                   }
@@ -1220,6 +1221,21 @@ export const createManagerPurchasePaymentRequest = async (
       throw new AppError('purchaseId, amount, and paymentMethod are required', 400);
     }
 
+    // An additional cost must wait for Finance like any other Manager spend. The Cheque
+    // branch below skips the approval queue entirely, and its ISSUED cheque is tagged
+    // sourceType PURCHASE — which on clearance records a *vendor* payment, settling the
+    // vendor's invoice with money that went to a freight forwarder or labourer.
+    const isChequeMethod =
+      String(paymentMethod ?? '')
+        .trim()
+        .toUpperCase() === 'CHEQUE';
+    if (purchaseCostType && isChequeMethod) {
+      throw new AppError(
+        'Additional costs can be paid by Cash or Bank Transfer only, so they go through Finance approval',
+        400,
+      );
+    }
+
     const empInfo = await fetchEmployeeInfo(userId);
     const managerName = empInfo?.name || 'Branch Manager';
     const empBranchId = empInfo?.branchId || branchId || '';
@@ -1257,6 +1273,11 @@ export const createManagerPurchasePaymentRequest = async (
     // clearing (chequesRoutes /:id/clear) for Cheque — see purchaseOrigin lookup below,
     // which no longer depends on record-payment's response.
     let purchaseOrigin: string | undefined;
+    // Vendor and lot number are filled in from the purchase itself when the form did not
+    // send them (Add Cost is opened from screens that only know the purchase id), so
+    // Finance always sees which vendor's lot the request belongs to.
+    let resolvedVendorName: string | undefined = vendorName || undefined;
+    let resolvedPurchaseRef: string | undefined = purchaseRef || undefined;
     try {
       const venInvUrl = process.env.VEN_INV_SERVICE_URL || 'http://localhost:3003';
       const serviceToken = makeServiceToken();
@@ -1265,7 +1286,14 @@ export const createManagerPurchasePaymentRequest = async (
       });
       if (purchaseRes.ok) {
         const purchaseData = await purchaseRes.json();
-        purchaseOrigin = (purchaseData.data ?? purchaseData)?.purchaseOrigin;
+        const p = (purchaseData.data ?? purchaseData) as {
+          purchaseOrigin?: string;
+          vendor?: { name?: string };
+          lot?: { lotNumber?: string };
+        };
+        purchaseOrigin = p?.purchaseOrigin;
+        resolvedVendorName = resolvedVendorName || p?.vendor?.name || undefined;
+        resolvedPurchaseRef = resolvedPurchaseRef || p?.lot?.lotNumber || undefined;
       }
     } catch {
       /* origin enrichment is best-effort, same as the old record-payment response path */
@@ -1281,11 +1309,7 @@ export const createManagerPurchasePaymentRequest = async (
     // the register, no dates, no reminder, no clear/bounce lifecycle) AND had the bank
     // debited immediately, before the cheque had cleared. The cheque-handling code here was
     // correct all along; it simply never ran.
-    if (
-      String(paymentMethod ?? '')
-        .trim()
-        .toUpperCase() === 'CHEQUE'
-    ) {
+    if (isChequeMethod) {
       const chequeRepo = Source.getRepository(Cheque);
       const chequeNo = chequeNumber || referenceNumber || `CHQ-${Date.now()}`;
       const existing = await chequeRepo.findOne({ where: { chequeNo, branchId: empBranchId } });
@@ -1293,7 +1317,7 @@ export const createManagerPurchasePaymentRequest = async (
         const cheque = chequeRepo.create({
           chequeNo,
           bankName: chequeBankName || undefined,
-          partyName: vendorName || 'Vendor',
+          partyName: resolvedVendorName || 'Vendor',
           amount: parseFloat(String(amount)),
           dueDate: chequeDueDate ? new Date(chequeDueDate) : new Date(),
           chequeDate: chequeDueDate ? new Date(chequeDueDate) : new Date(),
@@ -1301,11 +1325,12 @@ export const createManagerPurchasePaymentRequest = async (
           type: 'ISSUED',
           status: 'PENDING',
           description:
-            description || `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`,
+            description ||
+            `Vendor payment — ${resolvedVendorName || 'vendor'} (${resolvedPurchaseRef || 'N/A'})`,
           branchId: empBranchId,
           sourceType: 'PURCHASE',
           sourceReferenceId: purchaseId,
-          sourceLabel: purchaseRef ? `Purchase ${purchaseRef}` : 'Purchase Order',
+          sourceLabel: resolvedPurchaseRef ? `Purchase ${resolvedPurchaseRef}` : 'Purchase Order',
           createdBy: userId,
         });
         await chequeRepo.save(cheque);
@@ -1344,16 +1369,16 @@ export const createManagerPurchasePaymentRequest = async (
       description:
         description ||
         (purchaseCostType
-          ? `${purchaseCostType} cost — ${purchaseRef || 'purchase'} (${vendorName || 'vendor'} lot)`
-          : `Vendor payment — ${vendorName || 'vendor'} (${purchaseRef || 'N/A'})`),
+          ? `${purchaseCostType} cost — ${resolvedPurchaseRef || 'purchase'} (${resolvedVendorName || 'vendor'} lot)`
+          : `Vendor payment — ${resolvedVendorName || 'vendor'} (${resolvedPurchaseRef || 'N/A'})`),
       amount: parseFloat(String(amount)),
       currency: currency || 'AED',
       status: 'SUBMITTED',
       submittedAt: new Date(),
       requestSource: 'MANAGER_PURCHASE',
       purchaseId,
-      purchaseRef: purchaseRef || undefined,
-      vendorName: vendorName || undefined,
+      purchaseRef: resolvedPurchaseRef,
+      vendorName: resolvedVendorName,
       purchaseOrigin: purchaseOrigin || undefined,
       purchaseCostType: purchaseCostType || undefined,
       receiptUrl: proofUrl,
@@ -1372,10 +1397,16 @@ export const createManagerPurchasePaymentRequest = async (
     for (const fmId of fmIds) {
       await sendNotification(
         fmId,
-        'Purchase Payment — Approval Required',
-        `${managerName} requests ${currency || 'AED'} ${parseFloat(String(amount)).toFixed(2)} payment to ${vendorName || 'vendor'} via ${paymentMethod}. Cash held until you approve.`,
+        purchaseCostType
+          ? 'Purchase Additional Cost — Approval Required'
+          : 'Purchase Payment — Approval Required',
+        purchaseCostType
+          ? `${managerName} added a ${purchaseCostType} cost of ${currency || 'AED'} ${parseFloat(String(amount)).toFixed(2)} on lot ${resolvedPurchaseRef || 'N/A'} (${resolvedVendorName || 'vendor'}) via ${paymentMethod}. It is added to the lot and cash deducted only when you approve.`
+          : `${managerName} requests ${currency || 'AED'} ${parseFloat(String(amount)).toFixed(2)} payment to ${resolvedVendorName || 'vendor'} via ${paymentMethod}. Cash held until you approve.`,
         'EXPENSE_REQUEST',
-        '/finance/accounts/expenses?tab=requests',
+        // Manager purchase requests (vendor payments and additional costs) are reviewed
+        // on Payables → Payments, not the Expenses requests list, which filters them out.
+        '/finance/accounts/payable?tab=payments',
       );
     }
 

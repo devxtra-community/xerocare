@@ -16,7 +16,15 @@ import {
 import { purchaseService, AddCostDto } from '@/services/purchaseService';
 import { getMyBranch } from '@/lib/branch';
 import { toast } from 'sonner';
-import { Calendar, FileText, Banknote, Paperclip, X } from 'lucide-react';
+import { Calendar, FileText, Banknote, Paperclip, X, CreditCard } from 'lucide-react';
+import {
+  fetchCashBankAccounts,
+  filterAccountsByPaymentMode,
+  accountTypeForPaymentMode,
+  insufficientBalanceError,
+} from '@/lib/finance/accountsApi';
+import { createManagerPurchasePaymentRequest } from '@/lib/employeeExpenses';
+import { getUserFromToken } from '@/lib/auth';
 
 import { getActiveCurrency } from '@/lib/currency';
 
@@ -27,15 +35,34 @@ interface AddCostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   purchaseId: string;
+  /** Lot number, shown to Finance on the approval request. Resolved server-side from the
+   *  purchase when omitted. */
+  purchaseRef?: string;
+  vendorName?: string;
   onSuccess: () => void;
 }
+
+// Cheque is deliberately absent: a Manager's cheque skips the Finance approval queue, and
+// a cleared purchase cheque settles the vendor's invoice instead of recording a cost.
+const MANAGER_COST_PAYMENT_METHODS = ['Bank Transfer', 'Cash'];
 
 export default function AddCostModal({
   open,
   onOpenChange,
   purchaseId,
+  purchaseRef,
+  vendorName,
   onSuccess,
 }: AddCostModalProps) {
+  // A Branch Manager's cost is spend the business has not approved yet, so it is raised
+  // as a Finance approval request; it is added to the lot and cash leaves only when
+  // Finance approves. Finance / Admin still record it on the lot directly.
+  const isManager = getUserFromToken()?.role === 'MANAGER';
+  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
+  const [accounts, setAccounts] = useState<
+    { id: string; name: string; type: string; currentBalance: number; currency: string }[]
+  >([]);
+  const [paidFromAccount, setPaidFromAccount] = useState('');
   const [loading, setLoading] = useState(false);
   const [currencyCode, setCurrencyCode] = useState(getActiveCurrency());
   const [customCostType, setCustomCostType] = useState('');
@@ -53,11 +80,31 @@ export default function AddCostModal({
       getMyBranch()
         .then((branch) => setCurrencyCode(branch?.currency_code || getActiveCurrency()))
         .catch(() => setCurrencyCode(getActiveCurrency()));
+      if (isManager) {
+        fetchCashBankAccounts()
+          .then((accs) => setAccounts(accs))
+          .catch(() => setAccounts([]));
+      }
     } else {
       setCustomCostType('');
       setAttachment(null);
+      setPaymentMethod('Bank Transfer');
+      setPaidFromAccount('');
     }
-  }, [open]);
+  }, [open, isManager]);
+
+  // Same rule as AddPaymentModal: only accounts matching the payment method, defaulting
+  // to the first one whenever the method or the account list changes.
+  const matchingAccounts = filterAccountsByPaymentMode(accounts, paymentMethod);
+  useEffect(() => {
+    if (matchingAccounts.some((a) => a.id === paidFromAccount)) return;
+    setPaidFromAccount(matchingAccounts[0]?.id ?? '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMethod, accounts]);
+  const selectedAccount = accounts.find((a) => a.id === paidFromAccount);
+  const balanceError = isManager
+    ? insufficientBalanceError(Number(formData.amount), selectedAccount)
+    : null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,13 +139,53 @@ export default function AddCostModal({
       return;
     }
 
+    // Store the custom label directly as the cost type — "Other" is a placeholder
+    // category, not something anyone wants to see saved.
+    const resolvedCostType = isOther ? customCostType.trim() : formData.costType;
+
+    if (isManager) {
+      if (!paidFromAccount) {
+        toast.error(
+          'No payment account loaded. Please wait for accounts to load or contact Finance to add a Cash/Bank account for your branch.',
+        );
+        setLoading(false);
+        return;
+      }
+      if (balanceError) {
+        toast.error(balanceError);
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
-      const payload: AddCostDto = {
-        ...formData,
-        // Store the custom label directly as the cost type — "Other" is a
-        // placeholder category, not something anyone wants to see saved.
-        costType: isOther ? customCostType.trim() : formData.costType,
-      };
+      if (isManager) {
+        // purchaseCostType is what makes Finance's approval record a cost line on the
+        // lot (internal/record-cost) instead of paying the vendor's invoice.
+        await createManagerPurchasePaymentRequest(
+          {
+            purchaseId,
+            purchaseRef: purchaseRef || undefined,
+            vendorName: vendorName || undefined,
+            amount: formData.amount,
+            paymentMethod,
+            paidFromAccountId: paidFromAccount,
+            description: formData.description || undefined,
+            paymentDate: formData.costDate as string,
+            currency: currencyCode,
+            purchaseCostType: resolvedCostType,
+          },
+          attachment,
+        );
+        toast.success(
+          `${resolvedCostType} cost submitted for Finance approval. It will be added to the lot and funds deducted once approved.`,
+        );
+        onSuccess();
+        onOpenChange(false);
+        return;
+      }
+
+      const payload: AddCostDto = { ...formData, costType: resolvedCostType };
       await purchaseService.addCost(purchaseId, payload, attachment);
       toast.success('Cost recorded successfully');
       onSuccess();
@@ -127,7 +214,9 @@ export default function AddCostModal({
             </DialogTitle>
           </DialogHeader>
           <div className="mt-2 text-slate-400 text-xs">
-            Record additional expenses related to this lot amount.
+            {isManager
+              ? 'Additional lot costs are sent to Finance for approval. The cost is added to the lot and funds deducted only once approved.'
+              : 'Record additional expenses related to this lot amount.'}
           </div>
         </div>
 
@@ -203,6 +292,62 @@ export default function AddCostModal({
               </div>
             )}
 
+            {isManager && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                    <CreditCard size={12} /> Payment Method
+                  </Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger className="h-10 text-xs border-slate-200">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MANAGER_COST_PAYMENT_METHODS.map((m) => (
+                        <SelectItem key={m} value={m} className="text-xs">
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-500 uppercase">
+                    Pay From Account
+                  </Label>
+                  {matchingAccounts.length === 0 ? (
+                    <p className="text-[11px] font-medium text-red-600">
+                      No{' '}
+                      {accountTypeForPaymentMode(paymentMethod) === 'CASH'
+                        ? 'Cash in Hand'
+                        : 'Bank'}{' '}
+                      account exists for this branch. Add one under Cash &amp; Bank first.
+                    </p>
+                  ) : (
+                    <Select value={paidFromAccount} onValueChange={setPaidFromAccount}>
+                      <SelectTrigger className="h-10 text-xs border-slate-200">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {matchingAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id} className="text-xs">
+                            {a.name} ({a.type}) — {a.currency}{' '}
+                            {Number(a.currentBalance).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                            })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {balanceError && (
+                    <p className="text-[11px] font-medium text-red-600">{balanceError}</p>
+                  )}
+                </div>
+              </>
+            )}
+
             <div className="space-y-2">
               <Label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
                 <FileText size={12} /> Description
@@ -266,9 +411,15 @@ export default function AddCostModal({
             <Button
               type="submit"
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 font-bold"
-              disabled={loading}
+              disabled={loading || (isManager && (matchingAccounts.length === 0 || !!balanceError))}
             >
-              {loading ? 'Recording...' : 'Record Cost'}
+              {loading
+                ? isManager
+                  ? 'Submitting...'
+                  : 'Recording...'
+                : isManager
+                  ? 'Submit for Approval'
+                  : 'Record Cost'}
             </Button>
           </div>
         </form>

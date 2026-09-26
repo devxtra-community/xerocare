@@ -105,6 +105,18 @@ export class PurchaseController {
       const branchId = req.user?.branchId;
       if (!branchId) throw new AppError('Branch ID is required', 400);
 
+      // A Manager's additional cost is money leaving the branch, so it must go through
+      // the Finance approval queue (billing POST /expenses/requests/manager-purchase with
+      // purchaseCostType) and is recorded here only via /internal/record-cost once
+      // approved. Writing it directly skipped Finance entirely — enforced server-side so
+      // a direct API call cannot bypass it either.
+      if (req.user?.role === 'MANAGER') {
+        throw new AppError(
+          'Additional costs added by a Branch Manager must be submitted for Finance approval',
+          403,
+        );
+      }
+
       const attachmentFile = req.file as unknown as { key?: string } | undefined;
 
       const costData = {

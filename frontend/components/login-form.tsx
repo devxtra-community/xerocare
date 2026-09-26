@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { requestLoginOtp, verifyLoginOtp, requestMagicLink } from '@/lib/auth';
 import Link from 'next/link';
 import { jwtDecode } from 'jwt-decode';
+import { clearQueryCache } from '@/lib/queryCache';
 
 /**
  * Error response from our server.
@@ -48,6 +49,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<'div'>) 
    * Shared by the OTP-verify path and the trusted-device (OTP-skipped) path.
    */
   const completeLogin = (accessToken: string) => {
+    clearQueryCache();
     localStorage.setItem('accessToken', accessToken);
     document.cookie = `accessToken=${accessToken}; path=/; max-age=86400; SameSite=Strict`;
 
