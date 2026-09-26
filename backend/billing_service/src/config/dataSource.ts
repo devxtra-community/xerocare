@@ -289,7 +289,8 @@ async function runPreMigrations() {
         ADD COLUMN IF NOT EXISTS "discountAmount" DECIMAL(12, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS "separateA3Pricing" BOOLEAN NULL DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS "bwA3ExcessRate" DECIMAL(10, 4) NULL,
-        ADD COLUMN IF NOT EXISTS "colorA3ExcessRate" DECIMAL(10, 4) NULL;
+        ADD COLUMN IF NOT EXISTS "colorA3ExcessRate" DECIMAL(10, 4) NULL,
+        ADD COLUMN IF NOT EXISTS "listUnitPrice" DECIMAL(12, 2) NULL;
       `);
       logger.info(
         'Guaranteed billType, serviceTicketId, maxCopyLimit, and service estimate validity columns exist on invoices table, and warranty column exists on invoice_items table.',

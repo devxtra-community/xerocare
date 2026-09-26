@@ -25,6 +25,8 @@ export interface InvoiceItem {
   // Legacy
   quantity?: number;
   unitPrice?: number;
+  /** Service estimates: catalog price before coverage (shown on covered lines, never totalled). */
+  listUnitPrice?: number | null;
   discount?: number;
   discountAmount?: number;
   serialNumber?: string;

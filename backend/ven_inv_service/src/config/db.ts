@@ -926,6 +926,23 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
           ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
           ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "listUnitPrice" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "listTotalPrice" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "listUnitPrice" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "listTotalPrice" NUMERIC(12,2) NULL;
+          -- Backfill the catalog price onto lines written before it was kept. A charged
+          -- line's own price is its list price; a covered catalog line takes the part's
+          -- base price. Covered custom lines have no catalog price and stay NULL.
+          UPDATE service_ticket_items i
+             SET "listUnitPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END,
+                 "listTotalPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END * i.quantity
+            FROM spare_parts sp
+           WHERE i."listUnitPrice" IS NULL AND sp.id = i."sparePartId";
+          UPDATE service_estimate_items i
+             SET "listUnitPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END,
+                 "listTotalPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END * i.quantity
+            FROM spare_parts sp
+           WHERE i."listUnitPrice" IS NULL AND sp.id = i."sparePartId";
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 

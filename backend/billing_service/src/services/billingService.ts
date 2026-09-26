@@ -4827,6 +4827,7 @@ export class BillingService {
       quantity: number;
       unitPrice: number;
       isFree?: boolean;
+      listUnitPrice?: number;
     }[];
     saleType: string;
     status: string;
@@ -4892,6 +4893,8 @@ export class BillingService {
       invItem.description = it.description;
       invItem.quantity = it.quantity;
       invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
+      // What the line is worth, even when covered — display only, never totalled.
+      invItem.listUnitPrice = Number(it.listUnitPrice) || Number(it.unitPrice) || null;
       return invItem;
     });
 
@@ -5170,7 +5173,13 @@ export class BillingService {
   async reviseEstimate(
     id: string,
     payload: {
-      items: { description: string; quantity: number; unitPrice: number; isFree?: boolean }[];
+      items: {
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        isFree?: boolean;
+        listUnitPrice?: number;
+      }[];
       visitChargeAmount: number;
       visitChargeMethod: string;
       discountAmount: number;
@@ -5208,6 +5217,8 @@ export class BillingService {
       invItem.description = it.description;
       invItem.quantity = it.quantity;
       invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
+      // What the line is worth, even when covered — display only, never totalled.
+      invItem.listUnitPrice = Number(it.listUnitPrice) || Number(it.unitPrice) || null;
       return invItem;
     });
     await invoiceItemRepo.save(invoiceItems);

@@ -83,6 +83,16 @@ export class ServiceTicketItem {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   totalCost?: number | null;
 
+  // The part's catalog price before coverage. unitPrice/totalPrice are what the customer
+  // is charged — 0 on a covered line (Rent, warranty, contract) — so without this the
+  // line's real value was discarded and a rented machine's parts all showed AED 0.00.
+  // Display/analytics only: never summed into any charge or total.
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  listUnitPrice?: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  listTotalPrice?: number | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

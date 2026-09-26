@@ -6345,20 +6345,58 @@ export default function ServiceDashboardPage() {
                             <span className="font-bold text-slate-500 block mb-1">
                               Declared Parts:
                             </span>
-                            {est.items.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex justify-between text-slate-600 border-b border-slate-50 pb-0.5 last:border-b-0"
-                              >
-                                <span>
-                                  {item.partName} x {item.quantity}
-                                </span>
-                                <span className="font-mono">
-                                  {getActiveCurrency()}{' '}
-                                  {(item.unitPrice * item.quantity).toFixed(2)}
-                                </span>
-                              </div>
-                            ))}
+                            {est.items.map((item, idx) => {
+                              // A covered line (Rent, warranty, contract) is charged 0 but
+                              // still shows what the part is worth — the machine's spend.
+                              const charged = Number(item.unitPrice || 0) * item.quantity;
+                              const worth =
+                                Number(item.listTotalPrice) ||
+                                Number(item.listUnitPrice || 0) * item.quantity;
+                              const covered = charged === 0 && worth > 0;
+                              return (
+                                <div
+                                  key={idx}
+                                  className="flex justify-between gap-2 text-slate-600 border-b border-slate-50 pb-0.5 last:border-b-0"
+                                >
+                                  <span>
+                                    {item.partName} x {item.quantity}
+                                  </span>
+                                  <span className="font-mono text-right">
+                                    {covered ? (
+                                      <>
+                                        {getActiveCurrency()} {worth.toFixed(2)}{' '}
+                                        <span className="rounded bg-emerald-50 px-1 font-sans text-[9px] font-bold text-emerald-700">
+                                          COVERED
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        {getActiveCurrency()} {charged.toFixed(2)}
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {(() => {
+                              const coveredTotal = est.items.reduce(
+                                (sum, item) =>
+                                  Number(item.unitPrice || 0) === 0
+                                    ? sum +
+                                      (Number(item.listTotalPrice) ||
+                                        Number(item.listUnitPrice || 0) * item.quantity)
+                                    : sum,
+                                0,
+                              );
+                              return coveredTotal > 0 ? (
+                                <div className="flex justify-between pt-1 text-emerald-700 font-semibold">
+                                  <span>Covered value (not charged)</span>
+                                  <span className="font-mono">
+                                    {getActiveCurrency()} {coveredTotal.toFixed(2)}
+                                  </span>
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         )}
 

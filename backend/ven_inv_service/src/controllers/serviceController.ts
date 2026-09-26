@@ -1578,6 +1578,8 @@ Xerocare Technical Services`;
             isFree: isItemFree,
             unitCost,
             totalCost: unitCost * quantity,
+            listUnitPrice: unitPrice,
+            listTotalPrice: unitPrice * quantity,
           });
           ticketItems.push(serviceItem);
         }
@@ -1673,6 +1675,8 @@ Xerocare Technical Services`;
             isApproved: true,
             unitCost: ticketItem.unitCost,
             totalCost: ticketItem.totalCost,
+            listUnitPrice: ticketItem.listUnitPrice,
+            listTotalPrice: ticketItem.listTotalPrice,
           });
           estItemsToSave.push(estItem);
         }
@@ -1702,6 +1706,8 @@ Xerocare Technical Services`;
           quantity: item.quantity,
           unitPrice: Number(item.unitPrice) || 0,
           isFree: item.isFree,
+          // Catalog value, shown to Finance on covered lines; never charged.
+          listUnitPrice: Number(item.listUnitPrice) || 0,
         }));
 
         billingItems.push({
@@ -1709,6 +1715,7 @@ Xerocare Technical Services`;
           quantity: 1,
           unitPrice: Number(finalLabourCost) || 0,
           isFree: false,
+          listUnitPrice: Number(finalLabourCost) || 0,
         });
 
         if (effectiveTransportCharge > 0) {
@@ -1717,6 +1724,7 @@ Xerocare Technical Services`;
             quantity: 1,
             unitPrice: effectiveTransportCharge,
             isFree: false,
+            listUnitPrice: effectiveTransportCharge,
           });
         }
 
@@ -1909,6 +1917,8 @@ Xerocare Technical Services`;
             isApproved: true,
             unitCost,
             totalCost: unitCost * quantity,
+            listUnitPrice: basePrice,
+            listTotalPrice: basePrice * quantity,
           });
           savedItems.push(estItem);
         }
@@ -2651,6 +2661,8 @@ Xerocare Technical Services`;
             isApproved: false,
             unitCost,
             totalCost: unitCost * quantity,
+            listUnitPrice: basePrice,
+            listTotalPrice: basePrice * quantity,
           });
           revisionItems.push(revItem);
         }
@@ -4108,6 +4120,7 @@ Xerocare Technical Services`;
           quantity: it.quantity,
           unitPrice: isFree ? 0 : Number(it.unitPrice) || 0,
           isFree,
+          listUnitPrice: Number(it.listUnitPrice) || Number(it.unitPrice) || 0,
         };
       });
 
@@ -4117,6 +4130,7 @@ Xerocare Technical Services`;
         quantity: 1,
         unitPrice: labourFree ? 0 : Number(laborCost) || 0,
         isFree: labourFree,
+        listUnitPrice: Number(laborCost) || 0,
       });
 
       const effectiveVisitCharge = quoteCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
@@ -6950,6 +6964,7 @@ For queries contact us at +974 4455 6677`;
           quantity: it.quantity,
           unitPrice: isFree ? 0 : Number(it.unitPrice) || 0,
           isFree,
+          listUnitPrice: Number(it.unitPrice) || Number(part?.base_price) || 0,
         };
       });
 
@@ -6998,6 +7013,8 @@ For queries contact us at +974 4455 6677`;
           isFree: !!it.isFree,
           unitCost,
           totalCost: unitCost * quantity,
+          listUnitPrice: Number(it.unitPrice) || Number(part?.base_price) || 0,
+          listTotalPrice: quantity * (Number(it.unitPrice) || Number(part?.base_price) || 0),
         });
       });
       await ticketItemRepo.save(newTicketItems);

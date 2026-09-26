@@ -40,6 +40,9 @@ export interface ServiceTicketItem {
   /** Real internal cost, even when unitPrice/totalPrice are 0 (FOC). Internal-only — never shown to the customer. */
   unitCost?: number | null;
   totalCost?: number | null;
+  /** Catalog price before coverage — the part's value on a covered (0-charge) line. Never totalled. */
+  listUnitPrice?: number | null;
+  listTotalPrice?: number | null;
 }
 
 export interface ServiceTicket {
@@ -355,6 +358,9 @@ export interface ServiceEstimateItem {
   totalPrice: number;
   isFree: boolean;
   isApproved: boolean;
+  /** Catalog price before coverage — the part's value on a covered (0-charge) line. Never totalled. */
+  listUnitPrice?: number | null;
+  listTotalPrice?: number | null;
 }
 
 export interface ServiceEstimate {
