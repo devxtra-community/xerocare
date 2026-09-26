@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useStableCallback } from '@/lib/hooks/useStableCallback';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,13 +28,16 @@ import {
 
 export function InstallationReportModal({
   requestId,
-  onClose,
+  onClose: onCloseProp,
   onSigned,
 }: {
   requestId: string;
   onClose: () => void;
   onSigned?: () => void;
 }) {
+  // Stable identity: parents pass onClose inline and may re-render every second (live
+  // timers), which otherwise restarted — and cancelled — this modal's load each tick.
+  const onClose = useStableCallback(onCloseProp);
   const [detail, setDetail] = useState<InstallationReportDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [link, setLink] = useState<string | null>(null);

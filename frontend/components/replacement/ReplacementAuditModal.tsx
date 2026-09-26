@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useStableCallback } from '@/lib/hooks/useStableCallback';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -22,13 +23,16 @@ import { ReplacementDetailView } from './ReplacementDetailView';
  */
 export function ReplacementAuditModal({
   requestId,
-  onClose,
+  onClose: onCloseProp,
   onDone,
 }: {
   requestId: string;
   onClose: () => void;
   onDone?: () => void;
 }) {
+  // Stable identity: parents pass onClose inline and may re-render every second (live
+  // timers), which otherwise restarted — and cancelled — this modal's load each tick.
+  const onClose = useStableCallback(onCloseProp);
   const [detail, setDetail] = useState<ReplacementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState('');

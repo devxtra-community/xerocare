@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useStableCallback } from '@/lib/hooks/useStableCallback';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -56,7 +57,10 @@ const fmt = (v?: string | null) => {
     : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export function ReplacementRequestModal({ contractId, onClose, onCreated }: Props) {
+export function ReplacementRequestModal({ contractId, onClose: onCloseProp, onCreated }: Props) {
+  // Stable identity: parents pass onClose inline and may re-render every second (live
+  // timers), which otherwise restarted — and cancelled — this modal's load each tick.
+  const onClose = useStableCallback(onCloseProp);
   const [ctx, setCtx] = useState<ReplacementContext | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
