@@ -244,6 +244,19 @@ app.all(
   '/b/invoices/:id/contract-agreement/signing-token',
   createServiceProxy(BILLING_SERVICE_URL),
 );
+// The two "send the agreement to the customer" endpoints were never registered here.
+// They fell through to the local /b/invoices router below, which parses (and therefore
+// drains) the body for every request under the prefix before the fall-through proxy can
+// forward it. fixRequestBody papers over that, but only for a body it can re-serialize —
+// the senders post a bare `{}`, and the whole path then depends on one helper restoring a
+// stream an earlier middleware consumed. Registering them here (like every sibling
+// contract-agreement route) forwards them untouched, which is the contract these
+// endpoints actually need.
+app.all('/b/invoices/:id/contract-agreement/notify/email', createServiceProxy(BILLING_SERVICE_URL));
+app.all(
+  '/b/invoices/:id/contract-agreement/notify/whatsapp',
+  createServiceProxy(BILLING_SERVICE_URL),
+);
 app.all('/b/invoices/:id/sale-payments', createServiceProxy(BILLING_SERVICE_URL));
 app.all('/b/invoices/:id/installation-request', createServiceProxy(BILLING_SERVICE_URL));
 

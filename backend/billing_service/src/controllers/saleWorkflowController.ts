@@ -332,9 +332,31 @@ export const signContractCustomerByUpload = async (
 // Shared by the HTTP handler below and the email/WhatsApp senders further down —
 // both need a fresh 72-hour signing link, not just the manual "Generate Signing
 // Link" button in the Remote Link tab.
-async function issueSigningToken(agreement: ContractAgreement): Promise<{ token: string }> {
+//
+// `reuseValid` exists because rotating on every send broke delivery: the token column
+// holds ONE token, so minting a new one on the second send invalidated the link already
+// sitting in the customer's inbox from the first. Two sends a minute apart meant whichever
+// message the customer opened second worked and the first was dead — the classic "the link
+// you sent me doesn't work" report. A send now keeps the current token while it is still
+// unused and unexpired, so every message already delivered stays clickable; the explicit
+// "Generate New Link" button still forces a rotation.
+async function issueSigningToken(
+  agreement: ContractAgreement,
+  opts: { reuseValid?: boolean } = {},
+): Promise<{ token: string }> {
+  const now = Date.now();
+  const stillValid =
+    !!agreement.signingToken &&
+    !agreement.signingTokenUsed &&
+    !!agreement.signingTokenExpiresAt &&
+    agreement.signingTokenExpiresAt.getTime() > now;
+
+  if (opts.reuseValid && stillValid) {
+    return { token: agreement.signingToken as string };
+  }
+
   const token = randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000); // 72 hours
+  const expiresAt = new Date(now + 72 * 60 * 60 * 1000); // 72 hours
 
   agreement.signingToken = token;
   agreement.signingTokenExpiresAt = expiresAt;
@@ -403,7 +425,7 @@ export const sendContractAgreementEmail = async (
 ) => {
   try {
     const id = req.params.id as string;
-    const { branchId } = req.user!;
+    const { branchId, userId } = req.user!;
     const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
 
     const repo = Source.getRepository(ContractAgreement);
@@ -428,7 +450,7 @@ export const sendContractAgreementEmail = async (
     if (!recipient)
       throw new AppError('Customer email not found. Please provide a recipient email.', 400);
 
-    const { token } = await issueSigningToken(agreement);
+    const { token } = await issueSigningToken(agreement, { reuseValid: true });
     const link = signingLinkUrl(token);
     const isFullySigned = agreement.signatureStatus === 'FULLY_SIGNED';
 
@@ -462,12 +484,13 @@ export const sendContractAgreementEmail = async (
       body: htmlBody,
       invoiceId: agreement.invoiceId,
       attachmentUrl: link,
+      requestedBy: userId,
     });
 
     logger.info(`[ContractAgreement] Email queued for ${agreement.agreementNumber} → ${recipient}`);
-    // Return the link actually used — a fresh token is minted on every send, which
-    // supersedes whatever the Remote Link tab may already be displaying. The caller
-    // uses this to keep that display in sync rather than silently going stale.
+    // Return the link actually used — reusing a still-valid token keeps links already
+    // delivered to the customer working, and the caller uses the value to keep the
+    // Remote Link display in sync rather than silently going stale.
     res.json({ success: true, data: { message: 'Agreement email queued', recipient, link } });
   } catch (err) {
     next(err);
@@ -481,7 +504,7 @@ export const sendContractAgreementWhatsApp = async (
 ) => {
   try {
     const id = req.params.id as string;
-    const { branchId } = req.user!;
+    const { branchId, userId } = req.user!;
     const { recipient: recipientOverride } = (req.body ?? {}) as { recipient?: string };
 
     const repo = Source.getRepository(ContractAgreement);
@@ -493,7 +516,7 @@ export const sendContractAgreementWhatsApp = async (
     if (!recipient)
       throw new AppError('Customer phone not found. Please provide a recipient number.', 400);
 
-    const { token } = await issueSigningToken(agreement);
+    const { token } = await issueSigningToken(agreement, { reuseValid: true });
     const link = signingLinkUrl(token);
     const isFullySigned = agreement.signatureStatus === 'FULLY_SIGNED';
 
@@ -511,6 +534,7 @@ export const sendContractAgreementWhatsApp = async (
       recipient,
       body,
       invoiceId: agreement.invoiceId,
+      requestedBy: userId,
     });
 
     logger.info(
@@ -1947,6 +1971,39 @@ export const recordSalePayment = async (req: Request, res: Response, next: NextF
       transactionChannel,
       transactionReference,
     } = req.body;
+
+    // ── Double-submit protection ──────────────────────────────────────────────────
+    // createSalePaymentRequest has no natural key, so this endpoint used to create a
+    // row — and a Finance notification — on every single call. The guard is deliberately
+    // narrow rather than clever: same invoice, same recorder, same amount, mode, deposit
+    // flag, cheque and remarks, all inside a 30-second window, is one click that landed
+    // twice. Anything else — a genuine second collection, even an identical one a minute
+    // later — still creates its own request. The original record is returned unchanged
+    // so the caller's response shape is identical either way.
+    const DUPLICATE_SUBMIT_WINDOW_MS = 30_000;
+    const recentForInvoice = await Source.getRepository(SalePaymentRequest).find({
+      where: { invoiceId: id, recordedByEmployeeId: userId },
+      order: { createdAt: 'DESC' },
+      take: 20,
+    });
+    const duplicateOf = recentForInvoice.find((r) => {
+      const createdAt = r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt);
+      if (Date.now() - createdAt.getTime() > DUPLICATE_SUBMIT_WINDOW_MS) return false;
+      return (
+        Number(r.amount) === Number(amount) &&
+        r.paymentMode === paymentMode &&
+        !!r.isSecurityDeposit === !!isSecurityDeposit &&
+        (r.chequeNumber || '') === (chequeNumber || '') &&
+        (r.remarks || '') === (remarks || '')
+      );
+    });
+    if (duplicateOf) {
+      logger.info(
+        `[recordSalePayment] Duplicate submission for invoice ${id} ignored — reusing ${duplicateOf.requestNo}.`,
+      );
+      res.status(200).json({ success: true, data: duplicateOf });
+      return;
+    }
 
     const request = await createSalePaymentRequest({
       invoiceId: id,

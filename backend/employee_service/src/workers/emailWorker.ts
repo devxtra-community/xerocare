@@ -14,6 +14,7 @@ import {
 import { logger } from '../config/logger';
 
 const MAX_EMAIL_RETRIES = 5;
+const MAX_NOTIFICATION_RETRIES = 5;
 
 export const startWorker = async () => {
   const channel = await getRabbitChannel();
@@ -176,20 +177,30 @@ export const startWorker = async () => {
       if (routingKey === 'notification.email.request') {
         // Payload: { recipient, subject, body, invoiceId, attachments }
         const { recipient, subject, body, attachments } = job;
-        if (recipient && body) {
-          // Import dynamically to avoid circular issues if any
-          const { sendEmail } = await import('../utils/mailer');
-          await sendEmail(recipient, subject || 'Notification from XeroCare', body, attachments);
-          logger.info(`[Notification Worker] Email sent to ${recipient}`);
+        // A job missing its destination or content used to fall through these
+        // guards and be acked as if it had been delivered. It wasn't — the
+        // customer just never received it — so that is now a failure, not a
+        // no-op.
+        if (!recipient || !body) {
+          throw new Error(
+            `Malformed email notification job (recipient=${!!recipient}, body=${!!body})`,
+          );
         }
+        // Import dynamically to avoid circular issues if any
+        const { sendEmail } = await import('../utils/mailer');
+        await sendEmail(recipient, subject || 'Notification from XeroCare', body, attachments);
+        logger.info(`[Notification Worker] Email sent to ${recipient}`);
       } else if (routingKey === 'notification.whatsapp.request') {
         // Payload: { recipient, body, invoiceId... }
         const { recipient, body } = job;
-        if (recipient && body) {
-          const { sendWhatsappMessage } = await import('../utils/whatsapp');
-          await sendWhatsappMessage(recipient, body);
-          logger.info(`[Notification Worker] WhatsApp processed for ${recipient}`);
+        if (!recipient || !body) {
+          throw new Error(
+            `Malformed WhatsApp notification job (recipient=${!!recipient}, body=${!!body})`,
+          );
         }
+        const { sendWhatsappMessage } = await import('../utils/whatsapp');
+        await sendWhatsappMessage(recipient, body);
+        logger.info(`[Notification Worker] WhatsApp sent to ${recipient}`);
       } else if (routingKey === 'notification.in_app.request') {
         const { recipients, notifyAdmins, title, message, type, data } = job;
 
@@ -230,9 +241,98 @@ export const startWorker = async () => {
       channel.ack(msg);
     } catch (err) {
       logger.error('Notification worker failed to process message', err);
+
+      const error = err as { code?: string; responseCode?: number };
+      // Same transient/fatal split the email_queue consumer above uses. Acking on
+      // the first failure — which is what this did — dropped the customer's
+      // message permanently: the API had already answered "queued", this log line
+      // was the only trace, and nobody was told the link never arrived.
+      const isTransient =
+        error.code === 'EAI_AGAIN' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ETIMEDOUT' ||
+        error.code === 'ESOCKET' ||
+        error.code === 'ECONNECTION' ||
+        error.code === 'ENETUNREACH' ||
+        error.code === 'EHOSTUNREACH' ||
+        error.code === 'ECONNREFUSED' ||
+        error.code === 'ABORT_ERR' ||
+        error.responseCode === 421 ||
+        (typeof error.responseCode === 'number' && error.responseCode >= 500);
+
+      const retryCount = Number(msg.properties.headers?.['x-retry-count'] || 0);
+
+      if (isTransient && retryCount < MAX_NOTIFICATION_RETRIES) {
+        const delayMs = Math.min(30_000, 1000 * 2 ** retryCount);
+        logger.info(
+          `Transient notification failure, retrying in ${delayMs}ms (attempt ${retryCount + 1}/${MAX_NOTIFICATION_RETRIES})`,
+          { routingKey, recipient: job.recipient, errorCode: error.code },
+        );
+        setTimeout(() => {
+          try {
+            channel.sendToQueue('notification_queue', msg.content, {
+              persistent: true,
+              headers: { ...(msg.properties.headers || {}), 'x-retry-count': retryCount + 1 },
+            });
+            channel.ack(msg);
+          } catch (republishErr) {
+            logger.error('Failed to requeue notification job, nacking instead', republishErr);
+            channel.nack(msg, false, true);
+          }
+        }, delayMs);
+        return;
+      }
+
+      // Permanent failure (or retries exhausted). Tell the employee who asked for
+      // the send, so a delivery failure is visible in the app instead of only in
+      // server logs.
+      await notifySenderOfDeliveryFailure(channel, job, routingKey, err).catch((notifyErr) =>
+        logger.error('Failed to report notification delivery failure', notifyErr),
+      );
+
       channel.ack(msg);
     }
   });
 
   logger.info('Email worker started and listening for jobs');
 };
+
+/**
+ * Turns a silent delivery failure into something the requester can see.
+ *
+ * Every customer-facing send is answered "queued" long before the provider has
+ * accepted anything, so without this the only record of a failed delivery is a log
+ * line. When the publisher told us who asked for the send, we raise an in-app
+ * notification for them telling them to retry on a working channel.
+ */
+async function notifySenderOfDeliveryFailure(
+  channel: Awaited<ReturnType<typeof getRabbitChannel>>,
+  job: {
+    requestedBy?: string;
+    recipient?: string;
+    subject?: string;
+  },
+  routingKey: string,
+  err: unknown,
+): Promise<void> {
+  if (!job.requestedBy) return;
+
+  const channelName = routingKey === 'notification.whatsapp.request' ? 'WhatsApp' : 'Email';
+  const reason = err instanceof Error ? err.message : String(err);
+  const subject = job.subject ? ` (${job.subject})` : '';
+
+  await channel.publish(
+    'domain_events',
+    'notification.in_app.request',
+    Buffer.from(
+      JSON.stringify({
+        recipients: [job.requestedBy],
+        title: `${channelName} to the customer could not be delivered`,
+        message: `The ${channelName} addressed to ${job.recipient || 'the customer'}${subject} failed: ${reason} Please resend it before assuming the customer received it.`,
+        type: 'ERROR',
+        data: { channel: channelName, recipient: job.recipient },
+      }),
+    ),
+    { persistent: true },
+  );
+}

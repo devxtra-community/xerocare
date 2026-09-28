@@ -103,6 +103,20 @@ export function InvoiceViewDialog({
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  // Which decision is in flight. Set synchronously on click so the button disables and
+  // shows a spinner before the round-trip completes — and so a second click, or a click
+  // on the other decision while one is running, is refused instead of firing a second
+  // request against the same invoice.
+  const [deciding, setDeciding] = useState<'approve' | 'reject' | null>(null);
+  const runDecision = async (kind: 'approve' | 'reject', action: () => void | Promise<void>) => {
+    if (deciding || !action) return;
+    setDeciding(kind);
+    try {
+      await action();
+    } finally {
+      setDeciding(null);
+    }
+  };
   // Controls whether the return invoice view or original invoice is shown
   const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
   const [showReturnSidebar, setShowReturnSidebar] = useState(false);
@@ -1945,12 +1959,17 @@ export function InvoiceViewDialog({
                   <Button
                     variant="outline"
                     size="sm"
+                    disabled={!!deciding}
                     onClick={() => {
                       setIsRejecting(false);
-                      if (onReject) onReject(rejectReason);
+                      void runDecision('reject', () => onReject?.(rejectReason));
                     }}
                   >
-                    Confirm
+                    {deciding === 'reject' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Confirm'
+                    )}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setIsRejecting(false)}>
                     Cancel
@@ -1958,7 +1977,12 @@ export function InvoiceViewDialog({
                 </div>
               )}
               {onApprove && (
-                <Button className="bg-emerald-600 text-white font-bold" onClick={onApprove}>
+                <Button
+                  className="bg-emerald-600 text-white font-bold"
+                  disabled={!!deciding}
+                  onClick={() => void runDecision('approve', onApprove)}
+                >
+                  {deciding === 'approve' && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   {approveLabel}
                 </Button>
               )}

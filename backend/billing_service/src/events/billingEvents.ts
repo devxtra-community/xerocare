@@ -29,6 +29,13 @@ export interface NotificationRequestEvent {
   invoiceId?: string; // Useful for linking
   attachmentUrl?: string; // Link to Invoice PDF
   attachments?: { filename: string; content: string; encoding: string }[]; // Base64 Buffer attachments
+  /**
+   * Employee who asked for this send. Optional everywhere, but once set the
+   * consumer can tell THEM when delivery finally fails — otherwise a provider
+   * outage is only ever visible in server logs nobody reads, and staff keep
+   * believing the customer got the message.
+   */
+  requestedBy?: string;
 }
 
 export interface InAppNotificationRequestEvent {

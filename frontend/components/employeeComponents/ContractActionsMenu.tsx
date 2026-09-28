@@ -17,6 +17,16 @@ export interface ContractAction {
   disabled?: boolean;
   /** Swaps the mark for a spinner while the action is in flight. */
   loading?: boolean;
+  /**
+   * Close the popover when this entry is clicked (default `true`).
+   *
+   * Closing is right for entries that open a dialog — leaving the popover mounted behind
+   * one traps focus. It is wrong for an entry that just fires a request and returns: the
+   * popover unmounts, its spinner goes with it, and the user sees nothing happen, which
+   * is how the same action ends up clicked twice. Those entries set this to `false` so
+   * the in-flight state stays on screen and the entry is disabled until it settles.
+   */
+  closeOnSelect?: boolean;
 }
 
 /**
@@ -66,9 +76,11 @@ export function ContractActionsMenu({
               type="button"
               disabled={action.disabled || action.loading}
               onClick={() => {
+                if (action.disabled || action.loading) return;
                 // Close first: most of these open a dialog of their own, and leaving the
-                // popover mounted behind it traps focus between the two.
-                setOpen(false);
+                // popover mounted behind it traps focus between the two. Entries that only
+                // fire a request opt out (see closeOnSelect) so their spinner is visible.
+                if (action.closeOnSelect !== false) setOpen(false);
                 action.onClick();
               }}
               className="flex items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none"

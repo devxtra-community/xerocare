@@ -52,8 +52,11 @@ export default function EmployeeOrdersTable({
     setRejectOpen(true);
   };
 
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const handleConfirmReject = async () => {
-    if (!rejectingInvoiceId || !rejectReason.trim()) return;
+    // Re-entry guard: without it a double click fired financeRejectInvoice twice.
+    if (!rejectingInvoiceId || !rejectReason.trim() || rejectSubmitting) return;
+    setRejectSubmitting(true);
     try {
       const { financeRejectInvoice } = await import('@/lib/invoice');
       await financeRejectInvoice(rejectingInvoiceId, rejectReason.trim());
@@ -63,6 +66,8 @@ export default function EmployeeOrdersTable({
       window.location.reload();
     } catch {
       toast.error('Failed to reject');
+    } finally {
+      setRejectSubmitting(false);
     }
   };
 
@@ -461,9 +466,10 @@ export default function EmployeeOrdersTable({
             <Button
               variant="destructive"
               onClick={handleConfirmReject}
-              disabled={!rejectReason.trim()}
+              disabled={!rejectReason.trim() || rejectSubmitting}
               className="h-9 text-xs px-4 font-bold"
             >
+              {rejectSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Reject Order
             </Button>
           </div>

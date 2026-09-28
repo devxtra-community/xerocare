@@ -1976,34 +1976,39 @@ export class BillingService {
       `Converted approved quotation into transaction (Proforma draft).`,
       oldStatus,
       InvoiceStatus.DRAFT,
-    );
+    ); // Detached: the conversion itself is committed, and what's left is one in-app
+    // notification preceded by a branch-manager lookup (an HTTP call that lists every
+    // manager). The next step of the conversion flow fires immediately after this
+    // method returns, so there is nothing to gain from making it wait.
+    void (async () => {
+      if (saved.branchId) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          const { QUOTATION_CONVERTED } = await import('../constants/notificationTypes');
+          const { getBranchManager, getCustomerName, getEmployeeDetails } =
+            await import('./billingHelpers');
 
-    if (saved.branchId) {
-      try {
-        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
-        const { QUOTATION_CONVERTED } = await import('../constants/notificationTypes');
-        const { getBranchManager, getCustomerName, getEmployeeDetails } =
-          await import('./billingHelpers');
+          const managerId = await getBranchManager(saved.branchId);
+          if (managerId) {
+            const customerName = await getCustomerName(saved.customerId);
+            const empDetails = await getEmployeeDetails(userId);
+            const employeeName = empDetails ? empDetails.name : 'Employee';
 
-        const managerId = await getBranchManager(saved.branchId);
-        if (managerId) {
-          const customerName = await getCustomerName(saved.customerId);
-          const empDetails = await getEmployeeDetails(userId);
-          const employeeName = empDetails ? empDetails.name : 'Employee';
-
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: managerId,
-            title: 'Quotation Converted',
-            message: `A quotation [${saved.invoiceNumber}] for ${customerName} has been converted into a transaction (Proforma contract) by ${employeeName}.`,
-            type: QUOTATION_CONVERTED,
-            referenceId: saved.id,
-            referenceType: 'CONTRACT',
-          });
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: managerId,
+              title: 'Quotation Converted',
+              message: `A quotation [${saved.invoiceNumber}] for ${customerName} has been converted into a transaction (Proforma contract) by ${employeeName}.`,
+              type: QUOTATION_CONVERTED,
+              referenceId: saved.id,
+              referenceType: 'CONTRACT',
+            });
+          }
+        } catch (err) {
+          logger.error('Failed to notify branch manager about quotation conversion', err);
         }
-      } catch (err) {
-        logger.error('Failed to notify branch manager about quotation conversion', err);
       }
-    }
+    })().catch((err: unknown) => logger.error('Post-conversion notification failed', err));
 
     return saved;
   }
@@ -2082,30 +2087,44 @@ export class BillingService {
 
       if (itemUpdates && itemUpdates.length > 0) {
         const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
+        // Validate every inventory item up front, in parallel. These were N sequential
+        // HTTP round-trips issued from inside an already-open DB transaction — the
+        // slowest part of "Allocate Machines" and the reason the transaction (and its
+        // locks) stayed held for so long. Failure semantics are unchanged: any bad item
+        // still throws and rolls the whole transaction back.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const validated = new Map<string, any>();
+        await Promise.all(
+          itemUpdates
+            .map((u) => ({ u, item: invoice.items.find((i) => i.id === u.id) }))
+            .filter((row) => row.item && row.u.productId)
+            .map(async ({ u, item }) => {
+              const endpoint =
+                (item!.itemType as unknown) === 'SPARE_PART' ||
+                (item!.itemType as unknown) === 'SPAREPART'
+                  ? 'spare-parts'
+                  : 'products';
+              try {
+                const response = await fetch(`${inventoryServiceUrl}/${endpoint}/${u.productId}`, {
+                  headers: { Authorization: token, 'Content-Type': 'application/json' },
+                });
+                if (!response.ok) throw new Error(response.statusText);
+                const data = await response.json();
+                if (!data.data) throw new AppError(`Item ${u.productId} not found`, 404);
+                validated.set(String(u.id).toLowerCase(), data.data);
+              } catch (error) {
+                if (error instanceof AppError) throw error;
+                logger.error(`Item validation failed: ${u.productId}`, error);
+                throw new AppError(`Failed to validate inventory item ${u.productId}`, 500);
+              }
+            }),
+        );
+
         for (const update of itemUpdates) {
           const item = invoice.items.find((i) => i.id === update.id);
           if (item && update.productId) {
-            let product;
-            try {
-              const endpoint =
-                (item.itemType as unknown) === 'SPARE_PART' ||
-                (item.itemType as unknown) === 'SPAREPART'
-                  ? 'spare-parts'
-                  : 'products';
-              const response = await fetch(
-                `${inventoryServiceUrl}/${endpoint}/${update.productId}`,
-                {
-                  headers: { Authorization: token, 'Content-Type': 'application/json' },
-                },
-              );
-              if (!response.ok) throw new Error(response.statusText);
-              const data = await response.json();
-              product = data.data;
-            } catch (error) {
-              logger.error(`Item validation failed: ${update.productId}`, error);
-              throw new AppError(`Failed to validate inventory item ${update.productId}`, 500);
-            }
-
+            const product = validated.get(String(update.id).toLowerCase());
             if (!product) throw new AppError(`Item ${update.productId} not found`, 404);
 
             item.productId = update.productId;
@@ -2245,6 +2264,16 @@ export class BillingService {
 
       if (!invoice) throw new AppError('Quotation not found', 404);
       if (invoice.contractStatus !== ContractStatus.PENDING_CONFIRMATION) {
+        // Idempotent replay. Once the contract is ACTIVE the activation has already
+        // succeeded, so a second identical request (accidental double-click, a retry
+        // after a dropped response) must report that state rather than fail — and
+        // above all must not run the activation a second time, which would re-record
+        // the deposit, re-push meter readings and re-notify everyone. Anything else
+        // that isn't PENDING_CONFIRMATION is still a genuine state error.
+        if (invoice.contractStatus === ContractStatus.ACTIVE) {
+          await queryRunner.rollbackTransaction();
+          return invoice;
+        }
         throw new AppError('Contract is not pending confirmation', 400);
       }
 
@@ -2283,23 +2312,37 @@ export class BillingService {
       const startReadings: MeterReadingPush[] = [];
       if (itemUpdates && itemUpdates.length > 0) {
         const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
+
+        // Product lookups (colour, used to enforce reading requirements) used to run one
+        // item at a time from inside the open transaction. Prefetch them in parallel,
+        // keeping the original swallow-the-error behaviour: a failed lookup simply means
+        // no colour check, exactly as it did before.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const productsByItem = new Map<string, any>();
+        await Promise.all(
+          itemUpdates
+            .map((u) => ({ u, item: invoice.items.find((i) => i.id === u.id) }))
+            .filter((row) => row.item && row.item!.productId)
+            .map(async ({ item }) => {
+              try {
+                const response = await fetch(`${inventoryServiceUrl}/products/${item!.productId}`, {
+                  headers: { Authorization: token, 'Content-Type': 'application/json' },
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  productsByItem.set(String(item!.id).toLowerCase(), data.data);
+                }
+              } catch (error) {
+                logger.error(`Product fetch failed for readings: ${item!.productId}`, error);
+              }
+            }),
+        );
+
         for (const update of itemUpdates) {
           const item = invoice.items.find((i) => i.id === update.id);
           if (item && item.productId) {
             // Check product color to enforce reading requirements
-            let product;
-            try {
-              const response = await fetch(`${inventoryServiceUrl}/products/${item.productId}`, {
-                headers: { Authorization: token, 'Content-Type': 'application/json' },
-              });
-              if (response.ok) {
-                const data = await response.json();
-                product = data.data;
-              }
-            } catch (error) {
-              logger.error(`Product fetch failed for readings: ${item.productId}`, error);
-            }
-
+            const product = productsByItem.get(String(item.id).toLowerCase());
             if (
               invoice.saleType !== SaleType.SALE &&
               invoice.saleType !== SaleType.PRODUCT_SALE &&
@@ -2462,20 +2505,114 @@ export class BillingService {
       // Emit status updates
       this.emitProductStatusUpdates(savedInvoice, userId);
 
-      // --- NEW: Warranty Confirmation Email for LEASE ---
-      if (savedInvoice.saleType === SaleType.LEASE) {
-        try {
-          await this.notificationService.sendWarrantyConfirmationEmail(savedInvoice.id);
-        } catch (err) {
-          logger.error(
-            `Failed to send warranty confirmation email for lease ${savedInvoice.id}`,
-            err,
-          );
+      // ── Everything below runs detached from the request ─────────────────────
+      // The contract has already committed at this point: what follows is a LEASE
+      // warranty email plus five in-app broadcasts, each preceded by an HTTP lookup
+      // (branch-manager list, finance list, customer name) that the employee pressing
+      // "Activate Contract" has no reason to wait for — those sequential lookups were
+      // the bulk of this action's response time. They still run, in the same order,
+      // and every failure is still logged exactly as before; they simply no longer
+      // sit in front of the response.
+      void (async () => {
+        // --- NEW: Warranty Confirmation Email for LEASE ---
+        if (savedInvoice.saleType === SaleType.LEASE) {
+          try {
+            await this.notificationService.sendWarrantyConfirmationEmail(savedInvoice.id);
+          } catch (err) {
+            logger.error(
+              `Failed to send warranty confirmation email for lease ${savedInvoice.id}`,
+              err,
+            );
+          }
         }
-      }
 
-      // Notify Creator
-      if (savedInvoice.createdBy) {
+        // Notify Creator
+        if (savedInvoice.createdBy) {
+          try {
+            const { NotificationPublisher } =
+              await import('../events/publisher/notificationPublisher');
+            const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
+            const { getCustomerName } = await import('./billingHelpers');
+
+            const customerName = await getCustomerName(savedInvoice.customerId);
+
+            await NotificationPublisher.publishInAppRequest({
+              recipientId: savedInvoice.createdBy,
+              title: 'Contract Activated',
+              message: `The contract for customer ${customerName} has been activated successfully.`,
+              type: CONTRACT_ACTIVATED,
+              referenceId: savedInvoice.id,
+              referenceType: 'CONTRACT',
+            });
+          } catch (err) {
+            logger.error('Failed to notify creator on contract activation', err);
+          }
+        }
+
+        // Notify Branch Manager
+        if (savedInvoice.branchId) {
+          try {
+            const { NotificationPublisher } =
+              await import('../events/publisher/notificationPublisher');
+            const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
+            const { getBranchManager, getCustomerName, getEmployeeDetails } =
+              await import('./billingHelpers');
+
+            const managerId = await getBranchManager(savedInvoice.branchId);
+            if (managerId) {
+              const customerName = await getCustomerName(savedInvoice.customerId);
+              const empDetails = await getEmployeeDetails(userId);
+              const employeeName = empDetails ? empDetails.name : 'Employee';
+
+              await NotificationPublisher.publishInAppRequest({
+                recipientId: managerId,
+                title: 'Contract Activated',
+                message: `Contract [${savedInvoice.invoiceNumber}] for customer ${customerName} has been activated by ${employeeName}.`,
+                type: CONTRACT_ACTIVATED,
+                referenceId: savedInvoice.id,
+                referenceType: 'CONTRACT',
+              });
+            }
+          } catch (err) {
+            logger.error('Failed to notify branch manager on contract activation', err);
+          }
+        }
+
+        // Notify Finance Team Members
+        if (savedInvoice.branchId) {
+          try {
+            const { NotificationPublisher } =
+              await import('../events/publisher/notificationPublisher');
+            const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
+            const { getFinanceEmployeesByBranch, getCustomerName } =
+              await import('./billingHelpers');
+
+            const customerName = await getCustomerName(savedInvoice.customerId);
+            const financeIds = await getFinanceEmployeesByBranch(savedInvoice.branchId);
+
+            for (const financeId of financeIds) {
+              try {
+                await NotificationPublisher.publishInAppRequest({
+                  recipientId: financeId,
+                  title: 'Contract Activated',
+                  message: `The contract for customer ${customerName} is now active. Delivery and billing schedules are initialized.`,
+                  type: CONTRACT_ACTIVATED,
+                  referenceId: savedInvoice.id,
+                  referenceType: 'CONTRACT',
+                });
+              } catch (err) {
+                logger.error(
+                  `Failed to publish contract activation notification to finance employee ${financeId}`,
+                  err,
+                );
+              }
+            }
+          } catch (err) {
+            logger.error('Failed to notify finance staff about contract activation', err);
+          }
+        }
+
+        // Notify Admins (cross-branch visibility)
         try {
           const { NotificationPublisher } =
             await import('../events/publisher/notificationPublisher');
@@ -2485,99 +2622,17 @@ export class BillingService {
           const customerName = await getCustomerName(savedInvoice.customerId);
 
           await NotificationPublisher.publishInAppRequest({
-            recipientId: savedInvoice.createdBy,
+            notifyAdmins: true,
             title: 'Contract Activated',
-            message: `The contract for customer ${customerName} has been activated successfully.`,
+            message: `The contract for customer ${customerName} (branch ${savedInvoice.branchId}) is now active.`,
             type: CONTRACT_ACTIVATED,
             referenceId: savedInvoice.id,
             referenceType: 'CONTRACT',
           });
         } catch (err) {
-          logger.error('Failed to notify creator on contract activation', err);
+          logger.error('Failed to notify admins about contract activation', err);
         }
-      }
-
-      // Notify Branch Manager
-      if (savedInvoice.branchId) {
-        try {
-          const { NotificationPublisher } =
-            await import('../events/publisher/notificationPublisher');
-          const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
-          const { getBranchManager, getCustomerName, getEmployeeDetails } =
-            await import('./billingHelpers');
-
-          const managerId = await getBranchManager(savedInvoice.branchId);
-          if (managerId) {
-            const customerName = await getCustomerName(savedInvoice.customerId);
-            const empDetails = await getEmployeeDetails(userId);
-            const employeeName = empDetails ? empDetails.name : 'Employee';
-
-            await NotificationPublisher.publishInAppRequest({
-              recipientId: managerId,
-              title: 'Contract Activated',
-              message: `Contract [${savedInvoice.invoiceNumber}] for customer ${customerName} has been activated by ${employeeName}.`,
-              type: CONTRACT_ACTIVATED,
-              referenceId: savedInvoice.id,
-              referenceType: 'CONTRACT',
-            });
-          }
-        } catch (err) {
-          logger.error('Failed to notify branch manager on contract activation', err);
-        }
-      }
-
-      // Notify Finance Team Members
-      if (savedInvoice.branchId) {
-        try {
-          const { NotificationPublisher } =
-            await import('../events/publisher/notificationPublisher');
-          const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
-          const { getFinanceEmployeesByBranch, getCustomerName } = await import('./billingHelpers');
-
-          const customerName = await getCustomerName(savedInvoice.customerId);
-          const financeIds = await getFinanceEmployeesByBranch(savedInvoice.branchId);
-
-          for (const financeId of financeIds) {
-            try {
-              await NotificationPublisher.publishInAppRequest({
-                recipientId: financeId,
-                title: 'Contract Activated',
-                message: `The contract for customer ${customerName} is now active. Delivery and billing schedules are initialized.`,
-                type: CONTRACT_ACTIVATED,
-                referenceId: savedInvoice.id,
-                referenceType: 'CONTRACT',
-              });
-            } catch (err) {
-              logger.error(
-                `Failed to publish contract activation notification to finance employee ${financeId}`,
-                err,
-              );
-            }
-          }
-        } catch (err) {
-          logger.error('Failed to notify finance staff about contract activation', err);
-        }
-      }
-
-      // Notify Admins (cross-branch visibility)
-      try {
-        const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
-        const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
-        const { getCustomerName } = await import('./billingHelpers');
-
-        const customerName = await getCustomerName(savedInvoice.customerId);
-
-        await NotificationPublisher.publishInAppRequest({
-          notifyAdmins: true,
-          title: 'Contract Activated',
-          message: `The contract for customer ${customerName} (branch ${savedInvoice.branchId}) is now active.`,
-          type: CONTRACT_ACTIVATED,
-          referenceId: savedInvoice.id,
-          referenceType: 'CONTRACT',
-        });
-      } catch (err) {
-        logger.error('Failed to notify admins about contract activation', err);
-      }
+      })().catch((err: unknown) => logger.error('Post-activation notifications failed', err));
 
       return savedInvoice;
     } catch (err) {

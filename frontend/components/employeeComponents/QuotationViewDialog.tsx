@@ -83,6 +83,19 @@ export function QuotationViewDialog({
   const [sending, setSending] = useState(false);
   const [isSendingCustomer, setIsSendingCustomer] = useState(false);
   const [isRequestingExtension, setIsRequestingExtension] = useState(false);
+  // Which Finance decision is in flight. These buttons had no in-flight state at all,
+  // so a double click fired Approve/Reject twice against the same quotation. Set
+  // synchronously on click: both buttons disable immediately and the clicked one spins.
+  const [deciding, setDeciding] = useState<'approve' | 'reject' | null>(null);
+  const runDecision = async (kind: 'approve' | 'reject', action?: () => void) => {
+    if (deciding || !action) return;
+    setDeciding(kind);
+    try {
+      await action();
+    } finally {
+      setDeciding(null);
+    }
+  };
   const [productDetails, setProductDetails] = useState<Record<string, ProductMeta>>({});
   const [showingOriginalInvoice, setShowingOriginalInvoice] = useState(false);
   const [ticketDetails, setTicketDetails] = useState<ServiceTicket | null>(null);
@@ -2316,17 +2329,26 @@ export function QuotationViewDialog({
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        onClick={onReject}
+                        onClick={() => void runDecision('reject', onReject)}
+                        disabled={!!deciding}
                         size="sm"
-                        className="h-10 border-red-200 text-red-600 hover:bg-red-50 font-normal text-[11px] uppercase tracking-widest px-8"
+                        className="h-10 border-red-200 text-red-600 hover:bg-red-50 font-normal text-[11px] uppercase tracking-widest px-8 disabled:opacity-60"
                       >
-                        Reject Order
+                        {deciding === 'reject' ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          'Reject Order'
+                        )}
                       </Button>
                       <Button
-                        onClick={onApprove}
+                        onClick={() => void runDecision('approve', onApprove)}
+                        disabled={!!deciding}
                         size="sm"
-                        className="h-10 bg-green-600 hover:bg-green-700 text-white font-normal text-[11px] uppercase tracking-widest px-10 shadow-lg shadow-green-100"
+                        className="h-10 bg-green-600 hover:bg-green-700 text-white font-normal text-[11px] uppercase tracking-widest px-10 shadow-lg shadow-green-100 disabled:opacity-60"
                       >
+                        {deciding === 'approve' && (
+                          <Loader2 size={13} className="animate-spin mr-2" />
+                        )}
                         Approve Order
                       </Button>
                     </div>

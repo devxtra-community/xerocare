@@ -224,10 +224,26 @@ export default function EmployeeLeaseTable({
     }
   };
 
-  const handleSendForApproval = async () => {
-    if (!selectedInvoice) return;
+  // Set synchronously on click so the menu entry shows its spinner and disables before
+  // the round-trip — a second click is refused while one is in flight.
+  const [sendingForApprovalId, setSendingForApprovalId] = useState<string | null>(null);
+
+  /**
+   * @param inv the row the menu entry was clicked on. The details dialog passes nothing —
+   * its invoice is already `selectedInvoice`.
+   *
+   * The row menu used to do `setSelectedInvoice(inv); handleSendForApproval();`, which
+   * read `selectedInvoice` in the same render, before that update had landed: the click
+   * then either did nothing at all (nothing previously selected) or acted on a DIFFERENT
+   * row — whichever invoice had last been opened. Passing the row itself is the only
+   * correct read.
+   */
+  const handleSendForApproval = async (inv?: Invoice) => {
+    const target = inv ?? selectedInvoice;
+    if (!target || sendingForApprovalId) return;
+    setSendingForApprovalId(target.id);
     try {
-      await employeeApproveInvoice(selectedInvoice.id);
+      await employeeApproveInvoice(target.id);
       toast.success('Sent for Finance Approval');
       setDetailsOpen(false);
       fetchInvoices();
@@ -237,6 +253,8 @@ export default function EmployeeLeaseTable({
       const err = error as { response?: { data?: { message?: string } } };
       const msg = err.response?.data?.message || 'Failed to send for approval';
       toast.error(msg);
+    } finally {
+      setSendingForApprovalId(null);
     }
   };
 
@@ -552,10 +570,11 @@ export default function EmployeeLeaseTable({
                                     icon: <SendMark />,
                                     label: 'Send to Finance',
                                     description: 'Submit this draft for approval',
-                                    onClick: () => {
-                                      setSelectedInvoice(inv);
-                                      handleSendForApproval();
-                                    },
+                                    loading: sendingForApprovalId === inv.id,
+                                    // Stays open so the spinner is actually visible — this one
+                                    // has no dialog to hand focus to.
+                                    closeOnSelect: false,
+                                    onClick: () => handleSendForApproval(inv),
                                   },
                                 ]
                               : []),

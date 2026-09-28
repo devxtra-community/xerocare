@@ -188,6 +188,7 @@ export function ContractAgreementModal({
   };
 
   const handleGenerateRemoteLink = async () => {
+    if (isGeneratingLink) return; // ignore repeat clicks while a token is being minted
     setIsGeneratingLink(true);
     try {
       const result = await generateSigningToken(invoice.id);
@@ -217,16 +218,21 @@ export function ContractAgreementModal({
   // same signing-link mechanism (fresh 72-hour token each send), so a customer who
   // hasn't signed yet can review and sign from the emailed/WhatsApped link too.
   const handleSendAgreement = async (channel: 'email' | 'whatsapp') => {
+    // Re-entry guard. State updates are asynchronous, so a second click landing in the
+    // same tick — or on the other channel's button — would still see `null` here and
+    // fire a second send, which mints a second job against the same agreement.
+    if (sendingAgreementVia) return;
     setSendingAgreementVia(channel);
     try {
       const result =
         channel === 'email'
           ? await sendContractAgreementEmail(invoice.id)
           : await sendContractAgreementWhatsApp(invoice.id);
-      // A fresh 72-hour token is minted server-side on every send, superseding
-      // whatever the Remote Link tab was already displaying — keep it in sync so
-      // "Copy Link" / "Send via WhatsApp" there never point at a now-invalid link.
-      setRemoteLink(result.link);
+      // Keep the Remote Link tab pointed at whatever the server actually used, so
+      // "Copy Link" there can never show a link that is not the one delivered. Only
+      // overwrite when the server really returned one — assigning `undefined` would
+      // blank the display back to "Generate Signing Link" after a successful send.
+      if (result?.link) setRemoteLink(result.link);
       toast.success(`Agreement sent via ${channel === 'email' ? 'email' : 'WhatsApp'}`, {
         description: `Sent to ${result.recipient}`,
       });

@@ -253,6 +253,11 @@ export function QuotationConversionFlow({
   };
 
   const handleConfirm = async () => {
+    // Re-entry guard: state updates are asynchronous, so a second click landing before
+    // the first render of `isSubmitting` would otherwise start a whole second
+    // conversion — duplicate allocations, duplicate payment requests, duplicate
+    // notifications.
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       // 1. Convert Quotation → Proforma (idempotent: backend returns early for PROFORMA/FINAL)
@@ -304,7 +309,14 @@ export function QuotationConversionFlow({
         });
       }
 
-      // 4. Submit advance payment request for Finance approval
+      // 4 + 5. Advance and Security Deposit are two independent records against the
+      // same invoice. They were submitted one after the other, so every conversion paid
+      // for two sequential round-trips that have nothing to do with each other; they now
+      // go out together. Both are allowed to settle before anything is reported, so a
+      // failure message reflects what actually happened rather than which request
+      // happened to reject first.
+      const paymentSubmissions: Promise<unknown>[] = [];
+
       // Skip the RENT advance for Arrears billing — no rent is collected upfront there —
       // but accessories are a separate, one-time charge unrelated to the rent-timing
       // method, so still collect them even on an Arrears contract if any are on file.
@@ -312,45 +324,55 @@ export function QuotationConversionFlow({
       const rentAdvancePortion = isArrears ? 0 : Number(advanceAmount || 0);
       if (rentAdvancePortion > 0 || accessoryTotal > 0) {
         const mode = paymentMode === 'CREDIT_CARD' ? 'BANK_TRANSFER' : paymentMode;
-        await recordSalePayment(quotation.id, {
-          amount: rentAdvancePortion + accessoryTotal,
-          paymentMode: mode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
-          // For a cheque, the date it was received from the customer.
-          paymentDate: (mode === 'CHEQUE' ? chequeReceivedDate : '') || paymentDate,
-          // Auto-generated server-side for non-Cheque modes (see billingHelpers.ts's
-          // generatePaymentReference) — nothing to send from here.
-          referenceNumber: undefined,
-          remarks:
-            remarks ||
-            `Advance payment collected at conversion — Invoice ${quotation.invoiceNumber}`,
-          chequeNumber: mode === 'CHEQUE' ? chequeNumber : undefined,
-          chequeBankName: mode === 'CHEQUE' ? chequeBankName : undefined,
-          // dueDate is a deprecated mirror of chequeDate server-side.
-          chequeDueDate: mode === 'CHEQUE' ? chequeDate : undefined,
-          chequeDate: mode === 'CHEQUE' ? chequeDate : undefined,
-        });
+        paymentSubmissions.push(
+          recordSalePayment(quotation.id, {
+            amount: rentAdvancePortion + accessoryTotal,
+            paymentMode: mode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
+            // For a cheque, the date it was received from the customer.
+            paymentDate: (mode === 'CHEQUE' ? chequeReceivedDate : '') || paymentDate,
+            // Auto-generated server-side for non-Cheque modes (see billingHelpers.ts's
+            // generatePaymentReference) — nothing to send from here.
+            referenceNumber: undefined,
+            remarks:
+              remarks ||
+              `Advance payment collected at conversion — Invoice ${quotation.invoiceNumber}`,
+            chequeNumber: mode === 'CHEQUE' ? chequeNumber : undefined,
+            chequeBankName: mode === 'CHEQUE' ? chequeBankName : undefined,
+            // dueDate is a deprecated mirror of chequeDate server-side.
+            chequeDueDate: mode === 'CHEQUE' ? chequeDate : undefined,
+            chequeDate: mode === 'CHEQUE' ? chequeDate : undefined,
+          }),
+        );
       }
 
-      // 5. Submit Security Deposit as a SEPARATE payment request for Finance approval
+      // Security Deposit — a SEPARATE payment request for Finance approval.
       // This is a distinct financial transaction — never combined with the advance.
-      // Skip if no security deposit required, or amount is zero.
+      // Skipped if no security deposit is required, or the amount is zero.
       const hasCautionDeposit = cautionAmount && Number(cautionAmount) > 0;
       if (hasCautionDeposit) {
         const cautionPayMode = cautionMode === 'CREDIT_CARD' ? 'BANK_TRANSFER' : cautionMode;
-        await recordSalePayment(quotation.id, {
-          amount: Number(cautionAmount),
-          paymentMode: cautionPayMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
-          paymentDate:
-            (cautionPayMode === 'CHEQUE' ? cautionChequeReceivedDate : '') || paymentDate,
-          // Auto-generated server-side for non-Cheque modes — nothing to send from here.
-          referenceNumber: undefined,
-          remarks: `Security Deposit collected at conversion — Invoice ${quotation.invoiceNumber}`,
-          isSecurityDeposit: true,
-          chequeNumber: cautionPayMode === 'CHEQUE' ? cautionChequeNumber : undefined,
-          chequeBankName: cautionPayMode === 'CHEQUE' ? cautionChequeBankName : undefined,
-          chequeDueDate: cautionPayMode === 'CHEQUE' ? cautionChequeDate : undefined,
-          chequeDate: cautionPayMode === 'CHEQUE' ? cautionChequeDate : undefined,
-        });
+        paymentSubmissions.push(
+          recordSalePayment(quotation.id, {
+            amount: Number(cautionAmount),
+            paymentMode: cautionPayMode as 'CASH' | 'BANK_TRANSFER' | 'CHEQUE',
+            paymentDate:
+              (cautionPayMode === 'CHEQUE' ? cautionChequeReceivedDate : '') || paymentDate,
+            // Auto-generated server-side for non-Cheque modes — nothing to send from here.
+            referenceNumber: undefined,
+            remarks: `Security Deposit collected at conversion — Invoice ${quotation.invoiceNumber}`,
+            isSecurityDeposit: true,
+            chequeNumber: cautionPayMode === 'CHEQUE' ? cautionChequeNumber : undefined,
+            chequeBankName: cautionPayMode === 'CHEQUE' ? cautionChequeBankName : undefined,
+            chequeDueDate: cautionPayMode === 'CHEQUE' ? cautionChequeDate : undefined,
+            chequeDate: cautionPayMode === 'CHEQUE' ? cautionChequeDate : undefined,
+          }),
+        );
+      }
+
+      if (paymentSubmissions.length > 0) {
+        const settled = await Promise.allSettled(paymentSubmissions);
+        const failed = settled.find((r) => r.status === 'rejected');
+        if (failed && failed.status === 'rejected') throw failed.reason;
       }
 
       let successMsg =
@@ -1091,6 +1113,7 @@ export function QuotationConversionFlow({
           <Button
             variant="ghost"
             onClick={step === 1 ? onClose : () => setStep((s) => (s - 1) as 1 | 2 | 3)}
+            disabled={isSubmitting}
             className="text-[10px] font-black uppercase tracking-widest text-slate-400"
           >
             {step === 1 ? 'Cancel' : 'Back'}
@@ -1103,8 +1126,13 @@ export function QuotationConversionFlow({
             }
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest px-8 rounded-xl shadow-lg shadow-emerald-100"
           >
+            {/* Keep a word next to the spinner: an icon-only button reads as "stuck", not
+                "working", and invites the second click this whole flow is guarding against. */}
             {isSubmitting ? (
-              <Loader2 size={14} className="animate-spin" />
+              <>
+                <Loader2 size={14} className="animate-spin mr-2" />
+                Processing…
+              </>
             ) : step === 3 ? (
               'Activate Contract'
             ) : (

@@ -327,10 +327,28 @@ export default function EmployeeRentTable({
     fetchInvoices();
   };
 
-  const handleSendForApproval = async () => {
-    if (!selectedInvoice) return;
+  // Which row's action is currently in flight. Set synchronously on click so the menu
+  // entry flips to its spinner and disables before any network round-trip completes —
+  // a second click (including one made after reopening the menu) is refused while set.
+  const [sendingForApprovalId, setSendingForApprovalId] = useState<string | null>(null);
+  const [activatingContractId, setActivatingContractId] = useState<string | null>(null);
+
+  /**
+   * @param inv the row the menu entry was clicked on. The details dialog passes nothing —
+   * its invoice is already `selectedInvoice`.
+   *
+   * The row menu used to do `setSelectedInvoice(inv); handleSendForApproval();`, which
+   * read `selectedInvoice` in the same render, before that update had landed. The click
+   * therefore either did nothing at all (nothing previously selected) or acted on a
+   * DIFFERENT row — whichever invoice had last been opened. Passing the row itself is
+   * the only correct read.
+   */
+  const handleSendForApproval = async (inv?: Invoice) => {
+    const target = inv ?? selectedInvoice;
+    if (!target || sendingForApprovalId) return;
+    setSendingForApprovalId(target.id);
     try {
-      await employeeApproveInvoice(selectedInvoice.id);
+      await employeeApproveInvoice(target.id);
       toast.success('Sent for Finance Approval');
       setDetailsOpen(false);
       fetchInvoices();
@@ -339,10 +357,14 @@ export default function EmployeeRentTable({
       const err = error as { response?: { data?: { message?: string } } };
       const msg = err.response?.data?.message || 'Failed to send for approval';
       toast.error(msg);
+    } finally {
+      setSendingForApprovalId(null);
     }
   };
 
   const handleActivateContract = async (inv: Invoice) => {
+    if (activatingContractId) return;
+    setActivatingContractId(inv.id);
     try {
       await activateContractInvoice(inv.id, { contractConfirmationUrl: '' });
       toast.success('Contract activated', {
@@ -352,6 +374,8 @@ export default function EmployeeRentTable({
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e.response?.data?.message || 'Failed to activate contract');
+    } finally {
+      setActivatingContractId(null);
     }
   };
 
@@ -572,10 +596,11 @@ export default function EmployeeRentTable({
                                     icon: <SendMark />,
                                     label: 'Send to Finance',
                                     description: 'Submit this draft for approval',
-                                    onClick: () => {
-                                      setSelectedInvoice(inv);
-                                      handleSendForApproval();
-                                    },
+                                    loading: sendingForApprovalId === inv.id,
+                                    // Stays open so the spinner is actually visible — this one
+                                    // has no dialog to hand focus to.
+                                    closeOnSelect: false,
+                                    onClick: () => handleSendForApproval(inv),
                                   },
                                 ]
                               : []),
@@ -593,6 +618,8 @@ export default function EmployeeRentTable({
                                     icon: <ActivateContractMark />,
                                     label: 'Activate Contract',
                                     description: 'Allocate machines and go live',
+                                    loading: activatingContractId === inv.id,
+                                    closeOnSelect: false,
                                     onClick: () => handleActivateContract(inv),
                                   },
                                 ]
