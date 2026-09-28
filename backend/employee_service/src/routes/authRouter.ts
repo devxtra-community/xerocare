@@ -13,6 +13,9 @@ import {
   getSessions,
   logoutSession,
   getMe,
+  getTrustedDevices,
+  revokeTrustedDevice,
+  revokeAllTrustedDevices,
 } from '../controllers/authController';
 import { authMiddleware } from '../middleware/authMiddleware';
 
@@ -97,5 +100,22 @@ authRouter.get('/sessions', authMiddleware, getSessions);
  * Log out one specific device from the list of active sessions.
  */
 authRouter.post('/sessions/logout', authMiddleware, logoutSession);
+
+// --- 5. Trusted Devices (skip-OTP) ---
+
+/**
+ * List browsers/devices that can currently log in without OTP.
+ */
+authRouter.get('/trusted-devices', authMiddleware, getTrustedDevices);
+
+/**
+ * Revoke one trusted device — it will need OTP again next login.
+ */
+authRouter.delete('/trusted-devices/:deviceId', authMiddleware, revokeTrustedDevice);
+
+/**
+ * Revoke every trusted device for this account (e.g. password compromised).
+ */
+authRouter.post('/revoke-trusted-devices', authMiddleware, revokeAllTrustedDevices);
 
 export default authRouter;

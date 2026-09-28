@@ -68,6 +68,14 @@ export class InvoiceItem {
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: 0 })
   unitPrice?: number;
 
+  /**
+   * Service estimates only: the line's catalog price before coverage. unitPrice is what
+   * the customer is charged — 0 on a covered line (Rent, warranty, service contract) — so
+   * this keeps what the part is worth visible to Finance. Never summed into any total.
+   */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  listUnitPrice?: number | null;
+
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: 0 })
   discountAmount?: number;
 

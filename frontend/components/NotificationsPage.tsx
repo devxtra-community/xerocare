@@ -132,6 +132,9 @@ export default function NotificationsPage({ role }: { role: string }) {
       case 'OPENING_BALANCE':
         router.push(`/${role}/opening-balances`);
         break;
+      case 'CUSTOM_PART_REQUEST':
+        router.push(`/${role}/rfqs/create?fromServiceTicket=${refId}`);
+        break;
       default:
         break;
     }

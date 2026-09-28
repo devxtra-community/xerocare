@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Plus, X } from 'lucide-react';
 import { fetchOwners, createOwner, type Owner } from '@/lib/finance/accountsApi';
+import { getUserFromToken } from '@/lib/auth';
 
 interface OwnerSelectProps {
   value: string;
@@ -34,8 +35,11 @@ export default function OwnerSelect({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
 
+  // Keyed by branch so one branch's owners can never be served from cache to another
+  // (the list is branch-scoped server-side). invalidateQueries(['owners']) still matches.
+  const branchId = getUserFromToken()?.branchId ?? 'all';
   const { data: owners = [], isLoading } = useQuery({
-    queryKey: ['owners'],
+    queryKey: ['owners', branchId],
     queryFn: () => fetchOwners(),
     staleTime: 60 * 1000,
   });

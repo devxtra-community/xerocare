@@ -27,6 +27,7 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { toast } from 'sonner';
 import Barcode from 'react-barcode';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import MachineServiceAnalyticsPanel from '@/components/products/MachineServiceAnalyticsPanel';
 
 interface ProductFeature {
   subHeading: string;
@@ -442,6 +443,15 @@ export default function ProductDetailPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Service & Spend Analytics — real internal cost, works for RENT/LEASE/
+          SALE and external machines alike. Staff-only, never customer-facing. */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
+        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+          Service & Spend History
+        </h3>
+        <MachineServiceAnalyticsPanel serialNumber={product.serial_no} currency={currency} />
       </div>
 
       {/* Image Preview Overlay Modal */}

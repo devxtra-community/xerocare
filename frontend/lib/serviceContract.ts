@@ -26,6 +26,9 @@ export interface ContractMachineInfo {
   serialNumber: string;
   ownership?: string | null;
   meterReading?: number | null;
+  /** PRINTER (default) | COMPUTER | OTHER — only PRINTER uses meter readings and
+   *  can take SMA/FSMA; COMPUTER/OTHER are AMC-only with no meter readings at all. */
+  machineType?: 'PRINTER' | 'COMPUTER' | 'OTHER';
 }
 
 export interface ContractTicketSummary {
@@ -176,9 +179,13 @@ export interface ExternalMachineInput {
   brand: string;
   modelName: string;
   serialNumber: string;
+  /** Only meaningful for PRINTER — ignored (sent as 0) for COMPUTER/OTHER. */
   meterReading: number;
   printColour?: 'BLACK_WHITE' | 'COLOUR' | 'BOTH';
   description?: string;
+  /** PRINTER (default) keeps meter-based service/SMA/FSMA; COMPUTER/OTHER have
+   *  no usage meter and can only ever be enrolled in an AMC contract. */
+  machineType?: 'PRINTER' | 'COMPUTER' | 'OTHER';
 }
 
 export interface RegisteredExternalMachine {
@@ -189,6 +196,7 @@ export interface RegisteredExternalMachine {
   ownership: string;
   meter_reading?: number;
   customer_id?: string | null;
+  machine_type?: 'PRINTER' | 'COMPUTER' | 'OTHER';
 }
 
 /** Registers a machine the customer bought elsewhere (ownership EXTERNAL). */

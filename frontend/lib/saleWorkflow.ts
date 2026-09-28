@@ -77,6 +77,8 @@ export interface InstallationRequest {
    *  SalePaymentRequest exists for this contract — gates the "Collect Security Deposit"
    *  action so it only shows when one is actually needed and missing. */
   securityDepositCollected?: boolean;
+  /** PENDING = recorded, awaiting Finance approval; APPROVED = approved; null = none. */
+  securityDepositStatus?: 'PENDING' | 'APPROVED' | null;
 }
 
 export interface SalePaymentRequest {
@@ -471,7 +473,14 @@ export const recordSalePayment = async (
     chequeDueDate?: string;
     chequeDate?: string;
     collectLater?: boolean;
-    paymentContext?: 'SALE' | 'RENT_ADVANCE' | 'RENT_PERIODIC' | 'LEASE_ADVANCE' | 'LEASE_PERIODIC';
+    paymentContext?:
+      | 'SALE'
+      | 'RENT_ADVANCE'
+      | 'RENT_PERIODIC'
+      | 'LEASE_ADVANCE'
+      | 'LEASE_PERIODIC'
+      | 'SERVICE_CONTRACT_SIGNING'
+      | 'SERVICE_CONTRACT_INSTALLMENT';
     isSecurityDeposit?: boolean;
 
     // ONLINE_PAYMENT only. Card facts, never the PAN or the CVV — and deliberately no

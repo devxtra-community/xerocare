@@ -15,11 +15,16 @@ export interface HistoryAllocation {
   productId?: string;
   modelId?: string;
   serialNumber?: string;
+  /** ALLOCATED while the machine is on the contract; REPLACED / RETURNED once it left. */
+  status?: string;
   currentBwA4?: number;
   currentBwA3?: number;
   currentColorA4?: number;
   currentColorA3?: number;
   warrantyInfo?: WarrantyInfo;
+  currentMeterReading?: number;
+  currentMeterReadingAt?: string | null;
+  currentMeterReadingSource?: string | null;
 }
 
 export interface HistoryInvoice {
@@ -57,7 +62,46 @@ export interface MachineAllocation {
   purchaseDate?: string;
   contractType?: string;
   meterReading?: number;
+  /** When the reading was taken and by which flow — see meterSourceLabel. */
+  meterReadingAt?: string | null;
+  meterReadingSource?: string | null;
   warrantyInfo?: WarrantyInfo;
+}
+
+/**
+ * Human label for where a machine's reading came from. A machine has one reading shared
+ * by every flow (service tickets, service contracts, Rent/Lease installation, usage and
+ * replacement), so the card says which one took it.
+ */
+export function meterSourceLabel(source?: string | null): string | null {
+  switch (source) {
+    case 'SERVICE_TICKET':
+      return 'Service ticket';
+    case 'SERVICE_DIAGNOSIS':
+      return 'Service diagnosis';
+    case 'SERVICE_COMPLETION':
+      return 'Service completion';
+    case 'SERVICE_CONTRACT':
+      return 'Service contract';
+    case 'EXTERNAL_REGISTRATION':
+      return 'Machine registration';
+    case 'CONTRACT_START':
+      return 'Contract start';
+    case 'INSTALLATION':
+      return 'Installation';
+    case 'RENT_USAGE':
+      return 'Rent usage';
+    case 'LEASE_USAGE':
+      return 'Lease usage';
+    case 'REPLACEMENT_REMOVED':
+      return 'Replacement (removed)';
+    case 'REPLACEMENT_INSTALLED':
+      return 'Replacement (installed)';
+    case 'CONTRACT_SYNC':
+      return 'Rent/Lease contract';
+    default:
+      return null;
+  }
 }
 
 /**
@@ -99,6 +143,17 @@ export function warrantyDisplayFields(w?: WarrantyInfo) {
  * real state from `effectiveTo` so the picker never labels a lapsed rental
  * "ACTIVE".
  */
+/**
+ * A machine taken off the contract by a replacement (REPLACED) or at contract end
+ * (RETURNED) is back in stock, not rented — it must not read ACTIVE in the picker. Only
+ * the machine still ALLOCATED carries the contract, which is also the only one the
+ * service ticket treats as Rent/Lease-covered.
+ */
+function allocationContractStatus(alloc: HistoryAllocation, inv: HistoryInvoice): string {
+  if (alloc.status && alloc.status !== 'ALLOCATED') return alloc.status;
+  return deriveContractStatus(inv.effectiveTo, inv.contractStatus);
+}
+
 function deriveContractStatus(effectiveTo?: string, rawStatus?: string): string {
   if (effectiveTo) {
     const end = new Date(effectiveTo);
@@ -130,9 +185,12 @@ export function getRentedMachines(
           effectiveFrom: inv.effectiveFrom,
           effectiveTo: inv.effectiveTo,
           monthlyRent: inv.monthlyRent || 0,
-          contractStatus: deriveContractStatus(inv.effectiveTo, inv.contractStatus),
+          contractStatus: allocationContractStatus(alloc, inv),
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
+          meterReading: alloc.currentMeterReading,
+          meterReadingAt: alloc.currentMeterReadingAt ?? null,
+          meterReadingSource: alloc.currentMeterReadingSource ?? null,
           type: 'RENT',
         });
       });
@@ -187,8 +245,13 @@ export function getLeasedMachines(
           remainingCopies: w.remainingCopies,
           expiredFirst: w.expiredFirst,
           warrantyInfo: alloc.warrantyInfo,
+          // Set only once the machine has left the lease (replaced / returned).
+          contractStatus: alloc.status && alloc.status !== 'ALLOCATED' ? alloc.status : undefined,
           contractReferenceId: inv.id,
           invoiceNumber: inv.invoiceNumber,
+          meterReading: alloc.currentMeterReading,
+          meterReadingAt: alloc.currentMeterReadingAt ?? null,
+          meterReadingSource: alloc.currentMeterReadingSource ?? null,
           type: 'LEASE',
         });
       });
@@ -261,6 +324,9 @@ export function getPurchasedMachines(
           expiredFirst: w.expiredFirst,
           effectiveTo: w.effectiveTo,
           warrantyInfo: alloc.warrantyInfo,
+          meterReading: alloc.currentMeterReading,
+          meterReadingAt: alloc.currentMeterReadingAt ?? null,
+          meterReadingSource: alloc.currentMeterReadingSource ?? null,
           type: 'SALE',
         });
       });
@@ -308,6 +374,8 @@ export function getExternalMachines(
         brandName: prod.brand,
         type: 'EXTERNAL',
         meterReading: prod.meter_reading || 0,
+        meterReadingAt: prod.meter_reading_at ?? null,
+        meterReadingSource: prod.meter_reading_source ?? null,
         contractType: contract?.contractType,
         contractReferenceId: contract?.id,
         effectiveTo: contract?.endDate,

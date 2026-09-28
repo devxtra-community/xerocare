@@ -29,7 +29,9 @@ type FormData = z.infer<typeof formSchema>;
 interface AddBrandDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  /** Called after a successful create/edit. The created/updated brand is
+   *  passed through so a caller can e.g. auto-select it in a form. */
+  onSuccess: (brand?: Brand) => void;
   /** Pass a brand to switch the dialog into edit mode */
   initialData?: Brand | null;
 }
@@ -73,15 +75,18 @@ export function AddBrandDialog({
   const onSubmit = async (data: FormData) => {
     try {
       setLoading(true);
+      let saved: Brand | undefined;
       if (isEditing && initialData) {
-        await updateBrand(initialData.id, data);
+        const res = await updateBrand(initialData.id, data);
+        saved = res?.data ?? { ...initialData, ...data };
         toast.success('Brand updated successfully');
       } else {
-        await createBrand(data);
+        const res = await createBrand(data);
+        saved = res?.data;
         toast.success('Brand created successfully');
       }
       reset();
-      onSuccess();
+      onSuccess(saved);
       onOpenChange(false);
     } catch (error: unknown) {
       console.error('error saving brand', error);

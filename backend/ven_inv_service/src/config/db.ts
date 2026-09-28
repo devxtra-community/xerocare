@@ -132,6 +132,35 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         `);
         logger.info('Guaranteed processed_invoice_items table exists.');
 
+        // Machine meter readings from every side of the system — service tickets, service
+        // contracts, and (pushed from billing_service) Rent/Lease installation, monthly
+        // usage and replacement. products.meter_reading stays the single current value;
+        // this log says which flow took each reading and when. See
+        // helpers/meterReadingHelper.ts.
+        await Source.query(`
+          CREATE TABLE IF NOT EXISTS product_meter_readings (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            product_id UUID NULL,
+            serial_no VARCHAR(255) NOT NULL,
+            total_reading INTEGER NOT NULL,
+            bw_a4 INTEGER NULL,
+            bw_a3 INTEGER NULL,
+            color_a4 INTEGER NULL,
+            color_a3 INTEGER NULL,
+            source VARCHAR(40) NOT NULL,
+            reference_id VARCHAR(64) NULL,
+            reference_no VARCHAR(100) NULL,
+            reading_date TIMESTAMP NOT NULL DEFAULT NOW(),
+            recorded_by VARCHAR(64) NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_pmr_product ON product_meter_readings(product_id, reading_date DESC);
+          CREATE INDEX IF NOT EXISTS idx_pmr_serial ON product_meter_readings(serial_no);
+          ALTER TABLE products
+            ADD COLUMN IF NOT EXISTS meter_reading_at TIMESTAMP NULL,
+            ADD COLUMN IF NOT EXISTS meter_reading_source VARCHAR(40) NULL;
+        `);
+
         // --- Multi-Currency & Tax: new branch columns ---
         await Source.query(`
           ALTER TABLE branches
@@ -893,6 +922,27 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS service_location VARCHAR(500);
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "partBrand" VARCHAR(255) NULL;
           ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS mpn VARCHAR(255) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "unitCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "totalCost" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "listUnitPrice" NUMERIC(12,2) NULL;
+          ALTER TABLE service_ticket_items ADD COLUMN IF NOT EXISTS "listTotalPrice" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "listUnitPrice" NUMERIC(12,2) NULL;
+          ALTER TABLE service_estimate_items ADD COLUMN IF NOT EXISTS "listTotalPrice" NUMERIC(12,2) NULL;
+          -- Backfill the catalog price onto lines written before it was kept. A charged
+          -- line's own price is its list price; a covered catalog line takes the part's
+          -- base price. Covered custom lines have no catalog price and stay NULL.
+          UPDATE service_ticket_items i
+             SET "listUnitPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END,
+                 "listTotalPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END * i.quantity
+            FROM spare_parts sp
+           WHERE i."listUnitPrice" IS NULL AND sp.id = i."sparePartId";
+          UPDATE service_estimate_items i
+             SET "listUnitPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END,
+                 "listTotalPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END * i.quantity
+            FROM spare_parts sp
+           WHERE i."listUnitPrice" IS NULL AND sp.id = i."sparePartId";
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
@@ -924,6 +974,26 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           );
         `);
         logger.info('Guaranteed machine_service_history table exists (new redesign).');
+
+        // External machines (never purchased from us — no matching Product row)
+        // still need a lifetime-spend history row, keyed by serialNumber alone.
+        // Postgres allows multiple NULLs under a UNIQUE constraint, so relaxing
+        // productId to nullable doesn't break its existing uniqueness among
+        // real products.
+        await Source.query(`
+          ALTER TABLE machine_service_history ALTER COLUMN "productId" DROP NOT NULL;
+        `);
+        try {
+          await Source.query(`
+            CREATE UNIQUE INDEX IF NOT EXISTS machine_service_history_serial_number_key
+              ON machine_service_history ("serialNumber");
+          `);
+        } catch (err) {
+          logger.warn(
+            'Could not add unique index on machine_service_history.serialNumber (likely pre-existing duplicate serials) — external-machine history lookups will still work by best match, just without the uniqueness guarantee:',
+            err,
+          );
+        }
 
         // 4. Create service_part_usage_logs table
         await Source.query(`

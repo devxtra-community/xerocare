@@ -191,6 +191,13 @@ export class Product {
   @Column({ name: 'meter_reading', type: 'int', default: 0, nullable: true })
   meter_reading?: number;
 
+  /** When meter_reading was last taken, and by which flow (see meterReadingHelper). */
+  @Column({ name: 'meter_reading_at', type: 'timestamp', nullable: true })
+  meter_reading_at?: Date | null;
+
+  @Column({ name: 'meter_reading_source', type: 'varchar', length: 40, nullable: true })
+  meter_reading_source?: string | null;
+
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customer_id?: string | null;
 

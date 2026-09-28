@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { modelService, CreateModelDTO } from '@/services/modelService';
+import { modelService, CreateModelDTO, Model } from '@/services/modelService';
 import { getBrands, Brand } from '@/lib/brand';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 
@@ -23,10 +23,20 @@ type FormData = z.infer<typeof formSchema>;
 interface AddModelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  /** Called after a successful create. The created model is passed through
+   *  so a caller can e.g. auto-select it in a form. */
+  onSuccess: (model?: Model) => void;
+  /** Pre-selects this brand when the dialog opens — e.g. when a caller
+   *  already has a brand chosen elsewhere in its own form. */
+  initialBrandId?: string;
 }
 
-export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialogProps) {
+export function AddModelDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+  initialBrandId,
+}: AddModelDialogProps) {
   const [loading, setLoading] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
 
@@ -49,15 +59,22 @@ export function AddModelDialog({ open, onOpenChange, onSuccess }: AddModelDialog
     resolver: zodResolver(formSchema),
   });
 
+  useEffect(() => {
+    if (open) {
+      reset({ model_no: '', model_name: '', brand_id: initialBrandId || '', description: '' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialBrandId]);
+
   const brandIdValue = useWatch({ control, name: 'brand_id' });
 
   const onSubmit = async (data: FormData) => {
     try {
       setLoading(true);
-      await modelService.createModel(data as CreateModelDTO);
+      const created = await modelService.createModel(data as CreateModelDTO);
       toast.success('Model created successfully');
       reset();
-      onSuccess();
+      onSuccess(created);
       onOpenChange(false);
     } catch (error: unknown) {
       console.error('error creating model', error);

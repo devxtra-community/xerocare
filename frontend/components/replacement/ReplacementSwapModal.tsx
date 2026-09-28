@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { useStableCallback } from '@/lib/hooks/useStableCallback';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,10 @@ function Panel({
   );
 }
 
-export function ReplacementSwapModal({ requestId, onClose, onDone }: Props) {
+export function ReplacementSwapModal({ requestId, onClose: onCloseProp, onDone }: Props) {
+  // Stable identity: parents pass onClose inline and may re-render every second (live
+  // timers), which otherwise restarted — and cancelled — this modal's load each tick.
+  const onClose = useStableCallback(onCloseProp);
   const [detail, setDetail] = useState<ReplacementDetail | null>(null);
   const [candidates, setCandidates] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);

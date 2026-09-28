@@ -51,6 +51,26 @@ export default function FinanceServiceEstimatesPage() {
   // Detail view state
   const [detailTarget, setDetailTarget] = useState<Invoice | null>(null);
   const [ticketDetails, setTicketDetails] = useState<ServiceTicket | null>(null);
+
+  /**
+   * A line's value before coverage. A covered line (Rent, warranty, service contract) is
+   * charged 0, but Finance still needs what the part or consumable is worth — it is the
+   * machine's real spend. Quotations raised before the value was stored fall back to the
+   * service ticket's own line, matched on the part name the description starts with.
+   */
+  const listPriceFor = (item: {
+    unitPrice?: number;
+    listUnitPrice?: number | null;
+    description?: string;
+  }): number => {
+    const stored = Number(item.listUnitPrice) || 0;
+    if (stored > 0) return stored;
+    if ((item.unitPrice || 0) > 0) return Number(item.unitPrice);
+    const match = ticketDetails?.items?.find(
+      (t) => !!t.partName && !!item.description?.startsWith(t.partName),
+    );
+    return Number(match?.listUnitPrice) || 0;
+  };
   const [loadingTicket, setLoadingTicket] = useState(false);
 
   // Approved estimates — ready to be sent to the customer
@@ -427,22 +447,22 @@ export default function FinanceServiceEstimatesPage() {
         <Dialog open onOpenChange={(v) => !v && setDetailTarget(null)}>
           <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden rounded-2xl max-h-[92vh] flex flex-col">
             {/* Header band */}
-            <DialogHeader className="shrink-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-5 space-y-2">
+            <DialogHeader className="shrink-0 bg-blue-50/60 border-b border-slate-100 px-6 py-5 space-y-2">
               <div className="flex items-start justify-between gap-3 pr-8">
                 <div>
-                  <DialogTitle className="text-white text-lg font-bold tracking-tight">
+                  <DialogTitle className="text-slate-900 text-lg font-bold tracking-tight">
                     Service Estimate Review
                   </DialogTitle>
-                  <DialogDescription className="text-slate-400 text-xs mt-0.5">
+                  <DialogDescription className="text-slate-500 text-xs mt-0.5">
                     Items, charges and technician context for this estimate.
                   </DialogDescription>
                 </div>
                 <div className="flex flex-col items-end gap-1.5">
-                  <span className="font-mono text-xs font-bold text-sky-300 bg-sky-500/10 border border-sky-400/20 px-2.5 py-1 rounded-lg">
+                  <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">
                     {detailTarget.invoiceNumber}
                   </span>
                   {(detailTarget.revisionCount || 0) > 0 && (
-                    <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md uppercase tracking-wider">
                       Revision {detailTarget.revisionCount}
                     </span>
                   )}
@@ -473,13 +493,13 @@ export default function FinanceServiceEstimatesPage() {
                 ].map((f) => (
                   <div
                     key={f.label}
-                    className="bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5"
+                    className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
                   >
                     <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">
                       {f.label}
                     </span>
                     <span
-                      className={`block text-[11px] font-semibold text-slate-100 truncate ${
+                      className={`block text-[11px] font-semibold text-slate-700 truncate ${
                         f.mono ? 'font-mono' : ''
                       }`}
                       title={f.value}
@@ -608,6 +628,8 @@ export default function FinanceServiceEstimatesPage() {
                         detailTarget.items.map((item, idx) => {
                           const lineTotal = (item.unitPrice || 0) * (item.quantity || 0);
                           const isFoc = (item.unitPrice || 0) === 0;
+                          const listPrice = listPriceFor(item);
+                          const coveredValue = isFoc ? listPrice * (item.quantity || 0) : 0;
                           return (
                             <TableRow key={idx} className="hover:bg-slate-50/60">
                               <TableCell className="font-medium text-slate-800 max-w-[320px]">
@@ -620,15 +642,27 @@ export default function FinanceServiceEstimatesPage() {
                               </TableCell>
                               <TableCell className="text-right font-mono text-slate-600">
                                 {isFoc ? (
-                                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
-                                    FOC
-                                  </Badge>
+                                  <span className="inline-flex items-center justify-end gap-1.5">
+                                    {listPrice > 0 && (
+                                      <span className="text-slate-500">
+                                        {formatCurrency(listPrice, currency)}
+                                      </span>
+                                    )}
+                                    <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">
+                                      {listPrice > 0 ? 'Covered' : 'FOC'}
+                                    </Badge>
+                                  </span>
                                 ) : (
                                   formatCurrency(item.unitPrice || 0, currency)
                                 )}
                               </TableCell>
                               <TableCell className="text-right font-mono font-semibold text-slate-800">
                                 {formatCurrency(lineTotal, currency)}
+                                {coveredValue > 0 && (
+                                  <span className="block text-[10px] font-normal text-slate-400">
+                                    value {formatCurrency(coveredValue, currency)}
+                                  </span>
+                                )}
                               </TableCell>
                             </TableRow>
                           );
@@ -648,6 +682,13 @@ export default function FinanceServiceEstimatesPage() {
                 {(() => {
                   const itemsSubtotal = (detailTarget.items || []).reduce(
                     (sum, it) => sum + (it.unitPrice || 0) * (it.quantity || 0),
+                    0,
+                  );
+                  // What the covered lines are worth. Shown for the record — the machine's
+                  // parts/consumables value — but never part of any total the customer pays.
+                  const coveredValueTotal = (detailTarget.items || []).reduce(
+                    (sum, it) =>
+                      (it.unitPrice || 0) === 0 ? sum + listPriceFor(it) * (it.quantity || 0) : sum,
                     0,
                   );
                   const visitCharge =
@@ -672,6 +713,14 @@ export default function FinanceServiceEstimatesPage() {
                             {formatCurrency(itemsSubtotal, currency)}
                           </span>
                         </div>
+                        {coveredValueTotal > 0 && (
+                          <div className="flex justify-between text-emerald-700 font-medium">
+                            <span>Covered value (not charged)</span>
+                            <span className="font-mono">
+                              {formatCurrency(coveredValueTotal, currency)}
+                            </span>
+                          </div>
+                        )}
                         {visitCharge > 0 && (
                           <div className="flex justify-between text-slate-500 font-medium">
                             <span className="flex items-center gap-1.5">
@@ -709,6 +758,12 @@ export default function FinanceServiceEstimatesPage() {
                             {formatCurrency(detailTarget.totalAmount, currency)}
                           </span>
                         </div>
+                        {coveredValueTotal > 0 && (
+                          <p className="text-[10px] text-emerald-700 font-medium leading-snug pt-1">
+                            Covered parts are not charged to the customer. Their value is kept for
+                            this machine&apos;s spend history.
+                          </p>
+                        )}
                         {visitCharge > 0 && !visitAdded && (
                           <p className="text-[10px] text-amber-700 font-medium leading-snug pt-1">
                             Visit charge is collected separately in cash on-site and is not part of

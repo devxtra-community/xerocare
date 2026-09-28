@@ -16,6 +16,7 @@ import { getAllModels, Model, formatModelLabel } from '@/lib/model';
 import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { getAllProducts, Product } from '@/lib/product';
 import { getBrands, Brand } from '@/lib/brand';
+import { getServiceTicketById } from '@/lib/serviceTicket';
 import { Button } from '@/components/ui/button';
 import {
   Trash2,
@@ -51,6 +52,7 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
   const vendorIdParam = searchParams.get('vendorId');
   const editRfqId = searchParams.get('edit');
   const isEditMode = !!editRfqId;
+  const fromServiceTicketId = searchParams.get('fromServiceTicket');
 
   const [loading, setLoading] = useState(false);
   const [loadingRfq, setLoadingRfq] = useState(isEditMode);
@@ -101,6 +103,45 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
       setSelectedVendors([vendorIdParam]);
     }
   }, [vendorIdParam]);
+
+  // Arrived here from a technician's "custom part" notification — seed one
+  // RFQ row per off-catalog item on that ticket so the manager doesn't have
+  // to retype what the technician already described.
+  useEffect(() => {
+    if (!fromServiceTicketId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const ticket = await getServiceTicketById(fromServiceTicketId);
+        if (cancelled) return;
+        const customItems = (ticket.items || []).filter((it) => it.itemSource === 'CUSTOM');
+        if (customItems.length === 0) {
+          toast.error('That ticket has no custom (off-catalog) parts to request.');
+          return;
+        }
+        setItems((prev) => [
+          ...prev,
+          ...customItems.map((it) => ({
+            itemType: ItemType.SPARE_PART,
+            customSparePartName: it.customPartName || it.partName,
+            customBrandName: it.customPartBrand || undefined,
+            description: it.customPartDescription || undefined,
+            mpn: it.mpn || undefined,
+            quantity: it.quantity || 1,
+          })),
+        ]);
+        toast.success(
+          `Pre-filled ${customItems.length} custom part${customItems.length > 1 ? 's' : ''} from ticket ${ticket.ticketNumber}.`,
+        );
+      } catch (error) {
+        console.error('Failed to load service ticket for RFQ prefill', error);
+        toast.error('Could not load that service ticket to pre-fill the request.');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fromServiceTicketId]);
 
   // Edit mode: load the existing draft and prefill the form. Backend
   // updateRfq() 400s on anything past DRAFT, so bounce back to the detail

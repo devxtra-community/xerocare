@@ -26,6 +26,8 @@ export interface ServiceTicketItem {
   customPartName?: string;
   customPartBrand?: string;
   customPartDescription?: string;
+  /** CUSTOM (off-catalog) items only — technician-entered internal cost, since there's no catalog price to pull from. */
+  customPartCost?: number;
   /** Brand of the part (from spare part record, or technician-entered for custom parts). */
   partBrand?: string | null;
   /** Manufacturer part number. */
@@ -35,6 +37,12 @@ export interface ServiceTicketItem {
   unitPrice: number;
   totalPrice: number;
   isFree: boolean;
+  /** Real internal cost, even when unitPrice/totalPrice are 0 (FOC). Internal-only — never shown to the customer. */
+  unitCost?: number | null;
+  totalCost?: number | null;
+  /** Catalog price before coverage — the part's value on a covered (0-charge) line. Never totalled. */
+  listUnitPrice?: number | null;
+  listTotalPrice?: number | null;
 }
 
 export interface ServiceTicket {
@@ -105,7 +113,9 @@ export const getServiceTicketById = async (id: string): Promise<ServiceTicket> =
 };
 
 export const createServiceTicket = async (data: Partial<ServiceTicket>): Promise<ServiceTicket> => {
-  const response = await api.post('/i/service/tickets', data);
+  // The create dialog shows validation failures (e.g. "machine already has an
+  // open ticket") inline itself, so the global toast would just duplicate it.
+  const response = await api.post('/i/service/tickets', data, { skipErrorToast: true });
   return response.data.data;
 };
 
@@ -122,6 +132,25 @@ export const collectVisitCharge = async (
     accountId,
     ...(paymentMode === 'CHEQUE' ? cheque : {}),
   });
+  return response.data.data;
+};
+
+/** Collect a service ticket's completion balance any time after it's marked
+ *  COMPLETED — "Not collected" at completion isn't final, the customer can
+ *  still pay later. Goes to Accounts as a pending approval, same as every
+ *  other collection path. */
+export const collectCompletionPayment = async (
+  id: string,
+  payload: {
+    amount: number;
+    paymentMode: string;
+    accountId?: string;
+    chequeNumber?: string;
+    chequeBankName?: string;
+    chequeDate?: string;
+  },
+): Promise<{ paymentRequestId: string; requestNo: string }> => {
+  const response = await api.post(`/i/service/tickets/${id}/collect-completion-payment`, payload);
   return response.data.data;
 };
 
@@ -274,6 +303,8 @@ export interface AssignedProduct {
   warranty_end_date?: string;
   brand?: string;
   meter_reading?: number;
+  meter_reading_at?: string | null;
+  meter_reading_source?: string | null;
 }
 
 export interface CustomerServiceHistory {
@@ -327,6 +358,9 @@ export interface ServiceEstimateItem {
   totalPrice: number;
   isFree: boolean;
   isApproved: boolean;
+  /** Catalog price before coverage — the part's value on a covered (0-charge) line. Never totalled. */
+  listUnitPrice?: number | null;
+  listTotalPrice?: number | null;
 }
 
 export interface ServiceEstimate {
@@ -543,6 +577,44 @@ export const getMachineYieldHistory = async (
   return response.data.data;
 };
 
+export interface MachineAnalyticsTicket {
+  ticketId: string;
+  ticketNumber: string;
+  date: string | null;
+  serviceContext: string;
+  partsUsed: Array<{
+    partName: string;
+    sku: string | null;
+    quantity: number;
+    unitCost: number;
+    totalCost: number;
+    isConsumable: boolean;
+  }>;
+  partsCostInternal: number;
+  labourCost: number;
+  totalSpend: number;
+}
+
+export interface MachineAnalytics {
+  serialNumber: string;
+  serviceVisitCount: number;
+  tickets: MachineAnalyticsTicket[];
+  toner: {
+    totalTonerReplacements: number;
+    replacementHistory: ConsumableYieldHistory[];
+    yieldHistory: ConsumableYieldHistory[];
+  };
+  lifetimePartsCost: number;
+  lifetimeLabourCost: number;
+  lifetimeSpend: number;
+}
+
+/** Real internal spend on a machine — works for company-owned AND external machines (keyed by serial, not productId). Internal-only, never shown to the customer. */
+export const getMachineAnalytics = async (serialNumber: string): Promise<MachineAnalytics> => {
+  const response = await api.get(`/i/service/machines/${serialNumber}/analytics`);
+  return response.data.data;
+};
+
 export interface ServiceFinanceDashboard {
   totalRevenue: number;
   totalPartsCost: number;
@@ -603,6 +675,8 @@ export const getMachineContext = async (
     limitExceeded: boolean;
     overagePerCopyRate: number;
   } | null;
+  /** Billing could not be asked about Rent/Lease/Sale — the context is not trustworthy. */
+  coverageUnverified?: boolean;
 }> => {
   const params: Record<string, string | number> = {};
   if (meterReading !== undefined && meterReading > 0) params.meterReading = meterReading;

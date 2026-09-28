@@ -152,16 +152,22 @@ export function QuotationViewDialog({
               if (spLocal) {
                 details[targetProductId] = spLocal as unknown as ProductMeta;
               } else {
-                // 1b. Not in the list, try fetching directly from spare-part service
+                // 1b. Not in the list — look it up by what the line actually is. This used
+                // to probe the spare-part service first for every item, so each product
+                // line 404'd there and raised a "Spare part not found" toast before the
+                // product lookup succeeded. The fallback stays (older lines may carry no
+                // itemType) but both lookups are silent: a miss is expected and handled.
                 try {
-                  const spDetail = await getSparePartById(targetProductId).catch(() => null);
-                  if (spDetail) {
-                    details[targetProductId] = spDetail as unknown as ProductMeta;
-                  } else {
-                    // 1c. If not a spare part, try product service
-                    const p = await getProductById(targetProductId).catch(() => null);
-                    if (p) {
-                      details[targetProductId] = p as unknown as ProductMeta;
+                  const isSpareLine =
+                    item.itemType === 'SPAREPART' || (item.itemType as string) === 'SPARE_PART';
+                  const lookups = isSpareLine
+                    ? [getSparePartById, getProductById]
+                    : [getProductById, getSparePartById];
+                  for (const lookup of lookups) {
+                    const found = await lookup(targetProductId, { silent: true }).catch(() => null);
+                    if (found) {
+                      details[targetProductId] = found as unknown as ProductMeta;
+                      break;
                     }
                   }
                 } catch (e) {

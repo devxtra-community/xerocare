@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { EntityManager } from 'typeorm';
 import { Source } from '../config/dataSource';
 import { Owner } from '../entities/ownerEntity';
 import { AppError } from '../errors/appError';
@@ -20,12 +21,17 @@ export const getOwners = async (req: Request, res: Response, next: NextFunction)
     const qb = repo.createQueryBuilder('o');
     if (!includeInactive) qb.andWhere('o.isActive = :active', { active: true });
     if (branchFilter.length > 0) {
-      // Legacy rows with no branch stay visible: they pre-date branch scoping and could
-      // not be attributed to one branch, so hiding them would make owners referenced by
-      // real equity entries unselectable. Every owner created from now on carries a branch.
-      qb.andWhere('(o."branchId" IN (:...branchIds) OR o."branchId" IS NULL)', {
-        branchIds: branchFilter,
-      });
+      // A legacy owner with no branch is shown only to a branch that has actually used
+      // them (an equity entry in that branch). This used to be `OR "branchId" IS NULL`,
+      // which put every unattributed owner — whichever branch they really belonged to —
+      // into every branch's Owner Contribution selector. Owners created from now on
+      // always carry a branch; ADMIN still sees the full list.
+      qb.andWhere(
+        `(o."branchId" IN (:...branchIds) OR (o."branchId" IS NULL AND EXISTS (
+            SELECT 1 FROM equity_entries e
+             WHERE e."ownerId" = o.id AND e."branchId" IN (:...branchIds))))`,
+        { branchIds: branchFilter },
+      );
     }
     qb.orderBy('o.name', 'ASC');
     const owners = await qb.getMany();
@@ -55,6 +61,48 @@ function resolveOwnerBranchFilter(req: Request): string[] {
 /** The branch a newly created owner belongs to, taken from the caller — never the body. */
 function resolveOwnerBranchId(req: Request): string | undefined {
   return req.user?.branchId ?? req.branchFilter?.[0] ?? undefined;
+}
+
+/**
+ * The server-side control for every form that posts an equity entry against an owner
+ * (Equity, and the Cash & Bank opening balance). The dropdown is only presentation — the
+ * ownerId arrives in the request body, so a direct call could otherwise contribute
+ * against another branch's owner.
+ *
+ * Same rule as getOwners: the owner must belong to `branchId`, or be a legacy owner with
+ * no branch that this branch has already used.
+ */
+export async function assertOwnerUsableInBranch(
+  ownerId: string,
+  branchId: string | undefined,
+  em: EntityManager = Source.manager,
+): Promise<Owner> {
+  const owner = await em.getRepository(Owner).findOne({ where: { id: ownerId } });
+  if (!owner) throw new AppError('Selected owner not found', 400);
+  if (!branchId) return owner; // ADMIN / company-wide scope
+  if (owner.branchId) {
+    if (owner.branchId !== branchId) {
+      throw new AppError(
+        `${owner.name} belongs to another branch and cannot be used for an entry in this one.`,
+        403,
+      );
+    }
+    return owner;
+  }
+  const usedHere = await em
+    .createQueryBuilder()
+    .select('1')
+    .from('equity_entries', 'e')
+    .where('e."ownerId" = :ownerId AND e."branchId" = :branchId', { ownerId, branchId })
+    .limit(1)
+    .getRawOne();
+  if (!usedHere) {
+    throw new AppError(
+      `${owner.name} is not assigned to this branch and cannot be used for an entry in it.`,
+      403,
+    );
+  }
+  return owner;
 }
 
 /** Refuses to touch an owner belonging to another branch. */

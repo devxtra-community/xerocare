@@ -36,6 +36,7 @@ import Barcode from 'react-barcode';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getProductHistory, ProductHistoryResponse, HistoryEvent } from '@/lib/productHistory';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import MachineServiceAnalyticsPanel from '@/components/products/MachineServiceAnalyticsPanel';
 
 interface ProductFeature {
   subHeading: string;
@@ -250,7 +251,12 @@ export default function ProductDetailPage() {
         </TabsList>
 
         <TabsContent value="lifecycle" className="focus-visible:outline-none focus-visible:ring-0">
-          <LifecycleTab history={history} loading={historyLoading} />
+          <LifecycleTab
+            history={history}
+            loading={historyLoading}
+            serialNumber={product.serial_no}
+            currency={currency}
+          />
         </TabsContent>
 
         <TabsContent value="details" className="focus-visible:outline-none focus-visible:ring-0">
@@ -721,9 +727,13 @@ function EventCard({ event }: { event: HistoryEvent }) {
 function LifecycleTab({
   history,
   loading,
+  serialNumber,
+  currency,
 }: {
   history: ProductHistoryResponse | null;
   loading: boolean;
+  serialNumber?: string | null;
+  currency?: string;
 }) {
   if (loading) {
     return (
@@ -781,6 +791,15 @@ function LifecycleTab({
           ))}
         </div>
       )}
+
+      {/* Real internal spend + per-ticket/toner breakdown — additive to the
+          summary above, works for external machines too (keyed by serial). */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+          Service & Spend Detail
+        </h4>
+        <MachineServiceAnalyticsPanel serialNumber={serialNumber} currency={currency} />
+      </div>
 
       {/* Timeline */}
       {history.events.length === 0 ? (

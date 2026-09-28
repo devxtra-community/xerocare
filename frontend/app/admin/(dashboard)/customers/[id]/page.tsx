@@ -143,6 +143,7 @@ function Customer360Content() {
         createdByName={createdByName}
         createdByRole={createdByEmployee?.role}
         backHref="/admin/customers"
+        productBasePath="/admin"
       />
     </div>
   );

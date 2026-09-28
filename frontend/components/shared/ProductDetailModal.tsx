@@ -2,8 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { getProductById, getAllProducts } from '@/lib/product';
+import {
+  getProductById,
+  getAllProducts,
+  getProductMeterReadings,
+  type MeterReadingEntry,
+} from '@/lib/product';
+import { meterSourceLabel } from '@/lib/machineAllocations';
+import { getServiceContracts, ServiceContract } from '@/lib/serviceContract';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { getActiveCurrency } from '@/lib/currency';
 import {
   Loader2,
   Package,
@@ -14,6 +22,8 @@ import {
   Users,
   Hash,
   CheckCircle2,
+  FileText,
+  Gauge,
 } from 'lucide-react';
 
 interface ProductDetail {
@@ -34,6 +44,8 @@ interface ProductDetail {
   barcode_id?: string;
   hs_code?: string;
   meter_reading?: number;
+  meter_reading_at?: string | null;
+  meter_reading_source?: string | null;
   ownership?: string;
   model?: {
     id: string;
@@ -122,6 +134,9 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableQty, setAvailableQty] = useState<number | null>(null);
+  const [contracts, setContracts] = useState<ServiceContract[]>([]);
+  const [contractsLoading, setContractsLoading] = useState(false);
+  const [meterReadings, setMeterReadings] = useState<MeterReadingEntry[]>([]);
 
   useEffect(() => {
     if (!open || !productId) return;
@@ -158,6 +173,32 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
         if (!cancelled) setLoading(false);
       });
 
+    // Every AMC/SMA/FSMA agreement this machine has ever been under — current
+    // and expired/cancelled — regardless of which branch or customer it was
+    // under at the time. Silently empty for machines that never had one.
+    setContractsLoading(true);
+    setContracts([]);
+    getServiceContracts({ productId })
+      .then((list) => {
+        if (!cancelled) setContracts(list);
+      })
+      .catch(() => {
+        if (!cancelled) setContracts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setContractsLoading(false);
+      });
+
+    // Every reading of this machine, whichever flow took it.
+    setMeterReadings([]);
+    getProductMeterReadings(productId)
+      .then((rows) => {
+        if (!cancelled) setMeterReadings(rows.slice(0, 10));
+      })
+      .catch(() => {
+        if (!cancelled) setMeterReadings([]);
+      });
+
     return () => {
       cancelled = true;
     };
@@ -182,7 +223,10 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg rounded-2xl p-0 overflow-hidden border border-slate-200 shadow-2xl">
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-lg rounded-2xl p-0 overflow-hidden border border-slate-200 shadow-2xl"
+      >
         <DialogTitle className="sr-only">Product Details</DialogTitle>
 
         {/* ── White header ── */}
@@ -278,7 +322,25 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                   <Field label="Serial No." value={product.serial_no} />
                   <Field label="Barcode ID" value={product.barcode_id} />
                   <Field label="Print Colour" value={product.print_colour?.replace(/_/g, ' ')} />
-                  <Field label="Meter Reading" value={product.meter_reading ?? null} />
+                  <Field
+                    label="Meter Reading"
+                    value={
+                      product.meter_reading != null
+                        ? Number(product.meter_reading).toLocaleString()
+                        : null
+                    }
+                  />
+                  <Field
+                    label="Reading Taken"
+                    value={
+                      [
+                        meterSourceLabel(product.meter_reading_source),
+                        fmtDate(product.meter_reading_at),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || null
+                    }
+                  />
                 </div>
               </div>
 
@@ -331,6 +393,93 @@ export function ProductDetailModal({ productId, open, onClose, hideVendorDetails
                     <Field label="Phone" value={product.vendor.phone} />
                     <Field label="Email" value={product.vendor.email} />
                   </div>
+                </div>
+              )}
+
+              {/* ── Service Agreement History ── */}
+              {/* ── Meter Reading History ── one shared reading per machine, fed by
+                  service tickets/contracts and Rent/Lease installation, usage and
+                  replacement alike. */}
+              {meterReadings.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                  <SectionLabel icon={Gauge} label="Meter Reading History" />
+                  <div className="divide-y divide-slate-100">
+                    {meterReadings.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between py-1.5 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-700">
+                            {meterSourceLabel(r.source) ?? r.source}
+                            {r.referenceNo && (
+                              <span className="font-normal text-slate-400"> · {r.referenceNo}</span>
+                            )}
+                          </p>
+                          <p className="text-[10px] text-slate-400">{fmtDate(r.readingDate)}</p>
+                        </div>
+                        <span className="shrink-0 font-bold tabular-nums text-slate-800">
+                          {Number(r.totalReading).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(contractsLoading || contracts.length > 0) && (
+                <div className="bg-white rounded-xl border border-slate-100 p-4">
+                  <SectionLabel icon={FileText} label="Service Agreement History" />
+                  {contractsLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 size={16} className="animate-spin text-slate-400" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {contracts.map((c) => {
+                        const isCurrent = c.status === 'ACTIVE';
+                        return (
+                          <div
+                            key={c.id}
+                            className={`rounded-lg border p-3 ${
+                              isCurrent
+                                ? 'border-emerald-200 bg-emerald-50/50'
+                                : 'border-slate-100 bg-slate-50/50'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100 rounded px-1.5 py-0.5">
+                                  {c.contractType}
+                                </span>
+                                <span
+                                  className={`text-[9px] font-black uppercase tracking-wider rounded px-1.5 py-0.5 border ${
+                                    isCurrent
+                                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                                  }`}
+                                >
+                                  {c.status}
+                                </span>
+                                {(c.customer?.firstName || c.customer?.lastName) && (
+                                  <span className="text-[10px] text-slate-500 font-semibold truncate">
+                                    {[c.customer?.firstName, c.customer?.lastName]
+                                      .filter(Boolean)
+                                      .join(' ')}
+                                  </span>
+                                )}
+                              </div>
+                              {c.contractType !== 'FSMA' && (
+                                <span className="text-xs font-black text-slate-700">
+                                  {getActiveCurrency()} {Number(c.contractValue).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1.5 text-[10px] text-slate-400 font-semibold">
+                              {fmtDate(c.startDate)} → {fmtDate(c.endDate)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -5,10 +5,12 @@ export class MachineServiceHistory {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid', unique: true })
-  productId!: string; // Links to Product entity
+  // Nullable: external machines (never purchased from us, no matching Product
+  // row) still get a history row, keyed by serialNumber alone.
+  @Column({ type: 'uuid', unique: true, nullable: true })
+  productId!: string | null;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', unique: true })
   serialNumber!: string;
 
   @Column({ type: 'int', default: 0 })

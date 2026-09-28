@@ -49,3 +49,23 @@ export const clearCookieOptions: CookieOptions = {
   sameSite: 'lax',
   path: '/',
 };
+
+export const TRUSTED_DEVICE_COOKIE_NAME = 'xc_device_token';
+
+/** 1 day — staff verify with OTP once each morning, plain password the rest of the day. */
+export const TRUSTED_DEVICE_COOKIE_MAX_AGE = 24 * 60 * 60 * 1000;
+
+export const trustedDeviceCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: isSecure,
+  sameSite: 'lax',
+  maxAge: TRUSTED_DEVICE_COOKIE_MAX_AGE,
+  path: '/',
+};
+
+export const clearTrustedDeviceCookieOptions: CookieOptions = {
+  httpOnly: true,
+  secure: isSecure,
+  sameSite: 'lax',
+  path: '/',
+};

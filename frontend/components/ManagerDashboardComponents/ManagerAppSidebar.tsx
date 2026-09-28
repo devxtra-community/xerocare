@@ -484,13 +484,16 @@ export default function ManagerSidebar() {
                         </SidebarMenuButton>
 
                         {isOpen && (
-                          <SidebarMenuSub className="mt-1 ml-4 border-l border-card/20 pl-2">
+                          // The base sub-menu adds its own mx-3.5/px-2.5 indent; stacked with
+                          // this one it left too little width, so labels wrapped to two lines
+                          // inside a fixed-height row and overlapped. One indent, set here.
+                          <SidebarMenuSub className="mx-0 mt-1 mb-1 ml-5 gap-0.5 border-l border-card/20 px-0 py-0 pl-2">
                             {item.subItems?.map((sub) => (
                               <SidebarMenuSubItem key={sub.title}>
                                 <SidebarMenuSubButton
                                   asChild
                                   isActive={pathname === sub.href}
-                                  className={`rounded-md py-2
+                                  className={`h-auto min-h-9 rounded-md py-1.5
                                     ${
                                       pathname === sub.href
                                         ? 'bg-card text-sidebar'
@@ -499,19 +502,20 @@ export default function ManagerSidebar() {
                                 >
                                   <a
                                     href={sub.href}
-                                    className="flex items-center justify-between gap-3 px-3 w-full"
+                                    title={sub.title}
+                                    className="flex w-full items-center gap-2.5 px-2.5"
                                   >
-                                    <div className="flex items-center gap-3">
-                                      <sub.icon className="h-3.5 w-3.5" />
-                                      <span>{sub.title}</span>
-                                      <NavBadge
-                                        count={navCountFor(
-                                          sub.title,
-                                          navCounts,
-                                          badgeOverridesForHref(sub.href),
-                                        )}
-                                      />
-                                    </div>
+                                    <sub.icon className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="min-w-0 flex-1 truncate leading-5">
+                                      {sub.title}
+                                    </span>
+                                    <NavBadge
+                                      count={navCountFor(
+                                        sub.title,
+                                        navCounts,
+                                        badgeOverridesForHref(sub.href),
+                                      )}
+                                    />
                                     {sub.title === 'Overview' && expiryCount > 0 && (
                                       <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
                                         {expiryCount}

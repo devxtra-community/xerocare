@@ -64,6 +64,7 @@ export interface ProductPremiumQuotationProps {
     payment: number;
     balanceDue: number;
     paid: boolean;
+    pendingApprovalAmount?: number;
   };
 }
 
@@ -784,7 +785,7 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   Grand Total (Including {totals.vatName || 'VAT'}):
                 </span>
                 <span style={{ fontWeight: '500', fontSize: '18px' }}>
-                  {getActiveCurrency()} {fmt(totals.balanceDue)}
+                  {getActiveCurrency()} {fmt(totals.total)}
                 </span>
               </div>
               <div
@@ -796,23 +797,40 @@ const ProductPremiumQuotation: React.FC<ProductPremiumQuotationProps> = ({
                   marginTop: '1px',
                 }}
               >
-                {numberToWords(totals.balanceDue, getActiveCurrency())}
+                {numberToWords(totals.total, getActiveCurrency())}
               </div>
             </div>
 
-            {totals.paid && (
-              <div
-                style={{
-                  textAlign: 'right',
-                  marginTop: '12px',
-                  color: '#4ade80',
-                  fontWeight: '800',
-                  fontSize: '16px',
-                  letterSpacing: '0.1em',
-                }}
-              >
-                PAID
+            {totals.payment !== totals.total ? (
+              <div style={{ marginTop: '12px', textAlign: 'right' }}>
+                <div style={{ color: '#4ade80', fontWeight: 700, fontSize: '13px' }}>
+                  Amount Paid: {getActiveCurrency()} {fmt(totals.payment)}
+                </div>
+                <div style={{ color: '#f87171', fontWeight: 800, fontSize: '13px' }}>
+                  Balance Due: {getActiveCurrency()} {fmt(totals.balanceDue)}
+                </div>
+                {!!totals.pendingApprovalAmount && (
+                  <div style={{ color: '#fbbf24', fontWeight: 600, fontSize: '10px' }}>
+                    Awaiting Finance Approval: {getActiveCurrency()}{' '}
+                    {fmt(totals.pendingApprovalAmount)}
+                  </div>
+                )}
               </div>
+            ) : (
+              totals.paid && (
+                <div
+                  style={{
+                    textAlign: 'right',
+                    marginTop: '12px',
+                    color: '#4ade80',
+                    fontWeight: '800',
+                    fontSize: '16px',
+                    letterSpacing: '0.1em',
+                  }}
+                >
+                  PAID
+                </div>
+              )
             )}
           </div>
         </div>

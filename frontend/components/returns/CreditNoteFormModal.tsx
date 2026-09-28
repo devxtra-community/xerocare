@@ -509,6 +509,7 @@ export default function CreditNoteFormModal({ open, onClose, onSave, record }: P
     <>
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent
+          showCloseButton={false}
           className="p-0 overflow-hidden rounded-2xl border-0 shadow-2xl sm:max-w-none"
           style={{ maxWidth: 920, width: '95vw' }}
         >

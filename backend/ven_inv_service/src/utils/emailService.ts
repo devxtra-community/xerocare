@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { logger } from '../config/logger';
 
 // Same transport pattern as employee_service/src/utils/mailer.ts — the one
 // actually wired to working credentials in every .env in this repo
@@ -24,7 +25,7 @@ export async function sendServicePdfEmail(
   pdfBuffer: Buffer,
   filename: string,
 ): Promise<void> {
-  await getTransporter().sendMail({
+  const info = await getTransporter().sendMail({
     from: `Xerocare Technical Services <${process.env.MAIL_USER}>`,
     to: toEmail,
     subject,
@@ -37,6 +38,13 @@ export async function sendServicePdfEmail(
       },
     ],
   });
+  // sendMail resolving doesn't guarantee inbox delivery, but it does confirm
+  // Gmail's SMTP accepted the recipient — logging this (previously silent)
+  // is the only way to tell "we sent it, check spam" apart from "we never
+  // actually sent it" when a customer says they got nothing.
+  logger.info(
+    `Sent "${subject}" to ${toEmail} — accepted: ${JSON.stringify(info.accepted)}, rejected: ${JSON.stringify(info.rejected)}, messageId: ${info.messageId}`,
+  );
 }
 
 /** Plain-text email, no attachment — e.g. the ticket-creation confirmation. */
@@ -45,10 +53,13 @@ export async function sendServiceEmail(
   subject: string,
   bodyText: string,
 ): Promise<void> {
-  await getTransporter().sendMail({
+  const info = await getTransporter().sendMail({
     from: `Xerocare Technical Services <${process.env.MAIL_USER}>`,
     to: toEmail,
     subject,
     text: bodyText,
   });
+  logger.info(
+    `Sent "${subject}" to ${toEmail} — accepted: ${JSON.stringify(info.accepted)}, rejected: ${JSON.stringify(info.rejected)}, messageId: ${info.messageId}`,
+  );
 }

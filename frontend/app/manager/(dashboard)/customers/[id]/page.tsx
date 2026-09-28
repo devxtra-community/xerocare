@@ -135,6 +135,7 @@ export default function ManagerCustomer360Page() {
       createdByName={createdByName}
       createdByRole={createdByEmployee?.role}
       backHref="/employee/customers"
+      productBasePath="/manager"
     />
   );
 }

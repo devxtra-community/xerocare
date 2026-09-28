@@ -104,6 +104,11 @@ const startServer = async () => {
     const { startExchangeRateCron } = await import('./services/exchangeRateCron');
     startExchangeRateCron();
 
+    // Share Rent/Lease meter readings already on contracts with each machine's product
+    // record (see utils/meterReadingSync).
+    const { scheduleAllocatedMeterReadingCatchUp } = await import('./utils/meterReadingSync');
+    scheduleAllocatedMeterReadingCatchUp();
+
     const PORT = process.env.PORT || 3004;
 
     // Start listening for requests

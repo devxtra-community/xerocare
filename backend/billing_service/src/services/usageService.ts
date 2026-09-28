@@ -1,5 +1,6 @@
 import { UsageRepository } from '../repositories/usageRepository';
 import { InvoiceRepository } from '../repositories/invoiceRepository';
+import { pushMeterReadings, type MeterReadingPush } from '../utils/meterReadingSync';
 import { Invoice } from '../entities/invoiceEntity';
 import { AppError } from '../errors/appError';
 import { ReportedBy, UsageRecord } from '../entities/usageRecordEntity';
@@ -203,6 +204,10 @@ export class UsageService {
       });
     }
 
+    // End readings taken this period, mirrored to each machine's shared reading once the
+    // usage record is saved (see utils/meterReadingSync).
+    const meterPushes: MeterReadingPush[] = [];
+
     // Fetch Overlapping Allocations for this billing period
     const overlappingAllocations = await this.invoiceRepo.manager.find(ProductAllocation, {
       where: [
@@ -314,6 +319,21 @@ export class UsageService {
           alloc.currentColorA4 = endColorA4;
           alloc.currentColorA3 = endColorA3;
           await this.invoiceRepo.manager.save(ProductAllocation, alloc);
+          meterPushes.push({
+            productId: alloc.productId,
+            serialNo: alloc.serialNumber,
+            counters: {
+              bwA4: endBwA4,
+              bwA3: endBwA3,
+              colorA4: endColorA4,
+              colorA3: endColorA3,
+            },
+            source: contract.saleType === SaleType.LEASE ? 'LEASE_USAGE' : 'RENT_USAGE',
+            referenceId: contract.id,
+            referenceNo: contract.invoiceNumber ?? null,
+            readingDate: payload.readingTakenDate || payload.billingPeriodEnd,
+            recordedBy: payload.recordedBy ?? null,
+          });
         }
 
         const dBwA4 = Math.max(0, endBwA4 - startBwA4);
@@ -683,6 +703,7 @@ export class UsageService {
           colorA3: totalEndColorA3 || payload.colorA3Count,
         });
 
+        await pushMeterReadings(meterPushes);
         return { usage };
       } catch (error) {
         await queryRunner.rollbackTransaction();
@@ -772,6 +793,7 @@ export class UsageService {
         colorA3: totalEndColorA3 || payload.colorA3Count,
       });
 
+      await pushMeterReadings(meterPushes);
       return { usage, nextPeriod };
     }
   }
@@ -1477,6 +1499,8 @@ export class UsageService {
     }
 
     const contract = await this.invoiceRepo.findById(usage.contractId);
+    // Corrected end readings, mirrored to each machine's shared reading after saving.
+    const correctedReadings: MeterReadingPush[] = [];
     if (!contract) {
       throw new AppError('Contract not found', 404);
     }
@@ -1607,6 +1631,20 @@ export class UsageService {
             alloc.currentColorA4 = existingItem.endColorA4;
             alloc.currentColorA3 = existingItem.endColorA3;
             await this.invoiceRepo.manager.save(ProductAllocation, alloc);
+            correctedReadings.push({
+              productId: alloc.productId,
+              serialNo: alloc.serialNumber,
+              counters: {
+                bwA4: existingItem.endBwA4,
+                bwA3: existingItem.endBwA3,
+                colorA4: existingItem.endColorA4,
+                colorA3: existingItem.endColorA3,
+              },
+              source: contract?.saleType === SaleType.LEASE ? 'LEASE_USAGE' : 'RENT_USAGE',
+              referenceId: usage.contractId,
+              referenceNo: contract?.invoiceNumber ?? null,
+              readingDate: payload.readingTakenDate || usage.readingTakenDate || new Date(),
+            });
           }
 
           existingItem.deltaBwA4 = Math.max(0, existingItem.endBwA4 - existingItem.startBwA4);
@@ -1728,7 +1766,9 @@ export class UsageService {
     usage.signingTokenExpiresAt = undefined;
     usage.signingTokenUsed = false;
 
-    return this.usageRepo.save(usage);
+    const saved = await this.usageRepo.save(usage);
+    await pushMeterReadings(correctedReadings);
+    return saved;
   }
 
   /**

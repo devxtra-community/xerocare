@@ -20,6 +20,7 @@ import { ManualPayable } from '../entities/manualPayableEntity';
 import { PayablePayment } from '../entities/payablePaymentEntity';
 import { EquityEntry, EquityType } from '../entities/equityEntryEntity';
 import { Owner } from '../entities/ownerEntity';
+import { assertOwnerUsableInBranch } from './ownerController';
 import { Invoice } from '../entities/invoiceEntity';
 import { CreditNote } from '../entities/creditNoteEntity';
 import { PaymentTransaction } from '../entities/paymentTransactionEntity';
@@ -184,6 +185,11 @@ export const createCashBankAccount = async (req: Request, res: Response, next: N
         !req.body.ownerId
       ) {
         throw new AppError('Select an owner/shareholder for this opening balance source', 400);
+      }
+      // This form never checked the owner's branch, so another branch's contributor
+      // could be posted into this branch's equity through the opening balance.
+      if (OPENING_BALANCE_OWNER_TRACKED_SOURCES.includes(openingBalanceSource)) {
+        await assertOwnerUsableInBranch(req.body.ownerId as string, branchId);
       }
     }
 
@@ -2174,17 +2180,7 @@ export const createEquityEntry = async (req: Request, res: Response, next: NextF
     // selector is presentation; this is the control — the id arrives in the request body
     // and a direct API call would otherwise bypass the dropdown entirely.
     if (req.body.ownerId) {
-      const owner = await Source.getRepository(Owner).findOne({
-        where: { id: req.body.ownerId as string },
-      });
-      if (!owner) throw new AppError('Selected owner not found', 400);
-      // Legacy owners carry no branch and stay usable — see ownerEntity.ts.
-      if (owner.branchId && jwtBranchId && owner.branchId !== jwtBranchId) {
-        throw new AppError(
-          `${owner.name} belongs to another branch and cannot be used for an entry in this one.`,
-          403,
-        );
-      }
+      await assertOwnerUsableInBranch(req.body.ownerId as string, jwtBranchId);
     }
 
     // Cheque-mode entries have no bank account chosen yet (that happens later, at

@@ -52,8 +52,10 @@ import { ContractAgreementModal } from '@/components/employeeComponents/Contract
 import { BillModal } from '@/components/Finance/BillModal';
 import CreditNoteViewModal from '@/components/returns/CreditNoteViewModal';
 import type { CreditNoteRecord } from '@/lib/invoice';
+import CustomerProductsPanel from './CustomerProductsPanel';
 
 type Tab =
+  | 'products'
   | 'quotations'
   | 'contracts'
   | 'bills'
@@ -165,6 +167,10 @@ interface Props {
   /** Shown as a banner under the header when this profile is scoped narrower than the
    *  full branch history (e.g. the Employee personal-only view). */
   scopeNotice?: string;
+  /** e.g. "/manager" or "/admin" — only passed by roles with a product detail
+   *  page, so the Products & Services tab can link machine cards through to
+   *  it. Omit for roles without one (employee/finance/hr). */
+  productBasePath?: string;
 }
 
 export default function Customer360View({
@@ -175,10 +181,11 @@ export default function Customer360View({
   createdByRole,
   backHref,
   scopeNotice,
+  productBasePath,
 }: Props) {
   const router = useRouter();
   const currency = useBranchCurrency();
-  const [activeTab, setActiveTab] = useState<Tab>('contracts');
+  const [activeTab, setActiveTab] = useState<Tab>('products');
 
   // Contract Agreement modal state
   const [agreementInvoice, setAgreementInvoice] = useState<Invoice | null>(null);
@@ -218,6 +225,7 @@ export default function Customer360View({
   }));
 
   const tabs: { id: Tab; label: string; count: number }[] = [
+    { id: 'products', label: 'Products & Services', count: 0 },
     { id: 'contracts', label: 'Contracts', count: contracts.length },
     { id: 'quotations', label: 'Quotations', count: quotations.length },
     { id: 'bills', label: 'Rent/Lease Bills', count: bills.length },
@@ -466,6 +474,9 @@ export default function Customer360View({
         </div>
 
         <div className="p-4 overflow-x-auto">
+          {activeTab === 'products' && (
+            <CustomerProductsPanel customerId={customer.id} productBasePath={productBasePath} />
+          )}
           {activeTab === 'contracts' && (
             <ContractsTab
               invoices={contracts}

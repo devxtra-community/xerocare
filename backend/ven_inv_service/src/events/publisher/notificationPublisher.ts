@@ -25,7 +25,8 @@ export class NotificationPublisher {
       | 'SERVICE'
       | 'SERVICE_TICKET'
       | 'SERVICE_CONTRACT'
-      | 'STOCK_TRANSFER';
+      | 'STOCK_TRANSFER'
+      | 'CUSTOM_PART_REQUEST';
   }) {
     try {
       const channel = await getRabbitChannel();

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useStableCallback } from '@/lib/hooks/useStableCallback';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -41,7 +42,10 @@ const COUNTERS = [
 
 type CounterKey = (typeof COUNTERS)[number][0];
 
-export function ReplacementInstallModal({ requestId, onClose, onDone }: Props) {
+export function ReplacementInstallModal({ requestId, onClose: onCloseProp, onDone }: Props) {
+  // Stable identity: parents pass onClose inline and may re-render every second (live
+  // timers), which otherwise restarted — and cancelled — this modal's load each tick.
+  const onClose = useStableCallback(onCloseProp);
   const [detail, setDetail] = useState<ReplacementDetail | null>(null);
   const [floor, setFloor] = useState<MeterReading | null>(null);
   const [loading, setLoading] = useState(true);

@@ -1,13 +1,44 @@
 import nodemailer from 'nodemailer';
 import * as XLSX from 'xlsx';
 
-export const mailer = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
+/**
+ * Local dev hammers Gmail's send rate limit (every OTP is a real email).
+ * Outside production, send through Ethereal instead — a throwaway SMTP
+ * sandbox that never delivers anything real; view caught mail at
+ * https://ethereal.email using ETHEREAL_USER/ETHEREAL_PASS.
+ *
+ * If those aren't set (not opted in yet), fall back to the same Gmail
+ * transport used in production rather than a silent no-op transport —
+ * this repo's Gmail creds are already live via the shell environment
+ * (not a tracked .env), so login/OTP/magic-link must keep working out of
+ * the box until someone deliberately configures Ethereal.
+ */
+const createTransporter = () => {
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    process.env.ETHEREAL_USER &&
+    process.env.ETHEREAL_PASS
+  ) {
+    return nodemailer.createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      auth: {
+        user: process.env.ETHEREAL_USER,
+        pass: process.env.ETHEREAL_PASS,
+      },
+    });
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+  });
+};
+
+export const mailer = createTransporter();
 
 export async function sendEmployeeWelcomeMail(to: string, password: string) {
   await mailer.sendMail({

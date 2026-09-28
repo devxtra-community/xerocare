@@ -70,6 +70,25 @@ export class ServiceEstimateItem {
   @Column({ type: 'boolean', default: true })
   isApproved!: boolean;
 
+  // Real internal cost — mirrors ServiceTicketItem.unitCost/totalCost, carried
+  // onto the estimate (and estimate revisions, via revisionId) so finance can
+  // see true spend even on a zero-price FOC line.
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  unitCost?: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  totalCost?: number | null;
+
+  // The part's catalog price before coverage. unitPrice/totalPrice are what the customer
+  // is charged — 0 on a covered line (Rent, warranty, contract) — so without this the
+  // line's real value was discarded and a rented machine's parts all showed AED 0.00.
+  // Display/analytics only: never summed into any charge or total.
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  listUnitPrice?: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  listTotalPrice?: number | null;
+
   @CreateDateColumn()
   created_at!: Date;
 

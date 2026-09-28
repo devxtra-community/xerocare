@@ -1,5 +1,6 @@
 import { InvoiceRepository } from '../repositories/invoiceRepository';
 import { In, Raw } from 'typeorm';
+import { pushMeterReadings, type MeterReadingPush } from '../utils/meterReadingSync';
 import { Source } from '../config/dataSource';
 import { resolveBillingCycle } from '../utils/billingPeriod';
 import { logAudit } from './auditLogService';
@@ -2278,6 +2279,8 @@ export class BillingService {
       }
 
       // 2. Process Initial Readings
+      // Mirrored to each machine's shared reading after commit (utils/meterReadingSync).
+      const startReadings: MeterReadingPush[] = [];
       if (itemUpdates && itemUpdates.length > 0) {
         const inventoryServiceUrl = process.env.INVENTORY_SERVICE_URL || 'http://localhost:3003';
         for (const update of itemUpdates) {
@@ -2346,6 +2349,18 @@ export class BillingService {
                 currentColorA3: item.initialColorA3Count || 0,
               },
             );
+            startReadings.push({
+              productId: item.productId,
+              counters: {
+                bwA4: item.initialBwCount || 0,
+                bwA3: item.initialBwA3Count || 0,
+                colorA4: item.initialColorCount || 0,
+                colorA3: item.initialColorA3Count || 0,
+              },
+              source: 'CONTRACT_START',
+              referenceId: invoice.id,
+              recordedBy: userId,
+            });
           }
         }
       }
@@ -2376,6 +2391,9 @@ export class BillingService {
       const promotedNumber = await promoteQuotationToInvoice(queryRunner.manager, savedInvoice.id);
       if (promotedNumber) savedInvoice.invoiceNumber = promotedNumber;
       await queryRunner.commitTransaction();
+      await pushMeterReadings(
+        startReadings.map((r) => ({ ...r, referenceNo: savedInvoice.invoiceNumber ?? null })),
+      );
 
       // Record Security Deposit — goes through the approval gate, NOT directly to cashbook.
       // Cash/Bank: PENDING SalePaymentRequest (Accounts approval required)
@@ -3579,6 +3597,40 @@ export class BillingService {
         }).catch((err) => logger.error('Failed to emit LEASE/RENT event', err));
       }
 
+      // Both halves of the swap are real readings of real machines: the outgoing unit's
+      // closing count and the incoming unit's opening count. Mirror both to each
+      // machine's shared reading so the service side sees them too.
+      await pushMeterReadings([
+        {
+          productId: oldAllocation.productId,
+          serialNo: oldAllocation.serialNumber,
+          counters: {
+            bwA4: oldAllocation.currentBwA4,
+            bwA3: oldAllocation.currentBwA3,
+            colorA4: oldAllocation.currentColorA4,
+            colorA3: oldAllocation.currentColorA3,
+          },
+          source: 'REPLACEMENT_REMOVED',
+          referenceId: oldAllocation.contractId,
+          referenceNo: invoice?.invoiceNumber ?? null,
+          readingDate: ts,
+        },
+        {
+          productId: newAllocation.productId,
+          serialNo: newAllocation.serialNumber,
+          counters: {
+            bwA4: newAllocation.currentBwA4,
+            bwA3: newAllocation.currentBwA3,
+            colorA4: newAllocation.currentColorA4,
+            colorA3: newAllocation.currentColorA3,
+          },
+          source: 'REPLACEMENT_INSTALLED',
+          referenceId: newAllocation.contractId,
+          referenceNo: invoice?.invoiceNumber ?? null,
+          readingDate: ts,
+        },
+      ]);
+
       return newAllocation;
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -4775,6 +4827,7 @@ export class BillingService {
       quantity: number;
       unitPrice: number;
       isFree?: boolean;
+      listUnitPrice?: number;
     }[];
     saleType: string;
     status: string;
@@ -4840,6 +4893,8 @@ export class BillingService {
       invItem.description = it.description;
       invItem.quantity = it.quantity;
       invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
+      // What the line is worth, even when covered — display only, never totalled.
+      invItem.listUnitPrice = Number(it.listUnitPrice) || Number(it.unitPrice) || null;
       return invItem;
     });
 
@@ -5032,10 +5087,12 @@ export class BillingService {
 
   /**
    * Creates the lump-sum invoice for an AMC service contract at signing time, and — if an
-   * initial payment was collected on the spot — records it against that same invoice via the
-   * normal payment path so status (INVOICED/PARTIAL via ledger/PAID) and cashbook posting stay
-   * consistent with every other payment in the system. Later installments reuse this invoiceId
-   * through the existing /invoices/:id/payments or /payments/record endpoints.
+   * initial payment was collected on the spot — raises it as a PENDING SalePaymentRequest
+   * against that same invoice, exactly like every other collection in the system (sale,
+   * rent, visit charge). It does NOT touch the cashbook or InvoiceLedger here: whoever took
+   * the money at signing has no authority to post it themselves, so the contract stays
+   * INVOICED/unpaid until Finance approves the request. Later installments reuse this same
+   * invoiceId through the existing sale-payments (recordSalePayment) path.
    */
   async createContractInvoice(payload: {
     customerId: string;
@@ -5051,6 +5108,7 @@ export class BillingService {
       paymentDate?: string;
       referenceNumber?: string;
       remarks?: string;
+      cashAccountId?: string;
     };
   }): Promise<Invoice> {
     const invoiceNumber = await this.invoiceRepo.generateInvoiceNumber();
@@ -5093,20 +5151,20 @@ export class BillingService {
     savedInvoice.items = [invoiceItem];
 
     if (payload.initialPayment && payload.initialPayment.amount > 0) {
-      await this.recordPayment(
-        savedInvoice.id,
-        {
-          paymentMode: payload.initialPayment.paymentMode,
-          amount: payload.initialPayment.amount,
-          transactionDate: payload.initialPayment.paymentDate,
-          referenceNumber: payload.initialPayment.referenceNumber,
-          remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
-          bypassStatusCheck: true,
-        },
-        payload.createdBy,
-      );
-      const withPayment = await this.invoiceRepo.findById(savedInvoice.id);
-      if (withPayment) return withPayment;
+      await createSalePaymentRequest({
+        invoiceId: savedInvoice.id,
+        branchId: payload.branchId,
+        userId: payload.createdBy,
+        amount: payload.initialPayment.amount,
+        paymentMode: payload.initialPayment.paymentMode,
+        paymentDate: payload.initialPayment.paymentDate
+          ? new Date(payload.initialPayment.paymentDate)
+          : new Date(),
+        referenceNumber: payload.initialPayment.referenceNumber,
+        remarks: payload.initialPayment.remarks || 'Initial payment at contract signing',
+        cashAccountId: payload.initialPayment.cashAccountId,
+        paymentContext: 'SERVICE_CONTRACT_SIGNING',
+      });
     }
 
     return savedInvoice;
@@ -5115,7 +5173,13 @@ export class BillingService {
   async reviseEstimate(
     id: string,
     payload: {
-      items: { description: string; quantity: number; unitPrice: number; isFree?: boolean }[];
+      items: {
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        isFree?: boolean;
+        listUnitPrice?: number;
+      }[];
       visitChargeAmount: number;
       visitChargeMethod: string;
       discountAmount: number;
@@ -5153,6 +5217,8 @@ export class BillingService {
       invItem.description = it.description;
       invItem.quantity = it.quantity;
       invItem.unitPrice = it.isFree ? 0 : it.unitPrice;
+      // What the line is worth, even when covered — display only, never totalled.
+      invItem.listUnitPrice = Number(it.listUnitPrice) || Number(it.unitPrice) || null;
       return invItem;
     });
     await invoiceItemRepo.save(invoiceItems);

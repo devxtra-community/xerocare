@@ -14,6 +14,7 @@ import cookieParser from 'cookie-parser';
 import { getRabbitChannel } from './config/rabbitmq';
 import { startWorker } from './workers/emailWorker';
 import { startBranchConsumer } from './events/consumers/branchConsumer';
+import { startDeviceCleanupCron } from './services/deviceCleanupCron';
 import { httpLogger } from './middleware/httplogger';
 import healthRouter from './routes/health';
 import { logger } from './config/logger';
@@ -97,6 +98,7 @@ const startServer = async () => {
     // Start the automatic email and office notification systems
     await startWorker();
     await startBranchConsumer();
+    startDeviceCleanupCron();
 
     const PORT = process.env.EMPLOYEE_PORT || process.env.PORT || 3002;
 
