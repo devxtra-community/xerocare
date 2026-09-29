@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2, FileText, CheckCircle2, AlertTriangle, ThumbsDown, Download } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -283,20 +285,19 @@ export default function RemoteServiceEstimateApprovalPage() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <Button
+                    <LoadingButton
                       onClick={handleApprove}
+                      loading={isSaving}
+                      loadingText="Approving..."
                       disabled={!customerName.trim() || isSaving}
-                      className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-100 disabled:opacity-40"
-                    >
-                      {isSaving ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <>
-                          <CheckCircle2 size={18} className="mr-2" />
-                          Approve Quotation
-                        </>
+                      className={cn(
+                        buttonVariants(),
+                        'flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-100 disabled:opacity-40',
                       )}
-                    </Button>
+                    >
+                      <CheckCircle2 size={18} className="mr-2" />
+                      Approve Quotation
+                    </LoadingButton>
                     <Button
                       variant="outline"
                       onClick={() => setState('rejecting')}
@@ -332,13 +333,18 @@ export default function RemoteServiceEstimateApprovalPage() {
                     >
                       Back
                     </Button>
-                    <Button
+                    <LoadingButton
                       onClick={handleReject}
+                      loading={isSaving}
+                      loadingText="Submitting..."
                       disabled={!rejectReason.trim() || isSaving}
-                      className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl disabled:opacity-40"
+                      className={cn(
+                        buttonVariants(),
+                        'flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black text-sm rounded-xl disabled:opacity-40',
+                      )}
                     >
-                      {isSaving ? <Loader2 size={18} className="animate-spin" /> : 'Submit'}
-                    </Button>
+                      Submit
+                    </LoadingButton>
                   </div>
                 </>
               )}

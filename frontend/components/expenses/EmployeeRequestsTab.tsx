@@ -22,6 +22,7 @@ import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -813,17 +814,17 @@ export function PayModal({
           <Button variant="outline" onClick={onClose} disabled={payMut.isPending}>
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             onClick={() => payMut.mutate()}
+            loading={payMut.isPending}
+            loadingText="Recording..."
             disabled={!canSubmit || payMut.isPending}
             className="bg-purple-600 text-white hover:bg-purple-700"
           >
-            {payMut.isPending
-              ? 'Recording...'
-              : isCheque
-                ? 'Record — Create Cheque'
-                : `Record Payment${selectedAccount ? ` — ${selectedAccount.name}` : ''}`}
-          </Button>
+            {isCheque
+              ? 'Record — Create Cheque'
+              : `Record Payment${selectedAccount ? ` — ${selectedAccount.name}` : ''}`}
+          </LoadingButton>
         </div>
       </div>
     </div>

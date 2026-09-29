@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { costLineForType } from '@/lib/purchaseCostTypes';
 import { PURCHASE_COST_TYPES } from '@/lib/purchaseCostTypes';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -728,8 +729,10 @@ export default function AddPaymentModal({
             >
               Cancel
             </Button>
-            <Button
+            <LoadingButton
               type="submit"
+              loading={loading}
+              loadingText="Submitting..."
               className="flex-1 bg-primary hover:bg-primary/90 font-bold"
               disabled={
                 loading ||
@@ -737,16 +740,14 @@ export default function AddPaymentModal({
                 (formData.paymentMethod !== 'Cheque' && matchingAccounts.length === 0)
               }
             >
-              {loading
-                ? 'Submitting...'
-                : getUserFromToken()?.role === 'MANAGER'
-                  ? payFor === 'COST'
-                    ? 'Request Cost Approval'
-                    : 'Request Payment Approval'
-                  : payFor === 'COST'
-                    ? 'Record Cost'
-                    : 'Record Payment'}
-            </Button>
+              {getUserFromToken()?.role === 'MANAGER'
+                ? payFor === 'COST'
+                  ? 'Request Cost Approval'
+                  : 'Request Payment Approval'
+                : payFor === 'COST'
+                  ? 'Record Cost'
+                  : 'Record Payment'}
+            </LoadingButton>
           </div>
         </form>
       </DialogContent>

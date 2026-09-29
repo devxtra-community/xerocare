@@ -4,7 +4,9 @@ import Image from 'next/image';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -848,13 +850,18 @@ export default function EmployeeFormDialog({
             >
               Cancel
             </button>
-            <Button
+            <LoadingButton
               type="submit"
+              loading={isSubmitting}
+              loadingText="Processing..."
               disabled={isSubmitting}
-              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70"
+              className={cn(
+                buttonVariants(),
+                'h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg disabled:opacity-70',
+              )}
             >
-              {isSubmitting ? 'Processing...' : initialData ? 'Update Employee' : 'Create Employee'}
-            </Button>
+              {initialData ? 'Update Employee' : 'Create Employee'}
+            </LoadingButton>
           </div>
         </form>
       </DialogContent>

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { PaymentSummary, recordPayment, getAccountSummary } from '@/lib/payment';
 import { recordSalePayment } from '@/lib/saleWorkflow';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -509,10 +510,14 @@ export function InvoiceAccountView({
                   <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={submitting}>
-                    {submitting ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : null}
+                  <LoadingButton
+                    type="submit"
+                    loading={submitting}
+                    loadingText="Recording..."
+                    disabled={submitting}
+                  >
                     Save Payment
-                  </Button>
+                  </LoadingButton>
                 </div>
               </form>
             )}

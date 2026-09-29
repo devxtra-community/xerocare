@@ -50,6 +50,7 @@ import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import { PayableDetailModal } from '@/components/accounts/ReceivablePayableDetail';
 import {
@@ -456,8 +457,10 @@ function PaymentModal({
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             onClick={() => mut.mutate()}
+            loading={mut.isPending}
+            loadingText="Recording..."
             disabled={
               mut.isPending ||
               !!balanceError ||
@@ -465,8 +468,8 @@ function PaymentModal({
             }
             className="flex-1"
           >
-            {mut.isPending ? 'Saving...' : 'Record'}
-          </Button>
+            Record
+          </LoadingButton>
         </div>
       </div>
     </div>
@@ -600,13 +603,15 @@ function ExpensePaymentModal({
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             onClick={() => mut.mutate()}
+            loading={mut.isPending}
+            loadingText="Processing..."
             disabled={mut.isPending || !form.paidFrom || !!balanceError}
             className="flex-1"
           >
-            {mut.isPending ? 'Processing...' : 'Pay Now'}
-          </Button>
+            Pay Now
+          </LoadingButton>
         </div>
       </div>
     </div>

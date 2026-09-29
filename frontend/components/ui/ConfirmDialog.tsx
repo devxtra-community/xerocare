@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { Modal } from './Modal';
-import { Button } from './button'; // use the existing lowercase/uppercase button
-import { AlertTriangle, CheckCircle2, Info, Loader2 } from 'lucide-react';
+import { Button, buttonVariants } from './button'; // use the existing lowercase/uppercase button
+import { LoadingButton } from './LoadingButton';
+import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface ConfirmDialogProps {
@@ -51,11 +52,21 @@ export function ConfirmDialog({
     },
   }[type];
 
+  // Self-locking: callers don't always pass `isLoading` (and it can't cover the very
+  // first click anyway), so the dialog tracks its own in-flight state. A second click
+  // while the API call is running is ignored instead of firing the action twice.
+  const [pending, setPending] = React.useState(false);
+  const busy = isLoading || pending;
+
   const handleConfirm = async () => {
+    if (busy) return;
+    setPending(true);
     try {
       await onConfirm();
     } catch (error) {
       console.error('Error during confirmation callback:', error);
+    } finally {
+      setPending(false);
     }
   };
 
@@ -64,8 +75,8 @@ export function ConfirmDialog({
       isOpen={isOpen}
       onClose={onClose}
       maxWidth="sm"
-      showCloseButton={!isLoading}
-      closeOnOutsideClick={!isLoading}
+      showCloseButton={!busy}
+      closeOnOutsideClick={!busy}
     >
       <div className="flex flex-col items-center text-center p-2">
         {/* Icon at top center */}
@@ -82,26 +93,24 @@ export function ConfirmDialog({
           <Button
             variant="outline"
             onClick={onClose}
-            disabled={isLoading}
+            disabled={busy}
             className="text-gray-500 border-gray-300 hover:bg-gray-50 hover:text-gray-700 min-w-[90px] h-9"
           >
             {cancelText}
           </Button>
-          <Button
-            variant={typeConfig.confirmVariant}
+          <LoadingButton
             onClick={handleConfirm}
-            disabled={isLoading}
-            className={cn('min-w-[100px] h-9', typeConfig.confirmClass)}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="size-4 animate-spin mr-1.5" />
-                Processing...
-              </>
-            ) : (
-              confirmText
+            loading={busy}
+            loadingText="Processing..."
+            disabled={busy}
+            className={cn(
+              buttonVariants({ variant: typeConfig.confirmVariant }),
+              'min-w-[100px] h-9',
+              typeConfig.confirmClass,
             )}
-          </Button>
+          >
+            {confirmText}
+          </LoadingButton>
         </div>
       </div>
     </Modal>

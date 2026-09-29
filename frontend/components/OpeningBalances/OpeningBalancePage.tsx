@@ -27,6 +27,7 @@ import OpeningBalanceTable from './OpeningBalanceTable';
 import OpeningBalanceDetailPanel from './OpeningBalanceDetailPanel';
 import { InvoiceAccountView } from '../invoice/InvoiceAccountView';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -1381,9 +1382,15 @@ export default function OpeningBalancePage() {
               >
                 Cancel
               </button>
-              <Button type="submit" disabled={paymentLoading} className="h-11 px-8 rounded-xl">
-                {paymentLoading ? 'Recording...' : 'Record Payment'}
-              </Button>
+              <LoadingButton
+                type="submit"
+                loading={paymentLoading}
+                loadingText="Recording..."
+                disabled={paymentLoading}
+                className="h-11 px-8 rounded-xl"
+              >
+                Record Payment
+              </LoadingButton>
             </div>
           </form>
         </DialogContent>
