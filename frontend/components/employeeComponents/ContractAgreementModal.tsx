@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { publicAppLink, isUnreachableLink } from '@/lib/publicAppUrl';
+import { copyTextToClipboard } from '@/lib/clipboard';
 import {
   ContractAgreement,
   createOrGetContractAgreement,
@@ -203,10 +204,16 @@ export function ContractAgreementModal({
     }
   };
 
-  const copyLink = () => {
+  // Clipboard writes must happen inside the click's user gesture on insecure
+  // origins, so the await below stays direct — no intermediate setState round-trip.
+  const copyLink = async () => {
     if (!remoteLink) return;
-    navigator.clipboard.writeText(remoteLink);
-    toast.success('Link copied to clipboard');
+    const ok = await copyTextToClipboard(remoteLink);
+    if (ok) {
+      toast.success('Copied! Link copied to clipboard');
+    } else {
+      toast.error('Could not copy the link. Please copy it manually.');
+    }
   };
 
   const handlePrint = () => {
