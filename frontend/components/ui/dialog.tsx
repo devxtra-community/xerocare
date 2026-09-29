@@ -62,9 +62,12 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-6 right-6 rounded-full p-1 opacity-60 transition-all hover:opacity-100 hover:bg-card/50 focus:outline-none"
+            // A real button shape with a border and a focus ring, not a bare floating X:
+            // a hit target you can see is easier to aim for, and keyboard users get the
+            // same affordance as mouse users.
+            className="absolute top-5 right-5 rounded-lg border border-transparent p-1.5 text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
-            <XIcon className="size-5" />
+            <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}

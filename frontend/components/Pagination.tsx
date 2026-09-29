@@ -26,7 +26,7 @@ export default function Pagination({
   const endItem = total !== undefined && limit !== undefined ? Math.min(page * limit, total) : null;
 
   return (
-    <div className="p-4 border-t border-gray-50 flex flex-col sm:flex-row items-center justify-between bg-card text-xs gap-4">
+    <div className="px-4 py-3 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between bg-card text-xs gap-3">
       <div className="text-muted-foreground font-medium">
         {startItem !== null && endItem !== null && total !== undefined ? (
           <>
@@ -74,10 +74,11 @@ export default function Pagination({
               <button
                 key={pageNum}
                 onClick={() => onPageChange(pageNum)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                aria-current={page === pageNum ? 'page' : undefined}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 ${
                   page === pageNum
                     ? 'bg-primary text-white font-bold shadow-sm shadow-primary/20'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted hover:text-primary font-medium'
                 }`}
               >
                 {pageNum}

@@ -148,6 +148,117 @@
   --muted-rgb: 229 231 235;
 }
 
+/* ── Enterprise action-icon system ─────────────────────────────────────────────
+   One treatment for every icon-only action in every table: same 30px hit area, same
+   7px radius, same hairline border, same icon size — and a colour language that stays
+   neutral at rest and only speaks on hover. ERP tables are read by the hundred; a row
+   of brightly-coloured buttons is noise, while a row of identical neutral squares that
+   reveal their intent on hover is scannable and calm.
+
+   `.action-icon` — neutral (View / Edit / More / Documents / anything unspecified)
+   `.action-icon-success` — Approve / Accept / Activate / Confirm (green on hover)
+   `.action-icon-destructive` — Delete / Reject / Cancel (red on hover)
+   `.action-icon-info` — informational (Finance / details / send) (blue on hover)
+   `.action-icon-warning` — attention (amber on hover)
+
+   Every variant ships the accessible focus ring; colour is never the only signal, the
+   icon glyph and the tooltip carry the meaning too. */
+.action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: #64748b;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.action-icon > svg {
+  width: 14px;
+  height: 14px;
+}
+.action-icon:hover:not(:disabled),
+.action-icon:focus-visible:not(:disabled) {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+.action-icon:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Shared focus ring — keyboard affordance for every variant, colour-matched to its
+   hover tone so focus and intent read as the same language. */
+.action-icon:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 25%, transparent);
+}
+.action-icon-success:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 30%, transparent);
+}
+.action-icon-destructive:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.action-icon-info:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 30%, transparent);
+}
+.action-icon-warning:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 30%, transparent);
+}
+
+.action-icon-success:hover:not(:disabled),
+.action-icon-success:focus-visible:not(:disabled) {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.action-icon-destructive:hover:not(:disabled),
+.action-icon-destructive:focus-visible:not(:disabled) {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+.action-icon-info:hover:not(:disabled),
+.action-icon-info:focus-visible:not(:disabled) {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+.action-icon-warning:hover:not(:disabled),
+.action-icon-warning:focus-visible:not(:disabled) {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #d97706;
+}
+
+/* Grouped action row: the container tables wrap their icon buttons in. A shared
+   container — one gap, one alignment, wrap when the row is narrow — is what keeps the
+   action column the same width everywhere instead of drifting a few px per page. */
+.action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Restrained enterprise chart palette, shared by every Accounts/finance chart so
+   Revenue is always this blue and Expenses always this amber, wherever they appear. */
+:root {
+  --chart-revenue: #2563eb;
+  --chart-expense: #f59e0b;
+  --chart-profit: #10b981;
+  --chart-payroll: #64748b;
+  --chart-purchase: #93c5fd;
+  --chart-grid: #eef2f6;
+  --chart-axis: #64748b;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

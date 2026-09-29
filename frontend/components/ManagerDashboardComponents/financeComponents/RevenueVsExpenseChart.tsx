@@ -109,68 +109,103 @@ export default function RevenueVsExpenseChart({ selectedYear }: RevenueVsExpense
   }, [selectedYear]);
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[400px]">
-      <h4 className="text-sm font-bold text-primary uppercase mb-6">Revenue vs Expenses</h4>
+    // Same chart-card pattern as the Accounts module: white card, hairline border,
+    // uppercase micro-label header — so a finance dashboard chart and an Accounts
+    // analytics chart read as one system.
+    <div className="bg-card rounded-2xl shadow-sm border border-border/60 p-4 h-full min-h-[400px]">
+      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-4">
+        Revenue vs Expenses
+      </h4>
       <div className="h-[320px] w-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
+            <ComposedChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+              barCategoryGap="28%"
+            >
+              {/* Hairline solid grid — a dashed grid reads as a threshold. */}
+              <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
               <XAxis
                 dataKey="month"
-                axisLine={false}
+                axisLine={{ stroke: 'var(--chart-grid)' }}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                tick={{ fill: 'var(--chart-axis)', fontSize: 11 }}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                tick={{ fill: 'var(--chart-axis)', fontSize: 11 }}
                 tickFormatter={(val) => `${formatCompactNumber(val)}`}
               />
               <Tooltip
                 formatter={(val: number) => [`${getActiveCurrency()} ${formatCompactNumber(val)}`]}
                 contentStyle={{
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  boxShadow: '0 6px 20px rgba(15,23,42,0.10)',
+                  padding: '8px 10px',
                 }}
-                itemStyle={{ fontSize: '10px', fontWeight: 'bold' }}
+                labelStyle={{
+                  color: '#0f172a',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  marginBottom: 4,
+                }}
+                itemStyle={{
+                  fontSize: '11px',
+                  color: '#475569',
+                  padding: 0,
+                }}
+                cursor={{ fill: 'rgba(15,23,42,0.04)' }}
               />
+              {/* Ink-coloured legend labels — meaning lives in the swatch, not the text. */}
               <Legend
                 iconType="circle"
-                wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }}
+                iconSize={8}
+                formatter={(value: string) => (
+                  <span style={{ color: '#475569', fontSize: 11, fontWeight: 600 }}>{value}</span>
+                )}
+                wrapperStyle={{ paddingTop: '6px' }}
               />
+              {/* Semantic palette from globals.css: Revenue is always this blue, expense
+                  components always these muted tones, wherever they appear. */}
               <Bar
                 dataKey="revenue"
                 name="Revenue"
-                fill="#1d4ed8"
+                fill="var(--chart-revenue)"
                 radius={[4, 4, 0, 0]}
-                barSize={20}
+                maxBarSize={24}
+                isAnimationActive={false}
               />
               <Bar
                 dataKey="purchaseExpense"
                 stackId="expense"
                 name="Purchase Cost"
-                fill="#93c5fd"
+                fill="var(--chart-purchase)"
                 radius={[0, 0, 0, 0]}
-                barSize={20}
+                maxBarSize={24}
+                isAnimationActive={false}
               />
               <Bar
                 dataKey="salaryExpense"
                 stackId="expense"
                 name="Salary Expense"
-                fill="#3b82f6"
+                fill="var(--chart-expense)"
                 radius={[4, 4, 0, 0]}
-                barSize={20}
+                maxBarSize={24}
+                isAnimationActive={false}
               />
               <Line
                 type="monotone"
                 dataKey="revenue"
                 name="Trend"
-                stroke="#1d4ed8"
+                stroke="var(--chart-revenue)"
                 strokeWidth={2}
+                strokeLinecap="round"
                 dot={false}
+                isAnimationActive={false}
               />
             </ComposedChart>
           </ResponsiveContainer>

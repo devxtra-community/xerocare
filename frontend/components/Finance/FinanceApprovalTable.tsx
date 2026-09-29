@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ActionGroup, ActionIconButton } from '@/components/ui/ActionIconButton';
 import { Loader2, CheckCircle, XCircle, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -455,7 +456,7 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                 <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
                 <TableCell>{inv.employeeName || 'Unknown'}</TableCell>
                 <TableCell className="text-center">
-                  <div className="flex justify-center gap-2">
+                  <ActionGroup className="justify-center">
                     {inv.saleType === 'RENT' || inv.saleType === 'LEASE' ? (
                       <>
                         <Button
@@ -569,16 +570,14 @@ export default function FinanceApprovalTable({ saleType }: FinanceApprovalTableP
                         Processed
                       </Badge>
                     )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 w-9 p-0"
+                    <ActionIconButton
+                      label="Reject"
+                      tone="destructive"
                       onClick={() => openRejectDialog(inv)}
-                      title="Reject"
                     >
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
+                      <XCircle aria-hidden="true" />
+                    </ActionIconButton>
+                  </ActionGroup>
                 </TableCell>
               </TableRow>
             ))}

@@ -31,6 +31,7 @@ import {
 } from '@/lib/saleWorkflow';
 import { getApiErrorMessage } from '@/lib/apiError';
 import { ContractActionsMenu } from './ContractActionsMenu';
+import { ActionGroup, ActionIconButton } from '@/components/ui/ActionIconButton';
 import {
   AdvancePaymentMark,
   SecurityBillMark,
@@ -536,27 +537,23 @@ export default function EmployeeLeaseTable({
                       })}
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-blue-50"
+                      <ActionGroup className="justify-center">
+                        <ActionIconButton
+                          label="View Details"
+                          tone="info"
                           onClick={() => handleViewDetails(inv.id)}
-                          title="View Details"
                         >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                          <Eye aria-hidden="true" />
+                        </ActionIconButton>
 
                         {canViewLogs && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50"
+                          <ActionIconButton
+                            label="Full details & activity log"
+                            tone="neutral"
                             onClick={() => router.push(`/employee/invoices/${inv.id}`)}
-                            title="Full details & activity log"
                           >
-                            <Activity className="h-4 w-4" />
-                          </Button>
+                            <Activity aria-hidden="true" />
+                          </ActionIconButton>
                         )}
 
                         {/* Collapsed into one popover — see ContractActionsMenu. Each entry
@@ -658,7 +655,7 @@ export default function EmployeeLeaseTable({
                         />
 
                         {/* Edit button removed to enforce quotation-to-transaction workflow */}
-                      </div>
+                      </ActionGroup>
                     </TableCell>
                   </TableRow>
                 ))

@@ -81,23 +81,29 @@ export default function ProfitChart({ selectedYear }: ProfitChartProps) {
   }, [selectedYear]);
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-blue-100 p-4 h-full min-h-[400px]">
-      <h4 className="text-sm font-bold text-primary uppercase mb-6">Profit Trend</h4>
+    <div className="bg-card rounded-2xl shadow-sm border border-border/60 p-4 h-full min-h-[400px]">
+      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-4">
+        Profit Trend
+      </h4>
       <div className="h-[320px] w-full">
         {isClient && (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.2} />
+            <BarChart
+              data={data}
+              margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+              barCategoryGap="28%"
+            >
+              <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
               <XAxis
                 dataKey="month"
-                axisLine={false}
+                axisLine={{ stroke: 'var(--chart-grid)' }}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                tick={{ fill: 'var(--chart-axis)', fontSize: 11 }}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                tick={{ fill: 'var(--chart-axis)', fontSize: 11 }}
                 tickFormatter={(val) => `${formatCompactNumber(val)}`}
               />
               <Tooltip
@@ -106,18 +112,35 @@ export default function ProfitChart({ selectedYear }: ProfitChartProps) {
                   'Net Profit',
                 ]}
                 contentStyle={{
-                  borderRadius: '12px',
-                  border: 'none',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  boxShadow: '0 6px 20px rgba(15,23,42,0.10)',
+                  padding: '8px 10px',
                 }}
-                itemStyle={{ fontSize: '10px', fontWeight: 'bold', color: '#1d4ed8' }}
+                labelStyle={{
+                  color: '#0f172a',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  marginBottom: 4,
+                }}
+                itemStyle={{
+                  fontSize: '11px',
+                  color: '#475569',
+                  fontWeight: 600,
+                  padding: 0,
+                }}
+                cursor={{ fill: 'rgba(15,23,42,0.04)' }}
               />
+              {/* Profit carries the palette's green — the same green the Accounts module
+                  uses for anything that lands, so the two charts agree with each other. */}
               <Bar
                 dataKey="profit"
                 name="Net Profit"
-                fill="#1d4ed8"
+                fill="var(--chart-profit)"
                 radius={[4, 4, 0, 0]}
-                barSize={30}
+                maxBarSize={24}
+                isAnimationActive={false}
               />
             </BarChart>
           </ResponsiveContainer>
