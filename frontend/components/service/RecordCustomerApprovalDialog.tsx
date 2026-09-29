@@ -2,8 +2,10 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/button';
-import { CheckCircle2, FileText, Loader2, PenLine, ShieldCheck, Upload } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
+import { CheckCircle2, FileText, PenLine, ShieldCheck, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CustomerDecisionChannel, RecordCustomerDecisionMeta } from '@/lib/serviceTicket';
 import { ESignatureCanvas } from '@/components/employeeComponents/ESignatureCanvas';
@@ -46,6 +48,10 @@ export function RecordCustomerApprovalDialog({
   const [confirmedVia, setConfirmedVia] = useState<CustomerDecisionChannel>('IN_PERSON');
   const [note, setNote] = useState('');
   const [ack, setAck] = useState(false);
+  // Guards the submit itself. The parent's `submitting` flag only covers some of the
+  // paths into this dialog, so without a local lock a fast double-click on
+  // "Record Approval" could record the approval (and the payment) twice.
+  const [isRecording, setIsRecording] = useState(false);
 
   // Signature — required either way: drawn live (customer physically present)
   // or an uploaded photo/PDF of a copy they signed elsewhere, same rule as the
@@ -62,6 +68,7 @@ export function RecordCustomerApprovalDialog({
       setConfirmedVia('IN_PERSON');
       setNote('');
       setAck(false);
+      setIsRecording(false);
       setSignMethod('CAPTURE');
       setSigData(null);
       setUploadFile(null);
@@ -77,22 +84,32 @@ export function RecordCustomerApprovalDialog({
         })}`
       : 'the quoted amount';
 
-  const hasSignature =
-    signMethod === 'CAPTURE' ? !!sigData : !!uploadFile && attestationNote.trim().length > 0;
-  const canSubmit = customerName.trim().length > 1 && ack && hasSignature && !submitting;
+  const isBusy = submitting || isRecording;
 
-  const handleSubmit = () => {
-    const meta: RecordCustomerDecisionMeta = {
-      customerName: customerName.trim(),
-      confirmedVia,
-      note: note.trim() || undefined,
-    };
-    if (signMethod === 'CAPTURE') {
-      if (!sigData) return;
-      onConfirm({ ...meta, signatureData: sigData });
-    } else {
-      if (!uploadFile) return;
-      onConfirmUpload(meta, uploadFile, attestationNote.trim());
+  // Signature must have been captured on the canvas (or uploaded) and saved before the
+  // approval can be recorded — a blank pad can never be submitted.
+  const signatureSaved =
+    signMethod === 'CAPTURE' ? !!sigData : !!uploadFile && attestationNote.trim().length > 0;
+  const canSubmit = customerName.trim().length > 1 && ack && signatureSaved && !isBusy;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return; // second click while the first is still in flight
+    setIsRecording(true);
+    try {
+      const meta: RecordCustomerDecisionMeta = {
+        customerName: customerName.trim(),
+        confirmedVia,
+        note: note.trim() || undefined,
+      };
+      if (signMethod === 'CAPTURE') {
+        if (!sigData) return;
+        await onConfirm({ ...meta, signatureData: sigData });
+      } else {
+        if (!uploadFile) return;
+        await onConfirmUpload(meta, uploadFile, attestationNote.trim());
+      }
+    } finally {
+      setIsRecording(false);
     }
   };
 
@@ -299,27 +316,22 @@ export function RecordCustomerApprovalDialog({
             gates were the two things furthest from each other, and staff had to scroll
             back down to a button they had already passed. */}
         <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white pt-3">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+          <Button variant="outline" onClick={onClose} disabled={isBusy}>
             Cancel
           </Button>
-          <Button
-            variant="success"
-            className="bg-green-600 text-white hover:bg-green-700"
-            disabled={!canSubmit}
+          <LoadingButton
             onClick={handleSubmit}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="mr-1.5 size-4 animate-spin" />
-                Recording...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="mr-1.5 size-4" />
-                Record Approval
-              </>
+            loading={isBusy}
+            loadingText="Recording..."
+            disabled={!canSubmit}
+            className={cn(
+              buttonVariants({ variant: 'success' }),
+              'bg-green-600 text-white hover:bg-green-700',
             )}
-          </Button>
+          >
+            <CheckCircle2 className="mr-1.5 size-4" />
+            Record Approval
+          </LoadingButton>
         </div>
       </div>
     </Modal>

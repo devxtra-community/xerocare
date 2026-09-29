@@ -8,7 +8,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -17,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, User, Mail, Save, MapPin, Plus, Star, Trash } from 'lucide-react';
+import { User, Mail, Save, MapPin, Plus, Star, Trash } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -865,14 +867,19 @@ export default function CustomerFormDialog({
             >
               Discard
             </button>
-            <Button
+            <LoadingButton
               type="submit"
-              className="h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg transition-all flex items-center gap-2"
+              loading={loading}
+              loadingText="Saving..."
+              className={cn(
+                buttonVariants(),
+                'h-12 px-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold shadow-lg transition-all flex items-center gap-2',
+              )}
               disabled={loading}
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save size={18} />}
+              <Save size={18} />
               {customer ? 'Update Profile' : 'Create Customer'}
-            </Button>
+            </LoadingButton>
           </div>
         </form>
       </DialogContent>

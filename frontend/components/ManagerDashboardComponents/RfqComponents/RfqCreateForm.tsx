@@ -17,7 +17,9 @@ import { getAllSpareParts, SparePart } from '@/lib/spare-part';
 import { getAllProducts, Product } from '@/lib/product';
 import { getBrands, Brand } from '@/lib/brand';
 import { getServiceTicketById } from '@/lib/serviceTicket';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import {
   Trash2,
   PlusCircle,
@@ -957,20 +959,16 @@ export default function RfqCreateForm({ basePath }: RfqCreateFormProps) {
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="min-w-[120px]">
-              {loading ? (
-                isEditMode ? (
-                  'Updating...'
-                ) : (
-                  'Creating...'
-                )
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  {isEditMode ? 'Update Draft' : 'Save Draft'}
-                </>
-              )}
-            </Button>
+            <LoadingButton
+              type="submit"
+              loading={loading}
+              loadingText={isEditMode ? 'Updating...' : 'Creating...'}
+              disabled={loading}
+              className={cn(buttonVariants(), 'min-w-[120px]')}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {isEditMode ? 'Update Draft' : 'Save Draft'}
+            </LoadingButton>
           </div>
         </form>
       )}

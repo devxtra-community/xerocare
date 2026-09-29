@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { ArrowRight, Bell, Check, CheckCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/Modal';
 import api from '@/lib/api';
 import { formatNotificationTime } from '@/lib/format';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -57,11 +59,295 @@ function getIcon(type: string) {
 
 type FilterType = 'ALL' | 'UNREAD';
 
+/**
+ * Where a notification's "Go" button should take the signed-in user.
+ *
+ * `path` is always a page that actually exists for the role reading the
+ * notification — the routes below mirror the sidebar hrefs (which is why Admin
+ * is sent to /manager/opening-balances and Managers to /employee/service).
+ * A role with no such page resolves to `null`, and the button is simply not
+ * rendered instead of bouncing the user off a 404 or middleware redirect.
+ */
+interface NotificationTarget {
+  path: string;
+  label: string;
+}
+
+const SERVICE_PAGE: Record<string, string | null> = {
+  admin: '/admin/service',
+  employee: '/employee/service',
+  manager: '/employee/service',
+  finance: '/finance/service-estimates',
+  hr: null,
+};
+
+const SERVICE_CONTRACT_PAGE: Record<string, string | null> = {
+  admin: '/employee/service/contracts',
+  employee: '/employee/service/contracts',
+  manager: '/employee/service/contracts',
+  finance: '/finance/contract-renewals',
+  hr: null,
+};
+
+const SALES_PAGE: Record<string, string | null> = {
+  admin: '/admin/sales',
+  employee: '/employee/sales',
+  manager: '/manager/sales',
+  finance: '/finance/quotations',
+  hr: null,
+};
+
+const CONTRACT_PAGE: Record<string, string | null> = {
+  admin: '/admin/sales',
+  employee: '/employee/sales',
+  manager: '/manager/sales',
+  finance: '/finance/contract-renewals',
+  hr: null,
+};
+
+const RENT_PAGE: Record<string, string | null> = {
+  admin: '/finance/rent',
+  employee: '/employee/rent',
+  manager: '/finance/rent',
+  finance: '/finance/rent',
+  hr: null,
+};
+
+const LEASE_PAGE: Record<string, string | null> = {
+  admin: '/finance/lease',
+  employee: '/employee/lease',
+  manager: '/finance/lease',
+  finance: '/finance/lease',
+  hr: null,
+};
+
+const OPENING_BALANCE_PAGE: Record<string, string | null> = {
+  admin: '/manager/opening-balances',
+  employee: '/employee/opening-balances',
+  manager: '/manager/opening-balances',
+  finance: '/finance/opening-balances',
+  hr: null,
+};
+
+const RFQ_PAGE: Record<string, string | null> = {
+  admin: '/admin/rfqs',
+  manager: '/manager/rfqs',
+  employee: null,
+  finance: null,
+  hr: null,
+};
+
+const RFQ_CREATE_PAGE: Record<string, string | null> = {
+  admin: '/admin/rfqs/create',
+  manager: '/manager/rfqs/create',
+  employee: null,
+  finance: null,
+  hr: null,
+};
+
+const LEAVE_PAGE: Record<string, string | null> = {
+  admin: '/hr/leave',
+  manager: '/hr/leave',
+  hr: '/hr/leave',
+  employee: '/employee/leave',
+  finance: null,
+};
+
+const PAYROLL_PAGE: Record<string, string | null> = {
+  admin: '/hr/payroll',
+  manager: '/hr/payroll',
+  hr: '/hr/payroll',
+  employee: null,
+  finance: null,
+};
+
+const TABLES: Record<string, Record<string, string | null>> = {
+  STOCK_TRANSFER: {
+    admin: '/admin/stock-transfers',
+    manager: '/manager/stock-transfers',
+    employee: null,
+    finance: null,
+    hr: null,
+  },
+  CHEQUE: {
+    admin: '/admin/accounts/cheques',
+    manager: '/manager/accounts/cheques',
+    finance: '/finance/accounts/cheques',
+    employee: null,
+    hr: null,
+  },
+  TARGET: {
+    admin: '/manager/targets',
+    manager: '/manager/targets',
+    employee: null,
+    finance: null,
+    hr: null,
+  },
+  MACHINE_SWAP: {
+    admin: '/manager/machine-swaps',
+    manager: '/manager/machine-swaps',
+    employee: null,
+    finance: null,
+    hr: null,
+  },
+  LOT: { admin: '/admin/lots', manager: '/manager/lots', employee: null, finance: null, hr: null },
+  INVENTORY: {
+    admin: '/admin/inventory',
+    manager: '/manager/inventory',
+    employee: null,
+    finance: null,
+    hr: null,
+  },
+  RETURNS: {
+    admin: '/admin/sales/returns',
+    manager: '/manager/sales/returns',
+    employee: '/employee/sales/returns',
+    finance: '/finance/returns',
+    hr: null,
+  },
+};
+
+const REFERENCE_LABELS: Record<string, string> = {
+  SERVICE_TICKET: 'Service ticket',
+  SERVICE: 'Service',
+  SERVICE_CONTRACT: 'Service contract',
+  QUOTATION: 'Quotation',
+  TEMPLATE: 'Quotation template',
+  CONTRACT: 'Contract',
+  OPENING_BALANCE: 'Opening balance',
+  CUSTOM_PART_REQUEST: 'Custom part request',
+  STOCK_TRANSFER: 'Stock transfer',
+  CHEQUE: 'Cheque',
+  TARGET: 'Target',
+  MACHINE_SWAP: 'Machine swap',
+  CREDIT_NOTE: 'Credit note',
+  RENT: 'Rent order',
+  LEASE: 'Lease order',
+  ORDER: 'Order',
+};
+
+function pick(role: string, table: Record<string, string | null>): string | null {
+  return table[role] ?? null;
+}
+
+/** "TICKET_CREATED" -> "Ticket created" (notification type badge / related-to row). */
+function humanizeType(type?: string | null): string {
+  if (!type) return 'Notification';
+  const words = type.replace(/_/g, ' ').trim();
+  return words.charAt(0).toUpperCase() + words.slice(1).toLowerCase();
+}
+
+function formatFullTime(value?: string | null): string {
+  const date = value ? new Date(value) : null;
+  return date && !isNaN(date.getTime()) ? format(date, 'dd MMM yyyy, hh:mm a') : 'Unknown date';
+}
+
+/**
+ * Resolves the page a notification points at for the *signed-in* role.
+ *
+ * Order matters: a structured service reference always wins (a Rent-covered
+ * machine still produces a Service ticket notification, and that belongs on the
+ * service page), then the wording is checked for rent/lease — there is no
+ * `referenceType` for those yet — and only then the notification `type`.
+ */
+function resolveTarget(notif: Notification, role: string): NotificationTarget | null {
+  const refId = (notif.data?.referenceId as string) || '';
+  const refType = ((notif.data?.referenceType as string) || '').toUpperCase();
+  const type = (notif.type || '').toUpperCase();
+  const text = `${notif.title} ${notif.message}`;
+
+  const fromTable = (
+    table: Record<string, string | null>,
+    label: string,
+  ): NotificationTarget | null => {
+    const path = pick(role, table);
+    return path ? { path, label } : null;
+  };
+
+  const isServiceRef =
+    refType === 'SERVICE' || refType === 'SERVICE_TICKET' || refType === 'CUSTOM_PART_REQUEST';
+
+  if (!isServiceRef) {
+    if (/\brent(al)?\b/i.test(text)) {
+      const target = fromTable(RENT_PAGE, 'Go to rent');
+      if (target) return target;
+    }
+    if (/\bleas(e|ed|ing|es)\b/i.test(text)) {
+      const target = fromTable(LEASE_PAGE, 'Go to lease');
+      if (target) return target;
+    }
+  }
+
+  switch (refType) {
+    case 'SERVICE_TICKET':
+    case 'SERVICE':
+      return fromTable(SERVICE_PAGE, 'Go to service tickets');
+    case 'SERVICE_CONTRACT': {
+      const base = pick(role, SERVICE_CONTRACT_PAGE);
+      if (!base) return null;
+      return { path: refId ? `${base}/${refId}` : base, label: 'Open service contract' };
+    }
+    case 'QUOTATION':
+    case 'TEMPLATE':
+      return fromTable(SALES_PAGE, 'View quotation');
+    case 'CONTRACT':
+      return fromTable(CONTRACT_PAGE, 'View contract');
+    case 'OPENING_BALANCE':
+      return fromTable(OPENING_BALANCE_PAGE, 'View opening balances');
+    case 'CUSTOM_PART_REQUEST': {
+      const base = pick(role, RFQ_CREATE_PAGE);
+      if (!base) return null;
+      return { path: refId ? `${base}?fromServiceTicket=${refId}` : base, label: 'Open RFQ' };
+    }
+    case 'STOCK_TRANSFER':
+      return fromTable(TABLES.STOCK_TRANSFER, 'View stock transfers');
+    case 'CHEQUE':
+      return fromTable(TABLES.CHEQUE, 'View cheques');
+    case 'TARGET':
+      return fromTable(TABLES.TARGET, 'View targets');
+    case 'MACHINE_SWAP':
+      return fromTable(TABLES.MACHINE_SWAP, 'View machine swaps');
+    case 'CREDIT_NOTE':
+      return fromTable(TABLES.RETURNS, 'View returns');
+    case 'RENT':
+      return fromTable(RENT_PAGE, 'Go to rent');
+    case 'LEASE':
+      return fromTable(LEASE_PAGE, 'Go to lease');
+    default:
+      break;
+  }
+
+  // No usable reference payload — fall back to what the notification is about.
+  if (type.startsWith('LEAVE_')) return fromTable(LEAVE_PAGE, 'View leave requests');
+  if (type.startsWith('PAYROLL') || type === 'SALARY_PAID')
+    return fromTable(PAYROLL_PAGE, 'View payroll');
+  if (type.startsWith('RFQ_') || type === 'VENDOR_QUOTE_RECEIVED')
+    return fromTable(RFQ_PAGE, 'View RFQs');
+  if (type.startsWith('LOT_')) return fromTable(TABLES.LOT, 'View lots');
+  if (type === 'LOW_STOCK_ALERT') return fromTable(TABLES.INVENTORY, 'View inventory');
+  if (
+    type.startsWith('QUOTATION_') ||
+    type.startsWith('TEMPLATE_') ||
+    type.startsWith('CUSTOMER_')
+  ) {
+    return fromTable(SALES_PAGE, 'View sales');
+  }
+  if (type === 'CONTRACT_ACTIVATED' || type === 'DIRECT_SALE_UNPAID')
+    return fromTable(CONTRACT_PAGE, 'View sales');
+  if (type.startsWith('SERVICE') || type.startsWith('TICKET_') || type === 'TECHNICIAN_ASSIGNED') {
+    return fromTable(SERVICE_PAGE, 'Go to service tickets');
+  }
+
+  return null;
+}
+
 export default function NotificationsPage({ role }: { role: string }) {
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<FilterType>('ALL');
   const [loading, setLoading] = useState(true);
+  // Notification whose detail dialog is open (full description + Go button).
+  const [selected, setSelected] = useState<Notification | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -87,6 +373,8 @@ export default function NotificationsPage({ role }: { role: string }) {
     try {
       await api.put(`/e/notifications/${id}/read`);
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+      // Keep the open dialog in sync — it holds its own copy of the notification.
+      setSelected((prev) => (prev && prev.id === id ? { ...prev, is_read: true } : prev));
     } catch (err) {
       console.error('Failed to mark as read', err);
     }
@@ -102,42 +390,20 @@ export default function NotificationsPage({ role }: { role: string }) {
     }
   };
 
-  const handleClick = (notif: Notification) => {
+  // Clicking a card opens its detail dialog — the un-clamped description and the
+  // navigation button both live there (the list row keeps its 2-line preview).
+  const openNotification = (notif: Notification) => {
+    setSelected(notif);
     if (!notif.is_read) markAsRead(notif.id);
+  };
 
-    const refId = notif.data?.referenceId as string | undefined;
-    const refType = notif.data?.referenceType as string | undefined;
-
-    if (!refId || !refType) return;
-
-    switch (refType) {
-      case 'QUOTATION':
-      case 'TEMPLATE':
-        router.push(`/${role}/sales`);
-        break;
-      case 'CONTRACT':
-        router.push(`/${role}/sales`);
-        break;
-      case 'SERVICE_CONTRACT':
-        // Service contracts only have a detail page under /employee — but
-        // managers are already permitted there (see middleware.ts, they keep
-        // their own sidebar while browsing it), so this is intentionally not
-        // `/${role}/...` like the other cases.
-        router.push(`/employee/service/contracts/${refId}`);
-        break;
-      case 'SERVICE_TICKET':
-      case 'SERVICE':
-        router.push(`/${role}/service`);
-        break;
-      case 'OPENING_BALANCE':
-        router.push(`/${role}/opening-balances`);
-        break;
-      case 'CUSTOM_PART_REQUEST':
-        router.push(`/${role}/rfqs/create?fromServiceTicket=${refId}`);
-        break;
-      default:
-        break;
-    }
+  const goToTarget = () => {
+    if (!selected) return;
+    const target = resolveTarget(selected, role);
+    if (!target) return;
+    if (!selected.is_read) markAsRead(selected.id);
+    setSelected(null);
+    router.push(target.path);
   };
 
   const filtered = filter === 'UNREAD' ? notifications.filter((n) => !n.is_read) : notifications;
@@ -211,11 +477,11 @@ export default function NotificationsPage({ role }: { role: string }) {
                 key={notif.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => handleClick(notif)}
+                onClick={() => openNotification(notif)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    handleClick(notif);
+                    openNotification(notif);
                   }
                 }}
                 className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
@@ -269,6 +535,68 @@ export default function NotificationsPage({ role }: { role: string }) {
             ))}
           </div>
         )}
+
+        {/* Detail dialog: full description + the button that navigates */}
+        {selected &&
+          (() => {
+            const target = resolveTarget(selected, role);
+            const refType = (selected.data?.referenceType as string) || '';
+            const related = refType ? REFERENCE_LABELS[refType] || humanizeType(refType) : null;
+
+            return (
+              <Modal
+                key={selected.id}
+                isOpen
+                onClose={() => setSelected(null)}
+                title={selected.title}
+                maxWidth="lg"
+              >
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    <span className="text-base leading-none">{getIcon(selected.type)}</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+                      {humanizeType(selected.type)}
+                    </span>
+                    <span>{formatFullTime(selected.createdAt)}</span>
+                    {!selected.is_read && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">
+                        Unread
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Full description — never clamped here. */}
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                    {selected.message}
+                  </p>
+
+                  {related && (
+                    <div className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                      <span>Related to</span>
+                      <span className="font-semibold text-gray-700">{related}</span>
+                    </div>
+                  )}
+
+                  <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-gray-100 bg-white px-1 pt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 text-xs"
+                      onClick={() => setSelected(null)}
+                    >
+                      Close
+                    </Button>
+                    {target && (
+                      <Button size="sm" className="h-9 gap-1.5 text-xs" onClick={goToTarget}>
+                        {target.label}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Modal>
+            );
+          })()}
       </div>
     </div>
   );

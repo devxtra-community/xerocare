@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import {
   Select,
   SelectContent,
@@ -19,10 +20,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { lotService, type Lot, type SplitMethod, type LandedCostAllocationResult } from '@/lib/lot';
 import type { Purchase, PurchaseCost } from '@/services/purchaseService';
 import { formatCurrency } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 const SPLIT_METHOD_LABELS: Record<SplitMethod, string> = {
   BY_VALUE: 'By Value',
@@ -229,16 +231,19 @@ export default function AllocateLandedCostsModal({
         )}
 
         <div className="flex justify-between items-center gap-2 pt-2">
-          <Button
+          <LoadingButton
             type="button"
-            variant="outline"
-            className="h-9 text-xs border-red-200 text-red-600 hover:bg-red-50"
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'h-9 text-xs border-red-200 text-red-600 hover:bg-red-50',
+            )}
+            loading={resetting}
+            loadingText="Resetting..."
             disabled={!alreadyAllocated || resetting}
             onClick={handleReset}
           >
-            {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
             Reset
-          </Button>
+          </LoadingButton>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -248,15 +253,16 @@ export default function AllocateLandedCostsModal({
             >
               Close
             </Button>
-            <Button
+            <LoadingButton
               type="button"
-              className="h-9 text-xs"
+              className={cn(buttonVariants(), 'h-9 text-xs')}
+              loading={applying}
+              loadingText="Applying..."
               disabled={!canAllocate || applying}
               onClick={handleApply}
             >
-              {applying ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
               Apply Allocation
-            </Button>
+            </LoadingButton>
           </div>
         </div>
         <p className="text-[10px] text-slate-400 text-center">

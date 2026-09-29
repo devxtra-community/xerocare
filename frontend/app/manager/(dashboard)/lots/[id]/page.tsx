@@ -36,7 +36,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
@@ -57,6 +58,7 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import { purchaseService, Purchase } from '@/services/purchaseService';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -130,6 +132,9 @@ export default function LotDetailPage() {
     Record<string, { received: number; damaged: number }>
   >({});
   const [isSaving, setIsSaving] = useState(false);
+  // "Add … to Inventory" only jumps to the registration page, but a fast double-click
+  // fired the navigation twice — this locks the buttons while the route change is issued.
+  const [navigatingInventory, setNavigatingInventory] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditPurchaseModal, setShowEditPurchaseModal] = useState(false);
@@ -388,11 +393,19 @@ export default function LotDetailPage() {
   };
 
   const handleAddToInventory = (itemId?: string, type?: LotItemType) => {
-    if (!lot) return;
-    if (type === LotItemType.MODEL) {
-      router.push(`/manager/products?lotId=${lot.id}${itemId ? `&itemId=${itemId}` : ''}`);
-    } else if (type === LotItemType.SPARE_PART) {
-      router.push(`/manager/spare-parts?lotId=${lot.id}${itemId ? `&itemId=${itemId}` : ''}`);
+    if (!lot || navigatingInventory) return; // ignore the second click
+    if (type !== LotItemType.MODEL && type !== LotItemType.SPARE_PART) return;
+    setNavigatingInventory(true);
+    try {
+      if (type === LotItemType.MODEL) {
+        router.push(`/manager/products?lotId=${lot.id}${itemId ? `&itemId=${itemId}` : ''}`);
+      } else {
+        router.push(`/manager/spare-parts?lotId=${lot.id}${itemId ? `&itemId=${itemId}` : ''}`);
+      }
+    } catch (err) {
+      setNavigatingInventory(false);
+      toast.error('Could not open the inventory registration page');
+      console.error(err);
     }
   };
 
@@ -589,19 +602,19 @@ export default function LotDetailPage() {
               >
                 <Undo2 size={14} className="mr-2" /> Cancel
               </Button>
-              <Button
-                size="sm"
+              <LoadingButton
                 onClick={handleSaveReceiving}
+                loading={isSaving}
+                loadingText="Saving..."
                 disabled={isSaving}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {isSaving ? (
-                  <Activity size={14} className="animate-spin mr-2" />
-                ) : (
-                  <Save size={14} className="mr-2" />
+                className={cn(
+                  buttonVariants({ size: 'sm' }),
+                  'bg-amber-600 hover:bg-amber-700 text-white',
                 )}
+              >
+                <Save size={14} className="mr-2" />
                 Save Changes
-              </Button>
+              </LoadingButton>
             </div>
           </div>
         )}
@@ -911,14 +924,17 @@ export default function LotDetailPage() {
               <div className="flex flex-wrap gap-2">
                 {lot.status === LotStatus.RECEIVED && hasProducts && (
                   <div className="flex gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700"
+                    <LoadingButton
+                      loading={navigatingInventory}
+                      loadingText="Opening..."
+                      className={cn(
+                        buttonVariants({ variant: 'outline', size: 'sm' }),
+                        'h-7 text-[10px] gap-1.5 border-blue-200 text-blue-700',
+                      )}
                       onClick={() => handleAddToInventory(undefined, LotItemType.MODEL)}
                     >
                       <Plus size={12} /> Add Products to Inventory
-                    </Button>
+                    </LoadingButton>
                     <span
                       title={
                         hasRegisteredProducts
@@ -940,14 +956,17 @@ export default function LotDetailPage() {
                 )}
                 {lot.status === LotStatus.RECEIVED && hasSpareParts && (
                   <div className="flex gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700"
+                    <LoadingButton
+                      loading={navigatingInventory}
+                      loadingText="Opening..."
+                      className={cn(
+                        buttonVariants({ variant: 'outline', size: 'sm' }),
+                        'h-7 text-[10px] gap-1.5 border-orange-200 text-orange-700',
+                      )}
                       onClick={() => handleAddToInventory(undefined, LotItemType.SPARE_PART)}
                     >
                       <Plus size={12} /> Add Spare to Inventory
-                    </Button>
+                    </LoadingButton>
                     <span
                       title={
                         hasRegisteredSpareParts
@@ -1583,14 +1602,15 @@ export default function LotDetailPage() {
               >
                 Cancel
               </Button>
-              <Button
+              <LoadingButton
                 onClick={handleConfirmReceived}
+                loading={isSaving}
+                loadingText="Confirming..."
                 disabled={isSaving}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {isSaving ? <Activity size={14} className="animate-spin mr-2" /> : null}
                 Finalize & Confirm
-              </Button>
+              </LoadingButton>
             </div>
           </Card>
         </div>

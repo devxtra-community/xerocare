@@ -43,6 +43,7 @@ import Pagination from '@/components/Pagination';
 import StatCard from '@/components/StatCard';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import { ReceivableDetailModal } from '@/components/accounts/ReceivablePayableDetail';
 import {
@@ -428,15 +429,17 @@ function PaymentModal({
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             onClick={() => mut.mutate()}
+            loading={mut.isPending}
+            loadingText="Recording..."
             disabled={
               mut.isPending || (!isCheque && (matchingAccounts.length === 0 || !form.paidToAccount))
             }
             className="flex-1"
           >
-            {mut.isPending ? 'Saving...' : isCheque ? 'Record Cheque' : 'Record'}
-          </Button>
+            {isCheque ? 'Record Cheque' : 'Record'}
+          </LoadingButton>
         </div>
       </div>
     </div>

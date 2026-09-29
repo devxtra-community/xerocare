@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
   Search,
@@ -584,9 +586,15 @@ function BranchWizard({
               Next <ChevronRight size={16} />
             </Button>
           ) : (
-            <Button onClick={() => onConfirm(form)} disabled={isSubmitting || !canSubmit}>
-              {isSubmitting ? 'Saving...' : isEditing ? 'Update Branch' : 'Create Branch'}
-            </Button>
+            <LoadingButton
+              onClick={() => onConfirm(form)}
+              loading={isSubmitting}
+              loadingText="Saving..."
+              disabled={isSubmitting || !canSubmit}
+              className={cn(buttonVariants())}
+            >
+              {isEditing ? 'Update Branch' : 'Create Branch'}
+            </LoadingButton>
           )}
         </div>
       </DialogContent>

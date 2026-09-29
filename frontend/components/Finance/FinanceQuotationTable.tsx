@@ -9,7 +9,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -655,19 +657,16 @@ export default function FinanceQuotationTable({
               <Button variant="outline" onClick={() => setRejectOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                variant="destructive"
+              <LoadingButton
                 onClick={handleRejectConfirm}
+                loading={actionLoading}
+                loadingText="Rejecting..."
                 disabled={actionLoading}
-                className="gap-2"
+                className={cn(buttonVariants({ variant: 'destructive' }), 'gap-2')}
               >
-                {actionLoading ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <XCircle size={14} />
-                )}
-                {actionLoading ? 'Rejecting...' : 'Confirm Rejection'}
-              </Button>
+                <XCircle size={14} />
+                Confirm Rejection
+              </LoadingButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>

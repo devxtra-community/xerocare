@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -990,13 +991,15 @@ export default function ServiceContractDetailPage() {
               >
                 Cancel
               </Button>
-              <Button
+              <LoadingButton
                 type="submit"
+                loading={savingPayment}
+                loadingText="Recording..."
                 disabled={savingPayment}
                 className="h-10 px-4 bg-green-600 hover:bg-green-700 text-white font-medium text-xs shadow-sm"
               >
-                {savingPayment ? 'Recording...' : 'Record Payment'}
-              </Button>
+                Record Payment
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

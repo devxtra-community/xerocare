@@ -6,7 +6,8 @@ import { DeleteConfirmDialog } from '@/components/dialogs/DeleteConfirmDialog';
 import { usePagination } from '@/hooks/usePagination';
 import VendorStats from './VendorStats';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import {
   Eye,
   Edit,
@@ -1567,8 +1568,10 @@ export function VendorFormModal({
             >
               Cancel
             </button>
-            <Button
-              className="h-11 px-10"
+            <LoadingButton
+              className={cn(buttonVariants(), 'h-11 px-10')}
+              loading={isSubmitting}
+              loadingText="Saving..."
               disabled={isSubmitting}
               onClick={async () => {
                 if (!form.name.trim()) {
@@ -1633,8 +1636,8 @@ export function VendorFormModal({
                 }
               }}
             >
-              {isSubmitting ? 'Saving...' : initialData ? 'Update' : 'Confirm'}
-            </Button>
+              {initialData ? 'Update' : 'Confirm'}
+            </LoadingButton>
           </div>
         </div>
       </DialogContent>

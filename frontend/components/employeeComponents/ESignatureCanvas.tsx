@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { RotateCcw, Check } from 'lucide-react';
 
 interface ESignatureCanvasProps {
@@ -26,7 +27,18 @@ export function ESignatureCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(!existingSignature);
+  // Feedback after "Save Signature": the button flips to "Saved ✓" for two seconds so
+  // the person handing over the device can see the signature was actually captured —
+  // without it the click looks like it did nothing.
+  const [saved, setSaved] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
 
   const getPos = (
     e: MouseEvent | TouchEvent,
@@ -77,11 +89,18 @@ export function ESignatureCanvas({
       e.preventDefault();
       const canvas = canvasRef.current;
       if (!canvas) return;
+      // Once somebody draws over a signature that was already saved, that saved copy no
+      // longer matches the canvas — drop it so nothing can be submitted as "saved" while
+      // the pad shows something different. The save button returns to "Save Signature".
+      if (saved) {
+        setSaved(false);
+        onClear?.();
+      }
       setIsDrawing(true);
       setIsEmpty(false);
       lastPos.current = getPos(e, canvas);
     },
-    [readOnly],
+    [readOnly, onClear, saved],
   );
 
   const draw = useCallback(
@@ -139,14 +158,23 @@ export function ESignatureCanvas({
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     setIsEmpty(true);
+    setSaved(false);
     onClear?.();
   };
 
   const handleSave = () => {
     const canvas = canvasRef.current;
-    if (!canvas || isEmpty) return;
+    if (!canvas || isEmpty || saved) return;
+
+    // Read the drawing straight off the canvas and hand it to the parent, which keeps it
+    // in state — this is the only place the pixels leave the <canvas>.
     const dataUrl = canvas.toDataURL('image/png');
     onSave(dataUrl);
+
+    // Confirm it landed: "Saved ✓" for two seconds, then back to the normal label.
+    setSaved(true);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
   };
 
   return (
@@ -182,16 +210,17 @@ export function ESignatureCanvas({
             <RotateCcw size={12} className="mr-1" />
             Clear
           </Button>
-          <Button
+          <LoadingButton
             type="button"
-            size="sm"
             onClick={handleSave}
+            loading={saved}
+            loadingText="Saved ✓"
             disabled={isEmpty}
             className="text-[10px] font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-4 rounded-lg disabled:opacity-40"
           >
             <Check size={12} className="mr-1" />
             Save Signature
-          </Button>
+          </LoadingButton>
         </div>
       )}
     </div>

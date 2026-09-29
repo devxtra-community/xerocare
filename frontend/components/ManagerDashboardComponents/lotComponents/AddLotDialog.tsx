@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useForm, useFieldArray, Control, Resolver, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -22,7 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Plus, Trash2, Upload, FileSpreadsheet, Download, Loader2, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Upload, FileSpreadsheet, Download, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { LotItemType, lotService, Vendor } from '@/lib/lot';
 import { getAllModels, Model, formatModelLabel } from '@/lib/model';
@@ -36,7 +37,7 @@ import { getMyBranch } from '@/lib/branch';
 import { MultiSelect } from '@/components/ui/multi-select';
 import * as XLSX from 'xlsx';
 import { formatCurrency } from '@/lib/format';
-import { generateLotId } from '@/lib/utils';
+import { generateLotId, cn } from '@/lib/utils';
 import { AddModelDialog } from '../productComponents/AddModelDialog';
 import { AddBrandDialog } from '../BrandComponents/AddBrandDialog';
 import { Label } from '@/components/ui/label';
@@ -412,10 +413,15 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
 
             {uploadFile && (
               <div className="w-full max-w-md">
-                <Button onClick={handleUpload} disabled={loading} size="lg" className="w-full">
-                  {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                  {loading ? 'Processing...' : `Upload ${uploadFile.name}`}
-                </Button>
+                <LoadingButton
+                  onClick={handleUpload}
+                  loading={loading}
+                  loadingText="Uploading..."
+                  disabled={loading}
+                  className={cn(buttonVariants({ size: 'lg' }), 'w-full')}
+                >
+                  {`Upload ${uploadFile.name}`}
+                </LoadingButton>
               </div>
             )}
           </div>
@@ -1063,15 +1069,18 @@ export default function AddLotDialog({ onClose, onSuccess }: AddLotDialogProps) 
                   >
                     Cancel
                   </Button>
-                  <Button
+                  <LoadingButton
                     type="submit"
+                    loading={loading}
+                    loadingText="Saving..."
                     disabled={loading || isValidatingLot || !!form.formState.errors.lotNumber}
-                    size="sm"
-                    className="min-w-[120px] bg-blue-700 hover:bg-blue-800 text-white font-semibold"
+                    className={cn(
+                      buttonVariants({ size: 'sm' }),
+                      'min-w-[120px] bg-blue-700 hover:bg-blue-800 text-white font-semibold',
+                    )}
                   >
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {loading ? 'Saving...' : 'Save Lot'}
-                  </Button>
+                    Save Lot
+                  </LoadingButton>
                 </div>
               </div>
             </form>

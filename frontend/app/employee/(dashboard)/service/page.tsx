@@ -97,7 +97,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -3995,14 +3997,18 @@ export default function ServiceDashboardPage() {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   type="submit"
+                  loading={submitting}
+                  loadingText="Saving..."
                   disabled={submitting}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs"
+                  className={cn(
+                    buttonVariants(),
+                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs',
+                  )}
                 >
-                  {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />} Create
-                  Ticket
-                </Button>
+                  Create Ticket
+                </LoadingButton>
               </div>
             </form>
           </Card>
@@ -4086,14 +4092,18 @@ export default function ServiceDashboardPage() {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   type="submit"
+                  loading={creatingLead}
+                  loadingText="Creating..."
                   disabled={creatingLead}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl"
+                  className={cn(
+                    buttonVariants(),
+                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                  )}
                 >
-                  {creatingLead && <Loader2 className="mr-2 h-3 w-3 animate-spin" />} Create &
-                  Associate
-                </Button>
+                  Create &amp; Associate
+                </LoadingButton>
               </div>
             </form>
           </Card>
@@ -4179,18 +4189,22 @@ export default function ServiceDashboardPage() {
                     >
                       Cancel
                     </Button>
-                    <Button
+                    <LoadingButton
                       type="submit"
+                      loading={submitting}
+                      loadingText={isReassignment ? 'Updating...' : 'Assigning...'}
                       disabled={
                         submitting ||
                         !assignForm.technicianId ||
                         assignForm.technicianId === selectedTicket.assignedTechnicianId
                       }
-                      className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl"
+                      className={cn(
+                        buttonVariants(),
+                        'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                      )}
                     >
-                      {submitting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
                       {isReassignment ? 'Change Job' : 'Assign Job'}
-                    </Button>
+                    </LoadingButton>
                   </div>
                 </form>
               </Card>
@@ -4917,13 +4931,18 @@ export default function ServiceDashboardPage() {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   type="submit"
+                  loading={submitting}
+                  loadingText="Submitting..."
                   disabled={submitting}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl"
+                  className={cn(
+                    buttonVariants(),
+                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                  )}
                 >
-                  {submitting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />} Submit Diagnosis
-                </Button>
+                  Submit Diagnosis
+                </LoadingButton>
               </div>
             </form>
           </Card>
@@ -4970,13 +4989,18 @@ export default function ServiceDashboardPage() {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   type="submit"
+                  loading={submitting}
+                  loadingText="Submitting..."
                   disabled={submitting}
-                  className="bg-primary hover:bg-primary/95 text-white font-bold rounded-xl"
+                  className={cn(
+                    buttonVariants(),
+                    'bg-primary hover:bg-primary/95 text-white font-bold rounded-xl',
+                  )}
                 >
-                  {submitting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />} Submit Quotation
-                </Button>
+                  Submit Quotation
+                </LoadingButton>
               </div>
             </form>
           </Card>
@@ -5227,13 +5251,18 @@ export default function ServiceDashboardPage() {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   type="submit"
+                  loading={submitting}
+                  loadingText="Completing..."
                   disabled={submitting}
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl"
+                  className={cn(
+                    buttonVariants(),
+                    'bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl',
+                  )}
                 >
-                  {submitting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />} Mark Completed
-                </Button>
+                  Mark Completed
+                </LoadingButton>
               </div>
             </form>
           </Card>
@@ -6748,14 +6777,18 @@ export default function ServiceDashboardPage() {
                         ))}
                       </div>
 
-                      <Button
+                      <LoadingButton
                         type="submit"
+                        loading={submitting}
+                        loadingText="Submitting..."
                         disabled={submitting}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs py-2.5"
+                        className={cn(
+                          buttonVariants(),
+                          'w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs py-2.5',
+                        )}
                       >
-                        {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />} Submit
-                        Revision for Approval
-                      </Button>
+                        Submit Revision for Approval
+                      </LoadingButton>
                     </form>
                   </div>
                 ) : estimatesData.estimates.length === 0 ? (
@@ -6840,14 +6873,18 @@ export default function ServiceDashboardPage() {
                         ))}
                       </div>
 
-                      <Button
+                      <LoadingButton
                         type="submit"
+                        loading={submitting}
+                        loadingText="Saving..."
                         disabled={submitting}
-                        className="w-full bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs py-2.5"
+                        className={cn(
+                          buttonVariants(),
+                          'w-full bg-primary hover:bg-primary/95 text-white font-bold rounded-xl text-xs py-2.5',
+                        )}
                       >
-                        {submitting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />} Create
-                        Draft Estimate
-                      </Button>
+                        Create Draft Estimate
+                      </LoadingButton>
                     </form>
                   </div>
                 ) : (
@@ -7659,22 +7696,24 @@ export default function ServiceDashboardPage() {
       <RecordCustomerApprovalDialog
         open={!!approveModal}
         onClose={() => setApproveModal(null)}
-        onConfirm={(meta) => {
+        onConfirm={async (meta) => {
           if (!approveModal) return;
+          // Returned so the dialog can await it and stay locked (spinner + disabled)
+          // until the API call finishes — otherwise a second click slips through.
           if (approveModal.kind === 'ticket') {
             const ticket = filteredTickets.find((t) => t.id === approveModal.ticketId);
-            if (ticket) handleApproveQuotation(ticket, meta);
+            if (ticket) await handleApproveQuotation(ticket, meta);
           } else {
-            handleApproveCustomer(approveModal.estimateId, meta);
+            await handleApproveCustomer(approveModal.estimateId, meta);
           }
         }}
-        onConfirmUpload={(meta, file, attestationNote) => {
+        onConfirmUpload={async (meta, file, attestationNote) => {
           if (!approveModal) return;
           if (approveModal.kind === 'ticket') {
             const ticket = filteredTickets.find((t) => t.id === approveModal.ticketId);
-            if (ticket) handleApproveQuotationUpload(ticket, file, attestationNote, meta);
+            if (ticket) await handleApproveQuotationUpload(ticket, file, attestationNote, meta);
           } else {
-            handleApproveCustomerUpload(approveModal.estimateId, file, attestationNote, meta);
+            await handleApproveCustomerUpload(approveModal.estimateId, file, attestationNote, meta);
           }
         }}
         ticketNumber={approveModal?.ticketNumber}

@@ -7,12 +7,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { financeApproveQuotation, Invoice } from '@/lib/invoice';
 import { toast } from 'sonner';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ApproveQuotationDialogProps {
   invoiceId: string;
@@ -109,18 +111,20 @@ export function ApproveQuotationDialog({
           <Button variant="outline" onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             onClick={handleApprove}
+            loading={loading}
+            loadingText="Approving..."
             disabled={loading}
-            className={
+            className={cn(
+              buttonVariants(),
               isExtension
                 ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white'
-            }
+                : 'bg-green-600 hover:bg-green-700 text-white',
+            )}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {isExtension ? 'Approve Extension' : 'Approve Quotation'}
-          </Button>
+          </LoadingButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

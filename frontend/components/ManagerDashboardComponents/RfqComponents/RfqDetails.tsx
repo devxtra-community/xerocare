@@ -21,7 +21,9 @@ import { getAllProducts, Product } from '@/lib/product';
 import { getBrands, Brand } from '@/lib/brand';
 import { getMyBranchWarehouses, Warehouse } from '@/lib/warehouse';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/LoadingButton';
+import { cn } from '@/lib/utils';
 import {
   ArrowLeft,
   Send,
@@ -75,6 +77,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   const [vendorToAward, setVendorToAward] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
   const [lotLoading, setLotLoading] = useState(false);
+  const [awarding, setAwarding] = useState(false);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [isWarehouseDialogOpen, setIsWarehouseDialogOpen] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
@@ -275,7 +278,8 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
   };
 
   const confirmAward = async () => {
-    if (!vendorToAward || !selectedWarehouseId) return;
+    if (!vendorToAward || !selectedWarehouseId || awarding) return; // no second award
+    setAwarding(true);
     try {
       const result = await awardVendor(id, vendorToAward, selectedWarehouseId);
       const conv = (result as Record<string, unknown>)?.conversion as
@@ -301,6 +305,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
           'Failed to award vendor',
       );
     } finally {
+      setAwarding(false);
       setVendorToAward(null);
     }
   };
@@ -398,32 +403,28 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             </Button>
           )}
           {rfq.status === RfqStatus.DRAFT && (
-            <Button
+            <LoadingButton
               onClick={handleSendRfq}
-              className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+              className={cn(buttonVariants(), 'bg-blue-600 hover:bg-blue-700 min-w-[120px]')}
+              loading={sendLoading}
+              loadingText="Sending..."
               disabled={sendLoading}
             >
-              {sendLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              {sendLoading ? 'Sending...' : 'Send RFQ'}
-            </Button>
+              <Send className="mr-2 h-4 w-4" />
+              Send RFQ
+            </LoadingButton>
           )}
           {rfq.status === RfqStatus.AWARDED && (
-            <Button
+            <LoadingButton
               onClick={() => handleCreateLot()}
-              className="bg-green-600 hover:bg-green-700 min-w-[130px]"
+              className={cn(buttonVariants(), 'bg-green-600 hover:bg-green-700 min-w-[130px]')}
+              loading={lotLoading}
+              loadingText="Creating..."
               disabled={lotLoading}
             >
-              {lotLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Package className="mr-2 h-4 w-4" />
-              )}
-              {lotLoading ? 'Creating...' : 'Create Lot'}
-            </Button>
+              <Package className="mr-2 h-4 w-4" />
+              Create Lot
+            </LoadingButton>
           )}
         </div>
       </div>
@@ -882,11 +883,23 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                       {(comparison.vendorsSummary as Record<string, unknown>[]).map(
                         (vs: Record<string, unknown>) => (
                           <td key={vs.vendorId as string} className="px-5 py-6 text-center">
-                            <Button
+                            <LoadingButton
                               onClick={() => handleAwardClick(vs.vendorId as string)}
-                              disabled={!!vs.allOutOfStock}
-                              variant={vs.isCheapest ? 'default' : 'outline'}
-                              className={`w-full h-11 transition-all ${vs.allOutOfStock ? 'opacity-50 cursor-not-allowed' : vs.isCheapest ? 'bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg' : 'hover:border-primary/50 hover:text-primary'}`}
+                              loading={awarding}
+                              loadingText="Awarding..."
+                              disabled={!!vs.allOutOfStock || awarding}
+                              className={cn(
+                                buttonVariants({
+                                  variant: vs.isCheapest ? 'default' : 'outline',
+                                }),
+                                `w-full h-11 transition-all ${
+                                  vs.allOutOfStock
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : vs.isCheapest
+                                      ? 'bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg'
+                                      : 'hover:border-primary/50 hover:text-primary'
+                                }`,
+                              )}
                               title={
                                 vs.allOutOfStock
                                   ? 'Vendor has no stock for any requested item'
@@ -895,7 +908,7 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
                             >
                               <CheckCircle className="mr-2 h-4 w-4" />
                               {vs.allOutOfStock ? 'No Stock' : 'Award Vendor'}
-                            </Button>
+                            </LoadingButton>
                           </td>
                         ),
                       )}
@@ -1023,9 +1036,16 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmAward}
-              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
+              disabled={awarding}
+              className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all disabled:opacity-70"
             >
-              Confirm Award
+              {awarding ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Awarding...
+                </span>
+              ) : (
+                'Confirm Award'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1091,22 +1111,20 @@ export default function RfqDetails({ id, basePath }: RfqDetailsProps) {
             >
               Cancel
             </Button>
-            <Button
+            <LoadingButton
               onClick={() => {
                 setIsWarehouseDialogOpen(false);
                 if (warehousePickerFor === 'lot') handleCreateLot(selectedWarehouseId);
                 setWarehousePickerFor(null);
               }}
+              loading={lotLoading}
+              loadingText="Creating..."
               disabled={!selectedWarehouseId || lotLoading}
               className="w-full sm:w-1/2 rounded-xl h-12 text-[15px] font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20 transition-all"
             >
-              {lotLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Package className="mr-2 h-4 w-4" />
-              )}
-              {lotLoading ? 'Creating...' : 'Continue'}
-            </Button>
+              <Package className="mr-2 h-4 w-4" />
+              Continue
+            </LoadingButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
