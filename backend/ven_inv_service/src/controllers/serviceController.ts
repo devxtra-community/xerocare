@@ -1017,6 +1017,12 @@ export class ServiceController {
         serviceLocation,
         machineType: machineTypeInput,
         visitChargeAmount,
+        visitChargeCollected,
+        visitChargePaymentMode,
+        visitChargeAccountId,
+        visitChargeChequeNumber,
+        visitChargeChequeBankName,
+        visitChargeChequeDate,
       } = req.body;
 
       const reportedMeterReading =
@@ -1141,6 +1147,40 @@ export class ServiceController {
         }
       }
 
+      if (visitChargeCollected) {
+        const callerJob = req.user?.employeeJob;
+        if (
+          !['ADMIN', 'MANAGER'].includes(req.user?.role || '') &&
+          callerJob !== 'SERVICE_HELP_DESK'
+        ) {
+          throw new AppError(
+            'Only service help desk may collect the visit charge during ticket creation',
+            403,
+          );
+        }
+        if (!chargeableVisit || quotedVisitCharge <= 0) {
+          throw new AppError(
+            'A visit charge cannot be collected for a covered service or zero amount',
+            400,
+          );
+        }
+        if (
+          !visitChargePaymentMode ||
+          (visitChargePaymentMode !== 'CHEQUE' && !visitChargeAccountId)
+        ) {
+          throw new AppError(
+            'Payment mode and account are required to collect the visit charge',
+            400,
+          );
+        }
+        if (!['CASH', 'BANK_TRANSFER', 'CHEQUE'].includes(visitChargePaymentMode)) {
+          throw new AppError('Unsupported visit charge payment mode', 400);
+        }
+        if (visitChargePaymentMode === 'CHEQUE' && !visitChargeChequeNumber) {
+          throw new AppError('A cheque number is required to collect the visit charge', 400);
+        }
+      }
+
       const ticket = ticketRepo.create({
         ticketNumber,
         customerId: customerId || null,
@@ -1168,6 +1208,20 @@ export class ServiceController {
       });
 
       await ticketRepo.save(ticket);
+      if (visitChargeCollected) {
+        await this.requestVisitChargeApproval(ticket, {
+          paymentMode: visitChargePaymentMode,
+          accountId: visitChargeAccountId,
+          chequeNumber: visitChargeChequeNumber,
+          chequeBankName: visitChargeChequeBankName,
+          chequeDate: visitChargeChequeDate,
+          userId: req.user.userId,
+          userName: await this.resolveCollectorName(req),
+          userRole: req.user.employeeJob || req.user.role,
+          remarks: `Service Visit Charge — Ticket ${ticket.ticketNumber} — collected at ticket creation`,
+          activityNote: `Visit charge of ${ticket.visitChargeAmount} collected at ticket creation and sent to Accounts for approval.`,
+        });
+      }
       logger.info('Resolved service ticket machine coverage', {
         ticketId: ticket.id,
         serialNumber: ticket.serialNumber,
@@ -2367,6 +2421,11 @@ Xerocare Technical Services`;
             productModel: ticket.productModel,
             serialNumber: ticket.serialNumber,
             status: ticket.status,
+            visitChargeAmount: Number(ticket.visitChargeAmount) || 0,
+            visitChargeMethod: ticket.visitChargeMethod,
+            visitChargeStatus: ticket.visitChargeStatus,
+            visitChargeCollected: ticket.visitChargeCollected,
+            visitChargeCollectedAt: ticket.visitChargeCollectedAt,
           },
           branch: branch
             ? { name: branch.name, currencyCode: branch.currency_code, taxName: branch.tax_name }
@@ -3524,7 +3583,27 @@ Xerocare Technical Services`;
         estimates.map((e) => this.withSignedEstimateDoc(e)),
       );
 
-      res.status(200).json({ success: true, data: { estimates: signedEstimates, revisions } });
+      const ticket = await Source.getRepository(ServiceTicket).findOne({
+        where: { id: String(id) },
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          estimates: signedEstimates,
+          revisions,
+          visitCharge: ticket
+            ? {
+                amount: Number(ticket.visitChargeAmount) || 0,
+                method: ticket.visitChargeMethod,
+                status: ticket.visitChargeStatus,
+                collected: ticket.visitChargeCollected,
+                collectedAt: ticket.visitChargeCollectedAt,
+                requestId: ticket.visitChargeRequestId,
+              }
+            : null,
+        },
+      });
     } catch (error) {
       next(error);
     }

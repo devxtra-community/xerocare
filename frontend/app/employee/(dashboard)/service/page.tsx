@@ -409,6 +409,7 @@ export default function ServiceDashboardPage() {
     scheduledVisitDate: '',
     serviceLocation: '',
     visitChargeAmount: '',
+    visitChargeCollected: false,
   });
 
   const [creationPath, setCreationPath] = useState<'existing' | 'new'>('existing');
@@ -798,7 +799,29 @@ export default function ServiceDashboardPage() {
               : undefined,
           visitChargeAmount:
             newTicket.visitChargeAmount !== '' ? Number(newTicket.visitChargeAmount) : undefined,
+          visitChargeCollected: newTicket.visitChargeCollected,
+          visitChargePaymentMode: newTicket.visitChargeCollected ? collectVCPaymentMode : undefined,
+          visitChargeAccountId: newTicket.visitChargeCollected ? collectVCAccountId : undefined,
+          visitChargeChequeNumber: newTicket.visitChargeCollected
+            ? collectVCChequeNumber.trim() || undefined
+            : undefined,
+          visitChargeChequeBankName: newTicket.visitChargeCollected
+            ? collectVCChequeBank.trim() || undefined
+            : undefined,
+          visitChargeChequeDate: newTicket.visitChargeCollected
+            ? collectVCChequeDate || undefined
+            : undefined,
         };
+
+        if (
+          newTicket.visitChargeCollected &&
+          (!collectVCPaymentMode ||
+            (collectVCPaymentMode !== 'CHEQUE' && !collectVCAccountId) ||
+            (collectVCPaymentMode === 'CHEQUE' && !collectVCChequeNumber.trim()))
+        ) {
+          toast.error('Select the payment mode and required account or cheque details.');
+          return;
+        }
 
         setCreateTicketError('');
         await createServiceTicket(payload);
@@ -1924,7 +1947,13 @@ export default function ServiceDashboardPage() {
       scheduledVisitDate: '',
       serviceLocation: '',
       visitChargeAmount: '',
+      visitChargeCollected: false,
     });
+    setCollectVCPaymentMode('');
+    setCollectVCAccountId('');
+    setCollectVCChequeNumber('');
+    setCollectVCChequeBank('');
+    setCollectVCChequeDate('');
     setLeadForm({
       name: '',
       location: '',
@@ -3879,6 +3908,64 @@ export default function ServiceDashboardPage() {
                             Sent to the customer in the confirmation email. Leave blank to confirm
                             the amount later — technician assignment is never blocked on payment.
                           </p>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mt-3 mb-1">
+                            Visit Charge Payment Status
+                          </label>
+                          <select
+                            value={newTicket.visitChargeCollected ? 'COLLECTED' : 'NOT_COLLECTED'}
+                            onChange={(e) =>
+                              setNewTicket({
+                                ...newTicket,
+                                visitChargeCollected: e.target.value === 'COLLECTED',
+                              })
+                            }
+                            className="w-full h-9 text-xs border border-slate-200 rounded-xl px-3 bg-white"
+                          >
+                            <option value="NOT_COLLECTED">Not Collected</option>
+                            <option value="COLLECTED">Collected now</option>
+                          </select>
+                          {newTicket.visitChargeCollected && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                              <select
+                                value={collectVCPaymentMode}
+                                onChange={(e) => handleCollectVCModeChange(e.target.value)}
+                                className="h-9 text-xs border border-slate-200 rounded-xl px-3 bg-white"
+                              >
+                                <option value="">Payment method</option>
+                                <option value="CASH">Cash</option>
+                                <option value="BANK_TRANSFER">Bank Transfer</option>
+                                <option value="CHEQUE">Cheque</option>
+                              </select>
+                              {collectVCPaymentMode && collectVCPaymentMode !== 'CHEQUE' && (
+                                <select
+                                  value={collectVCAccountId}
+                                  onChange={(e) => setCollectVCAccountId(e.target.value)}
+                                  className="h-9 text-xs border border-slate-200 rounded-xl px-3 bg-white"
+                                >
+                                  <option value="">Select account</option>
+                                  {collectVCEligibleAccounts.map((account) => (
+                                    <option key={account.id} value={account.id}>
+                                      {account.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              {collectVCPaymentMode === 'CHEQUE' && (
+                                <Input
+                                  value={collectVCChequeNumber}
+                                  onChange={(e) => setCollectVCChequeNumber(e.target.value)}
+                                  placeholder="Cheque number"
+                                  className="h-9 text-xs"
+                                />
+                              )}
+                            </div>
+                          )}
+                          {newTicket.visitChargeCollected && (
+                            <p className="text-[10px] text-amber-700 mt-2">
+                              The collection will be sent to Accounts for approval. It is not posted
+                              to the cashbook until Accounts approves it.
+                            </p>
+                          )}
                         </div>
                       );
                     })()}
@@ -6367,6 +6454,24 @@ export default function ServiceDashboardPage() {
                               </span>
                             </p>
                           )}
+                          {selectedTicket?.visitChargeMethod === 'SEPARATE' &&
+                            Number(selectedTicket.visitChargeAmount || 0) > 0 && (
+                              <p>
+                                Visit Charge (separate collection):{' '}
+                                <span className="font-semibold text-slate-800">
+                                  {getActiveCurrency()}{' '}
+                                  {Number(selectedTicket.visitChargeAmount).toFixed(2)}{' '}
+                                  <span className="text-[10px] font-bold uppercase">
+                                    {selectedTicket.visitChargeStatus === 'COLLECTED' ||
+                                    selectedTicket.visitChargeCollected
+                                      ? 'Collected'
+                                      : selectedTicket.visitChargeStatus === 'PENDING_APPROVAL'
+                                        ? 'Pending finance posting'
+                                        : 'Not collected'}
+                                  </span>
+                                </span>
+                              </p>
+                            )}
                           {Number(est.discountAmount || 0) > 0 && (
                             <p>
                               Discount:{' '}
