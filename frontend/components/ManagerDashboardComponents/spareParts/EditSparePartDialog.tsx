@@ -64,6 +64,7 @@ export default function EditSparePartDialog({
   const [formData, setFormData] = useState({
     lotNumber: '',
     part_name: '',
+    part_category: '',
     brand: '',
     model_ids: [] as string[],
     base_price: '',
@@ -111,6 +112,7 @@ export default function EditSparePartDialog({
         setFormData({
           lotNumber: product.lotNumber || '',
           part_name: product.part_name,
+          part_category: product.part_category || '',
           brand: product.brand,
           model_ids: model_ids,
           base_price: String(product.price ?? ''),
@@ -188,6 +190,18 @@ export default function EditSparePartDialog({
                 value={formData.part_name}
                 onChange={(e) => setFormData({ ...formData, part_name: e.target.value })}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Coverage Category</Label>
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={formData.part_category}
+                onChange={(e) => setFormData({ ...formData, part_category: e.target.value })}
+              >
+                <option value="">Infer from name and description</option>
+                <option value="SPARE_PART">Spare part</option>
+                <option value="CONSUMABLE">Consumable</option>
+              </select>
             </div>
             {/* Brand */}
             <div className="space-y-2">

@@ -44,12 +44,11 @@ import {
 import { ContractMeterReading } from '../entities/contractMeterReadingEntity';
 import {
   ContractCoverage,
-  FULL_COVERAGE,
-  NO_COVERAGE,
-  WARRANTY_COVERAGE,
   coverageForContractType,
+  coverageForServiceContext,
   normalizeCoverage,
   coverageAllowsItem,
+  isConsumableCategory,
 } from '../helpers/contractCoverageHelper';
 import { ServicePartUsageLog } from '../entities/servicePartUsageLogEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
@@ -248,7 +247,8 @@ export class ServiceController {
   /**
    * Helper to determine consumable type.
    */
-  private isConsumable(partName: string, sku: string): boolean {
+  private isConsumable(partName: string, sku: string, partCategory?: string | null): boolean {
+    if (partCategory) return isConsumableCategory(partCategory);
     const nameLower = (partName || '').toLowerCase();
     const skuLower = (sku || '').toLowerCase();
     return (
@@ -257,6 +257,9 @@ export class ServiceController {
       nameLower.includes('drum') ||
       nameLower.includes('developer') ||
       nameLower.includes('ink') ||
+      nameLower.includes('fuser') ||
+      nameLower.includes('transfer belt') ||
+      nameLower.includes('paper feed roller') ||
       skuLower.includes('tnr') ||
       skuLower.includes('crt')
     );
@@ -293,30 +296,62 @@ export class ServiceController {
     sparePartId: string,
     quantity: number,
   ): Promise<void> {
-    const sparePartRepo = Source.getRepository(SparePart);
-    const reservationRepo = Source.getRepository(InventoryReservation);
-
-    const part = await sparePartRepo.findOne({ where: { id: String(sparePartId) } });
-    if (!part) throw new Error(`Spare part not found: ${sparePartId}`);
-
-    if (part.quantity < quantity) {
-      throw new Error(
-        `Insufficient inventory for part: ${part.part_name}. Available: ${part.quantity}, Requested: ${quantity}`,
-      );
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      throw new AppError('Reserved part quantity must be a positive whole number', 400);
     }
 
-    part.quantity -= quantity;
-    part.reserved_quantity += quantity;
-    await sparePartRepo.save(part);
-    await deleteCached(`sparepart:${part.id}`);
+    const runner = Source.createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      const part = await runner.manager.findOne(SparePart, {
+        where: { id: String(sparePartId) },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!part) throw new AppError(`Spare part not found: ${sparePartId}`, 404);
 
-    const reservation = reservationRepo.create({
-      ticketId,
-      sparePartId,
-      reservedQuantity: quantity,
-      status: 'RESERVED',
-    });
-    await reservationRepo.save(reservation);
+      const reservations = await runner.manager.find(InventoryReservation, {
+        where: { ticketId, sparePartId, status: 'RESERVED' },
+      });
+      const alreadyReserved = reservations.reduce((sum, row) => sum + row.reservedQuantity, 0);
+      const delta = Math.max(0, quantity - alreadyReserved);
+      if (delta === 0) {
+        await runner.commitTransaction();
+        return;
+      }
+      if (part.quantity < delta) {
+        throw new AppError(
+          `Insufficient inventory for part: ${part.part_name}. Available: ${part.quantity}, Requested: ${delta}`,
+          400,
+        );
+      }
+
+      part.quantity -= delta;
+      part.reserved_quantity += delta;
+      await runner.manager.save(SparePart, part);
+      const reservation = reservations[0];
+      if (reservation) {
+        reservation.reservedQuantity += delta;
+        await runner.manager.save(InventoryReservation, reservation);
+      } else {
+        await runner.manager.save(
+          InventoryReservation,
+          runner.manager.create(InventoryReservation, {
+            ticketId,
+            sparePartId,
+            reservedQuantity: delta,
+            status: 'RESERVED',
+          }),
+        );
+      }
+      await runner.commitTransaction();
+      await deleteCached(`sparepart:${part.id}`);
+    } catch (error) {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      throw error;
+    } finally {
+      await runner.release();
+    }
   }
 
   /**
@@ -395,6 +430,18 @@ export class ServiceController {
       signedDocumentNote?: string | null;
     },
   ): Promise<void> {
+    if (estimate.status !== ServiceEstimateStatus.FINANCE_APPROVED) {
+      throw new AppError(
+        'Finance must approve the estimate before customer approval is recorded',
+        400,
+      );
+    }
+    if (Number(estimate.totalCost) <= 0) {
+      throw new AppError(
+        'This estimate has no customer charge and does not require customer approval',
+        400,
+      );
+    }
     // Same expiry gate as before — an expired estimate always blocks approval,
     // Finance must extend validity first.
     const revisionRepo = Source.getRepository(ServiceEstimateRevision);
@@ -633,22 +680,7 @@ export class ServiceController {
     serviceContext: ServiceContext;
   }): Promise<ContractCoverage> {
     const contractCoverage = await this.getTicketContractCoverage(ticket.contractReferenceId);
-    if (contractCoverage) return contractCoverage;
-    if (
-      ticket.serviceContext === ServiceContext.RENT ||
-      ticket.serviceContext === ServiceContext.LEASE_CPC ||
-      ticket.serviceContext === ServiceContext.FSMA
-    ) {
-      return { ...FULL_COVERAGE };
-    }
-    if (
-      ticket.serviceContext === ServiceContext.WARRANTY ||
-      ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
-      ticket.serviceContext === ServiceContext.SMA
-    ) {
-      return { ...WARRANTY_COVERAGE };
-    }
-    return { ...NO_COVERAGE };
+    return coverageForServiceContext(ticket.serviceContext, contractCoverage);
   }
 
   /**
@@ -665,6 +697,31 @@ export class ServiceController {
       coverageAllowsItem(coverage, { partCategory: item.partCategory, partName: item.partName }) ||
       !!item.isFree
     );
+  }
+
+  /** Apply finance approval and reserve internal-only work without customer approval. */
+  private async applyFinanceApproval(
+    estimate: ServiceEstimate,
+    ticket: ServiceTicket,
+  ): Promise<void> {
+    const isSecondApproval = ticket.status === ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2;
+    estimate.status = ServiceEstimateStatus.FINANCE_APPROVED;
+    await Source.getRepository(ServiceEstimate).save(estimate);
+
+    // A zero customer total is internally approved work. Reserve its actual
+    // catalog parts here; the reservation helper is transactional/idempotent.
+    if (Number(estimate.totalCost) <= 0) {
+      for (const item of estimate.items || []) {
+        if (item.itemSource === ServiceEstimateItemSource.SPARE_PART && item.sparePartId) {
+          await this.reserveSparePart(ticket.id, item.sparePartId, item.quantity);
+        }
+      }
+    }
+
+    ticket.status = isSecondApproval
+      ? ServiceTicketStatus.FINANCE_APPROVED_2
+      : ServiceTicketStatus.FINANCE_APPROVED;
+    await Source.getRepository(ServiceTicket).save(ticket);
   }
 
   /** Maps sparePartId → part_category for coverage checks over item lists. */
@@ -696,6 +753,7 @@ export class ServiceController {
   ): Promise<{
     serviceContext: ServiceContext;
     contractReferenceId: string | null;
+    allocationId: string | null;
     productId: string | null;
     jobType: JobType;
     track: 'A' | 'B';
@@ -718,6 +776,7 @@ export class ServiceController {
     // rented machine to the customer with no sign anything had gone wrong.
     let coverageUnverified = false;
     let contractReferenceId: string | null = null;
+    let allocationId: string | null = null;
     let productId: string | null = null;
     let jobType = JobType.ONSITE;
     let track: 'A' | 'B' = 'B';
@@ -783,6 +842,7 @@ export class ServiceController {
         jobType = JobType.WARRANTY_ONSITE;
         track = 'A';
         linkedInvoiceId = rentInvoice.id;
+        allocationId = rentInvoice.allocationId || null;
       } else {
         // Step 2 - Check if machine is under SALE warranty
         let isSaleWarrantyActive = false;
@@ -811,34 +871,41 @@ export class ServiceController {
         if (!isSaleWarrantyActive) {
           // Step 3 - Check if machine is on LEASE
           if (leaseInvoice) {
-            warrantyInfo = evaluateWarranty({
-              // COMPUTER / OTHER: time-only warranty, ignore any copy limit.
-              warrantyType: metered ? leaseInvoice.warrantyType || 'both' : 'duration',
-              warrantyDurationValue: leaseInvoice.warrantyDurationValue,
-              warrantyDurationUnit: leaseInvoice.warrantyDurationUnit,
-              warrantyCopyLimit: metered ? leaseInvoice.warrantyCopyLimit : null,
-              startDate: new Date(leaseInvoice.effectiveFrom),
-              copiesUsed,
-              fallbackMonths: Number(leaseInvoice.leaseTenureMonths) || 0,
-              fallbackCopyLimit:
-                Number(leaseInvoice.maxCopyLimit) || product.warranty_max_pages || 200000,
-            });
-
-            if (warrantyInfo.isUnderWarranty) {
-              // CPC / CPC_COMBO leases are full-service: spare parts AND toner
-              // covered, exactly like RENT. Fixed-plan leases keep the
-              // SMA-style coverage (toner chargeable).
-              const isCpcLease =
-                leaseInvoice.rentType === 'CPC' || leaseInvoice.rentType === 'CPC_COMBO';
-              serviceContext = isCpcLease
-                ? ServiceContext.LEASE_CPC
-                : ServiceContext.LEASE_UNDER_WARRANTY;
+            const isCpcLease =
+              leaseInvoice.rentType === 'CPC' || leaseInvoice.rentType === 'CPC_COMBO';
+            if (isCpcLease) {
+              // CPC is a full-service active lease contract. Its coverage is
+              // tied to the live allocation/contract, not the machine's
+              // separate copy-limited warranty window.
+              serviceContext = ServiceContext.LEASE_CPC;
               track = 'A';
               linkedInvoiceId = leaseInvoice.id;
+              allocationId = leaseInvoice.allocationId || null;
             } else {
-              serviceContext = ServiceContext.LEASE_EXPIRED;
-              track = 'B';
-              linkedInvoiceId = leaseInvoice.id;
+              warrantyInfo = evaluateWarranty({
+                // COMPUTER / OTHER: time-only warranty, ignore any copy limit.
+                warrantyType: metered ? leaseInvoice.warrantyType || 'both' : 'duration',
+                warrantyDurationValue: leaseInvoice.warrantyDurationValue,
+                warrantyDurationUnit: leaseInvoice.warrantyDurationUnit,
+                warrantyCopyLimit: metered ? leaseInvoice.warrantyCopyLimit : null,
+                startDate: new Date(leaseInvoice.effectiveFrom),
+                copiesUsed,
+                fallbackMonths: Number(leaseInvoice.leaseTenureMonths) || 0,
+                fallbackCopyLimit:
+                  Number(leaseInvoice.maxCopyLimit) || product.warranty_max_pages || 200000,
+              });
+
+              if (warrantyInfo.isUnderWarranty) {
+                serviceContext = ServiceContext.LEASE_UNDER_WARRANTY;
+                track = 'A';
+                linkedInvoiceId = leaseInvoice.id;
+                allocationId = leaseInvoice.allocationId || null;
+              } else {
+                serviceContext = ServiceContext.LEASE_EXPIRED;
+                track = 'B';
+                linkedInvoiceId = leaseInvoice.id;
+                allocationId = leaseInvoice.allocationId || null;
+              }
             }
           }
 
@@ -916,6 +983,7 @@ export class ServiceController {
     return {
       serviceContext,
       contractReferenceId,
+      allocationId,
       productId,
       jobType,
       track,
@@ -967,6 +1035,7 @@ export class ServiceController {
       const {
         serviceContext,
         contractReferenceId,
+        allocationId,
         productId,
         jobType: finalJobType,
         track,
@@ -1059,7 +1128,11 @@ export class ServiceController {
       // charge applies (third-party machines, expired lease/warranty, or
       // straight CHARGEABLE). Help desk quotes it now so the confirmation
       // email carries a real number instead of "TBD".
-      const chargeableVisit = !this.isTravelCovered(serviceContext);
+      const resolvedCoverage = await this.resolveItemCoverage({
+        serviceContext,
+        contractReferenceId,
+      });
+      const chargeableVisit = !resolvedCoverage.travel;
       let quotedVisitCharge = 0;
       if (chargeableVisit && visitChargeAmount !== undefined && visitChargeAmount !== null) {
         quotedVisitCharge = Number(visitChargeAmount) || 0;
@@ -1095,6 +1168,14 @@ export class ServiceController {
       });
 
       await ticketRepo.save(ticket);
+      logger.info('Resolved service ticket machine coverage', {
+        ticketId: ticket.id,
+        serialNumber: ticket.serialNumber,
+        productId: ticket.productId,
+        allocationId,
+        contractId: contractReferenceId || linkedInvoiceId,
+        serviceContext: ticket.serviceContext,
+      });
       await this.logActivity(
         ticket.id,
         'CREATION',
@@ -1121,22 +1202,6 @@ export class ServiceController {
       next(error);
     }
   };
-
-  /** Contexts where the machine is under an active rental/lease/warranty/service
-   *  contract — visits, labour, spare parts (and for RENT/FSMA/LEASE_CPC, toner
-   *  too) are covered, so no visit charge applies. Everything else — including
-   *  third-party machines and expired warranty/lease/contract — is chargeable. */
-  private isTravelCovered(serviceContext: ServiceContext): boolean {
-    return [
-      ServiceContext.AMC,
-      ServiceContext.SMA,
-      ServiceContext.FSMA,
-      ServiceContext.RENT,
-      ServiceContext.LEASE_CPC,
-      ServiceContext.WARRANTY,
-      ServiceContext.LEASE_UNDER_WARRANTY,
-    ].includes(serviceContext);
-  }
 
   /**
    * Best-effort confirmation email sent right when a ticket is created, so
@@ -1431,15 +1496,8 @@ Xerocare Technical Services`;
       // Visit + transportation are free whenever the machine is covered by a
       // service contract (AMC/SMA/FSMA — all include travel), by warranty, or is
       // a company-owned RENT machine. Only uncovered machines pay these charges.
-      const travelCoveredContext = [
-        ServiceContext.AMC,
-        ServiceContext.SMA,
-        ServiceContext.FSMA,
-        ServiceContext.RENT,
-        ServiceContext.LEASE_CPC,
-        ServiceContext.WARRANTY,
-        ServiceContext.LEASE_UNDER_WARRANTY,
-      ].includes(ticket.serviceContext);
+      const contractCoverage = await this.resolveItemCoverage(ticket);
+      const travelCoveredContext = contractCoverage.travel;
       // Fall back to whatever was already quoted on the ticket (e.g. at
       // creation) when the diagnosis form doesn't resend an amount — so an
       // upfront quote/collection isn't silently zeroed out here.
@@ -1524,11 +1582,6 @@ Xerocare Technical Services`;
       const itemRepo = Source.getRepository(ServiceTicketItem);
       const ticketItems: ServiceTicketItem[] = [];
       let hasCustomItem = false;
-
-      // Single source of truth for what's covered — real contract rules win,
-      // else RENT/LEASE_CPC/FSMA are fully free, WARRANTY/LEASE_UNDER_WARRANTY/
-      // SMA are free except toner, everything else pays for everything.
-      const contractCoverage = await this.resolveItemCoverage(ticket);
 
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
@@ -1626,16 +1679,7 @@ Xerocare Technical Services`;
       // there's anything to estimate. Covered items are already priced at 0
       // above — finance reviews and approves the FOC estimate like any other.
       const inputLabour = Number(labourCost) || 0;
-      const finalLabourCost =
-        ticket.serviceContext === ServiceContext.AMC ||
-        ticket.serviceContext === ServiceContext.RENT ||
-        ticket.serviceContext === ServiceContext.LEASE_CPC ||
-        ticket.serviceContext === ServiceContext.WARRANTY ||
-        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
-        ticket.serviceContext === ServiceContext.FSMA ||
-        ticket.serviceContext === ServiceContext.SMA
-          ? 0
-          : inputLabour;
+      const finalLabourCost = contractCoverage.labour ? 0 : inputLabour;
 
       if (
         (ticketItems && ticketItems.length > 0) ||
@@ -1717,26 +1761,29 @@ Xerocare Technical Services`;
           req.user?.userId,
         );
 
-        // Generate billing invoice for Track B. Brand + MPN travel in the
-        // description so finance sees exactly which part is being quoted.
-        const billingItems = ticketItems.map((item) => ({
-          description: `${item.partName}${item.partBrand ? ` — ${item.partBrand}` : ''}${
-            item.mpn ? ` [MPN: ${item.mpn}]` : ''
-          }`,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice) || 0,
-          isFree: item.isFree,
-          // Catalog value, shown to Finance on covered lines; never charged.
-          listUnitPrice: Number(item.listUnitPrice) || 0,
-        }));
+        // Billing receives customer-chargeable lines only. Covered lines and
+        // their internal costs remain on the service estimate for Finance.
+        const billingItems = ticketItems
+          .filter((item) => !item.isFree)
+          .map((item) => ({
+            description: `${item.partName}${item.partBrand ? ` — ${item.partBrand}` : ''}${
+              item.mpn ? ` [MPN: ${item.mpn}]` : ''
+            }`,
+            quantity: item.quantity,
+            unitPrice: Number(item.unitPrice) || 0,
+            isFree: false,
+            listUnitPrice: Number(item.listUnitPrice) || 0,
+          }));
 
-        billingItems.push({
-          description: 'Labor Cost / Service Charge',
-          quantity: 1,
-          unitPrice: Number(finalLabourCost) || 0,
-          isFree: false,
-          listUnitPrice: Number(finalLabourCost) || 0,
-        });
+        if (finalLabourCost > 0) {
+          billingItems.push({
+            description: 'Labor Cost / Service Charge',
+            quantity: 1,
+            unitPrice: Number(finalLabourCost),
+            isFree: false,
+            listUnitPrice: Number(finalLabourCost),
+          });
+        }
 
         if (effectiveTransportCharge > 0) {
           billingItems.push({
@@ -1748,45 +1795,48 @@ Xerocare Technical Services`;
           });
         }
 
-        try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-
-          const response = await axios.post(
-            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
-            {
-              customerId: ticket.customerId,
-              branchId: ticket.branchId,
-              createdBy: req.user?.userId || 'SYSTEM',
-              serviceTicketId: ticket.id,
-              items: billingItems,
-              visitChargeAmount: effectiveVisitCharge,
-              visitChargeMethod: visitChargeMethod || null,
-              discountAmount: Number(discountAmount) || 0,
-              technicianNoteToFinance: technicianNoteToFinance || null,
-              saleType: 'PRODUCT_SALE',
-              status: 'WAITING_FINANCE_APPROVAL',
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
+        // A zero customer total is an internal finance approval, not a
+        // customer quotation/invoice. Do not create a zero-value billing doc.
+        if (estimate.totalCost > 0)
+          try {
+            const token = sign(
+              { userId: 'ven_inv_service', role: 'ADMIN' },
+              ACCESS_SECRET as string,
+              {
+                expiresIn: '1m',
               },
-            },
-          );
-          if (response.data?.success) {
-            ticket.serviceQuotationId = response.data.data.id;
-            ticket.linkedInvoiceId = response.data.data.id;
-            ticket.estimateSentToFinance = true;
-            await ticketRepo.save(ticket);
+            );
+
+            const response = await axios.post(
+              `${BILLING_SERVICE_URL}/invoices/service-quotation`,
+              {
+                customerId: ticket.customerId,
+                branchId: ticket.branchId,
+                createdBy: req.user?.userId || 'SYSTEM',
+                serviceTicketId: ticket.id,
+                items: billingItems,
+                visitChargeAmount:
+                  visitChargeMethod === 'ADDED_TO_ESTIMATE' ? effectiveVisitCharge : 0,
+                visitChargeMethod: visitChargeMethod || null,
+                discountAmount: Number(discountAmount) || 0,
+                technicianNoteToFinance: technicianNoteToFinance || null,
+                saleType: 'PRODUCT_SALE',
+                status: 'WAITING_FINANCE_APPROVAL',
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            );
+            if (response.data?.success) {
+              ticket.serviceQuotationId = response.data.data.id;
+              ticket.estimateSentToFinance = true;
+              await ticketRepo.save(ticket);
+            }
+          } catch (billingErr) {
+            logger.error('Failed to post estimate to billing service:', billingErr);
           }
-        } catch (billingErr) {
-          logger.error('Failed to post estimate to billing service:', billingErr);
-        }
       }
 
       // Visit charge collected separately in cash on-site: post the receipt to
@@ -1848,18 +1898,8 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      let finalLabourCost = Number(labourCost) || 0;
-      if (
-        ticket.serviceContext === ServiceContext.RENT ||
-        ticket.serviceContext === ServiceContext.LEASE_CPC ||
-        ticket.serviceContext === ServiceContext.WARRANTY ||
-        ticket.serviceContext === ServiceContext.LEASE_UNDER_WARRANTY ||
-        ticket.serviceContext === ServiceContext.FSMA ||
-        ticket.serviceContext === ServiceContext.SMA ||
-        ticket.serviceContext === ServiceContext.AMC
-      ) {
-        finalLabourCost = 0;
-      }
+      const coverage = await this.resolveItemCoverage(ticket);
+      const finalLabourCost = coverage.labour ? 0 : Number(labourCost) || 0;
 
       const estimateRepo = Source.getRepository(ServiceEstimate);
       let estimate = await estimateRepo.findOne({
@@ -1884,8 +1924,6 @@ Xerocare Technical Services`;
       let calculatedTotal = Number(estimate.labourCost);
       const savedItems: ServiceEstimateItem[] = [];
       let hasCustomItem = false;
-      const coverage = await this.resolveItemCoverage(ticket);
-
       if (items && Array.isArray(items)) {
         const sparePartRepo = Source.getRepository(SparePart);
         for (const it of items) {
@@ -1987,7 +2025,7 @@ Xerocare Technical Services`;
 
         // Post the Track B estimate to the billing service to generate a service quotation
         const billingItems = (estimate.items || [])
-          .filter((it) => it.isApproved)
+          .filter((it) => it.isApproved && !it.isFree && Number(it.totalPrice) > 0)
           .map((it) => ({
             description: it.partName || it.sku || 'Spare Part',
             quantity: Number(it.quantity) || 1,
@@ -2005,35 +2043,37 @@ Xerocare Technical Services`;
         }
 
         try {
-          const token = sign(
-            { userId: 'ven_inv_service', role: 'ADMIN' },
-            ACCESS_SECRET as string,
-            {
-              expiresIn: '1m',
-            },
-          );
-
-          const response = await axios.post(
-            `${BILLING_SERVICE_URL}/invoices/service-quotation`,
-            {
-              customerId: ticket.customerId,
-              branchId: ticket.branchId,
-              createdBy: req.user?.userId || 'SYSTEM',
-              serviceTicketId: ticket.id,
-              items: billingItems,
-              saleType: 'SERVICE',
-              status: 'WAITING_FINANCE_APPROVAL',
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
+          if (Number(estimate.totalCost) > 0) {
+            const token = sign(
+              { userId: 'ven_inv_service', role: 'ADMIN' },
+              ACCESS_SECRET as string,
+              {
+                expiresIn: '1m',
               },
-            },
-          );
+            );
 
-          if (response.data?.success) {
-            ticket.serviceQuotationId = response.data.data.id;
-            ticket.estimateSentToFinance = true;
+            const response = await axios.post(
+              `${BILLING_SERVICE_URL}/invoices/service-quotation`,
+              {
+                customerId: ticket.customerId,
+                branchId: ticket.branchId,
+                createdBy: req.user?.userId || 'SYSTEM',
+                serviceTicketId: ticket.id,
+                items: billingItems,
+                saleType: 'SERVICE',
+                status: 'WAITING_FINANCE_APPROVAL',
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            );
+
+            if (response.data?.success) {
+              ticket.serviceQuotationId = response.data.data.id;
+              ticket.estimateSentToFinance = true;
+            }
           }
         } catch (billingErr) {
           logger.error('Failed to post Track B estimate to billing service:', billingErr);
@@ -2086,33 +2126,50 @@ Xerocare Technical Services`;
     try {
       const estimateId = req.params.estimateId as string;
       const estimateRepo = Source.getRepository(ServiceEstimate);
-      const estimate = await estimateRepo.findOne({ where: { id: String(estimateId) } });
+      const estimate = await estimateRepo.findOne({
+        where: { id: String(estimateId) },
+        relations: ['items'],
+      });
       if (!estimate) throw new Error('Estimate not found');
-
-      estimate.status = ServiceEstimateStatus.FINANCE_APPROVED;
-      await estimateRepo.save(estimate);
 
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
-      if (ticket) {
-        ticket.status = ServiceTicketStatus.FINANCE_APPROVED;
-        await ticketRepo.save(ticket);
-
-        await this.logActivity(
-          ticket.id,
-          'ESTIMATE_FINANCE_APPROVED',
-          `Estimate approved internally by Finance.`,
-          req.user?.userId,
-        );
-
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
-          title: 'Estimate Approved by Finance',
-          message: `Service Estimate for ticket ${ticket.ticketNumber} approved by Finance. Ready for customer review.`,
-          type: 'INFO',
-          referenceId: ticket.id,
-          referenceType: 'SERVICE',
-        });
+      if (!ticket) throw new AppError('Ticket not found', 404);
+      if (
+        estimate.status !== ServiceEstimateStatus.WAITING_FINANCE_APPROVAL &&
+        estimate.status !== ServiceEstimateStatus.FINANCE_APPROVED
+      ) {
+        throw new AppError(`Cannot approve estimate with status ${estimate.status}`, 400);
       }
+      if (
+        estimate.status === ServiceEstimateStatus.FINANCE_APPROVED &&
+        [
+          ServiceTicketStatus.CUSTOMER_APPROVED,
+          ServiceTicketStatus.IN_PROGRESS,
+          ServiceTicketStatus.COMPLETED,
+        ].includes(ticket.status)
+      ) {
+        return res.status(200).json({ success: true, data: estimate });
+      }
+      await this.applyFinanceApproval(estimate, ticket);
+
+      await this.logActivity(
+        ticket.id,
+        'ESTIMATE_FINANCE_APPROVED',
+        `Estimate approved internally by Finance.`,
+        req.user?.userId,
+      );
+
+      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        title: 'Estimate Approved by Finance',
+        message:
+          Number(estimate.totalCost) <= 0
+            ? `Covered service for ticket ${ticket.ticketNumber} approved by Finance. Parts reserved; ready for repair.`
+            : `Service Estimate for ticket ${ticket.ticketNumber} approved by Finance. Ready for customer review.`,
+        type: 'INFO',
+        referenceId: ticket.id,
+        referenceType: 'SERVICE',
+      });
 
       res.status(200).json({ success: true, data: estimate });
     } catch (error) {
@@ -2836,13 +2893,27 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
-      // Only allow starting repair for FREE_SERVICE or CUSTOMER_APPROVED tickets
+      let financeApprovedFreeWork = false;
+      if (
+        ticket.status === ServiceTicketStatus.FINANCE_APPROVED ||
+        ticket.status === ServiceTicketStatus.FINANCE_APPROVED_2
+      ) {
+        const approvedEstimate = await Source.getRepository(ServiceEstimate).findOne({
+          where: { ticketId: ticket.id, status: ServiceEstimateStatus.FINANCE_APPROVED },
+          order: { version: 'DESC' },
+        });
+        financeApprovedFreeWork = !!approvedEstimate && Number(approvedEstimate.totalCost) <= 0;
+      }
+
+      // Customer-chargeable estimates require recorded customer approval;
+      // zero-charge work can proceed after internal Finance approval.
       if (
         ticket.status !== ServiceTicketStatus.FREE_SERVICE &&
-        ticket.status !== ServiceTicketStatus.CUSTOMER_APPROVED
+        ticket.status !== ServiceTicketStatus.CUSTOMER_APPROVED &&
+        !financeApprovedFreeWork
       ) {
         throw new AppError(
-          `Cannot start repair: ticket must be in CUSTOMER_APPROVED or FREE_SERVICE status (current: ${ticket.status})`,
+          `Cannot start repair: customer approval or finance approval for a zero-charge estimate is required (current: ${ticket.status})`,
           400,
         );
       }
@@ -2984,11 +3055,7 @@ Xerocare Technical Services`;
       });
       if (!ticket) throw new Error('Ticket not found');
 
-      const allowedCompleteStatuses: ServiceTicketStatus[] = [
-        ServiceTicketStatus.IN_PROGRESS,
-        ServiceTicketStatus.FREE_SERVICE,
-        ServiceTicketStatus.CUSTOMER_APPROVED,
-      ];
+      const allowedCompleteStatuses: ServiceTicketStatus[] = [ServiceTicketStatus.IN_PROGRESS];
       if (!allowedCompleteStatuses.includes(ticket.status)) {
         throw new AppError(`Cannot complete ticket with current status: ${ticket.status}`, 400);
       }
@@ -3155,19 +3222,19 @@ Xerocare Technical Services`;
         let purchaseCost = item.unitCost != null ? Number(item.unitCost) || 0 : 0;
         let partNameForLog = item.partName || '';
         let skuForLog = item.sku || '';
-        let isConsumableItem = this.isConsumable(partNameForLog, skuForLog);
-
-        if (item.unitCost == null && item.sparePartId) {
+        let catalogPartCategory: string | null = null;
+        if (item.sparePartId) {
           const partDetails = await sparePartRepo.findOne({
             where: { id: String(item.sparePartId) },
           });
           if (partDetails) {
-            purchaseCost = Number(partDetails.purchase_price) || 0;
+            if (item.unitCost == null) purchaseCost = Number(partDetails.purchase_price) || 0;
             partNameForLog = partDetails.part_name;
             skuForLog = partDetails.sku;
-            isConsumableItem = this.isConsumable(partDetails.part_name, partDetails.sku);
+            catalogPartCategory = partDetails.part_category || null;
           }
         }
+        const isConsumableItem = this.isConsumable(partNameForLog, skuForLog, catalogPartCategory);
 
         const itemCost = purchaseCost * item.quantity;
         totalPartsCostInternal += itemCost;
@@ -3207,17 +3274,13 @@ Xerocare Technical Services`;
           await yieldRepo.save(newYield);
         }
 
-        // Save Part Usage Log — productId is NOT NULL here (it's a per-machine
-        // usage record), so this is skipped entirely for a ticket with no
-        // matched Product (e.g. a serial number not yet in the catalog).
-        // Previously this passed '' as a fallback, which isn't a valid uuid
-        // and crashed the whole completion request with a 500 — after the
-        // ticket's status had already been committed as COMPLETED, silently
-        // skipping the rest of the function including the Manager notification.
-        if (ticket.productId) {
+        // Store usage by serial even when this is an external machine with no
+        // catalog Product. productId remains nullable for legacy consumers.
+        if (ticket.serialNumber) {
           const usageLog = usageLogRepo.create({
             ticketId: ticket.id,
-            productId: ticket.productId,
+            productId: ticket.productId || null,
+            serialNumber: ticket.serialNumber,
             sparePartId: item.sparePartId || null,
             sku: skuForLog,
             partName: partNameForLog,
@@ -3694,6 +3757,7 @@ Xerocare Technical Services`;
         data: {
           serviceContext: details.serviceContext,
           contractReferenceId: details.contractReferenceId,
+          allocationId: details.allocationId,
           productId: details.productId,
           coverage,
           contract: activeContract,
@@ -3731,12 +3795,19 @@ Xerocare Technical Services`;
         });
       }
 
+      const usageLogs = await Source.getRepository(ServicePartUsageLog).find({
+        where: { serialNumber: String(serialNumber) },
+      });
+      const totalConsumablesCost = usageLogs
+        .filter((row) => row.isConsumable)
+        .reduce((sum, row) => sum + (Number(row.totalCost) || 0), 0);
+
       res.status(200).json({
         success: true,
         data: {
           totalTicketsCount: history.totalServiceVisits,
           totalPartsCost: Number(history.totalPartsSpend) || 0,
-          totalConsumablesCost: 0,
+          totalConsumablesCost,
           totalLabourCost: Number(history.totalLabourSpend) || 0,
           lifetimeCost: Number(history.totalLifetimeCost) || 0,
           history: [history],
@@ -3787,20 +3858,27 @@ Xerocare Technical Services`;
       const estimateRepo = Source.getRepository(ServiceEstimate);
 
       let lifetimePartsCost = 0;
+      let lifetimeConsumablesCost = 0;
       let lifetimeLabourCost = 0;
+      let lifetimeCustomerBilledAmount = 0;
       const ticketBreakdown = [];
 
       for (const t of tickets) {
         const usageLogs = await usageLogRepo.find({ where: { ticketId: t.id } });
         const partsCostInternal = usageLogs.reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0);
-
+        const consumablesCostInternal = usageLogs
+          .filter((l) => l.isConsumable)
+          .reduce((sum, l) => sum + (Number(l.totalCost) || 0), 0);
         const estimate = await estimateRepo.findOne({
           where: { ticketId: t.id, status: ServiceEstimateStatus.CUSTOMER_APPROVED },
         });
         const labourCost = estimate ? Number(estimate.labourCost) || 0 : 0;
+        const customerBilledAmount = estimate ? Number(estimate.totalCost) || 0 : 0;
 
         lifetimePartsCost += partsCostInternal;
+        lifetimeConsumablesCost += consumablesCostInternal;
         lifetimeLabourCost += labourCost;
+        lifetimeCustomerBilledAmount += customerBilledAmount;
 
         ticketBreakdown.push({
           ticketId: t.id,
@@ -3816,6 +3894,8 @@ Xerocare Technical Services`;
             isConsumable: l.isConsumable,
           })),
           partsCostInternal,
+          consumablesCostInternal,
+          customerBilledAmount,
           labourCost,
           totalSpend: partsCostInternal + labourCost,
         });
@@ -3840,7 +3920,9 @@ Xerocare Technical Services`;
             yieldHistory,
           },
           lifetimePartsCost,
+          lifetimeConsumablesCost,
           lifetimeLabourCost,
+          lifetimeCustomerBilledAmount,
           lifetimeSpend: lifetimePartsCost + lifetimeLabourCost,
         },
       });
@@ -4146,15 +4228,38 @@ Xerocare Technical Services`;
       });
 
       const labourFree = quoteCoverage.labour;
-      items.push({
-        description: 'Labor Cost / Service Charge',
-        quantity: 1,
-        unitPrice: labourFree ? 0 : Number(laborCost) || 0,
-        isFree: labourFree,
-        listUnitPrice: Number(laborCost) || 0,
-      });
+      const payableLabour = labourFree ? 0 : Number(laborCost) || 0;
+      if (payableLabour > 0) {
+        items.push({
+          description: 'Labor Cost / Service Charge',
+          quantity: 1,
+          unitPrice: payableLabour,
+          isFree: false,
+          listUnitPrice: payableLabour,
+        });
+      }
 
       const effectiveVisitCharge = quoteCoverage.travel ? 0 : Number(visitChargeAmount) || 0;
+      const visitChargeInEstimate =
+        visitChargeMethod === 'ADDED_TO_ESTIMATE' ? effectiveVisitCharge : 0;
+      const customerEstimateTotal = Math.max(
+        0,
+        items.reduce((sum, item) => sum + (item.isFree ? 0 : item.quantity * item.unitPrice), 0) +
+          visitChargeInEstimate -
+          (Number(discountAmount) || 0),
+      );
+
+      if (customerEstimateTotal <= 0) {
+        // The diagnosis path has already created the internal estimate used by
+        // Finance. Never create a zero-value customer quotation for covered work.
+        ticket.status = ServiceTicketStatus.WAITING_FINANCE_APPROVAL;
+        ticket.visitChargeAmount = effectiveVisitCharge;
+        ticket.visitChargeMethod = visitChargeMethod || null;
+        await ticketRepo.save(ticket);
+        return res.status(200).json({ success: true, data: ticket, quotationId: null });
+      }
+
+      const customerItems = items.filter((item) => !item.isFree && item.unitPrice > 0);
 
       // Every ticket goes to finance for review — covered/free items already
       // price at 0 above, finance just approves the FOC estimate like any other.
@@ -4163,8 +4268,8 @@ Xerocare Technical Services`;
         branchId: ticket.branchId,
         createdBy: ticket.createdBy,
         serviceTicketId: ticket.id,
-        items,
-        visitChargeAmount: effectiveVisitCharge,
+        items: customerItems,
+        visitChargeAmount: visitChargeInEstimate,
         visitChargeMethod: visitChargeMethod || null,
         discountAmount: Number(discountAmount) || 0,
         technicianNoteToFinance: technicianNoteToFinance || null,
@@ -4241,6 +4346,26 @@ Xerocare Technical Services`;
       const ticket = await ticketRepo.findOne({ where: { id: String(id) } });
       if (!ticket) throw new Error('Ticket not found');
 
+      if (
+        [
+          ServiceTicketStatus.CUSTOMER_APPROVED,
+          ServiceTicketStatus.IN_PROGRESS,
+          ServiceTicketStatus.COMPLETED,
+        ].includes(ticket.status)
+      ) {
+        return res.status(200).json({ success: true, data: ticket });
+      }
+      if (
+        ![
+          ServiceTicketStatus.WAITING_FINANCE_APPROVAL,
+          ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2,
+          ServiceTicketStatus.FINANCE_APPROVED,
+          ServiceTicketStatus.FINANCE_APPROVED_2,
+        ].includes(ticket.status)
+      ) {
+        throw new AppError(`Cannot approve Finance decision while ticket is ${ticket.status}`, 409);
+      }
+
       // FINANCE_APPROVED, not QUOTED.
       //
       // This is the cross-service half of Finance approving an estimate — billing calls it
@@ -4252,19 +4377,19 @@ Xerocare Technical Services`;
       // just approved. The estimate row said FINANCE_APPROVED; only the ticket disagreed.
       //
       // A re-estimate lands on the _2 state, mirroring approveRevisionFinance.
-      ticket.status =
-        ticket.status === ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2
-          ? ServiceTicketStatus.FINANCE_APPROVED_2
-          : ServiceTicketStatus.FINANCE_APPROVED;
-      await ticketRepo.save(ticket);
-
       const estimateRepo = Source.getRepository(ServiceEstimate);
       const estimate = await estimateRepo.findOne({
         where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
+        relations: ['items'],
       });
       if (estimate) {
-        estimate.status = ServiceEstimateStatus.FINANCE_APPROVED;
-        await estimateRepo.save(estimate);
+        await this.applyFinanceApproval(estimate, ticket);
+      } else {
+        ticket.status =
+          ticket.status === ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2
+            ? ServiceTicketStatus.FINANCE_APPROVED_2
+            : ServiceTicketStatus.FINANCE_APPROVED;
+        await ticketRepo.save(ticket);
       }
 
       // Update the latest pending revision for the ticket
@@ -4517,15 +4642,7 @@ Xerocare Technical Services`;
   ): Promise<void> {
     if (!ticket.serviceQuotationId) return;
 
-    const approvalTravelCovered = [
-      ServiceContext.AMC,
-      ServiceContext.SMA,
-      ServiceContext.FSMA,
-      ServiceContext.RENT,
-      ServiceContext.LEASE_CPC,
-      ServiceContext.WARRANTY,
-      ServiceContext.LEASE_UNDER_WARRANTY,
-    ].includes(ticket.serviceContext);
+    const approvalTravelCovered = (await this.resolveItemCoverage(ticket)).travel;
 
     const token = sign({ userId: 'ven_inv_service', role: 'ADMIN' }, ACCESS_SECRET as string, {
       expiresIn: '1m',
@@ -4613,6 +4730,15 @@ Xerocare Technical Services`;
       signedDocumentNote?: string | null;
     },
   ): Promise<void> {
+    if (
+      ticket.status !== ServiceTicketStatus.FINANCE_APPROVED &&
+      ticket.status !== ServiceTicketStatus.FINANCE_APPROVED_2
+    ) {
+      throw new AppError(
+        'Finance must approve the estimate before customer approval is recorded',
+        400,
+      );
+    }
     if (!opts.signatureData && !opts.signedDocumentUrl) {
       throw new AppError(
         'A customer signature (drawn or uploaded) is required to record approval',
@@ -5004,7 +5130,7 @@ Xerocare Technical Services`;
           400,
         );
       }
-      if (this.isTravelCovered(ticket.serviceContext)) {
+      if ((await this.resolveItemCoverage(ticket)).travel) {
         throw new AppError('This machine is covered — no visit charge applies', 400);
       }
       if (Number(ticket.visitChargeAmount) <= 0) {
@@ -6304,6 +6430,14 @@ Xerocare Technical Services`;
             }
           }
         }
+        const externalPartLogs = await Source.getRepository(ServicePartUsageLog).find({
+          where: { serialNumber: rawParam },
+          order: { replacedAt: 'DESC' },
+        });
+        const externalYields = await Source.getRepository(ConsumableYieldHistory).find({
+          where: { serialNumber: rawParam },
+          order: { installedDate: 'DESC' },
+        });
         return res.status(200).json({
           success: true,
           data: {
@@ -6313,8 +6447,8 @@ Xerocare Technical Services`;
               ...t,
               estimateTotalCost: latestEstimateCostBySerialTicket.get(t.id) ?? null,
             })),
-            partLogs: [],
-            yields: [],
+            partLogs: externalPartLogs,
+            yields: externalYields,
           },
         });
       }

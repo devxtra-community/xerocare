@@ -122,6 +122,7 @@ export class SparePartRepository {
         'lot.lotNumber AS lot_number',
         'lot.lotNumber AS lotNumber', // Frontend consistency
         'sp.part_name AS part_name',
+        'sp.part_category AS part_category',
         'sp.brand AS brand',
         'warehouse.warehouseName AS warehouse_name',
         'branch.name AS branch_name',

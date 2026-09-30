@@ -76,6 +76,7 @@ export default function AddSparePartDialog({
 
   const [formData, setFormData] = useState({
     part_name: '',
+    part_category: '',
     brand: '',
     model_ids: [] as string[],
     base_price: '',
@@ -175,6 +176,7 @@ export default function AddSparePartDialog({
 
           setFormData({
             part_name: sp?.part_name || selectedItem.customSparePartName || '',
+            part_category: sp?.part_category || '',
             brand: brandName,
             model_ids: sp?.model_id ? [sp.model_id] : selectedItem.modelIds || [],
             base_price: '',
@@ -290,6 +292,7 @@ export default function AddSparePartDialog({
       onOpenChange(false);
       setFormData({
         part_name: '',
+        part_category: '',
         brand: '',
         model_ids: [],
         base_price: '',
@@ -338,6 +341,7 @@ export default function AddSparePartDialog({
                       vendor_id: '',
                       warehouse_id: '',
                       part_name: '',
+                      part_category: '',
                       brand: '',
                       base_price: '',
                       purchase_price: '',
@@ -408,6 +412,7 @@ export default function AddSparePartDialog({
                       setFormData({
                         ...formData,
                         part_name: sp?.part_name || selectedItem.customSparePartName || '',
+                        part_category: sp?.part_category || '',
                         brand: brandName,
                         base_price: '',
                         purchase_price: (
@@ -488,6 +493,18 @@ export default function AddSparePartDialog({
               {selectedLotItemId && !isNoLot && (
                 <p className="text-xs text-muted-foreground mt-1">Auto-filled from lot item</p>
               )}
+            </div>
+            <div className="space-y-2">
+              <Label>Coverage Category</Label>
+              <select
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={formData.part_category}
+                onChange={(e) => setFormData({ ...formData, part_category: e.target.value })}
+              >
+                <option value="">Infer from name and description</option>
+                <option value="SPARE_PART">Spare part</option>
+                <option value="CONSUMABLE">Consumable</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label>Manufacturing Part Number (MPN) *</Label>

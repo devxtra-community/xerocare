@@ -6,6 +6,7 @@ export interface SparePart {
   sku: string;
   mpn?: string;
   part_name: string;
+  part_category?: string | null;
   brand: string;
   brand_id?: string;
   description?: string;

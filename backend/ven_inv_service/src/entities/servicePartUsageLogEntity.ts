@@ -5,8 +5,11 @@ export class ServicePartUsageLog {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid' })
-  productId!: string; // Which machine
+  @Column({ type: 'uuid', nullable: true })
+  productId!: string | null; // Which catalog machine, null for external machines
+
+  @Column({ type: 'varchar', nullable: true })
+  serialNumber!: string | null; // Stable machine key for external-machine history
 
   @Column({ type: 'uuid' })
   ticketId!: string; // Which service ticket

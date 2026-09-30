@@ -363,6 +363,20 @@ async function runPreMigrations() {
             `ALLOCATED rows for the same productId need manual cleanup first: ${(err as Error).message}`,
         );
       }
+      // Serial number is the fallback machine key used by service-ticket
+      // resolution, including legacy allocations with no productId. Prevent
+      // two live contracts from claiming the same physical serial.
+      try {
+        await client.query(`
+          CREATE UNIQUE INDEX IF NOT EXISTS "uniq_product_allocation_active_serial"
+            ON product_allocations ("serialNumber")
+            WHERE status = 'ALLOCATED' AND "serialNumber" <> '';
+        `);
+      } catch (err) {
+        logger.warn(
+          `Could not create uniq_product_allocation_active_serial — pre-existing duplicate active serial allocations need manual review: ${(err as Error).message}`,
+        );
+      }
 
       // Add columns to invoices table
       await client.query(`

@@ -76,10 +76,47 @@ export const normalizeCoverage = (
 
 export const TONER_CATEGORY = 'TONER';
 
+/** Catalog categories which are consumed or wear through normal machine use. */
+const CONSUMABLE_CATEGORIES = new Set([
+  'TONER',
+  'CONSUMABLE',
+  'INK',
+  'DRUM',
+  'FUSER',
+  'TRANSFER_BELT',
+  'PAPER_FEED_ROLLER',
+  'ROLLER',
+]);
+
 /** Fallback for parts without an explicit category (e.g. CUSTOM ticket items). */
-export const isTonerName = (name?: string | null): boolean => {
+export const isConsumableName = (name?: string | null): boolean => {
   if (!name) return false;
-  return /toner|cartridge|ink\b|developer/i.test(name);
+  return /toner|cartridge|ink\b|developer|drum|fuser|transfer belt|paper feed roller/i.test(name);
+};
+
+/** Backward-compatible name for existing consumers. */
+export const isTonerName = isConsumableName;
+
+export const inferCatalogPartCategory = (partName?: string | null, description?: string | null) =>
+  isConsumableName(`${partName || ''} ${description || ''}`) ? 'CONSUMABLE' : 'SPARE_PART';
+
+export const isConsumableCategory = (category?: string | null): boolean =>
+  !!category && CONSUMABLE_CATEGORIES.has(category.trim().toUpperCase());
+
+/** Resolve the contract coverage for the ticket's server-resolved context. */
+export const coverageForServiceContext = (
+  serviceContext: string,
+  contractCoverage?: ContractCoverage | null,
+): ContractCoverage => {
+  if (contractCoverage) return { ...contractCoverage };
+  if (['RENT', 'LEASE_CPC', 'FSMA'].includes(serviceContext)) return { ...FULL_COVERAGE };
+  if (['WARRANTY', 'LEASE_UNDER_WARRANTY', 'SMA'].includes(serviceContext)) {
+    return { ...WARRANTY_COVERAGE };
+  }
+  if (serviceContext === 'AMC') {
+    return { labour: true, spareParts: false, toner: false, travel: true };
+  }
+  return { ...NO_COVERAGE };
 };
 
 /** True when the given part/item category is paid for by the contract. */
@@ -87,7 +124,9 @@ export const coverageAllowsItem = (
   coverage: ContractCoverage,
   opts: { partCategory?: string | null; partName?: string | null },
 ): boolean => {
-  const isToner =
-    (opts.partCategory || '').toUpperCase() === TONER_CATEGORY || isTonerName(opts.partName);
-  return isToner ? coverage.toner : coverage.spareParts;
+  const category = opts.partCategory?.trim().toUpperCase();
+  // The catalog classification is authoritative when recognized. Names are only
+  // a fallback for legacy rows and custom items without a catalog category.
+  const consumable = category ? isConsumableCategory(category) : isConsumableName(opts.partName);
+  return consumable ? coverage.toner : coverage.spareParts;
 };

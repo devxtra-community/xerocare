@@ -11,6 +11,7 @@ import { generateSku } from '../utils/skuGenerator';
 import { Source } from '../config/db';
 import { Warehouse, WarehouseStatus } from '../entities/warehouseEntity';
 import { Branch } from '../entities/branchEntity';
+import { inferCatalogPartCategory } from '../helpers/contractCoverageHelper';
 
 interface BulkUploadRow {
   sku?: string;
@@ -30,6 +31,7 @@ interface BulkUploadRow {
   description?: string;
   yield?: string;
   maxDiscountableAmount?: number;
+  part_category?: string;
 }
 
 export class SparePartService {
@@ -229,6 +231,8 @@ export class SparePartService {
       mpn: data.mpn,
       description: data.description,
       yield: data.yield,
+      part_category:
+        data.part_category || inferCatalogPartCategory(data.part_name, data.description),
       maxDiscountableAmount: data.maxDiscountableAmount || 0,
       max_discount_amount: data.maxDiscountableAmount || 0,
       created_by: createdBy,
@@ -283,6 +287,7 @@ export class SparePartService {
       mpn: data.mpn,
       description: data.description,
       yield: data.yield,
+      part_category: data.part_category || undefined,
       warehouse_id: data.warehouse_id,
       vendor_id: data.vendor_id,
       maxDiscountableAmount: data.maxDiscountableAmount,
