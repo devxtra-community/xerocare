@@ -233,6 +233,13 @@ export default function RemoteServiceEstimateApprovalPage() {
                   {Number(data.estimate.visitChargeAmount) > 0 && (
                     <Row label="Visit charge" value={money(data.estimate.visitChargeAmount)} />
                   )}
+                  {data.ticket.visitChargeMethod === 'SEPARATE' &&
+                    Number(data.ticket.visitChargeAmount) > 0 && (
+                      <Row
+                        label={`Visit charge (${data.ticket.visitChargeStatus === 'COLLECTED' || data.ticket.visitChargeCollected ? 'PAID' : data.ticket.visitChargeStatus === 'PENDING_APPROVAL' ? 'PAYMENT PENDING APPROVAL' : 'UNPAID'})`}
+                        value={money(data.ticket.visitChargeAmount)}
+                      />
+                    )}
                   {Number(data.estimate.transportChargeAmount) > 0 && (
                     <Row
                       label="Transport charge"
@@ -243,7 +250,14 @@ export default function RemoteServiceEstimateApprovalPage() {
                     <Row label="Discount" value={`- ${money(data.estimate.discountAmount)}`} />
                   )}
                   <div className="flex justify-between pt-2 mt-1 border-t border-slate-200 text-sm font-black text-slate-800">
-                    <span>Total</span>
+                    <span>
+                      {data.ticket.visitChargeMethod === 'SEPARATE' &&
+                      Number(data.ticket.visitChargeAmount) > 0 &&
+                      (data.ticket.visitChargeStatus === 'COLLECTED' ||
+                        data.ticket.visitChargeCollected)
+                        ? 'Amount due for this estimate'
+                        : 'Total'}
+                    </span>
                     <span>{money(data.estimate.totalCost)}</span>
                   </div>
                 </div>

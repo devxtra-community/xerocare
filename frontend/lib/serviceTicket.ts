@@ -81,6 +81,12 @@ export interface ServiceTicket {
   items: ServiceTicketItem[];
   visitChargeAmount?: number;
   visitChargeMethod?: string | null;
+  /** Creation-time collection input; backend creates a pending billing request. */
+  visitChargePaymentMode?: string;
+  visitChargeAccountId?: string;
+  visitChargeChequeNumber?: string;
+  visitChargeChequeBankName?: string;
+  visitChargeChequeDate?: string;
   visitChargeCollected?: boolean;
   /** NONE | PENDING_APPROVAL | COLLECTED | REJECTED — see the ticket entity. */
   visitChargeStatus?: 'NONE' | 'PENDING_APPROVAL' | 'COLLECTED' | 'REJECTED';
@@ -766,6 +772,11 @@ export interface ServiceEstimateForSigning {
     productModel: string;
     serialNumber: string;
     status: string;
+    visitChargeAmount: number;
+    visitChargeMethod: string | null;
+    visitChargeStatus: 'NONE' | 'PENDING_APPROVAL' | 'COLLECTED' | 'REJECTED';
+    visitChargeCollected: boolean;
+    visitChargeCollectedAt: string | null;
   };
   branch: { name: string; currencyCode?: string | null; taxName?: string | null } | null;
   customerName: string | null;

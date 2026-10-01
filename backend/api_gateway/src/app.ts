@@ -439,6 +439,108 @@ app.post(
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
 app.get(
+  '/i/service/tickets/:id/estimates',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/estimates',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/estimates/submit',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/:estimateId/approve-finance',
+  authMiddleware,
+  requireRole(UserRole.FINANCE, UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/:estimateId/reject-finance',
+  authMiddleware,
+  requireRole(UserRole.FINANCE, UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/:estimateId/approve-customer',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/:estimateId/approve-customer-upload',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/:estimateId/reject-customer',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/tickets/:id/estimates/revisions',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/revisions/:revisionId/approve-finance',
+  authMiddleware,
+  requireRole(UserRole.FINANCE, UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/revisions/:revisionId/approve-customer',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/machines/:serialNumber/context',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/machines/:serialNumber/lifetime-cost',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/machines/:serialNumber/yield-history',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/machines/:serialNumber/analytics',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/machine/:productId/history',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
+  '/i/service/technicians/:technicianId/performance',
+  authMiddleware,
+  requireServiceRole(['SERVICE_TECHNICIAN', 'SERVICE_HELP_DESK', 'FINANCE']),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.get(
   '/i/service/technicians',
   authMiddleware,
   requireRole(UserRole.ADMIN, UserRole.MANAGER, UserRole.FINANCE, UserRole.EMPLOYEE),

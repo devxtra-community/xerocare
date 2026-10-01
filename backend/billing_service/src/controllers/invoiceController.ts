@@ -2096,15 +2096,20 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
     // REPLACED and back in stock, and the new unit carries the contract.
     const rentInvoice = await Source.query(
       `
-      SELECT i.id, i.type, i."billType", i."contractStatus"
+      SELECT i.id, i.type, i."billType", i."contractStatus",
+             pa.id AS "allocationId", pa."contractId", pa."productId", pa."serialNumber",
+             pa."startTimestamp"
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
       WHERE i.type = 'PROFORMA'
         AND (i."billType" = 'RENT' OR (i."billType" IS NULL AND i."saleType" = 'RENT'))
         AND i."contractStatus" = 'ACTIVE'
         AND pa.status = 'ALLOCATED'
+        AND pa."startTimestamp" <= CURRENT_TIMESTAMP
+        AND (pa."endTimestamp" IS NULL OR pa."endTimestamp" > CURRENT_TIMESTAMP)
         AND (pa."productId" = $1 OR pa."serialNumber" = $2)
-      LIMIT 1;
+      ORDER BY pa."startTimestamp" DESC, pa."createdAt" DESC
+      LIMIT 2;
     `,
       [productId, serialNumber],
     );
@@ -2128,18 +2133,38 @@ export const getMachineBillingContext = async (req: Request, res: Response, next
       `
       SELECT i.id, i."effectiveFrom", i."leaseTenureMonths", i."maxCopyLimit",
              i."warrantyType", i."warrantyDurationValue", i."warrantyDurationUnit", i."warrantyCopyLimit",
-             i."leaseType", i."rentType"
+             i."leaseType", i."rentType", pa.id AS "allocationId",
+             pa."contractId", pa."productId", pa."serialNumber", pa."startTimestamp"
       FROM invoices i
       JOIN product_allocations pa ON i.id = pa."contractId"
       WHERE i.type = 'PROFORMA'
         AND (i."billType" = 'LEASE' OR (i."billType" IS NULL AND i."saleType" = 'LEASE'))
         AND i."contractStatus" = 'ACTIVE'
         AND pa.status = 'ALLOCATED'
+        AND pa."startTimestamp" <= CURRENT_TIMESTAMP
+        AND (pa."endTimestamp" IS NULL OR pa."endTimestamp" > CURRENT_TIMESTAMP)
         AND (pa."productId" = $1 OR pa."serialNumber" = $2)
-      LIMIT 1;
+      ORDER BY pa."startTimestamp" DESC, pa."createdAt" DESC
+      LIMIT 2;
     `,
       [productId, serialNumber],
     );
+
+    // A service context must never be selected arbitrarily when the same
+    // physical machine has conflicting active allocations. The service layer
+    // treats this as unverified coverage and blocks ticket creation.
+    if ((rentInvoice?.length ?? 0) > 1 || (leaseInvoice?.length ?? 0) > 1) {
+      throw new AppError(
+        `Machine ${serialNumber} has multiple active contract allocations; resolve the allocation data before creating a service ticket.`,
+        409,
+      );
+    }
+    if (rentInvoice?.length && leaseInvoice?.length) {
+      throw new AppError(
+        `Machine ${serialNumber} is allocated to both RENT and LEASE contracts; resolve the allocation data before creating a service ticket.`,
+        409,
+      );
+    }
 
     const latestAllocation = await Source.query(
       `

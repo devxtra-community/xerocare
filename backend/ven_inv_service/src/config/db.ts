@@ -943,6 +943,20 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
                  "listTotalPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END * i.quantity
             FROM spare_parts sp
            WHERE i."listUnitPrice" IS NULL AND sp.id = i."sparePartId";
+          -- Recover internal purchase cost for historical catalog lines without
+          -- changing their customer-facing prices or totals.
+          UPDATE service_ticket_items i
+             SET "unitCost" = sp.purchase_price,
+                 "totalCost" = sp.purchase_price * i.quantity
+            FROM spare_parts sp
+           WHERE i."sparePartId" = sp.id
+             AND (i."unitCost" IS NULL OR i."totalCost" IS NULL);
+          UPDATE service_estimate_items i
+             SET "unitCost" = sp.purchase_price,
+                 "totalCost" = sp.purchase_price * i.quantity
+            FROM spare_parts sp
+           WHERE i."sparePartId" = sp.id
+             AND (i."unitCost" IS NULL OR i."totalCost" IS NULL);
         `);
         logger.info('Added columns to service_tickets for Redesign and Visit Charge.');
 
@@ -999,7 +1013,8 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
         await Source.query(`
           CREATE TABLE IF NOT EXISTS service_part_usage_logs (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            "productId" UUID NOT NULL,
+            "productId" UUID NULL,
+            "serialNumber" VARCHAR(255) NULL,
             "ticketId" UUID NOT NULL,
             "sparePartId" UUID NULL,
             "partName" VARCHAR(255) NOT NULL,
@@ -1015,6 +1030,18 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
             "linkedInvoiceId" VARCHAR(255) NULL,
             "replacedAt" TIMESTAMP DEFAULT NOW()
           );
+        `);
+        await Source.query(`
+          ALTER TABLE service_part_usage_logs
+            ALTER COLUMN "productId" DROP NOT NULL,
+            ADD COLUMN IF NOT EXISTS "serialNumber" VARCHAR(255) NULL;
+          UPDATE service_part_usage_logs usage
+             SET "serialNumber" = ticket."serialNumber"
+            FROM service_tickets ticket
+           WHERE usage."ticketId" = ticket.id
+             AND usage."serialNumber" IS NULL;
+          CREATE INDEX IF NOT EXISTS idx_service_part_usage_logs_serial
+            ON service_part_usage_logs ("serialNumber");
         `);
         logger.info('Guaranteed service_part_usage_logs table exists.');
 
@@ -1170,19 +1197,25 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
           `);
           logger.info('Guaranteed contract_meter_readings billing-sweep columns exist.');
 
-          // Toner vs spare part classification (SMA/AMC charge toner).
+          // Chargeable consumables versus covered spare parts under SMA/warranty.
+          // The category remains free-form VARCHAR for catalog compatibility.
           await Source.query(`
             ALTER TABLE spare_parts ADD COLUMN IF NOT EXISTS part_category VARCHAR(30) NULL;
           `);
           await Source.query(`
-            UPDATE spare_parts SET part_category = 'TONER'
-            WHERE part_category IS NULL
-              AND (part_name ~* 'toner|cartridge|developer' OR description ~* 'toner|cartridge|developer');
+            UPDATE spare_parts SET part_category = 'CONSUMABLE'
+            WHERE (part_category IS NULL OR part_category IN ('SPARE_PART', 'TONER'))
+              AND (part_name ~* 'toner|cartridge|developer|ink|drum|fuser|transfer[ -]?belt|paper[ -]?feed[ -]?roller'
+                OR description ~* 'toner|cartridge|developer|ink|drum|fuser|transfer[ -]?belt|paper[ -]?feed[ -]?roller');
           `);
           await Source.query(`
+            UPDATE spare_parts SET part_category = 'CONSUMABLE'
+            WHERE part_category = 'TONER';
             UPDATE spare_parts SET part_category = 'SPARE_PART' WHERE part_category IS NULL;
           `);
-          logger.info('Guaranteed spare_parts.part_category exists and is backfilled.');
+          logger.info(
+            'Guaranteed spare_parts.part_category exists and consumables are backfilled.',
+          );
 
           // External machines (bought elsewhere) have no model/warehouse/vendor
           await Source.query(`

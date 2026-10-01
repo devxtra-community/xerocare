@@ -8,6 +8,7 @@ export interface SparePartInventoryItem {
   lotNumber: string;
   barcode_id?: string;
   part_name: string;
+  part_category?: string | null;
   brand: string;
   compatible_model: string;
   compatible_models?: string;
