@@ -122,6 +122,10 @@ export class CreditNote {
   })
   damageReason?: DamageReason;
 
+  // Finance's inspection outcome for the returned product in replacement/exchange flows.
+  @Column({ name: 'returned_machine_disposition', type: 'varchar', length: 20, nullable: true })
+  returnedMachineDisposition?: 'STOCK' | 'WORKING_STOCK' | 'DAMAGED';
+
   // How the refund was settled (B.1 fix — now persisted)
   @Column({ type: 'varchar', nullable: true })
   paymentMode?: string;

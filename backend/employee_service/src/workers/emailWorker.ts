@@ -176,7 +176,7 @@ export const startWorker = async () => {
     try {
       if (routingKey === 'notification.email.request') {
         // Payload: { recipient, subject, body, invoiceId, attachments }
-        const { recipient, subject, body, attachments } = job;
+        const { recipient, subject, body, text, attachmentUrl, attachments } = job;
         // A job missing its destination or content used to fall through these
         // guards and be acked as if it had been delivered. It wasn't — the
         // customer just never received it — so that is now a failure, not a
@@ -188,7 +188,31 @@ export const startWorker = async () => {
         }
         // Import dynamically to avoid circular issues if any
         const { sendEmail } = await import('../utils/mailer');
-        await sendEmail(recipient, subject || 'Notification from XeroCare', body, attachments);
+        // attachmentUrl is part of the notification event contract (invoice PDF,
+        // receipt, or customer action link). It was previously discarded here, so
+        // URLs sent by producers never appeared in the customer's email.
+        const safeUrl = typeof attachmentUrl === 'string' ? attachmentUrl.trim() : '';
+        const urlHtml = safeUrl
+          ? `<p style="margin-top:20px;word-break:break-all"><a href="${safeUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">View or download your document</a><br><span>${safeUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span></p>`
+          : '';
+        const emailHtml = urlHtml && !body.includes(safeUrl) ? `${body}${urlHtml}` : body;
+        const emailText = [
+          text ||
+            body
+              .replace(/<[^>]*>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim(),
+          safeUrl,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+        await sendEmail(
+          recipient,
+          subject || 'Notification from XeroCare',
+          emailHtml,
+          attachments,
+          emailText,
+        );
         logger.info(`[Notification Worker] Email sent to ${recipient}`);
       } else if (routingKey === 'notification.whatsapp.request') {
         // Payload: { recipient, body, invoiceId... }

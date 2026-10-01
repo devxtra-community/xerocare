@@ -629,6 +629,7 @@ export function ContractAgreementModal({
                               {remoteLink}
                             </div>
                             <Button
+                              type="button"
                               variant="ghost"
                               size="sm"
                               onClick={copyLink}
@@ -678,6 +679,7 @@ export function ContractAgreementModal({
                           </Button>
                           <div className="grid grid-cols-3 gap-2">
                             <Button
+                              type="button"
                               variant="outline"
                               size="sm"
                               onClick={copyLink}

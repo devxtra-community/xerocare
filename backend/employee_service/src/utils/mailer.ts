@@ -367,12 +367,14 @@ export async function sendEmail(
   subject: string,
   html: string,
   attachments?: { filename: string; content: Buffer | string; encoding?: string }[],
+  text?: string,
 ) {
   await mailer.sendMail({
     from: process.env.MAIL_USER,
     to,
     subject,
     html,
+    text,
     attachments,
   });
 }

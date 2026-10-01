@@ -21,6 +21,11 @@ import {
   SETTLEMENT_TYPES,
 } from '../entities/settlementApproval';
 import { computeExchangeSettlement, computeRefundSettlement } from '../utils/creditNoteSettlement';
+import {
+  getReturnedProductStatus,
+  isReturnedMachineDisposition,
+  requiresReturnedMachineDisposition,
+} from '../utils/creditNoteInventory';
 
 export class CreditNoteController {
   private repository = Source.getRepository(CreditNote);
@@ -360,7 +365,7 @@ export class CreditNoteController {
     await queryRunner.startTransaction();
     try {
       const { id } = req.params;
-      const { financeNote, damageReason, paymentMode } = req.body; // B.1: paymentMode now persisted
+      const { financeNote, damageReason, paymentMode, returnedMachineDisposition } = req.body;
 
       if (!financeNote || !damageReason) {
         throw new AppError('Finance note and damage reason are required', 400);
@@ -374,9 +379,20 @@ export class CreditNoteController {
         throw new AppError('Invalid status for approval', 400);
       }
 
+      const needsMachineDisposition = requiresReturnedMachineDisposition(creditNote);
+      if (needsMachineDisposition && !isReturnedMachineDisposition(returnedMachineDisposition)) {
+        throw new AppError(
+          'Choose whether the returned machine goes to stock, working stock, or damaged stock',
+          400,
+        );
+      }
+
       creditNote.financeNote = financeNote;
       creditNote.damageReason = damageReason;
       creditNote.paymentMode = paymentMode || undefined; // B.1
+      if (needsMachineDisposition) {
+        creditNote.returnedMachineDisposition = returnedMachineDisposition;
+      }
 
       // Which returns are scrapped vs put back on the shelf. Reasons that describe a
       // faulty or incomplete unit are written off; a unit returned merely because it was
@@ -676,8 +692,10 @@ export class CreditNoteController {
 
       creditNote.status = CreditNoteStatus.PRODUCT_REPLACED;
 
-      const inventoryStatus: 'DAMAGED' | 'RETURNED' =
-        creditNote.damageReason === 'Damaged Product' ? 'DAMAGED' : 'RETURNED';
+      const inventoryStatus = getReturnedProductStatus(
+        creditNote.returnedMachineDisposition,
+        creditNote.damageReason,
+      );
 
       if (creditNote.itemCategory === 'PRODUCT') {
         const {

@@ -558,6 +558,7 @@ async function runPreMigrations() {
         ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS tax_percent DECIMAL(5,2) NULL;
         ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(12,2) NULL;
         ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "paymentMode" VARCHAR(255) NULL;
+        ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS returned_machine_disposition VARCHAR(20) NULL;
         ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementSparePartId" UUID NULL;
         ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementSparePartName" VARCHAR(255) NULL;
         ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS "replacementSparePartSku" VARCHAR(255) NULL;

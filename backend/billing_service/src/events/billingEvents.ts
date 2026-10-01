@@ -26,6 +26,8 @@ export interface NotificationRequestEvent {
   recipient: string; // Email or Phone number
   subject?: string; // For Email
   body: string; // Message content or PDF link
+  /** Plain-text alternative for email clients that strip or suppress HTML. */
+  text?: string;
   invoiceId?: string; // Useful for linking
   attachmentUrl?: string; // Link to Invoice PDF
   attachments?: { filename: string; content: string; encoding: string }[]; // Base64 Buffer attachments

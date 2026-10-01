@@ -357,6 +357,24 @@ export default function CreditNoteViewModal({ record, open, onClose }: Props) {
                 </div>
               )}
 
+              {record.returnedMachineDisposition && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Returned Machine
+                    Destination
+                  </p>
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3">
+                    <p className="text-xs font-bold text-emerald-700 leading-relaxed">
+                      {record.returnedMachineDisposition === 'WORKING_STOCK'
+                        ? 'Working stock — available to use or sell'
+                        : record.returnedMachineDisposition === 'DAMAGED'
+                          ? 'Damaged — removed from sellable stock'
+                          : 'Stock — returned, pending handling'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Damage Reason (if approved) */}
               {record.damageReason && (
                 <div>

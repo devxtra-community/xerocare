@@ -109,6 +109,7 @@ export interface CreditNoteRecord {
   notes?: string;
   financeNote?: string;
   damageReason?: string;
+  returnedMachineDisposition?: 'STOCK' | 'WORKING_STOCK' | 'DAMAGED';
   paymentMode?: string;
   rejectionReason?: string;
   // Product replacement/exchange fields

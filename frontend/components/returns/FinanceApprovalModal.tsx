@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,12 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 interface Props {
   open: boolean;
   onClose: () => void;
-  onConfirm: (data: { financeNote: string; damageReason: string; paymentMode: string }) => void;
+  onConfirm: (data: {
+    financeNote: string;
+    damageReason: string;
+    paymentMode: string;
+    returnedMachineDisposition?: 'STOCK' | 'WORKING_STOCK' | 'DAMAGED';
+  }) => void;
   record: CreditNoteRecord | null;
 }
 
@@ -35,10 +40,26 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
   const [financeNote, setFinanceNote] = useState('');
   const [damageReason, setDamageReason] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
+  const [returnedMachineDisposition, setReturnedMachineDisposition] = useState('');
+  const needsMachineDisposition =
+    record?.itemCategory !== 'SPARE_PART' &&
+    (record?.type === 'REPLACEMENT' || record?.type === 'CREDIT_EXCHANGE');
+
+  useEffect(() => {
+    setReturnedMachineDisposition('');
+  }, [record?.id]);
 
   const handleSubmit = () => {
     if (!financeNote || !damageReason || !paymentMode) return;
-    onConfirm({ financeNote, damageReason, paymentMode });
+    if (needsMachineDisposition && !returnedMachineDisposition) return;
+    onConfirm({
+      financeNote,
+      damageReason,
+      paymentMode,
+      returnedMachineDisposition: needsMachineDisposition
+        ? (returnedMachineDisposition as 'STOCK' | 'WORKING_STOCK' | 'DAMAGED')
+        : undefined,
+    });
   };
 
   return (
@@ -58,6 +79,24 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
               Amount: {formatCurrency(record?.productAmount ?? 0, currency)}
             </p>
           </div>
+
+          {needsMachineDisposition && (
+            <div className="grid gap-2">
+              <Label>Returned Machine Destination</Label>
+              <Select onValueChange={setReturnedMachineDisposition}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose inventory destination" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="STOCK">Stock — returned, pending handling</SelectItem>
+                  <SelectItem value="WORKING_STOCK">
+                    Working stock — available to use or sell
+                  </SelectItem>
+                  <SelectItem value="DAMAGED">Damaged — remove from sellable stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid gap-2">
             <Label>Damage Reason</Label>
@@ -106,7 +145,12 @@ export default function FinanceApprovalModal({ open, onClose, onConfirm, record 
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!financeNote || !damageReason || !paymentMode}
+            disabled={
+              !financeNote ||
+              !damageReason ||
+              !paymentMode ||
+              (needsMachineDisposition && !returnedMachineDisposition)
+            }
             className="bg-green-600 hover:bg-green-700"
           >
             Approve Return

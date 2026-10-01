@@ -473,7 +473,9 @@ export const sendContractAgreementEmail = async (
     <div style="margin-top:8px;text-align:center">
       <a href="${link}" target="_blank" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:12px 28px;border-radius:8px">${isFullySigned ? 'View Signed Agreement' : 'Review & Sign Agreement'}</a>
     </div>
-    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;text-align:center">This link is valid for 72 hours.</p>
+    <p style="margin:24px 0 8px;font-size:12px;color:#6b7280;text-align:center">If the button does not work, open this link:</p>
+    <p style="margin:0;font-size:12px;text-align:center;word-break:break-all"><a href="${link}" style="color:#4f46e5">${link}</a></p>
+    <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;text-align:center">This link is valid for 72 hours.</p>
   </div>
 </div>`;
 
@@ -482,6 +484,7 @@ export const sendContractAgreementEmail = async (
       recipient,
       subject: `Contract Agreement — ${agreement.agreementNumber}`,
       body: htmlBody,
+      text: `Dear ${agreement.customerName},\n\n${isFullySigned ? `Your fully signed contract agreement ${agreement.agreementNumber} with ${agreement.dealerName} is ready for your records.` : `Your contract agreement ${agreement.agreementNumber} with ${agreement.dealerName} is ready for review and signature.`}\n\nOpen the agreement: ${link}\n\nThis link is valid for 72 hours.`,
       invoiceId: agreement.invoiceId,
       attachmentUrl: link,
       requestedBy: userId,
@@ -1155,7 +1158,9 @@ export const sendBillEmail = async (req: Request, res: Response, next: NextFunct
     <div style="margin-top:8px;text-align:center">
       <a href="${link}" target="_blank" style="display:inline-block;background:#059669;color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:12px 28px;border-radius:8px">Review & Approve Bill</a>
     </div>
-    <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;text-align:center">This link is valid for 72 hours.</p>
+    <p style="margin:24px 0 8px;font-size:12px;color:#6b7280;text-align:center">If the button does not work, open this link:</p>
+    <p style="margin:0;font-size:12px;text-align:center;word-break:break-all"><a href="${link}" style="color:#059669">${link}</a></p>
+    <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;text-align:center">This link is valid for 72 hours.</p>
   </div>
 </div>`;
 
@@ -1164,6 +1169,7 @@ export const sendBillEmail = async (req: Request, res: Response, next: NextFunct
       recipient,
       subject: `Bill for ${periodLabel} — ${invoice.invoiceNumber}`,
       body: htmlBody,
+      text: `Dear ${invoice.customerName || 'Customer'},\n\nYour bill for ${periodLabel} is ready for review. Invoice: ${invoice.invoiceNumber}. Total: ${Number(usage.totalCharge).toFixed(2)}.\n\nReview and approve your bill: ${link}\n\nThis link is valid for 72 hours.`,
       invoiceId: invoice.id,
       attachmentUrl: link,
     });
