@@ -104,6 +104,7 @@ export interface ServiceTicket {
   meterReadingAtCreation?: number;
   branchName?: string;
   branchId?: string;
+  linkedInvoiceId?: string | null;
 }
 
 export const getServiceTickets = async (branchId?: string): Promise<ServiceTicket[]> => {
@@ -367,6 +368,9 @@ export interface ServiceEstimateItem {
   /** Catalog price before coverage — the part's value on a covered (0-charge) line. Never totalled. */
   listUnitPrice?: number | null;
   listTotalPrice?: number | null;
+  /** Internal-only cost fields returned to the Finance approval queue. */
+  unitCost?: number | null;
+  totalCost?: number | null;
 }
 
 export interface ServiceEstimate {
@@ -421,6 +425,27 @@ export interface ServiceEstimateRevision {
   submittedAt?: string;
   itemsSnapshot?: Record<string, unknown> | unknown[] | null;
 }
+
+export interface FinancePendingServiceEstimates {
+  estimates: Array<ServiceEstimate & { ticket: ServiceTicket }>;
+  revisions: Array<ServiceEstimateRevision & { ticket: ServiceTicket }>;
+}
+
+export const getFinancePendingServiceEstimates =
+  async (): Promise<FinancePendingServiceEstimates> => {
+    const response = await api.get('/i/service/estimates/finance-pending');
+    return response.data.data;
+  };
+
+export const rejectRevisionFinance = async (
+  revisionId: string,
+  remarks: string,
+): Promise<ServiceEstimateRevision> => {
+  const response = await api.post(`/i/service/estimates/revisions/${revisionId}/reject-finance`, {
+    remarks,
+  });
+  return response.data.data;
+};
 
 export const getTicketEstimates = async (
   id: string,

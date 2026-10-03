@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { requestForgotPasswordOtp, resetPassword } from '@/lib/auth';
 import { toast } from 'sonner';
+import { validatePassword } from '@/lib/passwordPolicy';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,8 +26,10 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const resetSubmissionInFlight = useRef(false);
   const router = useRouter();
 
   const handleRequestSubmit = (e: React.FormEvent) => {
@@ -57,6 +60,15 @@ export default function ForgotPasswordPage() {
 
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationError = validatePassword(newPassword);
+    setPasswordError(validationError);
+    if (validationError) return;
+    if (!otp.trim()) {
+      toast.error('Please enter the OTP.');
+      return;
+    }
+    if (resetSubmissionInFlight.current) return;
+    resetSubmissionInFlight.current = true;
     setLoading(true);
     try {
       const res = await resetPassword(email, otp, newPassword);
@@ -72,6 +84,7 @@ export default function ForgotPasswordPage() {
       if ((err as any).response?.data?.message) msg = (err as any).response.data.message;
       toast.error(msg);
     } finally {
+      resetSubmissionInFlight.current = false;
       setLoading(false);
     }
   };
@@ -135,8 +148,19 @@ export default function ForgotPasswordPage() {
                   id="new-password"
                   required
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setPasswordError(validatePassword(e.target.value));
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Use at least 15 characters. Spaces and passphrases are allowed.
+                </p>
+                {passwordError && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {passwordError}
+                  </p>
+                )}
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Resetting...' : 'Reset Password'}

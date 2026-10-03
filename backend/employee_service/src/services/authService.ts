@@ -4,6 +4,7 @@ import { verifyRefreshToken } from '../utils/jwt';
 import { AuthRepository } from '../repositories/authRepository';
 import { AppError } from '../errors/appError';
 import { AdminRepository } from '../repositories/adminRepository';
+import { validatePassword } from '../utils/passwordPolicy';
 
 export class AuthService {
   private employeeRepo = new EmployeeRepository();
@@ -100,6 +101,9 @@ export class AuthService {
   async changePassword(payload: { userId: string; currentPassword: string; newPassword: string }) {
     const { userId, currentPassword, newPassword } = payload;
 
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) throw new AppError(passwordError, 400);
+
     const user = await this.employeeRepo.findById(userId);
     if (!user) {
       throw new AppError('User not found', 404);
@@ -153,6 +157,9 @@ export class AuthService {
    * Resets a user's password (typically used by Admin).
    */
   async resetPassword(userId: string, newPassword: string) {
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) throw new AppError(passwordError, 400);
+
     const hash = await bcrypt.hash(newPassword, 10);
     await this.employeeRepo.updatePassword(userId, hash);
   }

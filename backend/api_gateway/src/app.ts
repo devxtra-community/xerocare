@@ -456,6 +456,12 @@ app.post(
   requireServiceRole(['SERVICE_TECHNICIAN']),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
 );
+app.get(
+  '/i/service/estimates/finance-pending',
+  authMiddleware,
+  requireRole(UserRole.FINANCE, UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
 app.post(
   '/i/service/estimates/:estimateId/approve-finance',
   authMiddleware,
@@ -494,6 +500,12 @@ app.post(
 );
 app.post(
   '/i/service/estimates/revisions/:revisionId/approve-finance',
+  authMiddleware,
+  requireRole(UserRole.FINANCE, UserRole.ADMIN, UserRole.MANAGER),
+  createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),
+);
+app.post(
+  '/i/service/estimates/revisions/:revisionId/reject-finance',
   authMiddleware,
   requireRole(UserRole.FINANCE, UserRole.ADMIN, UserRole.MANAGER),
   createServiceProxy(VENDOR_INVENTORY_SERVICE_URL),

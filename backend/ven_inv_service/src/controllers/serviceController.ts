@@ -27,6 +27,7 @@ import { Branch } from '../entities/branchEntity';
 import { ServiceDiagnosis } from '../entities/serviceDiagnosisEntity';
 import { ServiceEstimate, ServiceEstimateStatus } from '../entities/serviceEstimateEntity';
 import { ServiceEstimateRevision } from '../entities/serviceEstimateRevisionEntity';
+import { selectPendingServiceEstimateQueue } from '../helpers/financeServiceEstimateQueue';
 import {
   ServiceEstimateItem,
   ServiceEstimateItemSource,
@@ -723,6 +724,86 @@ export class ServiceController {
       : ServiceTicketStatus.FINANCE_APPROVED;
     await Source.getRepository(ServiceTicket).save(ticket);
   }
+
+  private assertFinanceBranchAccess(req: Request, ticket: ServiceTicket) {
+    if (req.user?.role !== 'ADMIN' && req.user?.branchId && req.user.branchId !== ticket.branchId) {
+      throw new AppError('You are not authorized to review estimates for this branch', 403);
+    }
+  }
+
+  /**
+   * GET /service/estimates/finance-pending
+   * The service estimate is the source record. Billing invoices remain a separate
+   * queue for chargeable quotations; this endpoint returns only unlinked work items.
+   */
+  getFinancePendingServiceEstimates = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const estimateRepo = Source.getRepository(ServiceEstimate);
+      const estimateQuery = estimateRepo
+        .createQueryBuilder('estimate')
+        .innerJoinAndSelect('estimate.ticket', 'ticket')
+        .leftJoinAndSelect('estimate.items', 'items')
+        .where('estimate.status = :status', {
+          status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL,
+        })
+        .andWhere('ticket.serviceQuotationId IS NULL')
+        .andWhere((query) => {
+          const newer = query
+            .subQuery()
+            .select('newer.id')
+            .from(ServiceEstimate, 'newer')
+            .where('newer.ticketId = estimate.ticketId')
+            .andWhere(
+              '(newer.version > estimate.version OR (newer.version = estimate.version AND newer.created_at > estimate.created_at))',
+            )
+            .getQuery();
+          return `NOT EXISTS ${newer}`;
+        });
+
+      if (req.user?.role !== 'ADMIN' && req.user?.branchId) {
+        estimateQuery.andWhere('ticket.branchId = :branchId', { branchId: req.user.branchId });
+      }
+
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const revisionQuery = revisionRepo
+        .createQueryBuilder('revision')
+        .innerJoinAndSelect('revision.ticket', 'ticket')
+        .leftJoinAndSelect('revision.items', 'items')
+        .where('revision.status = :status', { status: 'WAITING_ADDITIONAL_APPROVAL' })
+        .andWhere('revision.financeDecision IS NULL')
+        .andWhere('revision.invoiceId IS NULL')
+        .andWhere((query) => {
+          const newer = query
+            .subQuery()
+            .select('newer.id')
+            .from(ServiceEstimateRevision, 'newer')
+            .where('newer.ticketId = revision.ticketId')
+            .andWhere(
+              '(newer.version > revision.version OR (newer.version = revision.version AND newer.revisionNumber > revision.revisionNumber) OR (newer.version = revision.version AND newer.revisionNumber = revision.revisionNumber AND newer.submittedAt > revision.submittedAt))',
+            )
+            .getQuery();
+          return `NOT EXISTS ${newer}`;
+        });
+
+      if (req.user?.role !== 'ADMIN' && req.user?.branchId) {
+        revisionQuery.andWhere('ticket.branchId = :branchId', { branchId: req.user.branchId });
+      }
+
+      const [estimateCandidates, revisionCandidates] = await Promise.all([
+        estimateQuery.orderBy('estimate.created_at', 'DESC').getMany(),
+        revisionQuery.orderBy('revision.submittedAt', 'DESC').getMany(),
+      ]);
+      const { estimates, revisions } = selectPendingServiceEstimateQueue(
+        estimateCandidates as ServiceEstimate[],
+        revisionCandidates as ServiceEstimateRevision[],
+        { role: req.user?.role, branchId: req.user?.branchId },
+      );
+
+      return res.status(200).json({ success: true, data: { estimates, revisions } });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   /** Maps sparePartId → part_category for coverage checks over item lists. */
   private async getPartCategories(
@@ -2067,7 +2148,17 @@ Xerocare Technical Services`;
         where: { ticketId: String(id), status: ServiceEstimateStatus.DRAFT },
         relations: ['items'],
       });
-      if (!estimate) throw new Error('Draft estimate not found');
+      if (!estimate) {
+        const alreadySubmitted = await estimateRepo.findOne({
+          where: { ticketId: String(id), status: ServiceEstimateStatus.WAITING_FINANCE_APPROVAL },
+          relations: ['items'],
+          order: { version: 'DESC', created_at: 'DESC' },
+        });
+        if (alreadySubmitted) {
+          return res.status(200).json({ success: true, data: alreadySubmitted });
+        }
+        throw new Error('Draft estimate not found');
+      }
 
       estimate.status = ServiceEstimateStatus.WAITING_FINANCE_APPROVAL;
       await estimateRepo.save(estimate);
@@ -2189,21 +2280,24 @@ Xerocare Technical Services`;
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
       if (!ticket) throw new AppError('Ticket not found', 404);
-      if (
-        estimate.status !== ServiceEstimateStatus.WAITING_FINANCE_APPROVAL &&
-        estimate.status !== ServiceEstimateStatus.FINANCE_APPROVED
-      ) {
+      this.assertFinanceBranchAccess(req, ticket);
+
+      if (estimate.status === ServiceEstimateStatus.FINANCE_APPROVED) {
+        return res.status(200).json({ success: true, data: estimate });
+      }
+      if (estimate.status !== ServiceEstimateStatus.WAITING_FINANCE_APPROVAL) {
         throw new AppError(`Cannot approve estimate with status ${estimate.status}`, 400);
       }
-      if (
-        estimate.status === ServiceEstimateStatus.FINANCE_APPROVED &&
-        [
-          ServiceTicketStatus.CUSTOMER_APPROVED,
-          ServiceTicketStatus.IN_PROGRESS,
-          ServiceTicketStatus.COMPLETED,
-        ].includes(ticket.status)
-      ) {
-        return res.status(200).json({ success: true, data: estimate });
+
+      const latestEstimate = await estimateRepo.findOne({
+        where: { ticketId: estimate.ticketId },
+        order: { version: 'DESC', created_at: 'DESC' },
+      });
+      if (latestEstimate?.id !== estimate.id) {
+        throw new AppError('This estimate has been superseded by a newer version', 409);
+      }
+      if (ticket.status !== ServiceTicketStatus.WAITING_FINANCE_APPROVAL) {
+        throw new AppError('Ticket is no longer awaiting Finance approval', 409);
       }
       await this.applyFinanceApproval(estimate, ticket);
 
@@ -2246,15 +2340,28 @@ Xerocare Technical Services`;
       const estimate = await estimateRepo.findOne({ where: { id: String(estimateId) } });
       if (!estimate) throw new Error('Estimate not found');
 
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
+      if (!ticket) throw new AppError('Ticket not found', 404);
+      this.assertFinanceBranchAccess(req, ticket);
+      if (estimate.status !== ServiceEstimateStatus.WAITING_FINANCE_APPROVAL) {
+        throw new AppError(`Cannot reject estimate with status ${estimate.status}`, 400);
+      }
+      const latestEstimate = await estimateRepo.findOne({
+        where: { ticketId: estimate.ticketId },
+        order: { version: 'DESC', created_at: 'DESC' },
+      });
+      if (latestEstimate?.id !== estimate.id) {
+        throw new AppError('This estimate has been superseded by a newer version', 409);
+      }
+
       estimate.status = ServiceEstimateStatus.REJECTED;
       await estimateRepo.save(estimate);
 
-      const ticketRepo = Source.getRepository(ServiceTicket);
-      const ticket = await ticketRepo.findOne({ where: { id: estimate.ticketId } });
-      if (ticket) {
-        ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
-        await ticketRepo.save(ticket);
+      ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
+      await ticketRepo.save(ticket);
 
+      if (ticket.serviceQuotationId) {
         // Call billing service to reject invoice
         try {
           const token = sign(
@@ -2276,24 +2383,24 @@ Xerocare Technical Services`;
         } catch (err) {
           logger.error('Failed to reject invoice in billing service:', err);
         }
+      }
 
-        await this.logActivity(
-          ticket.id,
-          'ESTIMATE_FINANCE_REJECTED',
-          `Estimate rejected by Finance. Remarks: ${remarks}`,
-          req.user?.userId,
-        );
+      await this.logActivity(
+        ticket.id,
+        'ESTIMATE_FINANCE_REJECTED',
+        `Estimate rejected by Finance. Remarks: ${remarks}`,
+        req.user?.userId,
+      );
 
-        if (ticket.assignedTechnicianId) {
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: ticket.assignedTechnicianId,
-            title: 'Estimate Rejected by Finance',
-            message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${remarks}. Please revise.`,
-            type: 'TASK',
-            referenceId: ticket.id,
-            referenceType: 'SERVICE',
-          });
-        }
+      if (ticket.assignedTechnicianId) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: ticket.assignedTechnicianId,
+          title: 'Estimate Rejected by Finance',
+          message: `Service estimate for ticket ${ticket.ticketNumber} was rejected by Finance. Reason: ${remarks}. Please revise.`,
+          type: 'TASK',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
       }
 
       res.status(200).json({ success: true, data: estimate });
@@ -2861,15 +2968,41 @@ Xerocare Technical Services`;
       const revision = await revisionRepo.findOne({ where: { id: String(revisionId) } });
       if (!revision) throw new Error('Revision not found');
 
-      revision.status = 'FINANCE_APPROVED';
-      await revisionRepo.save(revision);
-
       const ticketRepo = Source.getRepository(ServiceTicket);
       const ticket = await ticketRepo.findOne({ where: { id: revision.ticketId } });
-      if (ticket) {
-        ticket.status = ServiceTicketStatus.FINANCE_APPROVED_2;
-        await ticketRepo.save(ticket);
+      if (!ticket) throw new AppError('Ticket not found', 404);
+      this.assertFinanceBranchAccess(req, ticket);
+      if (revision.status !== 'WAITING_ADDITIONAL_APPROVAL' || revision.financeDecision) {
+        if (revision.status === 'FINANCE_APPROVED' && revision.financeDecision === 'APPROVED') {
+          return res.status(200).json({ success: true, data: revision });
+        }
+        throw new AppError('This estimate revision is no longer awaiting Finance approval', 409);
       }
+      if (revision.invoiceId) {
+        throw new AppError(
+          'This revision is linked to a Billing quotation and must be approved there',
+          409,
+        );
+      }
+      const latestRevision = await revisionRepo.findOne({
+        where: { ticketId: revision.ticketId },
+        order: { version: 'DESC', revisionNumber: 'DESC', submittedAt: 'DESC' },
+      });
+      if (latestRevision?.id !== revision.id) {
+        throw new AppError('This estimate revision has been superseded', 409);
+      }
+      if (ticket.status !== ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2) {
+        throw new AppError('Ticket is no longer awaiting Finance approval for this revision', 409);
+      }
+
+      revision.status = 'FINANCE_APPROVED';
+      revision.financeDecision = 'APPROVED';
+      revision.financeDecisionBy = req.user?.userId || 'FINANCE';
+      revision.financeDecisionAt = new Date();
+      await revisionRepo.save(revision);
+
+      ticket.status = ServiceTicketStatus.FINANCE_APPROVED_2;
+      await ticketRepo.save(ticket);
 
       await this.logActivity(
         revision.ticketId,
@@ -2879,6 +3012,65 @@ Xerocare Technical Services`;
       );
 
       res.status(200).json({ success: true, data: revision });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * POST /service/estimates/revisions/:revisionId/reject-finance
+   */
+  rejectRevisionFinance = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const revisionId = req.params.revisionId as string;
+      const remarks = typeof req.body?.remarks === 'string' ? req.body.remarks.trim() : '';
+      if (!remarks) throw new AppError('Rejection remarks are required', 400);
+
+      const revisionRepo = Source.getRepository(ServiceEstimateRevision);
+      const revision = await revisionRepo.findOne({ where: { id: String(revisionId) } });
+      if (!revision) throw new AppError('Revision not found', 404);
+
+      const ticketRepo = Source.getRepository(ServiceTicket);
+      const ticket = await ticketRepo.findOne({ where: { id: revision.ticketId } });
+      if (!ticket) throw new AppError('Ticket not found', 404);
+      this.assertFinanceBranchAccess(req, ticket);
+      if (revision.status !== 'WAITING_ADDITIONAL_APPROVAL' || revision.financeDecision) {
+        throw new AppError('This estimate revision is no longer awaiting Finance approval', 409);
+      }
+      if (revision.invoiceId) {
+        throw new AppError(
+          'This revision is linked to a Billing quotation and must be rejected there',
+          409,
+        );
+      }
+      const latestRevision = await revisionRepo.findOne({
+        where: { ticketId: revision.ticketId },
+        order: { version: 'DESC', revisionNumber: 'DESC', submittedAt: 'DESC' },
+      });
+      if (latestRevision?.id !== revision.id) {
+        throw new AppError('This estimate revision has been superseded', 409);
+      }
+      if (ticket.status !== ServiceTicketStatus.WAITING_FINANCE_APPROVAL_2) {
+        throw new AppError('Ticket is no longer awaiting Finance approval for this revision', 409);
+      }
+
+      revision.status = 'REJECTED';
+      revision.financeDecision = 'REJECTED';
+      revision.financeDecisionBy = req.user?.userId || 'FINANCE';
+      revision.financeDecisionAt = new Date();
+      revision.financeDecisionNote = remarks;
+      await revisionRepo.save(revision);
+
+      ticket.status = ServiceTicketStatus.FINANCE_REJECTED;
+      await ticketRepo.save(ticket);
+      await this.logActivity(
+        ticket.id,
+        'ESTIMATE_REVISION_FINANCE_REJECTED',
+        `Estimate revision v${revision.version} rejected by Finance. Remarks: ${remarks}`,
+        req.user?.userId,
+      );
+
+      return res.status(200).json({ success: true, data: revision });
     } catch (error) {
       next(error);
     }

@@ -35,10 +35,20 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 import StatCard from '@/components/StatCard';
 import { getServiceTicketById, ServiceTicket } from '@/lib/serviceTicket';
 import SendDocumentModal from '@/components/SendDocumentModal';
+import PendingServiceEstimateQueue from '@/components/Finance/PendingServiceEstimateQueue';
+import {
+  getFinancePendingServiceEstimates,
+  FinancePendingServiceEstimates,
+} from '@/lib/serviceTicket';
 
 export default function FinanceServiceEstimatesPage() {
   const currency = useBranchCurrency();
   const [estimates, setEstimates] = useState<Invoice[]>([]);
+  const [internalEstimates, setInternalEstimates] = useState<FinancePendingServiceEstimates>({
+    estimates: [],
+    revisions: [],
+  });
+  const [internalQueueError, setInternalQueueError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -86,11 +96,18 @@ export default function FinanceServiceEstimatesPage() {
   const fetchEstimates = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [pending, approved] = await Promise.all([
+      setInternalQueueError(null);
+      const [pending, approved, internalQueue] = await Promise.all([
         getPendingServiceEstimates(),
         getApprovedServiceEstimates().catch(() => []),
+        getFinancePendingServiceEstimates().catch((error) => {
+          console.error('Failed to load internal service estimates:', error);
+          setInternalQueueError('Internal service estimates could not be loaded.');
+          return { estimates: [], revisions: [] };
+        }),
       ]);
       setEstimates(pending || []);
+      setInternalEstimates(internalQueue);
       setApprovedEstimates(
         (approved || []).filter(
           (inv) => inv.billType === 'SERVICE' && inv.status === 'FINANCE_APPROVED',
@@ -210,9 +227,11 @@ export default function FinanceServiceEstimatesPage() {
     );
   }
 
-  const pendingCount = estimates.filter(
-    (e) => e.billType === 'SERVICE' && e.status === 'WAITING_FINANCE_APPROVAL',
-  ).length;
+  const pendingCount =
+    estimates.filter((e) => e.billType === 'SERVICE' && e.status === 'WAITING_FINANCE_APPROVAL')
+      .length +
+    internalEstimates.estimates.length +
+    internalEstimates.revisions.length;
 
   return (
     <main className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
@@ -235,6 +254,17 @@ export default function FinanceServiceEstimatesPage() {
         </div>
       </div>
 
+      {internalQueueError && (
+        <p
+          role="alert"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+        >
+          {internalQueueError} The Billing quotation queue remains available below.
+        </p>
+      )}
+
+      <PendingServiceEstimateQueue data={internalEstimates} onRefresh={() => fetchEstimates()} />
+
       {/* Search and Filters */}
       <div className="bg-card rounded-xl p-4 shadow-sm border border-gray-100">
         <div className="relative max-w-sm">
@@ -255,7 +285,7 @@ export default function FinanceServiceEstimatesPage() {
             <TableHeader className="bg-slate-50/50 border-b border-slate-100">
               <TableRow>
                 <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
-                  ESTIMATE NUMBER
+                  BILLING QUOTATION
                 </TableHead>
                 <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
                   TICKET ID
@@ -282,7 +312,7 @@ export default function FinanceServiceEstimatesPage() {
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-14 text-muted-foreground">
                     <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                    No pending service estimates found.
+                    No Billing quotations are awaiting Finance approval.
                   </TableCell>
                 </TableRow>
               ) : (

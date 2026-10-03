@@ -53,6 +53,11 @@ router.post(
 router.get('/tickets/:id/estimates', controller.getTicketEstimates);
 router.post('/tickets/:id/estimates', controller.createEstimate);
 router.post('/tickets/:id/estimates/submit', controller.submitEstimateForApproval);
+router.get(
+  '/estimates/finance-pending',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.getFinancePendingServiceEstimates,
+);
 router.post(
   '/estimates/:estimateId/approve-finance',
   roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
@@ -84,6 +89,11 @@ router.post(
   '/estimates/revisions/:revisionId/approve-finance',
   roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
   controller.approveRevisionFinance,
+);
+router.post(
+  '/estimates/revisions/:revisionId/reject-finance',
+  roleMiddleware(['FINANCE', 'ADMIN', 'MANAGER']),
+  controller.rejectRevisionFinance,
 );
 router.post(
   '/estimates/revisions/:revisionId/approve-customer',

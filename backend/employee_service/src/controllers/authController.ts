@@ -17,6 +17,7 @@ import {
 } from '../config/cookieOptions';
 import { TrustedDeviceRepository } from '../repositories/trustedDeviceRepository';
 import { hashDeviceToken, generateDeviceToken } from '../utils/deviceToken';
+import { validatePassword } from '../utils/passwordPolicy';
 
 const authService = new AuthService();
 const otpService = new OtpService();
@@ -248,9 +249,16 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
  */
 export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const email = req.body.email.toLowerCase().trim();
-    const otp = String(req.body.otp).trim();
-    const { newPassword } = req.body;
+    const { email: rawEmail, otp: rawOtp, newPassword } = req.body ?? {};
+    if (typeof rawEmail !== 'string' || typeof rawOtp !== 'string') {
+      throw new AppError('Email and OTP are required', 400);
+    }
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) throw new AppError(passwordError, 400);
+
+    const email = rawEmail.toLowerCase().trim();
+    const otp = rawOtp.trim();
+    if (!email || !otp) throw new AppError('Email and OTP are required', 400);
     const currentRefreshToken = req.cookies.refreshToken;
 
     await otpService.verifyOtp(email, otp, OtpPurpose.FORGOT_PASSWORD);

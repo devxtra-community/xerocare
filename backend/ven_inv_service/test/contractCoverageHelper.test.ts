@@ -6,6 +6,7 @@ import {
   coverageForServiceContext,
   inferCatalogPartCategory,
 } from '../src/helpers/contractCoverageHelper';
+import { selectPendingServiceEstimateQueue } from '../src/helpers/financeServiceEstimateQueue';
 
 const itemCovered = (context: string, category: string, name = 'Catalog item'): boolean =>
   coverageAllowsItem(coverageForServiceContext(context), {
@@ -75,4 +76,127 @@ test('resolved contract coverage overrides context defaults', () => {
     travel: false,
   };
   assert.deepEqual(coverageForServiceContext('RENT', customCoverage), customCoverage);
+});
+
+test('Finance queue includes zero and positive customer totals without requiring an invoice', () => {
+  const ticket = {
+    id: 'ticket-1',
+    branchId: 'branch-1',
+    status: 'WAITING_FINANCE_APPROVAL',
+    serviceQuotationId: null,
+  };
+  const { estimates } = selectPendingServiceEstimateQueue(
+    [
+      {
+        id: 'covered',
+        ticketId: ticket.id,
+        ticket,
+        version: 1,
+        created_at: '2026-10-03T10:00:00Z',
+        status: 'WAITING_FINANCE_APPROVAL',
+        totalCost: 0,
+      },
+      {
+        id: 'chargeable',
+        ticketId: 'ticket-2',
+        ticket: { ...ticket, id: 'ticket-2' },
+        version: 1,
+        created_at: '2026-10-03T09:00:00Z',
+        status: 'WAITING_FINANCE_APPROVAL',
+        totalCost: 750,
+      },
+    ],
+    [],
+    { role: 'FINANCE', branchId: 'branch-1' },
+  );
+
+  assert.deepEqual(
+    estimates.map((estimate) => estimate.id),
+    ['covered', 'chargeable'],
+  );
+  assert.equal(estimates[0].totalCost, 0);
+  assert.equal(estimates[1].totalCost, 750);
+});
+
+test('Finance queue excludes wrong status, linked quotations, and out-of-branch estimates', () => {
+  const ticket = {
+    id: 'ticket-1',
+    branchId: 'branch-1',
+    status: 'WAITING_FINANCE_APPROVAL',
+    serviceQuotationId: null,
+  };
+  const candidates = [
+    {
+      id: 'wrong-status',
+      ticketId: ticket.id,
+      ticket,
+      version: 1,
+      created_at: '2026-10-03',
+      status: 'DRAFT',
+      totalCost: 0,
+    },
+    {
+      id: 'linked',
+      ticketId: 'ticket-2',
+      ticket: { ...ticket, id: 'ticket-2', serviceQuotationId: 'invoice-1' },
+      version: 1,
+      created_at: '2026-10-03',
+      status: 'WAITING_FINANCE_APPROVAL',
+      totalCost: 10,
+    },
+    {
+      id: 'wrong-branch',
+      ticketId: 'ticket-3',
+      ticket: { ...ticket, id: 'ticket-3', branchId: 'branch-2' },
+      version: 1,
+      created_at: '2026-10-03',
+      status: 'WAITING_FINANCE_APPROVAL',
+      totalCost: 10,
+    },
+  ];
+  const result = selectPendingServiceEstimateQueue(candidates, [], {
+    role: 'FINANCE',
+    branchId: 'branch-1',
+  });
+  assert.deepEqual(result.estimates, []);
+});
+
+test('Finance queue returns only the newest pending estimate revision per ticket', () => {
+  const ticket = {
+    id: 'ticket-1',
+    branchId: 'branch-1',
+    status: 'WAITING_FINANCE_APPROVAL_2',
+  };
+  const result = selectPendingServiceEstimateQueue(
+    [],
+    [
+      {
+        id: 'rev-1',
+        ticketId: ticket.id,
+        ticket,
+        version: 1,
+        revisionNumber: 1,
+        submittedAt: '2026-10-03T09:00:00Z',
+        status: 'WAITING_ADDITIONAL_APPROVAL',
+        financeDecision: null,
+        invoiceId: null,
+      },
+      {
+        id: 'rev-2',
+        ticketId: ticket.id,
+        ticket,
+        version: 1,
+        revisionNumber: 2,
+        submittedAt: '2026-10-03T10:00:00Z',
+        status: 'WAITING_ADDITIONAL_APPROVAL',
+        financeDecision: null,
+        invoiceId: null,
+      },
+    ],
+    { role: 'FINANCE', branchId: 'branch-1' },
+  );
+  assert.deepEqual(
+    result.revisions.map((revision) => revision.id),
+    ['rev-2'],
+  );
 });
