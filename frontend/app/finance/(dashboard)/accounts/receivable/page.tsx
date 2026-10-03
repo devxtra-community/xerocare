@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Eye,
   FileText,
+  DollarSign,
 } from 'lucide-react';
 import {
   fetchManualReceivables,
@@ -67,6 +68,7 @@ import StatementDialog, {
 } from '@/components/shared/StatementDialog';
 import { BillsDrilldownModal } from '@/components/Finance/BillsDrilldownModal';
 import { BillsMark, AdvancePaymentMark } from '@/components/ui/BrandMarks';
+import { InvoiceAccountView } from '@/components/invoice/InvoiceAccountView';
 
 const AGING_BUCKETS = ['Current', '1-30 days', '31-60 days', '61-90 days', '90+ days'];
 const AGING_COLORS: Record<string, string> = {
@@ -530,6 +532,7 @@ export default function AccountsReceivablePage() {
     contractId: string;
     invoiceNumber: string;
   } | null>(null);
+  const [collectingServiceInvoiceId, setCollectingServiceInvoiceId] = useState<string | null>(null);
 
   const currentUser = getUserFromToken();
   const { data: branches = [] } = useQuery({
@@ -1193,6 +1196,18 @@ export default function AccountsReceivablePage() {
                                 <BillsMark size={22} />
                               </button>
                             )}
+                            {r.isInvoice &&
+                              r.type === 'SERVICE' &&
+                              (r.outstanding ?? 0) > 0.004 && (
+                                <button
+                                  onClick={() => setCollectingServiceInvoiceId(r.id)}
+                                  className={`${ACTION_BTN} hover:bg-emerald-50 hover:ring-1 hover:ring-emerald-200`}
+                                  title="Record service collection for Accounts approval"
+                                  aria-label="Collect service invoice"
+                                >
+                                  <DollarSign className="h-4 w-4 text-emerald-600 transition-colors group-hover:text-emerald-700" />
+                                </button>
+                              )}
                             {!r.isInvoice && (r.outstanding ?? 0) > 0 && (
                               <button
                                 onClick={() => setPayingFor(r as ManualReceivable)}
@@ -1248,6 +1263,18 @@ export default function AccountsReceivablePage() {
               contractId={viewingBillsFor.contractId}
               invoiceNumber={viewingBillsFor.invoiceNumber}
               onClose={() => setViewingBillsFor(null)}
+            />
+          )}
+          {collectingServiceInvoiceId && (
+            <InvoiceAccountView
+              invoiceId={collectingServiceInvoiceId}
+              open
+              gated
+              paymentContext="SERVICE_COMPLETION"
+              onClose={() => {
+                setCollectingServiceInvoiceId(null);
+                refetch();
+              }}
             />
           )}
           {showCustomerPicker && (

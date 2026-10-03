@@ -2137,6 +2137,7 @@ function receiptContextLabel(request: SalePaymentRequest): string | undefined {
     LEASE_PERIODIC: 'Lease — Periodic Collection',
     LEASE_SECURITY_DEPOSIT: 'Lease — Security Deposit',
     SERVICE_VISIT_CHARGE: 'Service — Visit Charge',
+    SERVICE_COMPLETION: 'Service — Completion Payment',
   };
   return map[ctx] ?? ctx.replace(/_/g, ' ');
 }

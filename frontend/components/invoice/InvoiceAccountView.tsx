@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { PaymentSummary, recordPayment, getAccountSummary } from '@/lib/payment';
-import { recordSalePayment } from '@/lib/saleWorkflow';
+import { getSalePaymentsForInvoice, recordSalePayment } from '@/lib/saleWorkflow';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/ui/LoadingButton';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,8 @@ interface InvoiceAccountViewProps {
   /** When true, payment is routed through the Finance approval gate
    * (creates a SalePaymentRequest) instead of posting directly to the ledger. */
   gated?: boolean;
+  /** Optional classification for approval-gated service collections. */
+  paymentContext?: 'SERVICE_COMPLETION';
 }
 
 export function InvoiceAccountView({
@@ -49,6 +51,7 @@ export function InvoiceAccountView({
   onClose,
   open,
   gated = false,
+  paymentContext,
 }: InvoiceAccountViewProps) {
   const currency = useBranchCurrency();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
@@ -72,6 +75,7 @@ export function InvoiceAccountView({
   const [chequeBankName, setChequeBankName] = useState('');
   const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
   const [submitting, setSubmitting] = useState(false);
+  const [pendingApprovalAmount, setPendingApprovalAmount] = useState<number | null>(null);
 
   // Customer bank account + currency (Part 4: pay-from-customer-bank-account,
   // currency defaults from the selected account but stays overridable)
@@ -113,6 +117,25 @@ export function InvoiceAccountView({
     }
   }, [open, invoiceId, fetchSummary]);
 
+  useEffect(() => {
+    if (!open || paymentContext !== 'SERVICE_COMPLETION') return;
+    setPendingApprovalAmount(null);
+    getSalePaymentsForInvoice(invoiceId)
+      .then((payments) =>
+        setPendingApprovalAmount(
+          payments
+            .filter((payment) => payment.status === 'PENDING' && !payment.isSecurityDeposit)
+            .reduce((total, payment) => total + Number(payment.amount || 0), 0),
+        ),
+      )
+      .catch(() => setPendingApprovalAmount(null));
+  }, [open, invoiceId, paymentContext]);
+
+  const collectibleBalance =
+    summary && paymentContext === 'SERVICE_COMPLETION'
+      ? Math.max(0, summary.pendingBalance - (pendingApprovalAmount ?? summary.pendingBalance))
+      : (summary?.pendingBalance ?? 0);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amountPaid || Number(amountPaid) <= 0) {
@@ -146,8 +169,8 @@ export function InvoiceAccountView({
       ? Number(amountPaid) * (exchangeRate as number)
       : Number(amountPaid);
 
-    if (summary && amountInInvoiceCurrency > summary.pendingBalance + 0.01) {
-      toast.error('Amount cannot exceed pending balance');
+    if (summary && amountInInvoiceCurrency > collectibleBalance + 0.01) {
+      toast.error('Amount cannot exceed the balance not already awaiting approval');
       return;
     }
 
@@ -166,6 +189,7 @@ export function InvoiceAccountView({
           paymentDate,
           referenceNumber: referenceNumber || undefined,
           remarks: remarks || undefined,
+          paymentContext,
           chequeNumber: paymentMode === 'CHEQUE' ? chequeNumber : undefined,
           chequeBankName: paymentMode === 'CHEQUE' ? chequeBankName : undefined,
           // dueDate is a deprecated mirror of chequeDate server-side — send the
@@ -189,6 +213,9 @@ export function InvoiceAccountView({
         toast.success('Payment submitted for Finance approval.', {
           description: 'The outstanding balance will update once Finance approves the payment.',
         });
+        if (paymentContext === 'SERVICE_COMPLETION') {
+          setPendingApprovalAmount((current) => (current ?? 0) + amountInInvoiceCurrency);
+        }
       } else {
         await recordPayment({
           invoiceId,
@@ -270,8 +297,13 @@ export function InvoiceAccountView({
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 flex flex-col justify-center">
                 <p className="text-xs font-bold text-orange-600 uppercase">Pending Balance</p>
                 <p className="text-xl font-bold text-orange-700">
-                  {formatCurrency(summary.pendingBalance, invoiceCurrency)}
+                  {formatCurrency(collectibleBalance, invoiceCurrency)}
                 </p>
+                {paymentContext === 'SERVICE_COMPLETION' && (pendingApprovalAmount ?? 0) > 0 && (
+                  <p className="mt-1 text-[11px] text-orange-700">
+                    {formatCurrency(pendingApprovalAmount ?? 0, invoiceCurrency)} awaiting approval
+                  </p>
+                )}
               </div>
             </div>
 
@@ -289,7 +321,7 @@ export function InvoiceAccountView({
             {/* Action Bar */}
             <div className="flex justify-between items-center bg-card border rounded-lg p-3">
               <h3 className="font-bold text-slate-700 px-2">Payment Ledger</h3>
-              {summary.pendingBalance > 0 && (
+              {collectibleBalance > 0 && (
                 <Button onClick={() => setShowForm(!showForm)} className="gap-2 bg-primary">
                   <Plus size={16} /> Record Payment
                 </Button>
@@ -297,7 +329,7 @@ export function InvoiceAccountView({
             </div>
 
             {/* Payment Form */}
-            {showForm && summary.pendingBalance > 0 && (
+            {showForm && collectibleBalance > 0 && (
               <form
                 onSubmit={handleSubmit}
                 className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 animate-in slide-in-from-top-4 duration-200"
@@ -317,7 +349,7 @@ export function InvoiceAccountView({
                       placeholder={
                         paidCurrency && paidCurrency !== invoiceCurrency
                           ? 'Enter amount in the currency paid'
-                          : `Max: ${summary.pendingBalance.toFixed(2)}`
+                          : `Max: ${collectibleBalance.toFixed(2)}`
                       }
                     />
                     {paidCurrency &&

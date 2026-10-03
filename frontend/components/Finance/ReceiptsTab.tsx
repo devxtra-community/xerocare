@@ -315,7 +315,7 @@ const ctxType = (ctx?: string | null): 'SALE' | 'RENT' | 'LEASE' | 'SERVICE' | n
   if (!ctx || ctx === 'SALE') return 'SALE';
   if (ctx.startsWith('RENT')) return 'RENT';
   if (ctx.startsWith('LEASE')) return 'LEASE';
-  if (ctx.startsWith('SERVICE_CONTRACT')) return 'SERVICE';
+  if (ctx.startsWith('SERVICE')) return 'SERVICE';
   return null;
 };
 
@@ -1173,7 +1173,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                   <SelectItem value="SALE">Sale</SelectItem>
                   <SelectItem value="RENT">Rent</SelectItem>
                   <SelectItem value="LEASE">Lease</SelectItem>
-                  <SelectItem value="SERVICE">Service Contract</SelectItem>
+                  <SelectItem value="SERVICE">Service</SelectItem>
                 </SelectContent>
               </Select>
             </div>

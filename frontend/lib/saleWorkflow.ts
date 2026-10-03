@@ -146,7 +146,11 @@ export interface SalePaymentRequest {
     | 'RENT_SECURITY_DEPOSIT'
     | 'LEASE_ADVANCE'
     | 'LEASE_PERIODIC'
-    | 'LEASE_SECURITY_DEPOSIT';
+    | 'LEASE_SECURITY_DEPOSIT'
+    | 'SERVICE_COMPLETION'
+    | 'SERVICE_VISIT_CHARGE'
+    | 'SERVICE_CONTRACT_SIGNING'
+    | 'SERVICE_CONTRACT_INSTALLMENT';
   /** Marks this as a refundable security deposit, not rent/revenue — excluded from
    *  InvoiceLedger and every AR sum; CHEQUE mode routes to GuaranteeCheque, not the
    *  regular Cheque table, on approval. */
@@ -480,7 +484,8 @@ export const recordSalePayment = async (
       | 'LEASE_ADVANCE'
       | 'LEASE_PERIODIC'
       | 'SERVICE_CONTRACT_SIGNING'
-      | 'SERVICE_CONTRACT_INSTALLMENT';
+      | 'SERVICE_CONTRACT_INSTALLMENT'
+      | 'SERVICE_COMPLETION';
     isSecurityDeposit?: boolean;
 
     // ONLINE_PAYMENT only. Card facts, never the PAN or the CVV — and deliberately no
