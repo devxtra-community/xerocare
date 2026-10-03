@@ -73,10 +73,9 @@ export class ServiceTicketItem {
   @Column({ type: 'boolean', default: false })
   isFree!: boolean;
 
-  // Real internal cost — what the business actually spent on this item, even
-  // when it's priced free to the customer (unitPrice/totalPrice above are 0).
-  // For catalog parts, sourced from SparePart.purchase_price; for CUSTOM
-  // (off-catalog) items, technician-entered at diagnosis/estimate time.
+  // Machine/service cost, even when the customer charge above is 0. For
+  // catalog parts this snapshots SparePart.base_price at line creation; for
+  // CUSTOM (off-catalog) items it remains technician-entered.
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   unitCost?: number | null;
 

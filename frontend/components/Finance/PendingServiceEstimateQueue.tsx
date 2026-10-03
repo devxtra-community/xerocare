@@ -397,9 +397,9 @@ export default function PendingServiceEstimateQueue({
                       <TableHead>Part / item</TableHead>
                       <TableHead>Qty</TableHead>
                       <TableHead>Customer charge</TableHead>
-                      <TableHead>Covered value</TableHead>
-                      <TableHead>Internal unit cost</TableHead>
-                      <TableHead>Internal total cost</TableHead>
+                      <TableHead>Selling price / covered value</TableHead>
+                      <TableHead>Machine service unit cost</TableHead>
+                      <TableHead>Machine service cost</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -442,11 +442,11 @@ export default function PendingServiceEstimateQueue({
                 />
                 <Info label="Labour charge" value={formatCurrency(selected.labourCost, currency)} />
                 <Info
-                  label="Parts internal cost"
+                  label="Parts machine service cost"
                   value={formatCurrency(partsInternalCost(selected), currency)}
                 />
                 <Info
-                  label="Covered parts value"
+                  label="Covered selling price"
                   value={formatCurrency(coveredValue(selected), currency)}
                 />
               </div>

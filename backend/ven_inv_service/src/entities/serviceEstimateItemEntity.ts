@@ -70,9 +70,8 @@ export class ServiceEstimateItem {
   @Column({ type: 'boolean', default: true })
   isApproved!: boolean;
 
-  // Real internal cost — mirrors ServiceTicketItem.unitCost/totalCost, carried
-  // onto the estimate (and estimate revisions, via revisionId) so finance can
-  // see true spend even on a zero-price FOC line.
+  // Machine/service cost mirrors ServiceTicketItem.unitCost/totalCost, carried
+  // onto estimates and revisions separately from customer pricing.
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   unitCost?: number | null;
 

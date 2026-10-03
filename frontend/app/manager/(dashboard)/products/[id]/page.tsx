@@ -445,8 +445,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Service & Spend Analytics — real internal cost, works for RENT/LEASE/
-          SALE and external machines alike. Staff-only, never customer-facing. */}
+      {/* Service cost analytics for RENT/LEASE/SALE and external machines. */}
       <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
           Service & Spend History

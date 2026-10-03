@@ -27,7 +27,7 @@ export class ServicePartUsageLog {
   quantityUsed!: number;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
-  unitCost!: number; // Internal cost (even if charged QAR 0 to customer)
+  unitCost!: number; // Catalog selling price snapshot for service cost, even if customer charge is 0
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   totalCost!: number;

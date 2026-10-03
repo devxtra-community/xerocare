@@ -6,9 +6,9 @@ import { formatCurrency } from '@/lib/format';
 import { getMachineAnalytics, MachineAnalytics } from '@/lib/serviceTicket';
 
 /**
- * Real internal spend + service history for one machine, keyed by
+ * Machine service cost + service history for one machine, keyed by
  * serialNumber alone — works for company-owned (RENT/LEASE/SALE) AND
- * external machines never purchased from us. Staff-only: internal cost is
+ * external machines never purchased from us. Staff-only: service cost is
  * never shown on any customer-facing page.
  */
 export default function MachineServiceAnalyticsPanel({
@@ -63,7 +63,7 @@ export default function MachineServiceAnalyticsPanel({
         </div>
         <div className="bg-slate-50 rounded-xl p-3">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-            Parts Spend
+            Parts Service Cost
           </p>
           <p className="text-lg font-bold text-slate-700">
             {formatCurrency(analytics.lifetimePartsCost, currency)}
@@ -71,7 +71,7 @@ export default function MachineServiceAnalyticsPanel({
         </div>
         <div className="bg-slate-50 rounded-xl p-3">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-            Labour Spend
+            Labour Cost
           </p>
           <p className="text-lg font-bold text-slate-700">
             {formatCurrency(analytics.lifetimeLabourCost, currency)}
@@ -79,7 +79,7 @@ export default function MachineServiceAnalyticsPanel({
         </div>
         <div className="bg-amber-50 rounded-xl p-3">
           <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">
-            Lifetime Spend
+            Lifetime Service Cost
           </p>
           <p className="text-lg font-bold text-amber-700">
             {formatCurrency(analytics.lifetimeSpend, currency)}
@@ -95,9 +95,9 @@ export default function MachineServiceAnalyticsPanel({
               <th className="py-2 pr-2">Date</th>
               <th className="py-2 pr-2">Context</th>
               <th className="py-2 pr-2">Parts Used</th>
-              <th className="py-2 pr-2 text-right">Parts Cost</th>
-              <th className="py-2 pr-2 text-right">Labour</th>
-              <th className="py-2 text-right">Total Spend</th>
+              <th className="py-2 pr-2 text-right">Parts Service Cost</th>
+              <th className="py-2 pr-2 text-right">Labour Cost</th>
+              <th className="py-2 text-right">Total Service Cost</th>
             </tr>
           </thead>
           <tbody>

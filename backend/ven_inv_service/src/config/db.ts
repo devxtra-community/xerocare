@@ -943,17 +943,18 @@ export const connectWithRetry = async (initialDelayMs = 2000): Promise<DataSourc
                  "listTotalPrice" = CASE WHEN i."isFree" THEN sp.base_price ELSE i."unitPrice" END * i.quantity
             FROM spare_parts sp
            WHERE i."listUnitPrice" IS NULL AND sp.id = i."sparePartId";
-          -- Recover internal purchase cost for historical catalog lines without
-          -- changing their customer-facing prices or totals.
+          -- Fill only missing service-cost snapshots for older catalog lines.
+          -- Existing stored values are preserved; the service-cost basis is
+          -- the catalog selling price (base_price), not purchase price.
           UPDATE service_ticket_items i
-             SET "unitCost" = sp.purchase_price,
-                 "totalCost" = sp.purchase_price * i.quantity
+             SET "unitCost" = COALESCE(i."unitCost", sp.base_price),
+                 "totalCost" = COALESCE(i."totalCost", COALESCE(i."unitCost", sp.base_price) * i.quantity)
             FROM spare_parts sp
            WHERE i."sparePartId" = sp.id
              AND (i."unitCost" IS NULL OR i."totalCost" IS NULL);
           UPDATE service_estimate_items i
-             SET "unitCost" = sp.purchase_price,
-                 "totalCost" = sp.purchase_price * i.quantity
+             SET "unitCost" = COALESCE(i."unitCost", sp.base_price),
+                 "totalCost" = COALESCE(i."totalCost", COALESCE(i."unitCost", sp.base_price) * i.quantity)
             FROM spare_parts sp
            WHERE i."sparePartId" = sp.id
              AND (i."unitCost" IS NULL OR i."totalCost" IS NULL);

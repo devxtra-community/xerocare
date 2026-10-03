@@ -761,7 +761,7 @@ function LifecycleTab({
               value: mh.lastServiceDate ? formatDate(mh.lastServiceDate) : '—',
             },
             {
-              label: 'Parts Spend',
+              label: 'Parts Service Cost',
               value: Number(mh.totalPartsSpend).toLocaleString(undefined, {
                 minimumFractionDigits: 2,
               }),
@@ -773,7 +773,7 @@ function LifecycleTab({
               }),
             },
             {
-              label: 'Lifetime Cost',
+              label: 'Lifetime Service Cost',
               value: Number(mh.totalLifetimeCost).toLocaleString(undefined, {
                 minimumFractionDigits: 2,
               }),

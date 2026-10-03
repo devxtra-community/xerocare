@@ -71,6 +71,7 @@ import {
 import { deleteCached } from '../utils/cacheUtil';
 import { randomBytes } from 'crypto';
 import { recordMeterReading, totalFromCounters } from '../helpers/meterReadingHelper';
+import { calculateCatalogServicePartCost } from '../helpers/servicePartCost';
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET;
 if (!ACCESS_SECRET) {
@@ -1742,7 +1743,7 @@ Xerocare Technical Services`;
               partCategory = part.part_category || null;
               partBrand = part.brand || null;
               mpn = part.mpn || null;
-              unitCost = Number(part.purchase_price) || 0;
+              unitCost = calculateCatalogServicePartCost(part.base_price, 1).unitCost;
 
               // Check stock warnings
               if (part.quantity <= 5) {
@@ -1785,7 +1786,7 @@ Xerocare Technical Services`;
             totalPrice: finalPrice * quantity,
             isFree: isItemFree,
             unitCost,
-            totalCost: unitCost * quantity,
+            totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
             listUnitPrice: unitPrice,
             listTotalPrice: unitPrice * quantity,
           });
@@ -1897,7 +1898,7 @@ Xerocare Technical Services`;
         );
 
         // Billing receives customer-chargeable lines only. Covered lines and
-        // their internal costs remain on the service estimate for Finance.
+        // their machine service costs remain on the service estimate for Finance.
         const billingItems = ticketItems
           .filter((item) => !item.isFree)
           .map((item) => ({
@@ -2077,7 +2078,7 @@ Xerocare Technical Services`;
               if (basePrice === 0) {
                 basePrice = Number(part.base_price) || 0;
               }
-              unitCost = Number(part.purchase_price) || 0;
+              unitCost = calculateCatalogServicePartCost(part.base_price, 1).unitCost;
             }
           } else {
             unitCost = Number(it.customPartCost) || 0;
@@ -2109,7 +2110,7 @@ Xerocare Technical Services`;
             isFree: isItemFree,
             isApproved: true,
             unitCost,
-            totalCost: unitCost * quantity,
+            totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
             listUnitPrice: basePrice,
             listTotalPrice: basePrice * quantity,
           });
@@ -2872,7 +2873,7 @@ Xerocare Technical Services`;
               if (basePrice === 0) {
                 basePrice = Number(part.base_price) || 0;
               }
-              unitCost = Number(part.purchase_price) || 0;
+              unitCost = calculateCatalogServicePartCost(part.base_price, 1).unitCost;
             }
           } else {
             unitCost = Number(it.customPartCost) || 0;
@@ -2903,7 +2904,7 @@ Xerocare Technical Services`;
             isFree: isItemFree,
             isApproved: false,
             unitCost,
-            totalCost: unitCost * quantity,
+            totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
             listUnitPrice: basePrice,
             listTotalPrice: basePrice * quantity,
           });
@@ -3470,7 +3471,7 @@ Xerocare Technical Services`;
         // Prefer the cost captured at diagnosis/estimate time (covers CUSTOM
         // items, which have no catalog price to re-derive here) — only fall
         // back to a fresh SparePart lookup for items that predate that column.
-        let purchaseCost = item.unitCost != null ? Number(item.unitCost) || 0 : 0;
+        let serviceUnitCost = item.unitCost != null ? Number(item.unitCost) || 0 : 0;
         let partNameForLog = item.partName || '';
         let skuForLog = item.sku || '';
         let catalogPartCategory: string | null = null;
@@ -3479,7 +3480,11 @@ Xerocare Technical Services`;
             where: { id: String(item.sparePartId) },
           });
           if (partDetails) {
-            if (item.unitCost == null) purchaseCost = Number(partDetails.purchase_price) || 0;
+            // Legacy rows without a stored service-cost snapshot use the
+            // catalog selling price at completion. Existing snapshots win.
+            if (item.unitCost == null) {
+              serviceUnitCost = calculateCatalogServicePartCost(partDetails.base_price, 1).unitCost;
+            }
             partNameForLog = partDetails.part_name;
             skuForLog = partDetails.sku;
             catalogPartCategory = partDetails.part_category || null;
@@ -3487,7 +3492,10 @@ Xerocare Technical Services`;
         }
         const isConsumableItem = this.isConsumable(partNameForLog, skuForLog, catalogPartCategory);
 
-        const itemCost = purchaseCost * item.quantity;
+        const itemCost =
+          item.totalCost != null
+            ? Number(item.totalCost) || 0
+            : calculateCatalogServicePartCost(serviceUnitCost, item.quantity).totalCost;
         totalPartsCostInternal += itemCost;
 
         // Yield page calculation for consumables if replaced
@@ -3536,7 +3544,7 @@ Xerocare Technical Services`;
             sku: skuForLog,
             partName: partNameForLog,
             quantityUsed: item.quantity,
-            unitCost: purchaseCost,
+            unitCost: serviceUnitCost,
             totalCost: itemCost,
             replacedAt: new Date(),
             calculatedYield: yieldPages || null,
@@ -7420,7 +7428,7 @@ For queries contact us at +974 4455 6677`;
       const newTicketItems = items.map((it: ReviseEstimateItem) => {
         const part = it.sparePartId ? revisePartsById.get(it.sparePartId) : undefined;
         const quantity = Number(it.quantity) || 1;
-        let unitCost = part ? Number(part.purchase_price) || 0 : 0;
+        let unitCost = part ? calculateCatalogServicePartCost(part.base_price, 1).unitCost : 0;
         if (!part) {
           unitCost = Number(it.customPartCost) || 0;
           reviseHasCustomItem = true;
@@ -7438,7 +7446,7 @@ For queries contact us at +974 4455 6677`;
           totalPrice: quantity * (Number(it.unitPrice) || 0),
           isFree: !!it.isFree,
           unitCost,
-          totalCost: unitCost * quantity,
+          totalCost: calculateCatalogServicePartCost(unitCost, quantity).totalCost,
           listUnitPrice: Number(it.unitPrice) || Number(part?.base_price) || 0,
           listTotalPrice: quantity * (Number(it.unitPrice) || Number(part?.base_price) || 0),
         });

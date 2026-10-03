@@ -4601,7 +4601,7 @@ export default function ServiceDashboardPage() {
                             </div>
                             <div>
                               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
-                                Internal Cost (what we paid)
+                                Custom Service Cost (what we paid)
                               </label>
                               <Input
                                 type="number"
@@ -4623,9 +4623,9 @@ export default function ServiceDashboardPage() {
                           <p className="text-[10px] text-slate-400 flex items-center gap-1">
                             <Info className="size-3 shrink-0" />
                             Brand and Model Name are pre-filled from the machine on this ticket —
-                            edit if the part differs. Internal cost is never shown to the customer —
-                            it&apos;s tracked so we know what off-catalog parts actually cost us,
-                            and flags the branch manager to consider stocking it via RFQ.
+                            edit if the part differs. This cost applies to off-catalog parts and is
+                            never shown to the customer; it flags the branch manager to consider
+                            stocking the part via RFQ.
                           </p>
                         </div>
                       )}
@@ -5672,13 +5672,13 @@ export default function ServiceDashboardPage() {
                                   Qty
                                 </TableHead>
                                 <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
-                                  Unit Price
+                                  Selling Price
                                 </TableHead>
                                 <TableHead className="h-8 text-[10px] font-bold text-slate-500 py-1 text-right px-2">
-                                  Total
+                                  Customer Charge
                                 </TableHead>
                                 <TableHead className="h-8 text-[10px] font-bold text-amber-600 py-1 text-right px-2">
-                                  Internal Cost
+                                  Machine Service Cost
                                 </TableHead>
                               </TableRow>
                             </TableHeader>
@@ -5693,9 +5693,12 @@ export default function ServiceDashboardPage() {
                                   </TableCell>
                                   <TableCell className="py-1 px-2 text-xs text-slate-600 text-right">
                                     {getActiveCurrency()}{' '}
-                                    {item.unitPrice.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                    })}
+                                    {Number(item.listUnitPrice ?? item.unitPrice).toLocaleString(
+                                      undefined,
+                                      {
+                                        minimumFractionDigits: 2,
+                                      },
+                                    )}
                                   </TableCell>
                                   <TableCell className="py-1 px-2 text-xs font-bold text-slate-700 text-right">
                                     {item.isFree ? (
@@ -5718,8 +5721,9 @@ export default function ServiceDashboardPage() {
                           </Table>
                         </div>
                         <p className="text-[10px] text-slate-400 mt-1">
-                          Internal Cost is what we actually spent — staff view only, never shown to
-                          the customer.
+                          Machine Service Cost uses the catalog selling price captured when the part
+                          was added; customer charges remain separate and may be zero for covered
+                          parts.
                         </p>
                       </div>
                     )}

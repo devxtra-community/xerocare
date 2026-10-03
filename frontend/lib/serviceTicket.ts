@@ -37,10 +37,10 @@ export interface ServiceTicketItem {
   unitPrice: number;
   totalPrice: number;
   isFree: boolean;
-  /** Real internal cost, even when unitPrice/totalPrice are 0 (FOC). Internal-only — never shown to the customer. */
+  /** Machine service cost captured from catalog selling price, even when customer charge is 0 (FOC). */
   unitCost?: number | null;
   totalCost?: number | null;
-  /** Catalog price before coverage — the part's value on a covered (0-charge) line. Never totalled. */
+  /** Catalog selling price before coverage — retained separately from the customer charge. */
   listUnitPrice?: number | null;
   listTotalPrice?: number | null;
 }
