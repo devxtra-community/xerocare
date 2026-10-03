@@ -177,7 +177,22 @@ export default function InstallationRequestsPage() {
     setActionLoading(id);
     try {
       const updated = await startInstallation(id);
-      setRequests((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      // The start endpoint returns the installation row without the deposit details
+      // added by GET /installation-requests. Keep those fields from the enriched row
+      // so the outstanding deposit action remains available throughout the job.
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                ...updated,
+                securityDepositAmount: r.securityDepositAmount,
+                securityDepositCollected: r.securityDepositCollected,
+                securityDepositStatus: r.securityDepositStatus,
+              }
+            : r,
+        ),
+      );
       toast.success('Installation started');
     } catch (err) {
       toast.error('Failed to start', { description: getApiErrorMessage(err) });
@@ -190,7 +205,22 @@ export default function InstallationRequestsPage() {
     setActionLoading(id);
     try {
       const updated = await stopInstallation(id, readings);
-      setRequests((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      // Like the start endpoint, stop returns the bare installation row. Preserve
+      // the GET response's deposit enrichment so an uncollected deposit can still
+      // be collected after the technician records the initial meter readings.
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                ...updated,
+                securityDepositAmount: r.securityDepositAmount,
+                securityDepositCollected: r.securityDepositCollected,
+                securityDepositStatus: r.securityDepositStatus,
+              }
+            : r,
+        ),
+      );
       setLiveTimers((prev) => {
         const t = { ...prev };
         delete t[id];
