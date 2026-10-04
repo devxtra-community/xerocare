@@ -8,6 +8,7 @@ import { Source } from '../config/dataSource';
 import { ContractStatus } from '../entities/enums/contractStatus';
 import { AppError } from '../errors/appError';
 import { logger } from '../config/logger';
+import { InstallationRequest } from '../entities/installationRequestEntity';
 
 /**
  * Folds a post-query adjustment (credit exchange, return) into the per-branch
@@ -336,6 +337,42 @@ export class BillingReportService {
    */
   async getCollectionAlerts(branchId: string) {
     const activeContracts = await this.invoiceRepo.findActiveContracts(branchId);
+    const finalInvoices = await this.invoiceRepo.findUnpaidFinalInvoices(branchId);
+    const rentLeaseIds = [
+      ...new Set([
+        ...[...activeContracts, ...finalInvoices]
+          .filter((invoice) => invoice.saleType === 'RENT' || invoice.saleType === 'LEASE')
+          .map((invoice) => invoice.id),
+        ...finalInvoices
+          .filter((invoice) => invoice.saleType === 'RENT' || invoice.saleType === 'LEASE')
+          .map((invoice) => invoice.referenceContractId)
+          .filter((id): id is string => !!id),
+      ]),
+    ];
+
+    // Rent/Lease billing starts only after the technician has delivered the machine,
+    // completed the installation job, and recorded the initial meter reading. Without
+    // this gate, contracts appeared in Finance Monthly Collections as soon as they were
+    // activated, before there was a delivered machine or a valid starting reading.
+    const eligibleRentLeaseIds = new Set<string>();
+    if (rentLeaseIds.length > 0) {
+      const completedInstallations = await Source.getRepository(InstallationRequest)
+        .createQueryBuilder('installation')
+        .select('installation.invoiceId', 'invoiceId')
+        .where('installation.invoiceId IN (:...invoiceIds)', { invoiceIds: rentLeaseIds })
+        .andWhere('installation.status = :status', { status: 'COMPLETED' })
+        .andWhere('installation.initialReadingEnteredAt IS NOT NULL')
+        .getRawMany<{ invoiceId: string }>();
+      completedInstallations.forEach((installation) =>
+        eligibleRentLeaseIds.add(installation.invoiceId),
+      );
+    }
+
+    const collectionEligibleContracts = activeContracts.filter(
+      (contract) =>
+        (contract.saleType !== 'RENT' && contract.saleType !== 'LEASE') ||
+        eligibleRentLeaseIds.has(contract.id),
+    );
     const alerts: Array<{
       contractId: string;
       customerId: string;
@@ -367,7 +404,7 @@ export class BillingReportService {
       };
     }> = [];
 
-    for (const contract of activeContracts) {
+    for (const contract of collectionEligibleContracts) {
       if (!contract.effectiveFrom) continue;
 
       const history = await this.usageRepo.getUsageHistory(contract.id);
@@ -441,8 +478,14 @@ export class BillingReportService {
       });
     }
 
-    const finalInvoices = await this.invoiceRepo.findUnpaidFinalInvoices(branchId);
     for (const inv of finalInvoices) {
+      if (
+        (inv.saleType === 'RENT' || inv.saleType === 'LEASE') &&
+        !eligibleRentLeaseIds.has(inv.id) &&
+        (!inv.referenceContractId || !eligibleRentLeaseIds.has(inv.referenceContractId))
+      ) {
+        continue;
+      }
       alerts.push({
         contractId: inv.id,
         customerId: inv.customerId || '',
