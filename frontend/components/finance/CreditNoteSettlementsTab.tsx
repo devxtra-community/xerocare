@@ -16,6 +16,8 @@ import {
 } from '@/lib/finance/accountsApi';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -310,6 +312,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
     () => rows.filter((r) => statusFilter === 'ALL' || r.approvalStatus === statusFilter),
     [rows, statusFilter],
   );
+  const paging = useTablePagination(filtered, statusFilter);
   const pendingCount = rows.filter((r) => r.approvalStatus === 'PENDING').length;
 
   return (
@@ -374,7 +377,7 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((r) => {
+                paging.pageRows.map((r) => {
                   const chip = statusChip(r);
                   const canSettle =
                     r.approvalStatus === 'APPROVED' && r.settlementStatus !== 'SETTLED';
@@ -477,6 +480,15 @@ export default function CreditNoteSettlementsTab({ branchIds }: { branchIds?: st
             </TableBody>
           </Table>
         </div>
+        {!isLoading && filtered.length > 0 && (
+          <Pagination
+            page={paging.page}
+            totalPages={paging.totalPages}
+            total={paging.total}
+            limit={paging.pageSize}
+            onPageChange={paging.setPage}
+          />
+        )}
       </div>
 
       {settling && (

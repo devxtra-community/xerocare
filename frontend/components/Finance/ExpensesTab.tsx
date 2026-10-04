@@ -26,6 +26,8 @@ import { expenseCategoryLabel, expenseCategoryOptions } from '@/lib/finance/expe
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -240,6 +242,12 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
     });
   }, [expenseRequests, statusFilter, categoryFilter, roleFilter, dateFrom, dateTo, search]);
 
+  const ownExpensePaging = useTablePagination(ownExpenses, branchIds ?? '');
+  const requestPaging = useTablePagination(
+    filtered,
+    `${statusFilter}|${categoryFilter}|${roleFilter}|${dateFrom}|${dateTo}|${search}`,
+  );
+
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ['expense-requests-fm'] });
     qc.invalidateQueries({ queryKey: ['expense-requests-summary'] });
@@ -405,7 +413,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ownExpenses.map((e) => (
+              {ownExpensePaging.pageRows.map((e) => (
                 <TableRow key={e.id}>
                   <TableCell className="pl-4 text-xs font-semibold text-slate-600">
                     {new Date(e.date).toLocaleDateString('en-GB')}
@@ -458,6 +466,15 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
             </TableBody>
           </Table>
         )}
+        {!loadingOwn && ownExpenses.length > 0 && (
+          <Pagination
+            page={ownExpensePaging.page}
+            totalPages={ownExpensePaging.totalPages}
+            total={ownExpensePaging.total}
+            limit={ownExpensePaging.pageSize}
+            onPageChange={ownExpensePaging.setPage}
+          />
+        )}
       </div>
 
       {/* Table */}
@@ -508,7 +525,7 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((r) => {
+                requestPaging.pageRows.map((r) => {
                   const cfg = STATUS_CONFIG[r.status] ?? STATUS_CONFIG.PENDING;
                   return (
                     <TableRow key={r.id} className="hover:bg-blue-50/50 transition-colors">
@@ -604,6 +621,15 @@ export default function ExpensesTab({ branchIds }: { branchIds?: string } = {}) 
               )}
             </TableBody>
           </Table>
+        )}
+        {!isLoading && filtered.length > 0 && (
+          <Pagination
+            page={requestPaging.page}
+            totalPages={requestPaging.totalPages}
+            total={requestPaging.total}
+            limit={requestPaging.pageSize}
+            onPageChange={requestPaging.setPage}
+          />
         )}
       </div>
 

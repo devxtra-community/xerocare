@@ -27,6 +27,8 @@ import { ViewApproveModal } from '@/components/expenses/EmployeeRequestsTab';
 import { formatCurrency } from '@/lib/format';
 import StatCard from '@/components/StatCard';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -259,6 +261,13 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
     });
   }, [purchaseRequests, reqStatusFilter, dateFrom, dateTo, search]);
 
+  const requestPaging = useTablePagination(
+    filteredRequests,
+    `${reqStatusFilter}|${dateFrom}|${dateTo}|${search}`,
+  );
+  const chequePaging = useTablePagination(issuedCheques, JSON.stringify(chequeParams));
+  const refundPaging = useTablePagination(customerRefunds, branchIds ?? '');
+
   const showRequests = sourceFilter === 'ALL' || sourceFilter === 'REQUESTS';
   const showCheques = sourceFilter === 'ALL' || sourceFilter === 'CHEQUES';
 
@@ -416,7 +425,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRequests.map((r) => {
+                  requestPaging.pageRows.map((r) => {
                     const cfg = REQ_STATUS_CONFIG[r.status] ?? REQ_STATUS_CONFIG.PENDING;
                     const isChequeMode = (r.paymentMode ?? '').toLowerCase() === 'cheque';
                     return (
@@ -517,6 +526,15 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
               </TableBody>
             </Table>
           )}
+          {!reqLoading && filteredRequests.length > 0 && (
+            <Pagination
+              page={requestPaging.page}
+              totalPages={requestPaging.totalPages}
+              total={requestPaging.total}
+              limit={requestPaging.pageSize}
+              onPageChange={requestPaging.setPage}
+            />
+          )}
         </div>
       )}
 
@@ -559,7 +577,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                       </td>
                     </tr>
                   ) : (
-                    issuedCheques.map((c) => {
+                    chequePaging.pageRows.map((c) => {
                       const isOverdue =
                         new Date(c.dueDate) < new Date() &&
                         ['PENDING', 'ISSUED'].includes(c.status);
@@ -647,6 +665,15 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
               </table>
             </div>
           )}
+          {!chequeLoading && issuedCheques.length > 0 && (
+            <Pagination
+              page={chequePaging.page}
+              totalPages={chequePaging.totalPages}
+              total={chequePaging.total}
+              limit={chequePaging.pageSize}
+              onPageChange={chequePaging.setPage}
+            />
+          )}
         </div>
       )}
 
@@ -695,7 +722,7 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
                   </TableCell>
                 </TableRow>
               ) : (
-                customerRefunds.map((r) => {
+                refundPaging.pageRows.map((r) => {
                   const statusColor =
                     r.status === 'PAID'
                       ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
@@ -741,6 +768,15 @@ export default function PaymentsTab({ branchIds }: { branchIds?: string } = {}) 
               )}
             </TableBody>
           </Table>
+        )}
+        {!refundLoading && customerRefunds.length > 0 && (
+          <Pagination
+            page={refundPaging.page}
+            totalPages={refundPaging.totalPages}
+            total={refundPaging.total}
+            limit={refundPaging.pageSize}
+            onPageChange={refundPaging.setPage}
+          />
         )}
       </div>
 

@@ -4,6 +4,7 @@
  */
 
 import api from '../api';
+import { getCustomerById } from '../customer';
 
 const BASE = '/b/accounts';
 
@@ -2255,7 +2256,55 @@ export const getOutputTax = (filters: TaxReportFilters = {}) =>
       success: boolean;
       data: OutputTaxResponse;
     }>(`${BASE}/tax/output`, { params: filters })
-    .then((r) => r.data.data);
+    .then(async (r) => {
+      const report = r.data.data;
+      const customersNeedingLocation = [
+        ...new Set(
+          report.rows
+            .filter(
+              (row) =>
+                row.customerId &&
+                (!row.customerCountry || !row.customerStateProvince || !row.customerCity),
+            )
+            .map((row) => row.customerId as string),
+        ),
+      ];
+      const customerLocations = new Map<
+        string,
+        { country?: string | null; stateProvince?: string | null; city?: string | null }
+      >();
+
+      await Promise.all(
+        customersNeedingLocation.map(async (customerId) => {
+          try {
+            const customer = await getCustomerById(customerId);
+            customerLocations.set(customerId, {
+              country: customer.country,
+              stateProvince: customer.stateProvince,
+              city: customer.city,
+            });
+          } catch {
+            // Keep the invoice snapshot when a customer has since been removed or
+            // the CRM service is temporarily unavailable.
+          }
+        }),
+      );
+
+      return {
+        ...report,
+        rows: report.rows.map((row) => {
+          if (!row.customerId) return row;
+          const location = customerLocations.get(row.customerId);
+          if (!location) return row;
+          return {
+            ...row,
+            customerCountry: row.customerCountry || location.country || undefined,
+            customerStateProvince: row.customerStateProvince || location.stateProvince || undefined,
+            customerCity: row.customerCity || location.city || undefined,
+          };
+        }),
+      };
+    });
 
 export const getInputTaxLocal = (filters: TaxReportFilters = {}) =>
   api

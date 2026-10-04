@@ -1114,9 +1114,9 @@ export default function AccountsPayablePage() {
     .reduce((s, p) => s + Number(p.outstanding ?? 0), 0);
 
   const payCharts = useMemo(() => {
-    // Charts describe the vendor liability, so they read the same filtered set the
-    // totals do — a tax row in "Top vendors" would name a tax as if it were a supplier
-    // we owe money to.
+    // Type/vendor charts show payables incurred, including amounts already settled,
+    // matching the monthly chart. AP aging below remains based on outstanding balances.
+    // A tax row in "Top vendors" would name a tax as if it were a supplier we owe money to.
     // An approved purchase cost is already inside its purchase order's amount, so
     // charting it again would count that spend twice.
     const chartRows = allPayables.filter(
@@ -1124,7 +1124,7 @@ export default function AccountsPayablePage() {
     );
     const typeMap: Record<string, number> = {};
     chartRows.forEach((p) => {
-      typeMap[p.type] = (typeMap[p.type] ?? 0) + (p.outstanding ?? 0);
+      typeMap[p.type] = (typeMap[p.type] ?? 0) + (Number(p.amount) || 0);
     });
     const byType = Object.entries(typeMap)
       .map(([name, value]) => ({ name: name.replace(/_/g, ' '), value }))
@@ -1133,7 +1133,7 @@ export default function AccountsPayablePage() {
     const vendorMap: Record<string, number> = {};
     chartRows.forEach((p) => {
       if (!p.payableTo) return;
-      vendorMap[p.payableTo] = (vendorMap[p.payableTo] ?? 0) + (p.outstanding ?? 0);
+      vendorMap[p.payableTo] = (vendorMap[p.payableTo] ?? 0) + (Number(p.amount) || 0);
     });
     const topVendors = Object.entries(vendorMap)
       .map(([name, value]) => ({ name, value }))
@@ -1369,7 +1369,7 @@ export default function AccountsPayablePage() {
                 <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      AP Aging Analysis
+                      AP Aging Analysis (Outstanding)
                     </h4>
                     <SimpleBarChart
                       data={agingTotals}
@@ -1381,13 +1381,13 @@ export default function AccountsPayablePage() {
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      Payable by Type
+                      Payable by Type (Total)
                     </h4>
                     <DonutChart data={payCharts?.byType ?? []} height={200} currency={currency} />
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">
-                      Top 5 Vendors
+                      Top 5 Vendors (Total)
                     </h4>
                     <HorizontalBarChart
                       data={payCharts?.topVendors ?? []}
