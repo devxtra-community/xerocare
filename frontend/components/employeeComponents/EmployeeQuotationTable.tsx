@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { getUserFromToken } from '@/lib/auth';
 import { EmployeeJob } from '@/lib/employeeJob';
 import StatCard from '@/components/StatCard';
@@ -306,6 +306,8 @@ const safeFormatDate = (
 export default function EmployeeQuotationTable() {
   const currency = useBranchCurrency();
   const [quotations, setQuotations] = useState<Invoice[]>([]);
+  const [sendingQuotationIds, setSendingQuotationIds] = useState<Set<string>>(new Set());
+  const sendingQuotationIdsRef = useRef(new Set<string>());
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -831,14 +833,25 @@ export default function EmployeeQuotationTable() {
   };
 
   const handleSendToFinance = async (id: string) => {
+    if (sendingQuotationIdsRef.current.has(id)) return;
+    sendingQuotationIdsRef.current.add(id);
+    setSendingQuotationIds((prev) => new Set(prev).add(id));
     try {
-      await employeeApproveInvoice(id);
+      const updated = await employeeApproveInvoice(id);
+      setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, ...updated } : q)));
+      setSelectedQ((prev) => (prev?.id === id ? { ...prev, ...updated } : prev));
       toast.success('Quotation sent to Finance team!');
       setViewOpen(false);
-      fetchQuotations();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       toast.error(err.response?.data?.message || 'Failed to send to finance.');
+    } finally {
+      sendingQuotationIdsRef.current.delete(id);
+      setSendingQuotationIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -1117,11 +1130,25 @@ export default function EmployeeQuotationTable() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-70"
                             onClick={() => handleSendToFinance(q.id)}
-                            title="Send to Finance"
+                            disabled={sendingQuotationIds.has(q.id)}
+                            title={
+                              sendingQuotationIds.has(q.id)
+                                ? 'Sending to Finance…'
+                                : 'Send to Finance'
+                            }
+                            aria-label={
+                              sendingQuotationIds.has(q.id)
+                                ? 'Sending to Finance'
+                                : 'Send to Finance'
+                            }
                           >
-                            <Send className="h-4 w-4" />
+                            {sendingQuotationIds.has(q.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
                           </Button>
                         )}
                         {q.status === 'ASSIGNED' && (

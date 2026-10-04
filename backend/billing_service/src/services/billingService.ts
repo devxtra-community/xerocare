@@ -1547,54 +1547,64 @@ export class BillingService {
       InvoiceStatus.EMPLOYEE_APPROVED,
     );
 
-    // Notify Finance Staff
-    if (invoice.branchId) {
+    // Notification delivery performs CRM/employee lookups and waits for RabbitMQ.
+    // The status and audit record are already saved, so keep the send action responsive
+    // by delivering these best-effort notifications without holding up the API response.
+    void (async () => {
+      // Notify Finance Staff
+      if (invoice.branchId) {
+        try {
+          const { NotificationPublisher } =
+            await import('../events/publisher/notificationPublisher');
+          const { QUOTATION_SUBMITTED } = await import('../constants/notificationTypes');
+          const { getFinanceEmployeesByBranch, getCustomerName } = await import('./billingHelpers');
+
+          const [customerName, financeIds] = await Promise.all([
+            getCustomerName(invoice.customerId),
+            getFinanceEmployeesByBranch(invoice.branchId),
+          ]);
+
+          await Promise.all(
+            financeIds.map(async (financeId) => {
+              try {
+                await NotificationPublisher.publishInAppRequest({
+                  recipientId: financeId,
+                  title: 'Quotation Submitted for Review',
+                  message: `A quotation [${invoice.invoiceNumber}] for ${customerName} has been submitted for review. Please check details and approve/reject.`,
+                  type: QUOTATION_SUBMITTED,
+                  referenceId: invoice.id,
+                  referenceType: 'QUOTATION',
+                });
+              } catch (err) {
+                logger.error(
+                  `Failed to publish quotation submit notification to finance employee ${financeId}`,
+                  err,
+                );
+              }
+            }),
+          );
+        } catch (err) {
+          logger.error('Failed to notify finance staff about quotation submission', err);
+        }
+      }
+
+      // Notify Submitting Employee
       try {
         const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
         const { QUOTATION_SUBMITTED } = await import('../constants/notificationTypes');
-        const { getFinanceEmployeesByBranch, getCustomerName } = await import('./billingHelpers');
 
-        const customerName = await getCustomerName(invoice.customerId);
-        const financeIds = await getFinanceEmployeesByBranch(invoice.branchId);
-
-        for (const financeId of financeIds) {
-          try {
-            await NotificationPublisher.publishInAppRequest({
-              recipientId: financeId,
-              title: 'Quotation Submitted for Review',
-              message: `A quotation [${invoice.invoiceNumber}] for ${customerName} has been submitted for review. Please check details and approve/reject.`,
-              type: QUOTATION_SUBMITTED,
-              referenceId: invoice.id,
-              referenceType: 'QUOTATION',
-            });
-          } catch (err) {
-            logger.error(
-              `Failed to publish quotation submit notification to finance employee ${financeId}`,
-              err,
-            );
-          }
-        }
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: userId,
+          title: 'Quotation Submitted',
+          message: `Your quotation [${invoice.invoiceNumber}] has been submitted for finance review.`,
+          type: QUOTATION_SUBMITTED,
+          referenceId: invoice.id,
+          referenceType: 'QUOTATION',
+        });
       } catch (err) {
-        logger.error('Failed to notify finance staff about quotation submission', err);
+        logger.error('Failed to publish quotation submit confirmation to submitting employee', err);
       }
-    }
-
-    // Notify Submitting Employee
-    try {
-      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
-      const { QUOTATION_SUBMITTED } = await import('../constants/notificationTypes');
-
-      await NotificationPublisher.publishInAppRequest({
-        recipientId: userId,
-        title: 'Quotation Submitted',
-        message: `Your quotation [${invoice.invoiceNumber}] has been submitted for finance review.`,
-        type: QUOTATION_SUBMITTED,
-        referenceId: invoice.id,
-        referenceType: 'QUOTATION',
-      });
-    } catch (err) {
-      logger.error('Failed to publish quotation submit confirmation to submitting employee', err);
-    }
+    })();
 
     return saved;
   }
