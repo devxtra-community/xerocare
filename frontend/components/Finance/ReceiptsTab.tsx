@@ -100,6 +100,8 @@ import {
 import { SalePaymentReceiptView } from '@/components/finance/SalePaymentReceiptView';
 import { formatCurrency, autoReferencePreview } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 
 /**
  * Modes whose money lands in a real cash or bank account, so approval must be told
@@ -109,6 +111,10 @@ import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
 const MODES_NEEDING_ACCOUNT = ['CASH', 'BANK_TRANSFER', 'ONLINE_PAYMENT'];
 
 type FilterTab = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL' | 'CUSTOMERS';
+type ReceiptPageRow =
+  | { kind: 'pending-estimate'; invoice: Invoice }
+  | { kind: 'accepted-estimate'; invoice: Invoice }
+  | { kind: 'payment'; payment: SalePaymentRequest };
 
 // ─── Customer Cheques (Received) Section ──────────────────────────────────────
 function CustomerChequesSection({ branchIds }: { branchIds?: string }) {
@@ -972,6 +978,50 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [payments]);
 
+  const filteredCustomerGroups = useMemo(
+    () =>
+      customerGroups.filter(
+        (group) => !search || group.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [customerGroups, search],
+  );
+
+  const paginationResetKey = [
+    tab,
+    search,
+    typeFilter,
+    modeFilter,
+    depositFilter,
+    dateFrom,
+    dateTo,
+    employeeFilter,
+  ].join('|');
+  const receiptRows = useMemo<ReceiptPageRow[]>(
+    () =>
+      tab === 'PENDING'
+        ? [
+            ...pendingEstimates.map((invoice) => ({ kind: 'pending-estimate' as const, invoice })),
+            ...acceptedEstimates.map((invoice) => ({
+              kind: 'accepted-estimate' as const,
+              invoice,
+            })),
+            ...filtered.map((payment) => ({ kind: 'payment' as const, payment })),
+          ]
+        : filtered.map((payment) => ({ kind: 'payment' as const, payment })),
+    [tab, pendingEstimates, acceptedEstimates, filtered],
+  );
+  const receiptPagination = useTablePagination(receiptRows, paginationResetKey, 6);
+  const customerPagination = useTablePagination(filteredCustomerGroups, paginationResetKey, 6);
+  const pagePendingEstimates = receiptPagination.pageRows
+    .filter((row) => row.kind === 'pending-estimate')
+    .map((row) => row.invoice);
+  const pageAcceptedEstimates = receiptPagination.pageRows
+    .filter((row) => row.kind === 'accepted-estimate')
+    .map((row) => row.invoice);
+  const pagePayments = receiptPagination.pageRows.flatMap((row) =>
+    row.kind === 'payment' ? [row.payment] : [],
+  );
+
   const uniqueCustomers = customerGroups.length;
 
   const statusBadge = (status: string) => {
@@ -1289,146 +1339,153 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               <div className="flex items-center justify-center py-12">
                 <Loader2 size={24} className="animate-spin text-slate-400" />
               </div>
-            ) : customerGroups.length === 0 ? (
+            ) : filteredCustomerGroups.length === 0 ? (
               <div className="text-center py-12">
                 <Users size={32} className="mx-auto mb-3 text-slate-300" />
                 <p className="text-sm font-bold text-slate-500">No customers yet</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {customerGroups
-                  .filter((g) => !search || g.name.toLowerCase().includes(search.toLowerCase()))
-                  .map((group) => {
-                    const isOpen = expandedCustomers.has(group.name);
-                    const approvedTotal = group.payments
-                      .filter((p) => p.status === 'APPROVED')
-                      .reduce((s, p) => s + Number(p.amount), 0);
-                    const pendingTotal = group.payments
-                      .filter((p) => p.status === 'PENDING')
-                      .reduce((s, p) => s + Number(p.amount), 0);
-                    const uniqueInvoices = new Set(group.payments.map((p) => p.invoiceNumber)).size;
-                    return (
-                      <div key={group.name}>
-                        <button
-                          onClick={() => toggleCustomer(group.name)}
-                          className="w-full flex items-center justify-between p-4 hover:bg-slate-50/60 text-left transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center">
-                              <Users size={13} className="text-teal-600" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-black text-slate-800">{group.name}</p>
-                              <p className="text-[10px] text-slate-400 font-bold">
-                                {uniqueInvoices} contract{uniqueInvoices !== 1 ? 's' : ''} ·{' '}
-                                {group.payments.length} payment
-                                {group.payments.length !== 1 ? 's' : ''}
+                {customerPagination.pageRows.map((group) => {
+                  const isOpen = expandedCustomers.has(group.name);
+                  const approvedTotal = group.payments
+                    .filter((p) => p.status === 'APPROVED')
+                    .reduce((s, p) => s + Number(p.amount), 0);
+                  const pendingTotal = group.payments
+                    .filter((p) => p.status === 'PENDING')
+                    .reduce((s, p) => s + Number(p.amount), 0);
+                  const uniqueInvoices = new Set(group.payments.map((p) => p.invoiceNumber)).size;
+                  return (
+                    <div key={group.name}>
+                      <button
+                        onClick={() => toggleCustomer(group.name)}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50/60 text-left transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center">
+                            <Users size={13} className="text-teal-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-800">{group.name}</p>
+                            <p className="text-[10px] text-slate-400 font-bold">
+                              {uniqueInvoices} contract{uniqueInvoices !== 1 ? 's' : ''} ·{' '}
+                              {group.payments.length} payment
+                              {group.payments.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {approvedTotal > 0 && (
+                            <div className="text-right">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">
+                                Approved
+                              </p>
+                              <p className="text-sm font-black text-emerald-700">
+                                {currency}{' '}
+                                {approvedTotal.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
                               </p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            {approvedTotal > 0 && (
-                              <div className="text-right">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-500">
-                                  Approved
-                                </p>
-                                <p className="text-sm font-black text-emerald-700">
-                                  {currency}{' '}
-                                  {approvedTotal.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  })}
-                                </p>
-                              </div>
-                            )}
-                            {pendingTotal > 0 && (
-                              <div className="text-right">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-amber-500">
-                                  Pending
-                                </p>
-                                <p className="text-sm font-black text-amber-700">
-                                  {currency}{' '}
-                                  {pendingTotal.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                  })}
-                                </p>
-                              </div>
-                            )}
-                            {isOpen ? (
-                              <ChevronDown size={14} className="text-slate-400" />
-                            ) : (
-                              <ChevronRight size={14} className="text-slate-400" />
-                            )}
-                          </div>
-                        </button>
-                        {isOpen && (
-                          <div className="bg-slate-50/50 border-t border-slate-100 px-4 pb-4">
-                            <table className="w-full text-xs mt-3">
-                              <thead>
-                                <tr className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
-                                  <th className="text-left pb-2 pr-4">Request No.</th>
-                                  <th className="text-left pb-2 pr-4">Invoice</th>
-                                  <th className="text-left pb-2 pr-4">Type</th>
-                                  <th className="text-left pb-2 pr-4">Mode</th>
-                                  <th className="text-right pb-2 pr-4">Amount</th>
-                                  <th className="text-left pb-2 pr-4">Date</th>
-                                  <th className="text-left pb-2 pr-4">Status</th>
-                                  <th className="text-right pb-2">Receipt</th>
+                          )}
+                          {pendingTotal > 0 && (
+                            <div className="text-right">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-amber-500">
+                                Pending
+                              </p>
+                              <p className="text-sm font-black text-amber-700">
+                                {currency}{' '}
+                                {pendingTotal.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                })}
+                              </p>
+                            </div>
+                          )}
+                          {isOpen ? (
+                            <ChevronDown size={14} className="text-slate-400" />
+                          ) : (
+                            <ChevronRight size={14} className="text-slate-400" />
+                          )}
+                        </div>
+                      </button>
+                      {isOpen && (
+                        <div className="bg-slate-50/50 border-t border-slate-100 px-4 pb-4">
+                          <table className="w-full text-xs mt-3">
+                            <thead>
+                              <tr className="text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                                <th className="text-left pb-2 pr-4">Request No.</th>
+                                <th className="text-left pb-2 pr-4">Invoice</th>
+                                <th className="text-left pb-2 pr-4">Type</th>
+                                <th className="text-left pb-2 pr-4">Mode</th>
+                                <th className="text-right pb-2 pr-4">Amount</th>
+                                <th className="text-left pb-2 pr-4">Date</th>
+                                <th className="text-left pb-2 pr-4">Status</th>
+                                <th className="text-right pb-2">Receipt</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {group.payments.map((pmt) => (
+                                <tr key={pmt.id} className="text-slate-600">
+                                  <td className="py-1.5 pr-4 font-mono font-bold text-slate-700">
+                                    {pmt.requestNo}
+                                  </td>
+                                  <td className="py-1.5 pr-4 font-bold">{pmt.invoiceNumber}</td>
+                                  <td className="py-1.5 pr-4">
+                                    <PaymentTypeBadges
+                                      paymentContext={pmt.paymentContext}
+                                      isSecurityDeposit={pmt.isSecurityDeposit}
+                                    />
+                                  </td>
+                                  <td className="py-1.5 pr-4">
+                                    {pmt.paymentMode.replace('_', ' ')}
+                                  </td>
+                                  <td className="py-1.5 pr-4 text-right font-mono font-black text-slate-800">
+                                    {pmt.currency}{' '}
+                                    {Number(pmt.amount).toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                    })}
+                                  </td>
+                                  <td className="py-1.5 pr-4">
+                                    {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
+                                  </td>
+                                  <td className="py-1.5 pr-4">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {statusBadge(pmt.status)}
+                                      {refundBadge(pmt)}
+                                    </div>
+                                  </td>
+                                  <td className="py-1.5 text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => openReceiptView(pmt)}
+                                      className="h-6 w-6 p-0 text-slate-400 hover:bg-slate-200"
+                                      title="View Receipt"
+                                    >
+                                      <Eye size={11} />
+                                    </Button>
+                                  </td>
                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {group.payments.map((pmt) => (
-                                  <tr key={pmt.id} className="text-slate-600">
-                                    <td className="py-1.5 pr-4 font-mono font-bold text-slate-700">
-                                      {pmt.requestNo}
-                                    </td>
-                                    <td className="py-1.5 pr-4 font-bold">{pmt.invoiceNumber}</td>
-                                    <td className="py-1.5 pr-4">
-                                      <PaymentTypeBadges
-                                        paymentContext={pmt.paymentContext}
-                                        isSecurityDeposit={pmt.isSecurityDeposit}
-                                      />
-                                    </td>
-                                    <td className="py-1.5 pr-4">
-                                      {pmt.paymentMode.replace('_', ' ')}
-                                    </td>
-                                    <td className="py-1.5 pr-4 text-right font-mono font-black text-slate-800">
-                                      {pmt.currency}{' '}
-                                      {Number(pmt.amount).toLocaleString(undefined, {
-                                        minimumFractionDigits: 2,
-                                      })}
-                                    </td>
-                                    <td className="py-1.5 pr-4">
-                                      {new Date(pmt.paymentDate).toLocaleDateString('en-GB')}
-                                    </td>
-                                    <td className="py-1.5 pr-4">
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        {statusBadge(pmt.status)}
-                                        {refundBadge(pmt)}
-                                      </div>
-                                    </td>
-                                    <td className="py-1.5 text-right">
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => openReceiptView(pmt)}
-                                        className="h-6 w-6 p-0 text-slate-400 hover:bg-slate-200"
-                                        title="View Receipt"
-                                      >
-                                        <Eye size={11} />
-                                      </Button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
+          {customerPagination.totalPages > 1 && (
+            <Pagination
+              page={customerPagination.page}
+              totalPages={customerPagination.totalPages}
+              total={customerPagination.total}
+              limit={customerPagination.pageSize}
+              onPageChange={customerPagination.setPage}
+            />
+          )}
         </Card>
       ) : (
         /* Standard payments table */
@@ -1438,7 +1495,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               <div className="flex items-center justify-center py-12">
                 <Loader2 size={24} className="animate-spin text-slate-400" />
               </div>
-            ) : filtered.length === 0 && !showEstimateRows && !showAcceptedRows ? (
+            ) : receiptRows.length === 0 ? (
               <div className="text-center py-12">
                 <DollarSign size={32} className="mx-auto mb-3 text-slate-300" />
                 <p className="text-sm font-bold text-slate-500">No payments in this category</p>
@@ -1461,7 +1518,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                 </TableHeader>
                 <TableBody>
                   {showEstimateRows &&
-                    pendingEstimates.map((inv) => (
+                    pagePendingEstimates.map((inv) => (
                       <TableRow
                         key={`est-${inv.id}`}
                         className="hover:bg-amber-50/40 bg-amber-50/20 [&>td]:py-4"
@@ -1540,7 +1597,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                       </TableRow>
                     ))}
                   {showAcceptedRows &&
-                    acceptedEstimates.map((inv) => (
+                    pageAcceptedEstimates.map((inv) => (
                       <TableRow
                         key={`acc-${inv.id}`}
                         className="hover:bg-emerald-50/40 bg-emerald-50/20 [&>td]:py-4"
@@ -1603,7 +1660,7 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
                         </TableCell>
                       </TableRow>
                     ))}
-                  {filtered.map((pmt) => (
+                  {pagePayments.map((pmt) => (
                     <TableRow key={pmt.id} className="hover:bg-slate-50/50 [&>td]:py-4">
                       <TableCell className="font-black text-slate-800 text-[13px] whitespace-nowrap">
                         {pmt.requestNo}
@@ -1768,6 +1825,15 @@ export default function ReceiptsTab({ branchIds }: { branchIds?: string } = {}) 
               </Table>
             )}
           </CardContent>
+          {receiptPagination.totalPages > 1 && (
+            <Pagination
+              page={receiptPagination.page}
+              totalPages={receiptPagination.totalPages}
+              total={receiptPagination.total}
+              limit={receiptPagination.pageSize}
+              onPageChange={receiptPagination.setPage}
+            />
+          )}
         </Card>
       )}
 
