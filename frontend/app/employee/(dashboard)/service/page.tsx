@@ -717,6 +717,15 @@ export default function ServiceDashboardPage() {
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (
+      (creationPath === 'new' || isOtherMachine) &&
+      newTicket.machineType === 'PRINTER' &&
+      meterReadingInput.trim() === ''
+    ) {
+      toast.error('Please enter the current meter reading for this external printer.');
+      return;
+    }
+
     if (creationPath === 'existing') {
       if (!newTicket.customerId) {
         toast.error('Please select a customer.');
@@ -3800,11 +3809,12 @@ export default function ServiceDashboardPage() {
                       newTicket.machineType === 'PRINTER' && (
                         <div>
                           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                            Current Meter Reading (Total Copies)
+                            Current Meter Reading (Total Copies) *
                           </label>
                           <Input
                             type="number"
                             min={0}
+                            required
                             placeholder="Ask the customer for the machine's current meter reading..."
                             value={meterReadingInput}
                             onChange={(e) => setMeterReadingInput(e.target.value)}
