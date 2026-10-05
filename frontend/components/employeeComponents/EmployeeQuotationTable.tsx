@@ -787,6 +787,32 @@ export default function EmployeeQuotationTable() {
       if (sType === 'RENT') {
         payload.rentType = sourceQuotationData.rentType as CreateInvoicePayload['rentType'];
         payload.rentPeriod = sourceQuotationData.rentPeriod as CreateInvoicePayload['rentPeriod'];
+        payload.items = mappedItems.filter((item) => item.itemType !== 'PRICING_RULE');
+        const rentPricingRows = mappedItems.filter((item) => item.itemType === 'PRICING_RULE');
+        const rentMachineRows = mappedItems.filter(
+          (item) => item.itemType !== 'PRICING_RULE' && item.itemType !== 'ACCESSORY',
+        );
+        payload.pricingItems = (rentPricingRows.length > 0 ? rentPricingRows : rentMachineRows).map(
+          (item) => ({
+            description: item.description,
+            bwIncludedLimit: item.bwIncludedLimit,
+            colorIncludedLimit: item.colorIncludedLimit,
+            combinedIncludedLimit: item.combinedIncludedLimit,
+            bwExcessRate: item.bwExcessRate !== undefined ? Number(item.bwExcessRate) : undefined,
+            colorExcessRate:
+              item.colorExcessRate !== undefined ? Number(item.colorExcessRate) : undefined,
+            combinedExcessRate:
+              item.combinedExcessRate !== undefined ? Number(item.combinedExcessRate) : undefined,
+            separateA3Pricing: item.separateA3Pricing,
+            bwA3ExcessRate:
+              item.bwA3ExcessRate !== undefined ? Number(item.bwA3ExcessRate) : undefined,
+            colorA3ExcessRate:
+              item.colorA3ExcessRate !== undefined ? Number(item.colorA3ExcessRate) : undefined,
+            bwSlabRanges: item.bwSlabRanges,
+            colorSlabRanges: item.colorSlabRanges,
+            comboSlabRanges: item.comboSlabRanges,
+          }),
+        );
         payload.monthlyRent = sourceQuotationData.monthlyRent;
         payload.advanceAmount = sourceQuotationData.advanceAmount;
         payload.discountPercent = sourceQuotationData.discountPercent;
