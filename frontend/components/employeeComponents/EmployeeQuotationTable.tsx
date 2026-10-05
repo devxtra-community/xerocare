@@ -70,6 +70,7 @@ import {
 } from '@/lib/invoice';
 import { getBrands, Brand } from '@/lib/brand';
 import { getAllModels, Model } from '@/lib/model';
+import { normalizeCopiedSlabRanges } from '@/lib/quotationCopy';
 
 import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
@@ -737,15 +738,6 @@ export default function EmployeeQuotationTable() {
           });
         }
 
-        const mappedSlabs = (ranges?: Array<{ from: number; to: number; rate: number }>) => {
-          if (!ranges) return [];
-          return ranges.map((r) => ({
-            from: r.from,
-            to: r.to,
-            rate: r.rate,
-          }));
-        };
-
         return {
           description: desc,
           quantity: item.quantity || 1,
@@ -771,9 +763,9 @@ export default function EmployeeQuotationTable() {
           bwA3RateTouched: item.bwA3ExcessRate !== undefined,
           colorA3RateTouched: item.colorA3ExcessRate !== undefined,
 
-          bwSlabRanges: mappedSlabs(item.bwSlabRanges),
-          colorSlabRanges: mappedSlabs(item.colorSlabRanges),
-          comboSlabRanges: mappedSlabs(item.comboSlabRanges),
+          bwSlabRanges: normalizeCopiedSlabRanges(item.bwSlabRanges),
+          colorSlabRanges: normalizeCopiedSlabRanges(item.colorSlabRanges),
+          comboSlabRanges: normalizeCopiedSlabRanges(item.comboSlabRanges),
         };
       });
 
