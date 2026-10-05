@@ -14,8 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getMyInvoices, getBranchInvoices, Invoice, employeeApproveInvoice } from '@/lib/invoice';
-import UsageRecordingModal from '../Finance/UsageRecordingModal';
+import {
+  getMyInvoices,
+  getBranchInvoices,
+  Invoice,
+  employeeApproveInvoice,
+  activateContractInvoice,
+} from '@/lib/invoice';
+import { ContractAgreementModal } from './ContractAgreementModal';
 import { BillModal } from '../Finance/BillModal';
 import {
   ReplacementActionButton,
@@ -36,7 +42,8 @@ import {
   AdvancePaymentMark,
   SecurityBillMark,
   SendMark,
-  MeterReadingMark,
+  SignContractMark,
+  ActivateContractMark,
 } from '@/components/ui/BrandMarks';
 import {
   Dialog,
@@ -107,17 +114,16 @@ export default function EmployeeLeaseTable({
   const [detailsOpen, setDetailsOpen] = useState(false); // Changed from useState(false) to useState(false) to allow state change
   const [approveOpen, setApproveOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [isUsageModalOpen, setIsUsageModalOpen] = useState(false);
 
   // One request-list call for the whole table; each row reads its own contract's latest
   // replacement out of the map (see useReplacementMap).
   const { map: replacementMap, refresh: refreshReplacements } = useReplacementMap();
-  const [editingUsage] = useState<Invoice | null>(null);
   const [search, setSearch] = useState('');
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [pendingQuotations, setPendingQuotations] = useState<Invoice[]>([]);
   const [loadingQuotations, setLoadingQuotations] = useState(false);
   const [selectedForConversion, setSelectedForConversion] = useState<Invoice | null>(null);
+  const [contractInvoice, setContractInvoice] = useState<Invoice | null>(null);
   // Advance payment receipt viewing (SalePaymentCollectionModal)
   const [collectionTarget, setCollectionTarget] = useState<Invoice | null>(null);
 
@@ -228,6 +234,7 @@ export default function EmployeeLeaseTable({
   // Set synchronously on click so the menu entry shows its spinner and disables before
   // the round-trip — a second click is refused while one is in flight.
   const [sendingForApprovalId, setSendingForApprovalId] = useState<string | null>(null);
+  const [activatingContractId, setActivatingContractId] = useState<string | null>(null);
 
   /**
    * @param inv the row the menu entry was clicked on. The details dialog passes nothing —
@@ -256,6 +263,24 @@ export default function EmployeeLeaseTable({
       toast.error(msg);
     } finally {
       setSendingForApprovalId(null);
+    }
+  };
+
+  const handleActivateContract = async (inv: Invoice) => {
+    if (activatingContractId) return;
+    setActivatingContractId(inv.id);
+    try {
+      await activateContractInvoice(inv.id, { contractConfirmationUrl: '' });
+      toast.success('Contract activated', {
+        description: `${inv.invoiceNumber} is now active on the service desk.`,
+      });
+      fetchInvoices();
+      onRefresh?.();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e.response?.data?.message || 'Failed to activate contract');
+    } finally {
+      setActivatingContractId(null);
     }
   };
 
@@ -505,6 +530,10 @@ export default function EmployeeLeaseTable({
                         <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-blue-100 text-blue-700">
                           CONTRACT ONGOING
                         </span>
+                      ) : inv.contractStatus === 'PENDING_CONFIRMATION' ? (
+                        <span className="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700">
+                          SETUP NEEDED
+                        </span>
                       ) : (
                         <span
                           className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide
@@ -575,17 +604,34 @@ export default function EmployeeLeaseTable({
                                   },
                                 ]
                               : []),
-                            ...(inv.status !== 'DRAFT' && inv.contractStatus !== 'COMPLETED'
+                            ...(inv.contractStatus === 'PENDING_CONFIRMATION'
                               ? [
                                   {
-                                    key: 'meter',
-                                    icon: <MeterReadingMark />,
-                                    label: 'Submit Meter Reading',
-                                    description: 'Record this period\u2019s usage',
-                                    onClick: () => {
-                                      setSelectedInvoice(inv);
-                                      setIsUsageModalOpen(true);
-                                    },
+                                    key: 'sign',
+                                    icon: <SignContractMark />,
+                                    label: 'Sign Contract Agreement',
+                                    description: 'Capture the customer signature',
+                                    onClick: () => setContractInvoice(inv),
+                                  },
+                                  {
+                                    key: 'activate',
+                                    icon: <ActivateContractMark />,
+                                    label: 'Activate Contract',
+                                    description: 'Allocate machines and go live',
+                                    loading: activatingContractId === inv.id,
+                                    closeOnSelect: false,
+                                    onClick: () => handleActivateContract(inv),
+                                  },
+                                ]
+                              : []),
+                            ...(inv.contractStatus === 'ACTIVE'
+                              ? [
+                                  {
+                                    key: 'agreement',
+                                    icon: <SignContractMark />,
+                                    label: 'Contract Agreement',
+                                    description: 'View the signed agreement',
+                                    onClick: () => setContractInvoice(inv),
                                   },
                                 ]
                               : []),
@@ -712,17 +758,12 @@ export default function EmployeeLeaseTable({
         />
       )}
 
-      {isUsageModalOpen && selectedInvoice && (
-        <UsageRecordingModal
-          isOpen={isUsageModalOpen}
-          onClose={() => setIsUsageModalOpen(false)}
-          contractId={selectedInvoice.id}
-          customerName={selectedInvoice.customerName}
-          invoice={editingUsage}
-          onSuccess={() => {
-            fetchInvoices();
-            onRefresh?.();
-          }}
+      {contractInvoice && (
+        <ContractAgreementModal
+          open={true}
+          invoice={contractInvoice}
+          onClose={() => setContractInvoice(null)}
+          onSigned={() => fetchInvoices()}
         />
       )}
       {isConverterOpen && (
