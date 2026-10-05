@@ -101,13 +101,13 @@ const menuItems = [
     title: 'Rent',
     icon: Key,
     href: '/employee/rent',
-    modules: ['rent', 'reading'],
+    modules: ['rent'],
   },
   {
     title: 'Lease',
     icon: FileText,
     href: '/employee/lease',
-    modules: ['lease', 'reading'],
+    modules: ['lease'],
   },
   {
     title: 'Quotations',
