@@ -1026,17 +1026,25 @@ function QuotationTemplateFormModal({
 
   // ── RENT state ──────────────────────────────────────────────────────────
   const [rentType, setRentType] = useState<string>(template?.rentType || 'FIXED_LIMIT');
+  const [paymentTiming, setPaymentTiming] = useState<'ADVANCE' | 'ARREARS'>(
+    template?.paymentTiming || 'ADVANCE',
+  );
+  const handleRentTypeChange = (value: string) => {
+    setRentType(value);
+    if (value === 'CPC' || value === 'CPC_COMBO') {
+      setMonthlyRent('');
+      setAdvanceAmount('');
+      setPaymentTiming('ARREARS');
+    }
+  };
   const [rentPeriod, setRentPeriod] = useState<string>(template?.rentPeriod || 'MONTHLY');
   const [monthlyRent, setMonthlyRent] = useState(
     template?.monthlyRent !== undefined && template?.monthlyRent !== null
       ? String(template.monthlyRent)
       : '',
   );
-  // Read-only: seeded from the template and never reassigned. The Security Deposit
-  // input used to write into this as well, conflating a refundable deposit with the
-  // first month's advance; removing that left nothing to set it, so the setter is gone
-  // rather than left dangling.
-  const [advanceAmount] = useState(
+  // Kept separately from the refundable security deposit, and cleared for CPC billing.
+  const [advanceAmount, setAdvanceAmount] = useState(
     template?.advanceAmount !== undefined && template?.advanceAmount !== null
       ? String(template.advanceAmount)
       : '',
@@ -1498,9 +1506,11 @@ function QuotationTemplateFormModal({
       } else if (activeCategory === 'RENT') {
         payload.rentType = rentType as NonNullable<CreateInvoicePayload>['rentType'];
         payload.rentPeriod = rentPeriod as NonNullable<CreateInvoicePayload>['rentPeriod'];
-        payload.monthlyRent = Number(monthlyRent);
+        payload.monthlyRent =
+          rentType !== 'CPC' && rentType !== 'CPC_COMBO' ? Number(monthlyRent) : undefined;
         payload.advanceAmount = Number(advanceAmount);
         payload.discountPercent = Number(discountPercent);
+        payload.paymentTiming = paymentTiming;
 
         payload.effectiveFrom = new Date().toISOString().split('T')[0];
         const d = new Date();
@@ -1519,32 +1529,60 @@ function QuotationTemplateFormModal({
           modelId: it.modelId,
           quantity: it.quantity,
           unitPrice: 0,
-          bwIncludedLimit: Number(it.bwIncludedLimit || 0),
-          colorIncludedLimit: Number(it.colorIncludedLimit || 0),
-          combinedIncludedLimit: Number(it.combinedIncludedLimit || 0),
-          bwExcessRate: Number(it.bwExcessRate || 0),
-          colorExcessRate: Number(it.colorExcessRate || 0),
-          combinedExcessRate: Number(it.combinedExcessRate || 0),
-          bwSlabRanges: (it.bwSlabRanges || []).map((s) => ({
-            from: Number(s.from),
-            to: Number(s.to),
-            rate: Number(s.rate),
-          })),
-          colorSlabRanges: (it.colorSlabRanges || []).map((s) => ({
-            from: Number(s.from),
-            to: Number(s.to),
-            rate: Number(s.rate),
-          })),
-          comboSlabRanges: (it.comboSlabRanges || []).map((s) => ({
-            from: Number(s.from),
-            to: Number(s.to),
-            rate: Number(s.rate),
-          })),
+          ...(rentType === 'FIXED_LIMIT'
+            ? {
+                bwIncludedLimit: Number(it.bwIncludedLimit || 0),
+                colorIncludedLimit: Number(it.colorIncludedLimit || 0),
+              }
+            : {}),
+          ...(rentType === 'FIXED_COMBO'
+            ? { combinedIncludedLimit: Number(it.combinedIncludedLimit || 0) }
+            : {}),
+          ...(rentType === 'FIXED_LIMIT' || rentType === 'CPC'
+            ? {
+                bwExcessRate: Number(it.bwExcessRate || 0),
+                colorExcessRate: Number(it.colorExcessRate || 0),
+              }
+            : {}),
+          ...(rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO'
+            ? { combinedExcessRate: Number(it.combinedExcessRate || 0) }
+            : {}),
+          ...(rentType === 'CPC'
+            ? {
+                bwSlabRanges: (it.bwSlabRanges || []).map((s) => ({
+                  from: Number(s.from),
+                  to: Number(s.to),
+                  rate: Number(s.rate),
+                })),
+              }
+            : {}),
+          ...(rentType === 'CPC'
+            ? {
+                colorSlabRanges: (it.colorSlabRanges || []).map((s) => ({
+                  from: Number(s.from),
+                  to: Number(s.to),
+                  rate: Number(s.rate),
+                })),
+              }
+            : {}),
+          ...(rentType === 'CPC_COMBO'
+            ? {
+                comboSlabRanges: (it.comboSlabRanges || []).map((s) => ({
+                  from: Number(s.from),
+                  to: Number(s.to),
+                  rate: Number(s.rate),
+                })),
+              }
+            : {}),
         }));
+        // Match the quotation payload shape: machine selections live in `items`,
+        // while `pricingItems` is required by the Rent quotation API.
+        payload.pricingItems = [];
       } else if (activeCategory === 'LEASE') {
         payload.leaseType = leaseType as 'EMI' | 'FSM';
         payload.leaseTenureMonths = Number(leaseTenureMonths);
         payload.totalLeaseAmount = Number(totalLeaseAmount);
+        payload.paymentTiming = paymentTiming;
 
         payload.effectiveFrom = new Date().toISOString().split('T')[0];
         const d = new Date();
@@ -1563,7 +1601,8 @@ function QuotationTemplateFormModal({
         } else {
           payload.rentType = rentType as NonNullable<CreateInvoicePayload>['rentType'];
           payload.rentPeriod = rentPeriod as NonNullable<CreateInvoicePayload>['rentPeriod'];
-          payload.monthlyRent = Number(monthlyRent);
+          payload.monthlyRent =
+            rentType !== 'CPC' && rentType !== 'CPC_COMBO' ? Number(monthlyRent) : undefined;
           payload.discountPercent = Number(discountPercent);
         }
 
@@ -1573,27 +1612,51 @@ function QuotationTemplateFormModal({
           modelId: it.modelId,
           quantity: it.quantity,
           unitPrice: 0,
-          bwIncludedLimit: Number(it.bwIncludedLimit || 0),
-          colorIncludedLimit: Number(it.colorIncludedLimit || 0),
-          combinedIncludedLimit: Number(it.combinedIncludedLimit || 0),
-          bwExcessRate: Number(it.bwExcessRate || 0),
-          colorExcessRate: Number(it.colorExcessRate || 0),
-          combinedExcessRate: Number(it.combinedExcessRate || 0),
-          bwSlabRanges: (it.bwSlabRanges || []).map((s) => ({
-            from: Number(s.from),
-            to: Number(s.to),
-            rate: Number(s.rate),
-          })),
-          colorSlabRanges: (it.colorSlabRanges || []).map((s) => ({
-            from: Number(s.from),
-            to: Number(s.to),
-            rate: Number(s.rate),
-          })),
-          comboSlabRanges: (it.comboSlabRanges || []).map((s) => ({
-            from: Number(s.from),
-            to: Number(s.to),
-            rate: Number(s.rate),
-          })),
+          ...(leaseType === 'FSM' && rentType === 'FIXED_LIMIT'
+            ? {
+                bwIncludedLimit: Number(it.bwIncludedLimit || 0),
+                colorIncludedLimit: Number(it.colorIncludedLimit || 0),
+              }
+            : {}),
+          ...(leaseType === 'FSM' && rentType === 'FIXED_COMBO'
+            ? { combinedIncludedLimit: Number(it.combinedIncludedLimit || 0) }
+            : {}),
+          ...(leaseType === 'FSM' && (rentType === 'FIXED_LIMIT' || rentType === 'CPC')
+            ? {
+                bwExcessRate: Number(it.bwExcessRate || 0),
+                colorExcessRate: Number(it.colorExcessRate || 0),
+              }
+            : {}),
+          ...(leaseType === 'FSM' && (rentType === 'FIXED_COMBO' || rentType === 'CPC_COMBO')
+            ? { combinedExcessRate: Number(it.combinedExcessRate || 0) }
+            : {}),
+          ...(leaseType === 'FSM' && rentType === 'CPC'
+            ? {
+                bwSlabRanges: (it.bwSlabRanges || []).map((s) => ({
+                  from: Number(s.from),
+                  to: Number(s.to),
+                  rate: Number(s.rate),
+                })),
+              }
+            : {}),
+          ...(leaseType === 'FSM' && rentType === 'CPC'
+            ? {
+                colorSlabRanges: (it.colorSlabRanges || []).map((s) => ({
+                  from: Number(s.from),
+                  to: Number(s.to),
+                  rate: Number(s.rate),
+                })),
+              }
+            : {}),
+          ...(leaseType === 'FSM' && rentType === 'CPC_COMBO'
+            ? {
+                comboSlabRanges: (it.comboSlabRanges || []).map((s) => ({
+                  from: Number(s.from),
+                  to: Number(s.to),
+                  rate: Number(s.rate),
+                })),
+              }
+            : {}),
         }));
       }
 
@@ -1832,7 +1895,7 @@ function QuotationTemplateFormModal({
                   <label className="text-[10px] font-black uppercase text-slate-500">
                     Rent Type
                   </label>
-                  <Select value={rentType} onValueChange={setRentType}>
+                  <Select value={rentType} onValueChange={handleRentTypeChange}>
                     <SelectTrigger className="text-xs h-9">
                       <SelectValue />
                     </SelectTrigger>
@@ -1922,7 +1985,7 @@ function QuotationTemplateFormModal({
                         // FSM leases only offer CPC billing now — force off any
                         // legacy FIXED_* default so the dropdown below stays valid.
                         if (val === 'FSM' && rentType !== 'CPC' && rentType !== 'CPC_COMBO') {
-                          setRentType('CPC');
+                          handleRentTypeChange('CPC');
                         }
                       }}
                     >
@@ -1989,7 +2052,7 @@ function QuotationTemplateFormModal({
                       <label className="text-[10px] font-black uppercase text-slate-500">
                         Rent Type
                       </label>
-                      <Select value={rentType} onValueChange={setRentType}>
+                      <Select value={rentType} onValueChange={handleRentTypeChange}>
                         <SelectTrigger className="text-xs h-9 bg-white">
                           <SelectValue />
                         </SelectTrigger>
@@ -2054,6 +2117,44 @@ function QuotationTemplateFormModal({
             )}
 
             {/* Security Deposit (Rental / Lease only) */}
+            {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
+              <div className="space-y-3 bg-card p-4 rounded-xl border border-violet-100">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-violet-600">
+                  Payment Timing
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                      Billing Method
+                    </label>
+                    <Select
+                      value={paymentTiming}
+                      onValueChange={(v) => setPaymentTiming(v as 'ADVANCE' | 'ARREARS')}
+                    >
+                      <SelectTrigger className="text-xs h-9 bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem
+                          value="ADVANCE"
+                          disabled={rentType === 'CPC' || rentType === 'CPC_COMBO'}
+                        >
+                          Advance Billing (Advance Payment)
+                        </SelectItem>
+                        <SelectItem value="ARREARS">Arrears Billing (Postpaid Billing)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {rentType === 'CPC' || rentType === 'CPC_COMBO'
+                      ? 'Cost-per-copy is billed after the fact, so postpaid is the only option.'
+                      : paymentTiming === 'ADVANCE'
+                        ? 'Customer pays upcoming period rent in advance.'
+                        : 'Customer pays after the billing period completes.'}
+                  </p>
+                </div>
+              </div>
+            )}
             {(activeCategory === 'RENT' || activeCategory === 'LEASE') && (
               <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
@@ -2236,7 +2337,7 @@ function QuotationTemplateFormModal({
                                 <div className="space-y-4">
                                   {/* Limit configuration */}
                                   <div className="grid grid-cols-3 gap-4">
-                                    {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                    {rentType === 'FIXED_LIMIT' && (
                                       <>
                                         <div className="space-y-1">
                                           <label className="text-[9px] font-bold text-slate-500">
@@ -2352,9 +2453,7 @@ function QuotationTemplateFormModal({
                                   </div>
 
                                   {/* Slabs configuration */}
-                                  {(rentType === 'FIXED_LIMIT' ||
-                                    rentType === 'CPC' ||
-                                    rentType === 'FIXED_COMBO') && (
+                                  {(rentType === 'CPC' || rentType === 'CPC_COMBO') && (
                                     <div className="space-y-3">
                                       <div className="flex justify-between items-center border-t pt-2 mt-2">
                                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
@@ -2364,7 +2463,7 @@ function QuotationTemplateFormModal({
 
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* BW Slabs */}
-                                        {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                        {rentType === 'CPC' && (
                                           <div className="space-y-2 bg-white p-2.5 rounded-lg border">
                                             <div className="flex justify-between items-center">
                                               <span className="text-[9px] font-bold text-slate-600">
@@ -2443,7 +2542,7 @@ function QuotationTemplateFormModal({
                                         )}
 
                                         {/* Color Slabs */}
-                                        {(rentType === 'FIXED_LIMIT' || rentType === 'CPC') && (
+                                        {rentType === 'CPC' && (
                                           <div className="space-y-2 bg-white p-2.5 rounded-lg border">
                                             <div className="flex justify-between items-center">
                                               <span className="text-[9px] font-bold text-slate-600">
@@ -2522,7 +2621,7 @@ function QuotationTemplateFormModal({
                                         )}
 
                                         {/* Combo Slabs */}
-                                        {rentType === 'FIXED_COMBO' && (
+                                        {rentType === 'CPC_COMBO' && (
                                           <div className="space-y-2 bg-white p-2.5 rounded-lg border col-span-2">
                                             <div className="flex justify-between items-center">
                                               <span className="text-[9px] font-bold text-slate-600">
