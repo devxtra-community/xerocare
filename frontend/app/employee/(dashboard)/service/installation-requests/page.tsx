@@ -624,9 +624,9 @@ export default function InstallationRequestsPage() {
                                     type="button"
                                     onClick={() => setDepositTarget(req)}
                                     title={`Collect the ${Number(req.securityDepositAmount).toFixed(2)} refundable security deposit`}
-                                    className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full border-2 border-slate-800 bg-amber-400 px-3 text-[9px] font-black uppercase tracking-widest text-slate-900 transition-colors hover:bg-amber-500 active:translate-y-px"
+                                    className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-2 border-slate-800 bg-blue-600 px-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 active:translate-y-px"
                                   >
-                                    <SecurityBillMark size={16} />
+                                    <SecurityBillMark size={14} />
                                     Collect Deposit Now
                                   </button>
                                 ))}
