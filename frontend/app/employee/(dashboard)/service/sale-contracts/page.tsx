@@ -363,7 +363,7 @@ export default function SaleContractsPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow className="bg-slate-50/70">
                   <TableHead className="w-8" />

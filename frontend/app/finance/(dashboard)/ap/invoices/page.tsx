@@ -25,6 +25,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 
 type DateRange = 'all' | 'today' | 'last_7' | 'last_30' | 'this_month' | 'last_month' | 'custom';
 
@@ -62,6 +64,11 @@ export default function APInvoiceListPage() {
       return dateMatch && searchMatch;
     });
   }, [search, dateRange, fromDate, toDate]);
+  const invoicePaging = useTablePagination(
+    filteredInvoices,
+    `${search}|${dateRange}|${fromDate}|${toDate}`,
+    10,
+  );
 
   // Analytics Logic
   const totalPayable = filteredInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
@@ -166,7 +173,7 @@ export default function APInvoiceListPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInvoices.map((inv) => {
+              invoicePaging.pageRows.map((inv) => {
                 const vendor = vendors.find((v) => v.id === inv.vendorId);
                 return (
                   <TableRow
@@ -207,6 +214,15 @@ export default function APInvoiceListPage() {
             )}
           </TableBody>
         </Table>
+        {filteredInvoices.length > 0 && (
+          <Pagination
+            page={invoicePaging.page}
+            totalPages={invoicePaging.totalPages}
+            total={invoicePaging.total}
+            limit={invoicePaging.pageSize}
+            onPageChange={invoicePaging.setPage}
+          />
+        )}
       </div>
     </div>
   );

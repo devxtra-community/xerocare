@@ -281,7 +281,7 @@ export default function FinanceServiceEstimatesPage() {
       {/* Table */}
       <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
         <div className="overflow-x-auto">
-          <Table className="w-full">
+          <Table pagination={{ pageSize: 10 }} className="w-full">
             <TableHeader className="bg-slate-50/50 border-b border-slate-100">
               <TableRow>
                 <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">
@@ -390,7 +390,7 @@ export default function FinanceServiceEstimatesPage() {
             </div>
           </div>
           <div className="overflow-x-auto p-2">
-            <Table className="w-full">
+            <Table pagination={{ pageSize: 10 }} className="w-full">
               <TableHeader className="bg-emerald-50/40 border-b border-emerald-100">
                 <TableRow>
                   <TableHead className="text-slate-500 font-bold text-[10px] tracking-wider uppercase">

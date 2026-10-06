@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
@@ -77,6 +79,7 @@ function ExpensesContent() {
     const matchSearch = !search || e.description?.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+  const expensePaging = useTablePagination(filtered, `${search}|${catFilter}`, 10);
 
   const total = filtered.reduce((s, e) => s + Number(e.amount), 0);
   const pending = filtered.filter((e) => e.status === 'PENDING').length;
@@ -197,7 +200,7 @@ function ExpensesContent() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((e) => (
+                  expensePaging.pageRows.map((e) => (
                     <tr key={e.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.expenseNo}</td>
                       <td className="px-4 py-3">{e.date?.slice(0, 10)}</td>
@@ -218,6 +221,15 @@ function ExpensesContent() {
                 )}
               </tbody>
             </table>
+            {expensePaging.total > expensePaging.pageSize && (
+              <Pagination
+                page={expensePaging.page}
+                totalPages={expensePaging.totalPages}
+                total={expensePaging.total}
+                limit={expensePaging.pageSize}
+                onPageChange={expensePaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>

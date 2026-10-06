@@ -181,7 +181,7 @@ export default function MyAchievementsPage() {
           <div className="p-4 border-b">
             <h3 className="font-semibold">Monthly History</h3>
           </div>
-          <Table>
+          <Table pagination={{ pageSize: 10 }}>
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>

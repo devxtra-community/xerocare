@@ -124,7 +124,7 @@ function BrandsContent() {
       </div>
 
       <div className="rounded-2xl bg-card shadow-sm overflow-hidden">
-        <Table>
+        <Table pagination={{ pageSize: 10 }}>
           <TableHeader>
             <TableRow>
               {['BRAND NAME', 'STATUS', 'CREATED AT', 'DESCRIPTION', 'ACTION'].map((h) => (

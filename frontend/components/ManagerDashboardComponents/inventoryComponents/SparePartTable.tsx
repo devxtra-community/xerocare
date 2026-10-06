@@ -178,7 +178,7 @@ export default function SparePartTable({ showActions = true, selectedYear }: Spa
 
       <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <Table className="min-w-[900px]">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[900px]">
             <TableHeader>
               <TableRow className="bg-muted/50/50 hover:bg-transparent">
                 <TableHead className="text-[10px] font-bold text-primary uppercase py-2 px-3">

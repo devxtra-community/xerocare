@@ -1182,7 +1182,7 @@ export default function ServiceContractsPage() {
 
       {/* Main Table */}
       <Card className="shadow-sm border-slate-200/80 overflow-hidden">
-        <Table className="w-full table-fixed">
+        <Table pagination={{ pageSize: 10 }} className="w-full table-fixed">
           <TableHeader className="bg-slate-50/80">
             <TableRow>
               <TableHead className="font-bold text-xs text-slate-600 w-[16%]">Customer</TableHead>

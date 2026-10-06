@@ -232,7 +232,7 @@ export default function PendingServiceEstimateQueue({
         />
       </div>
       <div className="overflow-x-auto p-2">
-        <Table>
+        <Table pagination={{ pageSize: 10 }}>
           <TableHeader className="bg-violet-50/50">
             <TableRow>
               <TableHead>Source</TableHead>
@@ -391,7 +391,7 @@ export default function PendingServiceEstimateQueue({
                 />
               </div>
               <div className="rounded-lg border overflow-x-auto">
-                <Table>
+                <Table pagination={{ pageSize: 10 }}>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Part / item</TableHead>

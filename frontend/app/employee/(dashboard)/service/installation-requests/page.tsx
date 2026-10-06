@@ -426,7 +426,7 @@ export default function InstallationRequestsPage() {
                   </p>
                 </div>
               ) : (
-                <Table>
+                <Table pagination={{ pageSize: 10 }}>
                   <TableHeader>
                     <TableRow className="bg-slate-50/70">
                       <TableHead className="text-[10px] font-black uppercase tracking-widest text-slate-400">

@@ -187,7 +187,7 @@ export default function ContractRenewalsPage() {
       {tab === 'renewals' && (
         <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table>
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
                   <TableHead>Contract</TableHead>

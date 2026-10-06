@@ -22,6 +22,8 @@ import {
 } from '@/lib/stockTransfer';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 export default function StockTransfersPage() {
   const router = useRouter();
@@ -59,6 +61,11 @@ export default function StockTransfersPage() {
       t.destination_branch?.name?.toLowerCase().includes(s)
     );
   });
+  const transferPaging = useTablePagination(
+    filtered,
+    `${search}|${statusFilter}|${typeFilter}`,
+    10,
+  );
 
   return (
     <div className="bg-blue-100 min-h-screen p-3 sm:p-4 md:p-6 space-y-6">
@@ -145,7 +152,7 @@ export default function StockTransfersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
+                {transferPaging.pageRows.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => router.push(`/admin/stock-transfers/${t.id}`)}
@@ -198,6 +205,15 @@ export default function StockTransfersPage() {
                 ))}
               </tbody>
             </table>
+            {transferPaging.total > transferPaging.pageSize && (
+              <Pagination
+                page={transferPaging.page}
+                totalPages={transferPaging.totalPages}
+                total={transferPaging.total}
+                limit={transferPaging.pageSize}
+                onPageChange={transferPaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>

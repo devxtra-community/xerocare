@@ -215,7 +215,7 @@ export default function VendorTable({
 
       <div className="rounded-2xl border border-blue-100 bg-card overflow-hidden shadow-sm m-4 mt-0">
         <div className="overflow-x-hidden">
-          <Table className="w-full">
+          <Table pagination={{ pageSize: 10 }} className="w-full">
             <TableHeader className="bg-muted/50/50">
               <TableRow className="border-b border-blue-50/50 hover:bg-transparent">
                 <TableHead className="font-bold text-[10px] text-primary uppercase py-3 px-4">

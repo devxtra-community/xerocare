@@ -538,7 +538,7 @@ export default function GeneralLedgerPage() {
       {/* Table */}
       {!isLoading && !isError && (
         <div className="bg-card rounded-xl shadow-sm border border-slate-100 p-1">
-          <Table>
+          <Table pagination={{ pageSize: 10 }}>
             <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead className="pl-4 w-24 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">

@@ -106,7 +106,7 @@ export default function ReturnsTable({
   return (
     <div className="rounded-2xl bg-card shadow-sm overflow-hidden border border-slate-100 p-4">
       <div className="overflow-x-auto mb-4">
-        <Table className="min-w-[800px] sm:min-w-full">
+        <Table pagination={{ pageSize: 10 }} className="min-w-[800px] sm:min-w-full">
           <TableHeader className="bg-muted/50/50">
             <TableRow>
               <TableHead className="text-primary font-bold">CREDIT NOTE #</TableHead>

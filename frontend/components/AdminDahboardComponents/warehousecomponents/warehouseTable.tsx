@@ -22,6 +22,8 @@ import {
 import { getBranches, Branch } from '@/lib/branch';
 import { toast } from 'sonner';
 import WarehouseFormDialog from '@/components/warehouse/WarehouseFormDialog';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 /**
  * Comprehensive Warehouse management dashboard component.
@@ -58,6 +60,7 @@ export default function WarehouseReport() {
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
+  const warehousePaging = useTablePagination(filtered, search, 10);
 
   // Calculate statistics
   const totalWarehouses = warehouses.length;
@@ -183,7 +186,7 @@ export default function WarehouseReport() {
             </thead>
 
             <tbody>
-              {filtered.map((w, i) => (
+              {warehousePaging.pageRows.map((w, i) => (
                 <tr
                   key={w.id}
                   className={`border-b border-gray-100 ${i % 2 !== 0 ? 'bg-blue-50/20' : 'bg-card'}`}
@@ -229,6 +232,15 @@ export default function WarehouseReport() {
               ))}
             </tbody>
           </table>
+          {warehousePaging.total > warehousePaging.pageSize && (
+            <Pagination
+              page={warehousePaging.page}
+              totalPages={warehousePaging.totalPages}
+              total={warehousePaging.total}
+              limit={warehousePaging.pageSize}
+              onPageChange={warehousePaging.setPage}
+            />
+          )}
         </div>
       </div>
 

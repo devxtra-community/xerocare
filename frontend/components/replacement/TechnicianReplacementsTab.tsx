@@ -96,7 +96,7 @@ export function TechnicianReplacementsTab() {
     <div className="space-y-4">
       <div className="overflow-hidden rounded-2xl border border-slate-100 bg-card p-4 shadow-sm">
         <div className="mb-2 overflow-x-auto">
-          <Table className="min-w-[900px] sm:min-w-full">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[900px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="font-bold text-primary">REQUEST</TableHead>

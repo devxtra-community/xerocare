@@ -34,6 +34,8 @@ import {
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 type SubTab = 'register' | 'rules' | 'journal';
 
@@ -413,6 +415,7 @@ function AssetsContent() {
       }),
     [assets, search],
   );
+  const assetPaging = useTablePagination(filtered, search, 10);
 
   const totalCost = assets.reduce((s, a) => s + Number(a.purchasePrice ?? 0), 0);
   const totalNBV = assets.reduce((s, a) => s + Number(a.nbv ?? 0), 0);
@@ -573,7 +576,7 @@ function AssetsContent() {
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((a) => (
+                    assetPaging.pageRows.map((a) => (
                       <tr key={a.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-800">{a.assetName ?? '—'}</p>
@@ -630,6 +633,15 @@ function AssetsContent() {
                   )}
                 </tbody>
               </table>
+              {assetPaging.total > assetPaging.pageSize && (
+                <Pagination
+                  page={assetPaging.page}
+                  totalPages={assetPaging.totalPages}
+                  total={assetPaging.total}
+                  limit={assetPaging.pageSize}
+                  onPageChange={assetPaging.setPage}
+                />
+              )}
             </div>
           )}
         </div>

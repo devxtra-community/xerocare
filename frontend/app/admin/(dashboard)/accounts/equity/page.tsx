@@ -17,6 +17,8 @@ import StatCard from '@/components/StatCard';
 import { DonutChart, SimpleLineChart } from '@/components/accounts/charts';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const TYPE_COLORS: Record<string, string> = {
   SHARE_CAPITAL: 'bg-blue-100 text-blue-700',
@@ -62,6 +64,7 @@ function EquityContent() {
     queryKey: ['admin-equity-entries', branchIds],
     queryFn: () => fetchEquityEntries(params),
   });
+  const entryPaging = useTablePagination(entries, entries.map((entry) => entry.id).join('|'), 10);
   const { data: charts } = useQuery({
     queryKey: ['admin-equity-charts', branchIds],
     queryFn: () =>
@@ -183,7 +186,7 @@ function EquityContent() {
                   </td>
                 </tr>
               ) : (
-                entries.slice(0, 30).map((e) => (
+                entryPaging.pageRows.map((e) => (
                   <tr key={e.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.entryNo}</td>
                     <td className="px-4 py-3">{String(e.date).slice(0, 10)}</td>
@@ -206,6 +209,15 @@ function EquityContent() {
               )}
             </tbody>
           </table>
+          {entryPaging.total > entryPaging.pageSize && (
+            <Pagination
+              page={entryPaging.page}
+              totalPages={entryPaging.totalPages}
+              total={entryPaging.total}
+              limit={entryPaging.pageSize}
+              onPageChange={entryPaging.setPage}
+            />
+          )}
         </div>
       </div>
       {showStatement && (

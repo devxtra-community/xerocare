@@ -118,7 +118,7 @@ export function FinanceReplacementsTab() {
 
       <div className="overflow-hidden rounded-xl border border-slate-100 bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <Table className="min-w-[900px] sm:min-w-full">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[900px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="font-bold text-primary">REQUEST</TableHead>

@@ -3,16 +3,80 @@
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
+import Pagination from '@/components/Pagination';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+type TablePaginationOptions = { pageSize?: number };
+type TablePaginationContextValue = {
+  page: number;
+  pageSize: number;
+  reportRows: (count: number, signature: string) => void;
+};
+const TablePaginationContext = React.createContext<TablePaginationContextValue | null>(null);
+
+function flattenRows(children: React.ReactNode): React.ReactNode[] {
+  return React.Children.toArray(children).flatMap((child) => {
+    if (
+      React.isValidElement<{ children?: React.ReactNode }>(child) &&
+      child.type === React.Fragment
+    ) {
+      return flattenRows(child.props.children);
+    }
+    return [child];
+  });
+}
+
+function Table({
+  className,
+  pagination,
+  children,
+  ...props
+}: React.ComponentProps<'table'> & { pagination?: TablePaginationOptions }) {
+  const [page, setPage] = React.useState(1);
+  const [rows, setRows] = React.useState({ count: 0, signature: '' });
+  const pageSize = Math.max(1, pagination?.pageSize ?? 10);
+  const totalPages = Math.max(1, Math.ceil(rows.count / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const reportRows = React.useCallback((count: number, signature: string) => {
+    setRows((current) =>
+      current.count === count && current.signature === signature ? current : { count, signature },
+    );
+  }, []);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [rows.signature]);
+
+  const table = (
+    <table data-slot="table" className={cn('w-full caption-bottom text-sm', className)} {...props}>
+      {children}
+    </table>
+  );
+
+  if (!pagination) {
+    return (
+      <div data-slot="table-container" className="relative w-full overflow-x-auto">
+        {table}
+      </div>
+    );
+  }
+
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
-      <table
-        data-slot="table"
-        className={cn('w-full caption-bottom text-sm', className)}
-        {...props}
-      />
-    </div>
+    <TablePaginationContext.Provider value={{ page: safePage, pageSize, reportRows }}>
+      <div data-slot="paginated-table-container" className="w-full">
+        <div data-slot="table-container" className="relative w-full overflow-x-auto">
+          {table}
+        </div>
+        {rows.count > pageSize && (
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            total={rows.count}
+            limit={pageSize}
+            onPageChange={setPage}
+          />
+        )}
+      </div>
+    </TablePaginationContext.Provider>
   );
 }
 
@@ -32,12 +96,32 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
+  const pagination = React.useContext(TablePaginationContext);
+  const rows = React.useMemo(() => flattenRows(props.children), [props.children]);
+  const signature = React.useMemo(
+    () =>
+      rows
+        .map((row, index) => (React.isValidElement(row) ? String(row.key ?? index) : String(index)))
+        .join('|'),
+    [rows],
+  );
+
+  React.useEffect(() => {
+    pagination?.reportRows(rows.length, signature);
+  }, [pagination, rows.length, signature]);
+
+  const visibleRows = pagination
+    ? rows.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize)
+    : props.children;
+
   return (
     <tbody
       data-slot="table-body"
       className={cn('[&_tr:last-child]:border-0', className)}
       {...props}
-    />
+    >
+      {visibleRows}
+    </tbody>
   );
 }
 

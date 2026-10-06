@@ -24,6 +24,8 @@ import { fetchBranches } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 import {
   ChequeDetailModal,
@@ -400,6 +402,7 @@ function ChequeTable({
   onView: (c: Cheque) => void;
   emptyLabel: string;
 }) {
+  const paging = useTablePagination(cheques, cheques.map((cheque) => cheque.id).join('|'), 10);
   const isOverdue = (c: Cheque) =>
     new Date(c.dueDate) < new Date() && ['PENDING', 'ISSUED'].includes(c.status);
 
@@ -429,7 +432,7 @@ function ChequeTable({
           </tr>
         </thead>
         <tbody className="divide-y">
-          {cheques.map((c) => (
+          {paging.pageRows.map((c) => (
             <tr
               key={c.id}
               className={`transition-colors ${isOverdue(c) ? 'bg-red-50/40' : 'hover:bg-gray-50'}`}
@@ -500,6 +503,15 @@ function ChequeTable({
           ))}
         </tbody>
       </table>
+      {paging.total > paging.pageSize && (
+        <Pagination
+          page={paging.page}
+          totalPages={paging.totalPages}
+          total={paging.total}
+          limit={paging.pageSize}
+          onPageChange={paging.setPage}
+        />
+      )}
     </div>
   );
 }

@@ -236,7 +236,7 @@ export default function HREmployeeManagementTable() {
 
       <div className="bg-card rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-auto max-h-[500px] relative">
-          <Table className="w-full text-left">
+          <Table pagination={{ pageSize: 10 }} className="w-full text-left">
             <TableHeader className="bg-muted/50/50 sticky top-0 z-20 shadow-sm">
               <TableRow className="border-b border-gray-100 hover:bg-transparent">
                 <TableHead className="px-3 py-2 text-[10px] font-bold text-primary uppercase">

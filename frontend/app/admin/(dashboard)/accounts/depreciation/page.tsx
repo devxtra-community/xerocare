@@ -22,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE: 'bg-emerald-100 text-emerald-700',
@@ -63,6 +65,7 @@ function DepreciationContent() {
       a.productId?.toLowerCase().includes(search.toLowerCase());
     return matchMethod && matchSearch;
   });
+  const assetPaging = useTablePagination(filtered, `${search}|${methodFilter}`, 10);
 
   const totalCost = assets.reduce((s, a) => s + Number(a.purchasePrice ?? 0), 0);
   const totalNBV = assets.reduce((s, a) => s + Number(a.nbv ?? 0), 0);
@@ -207,7 +210,7 @@ function DepreciationContent() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((a: AssetDepreciationRegister) => (
+                  assetPaging.pageRows.map((a: AssetDepreciationRegister) => (
                     <tr key={a.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">
                         {a.id.slice(0, 8)}…
@@ -238,6 +241,15 @@ function DepreciationContent() {
                 )}
               </tbody>
             </table>
+            {assetPaging.total > assetPaging.pageSize && (
+              <Pagination
+                page={assetPaging.page}
+                totalPages={assetPaging.totalPages}
+                total={assetPaging.total}
+                limit={assetPaging.pageSize}
+                onPageChange={assetPaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>

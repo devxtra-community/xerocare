@@ -136,7 +136,7 @@ export default function SalesSummaryTable({ selectedYear }: { selectedYear: numb
 
       {/* Scrollable Container with Custom Slider Styling */}
       <div className="flex-1 overflow-x-auto custom-scrollbar pb-2">
-        <Table className="min-w-[900px] border-collapse relative">
+        <Table pagination={{ pageSize: 10 }} className="min-w-[900px] border-collapse relative">
           <TableHeader>
             <TableRow className="border-b border-primary/10 hover:bg-transparent">
               <TableHead className="text-left text-[10px] sm:text-xs font-bold text-primary/60 uppercase tracking-wider py-3 px-2 w-[120px]">

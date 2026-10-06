@@ -149,7 +149,7 @@ function MachineReplacementsContent() {
 
       <div className="rounded-2xl bg-card shadow-sm border border-slate-100 overflow-hidden p-4">
         <div className="overflow-x-auto mb-2">
-          <Table className="min-w-[980px] sm:min-w-full">
+          <Table pagination={{ pageSize: 10 }} className="min-w-[980px] sm:min-w-full">
             <TableHeader className="bg-muted/50">
               <TableRow>
                 <TableHead className="text-primary font-bold">REQUEST</TableHead>

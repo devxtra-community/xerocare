@@ -727,7 +727,7 @@ export default function MyExpensesPage({ currency: currencyProp }: { currency?: 
 
       {/* Table */}
       <div className="bg-card rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <Table>
+        <Table pagination={{ pageSize: 10 }}>
           <TableHeader className="bg-muted/40">
             <TableRow>
               <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">

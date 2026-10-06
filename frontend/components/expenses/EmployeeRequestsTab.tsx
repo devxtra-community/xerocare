@@ -948,7 +948,7 @@ export default function EmployeeRequestsTab() {
             <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <Table>
+          <Table pagination={{ pageSize: 10 }}>
             <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead className="pl-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">

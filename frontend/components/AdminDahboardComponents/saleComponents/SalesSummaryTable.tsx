@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 // Removed unused static data
 
@@ -127,6 +129,11 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
       return matchesSearch && matchesModel && matchesMonth;
     });
   }, [salesData, searchTerm, selectedModel, selectedMonth]);
+  const salesPaging = useTablePagination(
+    filteredData,
+    `${selectedYear}|${searchTerm}|${selectedModel}|${selectedMonth}`,
+    10,
+  );
 
   return (
     <div className="rounded-2xl bg-card p-2 sm:p-3 shadow-sm w-full h-full flex flex-col space-y-4">
@@ -220,7 +227,7 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
 
             <tbody>
               {filteredData.length > 0 ? (
-                filteredData.map((row, index) => (
+                salesPaging.pageRows.map((row, index) => (
                   <tr key={index} className={index % 2 === 1 ? 'bg-blue-50/20' : 'bg-card'}>
                     <td className="py-1.5 sm:py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-medium text-foreground">
                       {row.productId}
@@ -254,6 +261,15 @@ const SalesSummaryTable = ({ selectedYear }: { selectedYear: number | 'all' }) =
               )}
             </tbody>
           </table>
+        )}
+        {!loading && filteredData.length > 0 && (
+          <Pagination
+            page={salesPaging.page}
+            totalPages={salesPaging.totalPages}
+            total={salesPaging.total}
+            limit={salesPaging.pageSize}
+            onPageChange={salesPaging.setPage}
+          />
         )}
       </div>
     </div>

@@ -241,7 +241,7 @@ export default function AssignTargetDialog({
               </Button>
             </div>
             {tiers.length > 0 && (
-              <Table>
+              <Table pagination={{ pageSize: 10 }}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>From %</TableHead>

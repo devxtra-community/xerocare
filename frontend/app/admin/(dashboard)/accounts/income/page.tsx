@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-700',
@@ -49,6 +51,7 @@ function IncomeContent() {
     const matchSearch = !search || e.description?.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+  const incomePaging = useTablePagination(filtered, `${search}|${catFilter}`, 10);
 
   const total = filtered.reduce((s, e) => s + Number(e.netAmount), 0);
   const pending = filtered.filter((e) => e.status === 'PENDING').length;
@@ -146,7 +149,7 @@ function IncomeContent() {
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((e) => (
+                  incomePaging.pageRows.map((e) => (
                     <tr key={e.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">{e.incomeNo}</td>
                       <td className="px-4 py-3">{e.date?.slice(0, 10)}</td>
@@ -176,6 +179,15 @@ function IncomeContent() {
                 )}
               </tbody>
             </table>
+            {incomePaging.total > incomePaging.pageSize && (
+              <Pagination
+                page={incomePaging.page}
+                totalPages={incomePaging.totalPages}
+                total={incomePaging.total}
+                limit={incomePaging.pageSize}
+                onPageChange={incomePaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>

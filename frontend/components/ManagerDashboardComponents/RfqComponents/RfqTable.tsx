@@ -108,7 +108,7 @@ export default function RfqTable({ basePath }: RfqTableProps) {
         {loading ? (
           <div className="p-8 text-center text-slate-500 animate-pulse">Loading RFQs...</div>
         ) : (
-          <Table>
+          <Table pagination={{ pageSize: 10 }}>
             <TableHeader className="bg-slate-50">
               <TableRow className="hover:bg-transparent">
                 <TableHead className="font-semibold text-slate-600">RFQ Number</TableHead>

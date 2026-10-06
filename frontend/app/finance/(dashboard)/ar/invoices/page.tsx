@@ -27,6 +27,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { arCustomers, arInvoices, arPayments } from '@/lib/finance/ar';
 
 import { getActiveCurrency } from '@/lib/currency';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
+import Pagination from '@/components/Pagination';
 export default function SalesInvoiceListPage() {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,6 +96,7 @@ export default function SalesInvoiceListPage() {
       return matchesStatus && matchesSearch;
     });
   }, [invoicesWithDerivedData, statusFilter, searchQuery]);
+  const invoicePaging = useTablePagination(filteredInvoices, `${statusFilter}|${searchQuery}`, 10);
 
   // Global KPIs based on filtered context
   const totalOutstanding = useMemo(
@@ -186,7 +189,7 @@ export default function SalesInvoiceListPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInvoices.map((inv) => (
+              invoicePaging.pageRows.map((inv) => (
                 <TableRow key={inv.id} className="group hover:bg-muted/50/30 transition-colors">
                   <TableCell className="font-bold text-blue-600 pl-6">
                     <Link href={`/finance/ar/invoices/${inv.id}`}>{inv.invoiceNumber}</Link>
@@ -215,6 +218,15 @@ export default function SalesInvoiceListPage() {
             )}
           </TableBody>
         </Table>
+        {filteredInvoices.length > 0 && (
+          <Pagination
+            page={invoicePaging.page}
+            totalPages={invoicePaging.totalPages}
+            total={invoicePaging.total}
+            limit={invoicePaging.pageSize}
+            onPageChange={invoicePaging.setPage}
+          />
+        )}
       </div>
     </div>
   );

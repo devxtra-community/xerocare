@@ -62,6 +62,8 @@ import type { BranchInfo } from '@/components/shared/documentTemplate';
 import OwnerSelect from '@/components/finance/OwnerSelect';
 import BranchIdentityChip from '@/components/finance/BranchIdentityChip';
 import { useBranchNameMap } from '@/hooks/useBranchNameMap';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 
 import { getActiveCurrency } from '@/lib/currency';
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -1880,6 +1882,8 @@ export default function CashBankPage() {
       ),
     [bankAccounts, search],
   );
+  const cashPaging = useTablePagination(filteredCash, search, 10);
+  const bankPaging = useTablePagination(filteredBank, search, 10);
 
   const filteredCashbook = useMemo(
     () =>
@@ -1896,6 +1900,8 @@ export default function CashBankPage() {
     () => cashbookEntries.filter((e) => e.category === 'TRANSFER'),
     [cashbookEntries],
   );
+  const cashbookPaging = useTablePagination(filteredCashbook, search, 10);
+  const transferPaging = useTablePagination(transferHistory, 'transfers', 10);
 
   const [pickerAccounts, setPickerAccounts] = useState<CashBankAccount[]>([]);
 
@@ -2098,7 +2104,7 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredCash.map((a) => (
+                      {cashPaging.pageRows.map((a) => (
                         <tr key={a.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
                           <td className="px-4 py-3 text-slate-600 text-xs font-medium">
@@ -2174,6 +2180,15 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
+                  {cashPaging.total > cashPaging.pageSize && (
+                    <Pagination
+                      page={cashPaging.page}
+                      totalPages={cashPaging.totalPages}
+                      total={cashPaging.total}
+                      limit={cashPaging.pageSize}
+                      onPageChange={cashPaging.setPage}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -2232,7 +2247,7 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredBank.map((a) => (
+                      {bankPaging.pageRows.map((a) => (
                         <tr key={a.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 font-medium text-slate-800">{a.name}</td>
                           <td className="px-4 py-3 text-slate-600">{a.bankName ?? '—'}</td>
@@ -2316,6 +2331,15 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
+                  {bankPaging.total > bankPaging.pageSize && (
+                    <Pagination
+                      page={bankPaging.page}
+                      totalPages={bankPaging.totalPages}
+                      total={bankPaging.total}
+                      limit={bankPaging.pageSize}
+                      onPageChange={bankPaging.setPage}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -2382,7 +2406,7 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredCashbook.slice(0, 200).map((e) => (
+                      {cashbookPaging.pageRows.map((e) => (
                         <tr key={e.id} className="hover:bg-slate-50">
                           <td className="px-4 py-2.5 whitespace-nowrap">
                             {String(e.date).slice(0, 10)}
@@ -2427,11 +2451,14 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
-                  {filteredCashbook.length > 200 && (
-                    <p className="px-4 py-2.5 text-xs text-slate-400 border-t">
-                      Showing 200 of {filteredCashbook.length} entries. Use date range filters on
-                      individual account history for full view.
-                    </p>
+                  {cashbookPaging.total > cashbookPaging.pageSize && (
+                    <Pagination
+                      page={cashbookPaging.page}
+                      totalPages={cashbookPaging.totalPages}
+                      total={cashbookPaging.total}
+                      limit={cashbookPaging.pageSize}
+                      onPageChange={cashbookPaging.setPage}
+                    />
                   )}
                 </div>
               )}
@@ -2478,7 +2505,7 @@ export default function CashBankPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {transferHistory.map((e) => (
+                      {transferPaging.pageRows.map((e) => (
                         <tr key={e.id} className="hover:bg-slate-50">
                           <td className="px-4 py-3 whitespace-nowrap">
                             {String(e.date).slice(0, 10)}
@@ -2505,6 +2532,15 @@ export default function CashBankPage() {
                       ))}
                     </tbody>
                   </table>
+                  {transferPaging.total > transferPaging.pageSize && (
+                    <Pagination
+                      page={transferPaging.page}
+                      totalPages={transferPaging.totalPages}
+                      total={transferPaging.total}
+                      limit={transferPaging.pageSize}
+                      onPageChange={transferPaging.setPage}
+                    />
+                  )}
                 </div>
               )}
             </>

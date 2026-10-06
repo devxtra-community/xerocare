@@ -199,7 +199,7 @@ export default function MachineSwapsPage() {
               </p>
             </div>
           ) : (
-            <Table>
+            <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow className="bg-slate-50/70">
                   {[

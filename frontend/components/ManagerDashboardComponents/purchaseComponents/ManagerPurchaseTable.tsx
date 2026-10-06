@@ -176,7 +176,7 @@ export default function ManagerPurchaseTable() {
       </div>
 
       <div className="rounded-2xl bg-white shadow-sm border border-slate-100 overflow-hidden">
-        <Table>
+        <Table pagination={{ pageSize: 10 }}>
           <TableHeader>
             <tr className="bg-slate-50/50">
               {[

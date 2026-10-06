@@ -29,6 +29,8 @@ import { fetchBranches } from '@/lib/finance/accounts';
 import { getUserFromToken } from '@/lib/auth';
 import { formatCurrency } from '@/lib/format';
 import { useBranchCurrency } from '@/lib/hooks/useBranchCurrency';
+import Pagination from '@/components/Pagination';
+import { useTablePagination } from '@/lib/hooks/useTablePagination';
 import BranchFilterBar from '@/components/accounts/admin/BranchFilterBar';
 import StatementDialog, { type SnapshotStatementData } from '@/components/shared/StatementDialog';
 import {
@@ -403,6 +405,11 @@ function AdminChequesContent() {
     queryKey,
     queryFn: () => fetchCheques(params),
   });
+  const chequePaging = useTablePagination(
+    cheques,
+    cheques.map((cheque) => cheque.id).join('|'),
+    10,
+  );
 
   const { data: summary = { RECEIVED: {}, ISSUED: {} } } = useQuery({
     queryKey: summaryKey,
@@ -603,7 +610,7 @@ function AdminChequesContent() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {cheques.map((c) => (
+                {chequePaging.pageRows.map((c) => (
                   <tr key={c.id} className={isOverdue(c) ? 'bg-red-50/40' : 'hover:bg-gray-50'}>
                     <td className="px-4 py-3 font-mono text-xs text-gray-700">{c.chequeNo}</td>
                     <td className="px-4 py-3">
@@ -669,6 +676,15 @@ function AdminChequesContent() {
                 ))}
               </tbody>
             </table>
+            {chequePaging.total > chequePaging.pageSize && (
+              <Pagination
+                page={chequePaging.page}
+                totalPages={chequePaging.totalPages}
+                total={chequePaging.total}
+                limit={chequePaging.pageSize}
+                onPageChange={chequePaging.setPage}
+              />
+            )}
           </div>
         )}
       </div>

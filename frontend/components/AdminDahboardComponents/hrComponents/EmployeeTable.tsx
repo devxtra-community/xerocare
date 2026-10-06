@@ -345,7 +345,7 @@ export default function EmployeeTable() {
 
       {/* Table */}
       <div className="overflow-x-auto min-h-[400px]">
-        <Table className="w-full">
+        <Table pagination={{ pageSize: 10 }} className="w-full">
           <TableHeader className="bg-muted/50/50">
             <TableRow className="border-b border-gray-100 hover:bg-transparent">
               <TableHead className="px-3 py-4 text-xs font-semibold text-primary uppercase tracking-wider">
