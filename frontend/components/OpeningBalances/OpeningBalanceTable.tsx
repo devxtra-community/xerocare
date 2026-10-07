@@ -51,16 +51,16 @@ export default function OpeningBalanceTable({
       case 'SERVICE_DEBT':
         return 'bg-info/10 text-info dark:bg-info/20 dark:text-info';
       default:
-        return 'bg-muted text-foreground dark:bg-foreground/20 dark:text-muted-foreground';
+        return 'bg-muted text-foreground';
     }
   };
 
   return (
-    <div className="w-full overflow-hidden bg-card dark:bg-foreground rounded-2xl shadow-sm border border-border dark:border-border">
+    <div className="w-full overflow-hidden bg-card text-card-foreground rounded-2xl shadow-sm border border-border">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-border dark:border-border bg-muted/50 dark:bg-foreground/50 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+            <tr className="border-b border-border bg-muted text-xs font-semibold uppercase text-muted-foreground tracking-wider">
               <th className="py-4 px-6">Entry Number</th>
               <th className="py-4 px-6">Customer</th>
               <th className="py-4 px-6">Branch</th>
@@ -71,7 +71,7 @@ export default function OpeningBalanceTable({
               <th className="py-4 px-6 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border dark:divide-border text-sm text-foreground dark:text-muted-foreground">
+          <tbody className="divide-y divide-border text-sm text-foreground">
             {entries.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-muted-foreground">
@@ -86,18 +86,15 @@ export default function OpeningBalanceTable({
                   Number(entry.openingBalance || 0) === Number(entry.remainingBalance || 0);
 
                 return (
-                  <tr
-                    key={entry.id}
-                    className="hover:bg-muted/50 dark:hover:bg-foreground/20 transition-colors"
-                  >
-                    <td className="py-4 px-6 font-medium text-foreground dark:text-muted-foreground">
+                  <tr key={entry.id} className="hover:bg-muted/50 transition-colors">
+                    <td className="py-4 px-6 font-medium text-foreground">
                       <div>{entry.entryNumber}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {new Date(entry.migratedAt).toLocaleDateString()}
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-semibold text-foreground dark:text-muted-foreground">
+                      <span className="font-semibold text-foreground">
                         {customerNames[entry.customerId] || 'Loading customer...'}
                       </span>
                       <span className="block text-xs text-muted-foreground">
@@ -105,7 +102,7 @@ export default function OpeningBalanceTable({
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-medium text-foreground dark:text-muted-foreground">
+                      <span className="font-medium text-foreground">
                         {entry.branchName || 'Unknown Branch'}
                       </span>
                     </td>
@@ -130,7 +127,7 @@ export default function OpeningBalanceTable({
                         })}
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-right font-semibold text-foreground dark:text-muted-foreground">
+                    <td className="py-4 px-6 text-right font-semibold text-foreground">
                       {getActiveCurrency()}{' '}
                       {Number(entry.remainingBalance).toLocaleString('en-US', {
                         minimumFractionDigits: 2,

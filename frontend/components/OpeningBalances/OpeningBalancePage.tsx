@@ -490,12 +490,10 @@ export default function OpeningBalancePage() {
 
       {/* Branch Aggregation Table for Admin & Finance */}
       {['ADMIN', 'FINANCE'].includes(userRole) && entries.length > 0 && (
-        <div className="bg-card dark:bg-foreground p-6 rounded-2xl border border-border dark:border-border shadow-sm space-y-4">
+        <div className="bg-card text-card-foreground p-6 rounded-2xl border border-border shadow-sm space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-foreground dark:text-muted-foreground">
-              Branch-wise Migration Summary
-            </h3>
-            <span className="text-xs text-muted-foreground bg-muted dark:bg-foreground px-3 py-1 rounded-full font-medium">
+            <h3 className="text-lg font-bold text-foreground">Branch-wise Migration Summary</h3>
+            <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full font-medium">
               Central Office Consolidation
             </span>
           </div>
@@ -510,7 +508,7 @@ export default function OpeningBalancePage() {
                   <th className="pb-3 pl-4 text-center">Active / Total Entries</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border dark:divide-border text-sm text-foreground dark:text-muted-foreground">
+              <tbody className="divide-y divide-border text-sm text-foreground">
                 {Object.values(
                   entries.reduce((acc: Record<string, BranchAggregation>, entry) => {
                     const branchKey = entry.branchName || 'Unknown Branch';
@@ -539,14 +537,9 @@ export default function OpeningBalancePage() {
                     return acc;
                   }, {}),
                 ).map((agg: BranchAggregation) => (
-                  <tr
-                    key={agg.branchName}
-                    className="hover:bg-muted/50 dark:hover:bg-foreground/20 transition-colors"
-                  >
-                    <td className="py-3 pr-4 font-semibold text-foreground dark:text-muted-foreground">
-                      {agg.branchName}
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium text-foreground dark:text-muted-foreground">
+                  <tr key={agg.branchName} className="hover:bg-muted/50 transition-colors">
+                    <td className="py-3 pr-4 font-semibold text-foreground">{agg.branchName}</td>
+                    <td className="py-3 px-4 text-right font-medium text-foreground">
                       {getActiveCurrency()}{' '}
                       {agg.totalMigrated.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
@@ -568,7 +561,7 @@ export default function OpeningBalancePage() {
                       })}
                     </td>
                     <td className="py-3 pl-4 text-center text-xs font-semibold">
-                      <span className="bg-muted dark:bg-foreground text-foreground dark:text-muted-foreground px-2.5 py-1 rounded-full">
+                      <span className="bg-muted text-foreground px-2.5 py-1 rounded-full">
                         {agg.activeCount} / {agg.totalCount}
                       </span>
                     </td>

@@ -248,7 +248,7 @@ export default function ManagerTargetsPage() {
         {/* ALL EMPLOYEES — every branch employee, sales/rent/lease done this
             month even if no target was ever assigned to them. */}
         <TabsContent value="activity" className="mt-4">
-          <div className="rounded-xl border bg-card dark:bg-foreground overflow-hidden">
+          <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
             <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
@@ -323,7 +323,7 @@ export default function ManagerTargetsPage() {
             </Button>
           </div>
 
-          <div className="rounded-xl border bg-card dark:bg-foreground overflow-hidden">
+          <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
             <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>
@@ -423,7 +423,7 @@ export default function ManagerTargetsPage() {
 
         {/* LEADERBOARD — targeted employees ranked by achievement %. */}
         <TabsContent value="leaderboard" className="mt-4">
-          <div className="rounded-xl border bg-card dark:bg-foreground overflow-hidden">
+          <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
             <Table pagination={{ pageSize: 10 }}>
               <TableHeader>
                 <TableRow>

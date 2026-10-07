@@ -47,7 +47,11 @@ function Table({
   }, [rows.signature]);
 
   const table = (
-    <table data-slot="table" className={cn('w-full caption-bottom text-sm', className)} {...props}>
+    <table
+      data-slot="table"
+      className={cn('w-full caption-bottom bg-card text-card-foreground text-sm', className)}
+      {...props}
+    >
       {children}
     </table>
   );

@@ -352,18 +352,25 @@ h4[class*='text-blue-'] {
   background-color: #fff;
 }
 
-/* Legacy native tables receive the shared light header, fine dividers and hover. */
-table:not([data-slot='table']) thead { background-color: #f8fafc; }
-table:not([data-slot='table']) th {
-  color: #475569;
-  font-weight: 600;
-  border-bottom: 1px solid #e5e7eb;
+/* Native tables share the same theme surfaces and readable text as UI tables. */
+table:not([data-slot='table']) {
+  color: var(--foreground);
+  background-color: var(--card);
 }
-table:not([data-slot='table']) td { border-bottom: 1px solid #eef0f2; }
-table:not([data-slot='table']) tbody tr:hover { background-color: #eff6ff; }
+table:not([data-slot='table']) thead { background-color: var(--muted); }
+table:not([data-slot='table']) th {
+  color: var(--foreground);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+table:not([data-slot='table']) td { border-bottom: 1px solid var(--border); }
+table:not([data-slot='table']) tbody tr:hover {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
 table:not([data-slot='table']) tbody tr[data-state='selected'] {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: var(--accent);
+  color: var(--accent-foreground);
 }
 
 /* Dark mode: blue accents become soft yellow, and near-black text becomes gray. */
@@ -428,20 +435,6 @@ table:not([data-slot='table']) tbody tr[data-state='selected'] {
 .dark :is([data-slot='sidebar-inner'], [data-slot='sidebar']) [data-sidebar='footer'] {
   background-color: #0b1120 !important;
 }
-.dark table:not([data-slot='table']) thead {
-  background-color: #172033;
-}
-.dark table:not([data-slot='table']) th {
-  color: #cbd5e1;
-  border-bottom-color: #334155;
-}
-.dark table:not([data-slot='table']) td {
-  border-bottom-color: #273449;
-}
-.dark table:not([data-slot='table']) tbody tr:hover {
-  background-color: #1e293b;
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;

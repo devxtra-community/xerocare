@@ -309,7 +309,7 @@ export default function AssignTargetDialog({
                   return (
                     <div
                       key={level}
-                      className="rounded-lg bg-card dark:bg-foreground p-2 text-center border"
+                      className="rounded-lg border border-border bg-card text-card-foreground p-2 text-center"
                     >
                       <div className="font-bold text-primary">{level}%</div>
                       <div className="text-muted-foreground">

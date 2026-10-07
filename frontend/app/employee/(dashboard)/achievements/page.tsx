@@ -179,7 +179,7 @@ export default function MyAchievementsPage() {
       )}
 
       {historyRows.length > 0 && (
-        <div className="rounded-xl border bg-card dark:bg-foreground overflow-hidden">
+        <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
           <div className="p-4 border-b">
             <h3 className="font-semibold">Monthly History</h3>
           </div>
