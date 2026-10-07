@@ -6,10 +6,12 @@ import { LotDocumentType } from '../entities/lotDocumentEntity';
 import { TransportMode, MODE_DETAIL_FIELDS } from '../entities/enums/transportMode';
 import { ShipmentStatus } from '../entities/enums/shipmentStatus';
 import { LandedCostService, SplitMethod } from '../services/landedCostService';
+import { Source } from '../config/db';
+import { Branch } from '../entities/branchEntity';
 
 const lotService = new LotService();
 const landedCostService = new LandedCostService();
-import { getRabbitChannel } from '../config/rabbitmq';
+import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { r2SignedGetUrl } from '../utils/r2Url';
 
 /**
@@ -21,19 +23,21 @@ export const createLot = async (req: Request, res: Response, next: NextFunction)
     const lotData = { ...req.body, branchId };
     const lot = await lotService.createLot(lotData);
 
-    // Dispatch in-app notification to Admins
+    // Lot creation is branch inventory activity: notify only its manager.
     try {
-      const channel = await getRabbitChannel();
-      const payload = {
-        notifyAdmins: true,
-        title: 'New Lot Created',
-        message: `Lot #${lot.lotNumber} has been created in branch ${branchId}.`,
-        type: 'LOT_CREATED',
-        data: { lotId: lot.id, branchId },
-      };
-      channel.sendToQueue('notification_queue', Buffer.from(JSON.stringify(payload)), {
-        persistent: true,
-      });
+      const branch = branchId
+        ? await Source.getRepository(Branch).findOne({ where: { id: branchId } })
+        : null;
+      if (branch?.manager_id) {
+        await NotificationPublisher.publishInAppRequest({
+          recipientId: branch.manager_id,
+          title: 'New Lot Created',
+          message: `Lot #${lot.lotNumber} has been created in branch ${branchId}.`,
+          type: 'LOT_CREATED',
+          referenceId: lot.id,
+          referenceType: 'LOT',
+        });
+      }
     } catch (e) {
       console.error('Failed to dispatch lot creation notification', e);
     }

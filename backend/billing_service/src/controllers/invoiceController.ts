@@ -5,6 +5,7 @@ import { BillingReportService } from '../services/billingReportService';
 import { NotificationService } from '../services/notificationService';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { getBranchManager } from '../services/billingHelpers';
+import { branchBusinessNotificationRecipients } from '../services/notificationRecipientPolicy';
 import { AppError } from '../errors/appError';
 import { MulterS3File } from '../types/multer-s3-file';
 import { Source } from '../config/dataSource';
@@ -139,16 +140,14 @@ export const createQuotation = async (req: Request, res: Response, next: NextFun
 
     try {
       const managerId = await getBranchManager(req.user.branchId);
-      if (managerId) {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: managerId,
-          title: 'New Quotation Created',
-          message: `A new ${saleType} quotation (${invoice.invoiceNumber}) was created${totalAmount ? ` for ${totalAmount}` : ''}.`,
-          type: 'INFO',
-          referenceId: invoice.id,
-          referenceType: 'QUOTATION',
-        });
-      }
+      await NotificationPublisher.publishInAppRequest({
+        recipientIds: branchBusinessNotificationRecipients(managerId, [req.user.userId]),
+        title: 'New Quotation Created',
+        message: `A new ${saleType} quotation (${invoice.invoiceNumber}) was created${totalAmount ? ` for ${totalAmount}` : ''}.`,
+        type: 'INFO',
+        referenceId: invoice.id,
+        referenceType: 'QUOTATION',
+      });
     } catch (err) {
       console.error('Failed to notify branch manager of new quotation (non-blocking):', err);
     }

@@ -8,6 +8,7 @@ import {
 import { Branch } from '../entities/branchEntity';
 import { MachineServiceHistory } from '../entities/machineServiceHistoryEntity';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
+import { getHelpDeskEmployeesByBranch } from '../helpers/serviceHelpers';
 import { logger } from '../config/logger';
 import { In } from 'typeorm';
 
@@ -162,24 +163,18 @@ export async function runPreventativeMaintenanceJob() {
           await ticketRepo.save(pmTicket);
           logger.info(`[CRON-PM] Created PM ticket ${ticketNumber} for serial ${serialNumber}`);
 
-          // Trigger notification to branch manager/admins
+          // PM tickets are branch operations for the manager and service work for Help Desk.
           const branchRepo = Source.getRepository(Branch);
           const branch = await branchRepo.findOne({ where: { id: branchId } });
-          const recipientIds = [];
-          if (branch && branch.manager_id) {
-            recipientIds.push(branch.manager_id);
-          }
-
-          for (const recipientId of recipientIds) {
-            await NotificationPublisher.publishInAppRequest({
-              recipientId,
-              title: 'Preventative Maintenance Ticket Created',
-              message: `Scheduled PM ticket ${ticketNumber} has been automatically created for serial ${serialNumber}.`,
-              type: 'TASK',
-              referenceId: pmTicket.id,
-              referenceType: 'SERVICE',
-            });
-          }
+          const helpDeskIds = await getHelpDeskEmployeesByBranch(branchId);
+          await NotificationPublisher.publishInAppRequest({
+            recipientIds: [branch?.manager_id, ...helpDeskIds],
+            title: 'Preventative Maintenance Ticket Created',
+            message: `Scheduled PM ticket ${ticketNumber} has been automatically created for serial ${serialNumber}.`,
+            type: 'TASK',
+            referenceId: pmTicket.id,
+            referenceType: 'SERVICE',
+          });
         }
       }
     }

@@ -8,6 +8,10 @@ import { logger } from '../config/logger';
 import { Notification } from '../entities/notificationEntity';
 import { Employee } from '../entities/employeeEntities';
 import { LeaveApplication } from '../entities/leaveApplicationEntity';
+import {
+  leaveSubmittedRecipients,
+  personalNotificationRecipient,
+} from './notificationRecipientPolicy';
 
 interface SubmitLeaveApplicationData {
   start_date: string;
@@ -104,12 +108,13 @@ export class LeaveApplicationService {
       const employeeName =
         `${employee.first_name || ''} ${employee.last_name || ''}`.trim() || 'An employee';
 
-      const recipientIds = new Set<string>();
-      if (manager) recipientIds.add(manager.id);
-      for (const hr of hrEmployees) recipientIds.add(hr.id);
+      const recipientIds = leaveSubmittedRecipients(
+        manager?.id ?? null,
+        hrEmployees.map((hr) => hr.id),
+      );
 
       await notificationRepo.save(
-        [...recipientIds].map((recipientId) =>
+        recipientIds.map((recipientId) =>
           notificationRepo.create({
             employee_id: recipientId,
             title: 'Leave Application Submitted',
@@ -185,7 +190,7 @@ export class LeaveApplicationService {
       const notificationRepo = Source.getRepository(Notification);
       await notificationRepo.save(
         notificationRepo.create({
-          employee_id: leaveApplication.employee_id,
+          employee_id: personalNotificationRecipient(leaveApplication.employee_id),
           title: 'Leave Approved',
           // start_date/end_date come back from TypeORM as plain 'YYYY-MM-DD'
           // strings here, not Date objects — .toDateString() previously threw
@@ -228,7 +233,7 @@ export class LeaveApplicationService {
       const notificationRepo = Source.getRepository(Notification);
       await notificationRepo.save(
         notificationRepo.create({
-          employee_id: leaveApplication.employee_id,
+          employee_id: personalNotificationRecipient(leaveApplication.employee_id),
           title: 'Leave Rejected',
           message: `Your ${leaveApplication.leave_type} leave from ${leaveApplication.start_date} to ${leaveApplication.end_date} was rejected. Reason: ${reason.trim()}`,
           type: 'LEAVE_REJECTED',

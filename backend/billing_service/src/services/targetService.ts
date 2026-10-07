@@ -13,6 +13,7 @@ import { getBranchCurrencyInfo, getBranchName, searchEmployeesByName } from './b
 import { applyBranchQB } from '../middlewares/branchFilterMiddleware';
 import { NotificationPublisher } from '../events/publisher/notificationPublisher';
 import { TARGET_ASSIGNED } from '../constants/notificationTypes';
+import { personalNotificationRecipients } from './notificationRecipientPolicy';
 
 export interface RequestUser {
   userId: string;
@@ -225,7 +226,7 @@ export class TargetService {
 
     try {
       await NotificationPublisher.publishInAppRequest({
-        recipientId: employeeId,
+        recipientIds: personalNotificationRecipients(employeeId),
         title: 'New Target Assigned',
         message: `You have a new ${saved.targetType} target of ${saved.currencyCode} ${saved.targetAmount} for ${targetMonth}.`,
         type: TARGET_ASSIGNED,

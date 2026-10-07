@@ -79,28 +79,6 @@ async function findBranchManager(branchId: string): Promise<string | null> {
   }
 }
 
-// Cross-branch visibility for Admins — same delivery mechanism (direct HTTP
-// call to employee_service's own internal endpoint), broadcast to every
-// active Admin.
-async function findAllAdmins(): Promise<string[]> {
-  try {
-    const empUrl = process.env.EMPLOYEE_SERVICE_URL || 'http://localhost:3002';
-    const token = makeServiceToken();
-    // Admin accounts live in employee_service's own separate `admin` table, not
-    // as Employee rows with role='ADMIN' — GET /employee?role=ADMIN always
-    // returns nothing. /admin/list is the real source.
-    const res = await fetch(`${empUrl}/admin/list`, {
-      headers: { Authorization: `Bearer ${token}`, 'x-internal-service': 'billing' },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const list: Array<{ id: string }> = data.data ?? [];
-    return list.map((e) => e.id);
-  } catch {
-    return [];
-  }
-}
-
 async function sendNotification(
   employeeId: string,
   title: string,
@@ -391,9 +369,18 @@ export const submitExpenseRequest = async (req: Request, res: Response, next: Ne
     request.submittedAt = new Date();
     const saved = await repo.save(request);
 
+    // The requester receives confirmation; finance and the branch manager own review/visibility.
+    await sendNotification(
+      userId,
+      'Expense Request Submitted',
+      `Your ${request.currency} ${Number(request.amount).toFixed(2)} expense request for ${request.category} was submitted.`,
+      'EXPENSE_REQUEST',
+    );
+
     // Notify finance managers
     const fmIds = await findFinanceManagersOfBranch(request.branchId);
     for (const fmId of fmIds) {
+      if (fmId === userId) continue;
       await sendNotification(
         fmId,
         'New Expense Request',
@@ -403,25 +390,15 @@ export const submitExpenseRequest = async (req: Request, res: Response, next: Ne
       );
     }
 
-    // Notify the branch Manager (branch-wide visibility) and all Admins
-    // (cross-branch visibility) — same event, different audiences.
+    // Notify the branch manager for branch business visibility.
     const managerId = await findBranchManager(request.branchId);
-    if (managerId) {
+    if (managerId && managerId !== userId && !fmIds.includes(managerId)) {
       await sendNotification(
         managerId,
         'Expense Request Submitted',
         `${request.employeeName} submitted a ${request.currency} ${Number(request.amount).toFixed(2)} expense request for ${request.category}.`,
         'EXPENSE_REQUEST',
         '/manager/expenses',
-      );
-    }
-    const adminIds = await findAllAdmins();
-    for (const adminId of adminIds) {
-      await sendNotification(
-        adminId,
-        'Expense Request Submitted',
-        `${request.employeeName} (branch ${request.branchName}) submitted a ${request.currency} ${Number(request.amount).toFixed(2)} expense request for ${request.category}.`,
-        'EXPENSE_REQUEST',
       );
     }
 
@@ -931,23 +908,15 @@ export const approveExpenseRequest = async (req: Request, res: Response, next: N
       'EXPENSE_APPROVED',
     );
 
-    // Notify the branch Manager and all Admins of the outcome too.
+    // Notify the branch manager of the business outcome.
     const managerId = await findBranchManager(request.branchId);
-    if (managerId) {
+    if (managerId && managerId !== request.employeeId) {
       await sendNotification(
         managerId,
         'Expense Request Approved',
         `${request.employeeName}'s ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was approved.`,
         'EXPENSE_APPROVED',
         '/manager/expenses',
-      );
-    }
-    for (const adminId of await findAllAdmins()) {
-      await sendNotification(
-        adminId,
-        'Expense Request Approved',
-        `${request.employeeName}'s (branch ${request.branchName}) ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was approved.`,
-        'EXPENSE_APPROVED',
       );
     }
 
@@ -1006,23 +975,15 @@ export const rejectExpenseRequest = async (req: Request, res: Response, next: Ne
         'EXPENSE_REJECTED',
       );
 
-      // Notify the branch Manager and all Admins of the outcome too.
+      // Notify the branch manager of the business outcome.
       const managerId = await findBranchManager(request.branchId);
-      if (managerId) {
+      if (managerId && managerId !== request.employeeId) {
         await sendNotification(
           managerId,
           'Expense Request Rejected',
           `${request.employeeName}'s ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was rejected. Reason: ${rejection_reason}.`,
           'EXPENSE_REJECTED',
           '/manager/expenses',
-        );
-      }
-      for (const adminId of await findAllAdmins()) {
-        await sendNotification(
-          adminId,
-          'Expense Request Rejected',
-          `${request.employeeName}'s (branch ${request.branchName}) ${request.currency} ${Number(request.amount).toFixed(2)} expense for ${request.category} was rejected. Reason: ${rejection_reason}.`,
-          'EXPENSE_REJECTED',
         );
       }
     }
@@ -1392,9 +1353,18 @@ export const createManagerPurchasePaymentRequest = async (
 
     const saved = await repo.save(request);
 
+    await sendNotification(
+      userId,
+      'Purchase Payment Request Submitted',
+      `Your request to pay ${currency || 'AED'} ${parseFloat(String(amount)).toFixed(2)} to ${resolvedVendorName || 'vendor'} was submitted for Finance review.`,
+      'EXPENSE_REQUEST',
+      '/manager/expenses',
+    );
+
     // Notify Finance Managers to review.
     const fmIds = await findFinanceManagersOfBranch(empBranchId);
     for (const fmId of fmIds) {
+      if (fmId === userId) continue;
       await sendNotification(
         fmId,
         purchaseCostType
@@ -1407,6 +1377,16 @@ export const createManagerPurchasePaymentRequest = async (
         // Manager purchase requests (vendor payments and additional costs) are reviewed
         // on Payables → Payments, not the Expenses requests list, which filters them out.
         '/finance/accounts/payable?tab=payments',
+      );
+    }
+    const branchManagerId = await findBranchManager(empBranchId);
+    if (branchManagerId && branchManagerId !== userId && !fmIds.includes(branchManagerId)) {
+      await sendNotification(
+        branchManagerId,
+        'Purchase Payment Request Submitted',
+        `${managerName} submitted a purchase payment request for ${currency || 'AED'} ${parseFloat(String(amount)).toFixed(2)}.`,
+        'EXPENSE_REQUEST',
+        '/manager/expenses',
       );
     }
 
@@ -1503,12 +1483,32 @@ export const createExpenseRequestFromPurchasePayment = async (
 
       const fmIdsChq = await findFinanceManagersOfBranch(branchId);
       for (const fmId of fmIdsChq) {
+        if (fmId === employeeId) continue;
         await sendNotification(
           fmId,
           'Vendor Cheque Issued',
           `${employeeName} issued a ${currency || 'AED'} ${Number(amount).toFixed(2)} cheque to ${vendorName || 'vendor'} (${purchaseRef || 'N/A'}). Go to Accounts → Cheques to track it through to clearance.`,
           'EXPENSE_REQUEST',
           '/finance/accounts/cheques',
+        );
+      }
+      await sendNotification(
+        employeeId,
+        'Vendor Cheque Issued',
+        `Your cheque ${chequeNo} for ${currency || 'AED'} ${Number(amount).toFixed(2)} was issued to ${vendorName || 'vendor'}.`,
+        'EXPENSE_REQUEST',
+      );
+      const branchManagerId = await findBranchManager(branchId);
+      if (
+        branchManagerId &&
+        branchManagerId !== employeeId &&
+        !fmIdsChq.includes(branchManagerId)
+      ) {
+        await sendNotification(
+          branchManagerId,
+          'Vendor Cheque Issued',
+          `${employeeName} issued cheque ${chequeNo} for ${currency || 'AED'} ${Number(amount).toFixed(2)} to ${vendorName || 'vendor'}.`,
+          'EXPENSE_REQUEST',
         );
       }
 
@@ -1560,14 +1560,31 @@ export const createExpenseRequestFromPurchasePayment = async (
 
     const saved = await repo.save(request);
 
+    await sendNotification(
+      employeeId,
+      'Purchase Payment Request Submitted',
+      `Your request to pay ${currency || 'AED'} ${Number(amount).toFixed(2)} to ${vendorName || 'vendor'} was submitted for Finance review.`,
+      'EXPENSE_REQUEST',
+    );
+
     const fmIds = await findFinanceManagersOfBranch(branchId);
     for (const fmId of fmIds) {
+      if (fmId === employeeId) continue;
       await sendNotification(
         fmId,
         'Purchase Payment — Approval Required',
         `${employeeName} requests ${currency || 'AED'} ${Number(amount).toFixed(2)} payment to ${vendorName || 'vendor'} (${purchaseRef || 'N/A'}) via ${paymentMethod || 'Cash'}. Cash held until you approve.`,
         'EXPENSE_REQUEST',
         '/finance/accounts/expenses?tab=requests',
+      );
+    }
+    const branchManagerId = await findBranchManager(branchId);
+    if (branchManagerId && branchManagerId !== employeeId && !fmIds.includes(branchManagerId)) {
+      await sendNotification(
+        branchManagerId,
+        'Purchase Payment Request Submitted',
+        `${employeeName} submitted a purchase payment request for ${currency || 'AED'} ${Number(amount).toFixed(2)}.`,
+        'EXPENSE_REQUEST',
       );
     }
 
@@ -1727,6 +1744,17 @@ export const payExpenseRequest = async (req: Request, res: Response, next: NextF
       `${request.currency} ${Number(request.amount).toFixed(2)} for ${request.category} has been paid. Reference: ${payment_reference || 'N/A'}`,
       'EXPENSE_PAID',
     );
+
+    for (const financeId of await findFinanceManagersOfBranch(request.branchId)) {
+      if (financeId === request.employeeId) continue;
+      await sendNotification(
+        financeId,
+        'Expense Paid',
+        `${request.currency} ${Number(request.amount).toFixed(2)} for ${request.category} was paid to ${request.employeeName}.`,
+        'EXPENSE_PAID',
+        '/finance/accounts/expenses?tab=requests',
+      );
+    }
 
     const updated = await repo.findOne({ where: { id: String(req.params.id) } });
     res.json({ success: true, data: updated });

@@ -4,6 +4,8 @@ import { AppError } from '../errors/appError';
 import { Source } from '../config/dataSource';
 import { logger } from '../config/logger';
 import { Notification } from '../entities/notificationEntity';
+import { Employee } from '../entities/employeeEntities';
+import { lateMarkRecipients } from './notificationRecipientPolicy';
 
 interface MarkLateData {
   employee_id: string;
@@ -55,14 +57,30 @@ export class LateMarkService {
 
     try {
       const notificationRepo = Source.getRepository(Notification);
+      const hrEmployees = await Source.getRepository(Employee).find({
+        where: { role: 'HR' as never },
+        select: ['id'],
+      });
+      const recipientIds = lateMarkRecipients(
+        data.employee_id,
+        hrEmployees.map((hr) => hr.id),
+      );
       await notificationRepo.save(
-        notificationRepo.create({
-          employee_id: data.employee_id,
-          title: 'Marked Late',
-          message: `You were marked late for ${data.date}.${data.note ? ` Note: ${data.note.trim()}` : ''}`,
-          type: 'LATE_MARKED',
-          data: { lateMarkId: lateMark.id },
-        }),
+        recipientIds.map((employeeId) =>
+          notificationRepo.create({
+            employee_id: employeeId,
+            title: 'Marked Late',
+            message:
+              employeeId === data.employee_id
+                ? `You were marked late for ${data.date}.${data.note ? ` Note: ${data.note.trim()}` : ''}`
+                : `${employee.first_name || 'An employee'} was marked late for ${data.date}.`,
+            type: 'LATE_MARKED',
+            data:
+              employeeId === data.employee_id
+                ? { lateMarkId: lateMark.id }
+                : { lateMarkId: lateMark.id, employeeId: data.employee_id },
+          }),
+        ),
       );
     } catch (err) {
       logger.error('Failed to notify employee of late mark:', err);

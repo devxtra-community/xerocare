@@ -19,6 +19,11 @@ import { EmployeeTarget } from '../entities/employeeTargetEntity';
 import { resolveBillingCycle } from '../utils/billingPeriod';
 import { TargetService, getPreviousMonthStr } from './targetService';
 import {
+  managerSummaryRecipients,
+  personalNotificationRecipients,
+  uniqueNotificationRecipients,
+} from './notificationRecipientPolicy';
+import {
   TARGET_ACHIEVEMENT_FINALIZED,
   MANAGER_TARGET_SUMMARY,
 } from '../constants/notificationTypes';
@@ -67,13 +72,13 @@ export async function expireContractsJob() {
       // 2. In-app notification — every Manager AND every Finance user at the branch.
       // Finance is who actually acts on renewal (see the Ongoing Contracts page), so
       // this can't be Manager-only the way it used to be.
-      const recipients30 = [
-        ...(await getBranchStaffByRole(contract.branchId, 'MANAGER')),
-        ...(await getBranchStaffByRole(contract.branchId, 'FINANCE')),
-      ];
+      const recipients30 = uniqueNotificationRecipients(
+        (await getBranchStaffByRole(contract.branchId, 'MANAGER')).map((employee) => employee.id),
+        (await getBranchStaffByRole(contract.branchId, 'FINANCE')).map((employee) => employee.id),
+      );
       for (const recipient of recipients30) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: recipient.id,
+          recipientId: recipient,
           title: 'Contract Expiring in 30 Days',
           message: `Contract ${contract.invoiceNumber} will expire in 30 days — its final billing period. Review it on Contract Renewals.`,
           type: 'WARNING',
@@ -126,13 +131,13 @@ export async function expireContractsJob() {
       });
 
       // 2. In-app notification — every Manager AND every Finance user at the branch.
-      const recipients7 = [
-        ...(await getBranchStaffByRole(contract.branchId, 'MANAGER')),
-        ...(await getBranchStaffByRole(contract.branchId, 'FINANCE')),
-      ];
+      const recipients7 = uniqueNotificationRecipients(
+        (await getBranchStaffByRole(contract.branchId, 'MANAGER')).map((employee) => employee.id),
+        (await getBranchStaffByRole(contract.branchId, 'FINANCE')).map((employee) => employee.id),
+      );
       for (const recipient of recipients7) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: recipient.id,
+          recipientId: recipient,
           title: 'Contract Expiring in 7 Days',
           message: `Contract ${contract.invoiceNumber} will expire in 7 days — decide renewal on Contract Renewals now.`,
           type: 'CRITICAL_WARNING',
@@ -175,13 +180,13 @@ export async function expireContractsJob() {
       });
 
       // 2. In-app notification — every Manager AND every Finance user at the branch.
-      const recipientsExpired = [
-        ...(await getBranchStaffByRole(contract.branchId, 'MANAGER')),
-        ...(await getBranchStaffByRole(contract.branchId, 'FINANCE')),
-      ];
+      const recipientsExpired = uniqueNotificationRecipients(
+        (await getBranchStaffByRole(contract.branchId, 'MANAGER')).map((employee) => employee.id),
+        (await getBranchStaffByRole(contract.branchId, 'FINANCE')).map((employee) => employee.id),
+      );
       for (const recipient of recipientsExpired) {
         await NotificationPublisher.publishInAppRequest({
-          recipientId: recipient.id,
+          recipientId: recipient,
           title: 'Contract Expired',
           message: `Contract ${contract.invoiceNumber} has expired today.`,
           type: 'EXPIRY',
@@ -947,8 +952,8 @@ async function getBranchManagerId(branchId: string): Promise<string | null> {
 }
 
 /**
- * All FINANCE-role employees for a branch — cheque reminders go to Finance plus the
- * branch Manager, since Managers asked for branch-scoped cheque visibility too.
+ * FINANCE-role employees for a branch. Cheque date reminders are an operational
+ * finance action; branch visibility alone does not make the manager an action owner.
  */
 async function getBranchFinanceIds(branchId: string): Promise<string[]> {
   try {
@@ -975,12 +980,7 @@ async function getBranchFinanceIds(branchId: string): Promise<string[]> {
 }
 
 async function getBranchChequeReminderRecipientIds(branchId: string): Promise<string[]> {
-  const [financeIds, managerId] = await Promise.all([
-    getBranchFinanceIds(branchId),
-    getBranchManagerId(branchId),
-  ]);
-
-  return [...new Set([...financeIds, ...(managerId ? [managerId] : [])])];
+  return [...new Set(await getBranchFinanceIds(branchId))];
 }
 
 /**
@@ -1014,7 +1014,7 @@ export async function targetFinalizationJob() {
         branchTotals.set(target.branchId, branchSummary);
 
         await NotificationPublisher.publishInAppRequest({
-          recipientId: target.employeeId,
+          recipientIds: personalNotificationRecipients(target.employeeId),
           title: `Incentive Finalized for ${lastMonth}`,
           message: `Your final incentive for ${lastMonth} is ${target.currencyCode} ${achievement.incentiveAmount}.`,
           type: TARGET_ACHIEVEMENT_FINALIZED,
@@ -1030,7 +1030,7 @@ export async function targetFinalizationJob() {
       const managerId = await getBranchManagerId(branchId);
       if (!managerId) continue;
       await NotificationPublisher.publishInAppRequest({
-        recipientId: managerId,
+        recipientIds: managerSummaryRecipients(managerId),
         title: `Target Results for ${lastMonth}`,
         message: `${summary.count} employee(s) finalized for ${lastMonth}. Total incentives: ${summary.currencyCode} ${summary.totalIncentive.toFixed(2)}.`,
         type: MANAGER_TARGET_SUMMARY,

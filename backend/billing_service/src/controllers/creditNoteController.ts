@@ -537,53 +537,24 @@ export class CreditNoteController {
         }
       }
 
-      // Notify the employee who created this credit note. A DIRECT_REFUND's credit note
-      // is COMPLETED here, but the money is NOT paid — the refund it raised still has to
-      // clear the Accounts approval gate and then actually be paid out, so the message
-      // must not imply the customer has their money. REPLACEMENT/CREDIT_EXCHANGE is only
-      // APPROVED and needs the employee to call complete() next.
       const isDirectRefund = creditNote.type === 'DIRECT_REFUND';
       try {
+        const { getBranchManager } = await import('../services/billingHelpers');
+        const managerId = await getBranchManager(creditNote.branchId);
         await NotificationPublisher.publishInAppRequest({
-          recipientId: creditNote.sellerEmployeeId,
+          recipientIds: [creditNote.sellerEmployeeId, managerId],
           title: isDirectRefund
             ? 'Credit Note Approved — Refund Pending Payout'
             : 'Credit Note Approved',
           message: isDirectRefund
-            ? `Your credit note ${creditNote.creditNoteNo} was approved. The refund is now with Accounts for payment approval — the customer has not been paid yet.`
-            : `Your credit note ${creditNote.creditNoteNo} was approved by Finance — it's ready for you to complete the ${creditNote.type === 'REPLACEMENT' ? 'replacement' : 'exchange'}.`,
+            ? `Credit note ${creditNote.creditNoteNo} was approved. The refund is now with Accounts for payment approval — the customer has not been paid yet.`
+            : `Credit note ${creditNote.creditNoteNo} was approved by Finance and is ready for the ${creditNote.type === 'REPLACEMENT' ? 'replacement' : 'exchange'} to be completed.`,
           type: 'CREDIT_NOTE_APPROVED',
           referenceId: creditNote.id,
           referenceType: 'CREDIT_NOTE',
         });
       } catch (err) {
-        logger.error('Failed to notify employee about credit note approval', err);
-      }
-      // Notify the branch Manager and Admins — a completed refund changes the
-      // originating invoice's status (see Part 3 of the notifications rollout).
-      try {
-        const { getBranchManager } = await import('../services/billingHelpers');
-        const managerId = await getBranchManager(creditNote.branchId);
-        if (managerId) {
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: managerId,
-            title: 'Credit Note Approved',
-            message: `Credit note ${creditNote.creditNoteNo} (${creditNote.itemCategory}) was approved.`,
-            type: 'CREDIT_NOTE_APPROVED',
-            referenceId: creditNote.id,
-            referenceType: 'CREDIT_NOTE',
-          });
-        }
-        await NotificationPublisher.publishInAppRequest({
-          notifyAdmins: true,
-          title: 'Credit Note Approved',
-          message: `Credit note ${creditNote.creditNoteNo} (branch ${creditNote.branchId}) was approved.`,
-          type: 'CREDIT_NOTE_APPROVED',
-          referenceId: creditNote.id,
-          referenceType: 'CREDIT_NOTE',
-        });
-      } catch (err) {
-        logger.error('Failed to notify manager/admins about credit note approval', err);
+        logger.error('Failed to notify credit note recipients about approval', err);
       }
 
       return res.status(200).json({
@@ -623,40 +594,18 @@ export class CreditNoteController {
       await this.repository.save(creditNote);
 
       try {
-        await NotificationPublisher.publishInAppRequest({
-          recipientId: creditNote.sellerEmployeeId,
-          title: 'Credit Note Rejected',
-          message: `Your credit note ${creditNote.creditNoteNo} was rejected by Finance. Reason: ${rejectionReason}.`,
-          type: 'CREDIT_NOTE_REJECTED',
-          referenceId: creditNote.id,
-          referenceType: 'CREDIT_NOTE',
-        });
-      } catch (err) {
-        logger.error('Failed to notify employee about credit note rejection', err);
-      }
-      try {
         const { getBranchManager } = await import('../services/billingHelpers');
         const managerId = await getBranchManager(creditNote.branchId);
-        if (managerId) {
-          await NotificationPublisher.publishInAppRequest({
-            recipientId: managerId,
-            title: 'Credit Note Rejected',
-            message: `Credit note ${creditNote.creditNoteNo} (${creditNote.itemCategory}) was rejected. Reason: ${rejectionReason}.`,
-            type: 'CREDIT_NOTE_REJECTED',
-            referenceId: creditNote.id,
-            referenceType: 'CREDIT_NOTE',
-          });
-        }
         await NotificationPublisher.publishInAppRequest({
-          notifyAdmins: true,
+          recipientIds: [creditNote.sellerEmployeeId, managerId],
           title: 'Credit Note Rejected',
-          message: `Credit note ${creditNote.creditNoteNo} (branch ${creditNote.branchId}) was rejected. Reason: ${rejectionReason}.`,
+          message: `Credit note ${creditNote.creditNoteNo} was rejected by Finance. Reason: ${rejectionReason}.`,
           type: 'CREDIT_NOTE_REJECTED',
           referenceId: creditNote.id,
           referenceType: 'CREDIT_NOTE',
         });
       } catch (err) {
-        logger.error('Failed to notify manager/admins about credit note rejection', err);
+        logger.error('Failed to notify credit note recipients about rejection', err);
       }
 
       return res.status(200).json({

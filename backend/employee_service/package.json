@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node --test test/passwordResetPolicy.test.cjs"
+    "test": "npm run build && node --test test/passwordResetPolicy.test.cjs test/notificationRecipientPolicy.test.cjs"
   },
   "keywords": [],
   "author": "",

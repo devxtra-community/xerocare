@@ -1,5 +1,6 @@
 import { getRabbitChannel } from '../../config/rabbitmq';
 import { logger } from '../../config/logger';
+import { uniqueNotificationRecipientIds } from '../../helpers/notificationRecipientPolicy';
 
 const EXCHANGE = 'domain_events';
 const ROUTING_KEY = 'notification.in_app.request';
@@ -9,6 +10,7 @@ export class NotificationPublisher {
     // Optional — omit (with notifyAdmins: true) for an admin-only broadcast
     // with no specific individual recipient.
     recipientId?: string;
+    recipientIds?: Array<string | null | undefined>;
     // Cross-branch/company-wide broadcast to every Admin — resolved on the
     // employee_service consumer side (Admin records live in that service's
     // own DB, not here), so this is the only way ven_inv_service can reach
@@ -26,6 +28,7 @@ export class NotificationPublisher {
       | 'SERVICE_TICKET'
       | 'SERVICE_CONTRACT'
       | 'STOCK_TRANSFER'
+      | 'LOT'
       | 'CUSTOM_PART_REQUEST';
   }) {
     try {
@@ -33,7 +36,7 @@ export class NotificationPublisher {
       await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
       const rabbitPayload = {
-        recipients: payload.recipientId ? [payload.recipientId] : [],
+        recipients: uniqueNotificationRecipientIds(payload.recipientId, payload.recipientIds),
         notifyAdmins: payload.notifyAdmins ?? false,
         title: payload.title,
         message: payload.message,
@@ -48,7 +51,7 @@ export class NotificationPublisher {
         persistent: true,
       });
       logger.info(
-        `[NotificationPublisher] Published in-app notification to ${payload.recipientId ?? '(none)'}${payload.notifyAdmins ? ' + all admins' : ''}`,
+        `[NotificationPublisher] Published in-app notification to ${payload.recipientIds?.length ?? (payload.recipientId ? 1 : 0)} recipient(s)${payload.notifyAdmins ? ' + all admins' : ''}`,
       );
     } catch (err) {
       logger.error('[NotificationPublisher] Failed to publish notification request:', err);

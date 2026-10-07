@@ -200,16 +200,8 @@ export class ServiceController {
     return `SCB-${yearMonth}-${nextNum}`;
   }
 
-  /**
-   * Notifies the branch manager AND every Admin (cross-branch visibility) of a
-   * service ticket event. Previously named getBranchManagerAndAdmins and only
-   * ever notified the branch manager — "AndAdmins" was aspirational, not real,
-   * since Admin records live in employee_service's own DB and ven_inv_service
-   * has no local way to resolve them. Admins are now reached via the
-   * notifyAdmins broadcast flag, resolved on the employee_service consumer
-   * side where Admin records actually live.
-   */
-  private async notifyBranchManagerAndAdmins(
+  /** Sends branch-scoped service/business visibility to that branch's manager. */
+  private async notifyBranchManager(
     branchId: string,
     notification: {
       title: string;
@@ -238,11 +230,6 @@ export class ServiceController {
       }
     } catch (err) {
       logger.error('Failed to notify branch manager:', err);
-    }
-    try {
-      await NotificationPublisher.publishInAppRequest({ notifyAdmins: true, ...notification });
-    } catch (err) {
-      logger.error('Failed to notify admins:', err);
     }
   }
 
@@ -597,7 +584,7 @@ export class ServiceController {
         referenceType: 'SERVICE',
       });
     }
-    await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+    await this.notifyBranchManager(ticket.branchId, {
       title: 'Customer Rejected Estimate',
       message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
       type: 'WARNING',
@@ -1319,13 +1306,22 @@ export class ServiceController {
         req.user.userId,
       );
 
-      await this.notifyBranchManagerAndAdmins(branchId, {
-        title: 'New Service Ticket Created',
-        message: `Ticket ${ticket.ticketNumber} has been created for serial ${ticket.serialNumber}.`,
-        type: 'INFO',
-        referenceId: ticket.id,
-        referenceType: 'SERVICE',
-      });
+      try {
+        const [branch, helpDeskIds] = await Promise.all([
+          Source.getRepository(Branch).findOne({ where: { id: branchId } }),
+          getHelpDeskEmployeesByBranch(branchId),
+        ]);
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: [branch?.manager_id, ticket.assignedTechnicianId, ...helpDeskIds],
+          title: 'New Service Ticket Created',
+          message: `Ticket ${ticket.ticketNumber} has been created for serial ${ticket.serialNumber}.`,
+          type: 'INFO',
+          referenceId: ticket.id,
+          referenceType: 'SERVICE',
+        });
+      } catch (err) {
+        logger.error('Failed to notify service ticket recipients:', err);
+      }
 
       // Confirmation email is best-effort — never fail ticket creation over
       // a down SMTP server or a customer with no email on file.
@@ -1502,7 +1498,7 @@ Xerocare Technical Services`;
       // them what they just did. Admin/Service Help Desk assignments still
       // notify the branch Manager, since they may not be the one who acted.
       if (req.user?.role !== 'MANAGER') {
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        await this.notifyBranchManager(ticket.branchId, {
           title: isReassignment ? 'Service Ticket Reassigned' : 'Technician Assigned to Ticket',
           message: `Ticket ${ticket.ticketNumber} has been ${isReassignment ? 'reassigned' : 'assigned'} to a technician.`,
           type: 'INFO',
@@ -1747,7 +1743,7 @@ Xerocare Technical Services`;
 
               // Check stock warnings
               if (part.quantity <= 5) {
-                await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+                await this.notifyBranchManager(ticket.branchId, {
                   title: 'Low Stock Alert (Service Diagnosis)',
                   message: `Spare part "${part.part_name}" (SKU: ${part.sku}) is low in stock (Qty: ${part.quantity}). Procurement needed for ticket ${ticket.ticketNumber}.`,
                   type: 'WARNING',
@@ -1798,7 +1794,7 @@ Xerocare Technical Services`;
       await ticketRepo.save(ticket);
 
       if (hasCustomItem) {
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        await this.notifyBranchManager(ticket.branchId, {
           title: 'Spare Part Procurement Needed',
           message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
           type: 'ACTION_REQUIRED',
@@ -2009,7 +2005,7 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
-      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+      await this.notifyBranchManager(ticket.branchId, {
         title: 'Ticket Diagnosis Completed',
         message: `Technician diagnosed ticket ${ticket.ticketNumber} and listed parts.`,
         type: 'INFO',
@@ -2119,7 +2115,7 @@ Xerocare Technical Services`;
       }
 
       if (hasCustomItem) {
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        await this.notifyBranchManager(ticket.branchId, {
           title: 'Spare Part Procurement Needed',
           message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
           type: 'ACTION_REQUIRED',
@@ -2309,7 +2305,7 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
-      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+      await this.notifyBranchManager(ticket.branchId, {
         title: 'Estimate Approved by Finance',
         message:
           Number(estimate.totalCost) <= 0
@@ -2801,7 +2797,7 @@ Xerocare Technical Services`;
             referenceType: 'SERVICE',
           });
         }
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        await this.notifyBranchManager(ticket.branchId, {
           title: 'Customer Rejected Estimate',
           message: `Customer rejected the service estimate for ticket ${ticket.ticketNumber}. Reason: ${reason}.`,
           type: 'WARNING',
@@ -2913,7 +2909,7 @@ Xerocare Technical Services`;
       }
 
       if (hasCustomItem) {
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        await this.notifyBranchManager(ticket.branchId, {
           title: 'Spare Part Procurement Needed',
           message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
           type: 'ACTION_REQUIRED',
@@ -3630,7 +3626,7 @@ Xerocare Technical Services`;
         req.user?.userId,
       );
 
-      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+      await this.notifyBranchManager(ticket.branchId, {
         title: 'Service Ticket Completed',
         message: `Ticket ${ticket.ticketNumber} has been completed by technician.`,
         type: 'INFO',
@@ -5678,7 +5674,7 @@ Xerocare Technical Services`;
           referenceType: 'SERVICE',
         });
       }
-      await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+      await this.notifyBranchManager(ticket.branchId, {
         title: 'Customer Rejected Service',
         message: `Customer rejected quotation for ticket ${ticket.ticketNumber}.`,
         type: 'WARNING',
@@ -7454,7 +7450,7 @@ For queries contact us at +974 4455 6677`;
       await ticketItemRepo.save(newTicketItems);
 
       if (reviseHasCustomItem) {
-        await this.notifyBranchManagerAndAdmins(ticket.branchId, {
+        await this.notifyBranchManager(ticket.branchId, {
           title: 'Spare Part Procurement Needed',
           message: `Ticket ${ticket.ticketNumber} used a custom (off-catalog) part — check if it needs to be procured via RFQ.`,
           type: 'ACTION_REQUIRED',

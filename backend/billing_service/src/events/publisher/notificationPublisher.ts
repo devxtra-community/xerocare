@@ -4,6 +4,7 @@ import {
   NotificationRequestEvent,
   InAppNotificationRequestEvent,
 } from '../billingEvents';
+import { uniqueNotificationRecipients } from '../../services/notificationRecipientPolicy';
 
 const EXCHANGE = 'domain_events'; // Or 'notification_events' if separated
 
@@ -37,7 +38,7 @@ export class NotificationPublisher {
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
 
     const rabbitPayload = {
-      recipients: payload.recipientId ? [payload.recipientId] : [],
+      recipients: uniqueNotificationRecipients(payload.recipientId, payload.recipientIds),
       notifyAdmins: payload.notifyAdmins ?? false,
       title: payload.title,
       message: payload.message,

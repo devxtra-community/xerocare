@@ -43,7 +43,9 @@ export interface NotificationRequestEvent {
 export interface InAppNotificationRequestEvent {
   // Optional — omit (with notifyAdmins: true) for an admin-only broadcast
   // with no specific individual recipient.
-  recipientId?: string;
+  recipientId?: string | null;
+  /** Additional recipients for one event; IDs are deduplicated before publish. */
+  recipientIds?: Array<string | null | undefined>;
   // Cross-branch/company-wide broadcast to every Admin — resolved on the
   // employee_service consumer side (Admin records live in that service's
   // own DB, not here), so this is the only way billing_service can reach

@@ -37,6 +37,7 @@ import { UsageRecordItem } from '../entities/usageRecordItemEntity';
 import { UsageService } from './usageService';
 import { NotificationService } from './notificationService';
 import { PaymentMode } from '../entities/paymentLedgerEntity';
+import { actionRequiredNotificationRecipients } from './notificationRecipientPolicy';
 import {
   emitProductAllocate,
   emitSparePartReduce,
@@ -1440,7 +1441,7 @@ export class BillingService {
             await import('./billingHelpers');
 
           const managerId = await getBranchManager(invoice.branchId);
-          if (managerId) {
+          if (managerId && managerId !== invoice.createdBy) {
             const customerName = await getCustomerName(invoice.customerId);
             const empDetails = await getEmployeeDetails(invoice.createdBy);
             const employeeName = empDetails ? empDetails.name : 'Employee';
@@ -1492,7 +1493,7 @@ export class BillingService {
             await import('./billingHelpers');
 
           const managerId = await getBranchManager(invoice.branchId);
-          if (managerId) {
+          if (managerId && managerId !== invoice.createdBy) {
             const customerName = await getCustomerName(invoice.customerId);
             const empDetails = await getEmployeeDetails(invoice.createdBy);
             const employeeName = empDetails ? empDetails.name : 'Employee';
@@ -1551,58 +1552,24 @@ export class BillingService {
     // The status and audit record are already saved, so keep the send action responsive
     // by delivering these best-effort notifications without holding up the API response.
     void (async () => {
-      // Notify Finance Staff
-      if (invoice.branchId) {
-        try {
-          const { NotificationPublisher } =
-            await import('../events/publisher/notificationPublisher');
-          const { QUOTATION_SUBMITTED } = await import('../constants/notificationTypes');
-          const { getFinanceEmployeesByBranch, getCustomerName } = await import('./billingHelpers');
-
-          const [customerName, financeIds] = await Promise.all([
-            getCustomerName(invoice.customerId),
-            getFinanceEmployeesByBranch(invoice.branchId),
-          ]);
-
-          await Promise.all(
-            financeIds.map(async (financeId) => {
-              try {
-                await NotificationPublisher.publishInAppRequest({
-                  recipientId: financeId,
-                  title: 'Quotation Submitted for Review',
-                  message: `A quotation [${invoice.invoiceNumber}] for ${customerName} has been submitted for review. Please check details and approve/reject.`,
-                  type: QUOTATION_SUBMITTED,
-                  referenceId: invoice.id,
-                  referenceType: 'QUOTATION',
-                });
-              } catch (err) {
-                logger.error(
-                  `Failed to publish quotation submit notification to finance employee ${financeId}`,
-                  err,
-                );
-              }
-            }),
-          );
-        } catch (err) {
-          logger.error('Failed to notify finance staff about quotation submission', err);
-        }
-      }
-
-      // Notify Submitting Employee
       try {
         const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
         const { QUOTATION_SUBMITTED } = await import('../constants/notificationTypes');
+        const { getFinanceEmployeesByBranch } = await import('./billingHelpers');
+        const financeIds = invoice.branchId
+          ? await getFinanceEmployeesByBranch(invoice.branchId)
+          : [];
 
         await NotificationPublisher.publishInAppRequest({
-          recipientId: userId,
-          title: 'Quotation Submitted',
-          message: `Your quotation [${invoice.invoiceNumber}] has been submitted for finance review.`,
+          recipientIds: actionRequiredNotificationRecipients(financeIds, invoice.createdBy),
+          title: 'Quotation Submitted for Review',
+          message: `Quotation [${invoice.invoiceNumber}] has been submitted for finance review.`,
           type: QUOTATION_SUBMITTED,
           referenceId: invoice.id,
           referenceType: 'QUOTATION',
         });
       } catch (err) {
-        logger.error('Failed to publish quotation submit confirmation to submitting employee', err);
+        logger.error('Failed to notify quotation submission recipients', err);
       }
     })();
 
@@ -1684,7 +1651,7 @@ export class BillingService {
         const { getBranchManager, getCustomerName } = await import('./billingHelpers');
 
         const managerId = await getBranchManager(invoice.branchId);
-        if (managerId) {
+        if (managerId && managerId !== invoice.createdBy) {
           const customerName = await getCustomerName(invoice.customerId);
 
           await NotificationPublisher.publishInAppRequest({
@@ -1699,25 +1666,6 @@ export class BillingService {
       } catch (err) {
         logger.error('Failed to notify branch manager about quotation approval', err);
       }
-    }
-
-    // Notify Admins (cross-branch visibility)
-    try {
-      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
-      const { QUOTATION_APPROVED } = await import('../constants/notificationTypes');
-      const { getCustomerName } = await import('./billingHelpers');
-
-      const customerName = await getCustomerName(invoice.customerId);
-      await NotificationPublisher.publishInAppRequest({
-        notifyAdmins: true,
-        title: 'Quotation Approved',
-        message: `A quotation [${invoice.invoiceNumber}] for ${customerName} (branch ${invoice.branchId}) has been approved by Finance.`,
-        type: QUOTATION_APPROVED,
-        referenceId: invoice.id,
-        referenceType: 'QUOTATION',
-      });
-    } catch (err) {
-      logger.error('Failed to notify admins about quotation approval', err);
     }
 
     // Callback to ven_inv_service for Service Tickets
@@ -1804,23 +1752,14 @@ export class BillingService {
         const customerName = await getCustomerName(invoice.customerId);
         const financeIds = await getFinanceEmployeesByBranch(invoice.branchId);
 
-        for (const financeId of financeIds) {
-          try {
-            await NotificationPublisher.publishInAppRequest({
-              recipientId: financeId,
-              title: 'Quotation Extension Requested',
-              message: `A validity extension has been requested for quotation [${invoice.invoiceNumber}] for customer ${customerName}.`,
-              type: QUOTATION_EXTENSION_REQUESTED,
-              referenceId: invoice.id,
-              referenceType: 'QUOTATION',
-            });
-          } catch (err) {
-            logger.error(
-              `Failed to publish quotation extension notification to finance employee ${financeId}`,
-              err,
-            );
-          }
-        }
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: actionRequiredNotificationRecipients(financeIds, invoice.createdBy),
+          title: 'Quotation Extension Requested',
+          message: `A validity extension has been requested for quotation [${invoice.invoiceNumber}] for customer ${customerName}.`,
+          type: QUOTATION_EXTENSION_REQUESTED,
+          referenceId: invoice.id,
+          referenceType: 'QUOTATION',
+        });
       } catch (err) {
         logger.error('Failed to notify finance staff about validity extension request', err);
       }
@@ -2006,7 +1945,7 @@ export class BillingService {
             const employeeName = empDetails ? empDetails.name : 'Employee';
 
             await NotificationPublisher.publishInAppRequest({
-              recipientId: managerId,
+              recipientIds: [managerId, userId, saved.createdBy],
               title: 'Quotation Converted',
               message: `A quotation [${saved.invoiceNumber}] for ${customerName} has been converted into a transaction (Proforma contract) by ${employeeName}.`,
               type: QUOTATION_CONVERTED,
@@ -2536,6 +2475,8 @@ export class BillingService {
           }
         }
 
+        const notifiedRecipientIds = new Set<string>();
+
         // Notify Creator
         if (savedInvoice.createdBy) {
           try {
@@ -2554,6 +2495,7 @@ export class BillingService {
               referenceId: savedInvoice.id,
               referenceType: 'CONTRACT',
             });
+            notifiedRecipientIds.add(savedInvoice.createdBy);
           } catch (err) {
             logger.error('Failed to notify creator on contract activation', err);
           }
@@ -2569,7 +2511,7 @@ export class BillingService {
               await import('./billingHelpers');
 
             const managerId = await getBranchManager(savedInvoice.branchId);
-            if (managerId) {
+            if (managerId && !notifiedRecipientIds.has(managerId)) {
               const customerName = await getCustomerName(savedInvoice.customerId);
               const empDetails = await getEmployeeDetails(userId);
               const employeeName = empDetails ? empDetails.name : 'Employee';
@@ -2582,6 +2524,7 @@ export class BillingService {
                 referenceId: savedInvoice.id,
                 referenceType: 'CONTRACT',
               });
+              notifiedRecipientIds.add(managerId);
             }
           } catch (err) {
             logger.error('Failed to notify branch manager on contract activation', err);
@@ -2601,6 +2544,7 @@ export class BillingService {
             const financeIds = await getFinanceEmployeesByBranch(savedInvoice.branchId);
 
             for (const financeId of financeIds) {
+              if (notifiedRecipientIds.has(financeId)) continue;
               try {
                 await NotificationPublisher.publishInAppRequest({
                   recipientId: financeId,
@@ -2610,6 +2554,7 @@ export class BillingService {
                   referenceId: savedInvoice.id,
                   referenceType: 'CONTRACT',
                 });
+                notifiedRecipientIds.add(financeId);
               } catch (err) {
                 logger.error(
                   `Failed to publish contract activation notification to finance employee ${financeId}`,
@@ -2620,27 +2565,6 @@ export class BillingService {
           } catch (err) {
             logger.error('Failed to notify finance staff about contract activation', err);
           }
-        }
-
-        // Notify Admins (cross-branch visibility)
-        try {
-          const { NotificationPublisher } =
-            await import('../events/publisher/notificationPublisher');
-          const { CONTRACT_ACTIVATED } = await import('../constants/notificationTypes');
-          const { getCustomerName } = await import('./billingHelpers');
-
-          const customerName = await getCustomerName(savedInvoice.customerId);
-
-          await NotificationPublisher.publishInAppRequest({
-            notifyAdmins: true,
-            title: 'Contract Activated',
-            message: `The contract for customer ${customerName} (branch ${savedInvoice.branchId}) is now active.`,
-            type: CONTRACT_ACTIVATED,
-            referenceId: savedInvoice.id,
-            referenceType: 'CONTRACT',
-          });
-        } catch (err) {
-          logger.error('Failed to notify admins about contract activation', err);
         }
       })().catch((err: unknown) => logger.error('Post-activation notifications failed', err));
 
@@ -2793,7 +2717,7 @@ export class BillingService {
         const { getBranchManager, getCustomerName } = await import('./billingHelpers');
 
         const managerId = await getBranchManager(invoice.branchId);
-        if (managerId) {
+        if (managerId && managerId !== invoice.createdBy) {
           const customerName = await getCustomerName(invoice.customerId);
 
           await NotificationPublisher.publishInAppRequest({
@@ -2808,25 +2732,6 @@ export class BillingService {
       } catch (err) {
         logger.error('Failed to notify branch manager about quotation rejection', err);
       }
-    }
-
-    // Notify Admins (cross-branch visibility)
-    try {
-      const { NotificationPublisher } = await import('../events/publisher/notificationPublisher');
-      const { QUOTATION_REJECTED } = await import('../constants/notificationTypes');
-      const { getCustomerName } = await import('./billingHelpers');
-
-      const customerName = await getCustomerName(invoice.customerId);
-      await NotificationPublisher.publishInAppRequest({
-        notifyAdmins: true,
-        title: 'Quotation Rejected',
-        message: `A quotation [${invoice.invoiceNumber}] for ${customerName} (branch ${invoice.branchId}) has been rejected by Finance. Reason: ${reason}.`,
-        type: QUOTATION_REJECTED,
-        referenceId: invoice.id,
-        referenceType: 'QUOTATION',
-      });
-    } catch (err) {
-      logger.error('Failed to notify admins about quotation rejection', err);
     }
 
     // Release any product allocations back to AVAILABLE
@@ -4215,7 +4120,7 @@ export class BillingService {
           const managerId = await getBranchManager(payload.branchId);
           if (managerId) {
             await NotificationPublisher.publishInAppRequest({
-              recipientId: managerId,
+              recipientIds: [managerId, savedInvoice.createdBy],
               title: 'Direct Sale Created — Payment Pending',
               message: `Direct sale [${savedInvoice.invoiceNumber}] was created with outstanding payment. Total: QAR ${savedInvoice.totalAmount}.`,
               type: DIRECT_SALE_UNPAID,
@@ -5325,23 +5230,14 @@ export class BillingService {
         const customerName = await getCustomerName(saved.customerId);
         const financeIds = await getFinanceEmployeesByBranch(saved.branchId);
 
-        for (const financeId of financeIds) {
-          try {
-            await NotificationPublisher.publishInAppRequest({
-              recipientId: financeId,
-              title: 'Estimate Revision Submitted',
-              message: `A revised service estimate for customer ${customerName} (ticket ${invoice.serviceTicketId}) has been submitted for review.`,
-              type: SERVICE_ESTIMATE_REVISED,
-              referenceId: saved.id,
-              referenceType: 'QUOTATION',
-            });
-          } catch (err) {
-            logger.error(
-              `Failed to publish service estimate revised notification to finance employee ${financeId}`,
-              err,
-            );
-          }
-        }
+        await NotificationPublisher.publishInAppRequest({
+          recipientIds: actionRequiredNotificationRecipients(financeIds, saved.createdBy),
+          title: 'Estimate Revision Submitted',
+          message: `A revised service estimate for customer ${customerName} (ticket ${invoice.serviceTicketId}) has been submitted for finance review.`,
+          type: SERVICE_ESTIMATE_REVISED,
+          referenceId: saved.id,
+          referenceType: 'QUOTATION',
+        });
       } catch (err) {
         logger.error('Failed to notify finance staff about estimate revision', err);
       }
@@ -6046,7 +5942,7 @@ export class BillingService {
         const managerId = await getBranchManager(invoice.branchId);
         if (managerId) {
           await NotificationPublisher.publishInAppRequest({
-            recipientId: managerId,
+            recipientIds: [managerId, invoice.createdBy],
             title: 'Payment Recorded',
             message: `A payment of QAR ${transaction.amount} was recorded via ${transaction.paymentMode} on invoice [${invoice.invoiceNumber}].`,
             type: PAYMENT_RECORDED,

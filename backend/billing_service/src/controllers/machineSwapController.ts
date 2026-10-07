@@ -165,7 +165,7 @@ export const initiateMachineSwap = async (req: Request, res: Response, next: Nex
 
     const saved = await swapRepo.save(swapRequest);
 
-    // Notify manager + admins
+    // Notify the requester and the manager responsible for this branch.
     const [managerId] = await Promise.all([fetchManagerId(branchId)]);
     const notifPayload = {
       title: 'Machine Swap Request',
@@ -175,12 +175,10 @@ export const initiateMachineSwap = async (req: Request, res: Response, next: Nex
       referenceType: 'MACHINE_SWAP' as const,
     };
 
-    await Promise.allSettled([
-      managerId
-        ? NotificationPublisher.publishInAppRequest({ recipientId: managerId, ...notifPayload })
-        : Promise.resolve(),
-      NotificationPublisher.publishInAppRequest({ notifyAdmins: true, ...notifPayload }),
-    ]);
+    await NotificationPublisher.publishInAppRequest({
+      recipientIds: [userId, managerId],
+      ...notifPayload,
+    });
 
     res
       .status(201)
