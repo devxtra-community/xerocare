@@ -1304,18 +1304,26 @@ function HistoryDrawer({
 
   const { data, isLoading } = useQuery({
     queryKey: ['cb-txns', account.id, fromDate, toDate, typeFilter, page],
-    queryFn: () =>
-      getCashBankTransactions(account.id, {
+    queryFn: async () => {
+      const filters = {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         entryType: typeFilter === 'ALL' ? undefined : typeFilter,
-        page,
         limit: 50,
-      }),
+      };
+      // The API keeps chronological ordering to calculate accurate running
+      // balances. Fetch its first page for the total page count, then map the
+      // drawer's newest-first page number onto the corresponding API page.
+      const firstPage = await getCashBankTransactions(account.id, { ...filters, page: 1 });
+      const apiPage = Math.max(1, firstPage.pages - page + 1);
+      return apiPage === 1
+        ? firstPage
+        : getCashBankTransactions(account.id, { ...filters, page: apiPage });
+    },
     staleTime: 30_000,
   });
 
-  const entries: CashBankTransactionEntry[] = data?.entries ?? [];
+  const entries: CashBankTransactionEntry[] = [...(data?.entries ?? [])].reverse();
 
   const generateStatement = async () => {
     setGeneratingStatement(true);
@@ -1459,7 +1467,7 @@ function HistoryDrawer({
         {data && data.pages > 1 && (
           <div className="px-6 py-3 border-t shrink-0 flex items-center justify-between text-sm text-foreground">
             <span>
-              {data.total} entries · Page {data.page} of {data.pages}
+              {data.total} entries · Page {page} of {data.pages} · newest first
             </span>
             <div className="flex gap-2">
               <Button
@@ -1468,7 +1476,7 @@ function HistoryDrawer({
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
-                Prev
+                Newer
               </Button>
               <Button
                 variant="outline"
@@ -1476,7 +1484,7 @@ function HistoryDrawer({
                 disabled={page >= data.pages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Next
+                Older
               </Button>
             </div>
           </div>

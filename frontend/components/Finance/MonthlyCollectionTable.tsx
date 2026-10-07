@@ -598,8 +598,15 @@ export default function MonthlyCollectionTable({
     },
   ];
 
-  // Client-side pagination logic
-  const paginatedAlerts = alerts.slice((page - 1) * limit, page * limit);
+  // Sort the complete filtered collection set before pagination so invoice
+  // numbers stay in natural ascending order across every page (INV-2 before INV-10).
+  const sortedAlerts = [...alerts].sort((a, b) =>
+    a.invoiceNumber.localeCompare(b.invoiceNumber, undefined, {
+      numeric: true,
+      sensitivity: 'base',
+    }),
+  );
+  const paginatedAlerts = sortedAlerts.slice((page - 1) * limit, page * limit);
 
   return (
     <>
