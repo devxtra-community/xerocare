@@ -70,7 +70,7 @@ import {
 } from '@/lib/invoice';
 import { getBrands, Brand } from '@/lib/brand';
 import { getAllModels, Model } from '@/lib/model';
-import { normalizeCopiedSlabRanges } from '@/lib/quotationCopy';
+import { normalizeCopiedRate, normalizeCopiedSlabRanges } from '@/lib/quotationCopy';
 
 import { QuotationViewDialog } from './QuotationViewDialog';
 import RentFormModal from './RentFormModal';
@@ -750,18 +750,14 @@ export default function EmployeeQuotationTable() {
           bwIncludedLimit: item.bwIncludedLimit,
           colorIncludedLimit: item.colorIncludedLimit,
           combinedIncludedLimit: item.combinedIncludedLimit,
-          bwExcessRate: item.bwExcessRate !== undefined ? String(item.bwExcessRate) : undefined,
-          colorExcessRate:
-            item.colorExcessRate !== undefined ? String(item.colorExcessRate) : undefined,
-          combinedExcessRate:
-            item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : undefined,
+          bwExcessRate: normalizeCopiedRate(item.bwExcessRate),
+          colorExcessRate: normalizeCopiedRate(item.colorExcessRate),
+          combinedExcessRate: normalizeCopiedRate(item.combinedExcessRate),
           separateA3Pricing: !!item.separateA3Pricing,
-          bwA3ExcessRate:
-            item.bwA3ExcessRate !== undefined ? String(item.bwA3ExcessRate) : undefined,
-          colorA3ExcessRate:
-            item.colorA3ExcessRate !== undefined ? String(item.colorA3ExcessRate) : undefined,
-          bwA3RateTouched: item.bwA3ExcessRate !== undefined,
-          colorA3RateTouched: item.colorA3ExcessRate !== undefined,
+          bwA3ExcessRate: normalizeCopiedRate(item.bwA3ExcessRate),
+          colorA3ExcessRate: normalizeCopiedRate(item.colorA3ExcessRate),
+          bwA3RateTouched: item.bwA3ExcessRate != null,
+          colorA3RateTouched: item.colorA3ExcessRate != null,
 
           bwSlabRanges: normalizeCopiedSlabRanges(item.bwSlabRanges),
           colorSlabRanges: normalizeCopiedSlabRanges(item.colorSlabRanges),
@@ -1723,18 +1719,14 @@ function QuotationFormModal({
           bwIncludedLimit: item.bwIncludedLimit,
           colorIncludedLimit: item.colorIncludedLimit,
           combinedIncludedLimit: item.combinedIncludedLimit,
-          bwExcessRate: item.bwExcessRate !== undefined ? String(item.bwExcessRate) : undefined,
-          colorExcessRate:
-            item.colorExcessRate !== undefined ? String(item.colorExcessRate) : undefined,
-          combinedExcessRate:
-            item.combinedExcessRate !== undefined ? String(item.combinedExcessRate) : undefined,
+          bwExcessRate: normalizeCopiedRate(item.bwExcessRate),
+          colorExcessRate: normalizeCopiedRate(item.colorExcessRate),
+          combinedExcessRate: normalizeCopiedRate(item.combinedExcessRate),
           separateA3Pricing: !!item.separateA3Pricing,
-          bwA3ExcessRate:
-            item.bwA3ExcessRate !== undefined ? String(item.bwA3ExcessRate) : undefined,
-          colorA3ExcessRate:
-            item.colorA3ExcessRate !== undefined ? String(item.colorA3ExcessRate) : undefined,
-          bwA3RateTouched: item.bwA3ExcessRate !== undefined,
-          colorA3RateTouched: item.colorA3ExcessRate !== undefined,
+          bwA3ExcessRate: normalizeCopiedRate(item.bwA3ExcessRate),
+          colorA3ExcessRate: normalizeCopiedRate(item.colorA3ExcessRate),
+          bwA3RateTouched: item.bwA3ExcessRate != null,
+          colorA3RateTouched: item.colorA3ExcessRate != null,
 
           bwSlabRanges: mappedSlabs(item.bwSlabRanges),
           colorSlabRanges: mappedSlabs(item.colorSlabRanges),
