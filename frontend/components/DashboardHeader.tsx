@@ -204,7 +204,7 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-card text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
+    <header className="sticky top-0 z-50 w-full shrink-0 border-b border-border bg-card text-foreground shadow-[0_1px_3px_rgba(15,23,42,0.05)]">
       <div
         className="flex h-14 sm:h-16 items-center justify-between px-3 sm:px-6 gap-2"
         suppressHydrationWarning
