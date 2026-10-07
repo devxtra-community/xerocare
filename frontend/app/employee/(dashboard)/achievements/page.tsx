@@ -68,7 +68,7 @@ export default function MyAchievementsPage() {
   if (!currentRow && historyRows.length === 0) {
     return (
       <div className="p-6">
-        <div className="rounded-xl border bg-card dark:bg-foreground p-8 text-center text-muted-foreground">
+        <div className="rounded-xl border border-border bg-card text-card-foreground p-8 text-center text-muted-foreground">
           <Award className="h-8 w-8 mx-auto mb-2 opacity-50" />
           No target has been assigned to you yet.
         </div>
@@ -91,7 +91,7 @@ export default function MyAchievementsPage() {
       </div>
 
       {currentRow && (
-        <div className="rounded-xl border bg-card dark:bg-foreground p-6 space-y-4">
+        <div className="rounded-xl border border-border bg-card text-card-foreground p-6 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="font-semibold text-lg">{currentRow.target.targetMonth}</h2>
             {currentRow.rank && (
@@ -121,7 +121,7 @@ export default function MyAchievementsPage() {
                 {Number(currentRow.achievement.achievementPercent).toFixed(1)}%
               </span>
             </div>
-            <div className="w-full bg-muted dark:bg-foreground rounded-full h-3 overflow-hidden">
+            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
               <div
                 className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${percent}%` }}
