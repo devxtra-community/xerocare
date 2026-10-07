@@ -11,6 +11,7 @@ import {
   User,
   Moon,
   Sun,
+  RefreshCw,
 } from 'lucide-react';
 import Image from 'next/image';
 
@@ -227,6 +228,17 @@ export default function DashboardHeader({ title = 'Dashboard' }: { title?: strin
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl border border-border bg-card text-foreground shadow-sm transition-colors hover:bg-muted"
+            onClick={() => window.location.reload()}
+            aria-label="Refresh current page"
+            title="Refresh current page"
+          >
+            <RefreshCw className="h-4 w-4" />
           </Button>
 
           {/* Notifications */}
