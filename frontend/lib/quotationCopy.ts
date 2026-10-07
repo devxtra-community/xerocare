@@ -4,6 +4,10 @@ export interface QuotationSlabRange {
   rate: number;
 }
 
+/** Keep absent nullable pricing rates absent while preserving configured values. */
+export const normalizeCopiedRate = (rate: number | null | undefined): string | undefined =>
+  rate == null ? undefined : String(rate);
+
 /** Omit empty ranges from copied quotation payloads; preserve configured slabs. */
 export const normalizeCopiedSlabRanges = (
   ranges?: QuotationSlabRange[] | null,
