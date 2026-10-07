@@ -331,7 +331,11 @@ const accountsMenuItems = [
   { title: 'Guarantee Cheques', icon: ShieldCheck, href: '/manager/accounts/guarantee-cheques' },
   { title: 'Exchange Rates', icon: ArrowLeftRight, href: '/manager/accounts/exchange-rates' },
   { title: 'Card Settlements', icon: CreditCard, href: '/manager/accounts/card-settlements' },
+  { title: 'Card Fees', icon: CreditCard, href: '/manager/accounts/card-fees' },
+  { title: 'Cheques', icon: Receipt, href: '/manager/accounts/cheques' },
   { title: 'Opening Balances', icon: FileSpreadsheet, href: '/manager/accounts/opening-balances' },
+  { title: 'Reports', icon: BarChart2, href: '/manager/accounts/reports' },
+  { title: 'Sale Payments', icon: DollarSign, href: '/manager/accounts/sale-payments' },
   { title: 'Profit & Loss', icon: TrendingUp, href: '/manager/accounts/profit-loss' },
   { title: 'Depreciation', icon: PieChart, href: '/manager/accounts/depreciation' },
 ];
