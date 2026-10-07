@@ -20,7 +20,10 @@ export function usePagination(initialLimit = 10) {
 
   /** Go to a specific page number. */
   const setPage = useCallback((page: number) => {
-    setPagination((prev) => ({ ...prev, page }));
+    setPagination((prev) => {
+      const totalPages = Math.max(1, Math.ceil(prev.total / prev.limit));
+      return { ...prev, page: Math.min(Math.max(1, page), totalPages) };
+    });
   }, []);
 
   /** Change how many items are shown on each page (e.g., show 20 instead of 10). */
@@ -30,7 +33,15 @@ export function usePagination(initialLimit = 10) {
 
   /** Update the total count of items we found in our search. */
   const setTotal = useCallback((total: number) => {
-    setPagination((prev) => ({ ...prev, total }));
+    setPagination((prev) => {
+      const nextTotal = Math.max(0, total);
+      const totalPages = Math.max(1, Math.ceil(nextTotal / prev.limit));
+      return {
+        ...prev,
+        total: nextTotal,
+        page: Math.min(Math.max(1, prev.page), totalPages),
+      };
+    });
   }, []);
 
   /** Go back to the very first page. */
